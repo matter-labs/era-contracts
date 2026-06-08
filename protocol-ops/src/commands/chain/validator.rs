@@ -1,24 +1,10 @@
-use std::path::Path;
-
+use alloy::primitives::Address;
 use anyhow::Context;
 use clap::Parser;
-use ethers::{
-    contract::BaseContract,
-    types::{Address, U256},
-};
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
-use crate::abi::ADMINFUNCTIONSABI_ABI;
-use crate::commands::output::write_output_if_requested;
-use crate::common::{
-    forge::{Forge, ForgeRunner, ForgeScriptArg},
-    logger, SharedRunArgs,
-};
-
-lazy_static! {
-    static ref ADMIN_FUNCTIONS: BaseContract = BaseContract::from(ADMINFUNCTIONSABI_ABI.clone());
-}
+use crate::common::logger;
+use crate::common::SharedRunArgs;
 
 /// Shared args for add-validator / remove-validator.
 ///
@@ -61,12 +47,15 @@ pub async fn run_remove(args: ChainValidatorArgs) -> anyhow::Result<()> {
 
 async fn run_update(args: ChainValidatorArgs, add: bool) -> anyhow::Result<()> {
     let (eco, chain_id) = args.topology.resolve()?;
-    let mut runner = ForgeRunner::new(&args.shared)?;
+    let mut runner = crate::common::forge::ForgeRunner::new(&args.shared)?;
 
-    // Sender is always the chain admin — that's the only address whose
-    // simulation authors a ChainAdmin.multicall with the intended semantics.
-    let sender = runner.prepare_chain_admin(eco.bridgehub, chain_id).await?;
-    let admin_address = sender.address;
+    let owner = runner
+        .prepare_chain_admin_owner(eco.bridgehub, chain_id)
+        .await?;
+    let admin_address =
+        crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, eco.bridgehub, chain_id)
+            .await
+            .context("resolving chain admin from L1")?;
     let validator_timelock = crate::common::l1_contracts::resolve_validator_timelock(
         &runner.rpc_url,
         eco.bridgehub,
@@ -74,49 +63,6 @@ async fn run_update(args: ChainValidatorArgs, add: bool) -> anyhow::Result<()> {
     )
     .await
     .context("resolving validator timelock from L1")?;
-
-    let script_path = Path::new("deploy-scripts/AdminFunctions.s.sol");
-    let script_full_path = runner.foundry_scripts_path.join(script_path);
-    if !script_full_path.exists() {
-        anyhow::bail!("Script not found: {}", script_full_path.display());
-    }
-
-    // ABI-encode the `updateValidator(...)` call once; pass it to forge as the
-    // `--sig` value (hex-encoded). Same mechanism as ecosystem upgrade's
-    // governance stages — lets us reuse AdminFunctions.sol's internal
-    // `Utils.adminExecute` path (which `vm.startBroadcast(adminOwner)`s a
-    // `ChainAdmin.multicall`) without needing a dedicated "prepare" Solidity
-    // function.
-    let calldata = ADMIN_FUNCTIONS
-        .encode(
-            "updateValidator",
-            (
-                admin_address,
-                args.access_control_restriction,
-                validator_timelock,
-                U256::from(chain_id),
-                args.validator_address,
-                add,
-            ),
-        )
-        .map_err(|e| anyhow::anyhow!("Failed to encode updateValidator calldata: {}", e))?;
-
-    let mut script_args = runner.forge_args.clone();
-    script_args.add_arg(ForgeScriptArg::Sig {
-        sig: ethers::utils::hex::encode(&calldata),
-    });
-    script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: runner.rpc_url.clone(),
-    });
-    script_args.add_arg(ForgeScriptArg::Ffi);
-    // `--broadcast` against the anvil fork produces no real-chain effect —
-    // it just records the tx in forge's run file so protocol-ops can extract
-    // it into the Safe bundle. Without this the Safe output would be empty.
-    script_args.add_arg(ForgeScriptArg::Broadcast);
-
-    let forge = Forge::new(&runner.foundry_scripts_path)
-        .script(script_path, script_args)
-        .with_wallet(&sender);
 
     let action = if add { "Adding" } else { "Removing" };
     logger::step(format!(
@@ -132,16 +78,25 @@ async fn run_update(args: ChainValidatorArgs, add: bool) -> anyhow::Result<()> {
     logger::info(format!("Validator address: {:#x}", args.validator_address));
     logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));
 
-    runner
-        .run(forge)
-        .with_context(|| format!("Failed to {} validator", if add { "add" } else { "remove" }))?;
-
     let command = if add {
         "chain.add-validator"
     } else {
         "chain.remove-validator"
     };
-    write_output_if_requested(
+
+    crate::common::admin_functions::update_validator(
+        &mut runner,
+        admin_address,
+        &owner,
+        args.access_control_restriction,
+        validator_timelock,
+        chain_id,
+        args.validator_address,
+        add,
+    )
+    .with_context(|| format!("Failed to {} validator", if add { "add" } else { "remove" }))?;
+
+    crate::common::output::write_output_if_requested(
         command,
         &args.shared,
         &runner,

@@ -5,8 +5,8 @@ use crate::{
     commands::ecosystem::upgrade::{UpgradeGovernanceArgs, UpgradePrepareArgs},
 };
 
-pub(crate) mod init;
-pub(crate) mod upgrade;
+pub mod init;
+pub mod upgrade;
 
 #[derive(Subcommand, Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -24,7 +24,7 @@ pub enum EcosystemCommands {
     UpgradeGovernance(UpgradeGovernanceArgs),
 }
 
-pub(crate) async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
+pub async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
     match args {
         EcosystemCommands::Init(args) => init::run(args).await,
         EcosystemCommands::UpgradePrepare(args) => upgrade::run_upgrade_prepare(args).await,

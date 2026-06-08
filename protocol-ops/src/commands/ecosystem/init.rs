@@ -1,15 +1,17 @@
+use alloy::primitives::{Address, B256};
 use clap::Parser;
-use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 
-use crate::commands::ctm::init::{ctm_init, CtmInitInput};
-use crate::commands::hub::init::{hub_init, HubInitInput};
+use crate::commands::ctm::deploy::CtmDeployInput;
+use crate::commands::ctm::init::ctm_init;
+use crate::commands::hub::deploy::DeployInput;
+use crate::commands::hub::init::hub_init;
 
-use crate::commands::output::write_output_if_requested;
+use crate::common::forge::scripts::deploy_ctm::DeployCTMOutput;
+use crate::common::forge::scripts::deploy_ecosystem::DeployL1CoreContractsOutput;
+use crate::common::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
-use crate::config::forge_interface::deploy_ctm::output::DeployCTMOutput;
-use crate::config::forge_interface::deploy_ecosystem::output::DeployL1CoreContractsOutput;
 use crate::types::VMOption;
 
 // ── CLI args ────────────────────────────────────────────────────────────────
@@ -46,10 +48,10 @@ pub struct EcosystemInitArgs {
     pub with_legacy_bridge: bool,
     /// ZK token asset ID
     #[clap(long, help_heading = "Advanced input")]
-    pub zk_token_asset_id: Option<H256>,
+    pub zk_token_asset_id: Option<B256>,
     /// CREATE2 factory salt (random by default)
     #[clap(long, help_heading = "Advanced input")]
-    pub create2_factory_salt: Option<H256>,
+    pub create2_factory_salt: Option<B256>,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
@@ -100,7 +102,7 @@ pub async fn ecosystem_init(
     // `Utils.DETERMINISTIC_CREATE2_ADDRESS` — no override needed.
 
     // Initialize Bridgehub contracts
-    let hub_input = HubInitInput {
+    let hub_input = DeployInput {
         owner: owner.address,
         era_chain_id: input.era_chain_id,
         with_legacy_bridge: input.with_legacy_bridge,
@@ -110,7 +112,7 @@ pub async fn ecosystem_init(
     let bridgehub_addr = hub_output.deployed_addresses.bridgehub.bridgehub_proxy_addr;
 
     // Initialize CTM contracts
-    let ctm_input = CtmInitInput {
+    let ctm_input = CtmDeployInput {
         bridgehub: bridgehub_addr,
         owner: owner.address,
         vm_type: input.vm_type,
@@ -138,8 +140,8 @@ pub struct EcosystemInitInput {
     pub vm_type: VMOption,
     pub with_testnet_verifier: bool,
     pub with_legacy_bridge: bool,
-    pub zk_token_asset_id: Option<H256>,
-    pub create2_factory_salt: Option<H256>,
+    pub zk_token_asset_id: Option<B256>,
+    pub create2_factory_salt: Option<B256>,
 }
 
 #[derive(Serialize)]

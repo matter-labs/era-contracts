@@ -5,20 +5,21 @@
 //! supplier, CTM deployment tracker, …) directly from L1 rather than
 //! requiring callers to pass them explicitly.
 
-use std::sync::Arc;
-
+use alloy::network::Ethereum;
+use alloy::primitives::{Address, U256};
+use alloy::providers::{ProviderBuilder, RootProvider};
 use anyhow::Context;
-use ethers::providers::{Http, Provider};
-use ethers::types::Address;
 
-use crate::abi::{BridgehubAbi, IChainTypeManagerAbi, ZkChainAbi};
+use crate::common::abi::{BridgehubAbi, IChainTypeManagerAbi, ZkChainAbi};
 
-fn provider(rpc_url: &str) -> anyhow::Result<Arc<Provider<Http>>> {
-    Ok(Arc::new(Provider::<Http>::try_from(rpc_url)?))
+type AlloyProvider = RootProvider<Ethereum>;
+
+fn provider(rpc_url: &str) -> anyhow::Result<AlloyProvider> {
+    Ok(ProviderBuilder::default().connect_http(rpc_url.parse()?))
 }
 
 fn ensure_nonzero(addr: Address, what: &str) -> anyhow::Result<Address> {
-    anyhow::ensure!(addr != Address::zero(), "{what} returned zero address");
+    anyhow::ensure!(addr != Address::ZERO, "{what} returned zero address");
     Ok(addr)
 }
 
@@ -30,7 +31,7 @@ pub async fn resolve_ctm_proxy(
 ) -> anyhow::Result<Address> {
     let bh = BridgehubAbi::new(bridgehub, provider(l1_rpc_url)?);
     let ctm = bh
-        .chain_type_manager(chain_id.into())
+        .chainTypeManager(U256::from(chain_id))
         .call()
         .await
         .context("bridgehub.chainTypeManager() call failed")?;
@@ -44,36 +45,36 @@ pub async fn resolve_ctm_proxy(
 /// 2. Otherwise, scan `ChainTypeManagerAdded(address indexed)` events on the
 ///    bridgehub and return the most recently added CTM.
 pub async fn discover_ctm_proxy(l1_rpc_url: &str, bridgehub: Address) -> anyhow::Result<Address> {
-    use ethers::providers::Middleware;
-    use ethers::types::Filter;
+    use alloy::primitives::keccak256;
+    use alloy::providers::Provider;
+    use alloy::rpc::types::Filter;
 
     let p = provider(l1_rpc_url)?;
     let bh = BridgehubAbi::new(bridgehub, p.clone());
 
     // Try via existing chain first.
     let chain_ids = bh
-        .get_all_zk_chain_chain_i_ds()
+        .getAllZKChainChainIDs()
         .call()
         .await
         .context("bridgehub.getAllZKChainChainIDs()")?;
     if let Some(first) = chain_ids.first() {
         let ctm = bh
-            .chain_type_manager(*first)
+            .chainTypeManager(*first)
             .call()
             .await
             .context("bridgehub.chainTypeManager()")?;
-        if ctm != Address::zero() {
+        if ctm != Address::ZERO {
             return Ok(ctm);
         }
     }
 
     // No chains — scan ChainTypeManagerAdded events.
     // event ChainTypeManagerAdded(address indexed chainTypeManager)
-    let topic0 =
-        ethers::types::H256::from(ethers::utils::keccak256(b"ChainTypeManagerAdded(address)"));
+    let topic0 = keccak256(b"ChainTypeManagerAdded(address)");
     let filter = Filter::new()
         .address(bridgehub)
-        .topic0(topic0)
+        .event_signature(topic0)
         .from_block(0u64);
     let logs = p
         .get_logs(&filter)
@@ -86,7 +87,7 @@ pub async fn discover_ctm_proxy(l1_rpc_url: &str, bridgehub: Address) -> anyhow:
         )
     })?;
     // The CTM address is indexed (topic1).
-    let ctm = Address::from_slice(&log.topics[1][12..32]);
+    let ctm = Address::from_slice(&log.topics()[1][12..]);
     ensure_nonzero(ctm, "ChainTypeManagerAdded event")
 }
 
@@ -94,7 +95,7 @@ pub async fn discover_ctm_proxy(l1_rpc_url: &str, bridgehub: Address) -> anyhow:
 pub async fn resolve_stm_tracker(l1_rpc_url: &str, bridgehub: Address) -> anyhow::Result<Address> {
     let bh = BridgehubAbi::new(bridgehub, provider(l1_rpc_url)?);
     let tracker = bh
-        .l_1_ctm_deployer()
+        .l1CtmDeployer()
         .call()
         .await
         .context("bridgehub.l1CtmDeployer() call failed")?;
@@ -108,40 +109,30 @@ pub async fn resolve_all_chain_ids(
 ) -> anyhow::Result<Vec<u64>> {
     let bh = BridgehubAbi::new(bridgehub, provider(l1_rpc_url)?);
     let ids = bh
-        .get_all_zk_chain_chain_i_ds()
+        .getAllZKChainChainIDs()
         .call()
         .await
         .context("bridgehub.getAllZKChainChainIDs() call failed")?;
-    Ok(ids.iter().map(|id| id.as_u64()).collect())
+    ids.iter()
+        .map(|id| u64::try_from(*id).context("chain ID overflow"))
+        .collect()
 }
 
 /// Resolve `ctm.L1_BYTECODES_SUPPLIER()` → bytecodes supplier address.
 ///
 /// This getter is on the concrete `ChainTypeManagerBase` but not in the
-/// `IChainTypeManager` interface, so we encode the calldata manually
-/// (selector `0x18f0c09b`).
+/// `IChainTypeManager` interface; we use a minimal inline sol! binding.
 pub async fn resolve_bytecodes_supplier(
     l1_rpc_url: &str,
     ctm_proxy: Address,
 ) -> anyhow::Result<Address> {
-    use ethers::providers::Middleware;
-
-    let provider = provider(l1_rpc_url)?;
-    // L1_BYTECODES_SUPPLIER() selector = 0x18f0c09b
-    let calldata = ethers::types::Bytes::from(ethers::utils::hex::decode("18f0c09b").unwrap());
-    let tx = ethers::types::TransactionRequest::new()
-        .to(ctm_proxy)
-        .data(calldata)
-        .into();
-    let result = provider
-        .call(&tx, None)
+    use crate::common::abi::IChainTypeManagerExt;
+    let ctm = IChainTypeManagerExt::new(ctm_proxy, provider(l1_rpc_url)?);
+    let addr = ctm
+        .L1_BYTECODES_SUPPLIER()
+        .call()
         .await
         .context("ctm.L1_BYTECODES_SUPPLIER() call failed")?;
-    anyhow::ensure!(
-        result.len() >= 32,
-        "ctm.L1_BYTECODES_SUPPLIER() returned invalid response"
-    );
-    let addr = Address::from_slice(&result[12..32]);
     ensure_nonzero(addr, "ctm.L1_BYTECODES_SUPPLIER()")
 }
 
@@ -156,18 +147,20 @@ pub async fn resolve_settlement_layer(
 ) -> anyhow::Result<u64> {
     let p = provider(l1_rpc_url)?;
     let bh = BridgehubAbi::new(bridgehub, p);
-    let l1_chain_id = bh
-        .l1_chain_id()
-        .call()
-        .await
-        .context("bridgehub.L1_CHAIN_ID() call failed")?
-        .as_u64();
-    let sl = bh
-        .settlement_layer(chain_id.into())
-        .call()
-        .await
-        .context("bridgehub.settlementLayer() call failed")?
-        .as_u64();
+    let l1_chain_id = u64::try_from(
+        bh.L1_CHAIN_ID()
+            .call()
+            .await
+            .context("bridgehub.L1_CHAIN_ID() call failed")?,
+    )
+    .context("L1 chain ID overflow")?;
+    let sl = u64::try_from(
+        bh.settlementLayer(U256::from(chain_id))
+            .call()
+            .await
+            .context("bridgehub.settlementLayer() call failed")?,
+    )
+    .context("settlement layer chain ID overflow")?;
     anyhow::ensure!(
         sl != 0 && sl != l1_chain_id,
         "chain {chain_id} settles on L1 (settlementLayer={sl}, L1_CHAIN_ID={l1_chain_id}) — \
@@ -263,7 +256,7 @@ pub async fn resolve_zk_chain(
 ) -> anyhow::Result<Address> {
     let bh = BridgehubAbi::new(bridgehub, provider(l1_rpc_url)?);
     let diamond = bh
-        .get_zk_chain(chain_id.into())
+        .getZKChain(U256::from(chain_id))
         .call()
         .await
         .context("bridgehub.getZKChain() call failed")?;
@@ -284,7 +277,7 @@ pub async fn resolve_validator_timelock(
     let ctm = resolve_ctm_proxy(l1_rpc_url, bridgehub, chain_id).await?;
     let ctm_ifc = IChainTypeManagerAbi::new(ctm, provider(l1_rpc_url)?);
     let vt = ctm_ifc
-        .validator_timelock_post_v29()
+        .validatorTimelockPostV29()
         .call()
         .await
         .context("ctm.validatorTimelockPostV29() call failed")?;
@@ -305,7 +298,7 @@ pub async fn resolve_chain_admin(
     let diamond = resolve_zk_chain(l1_rpc_url, bridgehub, chain_id).await?;
     let zk_chain = ZkChainAbi::new(diamond, provider(l1_rpc_url)?);
     let admin = zk_chain
-        .get_admin()
+        .getAdmin()
         .call()
         .await
         .with_context(|| format!("zkChain({:#x}).getAdmin() call failed", diamond))?;
@@ -319,7 +312,7 @@ pub async fn resolve_rollup_da_manager(
 ) -> anyhow::Result<Address> {
     let chain = ZkChainAbi::new(zk_chain, provider(l1_rpc_url)?);
     let manager = chain
-        .get_rollup_da_manager()
+        .getRollupDAManager()
         .call()
         .await
         .context("zkChain.getRollupDAManager() call failed")?;
@@ -329,7 +322,7 @@ pub async fn resolve_rollup_da_manager(
 /// Resolve `ctm.isZKsyncOS()` → bool.
 pub async fn resolve_is_zksync_os(l1_rpc_url: &str, ctm_proxy: Address) -> anyhow::Result<bool> {
     let ctm = IChainTypeManagerAbi::new(ctm_proxy, provider(l1_rpc_url)?);
-    ctm.is_z_ksync_os()
+    ctm.isZKsyncOS()
         .call()
         .await
         .context("ctm.isZKsyncOS() call failed")
@@ -344,35 +337,34 @@ pub async fn resolve_is_testnet_verifier(
     l1_rpc_url: &str,
     ctm_proxy: Address,
 ) -> anyhow::Result<bool> {
-    use ethers::providers::Middleware;
+    use crate::common::abi::ITestnetVerifier;
 
     let p = provider(l1_rpc_url)?;
     let ctm = IChainTypeManagerAbi::new(ctm_proxy, p.clone());
 
     let version = ctm
-        .protocol_version()
+        .protocolVersion()
         .call()
         .await
         .context("ctm.protocolVersion() call failed")?;
     let verifier = ctm
-        .protocol_version_verifier(version)
+        .protocolVersionVerifier(version)
         .call()
         .await
         .context("ctm.protocolVersionVerifier() call failed")?;
     ensure_nonzero(verifier, "ctm.protocolVersionVerifier()")?;
 
-    // IS_TESTNET_VERIFIER() selector = 0x272d0f1a
-    let calldata = ethers::types::Bytes::from(ethers::utils::hex::decode("272d0f1a").unwrap());
-    let tx = ethers::types::TransactionRequest::new()
-        .to(verifier)
-        .data(calldata)
-        .into();
-    match p.call(&tx, None).await {
-        Ok(result) if result.len() >= 32 => {
-            // ABI-encoded bool: last byte is 0 or 1
-            Ok(result[31] == 1)
-        }
-        // Call reverted or returned unexpected data — not a testnet verifier
-        _ => Ok(false),
+    let verifier_contract = ITestnetVerifier::new(verifier, p);
+    match verifier_contract.IS_TESTNET_VERIFIER().call().await {
+        Ok(is_testnet) => Ok(is_testnet),
+        // Older verifiers don't expose IS_TESTNET_VERIFIER — treat as production.
+        Err(_) => Ok(false),
     }
+}
+
+#[cfg(test)]
+mod tests {
+    // Verify these symbols compile and resolve — actual calls require a live RPC.
+    #[allow(unused_imports)]
+    use super::{resolve_bytecodes_supplier, resolve_is_testnet_verifier};
 }

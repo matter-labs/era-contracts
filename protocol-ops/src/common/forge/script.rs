@@ -1,19 +1,13 @@
-use std::{
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::path::{Path, PathBuf};
 
+use alloy::primitives::{Address, Bytes, B256, U256};
+use alloy::providers::Provider;
+use alloy::signers::local::PrivateKeySigner;
 use clap::{Parser, ValueEnum};
-use ethers::{
-    core::types::Bytes,
-    prelude::{LocalWallet, Middleware, Signer},
-    types::{Address, H256, U256},
-    utils::{hex, hex::ToHexExt},
-};
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
-use crate::common::ethereum::create_ethers_client;
+use crate::common::ethereum::get_provider;
 use crate::common::wallets::Wallet;
 
 /// ForgeScript is a wrapper around the forge script command.
@@ -77,7 +71,7 @@ impl ForgeScript {
 
     pub fn with_calldata(mut self, calldata: &Bytes) -> Self {
         self.args.add_arg(ForgeScriptArg::Sig {
-            sig: hex::encode(calldata),
+            sig: alloy::hex::encode(calldata.as_ref()),
         });
         self
     }
@@ -103,22 +97,23 @@ impl ForgeScript {
     }
 
     /// Adds the private key of the deployer account.
-    pub fn with_private_key(mut self, private_key: H256) -> Self {
+    pub fn with_private_key(mut self, private_key: B256) -> Self {
         self.args.add_arg(ForgeScriptArg::PrivateKey {
-            private_key: private_key.encode_hex(),
+            private_key: alloy::hex::encode(private_key),
         });
         self
     }
 
     // Do not start the script if balance is not enough
-    pub fn private_key(&self) -> anyhow::Result<Option<LocalWallet>> {
+    pub fn private_key(&self) -> anyhow::Result<Option<PrivateKeySigner>> {
         for a in &self.args.args {
             if let ForgeScriptArg::PrivateKey { private_key } = a {
-                let key = H256::from_str(private_key)
+                let key: B256 = private_key
+                    .parse()
                     .map_err(|e| anyhow::anyhow!("invalid private key hex: {e}"))?;
-                let wallet = LocalWallet::from_bytes(key.as_bytes())
+                let signer = PrivateKeySigner::from_bytes(&key)
                     .map_err(|e| anyhow::anyhow!("invalid private key: {e}"))?;
-                return Ok(Some(wallet));
+                return Ok(Some(signer));
             }
         }
         Ok(None)
@@ -134,7 +129,7 @@ impl ForgeScript {
         })
     }
 
-    pub(crate) fn sig(&self) -> Option<String> {
+    pub fn sig(&self) -> Option<String> {
         self.args.args.iter().find_map(|a| {
             if let ForgeScriptArg::Sig { sig } = a {
                 Some(sig.clone())
@@ -144,7 +139,7 @@ impl ForgeScript {
         })
     }
 
-    pub(crate) fn is_broadcast(&self) -> bool {
+    pub fn is_broadcast(&self) -> bool {
         self.args
             .args
             .iter()
@@ -159,23 +154,23 @@ impl ForgeScript {
         let Some(rpc_url) = self.rpc_url() else {
             return Ok(None);
         };
-        let Some(private_key) = self.private_key()? else {
+        let Some(signer) = self.private_key()? else {
             return Ok(None);
         };
-        let client = create_ethers_client(private_key, rpc_url, None)?;
-        let balance = client.get_balance(client.address(), None).await?;
+        let provider = get_provider(&rpc_url)?;
+        let balance = provider.get_balance(signer.address()).await?;
         Ok(Some(balance))
     }
 
-    pub(crate) fn needs_bridgehub_skip(&self) -> bool {
+    pub fn needs_bridgehub_skip(&self) -> bool {
         self.script_path == Path::new("deploy-scripts/DeployCTM.s.sol")
     }
 
-    pub(crate) fn script_name(&self) -> &Path {
+    pub fn script_name(&self) -> &Path {
         &self.script_path
     }
 
-    pub(crate) fn base_path(&self) -> &Path {
+    pub fn base_path(&self) -> &Path {
         &self.base_path
     }
 }

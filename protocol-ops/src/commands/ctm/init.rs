@@ -1,16 +1,16 @@
+use alloy::primitives::{Address, B256};
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 
 use crate::commands::ctm::accept_ownership::{accept_ownership, CtmAcceptOwnershipInput};
 use crate::commands::ctm::deploy::{deploy, CtmDeployInput};
 use crate::commands::hub::register_ctm::{register_ctm, RegisterCtmInput};
 
-use crate::commands::output::write_output_if_requested;
+use crate::common::forge::scripts::deploy_ctm::DeployCTMOutput;
+use crate::common::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
-use crate::config::forge_interface::deploy_ctm::output::DeployCTMOutput;
 use crate::types::VMOption;
 
 // ── CLI args ────────────────────────────────────────────────────────────────
@@ -51,10 +51,10 @@ pub struct CtmInitArgs {
     pub with_legacy_bridge: bool,
     /// ZK token asset ID
     #[clap(long, help_heading = "Advanced input")]
-    pub zk_token_asset_id: Option<H256>,
+    pub zk_token_asset_id: Option<B256>,
     /// CREATE2 factory salt
     #[clap(long, help_heading = "Advanced input")]
-    pub create2_factory_salt: Option<H256>,
+    pub create2_factory_salt: Option<B256>,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
         runner.prepare_sender(owner_addr).await?
     };
 
-    let ctm_input = CtmInitInput {
+    let ctm_input = CtmDeployInput {
         bridgehub: args.bridgehub,
         owner: owner.address,
         vm_type: args.vm_type,
@@ -122,21 +122,11 @@ pub async fn ctm_init(
     deployer: &Wallet,
     owner: &Wallet,
     admin: &Wallet,
-    input: &CtmInitInput,
+    input: &CtmDeployInput,
 ) -> anyhow::Result<DeployCTMOutput> {
     logger::step("Deploying CTM contracts...");
-    let deploy_input = CtmDeployInput {
-        bridgehub: input.bridgehub,
-        owner: input.owner,
-        vm_type: input.vm_type,
-        reuse_gov_and_admin: input.reuse_gov_and_admin,
-        with_testnet_verifier: input.with_testnet_verifier,
-        with_legacy_bridge: input.with_legacy_bridge,
-        zk_token_asset_id: input.zk_token_asset_id,
-        create2_factory_salt: input.create2_factory_salt,
-    };
     let t = std::time::Instant::now();
-    let deploy_output = deploy(runner, deployer, &deploy_input)?;
+    let deploy_output = deploy(runner, deployer, input)?;
     logger::info(format!("[timing] ctm.deploy: {:.2?}", t.elapsed()));
     let deployed = &deploy_output.deployed_addresses;
     let ctm_proxy = deployed.state_transition.state_transition_proxy_addr;
@@ -159,19 +149,4 @@ pub async fn ctm_init(
     logger::info(format!("[timing] ctm.register: {:.2?}", t.elapsed()));
 
     Ok(deploy_output)
-}
-
-// ── Internal structs ────────────────────────────────────────────────────────
-
-/// Input parameters for ctm init.
-#[derive(Debug, Clone, Serialize)]
-pub struct CtmInitInput {
-    pub bridgehub: Address,
-    pub owner: Address,
-    pub vm_type: VMOption,
-    pub reuse_gov_and_admin: bool,
-    pub with_testnet_verifier: bool,
-    pub with_legacy_bridge: bool,
-    pub zk_token_asset_id: Option<H256>,
-    pub create2_factory_salt: Option<H256>,
 }
