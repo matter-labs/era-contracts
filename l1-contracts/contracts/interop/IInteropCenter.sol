@@ -134,7 +134,7 @@ interface IInteropCenter {
         uint256 _chainId,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp,
-        BalanceChange memory _balanceChange
+        BalanceChange calldata _balanceChange
     ) external;
 
     /// @notice Sends an interop bundle.

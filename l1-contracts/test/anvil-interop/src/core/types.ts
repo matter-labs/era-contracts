@@ -124,6 +124,7 @@ export interface DeploymentState {
   l1Addresses?: CoreDeployedAddresses;
   ctmAddresses?: CTMDeployedAddresses;
   chainAddresses?: ChainAddresses[];
+  /** Token addresses used by interop tests, keyed by chain ID. Asset IDs are resolved from L2NativeTokenVault. */
   testTokens?: Record<number, string>;
   privateInteropAddresses?: Record<number, PrivateInteropAddresses>;
   /** L1 address of the custom ERC20 base token, keyed by chain ID. */

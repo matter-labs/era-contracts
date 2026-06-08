@@ -1068,11 +1068,6 @@
   },
   {
     "type": "error",
-    "name": "NotHyperchain",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "NotInitializedReentrancyGuard",
     "inputs": []
   },
@@ -1090,6 +1085,11 @@
   {
     "type": "error",
     "name": "NotSettlementLayer",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotZKChain",
     "inputs": []
   },
   {
@@ -1153,6 +1153,22 @@
     "type": "error",
     "name": "ValidateTxnNotEnoughGas",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ValueMismatch",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "actual",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",

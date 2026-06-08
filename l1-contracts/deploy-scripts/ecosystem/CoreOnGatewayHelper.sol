@@ -6,6 +6,7 @@ import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
+import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
 import {
     CoreContract,
@@ -35,7 +36,9 @@ import {
     L2_NTV_BEACON_DEPLOYER_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+    L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
+    L2_VERSION_SPECIFIC_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @title CoreOnGatewayHelper
@@ -78,25 +81,30 @@ library CoreOnGatewayHelper {
 
     // ======================== Force deployments ========================
 
-    function getCreate2DerivedForceDeploymentAddr(bool _isZKsyncOS, CoreContract _c) internal view returns (address) {
-        // FIXME: add support for additional force deployments on ZKsyncOS in scripts.
-        require(!_isZKsyncOS, "Additional force deployments are not supported for ZKsyncOS scripts");
-        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getDeployedBytecodeHash(false, _c), hex"");
-    }
-
-    /// @notice Build a force deployment entry for scripts that use additional Era force deployments.
-    function getForceDeployment(
-        bool _isZKsyncOS,
+    /// @notice Build a universal force-deployment entry for an Era CTM upgrade's
+    ///         additional core contracts.
+    /// @dev Era-only by construction: ZKsyncOS upgrades emit their additional
+    ///      force-deployments through a different path
+    ///      (`EcosystemUpgrade_v30_zksync_os_blobs`-style helpers) and do not
+    ///      use this function. Adding ZKsyncOS support here would mean
+    ///      switching `getDeployedBytecodeHash` to the proxy-upgrade
+    ///      bytecode-info shape (see `getBytecodeInfo`) — out of scope while
+    ///      the only caller that executes the result is Era-only.
+    function getEraForceDeployment(
         CoreContract _c
-    ) internal view returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
-        // FIXME: add support for additional force deployments on ZKsyncOS in scripts.
-        require(!_isZKsyncOS, "Additional force deployments are not supported for ZKsyncOS scripts");
-        forceDeployment = IL2ContractDeployer.ForceDeployment({
+    ) internal view returns (IComplexUpgrader.UniversalContractUpgradeInfo memory deployment) {
+        IL2ContractDeployer.ForceDeployment memory forceDeployment = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: getDeployedBytecodeHash(false, _c),
-            newAddress: getCreate2DerivedForceDeploymentAddr(_isZKsyncOS, _c),
+            newAddress: _resolveAddress(_c),
             callConstructor: false,
             value: 0,
             input: ""
+        });
+
+        deployment = IComplexUpgrader.UniversalContractUpgradeInfo({
+            upgradeType: IComplexUpgrader.ContractUpgradeType.EraForceDeployment,
+            deployedBytecodeInfo: abi.encode(forceDeployment),
+            newAddress: forceDeployment.newAddress
         });
     }
 
@@ -136,8 +144,8 @@ library CoreOnGatewayHelper {
         bool _isZKsyncOS
     ) private pure returns (CoreContract[] memory dependencyContracts) {
         if (_isZKsyncOS) {
-            // Reuse the canonical "other built-in" list — the same contracts
-            // `buildZKsyncOSForceDeployments` force-deploys on L2 at upgrade
+            // Reuse the canonical fixed-address core contract list - the same contract
+            // IDs `getBaseZKsyncOSForceDeployments` upgrades on L2 at upgrade
             // time. Every bytecode hash the upgrade tx's force-deploy path
             // queries must appear in the tx's `factory_deps`, otherwise the
             // server has no way to know which `EVMBytecodePublished` events
@@ -146,13 +154,13 @@ library CoreOnGatewayHelper {
             //
             // Plus `UpgradeableBeaconDeployer`, which
             // `FixedForceDeploymentsData.beaconDeployerInfo` references but
-            // which isn't part of `getOtherBuiltinCoreContracts()`.
-            CoreContract[] memory builtins = SystemContractsProcessing.getOtherBuiltinCoreContracts();
-            dependencyContracts = new CoreContract[](builtins.length + 1);
-            for (uint256 i = 0; i < builtins.length; i++) {
-                dependencyContracts[i] = builtins[i];
+            // which is not one of the fixed-address core contracts.
+            CoreContract[] memory fixedAddressCoreContracts = SystemContractsProcessing.getFixedAddressCoreContracts();
+            dependencyContracts = new CoreContract[](fixedAddressCoreContracts.length + 1);
+            for (uint256 i = 0; i < fixedAddressCoreContracts.length; i++) {
+                dependencyContracts[i] = fixedAddressCoreContracts[i];
             }
-            dependencyContracts[builtins.length] = CoreContract.UpgradeableBeaconDeployer;
+            dependencyContracts[fixedAddressCoreContracts.length] = CoreContract.UpgradeableBeaconDeployer;
             return dependencyContracts;
         }
 
@@ -211,12 +219,12 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.L2InteropRootStorage) return "L2InteropRootStorage";
         if (_c == CoreContract.GWAssetTracker) return "GWAssetTracker";
         if (_c == CoreContract.BeaconProxy) return "BeaconProxy";
-        if (_c == CoreContract.L2V29Upgrade) return "L2V29Upgrade";
         if (_c == CoreContract.L2V31Upgrade) return "L2V31Upgrade";
         if (_c == CoreContract.L2SharedBridgeLegacy) return "L2SharedBridgeLegacy";
         if (_c == CoreContract.BridgedStandardERC20) return "BridgedStandardERC20";
         if (_c == CoreContract.DiamondProxy) return "DiamondProxy";
         if (_c == CoreContract.ProxyAdmin) return "ProxyAdmin";
+        if (_c == CoreContract.TransparentUpgradeableProxy) return "TransparentUpgradeableProxy";
 
         revert UnknownCoreContract();
     }
@@ -246,6 +254,9 @@ library CoreOnGatewayHelper {
     /// @notice Resolve a CoreContract enum to its canonical L2 address.
     /// @dev Only covers contracts with well-known constant addresses.
     function _resolveAddress(CoreContract _c) internal pure returns (address) {
+        if (_c == CoreContract.L2V31Upgrade) {
+            return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
+        }
         if (_c == CoreContract.L2Bridgehub) return L2_BRIDGEHUB_ADDR;
         if (_c == CoreContract.L2AssetRouter) return L2_ASSET_ROUTER_ADDR;
         if (_c == CoreContract.L2NativeTokenVault) return L2_NATIVE_TOKEN_VAULT_ADDR;
@@ -325,6 +336,7 @@ library CoreOnGatewayHelper {
         if (_id == EraVmSystemContract.PubdataChunkPublisher) return address(0x8011);
         if (_id == EraVmSystemContract.Create2Factory) return address(0x10000);
         if (_id == EraVmSystemContract.SloadContract) return address(0x10006);
+        if (_id == EraVmSystemContract.SystemContractProxyAdmin) return L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR;
         revert UnknownEraVmSystemContract();
     }
 
@@ -360,6 +372,7 @@ library CoreOnGatewayHelper {
         if (_id == EraVmSystemContract.PubdataChunkPublisher) return "PubdataChunkPublisher";
         if (_id == EraVmSystemContract.Create2Factory) return "Create2Factory";
         if (_id == EraVmSystemContract.SloadContract) return "SloadContract";
+        if (_id == EraVmSystemContract.SystemContractProxyAdmin) return "SystemContractProxyAdmin";
         revert UnknownEraVmSystemContract();
     }
 

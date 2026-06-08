@@ -51,6 +51,10 @@ export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFf
 export const INTEROP_SEND_BUNDLE_GAS_LIMIT = 500_000;
 export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
 
+// Default TestnetERC20Token deployment parameters for interop test helpers
+export const TEST_TOKEN_DECIMALS = 18;
+export const TEST_TOKEN_MINT_AMOUNT_UNITS = "1000";
+
 export const INTEROP_BUNDLE_TUPLE_TYPE =
   "tuple(bytes1,uint256,uint256,bytes32,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes,bool))";
 export const INTEROP_BUNDLE_SENT_TOPIC = "0x593b2515b718ee761cd2a586d8613d22833a452122cfb7692ebabd538d57d3ff";

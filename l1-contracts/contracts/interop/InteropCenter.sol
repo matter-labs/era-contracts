@@ -36,7 +36,7 @@ import {
     InteropCallStarter,
     InteropCallStarterInternal
 } from "../common/Messaging.sol";
-import {MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {AssetIdMismatch, MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
 import {
@@ -54,6 +54,7 @@ import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
 import {AttributesDecoder} from "./AttributesDecoder.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
+import {ERC7930_V1_MIN_LENGTH} from "./InteropConstants.sol";
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 import {IL2CrossChainSender} from "../bridge/interfaces/IL2CrossChainSender.sol";
 import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol";
@@ -315,7 +316,7 @@ contract InteropCenter is
     /// @param _interoperableAddress The ERC-7930 address to verify.
     function _ensureEmptyChainReference(bytes calldata _interoperableAddress) internal pure {
         require(
-            _interoperableAddress.length >= 5,
+            _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH,
             InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
         );
         uint8 chainReferenceLength = uint8(_interoperableAddress[0x04]);
@@ -328,12 +329,12 @@ contract InteropCenter is
     /// @param _interoperableAddress The ERC-7930 address to verify.
     function _ensureEmptyAddress(bytes calldata _interoperableAddress) internal pure {
         require(
-            _interoperableAddress.length >= 5,
+            _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH,
             InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
         );
         uint8 chainReferenceLength = uint8(_interoperableAddress[0x04]);
         require(
-            _interoperableAddress.length >= 6 + chainReferenceLength,
+            _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH + chainReferenceLength,
             InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
         );
         uint8 addressLength = uint8(_interoperableAddress[0x05 + chainReferenceLength]);
@@ -376,6 +377,8 @@ contract InteropCenter is
 
             // Burn user value for interop calls.
             if (_totalBurnedCallsValue > 0) {
+                // TODO(EVM-1395): unify same-base-token interop funding with the L2AssetRouter/L2NTV path
+                // so InteropCenter does not need a dedicated BaseTokenHolder branch here.
                 // Send tokens to BaseTokenHolder and notify L2AssetTracker via burnAndStartBridging
                 L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: _totalBurnedCallsValue}(_destinationChainId);
             }
@@ -563,6 +566,9 @@ contract InteropCenter is
         address recipientAddress = _callStarter.to;
 
         if (_callStarter.callAttributes.indirectCall) {
+            // InteropCenter supports generic indirect calls with both source-chain msg.value and destination-side
+            // interopCallValue. Whether a particular indirect path supports non-zero interopCallValue is defined by
+            // the concrete IL2CrossChainSender implementation (e.g. the current L2AssetRouter/NTV path does not).
             // slither-disable-next-line arbitrary-send-eth
             InteropCallStarter memory actualCallStarter = IL2CrossChainSender(recipientAddress).initiateIndirectCall{
                 value: _callStarter.callAttributes.indirectCallMessageValue
@@ -612,14 +618,17 @@ contract InteropCenter is
         uint256 _chainId,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp,
-        BalanceChange memory _balanceChange
+        BalanceChange calldata _balanceChange
     ) external override onlySettlementLayerRelayedSender {
         address zkChain = L2_BRIDGEHUB.getZKChain(_chainId);
         if (zkChain == address(0)) {
             revert DestinationChainNotRegistered(_chainId);
         }
 
-        _balanceChange.baseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_chainId);
+        bytes32 baseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_chainId);
+        if (_balanceChange.baseTokenAssetId != baseTokenAssetId) {
+            revert AssetIdMismatch(baseTokenAssetId, _balanceChange.baseTokenAssetId);
+        }
         GW_ASSET_TRACKER.handleChainBalanceIncreaseOnGateway({
             _chainId: _chainId,
             _canonicalTxHash: _canonicalTxHash,
@@ -678,6 +687,7 @@ contract InteropCenter is
                 );
                 attributeUsed[2] = true;
                 bundleAttributes.executionAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
+                _validateOptionalInteroperableAddress(bundleAttributes.executionAddress);
             } else if (selector == IERC7786Attributes.unbundlerAddress.selector) {
                 require(!attributeUsed[3], AttributeAlreadySet(selector));
                 require(
@@ -687,6 +697,7 @@ contract InteropCenter is
                 );
                 attributeUsed[3] = true;
                 bundleAttributes.unbundlerAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
+                _validateOptionalInteroperableAddress(bundleAttributes.unbundlerAddress);
             } else if (selector == IERC7786Attributes.useFixedFee.selector) {
                 require(!attributeUsed[4], AttributeAlreadySet(selector));
                 require(
@@ -712,6 +723,15 @@ contract InteropCenter is
                 revert IERC7786GatewaySource.UnsupportedAttribute(selector);
             }
         }
+    }
+
+    function _validateOptionalInteroperableAddress(bytes memory _interoperableAddress) internal pure {
+        if (_interoperableAddress.length == 0) {
+            return;
+        }
+
+        // slither-disable-next-line unused-return
+        InteroperableAddress.parseEvmV1(_interoperableAddress);
     }
 
     /// @notice Checks if the attribute selector is supported by the InteropCenter.

@@ -26,7 +26,8 @@ import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Bridges assets between L1 and ZK chain, supporting both ETH and ERC20 tokens.
+/// @dev Routes asset transfers for both L1 <-> ZK chain bridging and interop between ZK chains,
+/// supporting both ETH and ERC20 tokens.
 /// @dev Designed for use with a proxy for upgradability.
 abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
@@ -79,7 +80,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     }
 
     /*//////////////////////////////////////////////////////////////
-                            INITIATE DEPOSIT Functions
+                            INITIATE BRIDGE Functions
     //////////////////////////////////////////////////////////////*/
 
     function bridgehubDepositBaseToken(
@@ -181,15 +182,12 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     }
 
     function _getTransferData(
-        bytes1 _encodingVersion,
+        bytes1 /* _encodingVersion */,
         address,
         bytes calldata _data
     ) internal virtual returns (bytes32 assetId, bytes memory transferData) {
-        if (_encodingVersion == NEW_ENCODING_VERSION) {
-            (assetId, transferData) = DataEncoding.decodeAssetRouterBridgehubDepositData(_data);
-        } else {
-            revert UnsupportedEncodingVersion();
-        }
+        // slither-disable-next-line unused-return
+        return DataEncoding.decodeAssetRouterBridgehubDepositData(_data);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -253,8 +251,8 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bool _passValue,
         address _nativeTokenVault
     ) internal returns (bytes memory bridgeMintCalldata) {
-        address l1AssetHandler = assetHandlerAddress[_assetId];
-        if (l1AssetHandler == address(0)) {
+        address assetHandler = assetHandlerAddress[_assetId];
+        if (assetHandler == address(0)) {
             // As a UX feature, whenever an asset handler is not present, we always try to register asset within native token vault.
             // The Native Token Vault is trusted to revert in an asset does not belong to it.
             //
@@ -266,11 +264,11 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
             // We do not do any additional transformations here (like setting `assetHandler` in the mapping),
             // because we expect that all those happened inside `tryRegisterTokenFromBurnData`
 
-            l1AssetHandler = _nativeTokenVault;
+            assetHandler = _nativeTokenVault;
         }
 
         uint256 msgValue = _passValue ? msg.value : 0;
-        bridgeMintCalldata = IAssetHandler(l1AssetHandler).bridgeBurn{value: msgValue}({
+        bridgeMintCalldata = IAssetHandler(assetHandler).bridgeBurn{value: msgValue}({
             _chainId: _chainId,
             _msgValue: _nextMsgValue,
             _assetId: _assetId,
@@ -283,7 +281,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _assetId The deposited asset ID.
     /// @param _bridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
-    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
+    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify bridge requests.
     /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
     function _requestToBridge(
         uint256 _chainId,

@@ -3,7 +3,12 @@ pragma solidity ^0.8.0;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
-import {InvalidProtocolVersion, Unauthorized, ZeroAddress, ZeroUpgradeTimestamp} from "../common/L1ContractErrors.sol";
+import {
+    CutDataForProtocolVersionNotAvailable,
+    Unauthorized,
+    ZeroAddress,
+    ZeroUpgradeTimestamp
+} from "../common/L1ContractErrors.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IServerNotifier} from "./IServerNotifier.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
@@ -22,7 +27,7 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
     IChainTypeManager public chainTypeManager;
 
     /// @notice Maps each chainId => protocolVersion => expected upgrade timestamp.
-    mapping(uint256 chainId => mapping(uint256 protocolVersion => uint256 upgradeTimestamp))
+    mapping(uint256 chainId => mapping(uint256 oldProtocolVersion => uint256 upgradeTimestamp))
         public protocolVersionToUpgradeTimestamp;
 
     /// @notice Modifier to ensure the caller is the administrator of the specified chain.
@@ -96,20 +101,16 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
 
     /// @notice Set the expected upgrade timestamp for a specific protocol version. Only allowed to be called by ChainAdmin.
     /// @param _chainId The chainId of the ZKsync chain for which the upgrade timestamp is being set.
-    /// @param _protocolVersion The ZKsync chain protocol version.
     /// @param _upgradeTimestamp The timestamp at which the chain node should expect the upgrade to happen.
-    function setUpgradeTimestamp(
-        uint256 _chainId,
-        uint256 _protocolVersion,
-        uint256 _upgradeTimestamp
-    ) external onlyChainAdmin(_chainId) {
+    function setUpgradeTimestamp(uint256 _chainId, uint256 _upgradeTimestamp) external onlyChainAdmin(_chainId) {
         if (_upgradeTimestamp == 0) {
             revert ZeroUpgradeTimestamp();
         }
-        if (!chainTypeManager.protocolVersionIsActive(_protocolVersion)) {
-            revert InvalidProtocolVersion();
+        uint256 _oldProtocolVersion = chainTypeManager.getProtocolVersion(_chainId);
+        if (chainTypeManager.upgradeCutHash(_oldProtocolVersion) == bytes32(0)) {
+            revert CutDataForProtocolVersionNotAvailable(_oldProtocolVersion);
         }
-        protocolVersionToUpgradeTimestamp[_chainId][_protocolVersion] = _upgradeTimestamp;
-        emit UpgradeTimestampUpdated(_chainId, _protocolVersion, _upgradeTimestamp);
+        protocolVersionToUpgradeTimestamp[_chainId][_oldProtocolVersion] = _upgradeTimestamp;
+        emit UpgradeTimestampUpdated(_chainId, _oldProtocolVersion, _upgradeTimestamp);
     }
 }

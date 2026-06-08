@@ -55,7 +55,8 @@ enum EraVmSystemContract {
     P256Verify,
     PubdataChunkPublisher,
     Create2Factory,
-    SloadContract
+    SloadContract,
+    SystemContractProxyAdmin
 }
 
 enum CoreContract {
@@ -74,12 +75,12 @@ enum CoreContract {
     L2InteropRootStorage,
     GWAssetTracker,
     BeaconProxy,
-    L2V29Upgrade,
     L2V31Upgrade,
     L2SharedBridgeLegacy,
     BridgedStandardERC20,
     DiamondProxy,
-    ProxyAdmin
+    ProxyAdmin,
+    TransparentUpgradeableProxy
 }
 
 /// @notice System contracts that have ZKsyncOS-specific implementations in l1-contracts.

@@ -11,6 +11,7 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {SystemContractProxyInitialized} from "contracts/common/L1ContractErrors.sol";
+import {RAND_ADDRESS} from "test/foundry/TestConstants.sol";
 
 contract MockImplementation {
     event Delegated(bytes4 indexed sig, address indexed arg);
@@ -152,10 +153,10 @@ contract SystemContractProxyTest is Test {
         assertEq(_readImplementation(proxy), beforeImpl, "impl should not change when non-admin calls upgradeTo");
 
         vm.expectEmit(true, true, true, true, proxy);
-        emit MockImplementation.Delegated(ITransparentUpgradeableProxy.changeAdmin.selector, address(0xDEAD));
+        emit MockImplementation.Delegated(ITransparentUpgradeableProxy.changeAdmin.selector, RAND_ADDRESS);
 
         vm.prank(user);
-        ITransparentUpgradeableProxy(payable(proxy)).changeAdmin(address(0xDEAD));
+        ITransparentUpgradeableProxy(payable(proxy)).changeAdmin(RAND_ADDRESS);
         // Should NOT have changed the admin
         assertEq(_readAdmin(proxy), proxyAdmin, "admin should not change when non-admin calls changeAdmin");
     }

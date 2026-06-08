@@ -45,9 +45,9 @@ import {L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2Contrac
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
-import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
+import {DefaultL2UpgradeStrategy} from "./DefaultL2UpgradeStrategy.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
-import {PublishFactoryDepsResult} from "./CTMUpgradeBase.sol";
+import {PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
 import {Utils} from "../../utils/Utils.sol";
 import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
@@ -56,7 +56,7 @@ import {UpgradeUtils} from "./UpgradeUtils.sol";
 // FIXME: if it is used however, it is not compatible with zksync os as it uses era bytecodes directly.
 /// @notice Script used for default CTM on gateway upgrade flow, should be run after L1 CTM upgrade
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
+contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     /**
      * @dev Storage slot with the admin of the contract.
      * This is the keccak-256 hash of "eip1967.proxy.admin" subtracted by 1, and is

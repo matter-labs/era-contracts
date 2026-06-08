@@ -182,7 +182,9 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // Pre-deploy some mock contracts to simulate existing deployments
         _etchAllDeferredContracts();
 
-        // For Era deployments, no proxy admin is needed
+        // Proxy admin setup runs for consistency, but Era still does not use
+        // proxy-admin-managed system contract upgrades.
+        vm.mockCall(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, abi.encodeWithSignature("owner()"), abi.encode(address(this)));
         vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
             false, // _isZKsyncOS

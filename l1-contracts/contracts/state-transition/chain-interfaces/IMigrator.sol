@@ -19,7 +19,8 @@ interface IMigrator is IZKChainBase {
     /// @notice Emitted when deposits are unpaused.
     event DepositsUnpaused(uint256 chainId);
 
-    /// @notice Pauses deposits before initiating migration to the Gateway.
+    /// @notice Pauses deposits before initiating migration to another settlement layer.
+    /// @dev This is required for both L1 -> Gateway and Gateway -> L1 migrations.
     function pauseDepositsBeforeInitiatingMigration() external;
 
     /// @notice Unpauses deposits, used after the chain is initialized
