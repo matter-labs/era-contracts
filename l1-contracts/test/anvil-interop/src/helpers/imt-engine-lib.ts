@@ -16,7 +16,7 @@
  * {AtomicInteropProof.indexedLeafHash}.
  */
 
-import type { providers } from "ethers";
+import type { providers, Wallet } from "ethers";
 import { BigNumber, Contract, ethers, utils } from "ethers";
 import { getAbi } from "../core/contracts";
 
@@ -171,11 +171,11 @@ export function merklePath(tree: BuiltTree, index: number): string[] {
 
 // ── Contract handles ───────────────────────────────────────────────────────────────────────
 
-export function commitmentTree(address: string, provider: providers.Provider): Contract {
+export function commitmentTree(address: string, provider: providers.Provider | Wallet): Contract {
   return new Contract(address, getAbi("L2InteropCommitmentTree"), provider);
 }
 
-export function globalRegistry(address: string, provider: providers.Provider): Contract {
+export function globalRegistry(address: string, provider: providers.Provider | Wallet): Contract {
   return new Contract(address, getAbi("GlobalInteropIMT"), provider);
 }
 

@@ -16,8 +16,10 @@
  *   }
  *
  * Commands:
- *   register-flow-id [--default] [--deadline <unix>]
- *       Interactively (or with defaults) define the two legs and persist the flow.
+ *   register-flow-id [--default] [--legs-file <path>] [--deadline <unix>]
+ *       Define the swap legs and persist the flow. With no flag the legs are entered
+ *       interactively; `--default` uses the built-in sample legs; `--legs-file <path>` reads an
+ *       array of SendSpec objects from a JSON file (non-interactive, for scripted demos).
  *   list-flows
  *   flow-info <flowId>
  *   commit-send <flowId> <legId> <privateKey> <rpcUrl>
@@ -186,7 +188,11 @@ function escrowContract(addr: string, signerOrProvider: Wallet | providers.Provi
 async function cmdRegister(state: State, statePath: string, flags: Record<string, string>): Promise<void> {
   const deadline = flags["deadline"] ? Number(flags["deadline"]) : Math.floor(Date.now() / 1000) + 3600;
   let specs: SendSpec[];
-  if (flags["default"]) {
+  if (flags["legs-file"]) {
+    // Non-interactive registration: read an array of SendSpec from a JSON file. Useful for
+    // scripted demos where the interactive prompts cannot be driven from stdin.
+    specs = JSON.parse(fs.readFileSync(flags["legs-file"], "utf8")) as SendSpec[];
+  } else if (flags["default"]) {
     specs = DEFAULT_LEGS;
   } else {
     specs = [
