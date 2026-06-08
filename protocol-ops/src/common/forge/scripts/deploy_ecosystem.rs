@@ -1,15 +1,24 @@
 use std::str::FromStr;
 
-use ethers::types::{Address, H256, U256};
+use alloy::primitives::{Address, B256, U256};
 use serde::{Deserialize, Serialize};
 
+use crate::common::forge::scripts::{Create2Addresses, ForgeScriptParams};
 use crate::common::traits::FileConfigTrait;
+
+pub const DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
+    input: "script-config/config-deploy-l1.toml",
+    output: "script-out/output-deploy-l1.toml",
+    script_path: "deploy-scripts/ecosystem/DeployL1CoreContracts.s.sol",
+};
+
+// ── Input types ──────────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct InitialDeploymentConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub create2_factory_addr: Option<Address>,
-    pub create2_factory_salt: H256,
+    pub create2_factory_salt: B256,
     pub governance_min_delay: u64,
     pub token_weth_address: Address,
     pub max_number_of_chains: u64,
@@ -22,14 +31,14 @@ impl Default for InitialDeploymentConfig {
     fn default() -> Self {
         Self {
             create2_factory_addr: None,
-            create2_factory_salt: H256::random(),
+            create2_factory_salt: B256::from(rand::random::<[u8; 32]>()),
             governance_min_delay: 0,
             max_number_of_chains: 100,
             validator_timelock_execution_delay: 0,
             token_weth_address: Address::from_str("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
                 .unwrap(),
             bridgehub_create_new_chain_salt: 0,
-            gateway_settlement_fee: U256::from(1000000000),
+            gateway_settlement_fee: U256::from(1000000000u64),
         }
     }
 }
@@ -78,7 +87,7 @@ pub struct ContractsDeployL1Config {
     pub governance_security_council_address: Address,
     pub governance_min_delay: u64,
     pub max_number_of_chains: u64,
-    pub create2_factory_salt: H256,
+    pub create2_factory_salt: B256,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub create2_factory_addr: Option<Address>,
     pub era_diamond_proxy_addr: Option<Address>,
@@ -87,4 +96,51 @@ pub struct ContractsDeployL1Config {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TokensDeployL1Config {
     pub token_weth_address: Address,
+}
+
+// ── Output types ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct DeployL1CoreContractsOutput {
+    pub contracts: Create2Addresses,
+    pub deployer_addr: Address,
+    pub era_chain_id: u32,
+    pub l1_chain_id: u32,
+    pub owner_address: Address,
+    pub deployed_addresses: DeployL1CoreContractsDeployedAddressesOutput,
+}
+
+impl FileConfigTrait for DeployL1CoreContractsOutput {}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct DeployL1CoreContractsDeployedAddressesOutput {
+    pub governance_addr: Address,
+    pub transparent_proxy_admin_addr: Address,
+    pub chain_admin: Address,
+    pub access_control_restriction_addr: Address,
+    pub bridgehub: L1BridgehubOutput,
+    pub bridges: L1BridgesOutput,
+    pub native_token_vault_addr: Address,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct L1BridgehubOutput {
+    pub bridgehub_implementation_addr: Address,
+    pub bridgehub_proxy_addr: Address,
+    pub ctm_deployment_tracker_proxy_addr: Address,
+    pub ctm_deployment_tracker_implementation_addr: Address,
+    pub message_root_proxy_addr: Address,
+    pub message_root_implementation_addr: Address,
+    pub chain_asset_handler_proxy_addr: Address,
+    pub chain_asset_handler_implementation_addr: Address,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct L1BridgesOutput {
+    pub erc20_bridge_implementation_addr: Address,
+    pub erc20_bridge_proxy_addr: Address,
+    pub shared_bridge_implementation_addr: Address,
+    pub shared_bridge_proxy_addr: Address,
+    pub l1_nullifier_implementation_addr: Address,
+    pub l1_nullifier_proxy_addr: Address,
 }

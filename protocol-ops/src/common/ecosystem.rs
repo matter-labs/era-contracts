@@ -14,9 +14,9 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+use alloy::primitives::Address;
 use anyhow::Context;
 use clap::Args;
-use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 
 /// Deserialization target for `ecosystem.yaml`.

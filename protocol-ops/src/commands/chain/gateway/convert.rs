@@ -1,12 +1,12 @@
 use std::path::Path;
 
+use alloy::primitives::Address;
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::commands::output::write_output_if_requested;
+use crate::common::output::write_output_if_requested;
 use crate::common::paths;
 use crate::common::EcosystemChainArgs;
 use crate::common::SharedRunArgs;
@@ -28,7 +28,7 @@ fn forge_env_path(rel: &str) -> String {
 /// Run deploy-filterer on an existing `runner` with `sender` already prepared
 /// (must be the chain admin owner EOA). Reusable from the fine-grained CLI
 /// entry point and the phase-level `chain gateway convert` command.
-pub(crate) async fn stage_deploy_filterer(
+pub async fn stage_deploy_filterer(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     bridgehub: Address,
@@ -75,7 +75,7 @@ pub(crate) async fn stage_deploy_filterer(
 /// Run grant-whitelist on an existing `runner`. `sender` must be the chain
 /// admin owner EOA. Auto-includes the CTM deployment tracker and governance
 /// address in the whitelist in addition to `extra_grantees`.
-pub(crate) async fn stage_grant_whitelist(
+pub async fn stage_grant_whitelist(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     bridgehub: Address,
@@ -216,7 +216,7 @@ fn dump_force_deployments(runner: &mut ForgeRunner, ctm_proxy: Address) -> anyho
 }
 
 /// Inputs for the vote-prepare stage.
-pub(crate) struct VotePrepareInputs<'a> {
+pub struct VotePrepareInputs<'a> {
     pub ctm_representative_chain_id: u64,
     pub vote_preparation_toml: &'a str,
     pub refund_recipient: Address,
@@ -226,7 +226,7 @@ pub(crate) struct VotePrepareInputs<'a> {
 /// Run vote-prepare on an existing `runner`. `sender` must be the whitelisted
 /// deployer EOA (= `refund_recipient`) — the script deploys gateway CTM
 /// contracts and pays for L1→L2 priority txs from that EOA's balance.
-pub(crate) async fn stage_vote_prepare(
+pub async fn stage_vote_prepare(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     bridgehub: Address,
@@ -377,7 +377,7 @@ struct VotePreparationOutput {
 
 /// Run governance-execute on an existing `runner`. `sender` must be the
 /// governance contract's owner EOA.
-pub(crate) async fn stage_governance_execute(
+pub async fn stage_governance_execute(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     bridgehub: Address,
@@ -441,7 +441,7 @@ pub(crate) async fn stage_governance_execute(
 
 /// Run revoke-whitelist on an existing `runner`. `sender` must be the chain
 /// admin owner EOA.
-pub(crate) async fn stage_revoke_whitelist(
+pub async fn stage_revoke_whitelist(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     bridgehub: Address,
