@@ -8,157 +8,197 @@ import {IAtomicFlowEscrow} from "./IAtomicFlowEscrow.sol";
 import {IL2InteropCommitmentTree} from "./IL2InteropCommitmentTree.sol";
 import {IL2GlobalInteropRootImporter} from "./IL2GlobalInteropRootImporter.sol";
 import {AtomicInteropProof} from "./libraries/AtomicInteropProof.sol";
-import {FlowLeg, PartState, ImtInclusionProof, ImtNonInclusionProof} from "./IAtomicInterop.sol";
+import {SendSpec, SpecState, ImtInclusionProof, ImtNonInclusionProof} from "./IAtomicInterop.sol";
+import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {
     EscrowAlreadyInitialized,
     EscrowChainsNotSorted,
+    EscrowDepositorMismatch,
     EscrowFlowIdMismatch,
-    EscrowLegNotOnThisChain,
-    EscrowLegZeroAmount,
-    EscrowLegZeroPayee,
-    EscrowLegZeroPayer,
-    EscrowLegZeroToken,
-    EscrowPartNotCommitted,
-    EscrowPartNotUnset,
-    EscrowPayerMismatch,
+    EscrowInvalidAuthorizeFromState,
+    EscrowInvalidRefundAuthorizeFromState,
     EscrowProofCountMismatch,
+    EscrowSelfDestination,
+    EscrowSendSpecMissingDest,
+    EscrowSendSpecZeroAmount,
+    EscrowSendSpecZeroOriginChain,
+    EscrowSendSpecZeroRecipient,
+    EscrowSendSpecZeroToken,
+    EscrowSpecAlreadyCommitted,
+    EscrowSpecNotExecutable,
+    EscrowSpecNotForThisChain,
+    EscrowSpecNotRevertable,
     EscrowSpecsNotSorted,
     ImporterBlockNotImported
 } from "./AtomicInteropErrors.sol";
 
+/// @dev `finalizeDeposit` is declared on `AssetRouterBase` but not on its interface. Tiny local
+/// interface so the escrow can call it without pulling in the abstract contract (mirrors L2FlowEscrow).
+interface IAssetRouterFinalizeDeposit {
+    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) external payable;
+}
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice See {IAtomicFlowEscrow}. Self-custodial demo escrow: each leg locks tokens on its own
-/// chain at commit time and releases them (to the payee on finalize, back to the payer on refund)
-/// once the flow's global outcome is *proven* — there is no L1 linker and no cross-chain message.
-///
-/// @dev The asset mechanics (lock/release of a held ERC20) are intentionally a thin demo stand-in
-/// for the bridge/NTV routing used by the L1-coordinated `dummy-interop` escrow; the focus here is
-/// the IMT-based, L1-free coordination. Swapping in AR/NTV settlement would not change the proof
-/// logic.
+/// @notice See {IAtomicFlowEscrow}. Mirrors `L2FlowEscrow`'s asset routing (burn on source / mint on
+/// destination through the L2 asset router + native token vault), but gates `authorize` /
+/// `authorizeRefund` on IMT proofs against an imported global interop-IMT root rather than an aliased
+/// L1 linker call. The settlement asset mechanics are identical to the L1-coordinated escrow, so
+/// cross-chain mints work the same way.
 contract AtomicFlowEscrow is IAtomicFlowEscrow {
     using SafeERC20 for IERC20;
 
-    /// @dev The append-only interop commitment tree for this chain. Also the "initialized" flag.
+    /// @dev The append-only indexed interop IMT for this chain. Also the "initialized" flag.
     address internal _commitmentTree;
     /// @dev The global-root importer this escrow verifies proofs against.
     address internal _importer;
+    /// @dev L2 asset router this escrow drives for burns/mints.
+    address internal _assetRouter;
+    /// @dev L2 native token vault used for source-side allowances.
+    address internal _nativeTokenVault;
 
-    /// @dev (flowId, specHash) => leg state on this chain.
-    mapping(bytes32 flowId => mapping(bytes32 specHash => PartState)) internal _state;
+    /// @dev (flowId, specHash) => state on this chain.
+    mapping(bytes32 flowId => mapping(bytes32 specHash => SpecState)) internal _state;
 
     /// @notice One-shot initializer.
-    /// @param _tree The {L2InteropCommitmentTree} this escrow appends commit leaves to.
+    /// @param _tree The {L2InteropCommitmentTree} this escrow inserts commit values into.
     /// @param _rootImporter The {L2GlobalInteropRootImporter} holding imported global roots.
-    function initialize(address _tree, address _rootImporter) external {
+    /// @param _ar The L2 asset router this escrow drives for burns/mints.
+    /// @param _ntv The L2 native token vault `_ar` routes through.
+    function initialize(address _tree, address _rootImporter, address _ar, address _ntv) external {
         if (_commitmentTree != address(0)) revert EscrowAlreadyInitialized();
         _commitmentTree = _tree;
         _importer = _rootImporter;
+        _assetRouter = _ar;
+        _nativeTokenVault = _ntv;
     }
 
     /// @inheritdoc IAtomicFlowEscrow
-    function commitPart(bytes32 _flowId, FlowLeg calldata _leg, uint256 _lowNullifierIndex) external {
-        if (_leg.chainId != block.chainid) revert EscrowLegNotOnThisChain(_leg.chainId);
-        if (_leg.amount == 0) revert EscrowLegZeroAmount();
-        if (_leg.token == address(0)) revert EscrowLegZeroToken();
-        if (_leg.payer == address(0)) revert EscrowLegZeroPayer();
-        if (_leg.payee == address(0)) revert EscrowLegZeroPayee();
-        if (msg.sender != _leg.payer) revert EscrowPayerMismatch(msg.sender, _leg.payer);
+    function commitSend(bytes32 _flowId, SendSpec calldata _spec, uint256 _lowNullifierIndex) external {
+        _validateSourceSpec(_spec);
+        if (msg.sender != _spec.depositor) revert EscrowDepositorMismatch(msg.sender, _spec.depositor);
 
-        bytes32 specHash = keccak256(abi.encode(_leg));
-        if (_state[_flowId][specHash] != PartState.Unset)
-            revert EscrowPartNotUnset(specHash, _state[_flowId][specHash]);
-        _state[_flowId][specHash] = PartState.Committed;
+        bytes32 specHash = keccak256(abi.encode(_spec));
+        if (_state[_flowId][specHash] != SpecState.Unset) revert EscrowSpecAlreadyCommitted(specHash);
+        _state[_flowId][specHash] = SpecState.Committed;
 
-        IERC20(_leg.token).safeTransferFrom(_leg.payer, address(this), _leg.amount);
+        IERC20(_spec.originToken).safeTransferFrom(_spec.depositor, address(this), _spec.amount);
 
         uint256 value = AtomicInteropProof.commitValue(_flowId, specHash);
         (uint256 index, ) = IL2InteropCommitmentTree(_commitmentTree).insert(value, _lowNullifierIndex);
 
-        emit PartCommitted(_flowId, specHash, _leg.payer, index);
+        emit FlowCommitted(_flowId, specHash, _spec.depositor, index);
     }
 
     /// @inheritdoc IAtomicFlowEscrow
-    function finalize(
+    function authorize(
         bytes32 _flowId,
-        FlowLeg[] calldata _legs,
+        SendSpec[] calldata _specs,
         uint256[] calldata _chainIds,
         uint64 _deadline,
         ImtInclusionProof[] calldata _proofs
     ) external {
-        bytes32[] memory specHashes = _computeAndCheckFlowId(_flowId, _legs, _chainIds, _deadline);
-        if (_proofs.length != _legs.length) revert EscrowProofCountMismatch(_legs.length, _proofs.length);
+        bytes32[] memory specHashes = _computeAndCheckFlowId(_flowId, _specs, _chainIds, _deadline);
+        if (_proofs.length != _specs.length) revert EscrowProofCountMismatch(_specs.length, _proofs.length);
 
-        // 1. Prove every leg of the flow was committed before the deadline.
-        uint256 n = _legs.length;
-        for (uint256 i = 0; i < n; ++i) {
-            uint256 value = AtomicInteropProof.commitValue(_flowId, specHashes[i]);
-            (bytes32 importedRoot, uint256 importedTs) = _resolveImported(_proofs[i].l1BlockNumber);
-            // solhint-disable-next-line func-named-parameters
-            AtomicInteropProof.verifyInclusion(
-                _proofs[i],
-                _legs[i].chainId,
-                value,
-                importedRoot,
-                importedTs,
-                _deadline
-            );
-        }
+        // 1. Prove every spec of the flow was committed (on its origin chain) before the deadline.
+        // solhint-disable-next-line func-named-parameters
+        _verifyInclusions(_flowId, _specs, specHashes, _deadline, _proofs);
 
-        // SB: this does not work for cross chain asset minting, please do what has been done inside `function execute` in the L2FlowEscrow.
-        // SB: In general make the flow a bit more similar to L2FlowEscrow. Make two functions: one to authorize (where just proof verification happens) 
-        // and execute.
-        // SB: this shuuld be well integrated into asset router / native token vault the same way as the L2FlowEscrow.
-        // 2. Release this chain's committed leg(s) to their payees.
+        // 2. Mark the specs relevant to this chain Executable.
+        _markExecutable(_flowId, _specs, specHashes);
+    }
+
+    /// @dev Extracted settle loop for `authorize` (non-via-IR stack relief).
+    function _markExecutable(bytes32 _flowId, SendSpec[] calldata _specs, bytes32[] memory _specHashes) internal {
+        uint256 n = _specs.length;
         for (uint256 i = 0; i < n; ++i) {
-            FlowLeg calldata leg = _legs[i];
-            if (leg.chainId != block.chainid) continue;
-            bytes32 specHash = specHashes[i];
-            if (_state[_flowId][specHash] != PartState.Committed) {
-                revert EscrowPartNotCommitted(specHash, _state[_flowId][specHash]);
+            SendSpec calldata spec = _specs[i];
+            if (spec.originChainId != block.chainid && spec.destChainId != block.chainid) continue;
+            bytes32 specHash = _specHashes[i];
+            SpecState s = _state[_flowId][specHash];
+            // Valid prior states: Unset (destination) or Committed (source).
+            if (s != SpecState.Unset && s != SpecState.Committed) {
+                revert EscrowInvalidAuthorizeFromState(specHash, s);
             }
-            _state[_flowId][specHash] = PartState.Finalized;
-            IERC20(leg.token).safeTransfer(leg.payee, leg.amount);
-            emit PartFinalized(_flowId, specHash, leg.payee, leg.amount);
+            _state[_flowId][specHash] = SpecState.Executable;
+            emit FlowAuthorized(_flowId, specHash);
         }
     }
 
     /// @inheritdoc IAtomicFlowEscrow
-    function refund(
+    function execute(bytes32 _flowId, SendSpec calldata _spec) external {
+        bytes32 specHash = keccak256(abi.encode(_spec));
+        SpecState s = _state[_flowId][specHash];
+        if (s != SpecState.Executable) revert EscrowSpecNotExecutable(specHash, s);
+        _state[_flowId][specHash] = SpecState.Executed;
+
+        bool isSource;
+        if (_spec.originChainId == block.chainid) {
+            _executeSource(_spec);
+            isSource = true;
+        } else if (_spec.destChainId == block.chainid) {
+            _executeDestination(_spec);
+            isSource = false;
+        } else {
+            revert EscrowSpecNotForThisChain(_spec.originChainId, _spec.destChainId);
+        }
+
+        emit FlowExecuted(_flowId, specHash, isSource);
+    }
+
+    /// @inheritdoc IAtomicFlowEscrow
+    function authorizeRefund(
         bytes32 _flowId,
-        FlowLeg[] calldata _legs,
+        SendSpec[] calldata _specs,
         uint256[] calldata _chainIds,
         uint64 _deadline,
-        uint256 _missingLegIndex,
+        uint256 _missingSpecIndex,
         ImtNonInclusionProof calldata _proof
     ) external {
-        bytes32[] memory specHashes = _computeAndCheckFlowId(_flowId, _legs, _chainIds, _deadline);
+        bytes32[] memory specHashes = _computeAndCheckFlowId(_flowId, _specs, _chainIds, _deadline);
 
-        // 1. Prove a leg is provably absent across the deadline boundary -> flow cannot finalize.
+        // 1. Prove a spec is provably absent across the deadline boundary -> flow cannot finalize.
         _verifyNonInclusion(
             _proof,
-            _legs[_missingLegIndex].chainId,
-            AtomicInteropProof.commitValue(_flowId, specHashes[_missingLegIndex]),
+            _specs[_missingSpecIndex].originChainId,
+            AtomicInteropProof.commitValue(_flowId, specHashes[_missingSpecIndex]),
             _deadline
         );
 
-        // 2. Return this chain's committed leg(s) to their payers.
-        uint256 n = _legs.length;
+        // 2. Mark this chain's source specs Revertable.
+        _markRevertable(_flowId, _specs, specHashes);
+    }
+
+    /// @dev Extracted settle loop for `authorizeRefund` (non-via-IR stack relief).
+    function _markRevertable(bytes32 _flowId, SendSpec[] calldata _specs, bytes32[] memory _specHashes) internal {
+        uint256 n = _specs.length;
         for (uint256 i = 0; i < n; ++i) {
-            FlowLeg calldata leg = _legs[i];
-            if (leg.chainId != block.chainid) continue;
-            bytes32 specHash = specHashes[i];
-            if (_state[_flowId][specHash] != PartState.Committed) {
-                revert EscrowPartNotCommitted(specHash, _state[_flowId][specHash]);
-            }
-            _state[_flowId][specHash] = PartState.Refunded;
-            IERC20(leg.token).safeTransfer(leg.payer, leg.amount);
-            emit PartRefunded(_flowId, specHash, leg.payer, leg.amount);
+            if (_specs[i].originChainId != block.chainid) continue;
+            bytes32 specHash = _specHashes[i];
+            SpecState s = _state[_flowId][specHash];
+            // Only Committed entries can be refunded — destinations have no lock to return.
+            if (s != SpecState.Committed) revert EscrowInvalidRefundAuthorizeFromState(specHash, s);
+            _state[_flowId][specHash] = SpecState.Revertable;
+            emit FlowRefundAuthorized(_flowId, specHash);
         }
     }
 
     /// @inheritdoc IAtomicFlowEscrow
-    function partState(bytes32 _flowId, bytes32 _specHash) external view returns (PartState) {
+    function claimRefund(bytes32 _flowId, SendSpec calldata _spec) external {
+        bytes32 specHash = keccak256(abi.encode(_spec));
+        SpecState s = _state[_flowId][specHash];
+        if (s != SpecState.Revertable) revert EscrowSpecNotRevertable(specHash, s);
+        _state[_flowId][specHash] = SpecState.Reverted;
+
+        IERC20(_spec.originToken).safeTransfer(_spec.depositor, _spec.amount);
+
+        emit FlowRefunded(_flowId, specHash, _spec.depositor);
+    }
+
+    /// @inheritdoc IAtomicFlowEscrow
+    function specState(bytes32 _flowId, bytes32 _specHash) external view returns (SpecState) {
         return _state[_flowId][_specHash];
     }
 
@@ -172,21 +212,56 @@ contract AtomicFlowEscrow is IAtomicFlowEscrow {
         return _importer;
     }
 
-    /// @dev Recomputes `flowId` from the legs/chains/deadline exactly as the off-chain coordinator
-    /// does and asserts it matches `_flowId`. Enforces strictly-ascending `specHashes` and
-    /// `_chainIds` (sorted + deduplicated), which canonicalizes the preimage.
-    /// @return specHashes The per-leg spec hashes in the provided (sorted) order.
+    /// @inheritdoc IAtomicFlowEscrow
+    function assetRouter() external view returns (address) {
+        return _assetRouter;
+    }
+
+    /// @inheritdoc IAtomicFlowEscrow
+    function nativeTokenVault() external view returns (address) {
+        return _nativeTokenVault;
+    }
+
+    /// @dev Source-side burn through AR/NTV (mirrors L2FlowEscrow._executeSource).
+    function _executeSource(SendSpec calldata _spec) internal {
+        IERC20(_spec.originToken).safeIncreaseAllowance(_nativeTokenVault, _spec.amount);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(_spec.originChainId, _spec.originToken);
+        bytes memory burnData = DataEncoding.encodeBridgeBurnData(_spec.amount, _spec.recipient, _spec.originToken);
+        bytes memory depositData = DataEncoding.encodeAssetRouterBridgehubDepositData(assetId, burnData);
+        IL2AssetRouter(_assetRouter).initiateIndirectCall({
+            _chainId: _spec.destChainId,
+            _originalCaller: address(this),
+            _value: 0,
+            _data: depositData
+        });
+    }
+
+    /// @dev Destination-side mint through AR/NTV (mirrors L2FlowEscrow._executeDestination).
+    function _executeDestination(SendSpec calldata _spec) internal {
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(_spec.originChainId, _spec.originToken);
+        bytes memory transferData = DataEncoding.encodeBridgeMintData({
+            _originalCaller: _spec.depositor,
+            _remoteReceiver: _spec.recipient,
+            _originToken: _spec.originToken,
+            _amount: _spec.amount,
+            _erc20Metadata: _spec.erc20Data
+        });
+        IAssetRouterFinalizeDeposit(_assetRouter).finalizeDeposit(_spec.originChainId, assetId, transferData);
+    }
+
+    /// @dev Recomputes `flowId` and asserts it matches, enforcing strictly-ascending `specHashes` and
+    /// `_chainIds`. Returns the per-spec hashes in the provided (sorted) order.
     function _computeAndCheckFlowId(
         bytes32 _flowId,
-        FlowLeg[] calldata _legs,
+        SendSpec[] calldata _specs,
         uint256[] calldata _chainIds,
         uint64 _deadline
     ) internal pure returns (bytes32[] memory specHashes) {
-        uint256 n = _legs.length;
+        uint256 n = _specs.length;
         specHashes = new bytes32[](n);
         bytes32 prev = bytes32(0);
         for (uint256 i = 0; i < n; ++i) {
-            bytes32 specHash = keccak256(abi.encode(_legs[i]));
+            bytes32 specHash = keccak256(abi.encode(_specs[i]));
             if (i != 0 && specHash <= prev) revert EscrowSpecsNotSorted();
             prev = specHash;
             specHashes[i] = specHash;
@@ -199,8 +274,33 @@ contract AtomicFlowEscrow is IAtomicFlowEscrow {
         if (computed != _flowId) revert EscrowFlowIdMismatch(_flowId, computed);
     }
 
-    /// @dev Resolves the before/after imported roots and runs the non-inclusion check. Extracted
-    /// from `refund` to keep that function's stack within the non-via-IR limit.
+    /// @dev Verifies every spec's inclusion proof (each against its origin chain) within the
+    /// deadline. Extracted from `authorize` to keep that function's stack within the non-via-IR limit.
+    function _verifyInclusions(
+        bytes32 _flowId,
+        SendSpec[] calldata _specs,
+        bytes32[] memory _specHashes,
+        uint64 _deadline,
+        ImtInclusionProof[] calldata _proofs
+    ) internal view {
+        uint256 n = _specs.length;
+        for (uint256 i = 0; i < n; ++i) {
+            uint256 value = AtomicInteropProof.commitValue(_flowId, _specHashes[i]);
+            (bytes32 importedRoot, uint256 importedTs) = _resolveImported(_proofs[i].l1BlockNumber);
+            // solhint-disable-next-line func-named-parameters
+            AtomicInteropProof.verifyInclusion(
+                _proofs[i],
+                _specs[i].originChainId,
+                value,
+                importedRoot,
+                importedTs,
+                _deadline
+            );
+        }
+    }
+
+    /// @dev Resolves the before/after imported roots and runs the non-inclusion check. Extracted from
+    /// `authorizeRefund` to keep that function's stack within the non-via-IR limit.
     function _verifyNonInclusion(
         ImtNonInclusionProof calldata _proof,
         uint256 _chainId,
@@ -222,12 +322,22 @@ contract AtomicFlowEscrow is IAtomicFlowEscrow {
         );
     }
 
-    /// @dev Fetches the imported global root and timestamp for an L1 block number, reverting if no
-    /// root was imported for it.
+    /// @dev Fetches the imported global root and timestamp for an L1 block number, reverting if none.
     function _resolveImported(uint256 _l1BlockNumber) internal view returns (bytes32 root, uint256 timestamp) {
         IL2GlobalInteropRootImporter imp = IL2GlobalInteropRootImporter(_importer);
         root = imp.globalRootAt(_l1BlockNumber);
         if (root == bytes32(0)) revert ImporterBlockNotImported(_l1BlockNumber);
         timestamp = imp.timestampAt(_l1BlockNumber);
+    }
+
+    /// @dev Validation applied at `commitSend`: a source-side spec describing a real outbound transfer
+    /// that originates on this chain.
+    function _validateSourceSpec(SendSpec calldata _spec) internal view {
+        if (_spec.destChainId == 0) revert EscrowSendSpecMissingDest();
+        if (_spec.destChainId == block.chainid) revert EscrowSelfDestination(_spec.destChainId);
+        if (_spec.originChainId != block.chainid) revert EscrowSendSpecZeroOriginChain();
+        if (_spec.amount == 0) revert EscrowSendSpecZeroAmount();
+        if (_spec.originToken == address(0)) revert EscrowSendSpecZeroToken();
+        if (_spec.recipient == address(0)) revert EscrowSendSpecZeroRecipient();
     }
 }

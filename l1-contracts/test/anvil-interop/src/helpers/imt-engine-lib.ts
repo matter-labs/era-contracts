@@ -28,12 +28,14 @@ export const ATOMIC_COMMIT_LEAF_TAG: string = utils
   .keccak256(utils.toUtf8Bytes("AtomicInterop.commit.v1"))
   .slice(0, 10);
 
-export interface FlowLeg {
-  chainId: BigNumber | number | string;
-  token: string;
+export interface SendSpec {
+  destChainId: BigNumber | number | string;
+  recipient: string;
+  originChainId: BigNumber | number | string;
+  originToken: string;
   amount: BigNumber | number | string;
-  payer: string;
-  payee: string;
+  erc20Data: string;
+  depositor: string;
 }
 
 /** Indexed-tree leaf. Fields are uint256, serialized as decimal strings. */
@@ -86,11 +88,21 @@ export function globalLeaf(chainId: BigNumber | number | string, chainImtRoot: s
   return utils.keccak256(utils.solidityPack(["bytes32", "uint256"], [chainImtRoot, BigNumber.from(chainId)]));
 }
 
-export function specHashOf(leg: FlowLeg): string {
+export function specHashOf(spec: SendSpec): string {
   return utils.keccak256(
     utils.defaultAbiCoder.encode(
-      ["tuple(uint256,address,uint256,address,address)"],
-      [[BigNumber.from(leg.chainId), leg.token, BigNumber.from(leg.amount), leg.payer, leg.payee]]
+      ["tuple(uint256,address,uint256,address,uint256,bytes,address)"],
+      [
+        [
+          BigNumber.from(spec.destChainId),
+          spec.recipient,
+          BigNumber.from(spec.originChainId),
+          spec.originToken,
+          BigNumber.from(spec.amount),
+          spec.erc20Data,
+          spec.depositor,
+        ],
+      ]
     )
   );
 }

@@ -4,16 +4,16 @@ pragma solidity 0.8.28;
 import {FullMerkle} from "contracts/common/libraries/FullMerkle.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {
-    FlowLeg,
+    SendSpec,
     IndexedLeaf,
     IMT_EMPTY_LEAF,
     ATOMIC_COMMIT_LEAF_TAG
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {IL2InteropCommitmentTree} from "contracts/atomic-interop/IL2InteropCommitmentTree.sol";
+import {InteropCallStarter} from "contracts/common/Messaging.sol";
 
 /// @notice A {FullMerkle}-backed tree used by tests to generate Merkle paths. {FullMerkle} and the
-/// chain IMT / global tree produce identical roots/paths for the same leaf hashes + zero value, so a
-/// path generated here verifies against the on-chain roots.
+/// chain IMT / global tree produce identical roots/paths for the same leaf hashes + zero value.
 contract FullMerkleWrapper {
     using FullMerkle for FullMerkle.FullTree;
 
@@ -46,7 +46,6 @@ contract MerkleCalldataWrapper {
 /// @notice Mirrors an on-chain {IL2InteropCommitmentTree} into a {FullMerkleWrapper} so tests can
 /// produce inclusion / non-inclusion Merkle paths and compute low-nullifier indices.
 contract IndexedImtProver {
-    /// @dev Build a FullMerkle mirror of the tree's current leaf set; returns the wrapper.
     function mirror(IL2InteropCommitmentTree _tree) public returns (FullMerkleWrapper wrapper) {
         wrapper = new FullMerkleWrapper();
         uint256 n = _tree.leafCount();
@@ -55,7 +54,6 @@ contract IndexedImtProver {
         }
     }
 
-    /// @dev Index of the low-nullifier leaf for `_value` in the tree's current state.
     function lowNullifierIndex(IL2InteropCommitmentTree _tree, uint256 _value) public view returns (uint256) {
         uint256 n = _tree.leafCount();
         for (uint256 i = 0; i < n; ++i) {
@@ -67,7 +65,6 @@ contract IndexedImtProver {
         revert("no low nullifier");
     }
 
-    /// @dev Index of the leaf whose value == `_value` (membership).
     function indexOfValue(IL2InteropCommitmentTree _tree, uint256 _value) public view returns (uint256) {
         uint256 n = _tree.leafCount();
         for (uint256 i = 0; i < n; ++i) {
@@ -76,6 +73,48 @@ contract IndexedImtProver {
             }
         }
         revert("value not present");
+    }
+}
+
+/// @notice Minimal Bridgehub stand-in: maps chainId => diamond proxy, which {GlobalInteropIMT} uses
+/// to authorize the submitter. Isolates the registry's submitter check from the full Bridgehub.
+contract MockBridgehub {
+    mapping(uint256 chainId => address zkChain) internal _zkChain;
+
+    function setZKChain(uint256 _chainId, address _addr) external {
+        _zkChain[_chainId] = _addr;
+    }
+
+    function getZKChain(uint256 _chainId) external view returns (address) {
+        return _zkChain[_chainId];
+    }
+}
+
+/// @notice Minimal asset-router stand-in that records the burn/mint calls the escrow makes, so tests
+/// can assert the escrow's orchestration without the full AR/NTV stack (the asset movement itself is
+/// the AR/NTV's concern, exercised in the heavier anvil-interop suite).
+contract MockAtomicAssetRouter {
+    uint256 public indirectCallCount;
+    uint256 public finalizeDepositCount;
+    uint256 public lastChainId;
+    bytes32 public lastAssetId;
+
+    function initiateIndirectCall(
+        uint256 _chainId,
+        address,
+        uint256,
+        bytes calldata
+    ) external payable returns (InteropCallStarter memory starter) {
+        ++indirectCallCount;
+        lastChainId = _chainId;
+        // Return a default (empty) starter; the escrow discards it.
+        return starter;
+    }
+
+    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata) external payable {
+        ++finalizeDepositCount;
+        lastChainId = _chainId;
+        lastAssetId = _assetId;
     }
 }
 
@@ -93,8 +132,8 @@ library AtomicInteropTestUtils {
         return keccak256(abi.encodePacked(_chainImtRoot, _chainId));
     }
 
-    function specHashOf(FlowLeg memory _leg) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_leg));
+    function specHashOf(SendSpec memory _spec) internal pure returns (bytes32) {
+        return keccak256(abi.encode(_spec));
     }
 
     /// @notice Computes flowId exactly as {AtomicFlowEscrow}. Both arrays must be strictly ascending.

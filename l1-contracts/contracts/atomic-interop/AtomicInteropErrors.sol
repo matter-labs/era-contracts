@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
-import {PartState} from "./IAtomicInterop.sol";
+import {SpecState} from "./IAtomicInterop.sol";
 
 // ── GlobalInteropIMT (L1) errors ────────────────────────────────────────────────────
-error GlobalImtZeroOwner();
-error GlobalImtNotOwner(address sender);
-error GlobalImtNotSubmitter(address sender, uint256 chainId);
+error GlobalImtZeroBridgehub();
+/// @dev The caller is not the diamond proxy of `chainId` as registered in the Bridgehub.
+error GlobalImtNotChainDiamond(address sender, uint256 chainId);
 error GlobalImtZeroRoot();
-error GlobalImtZeroSubmitter();
-error GlobalImtBatchNotIncreasing(uint256 chainId, uint256 current, uint256 provided);
+/// @dev Batch numbers must be strictly consecutive (no gaps).
+error GlobalImtNonConsecutiveBatch(uint256 chainId, uint256 expected, uint256 provided);
 error GlobalImtUnknownBlock(uint256 blockNumber);
 
 // ── L2InteropCommitmentTree (indexed merkle tree) errors ─────────────────────────────
@@ -33,16 +33,21 @@ error ImporterBlockNotImported(uint256 l1BlockNumber);
 
 // ── AtomicFlowEscrow errors ─────────────────────────────────────────────────────────
 error EscrowAlreadyInitialized();
-error EscrowLegNotOnThisChain(uint256 legChainId);
-error EscrowLegZeroAmount();
-error EscrowLegZeroToken();
-error EscrowLegZeroPayer();
-error EscrowLegZeroPayee();
-error EscrowPayerMismatch(address sender, address payer);
-error EscrowPartNotUnset(bytes32 specHash, PartState actual);
-error EscrowPartNotCommitted(bytes32 specHash, PartState actual);
+error EscrowDepositorMismatch(address sender, address depositor);
+error EscrowSpecAlreadyCommitted(bytes32 specHash);
+error EscrowSpecNotExecutable(bytes32 specHash, SpecState actual);
+error EscrowSpecNotRevertable(bytes32 specHash, SpecState actual);
+error EscrowInvalidAuthorizeFromState(bytes32 specHash, SpecState actual);
+error EscrowInvalidRefundAuthorizeFromState(bytes32 specHash, SpecState actual);
+error EscrowSpecNotForThisChain(uint256 originChainId, uint256 destChainId);
+error EscrowSendSpecMissingDest();
+error EscrowSendSpecZeroAmount();
+error EscrowSendSpecZeroRecipient();
+error EscrowSendSpecZeroToken();
+error EscrowSendSpecZeroOriginChain();
+error EscrowSelfDestination(uint256 destChainId);
 error EscrowFlowIdMismatch(bytes32 expected, bytes32 actual);
-error EscrowProofCountMismatch(uint256 legs, uint256 proofs);
+error EscrowProofCountMismatch(uint256 specs, uint256 proofs);
 error EscrowSpecsNotSorted();
 error EscrowChainsNotSorted();
 

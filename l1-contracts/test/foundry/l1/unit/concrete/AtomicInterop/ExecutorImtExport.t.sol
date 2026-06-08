@@ -16,13 +16,12 @@ import {GlobalInteropIMT} from "contracts/atomic-interop/GlobalInteropIMT.sol";
 /// {GlobalInteropIMT} registry — and that the legacy (no-export) path leaves the registry untouched.
 contract ExecutorImtExportTest is ExecutingTest {
     GlobalInteropIMT internal globalImt;
-    address internal imtOwner = makeAddr("imtOwner");
 
     function _setUpRegistry() internal {
-        globalImt = new GlobalInteropIMT(imtOwner);
-        // The diamond proxy is the msg.sender when the Executor calls the registry.
-        vm.prank(imtOwner);
-        globalImt.setGlobalSubmitter(address(executor), true);
+        // The registry resolves the authorized submitter (the diamond proxy) from the Bridgehub; the
+        // harness's DummyBridgehub already maps the chain to this diamond, which is the msg.sender
+        // when the Executor calls the registry.
+        globalImt = new GlobalInteropIMT(address(dummyBridgehub));
         // The chain admin (`owner`) opts the chain in.
         vm.prank(owner);
         IAdmin(address(executor)).setGlobalInteropImt(address(globalImt));
@@ -60,7 +59,7 @@ contract ExecutorImtExportTest is ExecutingTest {
         batches[0] = newStoredBatchInfo;
 
         InteropImtExport[] memory imtExports = new InteropImtExport[](1);
-        imtExports[0] = InteropImtExport({imtRoot: keccak256("imtRoot1"), daCommitment: keccak256("da1")});
+        imtExports[0] = InteropImtExport({imtRoot: keccak256("imtRoot1")});
 
         (uint256 from, uint256 to, bytes memory executeData) = _encodeExecuteWithImt(
             batches,
@@ -73,7 +72,6 @@ contract ExecutorImtExportTest is ExecutingTest {
 
         assertEq(globalImt.chainRootOf(l2ChainId), keccak256("imtRoot1"), "IMT root exported");
         assertEq(globalImt.currentBatchNumber(l2ChainId), batches[0].batchNumber);
-        assertEq(globalImt.daCommitmentOf(l2ChainId, batches[0].batchNumber), keccak256("da1"));
         assertTrue(globalImt.globalRoot() != bytes32(0), "global root advanced");
     }
 

@@ -172,12 +172,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert InvalidBatchesDataLength(n, _imtExports.length);
         }
         for (uint256 i = 0; i < n; ++i) {
-            IGlobalInteropIMT(registry).submitChainRoot(
-                s.chainId,
-                _batchesData[i].batchNumber,
-                _imtExports[i].imtRoot,
-                _imtExports[i].daCommitment
-            );
+            IGlobalInteropIMT(registry).submitChainRoot(s.chainId, _batchesData[i].batchNumber, _imtExports[i].imtRoot);
         }
     }
 

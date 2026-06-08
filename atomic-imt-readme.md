@@ -4,13 +4,15 @@ This document explains the **architecture** of the L1‑free atomic interop feat
 **hands‑on instructions** for trying it out.
 
 It is the advanced counterpart of the L1‑coordinated `dummy-interop` stack
-(`l1-contracts/contracts/dummy-interop`, `L1FlowLinker` + `L2FlowEscrow`). The difference: there is
-**no central L1 coordinator**. Flows finalize purely from Merkle proofs against an Indexed Merkle
-Tree (IMT) of "parts done" that each chain exposes on L1 and that L2s re‑import.
+(`l1-contracts/contracts/dummy-interop`, `L1FlowLinker` + `L2FlowEscrow`). It keeps that stack's
+`SendSpec` / `SpecState` model and asset routing (burn on source, mint on destination via the asset
+router + native token vault), but there is **no central L1 coordinator**: authorization is gated by
+Indexed Merkle Tree (IMT) proofs against a global interop‑IMT that each chain exposes on L1 and that
+L2s re‑import.
 
 - Contracts: `l1-contracts/contracts/atomic-interop/` (and its `README.md`).
 - Tests: `l1-contracts/test/foundry/l1/unit/concrete/AtomicInterop/`.
-- Tooling: `l1-contracts/test/anvil-interop/imt-engine.ts`, `imt-supplier.ts`.
+- Tooling: `l1-contracts/test/anvil-interop/{imt-engine,imt-supplier,atomic-flow-cli}.ts`.
 
 ---
 
@@ -18,16 +20,17 @@ Tree (IMT) of "parts done" that each chain exposes on L1 and that L2s re‑impor
 
 ### 1.1 The idea in one paragraph
 
-Each chain keeps an **Indexed Merkle Tree** of "parts done". When a participant does their part, the
-leg's commit value is inserted; each leaf stores `{value, nextValue, nextIndex}` pointers forming a
-sorted linked list, which makes both membership and **non‑membership** provable in O(log n). When the
-chain settles a batch, its current IMT root (plus a DA commitment to the tree's preimage) is exposed
-on L1 and folded into a **global IMT** that aggregates every chain's root; L1 also appends the new
-global root to an **append‑only history tree**. L2s re‑import the historical global root. To
-**finalize**, anyone proves — against an imported global root whose L1 timestamp is `≤ deadline` —
-that _every_ leg of the flow was committed in time. To **refund** after a timeout, anyone gives an
-O(log n) non‑inclusion proof that a leg is absent across the deadline boundary. No L1 contract ever
-"authorizes" settlement; it only stores roots.
+Each chain keeps an **Indexed Merkle Tree** of "parts done". `commitSend` locks the source tokens
+and inserts the leg's commit value; each leaf stores `{value, nextValue, nextIndex}` pointers
+forming a sorted linked list, which makes membership and **non‑membership** provable in O(log n).
+On batch settlement the chain's `Executor` (its diamond proxy) exposes the IMT root on L1 into the
+**global IMT** (an in‑place tree aggregating every chain's root), and L1 appends the new global root
+to an **append‑only history tree**. L2s re‑import the historical global root. To **authorize** a
+flow, anyone proves — against an imported global root with L1 timestamp `≤ deadline` — that _every_
+leg was committed in time; the relevant specs become `Executable` and `execute` performs the
+burn/mint through AR/NTV. To **refund** after a timeout, anyone gives an O(log n) non‑inclusion proof
+that a leg is absent across the deadline boundary. No L1 contract authorizes settlement; it only
+stores roots.
 
 ### 1.2 Components
 
@@ -35,111 +38,83 @@ O(log n) non‑inclusion proof that a leg is absent across the deadline boundary
         L2 chain A                         L1                         L2 chain B
   ┌────────────────────┐         ┌──────────────────────┐      ┌────────────────────┐
   │ AtomicFlowEscrow A  │         │  GlobalInteropIMT     │      │ AtomicFlowEscrow B  │
-  │  commitPart ────────┼──┐      │  (1) in-place global  │   ┌──┼ commitPart         │
-  │  finalize           │  │      │      tree: chain→root │   │  │ finalize           │
-  │  refund             │  │      │  (2) append-only      │   │  │ refund             │
-  └─────────┬──────────┘  │      │      history tree:    │   │  └─────────┬──────────┘
-            │ insert(v,    │      │      (blk,ts,root)    │   │            │ insert(v, lowNull)
-            │   lowNull)   │      │  + map root→block     │   │            ▼
-            ▼              │      └───────────▲───────────┘   │  ┌────────────────────┐
-  ┌────────────────────┐  │ submitChainRoot   │ submitChainRoot           │ L2InteropCommitment │
-  │ L2InteropCommitment │  └──(Executor on────┘──(Executor on─────────────│ Tree B (Indexed MT) │
-  │ Tree A (Indexed MT) │       batch execute)      batch execute)        └────────────────────┘
-  └────────────────────┘                                                            ▲
-            ▲                       │ historical global root                        │
-            │                       ▼  (imt-supplier)                               │
+  │  commitSend ────────┼──┐      │  (1) in-place global  │   ┌──┼ commitSend         │
+  │  authorize          │  │      │      tree: chain→root │   │  │ authorize          │
+  │  execute (AR/NTV)   │  │      │  (2) append-only      │   │  │ execute (AR/NTV)   │
+  │  authorizeRefund    │  │      │      history tree     │   │  │ authorizeRefund    │
+  │  claimRefund        │  │      │  submitter = chain's  │   │  │ claimRefund        │
+  └─────────┬──────────┘  │      │  diamond (Bridgehub)  │   │  └─────────┬──────────┘
+            │ insert(v,    │      └───────────▲───────────┘   │            │ insert(v, lowNull)
+            │   lowNull)   │  submitChainRoot  │ submitChainRoot           ▼
+            ▼              │  (Executor=diamond)│ (Executor=diamond)  ┌────────────────────┐
+  ┌────────────────────┐  └────────────────────┘─────────────────────│ L2InteropCommitment │
+  │ L2InteropCommitment │                                            │ Tree B (Indexed MT) │
+  │ Tree A (Indexed MT) │      historical global root (imt-supplier) └────────────────────┘
+  └────────────────────┘                  │                                    ▲
+            ▲                              ▼                                    │
   ┌────────────────────┐   ┌──────────────────────────┐            ┌────────────────────┐
   │ L2GlobalInterop-    │◄──┤  imt-supplier.ts          ├───────────►│ L2GlobalInterop-   │
-  │ RootImporter A      │   │  (trusted: reads L1,      │            │ RootImporter B     │
-  └────────────────────┘   │   imports to each L2)     │            └────────────────────┘
-                           └──────────────────────────┘
-   imt-engine.ts computes commit values, low-nullifier indices, and O(log n) inclusion /
-   non-inclusion proofs for finalize / refund.
+  │ RootImporter A      │   │  (reads L1, imports to L2)│            │ RootImporter B     │
+  └────────────────────┘   └──────────────────────────┘            └────────────────────┘
+   imt-engine.ts: commit values, low-nullifier indices, O(log n) inclusion / non-inclusion proofs.
+   atomic-flow-cli.ts: interactive register / commit / check-status / finalize over a JSON file.
 ```
 
-| Contract                       | Layer | Role                                                                                                                                                                                                                                                                                               |
-| ------------------------------ | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GlobalInteropIMT`             | L1    | **Two** trees: an in‑place `FullMerkle` global tree (leaf updated per chain) whose root is `globalRoot`, and an append‑only `DynamicIncrementalMerkle` history tree of `keccak256(block, timestamp, globalRoot)` snapshots whose root is `historyRoot`. Plus `mapping(globalRoot => blockNumber)`. |
-| `L2InteropCommitmentTree`      | L2    | Per‑chain **Indexed Merkle Tree** (`FullMerkle`‑backed); leaves `{value, nextValue, nextIndex}` form a sorted linked list.                                                                                                                                                                         |
-| `L2GlobalInteropRootImporter`  | L2    | Stores global roots imported from L1, keyed by L1 block number + timestamp.                                                                                                                                                                                                                        |
-| `AtomicFlowEscrow`             | L2    | `commitPart` / `finalize` / `refund`. State per `(flowId, specHash)`: `Unset → Committed → Finalized` (happy) or `→ Refunded` (timeout).                                                                                                                                                           |
-| `libraries/AtomicInteropProof` | both  | Pure O(log n) inclusion and low‑nullifier non‑inclusion verification.                                                                                                                                                                                                                              |
+| Contract                       | Layer | Role                                                                                                                                                                                                                                                                     |
+| ------------------------------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GlobalInteropIMT`             | L1    | In‑place `FullMerkle` global tree (`globalRoot`) + append‑only `DynamicIncrementalMerkle` history tree (`historyRoot`) + `mapping(globalRoot => block)`. Submitter for a chain = its diamond proxy, resolved from the **Bridgehub**. Batch numbers strictly consecutive. |
+| `L2InteropCommitmentTree`      | L2    | Per‑chain **Indexed Merkle Tree**; leaves `{value, nextValue, nextIndex}`.                                                                                                                                                                                               |
+| `L2GlobalInteropRootImporter`  | L2    | Stores global roots imported from L1 (L1 block + timestamp).                                                                                                                                                                                                             |
+| `AtomicFlowEscrow`             | L2    | `commitSend` / `authorize` / `execute` / `authorizeRefund` / `claimRefund`. `SpecState`: `Unset → Committed → Executable → Executed` or `Committed → Revertable → Reverted`. AR/NTV asset routing.                                                                       |
+| `libraries/AtomicInteropProof` | both  | O(log n) inclusion and low‑nullifier non‑inclusion verification.                                                                                                                                                                                                         |
 
 ### 1.3 The Indexed Merkle Tree
 
-A leaf is `{ value, nextValue, nextIndex }`. The tree is seeded with a head leaf `{0, 0, 0}` at index 0. Inserting `v`:
-
-1. find the **low‑nullifier** leaf `L` with `L.value < v` and (`L.nextValue == 0` or `v < L.nextValue`);
-2. append a new leaf `{ v, L.nextValue, L.nextIndex }`;
-3. repoint `L` to `{ L.value, v, newIndex }`.
-
-This keeps the leaves a sorted singly‑linked list over the append‑only array. Consequences:
-
-- **Membership** of `v`: a normal Merkle path to the leaf whose `value == v`.
-- **Non‑membership** of `v`: a Merkle path to the single low‑nullifier leaf bracketing `v`
-  (`L.value < v < L.nextValue`). O(log n) — no need to disclose the whole leaf set.
-
-The escrow caller (or the IMT engine) supplies the low‑nullifier index to `commitPart`; if the tree
-changed since it was computed, the insert reverts and the caller retries with a refreshed index.
+A leaf is `{value, nextValue, nextIndex}`, seeded with a head leaf `{0,0,0}` at index 0. Inserting
+`v`: find the **low‑nullifier** leaf `L` with `L.value < v` and (`L.nextValue == 0` or
+`v < L.nextValue`); append `{v, L.nextValue, L.nextIndex}`; repoint `L`. Membership of `v` is a path
+to the leaf whose `value == v`; non‑membership is a path to the single low‑nullifier leaf bracketing
+`v`. The caller supplies the low‑nullifier index to `commitSend` (from the IMT engine).
 
 ### 1.4 Identifiers and values
 
-- `specHash = keccak256(abi.encode(leg))`, `FlowLeg = { chainId, token, amount, payer, payee }`.
-- `flowId = keccak256(abi.encode(sortedSpecHashes, sortedChainIds, deadline))` — both arrays strictly
-  ascending.
-- Commit value inserted into a chain's IMT:
-  `uint256(keccak256(abi.encode(TAG, flowId, specHash)))`, `TAG = bytes4(keccak256("AtomicInterop.commit.v1"))`.
+- `SendSpec = {destChainId, recipient, originChainId, originToken, amount, erc20Data, depositor}`;
+  `specHash = keccak256(abi.encode(spec))`.
+- `flowId = keccak256(abi.encode(sortedSpecHashes, sortedChainIds, deadline))`.
+- Commit value: `uint256(keccak256(abi.encode(TAG, flowId, specHash)))`,
+  `TAG = bytes4(keccak256("AtomicInterop.commit.v1"))`.
 - Indexed‑leaf hash: `keccak256(abi.encode(value, nextValue, nextIndex))`.
-- Global‑tree leaf for a chain: `keccak256(abi.encodePacked(chainImtRoot, chainId))`.
+- Global‑tree leaf: `keccak256(abi.encodePacked(chainImtRoot, chainId))`.
 - History‑tree leaf: `keccak256(abi.encode(block, timestamp, globalRoot))`.
-- Empty/zero leaf for every tree: `bytes32(0)`.
 
 ### 1.5 Lifecycle
 
-1. **Create flow** (off‑chain): legs, `specHash`es, `flowId`.
-2. **`commitPart(flowId, leg, lowNullifierIndex)`**: payer locks `amount` of `token`; the escrow
-   inserts the leg's commit value into the chain's IMT.
-3. **Expose on L1**: on batch settlement the operator includes the chain's IMT root + DA commitment
-   in the execute data; the `Executor` calls `GlobalInteropIMT.submitChainRoot`, which updates the
-   chain's leaf in the global tree, appends `(block, timestamp, globalRoot)` to the history tree, and
-   records `mapping[globalRoot] = block`.
-4. **Import on L2**: the `imt-supplier` imports the global root into each L2's
-   `L2GlobalInteropRootImporter`.
-5. **`finalize(flowId, legs, chainIds, deadline, proofs[])`**: inclusion proof per leg (IMT path →
-   global path) against an imported global root with timestamp `≤ deadline`; the chain releases its
-   leg(s) to the payee.
-6. **`refund(flowId, legs, chainIds, deadline, missingLegIndex, proof)`**: low‑nullifier
-   non‑inclusion proof for the missing leg, with the chain IMT root identical in a global root
-   `≤ deadline` and one `> deadline`; the chain returns its leg(s) to the payer.
+1. **Create flow** (off‑chain): specs, `specHash`es, `flowId`.
+2. **`commitSend(flowId, spec, lowNullifierIndex)`** on the origin chain: lock + IMT insert.
+3. **Expose on L1**: the chain's `Executor` (diamond) calls `GlobalInteropIMT.submitChainRoot`.
+4. **Import on L2**: `imt-supplier` imports the global root into each L2 importer.
+5. **`authorize(flowId, specs, chainIds, deadline, proofs)`**: inclusion proof per spec → specs on
+   this chain become `Executable`.
+6. **`execute(flowId, spec)`**: source burn / destination mint via AR/NTV.
+7. **`authorizeRefund(flowId, specs, chainIds, deadline, missingSpecIndex, proof)` + `claimRefund`**:
+   the timeout path.
 
-### 1.6 Proof layers
-
-**Inclusion** (`ImtInclusionProof`): a leaf with `value == commitValue` at `imtLeafIndex` hashes
-(`imtProof`) to `chainImtRoot`, which hashes (`globalProof`) to `importedGlobalRoot`, with
-`importedTimestamp ≤ deadline`.
-
-**Non‑inclusion** (`ImtNonInclusionProof`): a low‑nullifier leaf bracketing the value, included in
-`chainImtRoot`, with `chainImtRoot` shown inside an imported global root `≤ deadline` (`globalProofG1`)
-and one `> deadline` (`globalProofG2`). The identical chain root across the boundary closes the
-"inserted just past the deadline / L1 reorg" window.
-
-### 1.7 Executor integration (opt‑in, backward compatible)
+### 1.6 Executor integration (opt‑in, backward compatible)
 
 New execute‑data encoding version `SUPPORTED_ENCODING_VERSION_EXECUTE_WITH_IMT = 2` carries a
-per‑batch `InteropImtExport { imtRoot, daCommitment }` (decoded by
-`BatchDecoder.decodeExecuteImtExports`). `ExecutorFacet._exportInteropImtRoots` calls
-`GlobalInteropIMT.submitChainRoot` on L1, gated by `ZKChainStorage.globalInteropImt` (set via
-`Admin.setGlobalInteropImt`). Chains that do not opt in, or send legacy v1 execute data, behave
-**byte‑for‑byte unchanged**.
+per‑batch `InteropImtExport { imtRoot }`. `ExecutorFacet._exportInteropImtRoots` calls
+`GlobalInteropIMT.submitChainRoot(chainId, batchNumber, imtRoot)`. Because the call comes from the
+diamond proxy, it satisfies the registry's "submitter == Bridgehub.getZKChain(chainId)" check. Gated
+by `ZKChainStorage.globalInteropImt` (set via `Admin.setGlobalInteropImt`); chains that do not opt in,
+or send legacy v1 execute data, behave byte‑for‑byte unchanged.
 
-### 1.8 Trust assumptions / demo simplifications
+### 1.7 Trust assumptions / demo simplifications
 
-- **Exposing the IMT root on L1** is trusted to the operator in the demo; in production the IMT root
-  is part of the block commitment and the DA commitment covers the IMT preimage.
-- **The `imt-supplier`** is a trusted EOA, mirroring how `L2InteropRootStorage`'s bootloader path is
-  mocked.
-- **Asset mechanics** in `AtomicFlowEscrow` are a self‑custodial lock/release stand‑in for bridge/NTV
-  routing; swapping in AR/NTV settlement does not change the proof logic.
+- Exposing the IMT root on L1 is operator‑trusted in the demo (submitted by the chain's diamond); in
+  production the IMT root is part of the block commitment.
+- The `imt-supplier` is a trusted EOA, mirroring how `L2InteropRootStorage`'s bootloader path is mocked.
+- The AR/NTV asset mechanics match `L2FlowEscrow`; the Foundry unit tests mock the asset router to
+  isolate the escrow's proof‑gating + state machine.
 
 ---
 
@@ -147,19 +122,10 @@ per‑batch `InteropImtExport { imtRoot, daCommitment }` (decoded by
 
 ### 2.1 Prerequisites
 
-A standard Foundry `forge` is enough for the contracts and the test demo (no zkSync VM needed):
-
-```bash
-forge --version   # forge 1.5.x
-```
-
-For the off‑chain CLIs you need Node + repo deps (`yarn install` at the repo root). `yarn` enforces
-Node ≥ 20; on Node 18 run the TypeScript tools via `npx ts-node ...` directly.
+A standard Foundry `forge` is enough for the contracts and the test demo. For the off‑chain CLIs you
+need Node + repo deps (`yarn install`); on Node 18 run the TS tools via `npx ts-node ...` directly.
 
 ### 2.2 Fastest path — run the demo as a test
-
-The end‑to‑end lifecycle (commit → expose on L1 → import on L2 → finalize, and timeout → refund) is
-exercised as a two‑chain scenario (`vm.chainId` simulates two L2s in one EVM):
 
 ```bash
 cd l1-contracts
@@ -169,98 +135,65 @@ forge test --match-path "test/foundry/l1/unit/concrete/AtomicInterop/*" -vv
 
 What the suites demonstrate:
 
-| Test                                                                              | Shows                                                                                                                                                                                                |
-| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AtomicFlowEscrow.t.sol::test_finalize_happyPath_bothLegsSettle`                  | Full happy path: both legs commit (indexed insert with low‑nullifier), roots are exposed to `GlobalInteropIMT`, imported on both L2s, and both escrows finalize from O(log n) inclusion proofs.      |
-| `…::test_refund_whenLegMissingAcrossDeadline`                                     | Timeout path: a leg never commits; an O(log n) low‑nullifier non‑inclusion proof across the deadline boundary refunds the payer (the head leaf alone certifies absence on an otherwise‑empty chain). |
-| `…::test_refund_revertsIfLegActuallyPresent`                                      | A forged non‑inclusion proof for a present leg is rejected by the low‑nullifier bracket check.                                                                                                       |
-| `…::test_finalize_revertsWhenImportedAfterDeadline` / `…_revertsOnFlowIdMismatch` | Finalize guards.                                                                                                                                                                                     |
-| `L2InteropCommitmentTree.t.sol`                                                   | Indexed‑tree insert maintains the sorted linked list; inclusion paths verify; low‑nullifier brackets; insert validation (zero value, wrong nullifier, appender).                                     |
-| `GlobalInteropIMT.t.sol::test_submitChainRoot_appendsHistoryTree`                 | The append‑only history tree advances and `mapping(globalRoot => block)` is recorded, alongside the in‑place global tree.                                                                            |
-| `ExecutorImtExport.t.sol`                                                         | Opt‑in chains export their IMT root to the registry on execute; legacy path leaves it untouched.                                                                                                     |
+| Test                                                                                                                            | Shows                                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AtomicFlowEscrow.t.sol::test_happyPath_commitAuthorizeExecute`                                                                 | Two‑leg swap: `commitSend` (indexed insert), expose roots, import, `authorize` (O(log n) inclusion), `execute` (source burn / dest mint via the mock AR on both chains).        |
+| `…::test_refund_whenLegMissingAcrossDeadline`                                                                                   | Timeout: a leg never commits; an O(log n) low‑nullifier non‑inclusion proof across the deadline boundary marks the source spec `Revertable` and `claimRefund` returns the lock. |
+| `…::test_authorizeRefund_revertsIfLegActuallyPresent`                                                                           | A forged non‑inclusion proof for a present leg is rejected by the low‑nullifier bracket.                                                                                        |
+| `…::test_authorize_revertsWhenImportedAfterDeadline`, `…::test_execute_revertsWhenNotAuthorized`, `…::test_commitSend_reverts*` | Guards.                                                                                                                                                                         |
+| `L2InteropCommitmentTree.t.sol`                                                                                                 | Indexed‑tree insert / linked list / low‑nullifier / inclusion paths.                                                                                                            |
+| `GlobalInteropIMT.t.sol`                                                                                                        | Bridgehub‑gated submitter, in‑place + history trees, strictly‑consecutive batches.                                                                                              |
+| `ExecutorImtExport.t.sol`                                                                                                       | Opt‑in chains export their IMT root to the registry on execute (submitted by the diamond); legacy path untouched.                                                               |
 
-Run a single scenario with traces:
+### 2.3 Off‑chain tooling against a live deployment
+
+Build artifacts first (`forge build`), then run from `l1-contracts/test/anvil-interop/`.
 
 ```bash
-forge test --match-test test_refund_whenLegMissingAcrossDeadline -vvvv
+# Commit value for a (flowId, specHash):
+npx ts-node imt-engine.ts value --flow-id 0x<flowId> --spec-hash 0x<specHash>
+# Low-nullifier index to pass to commitSend:
+npx ts-node imt-engine.ts low-nullifier --l2-rpc <url> --tree 0x<tree> --value 0x<commitValue>
+# Inclusion proof (ImtInclusionProof JSON for authorize):
+npx ts-node imt-engine.ts full-proof --l1-rpc <url> --l2-rpc <url> --tree 0x<tree> \
+    --registry 0x<GlobalInteropIMT> --chain-id 271 --value 0x<commitValue> --l1-block <n>
+# Non-inclusion proof (ImtNonInclusionProof JSON for authorizeRefund):
+npx ts-node imt-engine.ts non-inclusion --l1-rpc <url> --l2-rpc <url> --tree 0x<tree> \
+    --registry 0x<GlobalInteropIMT> --chain-id 272 --value 0x<value> \
+    --l1-block-before <n> --l1-block-after <n>
+
+# Import L1 global roots to an L2 (one-shot, or --poll <seconds>):
+npx ts-node imt-supplier.ts --l1-rpc <url> --l2-rpc <url> \
+    --registry 0x<GlobalInteropIMT> --importer 0x<importer> --pk 0x<supplierPk>
 ```
 
-### 2.3 Using the off‑chain tooling against a live deployment
+### 2.4 Interactive demo (`atomic-flow-cli.ts`)
 
-Build artifacts first (`cd l1-contracts && forge build`), then run from
-`l1-contracts/test/anvil-interop/`.
-
-#### IMT engine — values, low‑nullifiers, proofs
-
-// SB: please make an additional more interactive example as well, maybe like a pair 
-// of <(src chain_id, payer, token address)> <dst chain id, payer, token address>,
-// and the demo should autoresolve leg ids and flow id.
-// It should save all the details inside a JSON file.
-// and then provide the methods for the signers to do their part.
-// Basically, I want the following flow:
-// ```
-// - register_flow_id 
-// Please provide first part of the swap: <info> or the ability to use the default one
-// Please provide second part of the swap: <info> or the ability to use the default one
-// - list flows
-// - flow info <id> -> returns legs with their hashes and infos.
-// - commit-send <flow id> <legId> <privateKey> <rpcUrl>
-// - check-status <flow id> <rpcs> -> returns the status of whether all legs have been committed on the corresponding L2s.
-// - finalize <flow id> <legId> <rpc>
-
+A JSON‑backed walk‑through of a two‑leg swap. The state file (`atomic-flow-state.json`, override with
+`--state`) holds a `config` section you fill with deployed addresses (L1 `registry`, and per‑chain
+`rpc` / `escrow` / `tree` / `importer`), and the registered flows.
 
 ```bash
 cd l1-contracts/test/anvil-interop
 
-# Commit value for a (flowId, specHash):
-npx ts-node imt-engine.ts value --flow-id 0x<flowId> --spec-hash 0x<specHash>
+# Define the swap (interactive prompts; or --default for the built-in pair). Auto-resolves leg ids
+# (specHash) and the flowId and saves them.
+npx ts-node atomic-flow-cli.ts register-flow-id
+npx ts-node atomic-flow-cli.ts register-flow-id --default --deadline <unix>
 
-# Low-nullifier index to pass to commitPart when inserting a value:
-npx ts-node imt-engine.ts low-nullifier \
-  --l2-rpc http://localhost:9545 --tree 0x<L2InteropCommitmentTree> --value 0x<commitValue>
+npx ts-node atomic-flow-cli.ts list-flows
+npx ts-node atomic-flow-cli.ts flow-info <flowId>          # legs with their hashes + infos
 
-# Full inclusion proof (ImtInclusionProof JSON for AtomicFlowEscrow.finalize):
-npx ts-node imt-engine.ts full-proof \
-  --l1-rpc http://localhost:8545 --l2-rpc http://localhost:9545 \
-  --tree 0x<L2InteropCommitmentTree> --registry 0x<GlobalInteropIMT> \
-  --chain-id 271 --value 0x<commitValue> --l1-block <l1BlockWithRoot>
+# Each signer does their part on the leg's origin chain:
+npx ts-node atomic-flow-cli.ts commit-send <flowId> <legId> <privateKey> <rpcUrl>
 
-# O(log n) non-inclusion proof (ImtNonInclusionProof JSON for AtomicFlowEscrow.refund):
-npx ts-node imt-engine.ts non-inclusion \
-  --l1-rpc http://localhost:8545 --l2-rpc http://localhost:9545 \
-  --tree 0x<L2InteropCommitmentTree> --registry 0x<GlobalInteropIMT> \
-  --chain-id 272 --value 0x<missingValue> \
-  --l1-block-before <blockBeforeDeadline> --l1-block-after <blockAfterDeadline>
+# Whether all legs are committed on their L2s:
+npx ts-node atomic-flow-cli.ts check-status <flowId>
+
+# Authorize the flow (builds inclusion proofs for all legs) and execute the given leg:
+npx ts-node atomic-flow-cli.ts finalize <flowId> <legId> <privateKey> <rpcUrl>
 ```
 
-#### IMT supplier — import L1 global roots to L2
-
-```bash
-# One-shot: import every recorded L1 global root not yet on this L2.
-npx ts-node imt-supplier.ts \
-  --l1-rpc http://localhost:8545 --l2-rpc http://localhost:9545 \
-  --registry 0x<GlobalInteropIMT> --importer 0x<L2GlobalInteropRootImporter> \
-  --pk 0x<supplierPrivateKey>
-
-# Continuous: poll L1 every 5s and import new roots as they appear.
-npx ts-node imt-supplier.ts ... --poll 5
-```
-
-### 2.4 Sketch of a manual end‑to‑end run
-
-1. **Deploy** on L1: `GlobalInteropIMT(owner)`. On each L2: `L2InteropCommitmentTree`,
-   `L2GlobalInteropRootImporter`, `AtomicFlowEscrow`, then `tree.initialize(escrow)`,
-   `importer.initialize(supplier)`, `escrow.initialize(tree, importer)`.
-2. **Authorize** the submitter on L1 (`setGlobalSubmitter` or `setSubmitter`) and the supplier on each
-   importer (at init).
-3. **Commit**: for each leg compute its commit value and low‑nullifier index (`imt-engine.ts value` +
-   `low-nullifier`), approve the token, and call `commitPart(flowId, leg, lowNullifierIndex)`.
-4. **Expose**: `GlobalInteropIMT.submitChainRoot(chainId, batchNumber, tree.root(), daCommitment)`
-   for each chain (automatic from the `Executor` once the chain opts in via
-   `Admin.setGlobalInteropImt`).
-5. **Import**: run `imt-supplier.ts`.
-6. **Finalize / refund**: build the proof JSON with `imt-engine.ts` and submit it to
-   `AtomicFlowEscrow.finalize` / `refund`.
-
-> The Foundry integration test in §2.2 performs exactly this sequence in‑process and is the
-> recommended way to see the full flow end‑to‑end.
+> Exposing roots on L1 (`submitChainRoot`) and importing them to L2 (`imt-supplier`) happen out of
+> band between `commit-send` and `finalize` — in a real deployment automatically via the `Executor`
+> and the supplier. The Foundry integration test in §2.2 performs the whole sequence in‑process.

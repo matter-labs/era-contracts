@@ -10,36 +10,41 @@ import {IL2InteropCommitmentTree} from "contracts/atomic-interop/IL2InteropCommi
 import {L2GlobalInteropRootImporter} from "contracts/atomic-interop/L2GlobalInteropRootImporter.sol";
 import {AtomicFlowEscrow} from "contracts/atomic-interop/AtomicFlowEscrow.sol";
 import {
-    FlowLeg,
-    IndexedLeaf,
-    PartState,
+    SendSpec,
+    SpecState,
     ImtInclusionProof,
     ImtNonInclusionProof
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
-    EscrowFlowIdMismatch,
-    EscrowLegNotOnThisChain,
-    EscrowPartNotUnset,
-    EscrowPayerMismatch,
-    EscrowLegZeroAmount
+    EscrowDepositorMismatch,
+    EscrowSelfDestination,
+    EscrowSendSpecZeroAmount,
+    EscrowSpecAlreadyCommitted,
+    EscrowSpecNotExecutable
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {ProofDeadlineExceeded, ProofLowNullifierNotAbove} from "contracts/atomic-interop/AtomicInteropErrors.sol";
-import {AtomicInteropTestUtils, FullMerkleWrapper, IndexedImtProver} from "./AtomicInteropTestUtils.sol";
+import {
+    AtomicInteropTestUtils,
+    FullMerkleWrapper,
+    IndexedImtProver,
+    MockAtomicAssetRouter,
+    MockBridgehub
+} from "./AtomicInteropTestUtils.sol";
 
-/// @notice End-to-end tests for the L1-free atomic interop flow with an Indexed Merkle Tree per
-/// chain. Two "chains" are simulated within one EVM via `vm.chainId`. The flow finalizes only when
-/// both legs are proven committed in time (O(log n) inclusion), and refunds when a leg is proven
-/// absent across the deadline boundary (O(log n) low-nullifier non-inclusion) — no L1 coordinator.
+/// @notice End-to-end tests for the L1-free atomic interop flow with SendSpec legs, the two-phase
+/// authorize/execute split, and AR/NTV asset routing. Two "chains" are simulated within one EVM via
+/// `vm.chainId`. The asset router is mocked to isolate the escrow's proof-gating + state machine.
 contract AtomicFlowEscrowTest is Test {
     uint256 internal constant CHAIN_A = 271;
     uint256 internal constant CHAIN_B = 272;
     uint64 internal constant DEADLINE = 2000;
 
     GlobalInteropIMT internal registry;
+    MockBridgehub internal bridgehub;
     IndexedImtProver internal prover;
-    address internal owner = makeAddr("owner");
-    address internal operator = makeAddr("operator");
+    address internal operator = makeAddr("operator"); // the diamond proxy for both chains in this test
     address internal supplier = makeAddr("supplier");
+    address internal ntv = makeAddr("ntv");
 
     L2InteropCommitmentTree internal treeA;
     L2InteropCommitmentTree internal treeB;
@@ -47,6 +52,8 @@ contract AtomicFlowEscrowTest is Test {
     L2GlobalInteropRootImporter internal importerB;
     AtomicFlowEscrow internal escrowA;
     AtomicFlowEscrow internal escrowB;
+    MockAtomicAssetRouter internal arA;
+    MockAtomicAssetRouter internal arB;
     TestnetERC20Token internal tokenA;
     TestnetERC20Token internal tokenB;
 
@@ -56,13 +63,14 @@ contract AtomicFlowEscrowTest is Test {
     address internal dave = makeAddr("dave");
 
     function setUp() public {
-        registry = new GlobalInteropIMT(owner);
+        bridgehub = new MockBridgehub();
+        bridgehub.setZKChain(CHAIN_A, operator);
+        bridgehub.setZKChain(CHAIN_B, operator);
+        registry = new GlobalInteropIMT(address(bridgehub));
         prover = new IndexedImtProver();
-        vm.prank(owner);
-        registry.setGlobalSubmitter(operator, true);
 
-        (treeA, importerA, escrowA) = _deployStack();
-        (treeB, importerB, escrowB) = _deployStack();
+        (treeA, importerA, escrowA, arA) = _deployStack();
+        (treeB, importerB, escrowB, arB) = _deployStack();
 
         tokenA = new TestnetERC20Token("TokenA", "TKA", 18);
         tokenB = new TestnetERC20Token("TokenB", "TKB", 18);
@@ -72,124 +80,154 @@ contract AtomicFlowEscrowTest is Test {
 
     function _deployStack()
         internal
-        returns (L2InteropCommitmentTree tree, L2GlobalInteropRootImporter importer, AtomicFlowEscrow escrow)
+        returns (
+            L2InteropCommitmentTree tree,
+            L2GlobalInteropRootImporter importer,
+            AtomicFlowEscrow escrow,
+            MockAtomicAssetRouter ar
+        )
     {
         tree = new L2InteropCommitmentTree();
         importer = new L2GlobalInteropRootImporter();
         escrow = new AtomicFlowEscrow();
+        ar = new MockAtomicAssetRouter();
         tree.initialize(address(escrow));
         importer.initialize(supplier);
-        escrow.initialize(address(tree), address(importer));
+        escrow.initialize(address(tree), address(importer), address(ar), ntv);
+    }
+
+    function _specAB() internal view returns (SendSpec memory) {
+        return SendSpec(CHAIN_B, bob, CHAIN_A, address(tokenA), 100, "", alice);
+    }
+
+    function _specBA() internal view returns (SendSpec memory) {
+        return SendSpec(CHAIN_A, dave, CHAIN_B, address(tokenB), 50, "", carol);
     }
 
     // ── Happy path ──────────────────────────────────────────────────────────────────────
 
-    function test_finalize_happyPath_bothLegsSettle() public {
-        FlowLeg memory legA = FlowLeg(CHAIN_A, address(tokenA), 100, alice, bob);
-        FlowLeg memory legB = FlowLeg(CHAIN_B, address(tokenB), 50, carol, dave);
-        (FlowLeg[] memory legs, bytes32[] memory specHashes) = _sorted(legA, legB);
+    function test_happyPath_commitAuthorizeExecute() public {
+        SendSpec memory ab = _specAB();
+        SendSpec memory ba = _specBA();
+        (SendSpec[] memory specs, bytes32[] memory specHashes) = _sorted(ab, ba);
         bytes32 flowId = AtomicInteropTestUtils.computeFlowId(specHashes, _chainIds(), DEADLINE);
 
-        _commit(escrowA, tokenA, treeA, CHAIN_A, alice, flowId, legA);
-        _commit(escrowB, tokenB, treeB, CHAIN_B, carol, flowId, legB);
+        _commitSend(escrowA, tokenA, treeA, CHAIN_A, alice, flowId, ab);
+        _commitSend(escrowB, tokenB, treeB, CHAIN_B, carol, flowId, ba);
+
+        assertEq(tokenA.balanceOf(address(escrowA)), 100, "source A locked");
+        assertEq(tokenB.balanceOf(address(escrowB)), 50, "source B locked");
 
         _exposeAndImport(100, 1500);
 
         ImtInclusionProof[] memory proofs = new ImtInclusionProof[](2);
         for (uint256 i = 0; i < 2; ++i) {
-            proofs[i] = _inclusion(legs[i], flowId, 100);
+            proofs[i] = _inclusion(specs[i], flowId, 100);
         }
 
+        // Authorize on both chains.
         vm.chainId(CHAIN_A);
-        escrowA.finalize(flowId, legs, _chainIds(), DEADLINE, proofs);
+        escrowA.authorize(flowId, specs, _chainIds(), DEADLINE, proofs);
         vm.chainId(CHAIN_B);
-        escrowB.finalize(flowId, legs, _chainIds(), DEADLINE, proofs);
+        escrowB.authorize(flowId, specs, _chainIds(), DEADLINE, proofs);
 
-        assertEq(tokenA.balanceOf(bob), 100, "bob received");
-        assertEq(tokenA.balanceOf(address(escrowA)), 0, "escrowA drained");
-        assertEq(tokenB.balanceOf(dave), 50, "dave received");
-        assertTrue(escrowA.partState(flowId, AtomicInteropTestUtils.specHashOf(legA)) == PartState.Finalized);
-        assertTrue(escrowB.partState(flowId, AtomicInteropTestUtils.specHashOf(legB)) == PartState.Finalized);
+        bytes32 hAB = AtomicInteropTestUtils.specHashOf(ab);
+        bytes32 hBA = AtomicInteropTestUtils.specHashOf(ba);
+        assertTrue(escrowA.specState(flowId, hAB) == SpecState.Executable, "AB executable on A (source)");
+        assertTrue(escrowB.specState(flowId, hAB) == SpecState.Executable, "AB executable on B (dest)");
+
+        // Execute the AB leg: source burn on A, destination mint on B.
+        vm.chainId(CHAIN_A);
+        escrowA.execute(flowId, ab);
+        vm.chainId(CHAIN_B);
+        escrowB.execute(flowId, ab);
+
+        assertTrue(escrowA.specState(flowId, hAB) == SpecState.Executed);
+        assertTrue(escrowB.specState(flowId, hAB) == SpecState.Executed);
+        assertEq(arA.indirectCallCount(), 1, "source burn routed via AR on A");
+        assertEq(arB.finalizeDepositCount(), 1, "destination mint routed via AR on B");
+        assertEq(arB.lastChainId(), CHAIN_A, "dest mint references origin chain");
+
+        // Execute the BA leg symmetrically.
+        vm.chainId(CHAIN_B);
+        escrowB.execute(flowId, ba);
+        vm.chainId(CHAIN_A);
+        escrowA.execute(flowId, ba);
+        assertTrue(escrowB.specState(flowId, hBA) == SpecState.Executed);
+        assertTrue(escrowA.specState(flowId, hBA) == SpecState.Executed);
+        assertEq(arB.indirectCallCount(), 1, "source burn routed via AR on B");
+        assertEq(arA.finalizeDepositCount(), 1, "destination mint routed via AR on A");
     }
 
-    function test_finalize_revertsWhenImportedAfterDeadline() public {
-        FlowLeg memory legA = FlowLeg(CHAIN_A, address(tokenA), 100, alice, bob);
-        FlowLeg memory legB = FlowLeg(CHAIN_B, address(tokenB), 50, carol, dave);
-        (FlowLeg[] memory legs, bytes32[] memory specHashes) = _sorted(legA, legB);
+    function test_authorize_revertsWhenImportedAfterDeadline() public {
+        SendSpec memory ab = _specAB();
+        SendSpec memory ba = _specBA();
+        (SendSpec[] memory specs, bytes32[] memory specHashes) = _sorted(ab, ba);
         bytes32 flowId = AtomicInteropTestUtils.computeFlowId(specHashes, _chainIds(), DEADLINE);
 
-        _commit(escrowA, tokenA, treeA, CHAIN_A, alice, flowId, legA);
-        _commit(escrowB, tokenB, treeB, CHAIN_B, carol, flowId, legB);
-        _exposeAndImport(100, 5000); // timestamp AFTER deadline
+        _commitSend(escrowA, tokenA, treeA, CHAIN_A, alice, flowId, ab);
+        _commitSend(escrowB, tokenB, treeB, CHAIN_B, carol, flowId, ba);
+        _exposeAndImport(100, 5000); // after deadline
 
         ImtInclusionProof[] memory proofs = new ImtInclusionProof[](2);
         for (uint256 i = 0; i < 2; ++i) {
-            proofs[i] = _inclusion(legs[i], flowId, 100);
+            proofs[i] = _inclusion(specs[i], flowId, 100);
         }
 
         vm.chainId(CHAIN_A);
         vm.expectRevert(abi.encodeWithSelector(ProofDeadlineExceeded.selector, 5000, DEADLINE));
-        escrowA.finalize(flowId, legs, _chainIds(), DEADLINE, proofs);
+        escrowA.authorize(flowId, specs, _chainIds(), DEADLINE, proofs);
     }
 
-    function test_finalize_revertsOnFlowIdMismatch() public {
-        FlowLeg memory legA = FlowLeg(CHAIN_A, address(tokenA), 100, alice, bob);
-        FlowLeg memory legB = FlowLeg(CHAIN_B, address(tokenB), 50, carol, dave);
-        (FlowLeg[] memory legs, bytes32[] memory specHashes) = _sorted(legA, legB);
-        bytes32 realFlowId = AtomicInteropTestUtils.computeFlowId(specHashes, _chainIds(), DEADLINE);
+    function test_execute_revertsWhenNotAuthorized() public {
+        SendSpec memory ab = _specAB();
+        bytes32 flowId = keccak256("f");
+        _commitSend(escrowA, tokenA, treeA, CHAIN_A, alice, flowId, ab);
 
-        _commit(escrowA, tokenA, treeA, CHAIN_A, alice, realFlowId, legA);
-        _commit(escrowB, tokenB, treeB, CHAIN_B, carol, realFlowId, legB);
-        _exposeAndImport(100, 1500);
-
-        ImtInclusionProof[] memory proofs = new ImtInclusionProof[](2);
-        for (uint256 i = 0; i < 2; ++i) {
-            proofs[i] = _inclusion(legs[i], realFlowId, 100);
-        }
-
-        bytes32 wrongFlowId = keccak256("wrong");
+        bytes32 hAB = AtomicInteropTestUtils.specHashOf(ab);
         vm.chainId(CHAIN_A);
-        vm.expectRevert(abi.encodeWithSelector(EscrowFlowIdMismatch.selector, wrongFlowId, realFlowId));
-        escrowA.finalize(wrongFlowId, legs, _chainIds(), DEADLINE, proofs);
+        vm.expectRevert(abi.encodeWithSelector(EscrowSpecNotExecutable.selector, hAB, SpecState.Committed));
+        escrowA.execute(flowId, ab);
     }
 
     // ── Timeout / refund path ───────────────────────────────────────────────────────────
 
     function test_refund_whenLegMissingAcrossDeadline() public {
-        FlowLeg memory legA = FlowLeg(CHAIN_A, address(tokenA), 100, alice, bob);
-        FlowLeg memory legB = FlowLeg(CHAIN_B, address(tokenB), 50, carol, dave);
-        (FlowLeg[] memory legs, bytes32[] memory specHashes) = _sorted(legA, legB);
+        SendSpec memory ab = _specAB();
+        SendSpec memory ba = _specBA();
+        (SendSpec[] memory specs, bytes32[] memory specHashes) = _sorted(ab, ba);
         bytes32 flowId = AtomicInteropTestUtils.computeFlowId(specHashes, _chainIds(), DEADLINE);
 
-        // A commits; B never does (its IMT holds only the head leaf, which is the low nullifier for
-        // any absent value — so non-inclusion is a single-leaf proof).
-        _commit(escrowA, tokenA, treeA, CHAIN_A, alice, flowId, legA);
+        // A commits; B never does (its IMT holds only the head leaf -> low-nullifier for any value).
+        _commitSend(escrowA, tokenA, treeA, CHAIN_A, alice, flowId, ab);
         _exposeAndImportForRefund();
 
-        ImtNonInclusionProof memory proof = _nonInclusion(treeB, CHAIN_B, flowId, legB);
+        ImtNonInclusionProof memory proof = _nonInclusion(treeB, CHAIN_B, flowId, ba);
 
         uint256 aliceBefore = tokenA.balanceOf(alice);
         vm.chainId(CHAIN_A);
-        escrowA.refund(flowId, legs, _chainIds(), DEADLINE, _missingIdx(legs), proof);
+        escrowA.authorizeRefund(flowId, specs, _chainIds(), DEADLINE, _missingIdx(specs, CHAIN_B), proof);
 
+        bytes32 hAB = AtomicInteropTestUtils.specHashOf(ab);
+        assertTrue(escrowA.specState(flowId, hAB) == SpecState.Revertable);
+
+        escrowA.claimRefund(flowId, ab);
         assertEq(tokenA.balanceOf(alice), aliceBefore + 100, "alice refunded");
-        assertTrue(escrowA.partState(flowId, AtomicInteropTestUtils.specHashOf(legA)) == PartState.Refunded);
+        assertTrue(escrowA.specState(flowId, hAB) == SpecState.Reverted);
     }
 
-    function test_refund_revertsIfLegActuallyPresent() public {
-        FlowLeg memory legA = FlowLeg(CHAIN_A, address(tokenA), 100, alice, bob);
-        FlowLeg memory legB = FlowLeg(CHAIN_B, address(tokenB), 50, carol, dave);
-        (FlowLeg[] memory legs, bytes32[] memory specHashes) = _sorted(legA, legB);
+    function test_authorizeRefund_revertsIfLegActuallyPresent() public {
+        SendSpec memory ab = _specAB();
+        SendSpec memory ba = _specBA();
+        (SendSpec[] memory specs, bytes32[] memory specHashes) = _sorted(ab, ba);
         bytes32 flowId = AtomicInteropTestUtils.computeFlowId(specHashes, _chainIds(), DEADLINE);
 
-        // Both committed -> legB IS present. legB is the only real leaf on B, so the head now points
-        // at legB's value; using the head as a "low nullifier" fails the upper-bracket check.
-        _commit(escrowA, tokenA, treeA, CHAIN_A, alice, flowId, legA);
-        _commit(escrowB, tokenB, treeB, CHAIN_B, carol, flowId, legB);
+        _commitSend(escrowA, tokenA, treeA, CHAIN_A, alice, flowId, ab);
+        _commitSend(escrowB, tokenB, treeB, CHAIN_B, carol, flowId, ba); // BA IS present on B
         _exposeAndImportForRefund();
 
-        uint256 legBValue = AtomicInteropTestUtils.commitValue(flowId, AtomicInteropTestUtils.specHashOf(legB));
-        // Forge the proof with the (real) head leaf as the claimed low nullifier.
+        uint256 baValue = AtomicInteropTestUtils.commitValue(flowId, AtomicInteropTestUtils.specHashOf(ba));
+        // Forge: claim the head as low-nullifier even though BA is present -> upper-bracket fails.
         FullMerkleWrapper mirror = prover.mirror(treeB);
         ImtNonInclusionProof memory proof = ImtNonInclusionProof({
             chainId: CHAIN_B,
@@ -205,48 +243,49 @@ contract AtomicFlowEscrowTest is Test {
         });
 
         vm.chainId(CHAIN_A);
-        vm.expectRevert(abi.encodeWithSelector(ProofLowNullifierNotAbove.selector, legBValue, legBValue));
-        escrowA.refund(flowId, legs, _chainIds(), DEADLINE, _missingIdx(legs), proof);
+        vm.expectRevert(abi.encodeWithSelector(ProofLowNullifierNotAbove.selector, baValue, baValue));
+        escrowA.authorizeRefund(flowId, specs, _chainIds(), DEADLINE, _missingIdx(specs, CHAIN_B), proof);
     }
 
-    // ── commitPart edge cases ───────────────────────────────────────────────────────────
+    // ── commitSend edge cases ───────────────────────────────────────────────────────────
 
-    function test_commitPart_revertsOnWrongChain() public {
-        FlowLeg memory legA = FlowLeg(CHAIN_A, address(tokenA), 100, alice, bob);
-        vm.chainId(CHAIN_B);
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(EscrowLegNotOnThisChain.selector, CHAIN_A));
-        escrowA.commitPart(keccak256("f"), legA, 0);
-    }
-
-    function test_commitPart_revertsOnPayerMismatch() public {
-        FlowLeg memory legA = FlowLeg(CHAIN_A, address(tokenA), 100, alice, bob);
+    function test_commitSend_revertsOnWrongDepositor() public {
+        SendSpec memory ab = _specAB();
         vm.chainId(CHAIN_A);
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(EscrowPayerMismatch.selector, bob, alice));
-        escrowA.commitPart(keccak256("f"), legA, 0);
+        vm.expectRevert(abi.encodeWithSelector(EscrowDepositorMismatch.selector, bob, alice));
+        escrowA.commitSend(keccak256("f"), ab, 0);
     }
 
-    function test_commitPart_revertsOnZeroAmount() public {
-        FlowLeg memory legA = FlowLeg(CHAIN_A, address(tokenA), 0, alice, bob);
+    function test_commitSend_revertsOnSelfDestination() public {
+        // dest == origin == this chain.
+        SendSpec memory bad = SendSpec(CHAIN_A, bob, CHAIN_A, address(tokenA), 100, "", alice);
         vm.chainId(CHAIN_A);
         vm.prank(alice);
-        vm.expectRevert(EscrowLegZeroAmount.selector);
-        escrowA.commitPart(keccak256("f"), legA, 0);
+        vm.expectRevert(abi.encodeWithSelector(EscrowSelfDestination.selector, CHAIN_A));
+        escrowA.commitSend(keccak256("f"), bad, 0);
     }
 
-    function test_commitPart_revertsOnDoubleCommit() public {
-        FlowLeg memory legA = FlowLeg(CHAIN_A, address(tokenA), 100, alice, bob);
+    function test_commitSend_revertsOnZeroAmount() public {
+        SendSpec memory bad = SendSpec(CHAIN_B, bob, CHAIN_A, address(tokenA), 0, "", alice);
+        vm.chainId(CHAIN_A);
+        vm.prank(alice);
+        vm.expectRevert(EscrowSendSpecZeroAmount.selector);
+        escrowA.commitSend(keccak256("f"), bad, 0);
+    }
+
+    function test_commitSend_revertsOnDoubleCommit() public {
+        SendSpec memory ab = _specAB();
         bytes32 flowId = keccak256("f");
-        _commit(escrowA, tokenA, treeA, CHAIN_A, alice, flowId, legA);
-        bytes32 specHash = AtomicInteropTestUtils.specHashOf(legA);
+        _commitSend(escrowA, tokenA, treeA, CHAIN_A, alice, flowId, ab);
+        bytes32 specHash = AtomicInteropTestUtils.specHashOf(ab);
 
         vm.chainId(CHAIN_A);
         vm.prank(alice);
         tokenA.approve(address(escrowA), 100);
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(EscrowPartNotUnset.selector, specHash, PartState.Committed));
-        escrowA.commitPart(flowId, legA, 0);
+        vm.expectRevert(abi.encodeWithSelector(EscrowSpecAlreadyCommitted.selector, specHash));
+        escrowA.commitSend(flowId, ab, 0);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────────────────
@@ -257,52 +296,50 @@ contract AtomicFlowEscrowTest is Test {
         ids[1] = CHAIN_B;
     }
 
-    function _missingIdx(FlowLeg[] memory _legs) internal pure returns (uint256) {
-        return _legs[0].chainId == CHAIN_B ? 0 : 1;
+    function _missingIdx(SendSpec[] memory _specs, uint256 _originChainId) internal pure returns (uint256) {
+        return _specs[0].originChainId == _originChainId ? 0 : 1;
     }
 
     function _sorted(
-        FlowLeg memory _legA,
-        FlowLeg memory _legB
-    ) internal pure returns (FlowLeg[] memory legs, bytes32[] memory specHashes) {
-        bytes32 hA = AtomicInteropTestUtils.specHashOf(_legA);
-        bytes32 hB = AtomicInteropTestUtils.specHashOf(_legB);
-        legs = new FlowLeg[](2);
+        SendSpec memory _ab,
+        SendSpec memory _ba
+    ) internal pure returns (SendSpec[] memory specs, bytes32[] memory specHashes) {
+        bytes32 hAB = AtomicInteropTestUtils.specHashOf(_ab);
+        bytes32 hBA = AtomicInteropTestUtils.specHashOf(_ba);
+        specs = new SendSpec[](2);
         specHashes = new bytes32[](2);
-        if (hA < hB) {
-            (legs[0], legs[1], specHashes[0], specHashes[1]) = (_legA, _legB, hA, hB);
+        if (hAB < hBA) {
+            (specs[0], specs[1], specHashes[0], specHashes[1]) = (_ab, _ba, hAB, hBA);
         } else {
-            (legs[0], legs[1], specHashes[0], specHashes[1]) = (_legB, _legA, hB, hA);
+            (specs[0], specs[1], specHashes[0], specHashes[1]) = (_ba, _ab, hBA, hAB);
         }
     }
 
-    /// @dev Compute the leg's commit value, find its low-nullifier in the chain's IMT, and commit.
-    function _commit(
+    function _commitSend(
         AtomicFlowEscrow _escrow,
         TestnetERC20Token _token,
         IL2InteropCommitmentTree _tree,
         uint256 _chainId,
         address _payer,
         bytes32 _flowId,
-        FlowLeg memory _leg
+        SendSpec memory _spec
     ) internal {
-        uint256 value = AtomicInteropTestUtils.commitValue(_flowId, AtomicInteropTestUtils.specHashOf(_leg));
+        uint256 value = AtomicInteropTestUtils.commitValue(_flowId, AtomicInteropTestUtils.specHashOf(_spec));
         uint256 lowNull = prover.lowNullifierIndex(_tree, value);
         vm.chainId(_chainId);
         vm.prank(_payer);
-        _token.approve(address(_escrow), _leg.amount);
+        _token.approve(address(_escrow), _spec.amount);
         vm.prank(_payer);
-        _escrow.commitPart(_flowId, _leg, lowNull);
+        _escrow.commitSend(_flowId, _spec, lowNull);
     }
 
-    /// @dev Submit both chains' roots and import the resulting global root into both importers.
     function _exposeAndImport(uint256 _l1Block, uint256 _timestamp) internal {
         bytes32 rootA = treeA.root();
         bytes32 rootB = treeB.root();
         vm.prank(operator);
-        registry.submitChainRoot(CHAIN_A, 1, rootA, bytes32(0));
+        registry.submitChainRoot(CHAIN_A, 1, rootA);
         vm.prank(operator);
-        registry.submitChainRoot(CHAIN_B, 1, rootB, bytes32(0));
+        registry.submitChainRoot(CHAIN_B, 1, rootB);
         bytes32 gRoot = registry.globalRoot();
         vm.prank(supplier);
         importerA.importGlobalRoot(_l1Block, _timestamp, gRoot);
@@ -310,52 +347,49 @@ contract AtomicFlowEscrowTest is Test {
         importerB.importGlobalRoot(_l1Block, _timestamp, gRoot);
     }
 
-    /// @dev Import the same global root before AND after the deadline (chain B unchanged across it).
     function _exposeAndImportForRefund() internal {
         bytes32 rootA = treeA.root();
         bytes32 rootB = treeB.root();
         vm.prank(operator);
-        registry.submitChainRoot(CHAIN_A, 1, rootA, bytes32(0));
+        registry.submitChainRoot(CHAIN_A, 1, rootA);
         vm.prank(operator);
-        registry.submitChainRoot(CHAIN_B, 1, rootB, bytes32(0));
+        registry.submitChainRoot(CHAIN_B, 1, rootB);
         bytes32 gRoot = registry.globalRoot();
         vm.prank(supplier);
-        importerA.importGlobalRoot(100, 1500, gRoot); // before deadline
+        importerA.importGlobalRoot(100, 1500, gRoot);
         vm.prank(supplier);
-        importerA.importGlobalRoot(200, 5000, gRoot); // after deadline
+        importerA.importGlobalRoot(200, 5000, gRoot);
     }
 
-    /// @dev Build an inclusion proof for a committed leg.
     function _inclusion(
-        FlowLeg memory _leg,
+        SendSpec memory _spec,
         bytes32 _flowId,
         uint256 _l1Block
     ) internal returns (ImtInclusionProof memory) {
-        IL2InteropCommitmentTree tree = _leg.chainId == CHAIN_A ? treeA : treeB;
-        uint256 value = AtomicInteropTestUtils.commitValue(_flowId, AtomicInteropTestUtils.specHashOf(_leg));
+        IL2InteropCommitmentTree tree = _spec.originChainId == CHAIN_A ? treeA : treeB;
+        uint256 value = AtomicInteropTestUtils.commitValue(_flowId, AtomicInteropTestUtils.specHashOf(_spec));
         uint256 idx = prover.indexOfValue(tree, value);
         FullMerkleWrapper mirror = prover.mirror(tree);
         return
             ImtInclusionProof({
-                chainId: _leg.chainId,
+                chainId: _spec.originChainId,
                 chainImtRoot: tree.root(),
                 leaf: tree.leafAt(idx),
                 imtLeafIndex: idx,
                 imtProof: mirror.path(idx),
-                globalLeafIndex: registry.leafIndexOf(_leg.chainId),
-                globalProof: registry.merklePathForChain(_leg.chainId),
+                globalLeafIndex: registry.leafIndexOf(_spec.originChainId),
+                globalProof: registry.merklePathForChain(_spec.originChainId),
                 l1BlockNumber: _l1Block
             });
     }
 
-    /// @dev Build a (valid) non-inclusion proof for an absent leg, bracketing the deadline.
     function _nonInclusion(
         IL2InteropCommitmentTree _tree,
         uint256 _chainId,
         bytes32 _flowId,
-        FlowLeg memory _leg
+        SendSpec memory _spec
     ) internal returns (ImtNonInclusionProof memory) {
-        uint256 value = AtomicInteropTestUtils.commitValue(_flowId, AtomicInteropTestUtils.specHashOf(_leg));
+        uint256 value = AtomicInteropTestUtils.commitValue(_flowId, AtomicInteropTestUtils.specHashOf(_spec));
         uint256 lowIdx = prover.lowNullifierIndex(_tree, value);
         FullMerkleWrapper mirror = prover.mirror(_tree);
         return

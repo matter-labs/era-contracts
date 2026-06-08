@@ -1,34 +1,29 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
-/// @notice Per-`(flowId, specHash)` lifecycle on each L2 escrow in the L1-free atomic flow.
+/// @notice Per-`(flowId, specHash)` lifecycle on each L2 escrow in the L1-free atomic flow. Mirrors
+/// the `dummy-interop` `SpecState`, but transitions are gated by IMT proofs instead of an L1 linker.
 ///
-/// Unlike the L1-coordinated `dummy-interop` stack, no central linker authorizes settlement.
-/// Each chain independently transitions a leg once a caller proves — against an *imported*
-/// global interop-IMT root — that every leg of the flow was committed before the deadline
-/// (happy path), or that some leg is provably missing across the deadline boundary (refund).
-///
-///   `Unset -> Committed -> Finalized` (happy)
-///   `Unset -> Committed -> Refunded`  (timeout)
-enum PartState {
+///   Source:      `Unset -> Committed -> Executable -> Executed` (happy),
+///                `Unset -> Committed -> Revertable -> Reverted` (timeout).
+///   Destination: `Unset -> Executable -> Executed`.
+enum SpecState {
     Unset,
     Committed,
-    Finalized,
-    Refunded
+    Executable,
+    Executed,
+    Revertable,
+    Reverted
 }
 
-/// @notice One conditional transfer that lives entirely on a single chain (`chainId`).
+/// @notice Declarative description of one cross-chain asset transfer (identical instance known to
+/// source and destination), reused from the L1-coordinated interop stack so the asset mechanics can
+/// route through the asset router / native token vault exactly like `L2FlowEscrow`.
 ///
-/// A flow is a set of legs, possibly on different chains. The flow's atomicity is enforced
-/// purely by proofs: a leg may only finalize once *all* legs of the flow have appended their
-/// commit value to their chain's interop IMT within the deadline. There is no L1 coordinator.
-///
-/// `payer` locks `amount` of `token` on `chainId` at commit time; `payee` receives it on
-/// finalize. Cross-chain intent is expressed by composing legs on different chains into one
-/// flow, so that either both settle or both refund.
-// SB instead of the struct below, use the following struct that was used for hte L1 interop:
-// ```
-/* struct SendSpec {
+/// `assetId` is derived externally as
+/// `keccak256(abi.encode(originChainId, L2_NATIVE_TOKEN_VAULT_ADDR, originToken))`.
+/// `depositor` carries the source-side payer so the escrow needs no separate depositor mapping.
+struct SendSpec {
     uint256 destChainId;
     address recipient;
     uint256 originChainId;
@@ -36,15 +31,6 @@ enum PartState {
     uint256 amount;
     bytes erc20Data;
     address depositor;
-}
-*/
-// As the struct that we have right now does not specify the recipients chain etc
-struct FlowLeg {
-    uint256 chainId;
-    address token;
-    uint256 amount;
-    address payer;
-    address payee;
 }
 
 /// @notice A leaf of an Indexed Merkle Tree. In addition to its own `value`, each leaf points to
@@ -61,9 +47,9 @@ struct IndexedLeaf {
     uint256 nextIndex;
 }
 
-/// @notice Inclusion proof that a leg's commit value is present in its chain's interop IMT, and
-/// that this IMT root was exposed in a global interop-IMT root imported on the verifying L2 with an
-/// L1 timestamp not later than the flow deadline.
+/// @notice Inclusion proof that a spec's commit value is present in its origin chain's interop IMT,
+/// and that this IMT root was exposed in a global interop-IMT root imported on the verifying L2 with
+/// an L1 timestamp not later than the flow deadline.
 ///
 /// Layered proof:
 ///   1. `leaf` (with `leaf.value == commitValue`) at `imtLeafIndex` with `imtProof` hashes up to

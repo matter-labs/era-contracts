@@ -3,33 +3,33 @@ pragma solidity 0.8.28;
 
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
+import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IGlobalInteropIMT} from "./IGlobalInteropIMT.sol";
 import {AtomicInteropProof} from "./libraries/AtomicInteropProof.sol";
 import {IMT_EMPTY_LEAF} from "./IAtomicInterop.sol";
 import {
-    GlobalImtBatchNotIncreasing,
-    GlobalImtNotOwner,
-    GlobalImtNotSubmitter,
+    GlobalImtNonConsecutiveBatch,
+    GlobalImtNotChainDiamond,
     GlobalImtUnknownBlock,
-    GlobalImtZeroOwner,
-    GlobalImtZeroRoot,
-    GlobalImtZeroSubmitter
+    GlobalImtZeroBridgehub,
+    GlobalImtZeroRoot
 } from "./AtomicInteropErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice See {IGlobalInteropIMT}. L1 aggregator of chain interop-IMT roots.
 ///
-/// The global tree is a {FullMerkle} tree whose leaf `i` is `keccak256(chainImtRoot, chainId)`
-/// for the chain assigned leaf index `i`. Each `submitChainRoot` updates that chain's leaf in
-/// place and snapshots the resulting global root against the current L1 block / timestamp, which
-/// is exactly the data L2 importers consume.
+/// The in-place global tree is a {FullMerkle} tree whose leaf `i` is
+/// `keccak256(chainImtRoot, chainId)`. The history tree is an append-only
+/// {DynamicIncrementalMerkle} of `keccak256(block, timestamp, globalRoot)` snapshots. The only
+/// address allowed to submit a chain's root is that chain's diamond proxy, resolved from the
+/// Bridgehub — there are no owner-managed submitter roles.
 contract GlobalInteropIMT is IGlobalInteropIMT {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
-    /// @notice Owner authorized to manage submitters.
-    address public owner;
+    /// @notice The Bridgehub used to resolve each chain's diamond proxy (the authorized submitter).
+    address public immutable BRIDGE_HUB;
 
     /// @dev The aggregated, in-place global tree (leaves are per-chain interop IMT roots).
     FullMerkle.FullTree internal _globalTree;
@@ -50,8 +50,6 @@ contract GlobalInteropIMT is IGlobalInteropIMT {
     mapping(uint256 chainId => bytes32 imtRoot) internal _chainRoot;
     /// @dev chainId => last submitted batch number.
     mapping(uint256 chainId => uint256 batchNumber) internal _currentBatchNumber;
-    /// @dev chainId => batchNumber => DA commitment.
-    mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 daCommitment)) internal _daCommitments;
 
     /// @dev L1 block number => latest global root recorded at that block.
     mapping(uint256 blockNumber => bytes32 globalRoot) internal _globalRootAtBlock;
@@ -60,64 +58,28 @@ contract GlobalInteropIMT is IGlobalInteropIMT {
     /// @dev Ascending list of distinct L1 block numbers at which a global root was recorded.
     uint256[] internal _historyBlocks;
 
-    /// @dev chainId => submitter => allowed.
-    mapping(uint256 chainId => mapping(address submitter => bool allowed)) internal _isSubmitter;
-    /// @dev submitter => allowed for any chain (demo operator).
-    mapping(address submitter => bool allowed) internal _isGlobalSubmitter;
-
-    modifier onlyOwner() {
-        if (msg.sender != owner) revert GlobalImtNotOwner(msg.sender);
-        _;
-    }
-
-    /// @param _owner The address allowed to manage submitters.
-    constructor(address _owner) {
-        if (_owner == address(0)) revert GlobalImtZeroOwner();
-        owner = _owner;
+    /// @param _bridgehub The Bridgehub used to resolve each chain's diamond proxy.
+    constructor(address _bridgehub) {
+        if (_bridgehub == address(0)) revert GlobalImtZeroBridgehub();
+        BRIDGE_HUB = _bridgehub;
         // Initialize both trees with the empty-leaf zero value so paths/zeros align with the
         // off-chain engine and the proof library.
         _globalTree.setup(IMT_EMPTY_LEAF);
         _historyTree.setup(IMT_EMPTY_LEAF);
     }
 
-    // SB: the submitter for each chain is its diamond proxy (should be read from bridgehub)
-    // the owner does not need to set anyything.
     /// @inheritdoc IGlobalInteropIMT
-    function setSubmitter(uint256 _chainId, address _submitter, bool _allowed) external onlyOwner {
-        if (_submitter == address(0)) revert GlobalImtZeroSubmitter();
-        _isSubmitter[_chainId][_submitter] = _allowed;
-        emit SubmitterSet(_chainId, _submitter, _allowed);
-    }
-
-
-    // SB: this role should not exist at all
-    /// @inheritdoc IGlobalInteropIMT
-    function setGlobalSubmitter(address _submitter, bool _allowed) external onlyOwner {
-        if (_submitter == address(0)) revert GlobalImtZeroSubmitter();
-        _isGlobalSubmitter[_submitter] = _allowed;
-        emit GlobalSubmitterSet(_submitter, _allowed);
-    }
-
-    /// @inheritdoc IGlobalInteropIMT
-    function submitChainRoot(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        bytes32 _chainImtRoot,
-        // SB: delete everything related to DA commitment
-        bytes32 _daCommitment
-    ) external {
-        // SB: again these roles should not exist.
-        if (!_isGlobalSubmitter[msg.sender] && !_isSubmitter[_chainId][msg.sender]) {
-            revert GlobalImtNotSubmitter(msg.sender, _chainId);
+    function submitChainRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainImtRoot) external {
+        // Only the chain's diamond proxy (its Executor) may submit that chain's root.
+        if (msg.sender != IBridgehubBase(BRIDGE_HUB).getZKChain(_chainId)) {
+            revert GlobalImtNotChainDiamond(msg.sender, _chainId);
         }
         if (_chainImtRoot == bytes32(0)) revert GlobalImtZeroRoot();
 
-        // SB: must be strictly incremental, no gaps allwoed. 
-        // Strictly increasing (gaps allowed) prevents replay/regression of a chain's root while
-        // keeping batch execution liveness decoupled from exact-consecutive submissions.
-        uint256 current = _currentBatchNumber[_chainId];
-        if (_batchNumber <= current) {
-            revert GlobalImtBatchNotIncreasing(_chainId, current, _batchNumber);
+        // Batch numbers must be strictly consecutive (no gaps).
+        uint256 expected = _currentBatchNumber[_chainId] + 1;
+        if (_batchNumber != expected) {
+            revert GlobalImtNonConsecutiveBatch(_chainId, expected, _batchNumber);
         }
 
         bytes32 leaf = AtomicInteropProof.globalLeaf(_chainId, _chainImtRoot);
@@ -134,7 +96,6 @@ contract GlobalInteropIMT is IGlobalInteropIMT {
 
         _chainRoot[_chainId] = _chainImtRoot;
         _currentBatchNumber[_chainId] = _batchNumber;
-        _daCommitments[_chainId][_batchNumber] = _daCommitment;
 
         bytes32 newGlobalRoot = _globalTree.root();
         if (_globalRootAtBlock[block.number] == bytes32(0)) {
@@ -150,11 +111,15 @@ contract GlobalInteropIMT is IGlobalInteropIMT {
             _historyBlockOfRoot[newGlobalRoot] = block.number;
         }
 
-        // solhint-disable-next-line func-named-parameters
-        emit ChainRootSubmitted(_chainId, _batchNumber, _chainImtRoot, _daCommitment, newGlobalRoot);
+        emit ChainRootSubmitted(_chainId, _batchNumber, _chainImtRoot, newGlobalRoot);
         emit GlobalRootUpdated(block.number, block.timestamp, newGlobalRoot);
         // solhint-disable-next-line func-named-parameters
         emit HistoryAppended(historyIndex, block.number, block.timestamp, newGlobalRoot, newHistoryRoot);
+    }
+
+    /// @inheritdoc IGlobalInteropIMT
+    function bridgehub() external view returns (address) {
+        return BRIDGE_HUB;
     }
 
     /// @inheritdoc IGlobalInteropIMT
@@ -205,11 +170,6 @@ contract GlobalInteropIMT is IGlobalInteropIMT {
     /// @inheritdoc IGlobalInteropIMT
     function currentBatchNumber(uint256 _chainId) external view returns (uint256) {
         return _currentBatchNumber[_chainId];
-    }
-
-    /// @inheritdoc IGlobalInteropIMT
-    function daCommitmentOf(uint256 _chainId, uint256 _batchNumber) external view returns (bytes32) {
-        return _daCommitments[_chainId][_batchNumber];
     }
 
     /// @inheritdoc IGlobalInteropIMT
