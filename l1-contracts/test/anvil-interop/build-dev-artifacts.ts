@@ -12,8 +12,22 @@ const ANVIL_INTEROP_DEV_ARTIFACTS: DevArtifact[] = [
     reason: "deployed at test runtime via ContractFactory to receive cross-chain interop bundles",
   },
   {
+    contractPath: "contracts/dev-contracts/L2ChainAssetHandlerDev.sol",
+    reason:
+      "installed at the Gateway ChainAssetHandler address so reverse-TBM setup can bump migrationNumber through onlyUpgrader",
+  },
+  {
+    contractPath: "contracts/dev-contracts/L1ChainAssetHandlerDev.sol",
+    reason:
+      "deployed behind the L1 ChainAssetHandler proxy so reverse-TBM setup can bump migrationNumber through onlyOwner",
+  },
+  {
     contractPath: "contracts/dev-contracts/TestnetERC20Token.sol",
     reason: "deployed at test runtime to exercise a freshly registered, migrated chain-native asset",
+  },
+  {
+    contractPath: "contracts/dev-contracts/TransparentUpgradeableProxyForHarness.sol",
+    reason: "pulls TransparentUpgradeableProxy into forge out/ for the harness proxy-upgrade ABI",
   },
 ];
 

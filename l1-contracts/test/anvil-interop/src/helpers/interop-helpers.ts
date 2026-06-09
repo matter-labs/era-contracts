@@ -16,11 +16,12 @@ import {
   INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
   INTEROP_SEND_BUNDLE_GAS_LIMIT,
+  L2_BOOTLOADER_ADDR,
   L2_ASSET_ROUTER_ADDR,
   L2_INTEROP_HANDLER_ADDR,
 } from "../core/const";
 import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
-import { buildMockInteropProof } from "../core/utils";
+import { buildMockInteropProof, impersonateAndRun } from "../core/utils";
 import { encodeEvmChain, encodeEvmAddress } from "./erc7930";
 import { waitForLiveInteropProof } from "./temp-sdk";
 import { approveTokenForNtv, expectBalanceDelta, getTokenAddressForAsset, getTokenBalance } from "./balance-helpers";
@@ -30,6 +31,11 @@ const sendResultsByBundleData = new Map<string, InteropSendResult>();
 
 /** IERC7786Attributes interface — used for attribute encoding via encodeFunctionData. */
 const erc7786Iface = new ethers.utils.Interface(getAbi("IERC7786Attributes"));
+
+export interface AccumulatedProtocolFeesSnapshot {
+  coinbase: string;
+  amount: BigNumber;
+}
 
 // ── ERC-7786 attribute encoding ────────────────────────────────
 // Uses IERC7786Attributes.encodeFunctionData so selectors and parameter
@@ -450,6 +456,68 @@ export async function getInteropProtocolFee(provider: providers.JsonRpcProvider)
 }
 
 /**
+ * Set the dynamic interop protocol fee through the bootloader-only production entry point.
+ */
+export async function setInteropProtocolFee(provider: providers.JsonRpcProvider, fee: BigNumber): Promise<void> {
+  if (isLiveInteropMode()) {
+    throw new Error("setInteropProtocolFee uses Anvil bootloader impersonation and cannot run in live mode");
+  }
+
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  await impersonateAndRun(provider, L2_BOOTLOADER_ADDR, async (signer) => {
+    const tx = await interopCenter.connect(signer).setInteropFee(fee, { gasLimit: 500_000 });
+    await tx.wait();
+  });
+
+  const actualFee = await interopCenter.interopProtocolFee();
+  expect(actualFee.eq(fee), `InteropCenter fee should be ${fee.toString()}, got ${actualFee.toString()}`).to.be.true;
+}
+
+/**
+ * Get accumulated base-token interop fees for a coinbase address.
+ */
+export async function getAccumulatedProtocolFees(
+  provider: providers.JsonRpcProvider,
+  coinbase: string
+): Promise<BigNumber> {
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  return interopCenter.accumulatedProtocolFees(coinbase);
+}
+
+/**
+ * Snapshot the current block coinbase's accumulated dynamic interop protocol fees.
+ */
+export async function snapshotAccumulatedProtocolFees(
+  provider: providers.JsonRpcProvider
+): Promise<AccumulatedProtocolFeesSnapshot> {
+  const latestBlock = await provider.getBlock("latest");
+  return {
+    coinbase: latestBlock.miner,
+    amount: await getAccumulatedProtocolFees(provider, latestBlock.miner),
+  };
+}
+
+/**
+ * Assert the exact dynamic-fee delta credited by a transaction.
+ */
+export async function expectAccumulatedProtocolFeeDelta(
+  provider: providers.JsonRpcProvider,
+  before: AccumulatedProtocolFeesSnapshot,
+  receipt: providers.TransactionReceipt,
+  expectedDelta: BigNumber,
+  label: string
+): Promise<void> {
+  const minedBlock = await provider.getBlock(receipt.blockNumber);
+  expect(minedBlock.miner.toLowerCase(), `${label}: transaction mined by snapshotted coinbase`).to.equal(
+    before.coinbase.toLowerCase()
+  );
+
+  const after = await getAccumulatedProtocolFees(provider, minedBlock.miner);
+  const actualDelta = after.sub(before.amount);
+  expect(actualDelta.eq(expectedDelta), `${label}: protocol fee delta ${actualDelta} == ${expectedDelta}`).to.be.true;
+}
+
+/**
  * Get the fixed ZK interop fee from InteropCenter.
  */
 export async function getZkInteropFee(provider: providers.JsonRpcProvider): Promise<BigNumber> {
@@ -479,6 +547,40 @@ export async function getZkTokenAddress(provider: providers.JsonRpcProvider): Pr
 export async function getAccumulatedZkFees(provider: providers.JsonRpcProvider, coinbase: string): Promise<BigNumber> {
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
   return interopCenter.accumulatedZKFees(coinbase);
+}
+
+/**
+ * Snapshot the current block coinbase's accumulated fixed ZK interop fees.
+ */
+export async function snapshotAccumulatedZkFees(
+  provider: providers.JsonRpcProvider
+): Promise<AccumulatedProtocolFeesSnapshot> {
+  const latestBlock = await provider.getBlock("latest");
+  return {
+    coinbase: latestBlock.miner,
+    amount: await getAccumulatedZkFees(provider, latestBlock.miner),
+  };
+}
+
+/**
+ * Assert the exact fixed-ZK-fee delta credited by a transaction.
+ */
+export async function expectAccumulatedZkFeeDelta(
+  provider: providers.JsonRpcProvider,
+  before: AccumulatedProtocolFeesSnapshot,
+  receipt: providers.TransactionReceipt,
+  expectedDelta: BigNumber,
+  label: string
+): Promise<void> {
+  const minedBlock = await provider.getBlock(receipt.blockNumber);
+  expect(minedBlock.miner.toLowerCase(), `${label}: transaction mined by snapshotted coinbase`).to.equal(
+    before.coinbase.toLowerCase()
+  );
+
+  const after = await getAccumulatedZkFees(provider, minedBlock.miner);
+  const actualDelta = after.sub(before.amount);
+  expect(actualDelta.eq(expectedDelta), `${label}: accumulated ZK fee delta ${actualDelta} == ${expectedDelta}`).to.be
+    .true;
 }
 
 /**

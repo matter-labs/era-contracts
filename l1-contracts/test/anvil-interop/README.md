@@ -220,7 +220,7 @@ test/anvil-interop/
 - **Custom pubdata pricing**: Gas and pubdata costs use Anvil defaults, not ZKsync fee models
 - **Non-ETH base tokens**: All chains use ETH as the base token
 - **Validium mode**: All chains run as rollup (validium carries no meaning without batch settlement)
-- **Interop fees**: Settlement fees are always zero; non-zero fee testing not implemented
+- **Settlement fees**: `processLogsAndMessages` still uses a zero settlement fee payer; interop sends cover non-zero dynamic base-token fees and fixed ZK fees separately
 
 ### Mock Contracts
 
