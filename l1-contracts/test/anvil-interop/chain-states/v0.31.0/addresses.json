@@ -50,6 +50,30 @@
   "customBaseTokens": {
     "14": "0xf953b3A269d80e3eB0F2947630Da976B896A8C5b"
   },
+  "tbmAccountingSnapshots": {
+    "12:0x8df3463b1850eb1d8d1847743ea155aef6b16074db8ba81d897dc30554fb2085": {
+      "chainId": 12,
+      "assetId": "0x8df3463b1850eb1d8d1847743ea155aef6b16074db8ba81d897dc30554fb2085",
+      "l1SourceBefore": "3166666668000000",
+      "l1SourceAfter": "0",
+      "gwChainBefore": "0",
+      "gwChainAfter": "3166666668000000",
+      "gwPendingBefore": "0",
+      "gwPendingAfter": "0",
+      "migratedAmount": "3166666668000000"
+    },
+    "13:0x8df3463b1850eb1d8d1847743ea155aef6b16074db8ba81d897dc30554fb2085": {
+      "chainId": 13,
+      "assetId": "0x8df3463b1850eb1d8d1847743ea155aef6b16074db8ba81d897dc30554fb2085",
+      "l1SourceBefore": "3166666668000000",
+      "l1SourceAfter": "0",
+      "gwChainBefore": "0",
+      "gwChainAfter": "3166666668000000",
+      "gwPendingBefore": "0",
+      "gwPendingAfter": "0",
+      "migratedAmount": "3166666668000000"
+    }
+  },
   "zkToken": {
     "l1Address": "0x8f86403A4DE0BB5791fa46B8e795C547942fE4Cf",
     "assetId": "0x4c9e2233bf432661b67d4319987508be94866d721a613231b40b037a3926451d"
