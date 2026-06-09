@@ -3,7 +3,14 @@ import { Contract, providers, Wallet, ethers } from "ethers";
 import type { CoreDeployedAddresses } from "../core/types";
 import { extractAndRelayNewPriorityRequests } from "../core/utils";
 import { getAbi } from "../core/contracts";
-import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS, L1_CHAIN_ID } from "../core/const";
+import {
+  ANVIL_DEFAULT_PRIVATE_KEY,
+  ANVIL_INTEROP_BASE_TOKEN_PRIORITY_TX_GAS_LIMIT,
+  ANVIL_INTEROP_PRIORITY_TX_L1_GAS_PRICE_WEI,
+  ANVIL_INTEROP_REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+  ETH_TOKEN_ADDRESS,
+  L1_CHAIN_ID,
+} from "../core/const";
 import { encodeAssetRouterBridgehubDepositData, encodeBridgeBurnData, encodeNtvAssetId } from "../core/data-encoding";
 
 export interface DepositETHParams {
@@ -63,9 +70,9 @@ export async function depositETHToL2(params: DepositETHParams): Promise<DepositE
 
   const bridgehub = new Contract(l1Addresses.bridgehub, getAbi("L1Bridgehub"), l1Wallet);
 
-  const l2GasLimit = 1_000_000;
-  const l2GasPerPubdataByteLimit = 800;
-  const gasPrice = 50_000_000_000n; // 50 gwei
+  const l2GasLimit = ANVIL_INTEROP_BASE_TOKEN_PRIORITY_TX_GAS_LIMIT;
+  const l2GasPerPubdataByteLimit = ANVIL_INTEROP_REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
+  const gasPrice = ANVIL_INTEROP_PRIORITY_TX_L1_GAS_PRICE_WEI;
 
   const baseCost = await bridgehub.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, l2GasPerPubdataByteLimit);
   const mintValue = baseCost.add(amount);
@@ -157,8 +164,8 @@ export async function depositERC20ToL2(params: DepositERC20Params): Promise<Depo
   }
 
   const l2GasLimit = 2_000_000;
-  const l2GasPerPubdataByteLimit = 800;
-  const gasPrice = 50_000_000_000n; // 50 gwei
+  const l2GasPerPubdataByteLimit = ANVIL_INTEROP_REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
+  const gasPrice = ANVIL_INTEROP_PRIORITY_TX_L1_GAS_PRICE_WEI;
   const mintValue = await bridgehub.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, l2GasPerPubdataByteLimit);
 
   const secondBridgeCalldata = encodeAssetRouterBridgehubDepositData(

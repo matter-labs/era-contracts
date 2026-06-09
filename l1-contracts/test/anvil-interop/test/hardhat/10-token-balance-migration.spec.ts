@@ -118,6 +118,7 @@ const UNREGISTERED_CHAIN_ID = 1337;
 // (the chain-less form is what InteropCenter.sendBundle expects).
 const UNREGISTERED_DESTINATION_BYTES = encodeEvmChain(UNREGISTERED_CHAIN_ID);
 
+const POST_FORWARD_MIGRATION_NUMBER = 1;
 const POST_REVERSE_MIGRATION_NUMBER = 2;
 
 interface TrackerBalanceSnapshot {
@@ -391,9 +392,8 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         );
 
         const accounting = await snapshotTrackerBalances(chainId, ethAssetId);
-        // Base-token TBM migrates the ETH amount that funded the two-bridges
-        // priority requests in the harness setup. Compute it through Bridgehub so
-        // the assertion follows the same base-cost formula as production.
+        // The harness seeds ETH chainBalance with the outer + inner base-token
+        // priority tx costs, so forward TBM should credit that exact amount on GW.
         const priorityRequestBaseCost = await bridgehub.l2TransactionBaseCost(
           chainId,
           ANVIL_INTEROP_PRIORITY_TX_L1_GAS_PRICE_WEI,
@@ -402,7 +402,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         );
         const expectedMigratedEth = priorityRequestBaseCost.mul(ANVIL_INTEROP_TWO_BRIDGES_PRIORITY_REQUEST_COUNT);
 
-        expect(l1Mig, `L1AT assetMigrationNumber[${chainId}][ETH]`).to.equal(1);
+        expect(l1Mig, `L1AT assetMigrationNumber[${chainId}][ETH]`).to.equal(POST_FORWARD_MIGRATION_NUMBER);
         expect(l1Mig, `L1AT/GWAT assetMigrationNumber should match for chain ${chainId} (ETH)`).to.equal(gwMig);
         expect(accounting.l1.eq(0), `L1 chainBalance[${chainId}][ETH] migrated away from chain`).to.equal(true);
         expect(
@@ -441,9 +441,12 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         );
 
         const accounting = await snapshotTrackerBalances(chainId, testTokenAssetId);
+        const l2Provider = new ethers.providers.JsonRpcProvider(getL2RpcUrl(state, chainId));
+        const l2AssetTracker = new Contract(L2_ASSET_TRACKER_ADDR, getAbi("L2AssetTracker"), l2Provider);
+        const expectedMigratedTokenBalance = await l2AssetTracker.chainBalance(chainId, testTokenAssetId);
         const l1GatewayBalance = await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, gwChainId, testTokenAssetId);
 
-        expect(l1Mig, `L1AT assetMigrationNumber[${chainId}][testToken]`).to.equal(1);
+        expect(l1Mig, `L1AT assetMigrationNumber[${chainId}][testToken]`).to.equal(POST_FORWARD_MIGRATION_NUMBER);
         expect(l1Mig, `L1AT/GWAT assetMigrationNumber should match for chain ${chainId} (test token)`).to.equal(gwMig);
         expect(accounting.l1.eq(0), `L1 chainBalance[${chainId}][testToken] migrated away from chain`).to.equal(true);
         expect(
@@ -451,8 +454,12 @@ describe("10 - Token Balance Migration Lifecycle", function () {
           `GW pendingInteropBalance[${chainId}][testToken] is empty after forward TBM setup`
         ).to.equal(true);
         expect(
-          accounting.gwChain.eq(l1GatewayBalance),
-          `GW chainBalance[${chainId}][testToken] ${accounting.gwChain} == L1 chainBalance[GW][testToken] ${l1GatewayBalance}`
+          accounting.gwChain.eq(expectedMigratedTokenBalance),
+          `GW chainBalance[${chainId}][testToken] ${accounting.gwChain} == L2 chainBalance[${chainId}][testToken] ${expectedMigratedTokenBalance}`
+        ).to.equal(true);
+        expect(
+          l1GatewayBalance.eq(expectedMigratedTokenBalance),
+          `L1 chainBalance[GW][testToken] ${l1GatewayBalance} == L2 chainBalance[${chainId}][testToken] ${expectedMigratedTokenBalance}`
         ).to.equal(true);
       }
     });
@@ -479,7 +486,9 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         reverseTbmChainId,
         reverseTbmTestTokenAssetId
       );
-      expect(gwMigBefore, "setup guarantee: test token is already migrated on GW").to.equal(1);
+      expect(gwMigBefore, "setup guarantee: test token is already migrated on GW").to.equal(
+        POST_FORWARD_MIGRATION_NUMBER
+      );
 
       await migrateTokenBalanceToGW({
         l2Provider: reverseTbmProvider,
@@ -539,7 +548,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       const ethMigNum = BigNumber.from(await l2AssetTracker.assetMigrationNumber(reverseTbmChainId, ethAssetId));
       const unmigratedMigNum = BigNumber.from(await l2AssetTracker.assetMigrationNumber(reverseTbmChainId, unmigrated));
 
-      expect(ethMigNum, `L2 assetMigrationNumber[${reverseTbmChainId}][ETH]`).to.equal(1);
+      expect(ethMigNum, `L2 assetMigrationNumber[${reverseTbmChainId}][ETH]`).to.equal(POST_FORWARD_MIGRATION_NUMBER);
       expect(unmigratedMigNum.eq(0), "L2 assetMigrationNumber[·][unmigrated] == 0").to.equal(true);
     });
 
