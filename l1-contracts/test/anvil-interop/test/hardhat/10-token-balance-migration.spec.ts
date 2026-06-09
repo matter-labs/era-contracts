@@ -441,12 +441,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         );
 
         const accounting = await snapshotTrackerBalances(chainId, testTokenAssetId);
-        const l1GatewayBalance = await queryL1ChainBalance(
-          l1Provider,
-          l1AssetTrackerAddr,
-          gwChainId,
-          testTokenAssetId
-        );
+        const l1GatewayBalance = await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, gwChainId, testTokenAssetId);
 
         expect(l1Mig, `L1AT assetMigrationNumber[${chainId}][testToken]`).to.equal(1);
         expect(l1Mig, `L1AT/GWAT assetMigrationNumber should match for chain ${chainId} (test token)`).to.equal(gwMig);
