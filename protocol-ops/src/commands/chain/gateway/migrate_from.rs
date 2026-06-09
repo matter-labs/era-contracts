@@ -13,21 +13,21 @@
 //! Phase 0 reuses `migrate_to::stage_pause_deposits` because deposits have to
 //! be paused from the L1 side before the Migrator facet on the gateway will
 //! accept the withdrawal priority tx. Phase 1 waits for the notified server
-//! to report its settlement-change boundary and for the old gateway settlement
-//! layer to execute up to that boundary. Phases 2–4 are thin wrappers around a
-//! single stage each; the phase names stay to keep the CLI symmetric with
+//! to report its settlement-change boundary and for the chain server's
+//! finalized block to reach the block immediately before that boundary.
+//! Phases 2–4 are thin wrappers around a single stage each; the phase names stay to keep the CLI symmetric with
 //! `migrate-to` and to match the per-phase workflow split.
 
 use anyhow::Context;
 use clap::{Parser, Subcommand};
-use ethers::types::{Address, Bytes, H256, U256};
+use ethers::types::{Address, Bytes, H256};
 use ethers::utils::hex;
 use serde::{Deserialize, Serialize};
 
 use super::migrate_to::{stage_pause_deposits, wait_for_l2_tx_receipt};
-use crate::abi::{BridgehubAbi, IChainTypeManagerAbi, ZkChainAbi};
+use crate::abi::{BridgehubAbi, IChainTypeManagerAbi};
 use crate::commands::output::write_output_if_requested;
-use crate::common::addresses::{GATEWAY_L2_BRIDGEHUB, L2_L1_MESSENGER};
+use crate::common::addresses::L2_L1_MESSENGER;
 use crate::common::EcosystemChainArgs;
 use crate::common::SharedRunArgs;
 use crate::common::{forge::ForgeRunner, logger};
@@ -59,8 +59,8 @@ pub enum MigrateFromCommands {
     #[command(name = "phase-0-pause-deposits")]
     Phase0PauseDeposits(Phase0PauseDepositsArgs),
     /// Phase 1: wait until the chain server has reported the settlement
-    /// change block and the gateway-side chain diamond has executed the
-    /// corresponding pre-boundary batch.
+    /// change block and the chain server reports the pre-boundary block as
+    /// finalized on its current settlement layer.
     #[command(name = "phase-1-wait-ready")]
     Phase1WaitReady(Phase1WaitReadyArgs),
     /// Phase 2: send the start-migration L1→gateway-L2 priority tx. The
@@ -101,14 +101,10 @@ pub struct Phase1WaitReadyArgs {
     pub chain_id: u64,
 
     /// Migrating chain server RPC URL. The server must expose
-    /// `zks_lastSettlementChangeBlock` and `unstable_getBatchByBlockNumber`.
+    /// `zks_lastSettlementChangeBlock` and support `eth_getBlockByNumber`
+    /// with the `finalized` tag.
     #[clap(long)]
     pub chain_rpc_url: String,
-
-    /// Gateway L2 RPC URL. Used to read the migrating chain's gateway-side
-    /// diamond and its `getTotalBatchesExecuted()` value.
-    #[clap(long)]
-    pub gateway_rpc_url: String,
 
     /// Value of `zks_lastSettlementChangeBlock` captured before phase 0 was
     /// applied. When supplied, this phase waits for a strictly newer block so
@@ -120,7 +116,7 @@ pub struct Phase1WaitReadyArgs {
     #[clap(long, default_value_t = DEFAULT_MIGRATION_READY_TIMEOUT_SECS)]
     pub timeout_secs: u64,
 
-    /// Poll interval for the chain server and gateway diamond checks.
+    /// Poll interval for the chain server checks.
     #[clap(long, default_value_t = DEFAULT_MIGRATION_READY_POLL_INTERVAL_SECS)]
     pub poll_interval_secs: u64,
 }
@@ -258,7 +254,6 @@ pub async fn run_phase1_wait_ready(args: Phase1WaitReadyArgs) -> anyhow::Result<
     logger::step("Waiting for migration FROM gateway readiness");
     logger::info(format!("Chain ID: {}", args.chain_id));
     logger::info(format!("Chain RPC URL: {}", args.chain_rpc_url));
-    logger::info(format!("Gateway RPC URL: {}", args.gateway_rpc_url));
     if let Some(previous_block) = args.previous_settlement_change_block {
         logger::info(format!(
             "Previous settlement-change block: {previous_block}"
@@ -275,11 +270,10 @@ pub async fn run_phase1_wait_ready(args: Phase1WaitReadyArgs) -> anyhow::Result<
 
     logger::success("Migration FROM gateway readiness confirmed");
     logger::info(format!(
-        "Settlement-change block {} is in batch {}; gateway executed {} (required >= {})",
+        "Settlement-change block {}; finalized block {} (required >= {})",
         readiness.settlement_change_block,
-        readiness.trigger_batch,
-        readiness.executed_batch,
-        readiness.required_executed_batch,
+        readiness.finalized_block,
+        readiness.required_finalized_block,
     ));
     Ok(())
 }
@@ -654,29 +648,13 @@ fn l1_messenger_address() -> Address {
 #[derive(Debug)]
 struct MigrationReadyBoundary {
     settlement_change_block: u64,
-    trigger_batch: u64,
-    required_executed_batch: u64,
-    executed_batch: U256,
+    required_finalized_block: u64,
+    finalized_block: u64,
 }
 
 async fn wait_for_migration_from_gateway_ready(
     args: &Phase1WaitReadyArgs,
 ) -> anyhow::Result<MigrationReadyBoundary> {
-    use ethers::providers::{Http, Provider};
-
-    let chain_diamond_on_gateway =
-        resolve_chain_diamond_on_gateway(&args.gateway_rpc_url, args.chain_id)
-            .await
-            .context("resolve migrating chain diamond on gateway")?;
-    logger::info(format!(
-        "Chain diamond on gateway: {chain_diamond_on_gateway:#x}"
-    ));
-
-    let provider = std::sync::Arc::new(
-        Provider::<Http>::try_from(args.gateway_rpc_url.as_str())
-            .context("connect gateway provider")?,
-    );
-    let zk_chain = ZkChainAbi::new(chain_diamond_on_gateway, provider);
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(
             MIGRATION_READY_RPC_REQUEST_TIMEOUT_SECS,
@@ -721,40 +699,31 @@ async fn wait_for_migration_from_gateway_ready(
             }
         }
 
-        let Some(trigger_batch) =
-            get_batch_number_by_block_number(&client, &args.chain_rpc_url, settlement_change_block)
-                .await?
+        let required_finalized_block = settlement_change_block.saturating_sub(1);
+        let Some(finalized_block) =
+            get_finalized_block_number(&client, &args.chain_rpc_url).await?
         else {
             log_readiness_status(
                 &mut last_status,
-                format!(
-                    "settlement-change block {settlement_change_block} is not indexed to a batch yet"
-                ),
+                "server has not reported a finalized block yet",
             );
             tokio::time::sleep(poll_interval).await;
             continue;
         };
 
-        let required_executed_batch = trigger_batch.saturating_sub(1);
-        let executed_batch = zk_chain
-            .get_total_batches_executed()
-            .call()
-            .await
-            .context("gateway chain diamond getTotalBatchesExecuted")?;
-        if executed_batch >= U256::from(required_executed_batch) {
+        if finalized_block >= required_finalized_block {
             return Ok(MigrationReadyBoundary {
                 settlement_change_block,
-                trigger_batch,
-                required_executed_batch,
-                executed_batch,
+                required_finalized_block,
+                finalized_block,
             });
         }
 
         log_readiness_status(
             &mut last_status,
             format!(
-                "settlement-change block {settlement_change_block} is in batch {trigger_batch}; \
-                 gateway executed {executed_batch}, waiting for >= {required_executed_batch}"
+                "settlement-change block {settlement_change_block}; \
+                 finalized block {finalized_block}, waiting for >= {required_finalized_block}"
             ),
         );
         tokio::time::sleep(poll_interval).await;
@@ -767,32 +736,6 @@ fn log_readiness_status(last_status: &mut Option<String>, status: impl Into<Stri
         logger::info(status.clone());
         *last_status = Some(status);
     }
-}
-
-/// Resolve a chain's diamond proxy address on the gateway by querying the
-/// gateway's L2 bridgehub.
-async fn resolve_chain_diamond_on_gateway(
-    gateway_rpc_url: &str,
-    chain_id: u64,
-) -> anyhow::Result<Address> {
-    use ethers::providers::{Http, Provider};
-
-    let provider = std::sync::Arc::new(
-        Provider::<Http>::try_from(gateway_rpc_url).context("connect gateway provider")?,
-    );
-    let gw_bridgehub: Address = GATEWAY_L2_BRIDGEHUB.parse()?;
-    let bridgehub = BridgehubAbi::new(gw_bridgehub, provider);
-    let addr = bridgehub
-        .get_zk_chain(chain_id.into())
-        .call()
-        .await
-        .context("gateway L2 getZKChain call")?;
-    anyhow::ensure!(
-        addr != Address::zero(),
-        "getZKChain({chain_id}) returned zero; chain is not registered on gateway"
-    );
-
-    Ok(addr)
 }
 
 async fn get_last_settlement_change_block(
@@ -830,81 +773,44 @@ async fn get_last_settlement_change_block(
         .context("parse zks_lastSettlementChangeBlock result")
 }
 
-async fn get_batch_number_by_block_number(
+async fn get_finalized_block_number(
     client: &reqwest::Client,
     chain_rpc_url: &str,
-    block_number: u64,
 ) -> anyhow::Result<Option<u64>> {
     let body = serde_json::json!({
         "jsonrpc": "2.0",
         "id": 1,
-        "method": "unstable_getBatchByBlockNumber",
-        "params": [block_number],
+        "method": "eth_getBlockByNumber",
+        "params": ["finalized", false],
     });
     let resp: JsonRpcResponse<serde_json::Value> = client
         .post(chain_rpc_url)
         .json(&body)
         .send()
         .await
-        .context("send unstable_getBatchByBlockNumber request")?
+        .context("send eth_getBlockByNumber(finalized) request")?
         .json()
         .await
-        .context("parse unstable_getBatchByBlockNumber response")?;
+        .context("parse eth_getBlockByNumber(finalized) response")?;
 
     if let Some(error) = resp.error {
-        if is_retryable_batch_lookup_error(&error) {
-            return Ok(None);
-        }
         anyhow::bail!(
-            "{}({block_number}) returned {}",
-            "unstable_getBatchByBlockNumber",
+            "{} returned {}",
+            "eth_getBlockByNumber(finalized)",
             error.describe()
         );
     }
 
-    resp.result
-        .as_ref()
-        .map(extract_batch_number_from_persisted_batch)
-        .transpose()
-        .with_context(|| {
-            format!(
-                "parse {}({block_number}) result",
-                "unstable_getBatchByBlockNumber"
-            )
-        })
-}
+    let Some(block) = resp.result else {
+        return Ok(None);
+    };
+    let number = block
+        .get("number")
+        .ok_or_else(|| anyhow::anyhow!("eth_getBlockByNumber(finalized) result has no number"))?;
 
-fn is_retryable_batch_lookup_error(error: &JsonRpcError) -> bool {
-    error.message.contains("has not been finalized or indexed")
-        || error.message.contains("BatchNotAvailableYet")
-}
-
-fn extract_batch_number_from_persisted_batch(batch: &serde_json::Value) -> anyhow::Result<u64> {
-    let value = find_batch_number_value(batch)
-        .ok_or_else(|| anyhow::anyhow!("missing batch_info.batch_number in response: {batch}"))?;
-    parse_u64_rpc_value(value)
-}
-
-fn find_batch_number_value(batch: &serde_json::Value) -> Option<&serde_json::Value> {
-    for batch_info_key in ["batch_info", "batchInfo"] {
-        if let Some(batch_info) = batch.get(batch_info_key) {
-            for batch_number_key in ["batch_number", "batchNumber"] {
-                if let Some(value) = batch_info.get(batch_number_key) {
-                    return Some(value);
-                }
-            }
-        }
-    }
-
-    for committed_batch_key in ["committed_batch", "committedBatch"] {
-        if let Some(committed_batch) = batch.get(committed_batch_key) {
-            if let Some(value) = find_batch_number_value(committed_batch) {
-                return Some(value);
-            }
-        }
-    }
-
-    None
+    parse_u64_rpc_value(number)
+        .map(Some)
+        .context("parse eth_getBlockByNumber(finalized).number")
 }
 
 fn parse_u64_rpc_value(value: &serde_json::Value) -> anyhow::Result<u64> {
@@ -921,52 +827,6 @@ fn parse_u64_rpc_value(value: &serde_json::Value) -> anyhow::Result<u64> {
             }
         }
         _ => anyhow::bail!("expected u64 JSON number or string, got {value}"),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use serde_json::json;
-
-    use super::{extract_batch_number_from_persisted_batch, parse_u64_rpc_value};
-
-    #[test]
-    fn extracts_batch_number_from_snake_case_persisted_batch() {
-        let batch = json!({
-            "batch_info": {
-                "batch_number": 42
-            },
-            "block_range": [10, 12],
-            "execute_sl_block_number": null
-        });
-
-        assert_eq!(
-            extract_batch_number_from_persisted_batch(&batch).unwrap(),
-            42
-        );
-    }
-
-    #[test]
-    fn extracts_batch_number_from_camel_case_persisted_batch() {
-        let batch = json!({
-            "batchInfo": {
-                "batchNumber": "0x2a"
-            },
-            "blockRange": [10, 12],
-            "executeSlBlockNumber": null
-        });
-
-        assert_eq!(
-            extract_batch_number_from_persisted_batch(&batch).unwrap(),
-            42
-        );
-    }
-
-    #[test]
-    fn parses_decimal_and_hex_rpc_u64_values() {
-        assert_eq!(parse_u64_rpc_value(&json!(42)).unwrap(), 42);
-        assert_eq!(parse_u64_rpc_value(&json!("42")).unwrap(), 42);
-        assert_eq!(parse_u64_rpc_value(&json!("0x2a")).unwrap(), 42);
     }
 }
 
