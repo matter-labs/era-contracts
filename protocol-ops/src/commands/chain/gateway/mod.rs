@@ -3,6 +3,7 @@ use clap::Subcommand;
 pub(crate) mod convert;
 pub(crate) mod migrate_from;
 pub(crate) mod migrate_to;
+pub(crate) mod migration_ready;
 pub(crate) mod setup_fee_payer;
 
 /// Gateway operations: converting a chain into a gateway or migrating a chain to/from one.

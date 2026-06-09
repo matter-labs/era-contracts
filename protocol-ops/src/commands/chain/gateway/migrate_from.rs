@@ -25,6 +25,10 @@ use ethers::utils::hex;
 use serde::{Deserialize, Serialize};
 
 use super::migrate_to::{stage_pause_deposits, wait_for_l2_tx_receipt};
+use super::migration_ready::{
+    wait_for_settlement_change_ready, DEFAULT_MIGRATION_READY_POLL_INTERVAL_SECS,
+    DEFAULT_MIGRATION_READY_TIMEOUT_SECS,
+};
 use crate::abi::{BridgehubAbi, IChainTypeManagerAbi};
 use crate::commands::output::write_output_if_requested;
 use crate::common::addresses::L2_L1_MESSENGER;
@@ -35,10 +39,6 @@ use crate::config::forge_interface::script_params::{
     ADMIN_FUNCTIONS_INVOCATION, GATEWAY_UTILS_INVOCATION,
 };
 use crate::types::L2DACommitmentScheme;
-
-const DEFAULT_MIGRATION_READY_TIMEOUT_SECS: u64 = 300;
-const DEFAULT_MIGRATION_READY_POLL_INTERVAL_SECS: u64 = 2;
-const MIGRATION_READY_RPC_REQUEST_TIMEOUT_SECS: u64 = 30;
 
 // ── CLI args ──────────────────────────────────────────────────────────────
 
@@ -264,9 +264,15 @@ pub async fn run_phase1_wait_ready(args: Phase1WaitReadyArgs) -> anyhow::Result<
         );
     }
 
-    let readiness = wait_for_migration_from_gateway_ready(&args)
-        .await
-        .context("Waiting for migration FROM gateway readiness")?;
+    let readiness = wait_for_settlement_change_ready(
+        &args.chain_rpc_url,
+        args.previous_settlement_change_block,
+        args.timeout_secs,
+        args.poll_interval_secs,
+        "migration FROM gateway",
+    )
+    .await
+    .context("Waiting for migration FROM gateway readiness")?;
 
     logger::success("Migration FROM gateway readiness confirmed");
     logger::info(format!(
@@ -646,191 +652,6 @@ fn l1_messenger_address() -> Address {
 }
 
 #[derive(Debug)]
-struct MigrationReadyBoundary {
-    settlement_change_block: u64,
-    required_finalized_block: u64,
-    finalized_block: u64,
-}
-
-async fn wait_for_migration_from_gateway_ready(
-    args: &Phase1WaitReadyArgs,
-) -> anyhow::Result<MigrationReadyBoundary> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(
-            MIGRATION_READY_RPC_REQUEST_TIMEOUT_SECS,
-        ))
-        .build()
-        .context("build migration readiness RPC client")?;
-    let timeout = std::time::Duration::from_secs(args.timeout_secs);
-    let poll_interval = std::time::Duration::from_secs(args.poll_interval_secs);
-    let start = std::time::Instant::now();
-    let mut last_status = None::<String>;
-
-    loop {
-        if start.elapsed() >= timeout {
-            anyhow::bail!(
-                "timeout waiting for migration FROM gateway readiness after {}s",
-                args.timeout_secs
-            );
-        }
-
-        let Some(settlement_change_block) =
-            get_last_settlement_change_block(&client, &args.chain_rpc_url).await?
-        else {
-            log_readiness_status(
-                &mut last_status,
-                "server has not reported a settlement-change block yet",
-            );
-            tokio::time::sleep(poll_interval).await;
-            continue;
-        };
-
-        if let Some(previous_block) = args.previous_settlement_change_block {
-            if settlement_change_block <= previous_block {
-                log_readiness_status(
-                    &mut last_status,
-                    format!(
-                        "server still reports settlement-change block {settlement_change_block}; \
-                         waiting for a block greater than previous {previous_block}"
-                    ),
-                );
-                tokio::time::sleep(poll_interval).await;
-                continue;
-            }
-        }
-
-        let required_finalized_block = settlement_change_block.saturating_sub(1);
-        let Some(finalized_block) =
-            get_finalized_block_number(&client, &args.chain_rpc_url).await?
-        else {
-            log_readiness_status(
-                &mut last_status,
-                "server has not reported a finalized block yet",
-            );
-            tokio::time::sleep(poll_interval).await;
-            continue;
-        };
-
-        if finalized_block >= required_finalized_block {
-            return Ok(MigrationReadyBoundary {
-                settlement_change_block,
-                required_finalized_block,
-                finalized_block,
-            });
-        }
-
-        log_readiness_status(
-            &mut last_status,
-            format!(
-                "settlement-change block {settlement_change_block}; \
-                 finalized block {finalized_block}, waiting for >= {required_finalized_block}"
-            ),
-        );
-        tokio::time::sleep(poll_interval).await;
-    }
-}
-
-fn log_readiness_status(last_status: &mut Option<String>, status: impl Into<String>) {
-    let status = status.into();
-    if last_status.as_deref() != Some(status.as_str()) {
-        logger::info(status.clone());
-        *last_status = Some(status);
-    }
-}
-
-async fn get_last_settlement_change_block(
-    client: &reqwest::Client,
-    chain_rpc_url: &str,
-) -> anyhow::Result<Option<u64>> {
-    let body = serde_json::json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "zks_lastSettlementChangeBlock",
-        "params": [],
-    });
-    let resp: JsonRpcResponse<serde_json::Value> = client
-        .post(chain_rpc_url)
-        .json(&body)
-        .send()
-        .await
-        .context("send zks_lastSettlementChangeBlock request")?
-        .json()
-        .await
-        .context("parse zks_lastSettlementChangeBlock response")?;
-
-    if let Some(error) = resp.error {
-        anyhow::bail!(
-            "{} returned {}",
-            "zks_lastSettlementChangeBlock",
-            error.describe()
-        );
-    }
-
-    resp.result
-        .as_ref()
-        .map(parse_u64_rpc_value)
-        .transpose()
-        .context("parse zks_lastSettlementChangeBlock result")
-}
-
-async fn get_finalized_block_number(
-    client: &reqwest::Client,
-    chain_rpc_url: &str,
-) -> anyhow::Result<Option<u64>> {
-    let body = serde_json::json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "eth_getBlockByNumber",
-        "params": ["finalized", false],
-    });
-    let resp: JsonRpcResponse<serde_json::Value> = client
-        .post(chain_rpc_url)
-        .json(&body)
-        .send()
-        .await
-        .context("send eth_getBlockByNumber(finalized) request")?
-        .json()
-        .await
-        .context("parse eth_getBlockByNumber(finalized) response")?;
-
-    if let Some(error) = resp.error {
-        anyhow::bail!(
-            "{} returned {}",
-            "eth_getBlockByNumber(finalized)",
-            error.describe()
-        );
-    }
-
-    let Some(block) = resp.result else {
-        return Ok(None);
-    };
-    let number = block
-        .get("number")
-        .ok_or_else(|| anyhow::anyhow!("eth_getBlockByNumber(finalized) result has no number"))?;
-
-    parse_u64_rpc_value(number)
-        .map(Some)
-        .context("parse eth_getBlockByNumber(finalized).number")
-}
-
-fn parse_u64_rpc_value(value: &serde_json::Value) -> anyhow::Result<u64> {
-    match value {
-        serde_json::Value::Number(number) => number
-            .as_u64()
-            .ok_or_else(|| anyhow::anyhow!("expected unsigned u64 JSON number, got {value}")),
-        serde_json::Value::String(raw) => {
-            if let Some(hex) = raw.strip_prefix("0x") {
-                u64::from_str_radix(hex, 16).with_context(|| format!("parse hex u64 value {raw}"))
-            } else {
-                raw.parse::<u64>()
-                    .with_context(|| format!("parse decimal u64 value {raw}"))
-            }
-        }
-        _ => anyhow::bail!("expected u64 JSON number or string, got {value}"),
-    }
-}
-
-#[derive(Debug)]
 struct WithdrawalParams {
     l2_batch_number: u64,
     l2_message_index: u64,
@@ -842,25 +663,6 @@ struct WithdrawalParams {
 #[derive(Debug, Deserialize)]
 struct JsonRpcResponse<T> {
     result: Option<T>,
-    #[serde(default)]
-    error: Option<JsonRpcError>,
-}
-
-#[derive(Debug, Deserialize)]
-struct JsonRpcError {
-    code: i64,
-    message: String,
-    #[serde(default)]
-    data: Option<serde_json::Value>,
-}
-
-impl JsonRpcError {
-    fn describe(&self) -> String {
-        match &self.data {
-            Some(data) => format!("JSON-RPC error {}: {} ({data})", self.code, self.message),
-            None => format!("JSON-RPC error {}: {}", self.code, self.message),
-        }
-    }
 }
 
 #[derive(Debug, Deserialize)]
