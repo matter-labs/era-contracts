@@ -1,4 +1,4 @@
-import { Contract, ethers, providers, Wallet } from "ethers";
+import { BigNumber, Contract, ethers, providers, Wallet } from "ethers";
 import { getAbi } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
@@ -15,7 +15,7 @@ import {
   getChainDiamondProxy,
 } from "../core/utils";
 import { encodeNtvAssetId } from "../core/data-encoding";
-import type { ChainAddresses } from "../core/types";
+import type { ChainAddresses, TbmAccountingSnapshot } from "../core/types";
 import { getInteropSourcePrivateKey, isLiveInteropMode } from "../core/accounts";
 import { waitForLiveFinalizeWithdrawalParams } from "./temp-sdk";
 
@@ -66,6 +66,59 @@ export interface MigrateTokenToGatewayParams {
   gatewayChainId: number;
 }
 
+interface TrackerAccountingPoint {
+  l1Source: BigNumber;
+  gwChain: BigNumber;
+  gwPending: BigNumber;
+}
+
+export interface MigrateTokenBalanceToGWResult {
+  alreadyMigrated: boolean;
+  accounting: TbmAccountingSnapshot;
+  l2TxHash: string;
+  l1TxHash?: string;
+}
+
+export function tbmAccountingSnapshotKey(chainId: number, assetId: string): string {
+  return `${chainId}:${assetId.toLowerCase()}`;
+}
+
+async function snapshotForwardTbmAccounting(params: {
+  l1Provider: providers.JsonRpcProvider;
+  gwProvider: providers.JsonRpcProvider;
+  l1AssetTrackerAddr: string;
+  chainId: number;
+  assetId: string;
+}): Promise<TrackerAccountingPoint> {
+  const l1AssetTracker = new Contract(params.l1AssetTrackerAddr, getAbi("L1AssetTracker"), params.l1Provider);
+  const gwAssetTracker = new Contract(GW_ASSET_TRACKER_ADDR, getAbi("GWAssetTracker"), params.gwProvider);
+
+  return {
+    l1Source: await l1AssetTracker.chainBalance(params.chainId, params.assetId),
+    gwChain: await gwAssetTracker.chainBalance(params.chainId, params.assetId),
+    gwPending: await gwAssetTracker.pendingInteropBalance(params.chainId, params.assetId),
+  };
+}
+
+function buildForwardTbmAccountingSnapshot(
+  chainId: number,
+  assetId: string,
+  before: TrackerAccountingPoint,
+  after: TrackerAccountingPoint
+): TbmAccountingSnapshot {
+  return {
+    chainId,
+    assetId,
+    l1SourceBefore: before.l1Source.toString(),
+    l1SourceAfter: after.l1Source.toString(),
+    gwChainBefore: before.gwChain.toString(),
+    gwChainAfter: after.gwChain.toString(),
+    gwPendingBefore: before.gwPending.toString(),
+    gwPendingAfter: after.gwPending.toString(),
+    migratedAmount: before.l1Source.sub(after.l1Source).toString(),
+  };
+}
+
 /**
  * Orchestrates the full Token Balance Migration (TBM) flow:
  *
@@ -87,7 +140,7 @@ export async function migrateTokenBalanceToGW(params: {
   gwDiamondProxyAddr: string;
   l2DiamondProxyAddr: string;
   logger?: (line: string) => void;
-}): Promise<void> {
+}): Promise<MigrateTokenBalanceToGWResult> {
   const log = params.logger || console.log;
   const {
     l2Provider,
@@ -100,6 +153,13 @@ export async function migrateTokenBalanceToGW(params: {
     l2DiamondProxyAddr,
   } = params;
   const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
+  const accountingBefore = await snapshotForwardTbmAccounting({
+    l1Provider,
+    gwProvider,
+    l1AssetTrackerAddr,
+    chainId,
+    assetId,
+  });
 
   // ── Step 1: Call initiateL1ToGatewayMigrationOnL2 on L2 ──
 
@@ -119,7 +179,18 @@ export async function migrateTokenBalanceToGW(params: {
   const hasL1Message = l2Receipt.logs.some((l: { topics: string[] }) => l.topics[0] === l1MessageSentTopic);
   if (!hasL1Message) {
     log(`   [TBM] Migration already completed for asset ${assetId} on chain ${chainId}, skipping L1 steps`);
-    return;
+    const accountingAfter = await snapshotForwardTbmAccounting({
+      l1Provider,
+      gwProvider,
+      l1AssetTrackerAddr,
+      chainId,
+      assetId,
+    });
+    return {
+      alreadyMigrated: true,
+      l2TxHash: l2Receipt.transactionHash,
+      accounting: buildForwardTbmAccountingSnapshot(chainId, assetId, accountingBefore, accountingAfter),
+    };
   }
 
   // ── Step 2: Build finalization params and call receiveL1ToGatewayMigrationOnL1 on L1 ──
@@ -158,6 +229,20 @@ export async function migrateTokenBalanceToGW(params: {
   }
 
   log(`   [TBM] Token balance migration complete for chain ${chainId}, assetId ${assetId}`);
+  const accountingAfter = await snapshotForwardTbmAccounting({
+    l1Provider,
+    gwProvider,
+    l1AssetTrackerAddr,
+    chainId,
+    assetId,
+  });
+
+  return {
+    alreadyMigrated: false,
+    l2TxHash: l2Receipt.transactionHash,
+    l1TxHash: l1Receipt.transactionHash,
+    accounting: buildForwardTbmAccountingSnapshot(chainId, assetId, accountingBefore, accountingAfter),
+  };
 }
 
 /**
@@ -418,7 +503,7 @@ export async function registerAndMigrateTestTokens(params: {
   gwDiamondProxyAddr: string;
   chainAddresses: ChainAddresses[];
   logger?: (line: string) => void;
-}): Promise<void> {
+}): Promise<TbmAccountingSnapshot[]> {
   const log = params.logger || console.log;
   const {
     gwSettledChainIds,
@@ -454,10 +539,11 @@ export async function registerAndMigrateTestTokens(params: {
   );
 
   // Phase 2: TBM for each chain (sequential — L1 nonce + GW relay conflicts)
+  const accountingSnapshots: TbmAccountingSnapshot[] = [];
   for (const { chainId, rpcUrl, l2DiamondProxy, tokenAddr } of chainConfigs) {
     const l2Provider = new providers.JsonRpcProvider(rpcUrl);
     const assetId = encodeNtvAssetId(chainId, tokenAddr);
-    await migrateTokenBalanceToGW({
+    const result = await migrateTokenBalanceToGW({
       l2Provider,
       l1Provider,
       gwProvider,
@@ -468,6 +554,39 @@ export async function registerAndMigrateTestTokens(params: {
       l2DiamondProxyAddr: l2DiamondProxy,
       logger: log,
     });
+    accountingSnapshots.push(result.accounting);
     log(`   TBM complete for test token on chain ${chainId}`);
   }
+
+  return accountingSnapshots;
+}
+
+/**
+ * Read `assetMigrationNumber(chainId, assetId)` off an asset tracker.
+ * Works uniformly against `L1AssetTracker`, `GWAssetTracker`, and `L2AssetTracker`
+ * since they share the getter shape.
+ */
+export async function queryAssetMigrationNumber(
+  provider: providers.JsonRpcProvider,
+  contractAddr: string,
+  contractName: "L1AssetTracker" | "GWAssetTracker" | "L2AssetTracker",
+  chainId: number,
+  assetId: string
+): Promise<number> {
+  const contract = new Contract(contractAddr, getAbi(contractName), provider);
+  const result = await contract.assetMigrationNumber(chainId, assetId);
+  return BigNumber.from(result).toNumber();
+}
+
+/**
+ * Read `L1AssetTracker.chainBalance(chainId, assetId)` on L1.
+ */
+export async function queryL1ChainBalance(
+  l1Provider: providers.JsonRpcProvider,
+  l1AssetTrackerAddr: string,
+  chainId: number,
+  assetId: string
+): Promise<BigNumber> {
+  const contract = new Contract(l1AssetTrackerAddr, getAbi("L1AssetTracker"), l1Provider);
+  return contract.chainBalance(chainId, assetId);
 }
