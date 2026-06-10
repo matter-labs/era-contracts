@@ -70,21 +70,33 @@ FORGE="${FORGE:-forge}"
 # ──────────────────────────────────────────────────────────────────────────────────────────
 # Logging
 # ──────────────────────────────────────────────────────────────────────────────────────────
-if [ -t 1 ]; then C_B="\033[1m"; C_G="\033[32m"; C_Y="\033[33m"; C_R="\033[31m"; C_C="\033[36m"; C_0="\033[0m"
+# Use ANSI-C $'...' so the colour codes are real escape bytes — then plain `echo` prints them
+# correctly on every shell (no reliance on `echo -e`, which varies between bash/sh/macOS).
+if [ -t 1 ]; then
+  C_B=$'\033[1m'; C_G=$'\033[32m'; C_Y=$'\033[33m'; C_R=$'\033[31m'; C_C=$'\033[36m'; C_0=$'\033[0m'
 else C_B=""; C_G=""; C_Y=""; C_R=""; C_C=""; C_0=""; fi
 _STEP=0
-section() { echo ""; echo -e "${C_B}${C_C}══▶ $*${C_0}"; }
-step()    { _STEP=$((_STEP+1)); echo -e "${C_B}  [$_STEP] $*${C_0}"; }
-info()    { echo -e "      $*"; }
-ok()      { echo -e "      ${C_G}✓${C_0} $*"; }
-warn()    { echo -e "      ${C_Y}!${C_0} $*"; }
-die()     { echo -e "${C_R}✗ $*${C_0}" >&2; exit 1; }
+section() { echo ""; echo "${C_B}${C_C}══▶ $*${C_0}"; }
+step()    { _STEP=$((_STEP+1)); echo "${C_B}  [$_STEP] $*${C_0}"; }
+info()    { echo "      $*"; }
+ok()      { echo "      ${C_G}✓${C_0} $*"; }
+warn()    { echo "      ${C_Y}!${C_0} $*"; }
+die()     { echo "${C_R}✗ $*${C_0}" >&2; exit 1; }
 
 # ──────────────────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────────────────────────────────────────────────
 need_tool() { command -v "$1" >/dev/null 2>&1 || die "'$1' not found in PATH"; }
 need_file() { [ -e "$1" ] || die "$2 not found: $1 (set $3)"; }
+
+# Portable in-place sed (GNU and BSD/macOS differ on `sed -i`). Edits each file via a temp copy.
+sed_i() { # args: <sed-expr> <file>...
+  local expr="$1"; shift
+  local f
+  for f in "$@"; do sed "$expr" "$f" > "$f.tmp.$$" && mv "$f.tmp.$$" "$f"; done
+}
+# Lowercase a string without relying on bash 4 `${x,,}` (macOS ships bash 3.2).
+lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 
 json_get() { python3 -c "import json,sys;print(json.load(open('$1'))$2)"; }
 
@@ -166,7 +178,7 @@ YAML
   ( cd "$WORKDIR"
     "$ZK_DEPLOYER" server-config --chain chain-a --output chainA.yaml >/dev/null
     "$ZK_DEPLOYER" server-config --chain chain-b --output chainB.yaml >/dev/null
-    sed -i 's/pubdata_mode: .*/pubdata_mode: Validium/' chainA.yaml chainB.yaml
+    sed_i 's/pubdata_mode: .*/pubdata_mode: Validium/' chainA.yaml chainB.yaml
     cat >> chainB.yaml <<YAML
 
 rpc: { address: "0.0.0.0:3150" }
@@ -210,7 +222,7 @@ cmd_launch() {
   step "Sanity: atomic-interop predeploys initialized on both chains"
   for rpc in "$CHAIN_A_RPC" "$CHAIN_B_RPC"; do
     local tree; tree=$(cq call "$ESCROW_ADDR" 'commitmentTree()(address)' --rpc-url "$rpc")
-    [ "${tree,,}" = "${TREE_ADDR,,}" ] || die "escrow not initialized on $rpc (commitmentTree=$tree)"
+    [ "$(lc "$tree")" = "$(lc "$TREE_ADDR")" ] || die "escrow not initialized on $rpc (commitmentTree=$tree)"
   done
   ok "escrow ⇄ tree ⇄ importer wired on both chains"
 
