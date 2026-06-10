@@ -17,8 +17,11 @@
 //! for the notified server to report a newer settlement-change boundary and
 //! for the chain server's finalized block to reach the block immediately
 //! before that boundary.
-//! Phases 2–4 are thin wrappers around a single stage each; the phase names stay to keep the CLI symmetric with
-//! `migrate-to` and to match the per-phase workflow split.
+//! Phases 2 and 4 are thin wrappers around a single stage each. Phase 3 also
+//! owns the live waits needed before finalizing, because the L1 fork must be
+//! created only after the gateway migration batch is executed on L1. The phase
+//! names stay to keep the CLI symmetric with `migrate-to` and to match the
+//! per-phase workflow split.
 
 use anyhow::Context;
 use clap::{Parser, Subcommand};
@@ -57,7 +60,9 @@ pub enum MigrateFromCommands {
     /// Phase 0: pause-deposits + notify-server. The gateway's Migrator facet
     /// requires deposits paused before the withdrawal priority tx can
     /// execute; notify-server tells the chain server to stop producing new
-    /// batches. Chain admin signs both.
+    /// batches. The command also records the pre-phase-0
+    /// `zks_lastSettlementChangeBlock` value as
+    /// `previous_settlement_change_block` for phase 1. Chain admin signs both.
     #[command(name = "phase-0-pause-deposits")]
     Phase0PauseDeposits(Phase0PauseDepositsArgs),
     /// Phase 1: wait until the chain server has reported the settlement
@@ -268,6 +273,10 @@ pub async fn run_phase1_wait_ready(args: Phase1WaitReadyArgs) -> anyhow::Result<
     anyhow::ensure!(
         args.poll_interval_secs > 0,
         "--poll-interval-secs must be greater than 0"
+    );
+    anyhow::ensure!(
+        args.previous_settlement_change_block > 0,
+        "--previous-settlement-change-block must be greater than 0"
     );
 
     logger::step("Waiting for migration FROM gateway readiness");

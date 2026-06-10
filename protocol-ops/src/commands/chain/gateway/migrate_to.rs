@@ -1004,19 +1004,6 @@ pub struct Phase4ValidatorsArgs {
 }
 
 pub async fn run_phase4_validators(args: Phase4ValidatorsArgs) -> anyhow::Result<()> {
-    run_validators(
-        args,
-        "phase-4",
-        "chain.gateway.migrate-to.phase-4-validators",
-    )
-    .await
-}
-
-async fn run_validators(
-    args: Phase4ValidatorsArgs,
-    phase_label: &'static str,
-    output_label: &'static str,
-) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
@@ -1031,7 +1018,7 @@ async fn run_validators(
     let (gateway_chain_id, n_validators) =
         stage_enable_validators(&mut runner, bridgehub, chain_id, &enable_inputs)
             .await
-            .context(format!("{phase_label} enable-validators stage"))?;
+            .context("phase-4 enable-validators stage".to_string())?;
 
     let da_inputs = SetDaValidatorPairInputs {
         l1_da_validator: args.l1_da_validator,
@@ -1042,10 +1029,10 @@ async fn run_validators(
     let (_gateway_chain_id, chain_diamond_on_gw) =
         stage_set_da_validator_pair(&mut runner, bridgehub, chain_id, &da_inputs)
             .await
-            .context(format!("{phase_label} set-da-validator-pair stage"))?;
+            .context("phase-4 set-da-validator-pair stage".to_string())?;
 
     write_output_if_requested(
-        output_label,
+        "chain.gateway.migrate-to.phase-4-validators",
         &args.shared,
         &runner,
         &serde_json::json!({}),

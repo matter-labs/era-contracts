@@ -32,7 +32,7 @@ pub(crate) async fn wait_for_settlement_change_ready(
     let start = std::time::Instant::now();
     let mut last_status = None::<String>;
 
-    loop {
+    let settlement_change_block = loop {
         if start.elapsed() >= timeout {
             anyhow::bail!("timeout waiting for {wait_label} readiness after {timeout_secs}s");
         }
@@ -62,7 +62,23 @@ pub(crate) async fn wait_for_settlement_change_ready(
             }
         }
 
-        let required_finalized_block = settlement_change_block.saturating_sub(1);
+        break settlement_change_block;
+    };
+
+    let required_finalized_block = settlement_change_block.saturating_sub(1);
+    log_readiness_status(
+        &mut last_status,
+        format!(
+            "using settlement-change block {settlement_change_block}; \
+             waiting for finalized block >= {required_finalized_block}"
+        ),
+    );
+
+    loop {
+        if start.elapsed() >= timeout {
+            anyhow::bail!("timeout waiting for {wait_label} readiness after {timeout_secs}s");
+        }
+
         let Some(finalized_block) = get_finalized_block_number(&client, chain_rpc_url).await?
         else {
             log_readiness_status(
