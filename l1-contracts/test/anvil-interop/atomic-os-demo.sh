@@ -52,6 +52,13 @@ CHAIN_A_RPC="${CHAIN_A_RPC:-http://127.0.0.1:3050}"
 CHAIN_B_RPC="${CHAIN_B_RPC:-http://127.0.0.1:3150}"
 RELAYER_POLL="${RELAYER_POLL:-4}"
 
+# Base-token value written into intent.yaml. The zk-deployer intent schema for `base_token`
+# varies by version: older builds take the string `eth`; newer ones expect a struct. Override
+# via the BASE_TOKEN env var with an inline-YAML value, e.g.:
+#   BASE_TOKEN='eth'
+#   BASE_TOKEN='{ address: "0x0000000000000000000000000000000000000001" }'
+BASE_TOKEN="${BASE_TOKEN:-eth}"
+
 # Well-known L2 predeploy addresses for the atomic-interop contracts (genesis).
 TREE_ADDR="0x0000000000000000000000000000000000010012"
 IMPORTER_ADDR="0x0000000000000000000000000000000000010013"
@@ -117,8 +124,18 @@ scenario: l1_only
 wallets: { generate: true, ecosystem_seed: "atomic-interop-demo" }
 ecosystem: { era_chain_id: $CHAIN_A_ID, vm_type: zksyncos, with_testnet_verifier: true, with_legacy_bridge: false }
 chains:
-  - { name: chain-a, chain_id: $CHAIN_A_ID, role: l1_settling, base_token: eth, da_mode: no_da, skip_priority_txs: true }
-  - { name: chain-b, chain_id: $CHAIN_B_ID, role: l1_settling, base_token: eth, da_mode: no_da, skip_priority_txs: true }
+  - name: chain-a
+    chain_id: $CHAIN_A_ID
+    role: l1_settling
+    base_token: $BASE_TOKEN
+    da_mode: no_da
+    skip_priority_txs: true
+  - name: chain-b
+    chain_id: $CHAIN_B_ID
+    role: l1_settling
+    base_token: $BASE_TOKEN
+    da_mode: no_da
+    skip_priority_txs: true
 YAML
   ok "intent.yaml written"
 
