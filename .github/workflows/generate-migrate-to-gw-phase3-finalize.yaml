@@ -1,4 +1,4 @@
-name: "Migrate from Gateway: Phase 2 — Finalize"
+name: "Migrate to Gateway: Phase 3 - Finalize"
 
 on:
   workflow_dispatch:
@@ -21,17 +21,18 @@ on:
         required: true
         type: string
       chain_name:
-        description: "Chain name to migrate back from gateway"
+        description: "Chain name being migrated"
         required: true
         type: string
       deployer_address:
-        description: "Deployer EOA that will finalize the migration on L1"
+        description: "Deployer EOA that signs the finalize tx on L1"
         required: true
         type: string
-      migration_l2_tx_hash:
-        description: "L2 priority tx hash from phase 1 submit"
-        required: true
+      lookback_blocks:
+        description: "Number of L1 blocks to scan back for the MigrationStarted event"
+        required: false
         type: string
+        default: "216000"
 
 permissions:
   contents: read
@@ -46,21 +47,21 @@ jobs:
       EXTRA_MOUNTS: ${{ github.workspace }}/environments/${{ inputs.environment }}:/contracts/env
     steps:
       - uses: actions/checkout@v4
-      - name: Run phase 2 (finalize)
+      - name: Run phase 3 (finalize)
         run: |
           mkdir -p "$WORK_DIR"
           bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
-            chain gateway migrate-from phase-2-finalize \
-            --l1-rpc-url           "${{ inputs.l1_rpc_url }}" \
-            --ecosystem            /contracts/env/ecosystem.yaml \
-            --chain                "${{ inputs.chain_name }}" \
-            --deployer-address     "${{ inputs.deployer_address }}" \
-            --gateway-rpc-url      "${{ inputs.gateway_rpc_url }}" \
-            --migration-l2-tx-hash "${{ inputs.migration_l2_tx_hash }}" \
+            chain gateway migrate-to phase-3-finalize \
+            --l1-rpc-url      "${{ inputs.l1_rpc_url }}" \
+            --ecosystem       /contracts/env/ecosystem.yaml \
+            --chain           "${{ inputs.chain_name }}" \
+            --deployer-address "${{ inputs.deployer_address }}" \
+            --gateway-rpc-url "${{ inputs.gateway_rpc_url }}" \
+            --lookback-blocks "${{ inputs.lookback_blocks }}" \
             --out /contracts/work/session/safe
       - uses: actions/upload-artifact@v4
         with:
-          name: safe-bundles-migrate-from-gw-phase2-${{ inputs.chain_name }}-${{ inputs.environment }}
+          name: safe-bundles-migrate-to-gw-phase3-${{ inputs.chain_name }}-${{ inputs.environment }}
           path: ${{ env.WORK_DIR }}/safe/
           if-no-files-found: error
           retention-days: 30

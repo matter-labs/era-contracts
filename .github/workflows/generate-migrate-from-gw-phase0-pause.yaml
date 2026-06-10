@@ -16,6 +16,10 @@ on:
         description: "L1 RPC URL"
         required: true
         type: string
+      chain_rpc_url:
+        description: "Migrating chain server RPC URL"
+        required: true
+        type: string
       chain_name:
         description: "Chain name to migrate back from gateway"
         required: true
@@ -42,6 +46,7 @@ jobs:
             --l1-rpc-url "${{ inputs.l1_rpc_url }}" \
             --ecosystem  /contracts/env/ecosystem.yaml \
             --chain      "${{ inputs.chain_name }}" \
+            --chain-rpc-url "${{ inputs.chain_rpc_url }}" \
             --out /contracts/work/session/safe
       - uses: actions/upload-artifact@v4
         with:

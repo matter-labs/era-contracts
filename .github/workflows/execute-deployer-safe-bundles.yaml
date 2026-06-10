@@ -3,7 +3,7 @@ name: "Execute Deployer Safe Bundles"
 # Apply Safe Transaction Builder bundles whose `target` is the ecosystem
 # deployer EOA (i.e. bundles emitted by the chain-init workflow, the
 # ecosystem upgrade-prepare workflow, and the migrate-from/to
-# phase-2-finalize workflows). The deployer's private key is pulled from a
+# phase-3-finalize workflows). The deployer's private key is pulled from a
 # per-environment secret and used to sign every tx in the bundle via
 # `protocol-ops dev execute-safe`.
 #

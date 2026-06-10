@@ -1,4 +1,4 @@
-name: "Migrate to Gateway: Phase 2 — Finalize"
+name: "Migrate from Gateway: Phase 4 - Set DA Validator"
 
 on:
   workflow_dispatch:
@@ -16,29 +16,26 @@ on:
         description: "L1 RPC URL"
         required: true
         type: string
-      gateway_rpc_url:
-        description: "Gateway L2 RPC URL"
-        required: true
-        type: string
       chain_name:
-        description: "Chain name being migrated"
+        description: "Chain name to migrate back from gateway"
         required: true
         type: string
-      deployer_address:
-        description: "Deployer EOA that signs the finalize tx on L1"
+      l1_da_validator:
+        description: "L1 DA validator address to restore after migration"
         required: true
         type: string
-      vote_preparation_toml:
-        description: "Vote-prep TOML path inside protocol-ops container"
-        required: true
-        type: string
-        default: "/script-out/gateway_vote_prep_out.toml"
+      l2_da_commitment_scheme:
+        description: "L2 DA commitment scheme"
+        required: false
+        type: choice
+        options: [blobs-zk-sync-os, blobs-and-pubdata-keccak256]
+        default: blobs-zk-sync-os
 
 permissions:
   contents: read
 
 jobs:
-  finalize:
+  set-da:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -47,21 +44,20 @@ jobs:
       EXTRA_MOUNTS: ${{ github.workspace }}/environments/${{ inputs.environment }}:/contracts/env
     steps:
       - uses: actions/checkout@v4
-      - name: Run phase 2 (finalize)
+      - name: Run phase 4 (set-da-validator-pair)
         run: |
           mkdir -p "$WORK_DIR"
           bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
-            chain gateway migrate-to phase-2-finalize \
-            --l1-rpc-url      "${{ inputs.l1_rpc_url }}" \
-            --ecosystem       /contracts/env/ecosystem.yaml \
-            --chain           "${{ inputs.chain_name }}" \
-            --deployer-address "${{ inputs.deployer_address }}" \
-            --gateway-rpc-url "${{ inputs.gateway_rpc_url }}" \
-            --vote-preparation-toml "${{ inputs.vote_preparation_toml }}" \
+            chain gateway migrate-from phase-4-set-da-validator-pair \
+            --l1-rpc-url "${{ inputs.l1_rpc_url }}" \
+            --ecosystem  /contracts/env/ecosystem.yaml \
+            --chain      "${{ inputs.chain_name }}" \
+            --l1-da-validator "${{ inputs.l1_da_validator }}" \
+            --l2-da-commitment-scheme "${{ inputs.l2_da_commitment_scheme }}" \
             --out /contracts/work/session/safe
       - uses: actions/upload-artifact@v4
         with:
-          name: safe-bundles-migrate-to-gw-phase2-${{ inputs.chain_name }}-${{ inputs.environment }}
+          name: safe-bundles-migrate-from-gw-phase4-${{ inputs.chain_name }}-${{ inputs.environment }}
           path: ${{ env.WORK_DIR }}/safe/
           if-no-files-found: error
           retention-days: 30
