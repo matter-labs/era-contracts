@@ -38,7 +38,7 @@ pub(crate) async fn wait_for_settlement_change_ready(
         }
 
         let Some(settlement_change_block) =
-            get_last_settlement_change_block(&client, chain_rpc_url).await?
+            get_last_settlement_change_block_with_client(&client, chain_rpc_url).await?
         else {
             log_readiness_status(
                 &mut last_status,
@@ -92,6 +92,19 @@ pub(crate) async fn wait_for_settlement_change_ready(
     }
 }
 
+pub(crate) async fn get_last_settlement_change_block(
+    chain_rpc_url: &str,
+) -> anyhow::Result<Option<u64>> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(
+            MIGRATION_READY_RPC_REQUEST_TIMEOUT_SECS,
+        ))
+        .build()
+        .context("build settlement-change RPC client")?;
+
+    get_last_settlement_change_block_with_client(&client, chain_rpc_url).await
+}
+
 fn log_readiness_status(last_status: &mut Option<String>, status: impl Into<String>) {
     let status = status.into();
     if last_status.as_deref() != Some(status.as_str()) {
@@ -100,7 +113,7 @@ fn log_readiness_status(last_status: &mut Option<String>, status: impl Into<Stri
     }
 }
 
-async fn get_last_settlement_change_block(
+async fn get_last_settlement_change_block_with_client(
     client: &reqwest::Client,
     chain_rpc_url: &str,
 ) -> anyhow::Result<Option<u64>> {

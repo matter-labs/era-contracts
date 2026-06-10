@@ -12,9 +12,11 @@
 //!
 //! Phase 0 reuses `migrate_to::stage_pause_deposits` because deposits have to
 //! be paused from the L1 side before the Migrator facet on the gateway will
-//! accept the withdrawal priority tx. Phase 1 waits for the notified server
-//! to report its settlement-change boundary and for the chain server's
-//! finalized block to reach the block immediately before that boundary.
+//! accept the withdrawal priority tx. It also captures the pre-phase-0
+//! `zks_lastSettlementChangeBlock` value into output metadata. Phase 1 waits
+//! for the notified server to report a newer settlement-change boundary and
+//! for the chain server's finalized block to reach the block immediately
+//! before that boundary.
 //! Phases 2–4 are thin wrappers around a single stage each; the phase names stay to keep the CLI symmetric with
 //! `migrate-to` and to match the per-phase workflow split.
 
@@ -26,8 +28,8 @@ use serde::{Deserialize, Serialize};
 
 use super::migrate_to::{stage_pause_deposits, wait_for_l2_tx_receipt};
 use super::migration_ready::{
-    wait_for_settlement_change_ready, DEFAULT_MIGRATION_READY_POLL_INTERVAL_SECS,
-    DEFAULT_MIGRATION_READY_TIMEOUT_SECS,
+    get_last_settlement_change_block, wait_for_settlement_change_ready,
+    DEFAULT_MIGRATION_READY_POLL_INTERVAL_SECS, DEFAULT_MIGRATION_READY_TIMEOUT_SECS,
 };
 use crate::abi::{BridgehubAbi, IChainTypeManagerAbi};
 use crate::commands::output::write_output_if_requested;
@@ -92,6 +94,11 @@ pub struct Phase0PauseDepositsArgs {
     #[clap(flatten)]
     #[serde(flatten)]
     pub topology: EcosystemChainArgs,
+
+    /// Migrating chain server RPC URL. Used to capture the pre-phase-0
+    /// `zks_lastSettlementChangeBlock` baseline into the output metadata.
+    #[clap(long)]
+    pub chain_rpc_url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
@@ -106,11 +113,12 @@ pub struct Phase1WaitReadyArgs {
     #[clap(long)]
     pub chain_rpc_url: String,
 
-    /// Value of `zks_lastSettlementChangeBlock` captured before phase 0 was
-    /// applied. When supplied, this phase waits for a strictly newer block so
-    /// an older migration-to boundary cannot satisfy the migrate-from wait.
+    /// Value of `zks_lastSettlementChangeBlock` captured by phase 0 before
+    /// its Safe bundle was applied. This phase waits for a strictly newer
+    /// block so an older migration-to boundary cannot satisfy the
+    /// migrate-from wait.
     #[clap(long)]
-    pub previous_settlement_change_block: Option<u64>,
+    pub previous_settlement_change_block: u64,
 
     /// Overall timeout for the wait.
     #[clap(long, default_value_t = DEFAULT_MIGRATION_READY_TIMEOUT_SECS)]
@@ -219,6 +227,14 @@ pub async fn run(cmd: MigrateFromCommands) -> anyhow::Result<()> {
 pub async fn run_phase0_pause_deposits(args: Phase0PauseDepositsArgs) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
+    let previous_settlement_change_block = get_last_settlement_change_block(&args.chain_rpc_url)
+        .await
+        .context("read pre-phase-0 zks_lastSettlementChangeBlock")?
+        .unwrap_or(0);
+
+    logger::info(format!(
+        "Pre-phase-0 settlement-change block: {previous_settlement_change_block}"
+    ));
 
     // Pause-deposits is shared with the to-gateway flow: it's the same L1
     // `pauseDepositsBeforeInitiatingMigration` call either direction.
@@ -234,7 +250,10 @@ pub async fn run_phase0_pause_deposits(args: Phase0PauseDepositsArgs) -> anyhow:
         &args.shared,
         &runner,
         &serde_json::json!({}),
-        &serde_json::json!({ "chain_id": chain_id }),
+        &serde_json::json!({
+            "chain_id": chain_id,
+            "previous_settlement_change_block": previous_settlement_change_block,
+        }),
     )
     .await
 }
@@ -254,19 +273,14 @@ pub async fn run_phase1_wait_ready(args: Phase1WaitReadyArgs) -> anyhow::Result<
     logger::step("Waiting for migration FROM gateway readiness");
     logger::info(format!("Chain ID: {}", args.chain_id));
     logger::info(format!("Chain RPC URL: {}", args.chain_rpc_url));
-    if let Some(previous_block) = args.previous_settlement_change_block {
-        logger::info(format!(
-            "Previous settlement-change block: {previous_block}"
-        ));
-    } else {
-        logger::info(
-            "No previous settlement-change block supplied; accepting the first block reported by the server",
-        );
-    }
+    logger::info(format!(
+        "Previous settlement-change block: {}",
+        args.previous_settlement_change_block
+    ));
 
     let readiness = wait_for_settlement_change_ready(
         &args.chain_rpc_url,
-        args.previous_settlement_change_block,
+        Some(args.previous_settlement_change_block),
         args.timeout_secs,
         args.poll_interval_secs,
         "migration FROM gateway",
