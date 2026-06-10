@@ -475,6 +475,10 @@ library L2GenesisForceDeploymentsHelper {
                 L2_ASSET_ROUTER_ADDR,
                 L2_NATIVE_TOKEN_VAULT_ADDR
             );
+            // Wire the reverse link so the escrow can drive AR/NTV burns (source) and mints
+            // (destination) at execute() time. The genesis force-deployment runs as the complex
+            // upgrader, which `setAtomicFlowEscrow` authorises for this one-shot genesis wiring.
+            L2AssetRouter(L2_ASSET_ROUTER_ADDR).setAtomicFlowEscrow(L2_ATOMIC_FLOW_ESCROW_ADDR);
         }
     }
 

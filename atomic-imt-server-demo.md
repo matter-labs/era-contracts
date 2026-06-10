@@ -36,7 +36,7 @@ cd l1-contracts/test/anvil-interop
 ./atomic-os-demo.sh launch          # start Anvil + both servers, deploy L1 GlobalInteropIMT,
                                      # fund the rich/relayer wallet via L1->L2, start the relayer daemon
 ./atomic-os-demo.sh demo            # register a sample swap, commit both legs, wait for relay,
-                                     # authorize (verifies the IMT inclusion proof), then try execute
+                                     # authorize (verifies the IMT inclusion proof) + execute the full swap
 
 ./atomic-os-demo.sh status          # show running processes + key addresses
 ./atomic-os-demo.sh stop            # tear everything down
@@ -53,18 +53,27 @@ sections below explain what each command does, if you want to run it by hand.
 
 | Step             | Component                                                                  | Result                                                                                                                                |
 | ---------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Genesis          | 3 new L2 predeploys (`0x10012` tree, `0x10013` importer, `0x10014` escrow) | deployed **and initialized** at genesis on both chains                                                                                |
+| Genesis          | 3 new L2 predeploys (`0x10012` tree, `0x10013` importer, `0x10014` escrow) | deployed **and initialized** at genesis on both chains; the L2 AssetRouter's `atomicFlowEscrow` gate wired to the escrow              |
 | `commitSend`     | `AtomicFlowEscrow` + `L2InteropCommitmentTree`                             | ERC20 escrowed, commit value inserted into the per-chain Indexed Merkle Tree                                                          |
 | relay (parallel) | `atomic-root-relayer.ts`                                                   | per-chain IMT root → L1 `GlobalInteropIMT`; global root + history imported back to each chain                                         |
 | `authorize`      | `AtomicFlowEscrow`                                                         | **remote** leg verified via IMT **inclusion proof** vs. the imported global root; **local** leg via local state — both → `Executable` |
+| `execute`        | `AtomicFlowEscrow` → AR/NTV                                                | source burn + destination mint; **recipient receives the bridged token on the other chain, source escrow debited to 0**               |
 
-`execute()` (the AR/NTV token settlement) is intentionally **out of scope** for this
-lightweight two-server demo: it needs the standard cross-chain bridge authorisation
-(the escrow registered as an authorised deposit finaliser + matching `assetId`s), which is
-orthogonal to the IMT coordination layer and is already covered by the 30 Foundry tests in
-`l1-contracts/test/foundry/l1/unit/concrete/AtomicInterop/` (which use `MockAtomicAssetRouter`).
-On the live chains `execute()` reverts with `Unauthorized(0x…10014)` from the L2 AssetRouter —
-expected.
+The demo runs a **complete, balance-verified atomic swap**: it commits both legs, authorises on
+both chains, executes all four sides (each leg's source burn + destination mint), and asserts that
+the recipient received `100` bridged DEMO on chain-b and `50` on chain-a while both source escrows
+went to `0`.
+
+> **What makes `execute()` work.** The L2 AssetRouter has an `atomicFlowEscrow` authorisation gate
+> (`onlyAssetRouterCounterpartOrSelf` / `onlyL2InteropCenter`) that lets the canonical escrow drive
+> `finalizeDeposit` (destination mint) and `initiateIndirectCall` (source burn). That gate must be
+> pointed at the escrow once via `L2AssetRouter.setAtomicFlowEscrow(...)`. On ZKsync OS this is now
+> wired automatically during the genesis force-deployment (the helper runs as the complex upgrader,
+> which `setAtomicFlowEscrow` authorises) — see `L2GenesisForceDeploymentsHelper._initializeV31Contracts`.
+> Each leg's `SendSpec.erc20Data` also carries the origin token's `(name, symbol, decimals)` so the
+> destination NTV can deploy the bridged token on first mint. (The 30 Foundry unit tests in
+> `l1-contracts/test/foundry/l1/unit/concrete/AtomicInterop/` use `MockAtomicAssetRouter`, which only
+> records the AR calls; real fund movement is exercised here and in the hardhat dummy-flow swap test.)
 
 ---
 
@@ -289,12 +298,20 @@ $CLI commit-send <flowId> <legId-B> $PK http://127.0.0.1:3150   # commit leg B o
 # let the relayer expose the post-commit roots + import the global root (or wait one poll cycle)
 $CLI check-status <flowId>                            # → allCommitted: true
 
-$CLI finalize <flowId> <legId-A> $PK http://127.0.0.1:3150       # authorize (+ execute) on chain-b
+# authorize on BOTH chains (builds the IMT inclusion proof for each chain's remote-origin leg)
+$CLI authorize <flowId> $PK http://127.0.0.1:3150     # chain-b: leg A (remote) + leg B (local) → Executable
+$CLI authorize <flowId> $PK http://127.0.0.1:3050     # chain-a: leg B (remote) + leg A (local) → Executable
+
+# execute all four sides (source burn + destination mint for each leg)
+$CLI execute <flowId> <legId-A> $PK http://127.0.0.1:3050   # leg A source burn  (chain-a)
+$CLI execute <flowId> <legId-A> $PK http://127.0.0.1:3150   # leg A dest   mint  (chain-b)
+$CLI execute <flowId> <legId-B> $PK http://127.0.0.1:3150   # leg B source burn  (chain-b)
+$CLI execute <flowId> <legId-B> $PK http://127.0.0.1:3050   # leg B dest   mint  (chain-a)
 ```
 
-`finalize` first sends `authorize`, which **succeeds**: the remote (chain-a-origin) leg is
-proven present via an IMT inclusion proof against chain-b's imported global root, and the
-local (chain-b-origin) leg via local state. Confirm on chain-b:
+`authorize` **succeeds** on each chain: the remote-origin leg is proven present via an IMT inclusion
+proof against that chain's imported global root, and the local-origin leg via local state. Both specs
+on each chain become `Executable`:
 
 ```bash
 cast call 0x…10014 'specState(bytes32,bytes32)(uint8)' <flowId> <legId-A> --rpc-url http://127.0.0.1:3150  # → 2 (Executable)
@@ -303,8 +320,11 @@ cast call 0x…10014 'specState(bytes32,bytes32)(uint8)' <flowId> <legId-B> --rp
 
 (`SpecState`: `0 Unset · 1 Committed · 2 Executable · 3 Executed · 4 Revertable · 5 Reverted`.)
 
-The subsequent `execute()` reverts with `Unauthorized(0x…10014)` — expected (see
-_What this demo proves_ above).
+`execute` then settles via AR/NTV: the source side burns the escrowed token and the destination side
+mints the bridged token to the recipient. After all four calls, the recipient holds `100` bridged
+DEMO on chain-b and `50` on chain-a, and both source escrows are `0` (`atomic-os-demo.sh demo`
+asserts exactly this). Convenience: `finalize <flowId> <legId> <pk> <rpc>` does authorize+execute
+for one leg in a single call.
 
 ---
 

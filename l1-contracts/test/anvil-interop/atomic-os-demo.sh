@@ -248,6 +248,27 @@ cmd_demo() {
   # The flow CLI expects the command as the first arg; flags (incl. --state) come after.
   flowcli() { ( cd "$ANVIL_INTEROP" && npx ts-node atomic-flow-cli.ts "$@" --state "$STATE" ); }
 
+  # Encode the origin token's (name,symbol,decimals) so the destination NTV can deploy the
+  # bridged token on first mint. Format: 0x01 || abi.encode(uint256 chainId, bytes name,
+  # bytes symbol, bytes decimals) — matches encodeErc20Data in src/helpers/dummy-flow-helpers.ts.
+  erc20_data() { # args: chainId name symbol decimals
+    local nb sb db inner
+    nb=$($CAST abi-encode "f(string)" "$2" 2>/dev/null)
+    sb=$($CAST abi-encode "f(string)" "$3" 2>/dev/null)
+    db=$($CAST abi-encode "f(uint8)" "$4" 2>/dev/null)
+    inner=$($CAST abi-encode "f(uint256,bytes,bytes,bytes)" "$1" "$nb" "$sb" "$db" 2>/dev/null)
+    echo "0x01${inner:2}"
+  }
+
+  # Resolve the bridged-token address for a native (originChainId, originToken) on a destination
+  # chain, via the destination NTV's tokenAddress(assetId) where assetId = encodeNtvAssetId(...).
+  bridged_token() { # args: originChainId originToken destRpc
+    local aid
+    aid=$( cd "$ANVIL_INTEROP" && npx ts-node -e \
+      "import {encodeNtvAssetId} from './src/core/data-encoding'; console.log(encodeNtvAssetId($1,'$2'))" 2>/dev/null )
+    cq call 0x0000000000000000000000000000000000010004 'tokenAddress(bytes32)(address)' "$aid" --rpc-url "$3"
+  }
+
   step "Deploying demo ERC20s + minting to $DEP + approving the escrow"
   local TOKA TOKB
   TOKA=$( cd "$L1_CONTRACTS" && $FORGE create contracts/dev-contracts/TestnetERC20Token.sol:TestnetERC20Token \
@@ -280,12 +301,15 @@ JSON
   ok "config seeded ($STATE)"
 
   step "Registering the swap flow (leg A: a→b 100 DEMO, leg B: b→a 50 DEMO)"
+  local ERC20DATA_A ERC20DATA_B
+  ERC20DATA_A=$(erc20_data "$CHAIN_A_ID" "DemoToken" "DEMO" 18)
+  ERC20DATA_B=$(erc20_data "$CHAIN_B_ID" "DemoToken" "DEMO" 18)
   cat > "$WORKDIR/legs.json" <<JSON
 [
   { "originChainId": $CHAIN_A_ID, "depositor": "$DEP", "originToken": "$TOKA", "amount": "100",
-    "destChainId": $CHAIN_B_ID, "recipient": "$RECIPIENT", "erc20Data": "0x" },
+    "destChainId": $CHAIN_B_ID, "recipient": "$RECIPIENT", "erc20Data": "$ERC20DATA_A" },
   { "originChainId": $CHAIN_B_ID, "depositor": "$DEP", "originToken": "$TOKB", "amount": "50",
-    "destChainId": $CHAIN_A_ID, "recipient": "$RECIPIENT", "erc20Data": "0x" }
+    "destChainId": $CHAIN_A_ID, "recipient": "$RECIPIENT", "erc20Data": "$ERC20DATA_B" }
 ]
 JSON
   flowcli register-flow-id --legs-file "$WORKDIR/legs.json" >/dev/null
@@ -299,28 +323,47 @@ JSON
   flowcli commit-send "$FLOWID" "$LEG_A" "$RICH_PK" "$CHAIN_A_RPC" | sed 's/^/      /'
   flowcli commit-send "$FLOWID" "$LEG_B" "$RICH_PK" "$CHAIN_B_RPC" | sed 's/^/      /'
 
-  step "Waiting for the relayer to expose the post-commit roots and import the global root"
+  step "Authorizing the flow on both chains (verifies the IMT inclusion proofs)"
+  # The relayer daemon needs one poll cycle to expose the post-commit roots to L1 and import the
+  # resulting global root back; retry authorize until that proof is available.
   flowcli check-status "$FLOWID" >/dev/null  # sanity
   local attempt=0
-  until flowcli authorize "$FLOWID" "$RICH_PK" "$CHAIN_B_RPC" >"$WORKDIR/authorize.log" 2>&1; do
-    attempt=$((attempt+1)); [ "$attempt" -gt 15 ] && { cat "$WORKDIR/authorize.log"; die "authorize did not succeed (relayer/proof not ready)"; }
+  until flowcli authorize "$FLOWID" "$RICH_PK" "$CHAIN_B_RPC" >"$WORKDIR/authorize-b.log" 2>&1; do
+    attempt=$((attempt+1)); [ "$attempt" -gt 15 ] && { cat "$WORKDIR/authorize-b.log"; die "authorize did not succeed (relayer/proof not ready)"; }
     sleep "$RELAYER_POLL"
   done
-  sed 's/^/      /' "$WORKDIR/authorize.log"
-  ok "authorize succeeded — both legs verified (remote via IMT inclusion proof, local via local state)"
+  sed 's/^/      /' "$WORKDIR/authorize-b.log"
+  flowcli authorize "$FLOWID" "$RICH_PK" "$CHAIN_A_RPC" 2>&1 | sed 's/^/      /'
+  ok "both chains authorized — every spec verified (remote legs via IMT inclusion proof, local via local state)"
 
-  step "On-chain spec states on chain-b (2 = Executable)"
-  info "leg A: $(cq call "$ESCROW_ADDR" 'specState(bytes32,bytes32)(uint8)' "$FLOWID" "$LEG_A" --rpc-url "$CHAIN_B_RPC")   leg B: $(cq call "$ESCROW_ADDR" 'specState(bytes32,bytes32)(uint8)' "$FLOWID" "$LEG_B" --rpc-url "$CHAIN_B_RPC")"
+  step "Spec states (2 = Executable) — leg A / leg B"
+  info "chain-a: $(cq call "$ESCROW_ADDR" 'specState(bytes32,bytes32)(uint8)' "$FLOWID" "$LEG_A" --rpc-url "$CHAIN_A_RPC") / $(cq call "$ESCROW_ADDR" 'specState(bytes32,bytes32)(uint8)' "$FLOWID" "$LEG_B" --rpc-url "$CHAIN_A_RPC")    chain-b: $(cq call "$ESCROW_ADDR" 'specState(bytes32,bytes32)(uint8)' "$FLOWID" "$LEG_A" --rpc-url "$CHAIN_B_RPC") / $(cq call "$ESCROW_ADDR" 'specState(bytes32,bytes32)(uint8)' "$FLOWID" "$LEG_B" --rpc-url "$CHAIN_B_RPC")"
 
-  step "Attempting execute (AR/NTV token settlement) on chain-b"
-  if flowcli execute "$FLOWID" "$LEG_A" "$RICH_PK" "$CHAIN_B_RPC" >"$WORKDIR/execute.log" 2>&1; then
-    sed 's/^/      /' "$WORKDIR/execute.log"; ok "execute succeeded"
+  step "Executing all four sides (source burn + destination mint for each leg)"
+  flowcli execute "$FLOWID" "$LEG_A" "$RICH_PK" "$CHAIN_A_RPC" | sed 's/^/      /'   # leg A source burn (chain-a)
+  flowcli execute "$FLOWID" "$LEG_A" "$RICH_PK" "$CHAIN_B_RPC" | sed 's/^/      /'   # leg A dest mint (chain-b)
+  flowcli execute "$FLOWID" "$LEG_B" "$RICH_PK" "$CHAIN_B_RPC" | sed 's/^/      /'   # leg B source burn (chain-b)
+  flowcli execute "$FLOWID" "$LEG_B" "$RICH_PK" "$CHAIN_A_RPC" | sed 's/^/      /'   # leg B dest mint (chain-a)
+  ok "all four execute calls landed"
+
+  step "Verifying balances — recipient received bridged tokens, source escrows debited"
+  local bridgedA bridgedB
+  bridgedA=$(bridged_token "$CHAIN_A_ID" "$TOKA" "$CHAIN_B_RPC")   # token-a bridged onto chain-b
+  bridgedB=$(bridged_token "$CHAIN_B_ID" "$TOKB" "$CHAIN_A_RPC")   # token-b bridged onto chain-a
+  local recvA recvB escA escB
+  recvA=$(cq call "$bridgedA" 'balanceOf(address)(uint256)' "$RECIPIENT" --rpc-url "$CHAIN_B_RPC")
+  recvB=$(cq call "$bridgedB" 'balanceOf(address)(uint256)' "$RECIPIENT" --rpc-url "$CHAIN_A_RPC")
+  escA=$(cq call "$TOKA" 'balanceOf(address)(uint256)' "$ESCROW_ADDR" --rpc-url "$CHAIN_A_RPC")
+  escB=$(cq call "$TOKB" 'balanceOf(address)(uint256)' "$ESCROW_ADDR" --rpc-url "$CHAIN_B_RPC")
+  info "recipient on chain-b: ${recvA%% *} bridged DEMO (token-a)   [expect 100]"
+  info "recipient on chain-a: ${recvB%% *} bridged DEMO (token-b)   [expect 50]"
+  info "source escrow on chain-a: ${escA%% *} token-a   on chain-b: ${escB%% *} token-b   [expect 0 / 0]"
+  if [ "${recvA%% *}" = "100" ] && [ "${recvB%% *}" = "50" ] && [ "${escA%% *}" = "0" ] && [ "${escB%% *}" = "0" ]; then
+    ok "atomic swap settled: funds received on both destinations, source escrows burned"
   else
-    warn "execute reverted (expected in this lightweight 2-server demo: the L2 AssetRouter"
-    warn "does not authorize the escrow as a deposit finaliser, and cross-chain assetId"
-    warn "registration / message delivery is not wired here — covered by the Foundry tests)."
+    die "balance check failed — see values above"
   fi
-  echo ""; ok "demo complete."
+  echo ""; ok "demo complete — full atomic swap executed and verified."
 }
 
 # ──────────────────────────────────────────────────────────────────────────────────────────

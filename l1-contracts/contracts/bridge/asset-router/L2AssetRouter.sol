@@ -277,12 +277,17 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
 
     /// @notice Registers the canonical atomic-flow escrow on this chain. One-shot: the
     /// escrow address is set exactly once, after which the AR's atomic-flow auth gates
-    /// recognise it. Gated `onlyOwner` so that:
-    ///   - on a system-deployed AR, the aliased L1 governance owner can opt in;
-    ///   - on a userspace AR (e.g. `PrivateL2AssetRouter` deployed by an EOA), the
-    ///     deploying owner can wire its own escrow without needing the system upgrader.
+    /// recognise it. Callable by:
+    ///   - the complex upgrader, so the genesis force-deployment wires the canonical
+    ///     predeployed escrow on ZKsync OS out of the box (the upgrader is the genesis caller);
+    ///   - the owner, so a system AR's aliased L1 governance can opt in post-genesis, and a
+    ///     userspace AR (e.g. `PrivateL2AssetRouter` deployed by an EOA) can wire its own escrow
+    ///     without needing the system upgrader.
     /// See `atomicFlowEscrow` for the broader design context.
-    function setAtomicFlowEscrow(address _escrow) external onlyOwner {
+    function setAtomicFlowEscrow(address _escrow) external {
+        if (msg.sender != owner() && msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
         require(atomicFlowEscrow == address(0), Unauthorized(msg.sender));
         require(_escrow != address(0), EmptyAddress());
         atomicFlowEscrow = _escrow;
