@@ -110,23 +110,16 @@ uint256 constant L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS = 21000;
 /// @dev The cost of calldata byte for the L1->L2 transaction in computational L2 gas for ZKsync OS.
 uint256 constant L1_TX_CALLDATA_PRICE_L2_GAS_ZKSYNC_OS = 16;
 
-/// @dev The static part of the L1->l2 transaction native cost for ZKsync OS.
-/// It includes hashing (126_000) and coinbase/refund mint_base_token intrinsic native worst case costs.
-uint256 constant L1_TX_STATIC_NATIVE_ZKSYNC_OS = 2_875_420;
-
-/// @dev The encoding cost per keccak256 round(136 bytes) of the L1->l2 transaction in native resource for ZKsync OS.
-uint256 constant L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS = 17500;
-
-/// @dev The cost of calldata byte for the L1->L2 transaction in native resource for ZKsync OS.
-uint256 constant L1_TX_CALLDATA_COST_NATIVE_ZKSYNC_OS = 1;
+/// @dev The maximal computational native limit for transaction in ZKsync OS.
+uint256 constant MAX_NATIVE_COMPUTATIONAL_ZKSYNC_OS = 1 << 35;
 
 /// @dev The intrinsic cost of the L1->l2 transaction in pubdata for ZKsync OS
 /// It includes tx log, coinbase, treasury, refund recipient and asset tracker pubdata.
 uint256 constant L1_TX_INTRINSIC_PUBDATA_ZKSYNC_OS = 351;
 
-/// @dev The native per gas ratio for 0 gas price(service/upgrade/gateway) transactions in ZKsync OS.
+/// @dev The native per gas ratio for l1 -> l2 txs, including upgrade/service/gateway transactions in ZKsync OS.
 /// This value is big enough to cover computational native resources usage for any operations.
-uint256 constant FREE_TX_NATIVE_PER_GAS = 10_000;
+uint256 constant L1_TX_NATIVE_PER_GAS = 100_000_000;
 
 /// @dev The mask which should be applied to the packed batch and L2 block timestamp in order
 /// to obtain the L2 block timestamp. Applying this mask is equivalent to calculating modulo 2**128

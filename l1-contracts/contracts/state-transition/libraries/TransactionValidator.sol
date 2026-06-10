@@ -6,22 +6,20 @@ import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 import {
-    L1_TX_CALLDATA_COST_NATIVE_ZKSYNC_OS,
     L1_TX_CALLDATA_PRICE_L2_GAS_ZKSYNC_OS,
     L1_TX_DELTA_544_ENCODING_BYTES,
     L1_TX_DELTA_FACTORY_DEPS_L2_GAS,
     L1_TX_DELTA_FACTORY_DEPS_PUBDATA,
-    L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS,
     L1_TX_INTRINSIC_L2_GAS,
     L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS,
     L1_TX_INTRINSIC_PUBDATA,
     L1_TX_INTRINSIC_PUBDATA_ZKSYNC_OS,
     L1_TX_MIN_L2_GAS_BASE,
-    L1_TX_STATIC_NATIVE_ZKSYNC_OS,
     MEMORY_OVERHEAD_GAS,
     TX_SLOT_OVERHEAD_L2_GAS,
-    FREE_TX_NATIVE_PER_GAS,
-    ZKSYNC_OS_L1_TX_NATIVE_PRICE
+    L1_TX_NATIVE_PER_GAS,
+    ZKSYNC_OS_L1_TX_NATIVE_PRICE,
+    MAX_NATIVE_COMPUTATIONAL_ZKSYNC_OS
 } from "../../common/Config.sol";
 import {
     InvalidUpgradeTxn,
@@ -139,28 +137,26 @@ library TransactionValidator {
         bool zksyncOS
     ) internal pure returns (uint256) {
         if (zksyncOS) {
-            uint256 gasCost = L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS;
-            // we are always a bit overcharging for zero bytes
-            gasCost += L1_TX_CALLDATA_PRICE_L2_GAS_ZKSYNC_OS * _calldataLength;
+            // Due to double account resources model in zksync os, we need to calculate 2 things for minimal gas limit:
+            // 1. Intrinsic tx cost in gas
+            // 2. Intrinsic tx cost in native resources
+            // And then take the bigger value
 
-            uint256 nativeComputationalCost = L1_TX_STATIC_NATIVE_ZKSYNC_OS; // static computational native part
-            nativeComputationalCost +=
-                Math.max(1, Math.ceilDiv(_encodingLength, 136)) * L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS; // dynamic computational native part for hashing
-            nativeComputationalCost += _calldataLength * L1_TX_CALLDATA_COST_NATIVE_ZKSYNC_OS; // dynamic computational part for calldata
-            uint256 gasNeededToCoverComputationalNative;
-            // 0 gas price is possible only for specific set of transactions: upgrade, service or gateway.
-            if (_maxFeePerGas == 0) {
-                gasNeededToCoverComputationalNative = nativeComputationalCost / FREE_TX_NATIVE_PER_GAS;
-            } else {
-                gasNeededToCoverComputationalNative =
-                    (nativeComputationalCost * ZKSYNC_OS_L1_TX_NATIVE_PRICE) / _maxFeePerGas;
-            }
+            // 1. Intrinsic tx cost in gas
+            uint256 intrinsicGasCost = L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS;
+            // we are always a bit overestimating for zero bytes
+            intrinsicGasCost += L1_TX_CALLDATA_PRICE_L2_GAS_ZKSYNC_OS * _calldataLength;
 
-            uint256 pubdataGasCost = L1_TX_INTRINSIC_PUBDATA_ZKSYNC_OS * _l2GasPricePerPubdata;
+            // 2. Intrinsic tx cost in native resources
+            // Since we are using huge `L1_TX_NATIVE_PER_GAS` ratio, it mostly consists of pubdata cost.
+            uint256 intrinsicPubdataGasCost = L1_TX_INTRINSIC_PUBDATA_ZKSYNC_OS * _l2GasPricePerPubdata;
+            // And because of huge ratio, we are overestimating using `MAX_NATIVE_COMPUTATIONAL_ZKSYNC_OS`.
+            // Actual intrinsic cost is much lower, but even with `MAX_NATIVE_COMPUTATIONAL_ZKSYNC_OS`
+            // it will be around 343 gas and overestimate makes code safer and easier to support
+            uint256 gasForIntrinsicNative = intrinsicPubdataGasCost +
+                Math.ceilDiv(MAX_NATIVE_COMPUTATIONAL_ZKSYNC_OS, L1_TX_NATIVE_PER_GAS);
 
-            uint256 totalGasForNative = gasNeededToCoverComputationalNative + pubdataGasCost;
-
-            return Math.max(gasCost, totalGasForNative);
+            return Math.max(intrinsicGasCost, gasForIntrinsicNative);
         } else {
             uint256 costForComputation;
             {
