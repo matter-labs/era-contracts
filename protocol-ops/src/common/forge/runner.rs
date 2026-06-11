@@ -1,7 +1,4 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
 
 use anyhow::Context;
 use chrono::Utc;
@@ -11,17 +8,19 @@ use xshell::{cmd, Shell};
 
 use super::script::{ForgeScript, ForgeScriptArg, ForgeScriptArgs};
 // Forge is defined in the parent module (mod.rs); use the full path to avoid confusion.
+use crate::common::forge::scripts::ForgeScriptParams;
 use crate::common::forge::Forge;
 use crate::common::{
-    anvil::{self, AnvilInstance},
+    anvil,
     cmd::{Cmd, CmdResult},
     ethereum::query_chain_id_sync,
+    files::read_json_file,
     logger, paths,
     traits::{ReadConfig, SaveConfig},
     wallets::Wallet,
     SharedRunArgs,
 };
-use crate::config::forge_interface::script_params::ForgeScriptParams;
+use alloy::node_bindings::AnvilInstance;
 
 /// Result of a forge script execution containing the broadcast JSON payload.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -44,8 +43,8 @@ impl ForgeScriptRun {
 /// Encapsulates the full execution environment for forge scripts:
 /// shell, forge CLI args, target anvil-fork RPC, foundry path, and run history.
 pub struct ForgeRunner {
-    /// Shell used for file I/O and command execution.
-    pub shell: Shell,
+    /// Shell used for command execution and directory management (xshell cmd! / push_dir).
+    shell: Shell,
     /// User-supplied forge CLI flags (--verify, --verifier-url, etc.).
     pub forge_args: ForgeScriptArgs,
     /// Effective RPC URL for Forge simulations (always the anvil fork).
@@ -70,7 +69,7 @@ impl ForgeRunner {
             shared.l1_rpc_url
         ));
         let anvil = anvil::start_anvil_fork(&shared.l1_rpc_url)?;
-        let rpc_url = anvil.rpc_url().to_string();
+        let rpc_url = anvil.endpoint();
 
         Ok(ForgeRunner {
             shell,
@@ -87,7 +86,7 @@ impl ForgeRunner {
     /// Needed when the auto-resolved sender is a contract (e.g. Governance)
     /// or an EOA without ETH on the forked chain — forge's `--sender
     /// --unlocked` still requires the impersonated address to pay gas.
-    pub async fn fund_sender(&self, address: ethers::types::Address) -> anyhow::Result<()> {
+    pub async fn fund_sender(&self, address: alloy::primitives::Address) -> anyhow::Result<()> {
         anvil::set_balance(&self.rpc_url, address).await
     }
 
@@ -95,7 +94,10 @@ impl ForgeRunner {
     /// it on the anvil fork. Convenience wrapper around
     /// `Wallet::parse(None, Some(address))` + `fund_sender`, since every
     /// prepare-shape command needs both.
-    pub async fn prepare_sender(&self, address: ethers::types::Address) -> anyhow::Result<Wallet> {
+    pub async fn prepare_sender(
+        &self,
+        address: alloy::primitives::Address,
+    ) -> anyhow::Result<Wallet> {
         self.fund_sender(address).await?;
         Wallet::parse(None, Some(address))
     }
@@ -104,7 +106,7 @@ impl ForgeRunner {
     /// and prepare it as a sender on the fork (fund + impersonate).
     pub async fn prepare_chain_admin(
         &self,
-        bridgehub: ethers::types::Address,
+        bridgehub: alloy::primitives::Address,
         chain_id: u64,
     ) -> anyhow::Result<Wallet> {
         let admin =
@@ -120,7 +122,7 @@ impl ForgeRunner {
     /// ChainAdmin contract itself has no private key.
     pub async fn prepare_chain_admin_owner(
         &self,
-        bridgehub: ethers::types::Address,
+        bridgehub: alloy::primitives::Address,
         chain_id: u64,
     ) -> anyhow::Result<Wallet> {
         let owner = crate::common::l1_contracts::resolve_chain_admin_owner(
@@ -137,7 +139,7 @@ impl ForgeRunner {
     /// `Governance(bridgehub.owner()).owner()` and prepare it as a sender.
     pub async fn prepare_governance_owner(
         &self,
-        bridgehub: ethers::types::Address,
+        bridgehub: alloy::primitives::Address,
     ) -> anyhow::Result<Wallet> {
         let owner = crate::common::l1_contracts::resolve_governance_owner(&self.rpc_url, bridgehub)
             .await
@@ -157,6 +159,9 @@ impl ForgeRunner {
         let command_result = self.execute(&script, &args, false)?;
 
         if command_result.proposal_error() {
+            logger::info(
+                "Governance proposal already exists on-chain — skipping broadcast for this step.",
+            );
             return Ok(());
         }
 
@@ -175,7 +180,7 @@ impl ForgeRunner {
         wallet: &Wallet,
     ) -> anyhow::Result<O> {
         let input_path = params.input(&self.foundry_scripts_path);
-        input.save(&self.shell, &input_path)?;
+        input.save(&input_path)?;
 
         let forge = Forge::new(&self.foundry_scripts_path)
             .script(&params.script(), self.forge_args.clone())
@@ -186,7 +191,7 @@ impl ForgeRunner {
         self.run(forge)?;
 
         let output_path = params.output(&self.foundry_scripts_path);
-        O::read(&self.shell, output_path)
+        O::read(output_path)
     }
 
     fn execute(
@@ -222,12 +227,7 @@ impl ForgeRunner {
                 (None, serde_json::Value::Null)
             }
             Some(broadcast_file) => {
-                let payload = read_json(&broadcast_file).with_context(|| {
-                    format!(
-                        "Failed to read JSON from broadcast file: {}",
-                        broadcast_file.display()
-                    )
-                })?;
+                let payload = read_json_file::<Value>(&broadcast_file)?;
                 let run_ts_raw = payload
                     .get("timestamp")
                     .and_then(|t| t.as_i64())
@@ -352,15 +352,4 @@ fn derive_run_latest_filename(sig: Option<String>) -> String {
             }
         }
     }
-}
-
-fn read_json(path: &Path) -> anyhow::Result<Value> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("failed to read forge broadcast file {}", path.display()))?;
-    serde_json::from_str(&content).with_context(|| {
-        format!(
-            "failed to parse forge broadcast file {} as JSON",
-            path.display()
-        )
-    })
 }

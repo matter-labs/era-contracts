@@ -1,6 +1,7 @@
 mod cast_transactions;
 mod runner;
 mod script;
+pub mod scripts;
 use std::path::{Path, PathBuf};
 
 pub use cast_transactions::{split_into_bundles, SafeBundle};

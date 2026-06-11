@@ -1,17 +1,16 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
+use alloy::network::{EthereumWallet, TransactionBuilder};
+use alloy::primitives::{Address, Bytes, U256};
+use alloy::providers::{Provider, ProviderBuilder};
+use alloy::rpc::types::TransactionRequest;
+use alloy::signers::local::PrivateKeySigner;
 use anyhow::Context;
 use clap::Parser;
-use ethers::middleware::Middleware;
-use ethers::types::{Address, BlockNumber, Bytes, TransactionRequest, H256, U256};
 use serde_json::Value;
 
-use ethers::providers::{Http, Provider};
-use ethers::signers::{LocalWallet, Signer};
-
-use crate::common::logger;
+use crate::common::{logger, PrivateKey};
 
 /// Per-tx gas estimate buffer in basis points (12500 = 125% = 25% headroom).
 const GAS_ESTIMATE_BUFFER_BPS: u64 = 12_500;
@@ -29,7 +28,7 @@ const PER_TX_GAS_LIMIT_CAP: u64 = 20_000_000;
 /// our replay tooling, the broadcaster is derived from the supplied private
 /// key (every tx in the batch is sent under that key's address).
 ///
-/// Implementation note: we replay each tx natively via ethers (sign locally,
+/// Implementation note: we replay each tx natively via alloy (sign locally,
 /// send via `eth_sendRawTransaction`, await a receipt) instead of shelling
 /// out to forge. Forge involvement here was pure overhead — every bundle
 /// paid ~1-2s of forge startup before the first tx hit the wire. Bundles
@@ -54,15 +53,15 @@ pub struct DevExecuteSafeArgs {
     /// Private key whose address is used as the broadcaster for every tx in
     /// the bundle.
     #[clap(long)]
-    pub private_key: String,
+    pub private_key: PrivateKey,
 }
 
 pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
-    execute_one_bundle(&args.safe_file, &args.l1_rpc_url, &args.private_key).await
+    execute_one_bundle(&args.safe_file, &args.l1_rpc_url, args.private_key.expose()).await
 }
 
 /// Replay a single Safe bundle file under one signer.
-async fn execute_one_bundle(
+pub async fn execute_one_bundle(
     safe_file: &Path,
     l1_rpc_url: &str,
     private_key: &str,
@@ -78,28 +77,20 @@ async fn execute_one_bundle(
         .and_then(|t| t.as_array())
         .ok_or_else(|| anyhow::anyhow!("Safe file missing or invalid `.transactions` array"))?;
 
-    let pk_h256 =
-        H256::from_str(private_key).context("invalid private key (expected 0x-prefixed hex)")?;
-    let wallet = LocalWallet::from_bytes(pk_h256.as_bytes())
+    let pk_hex = private_key.strip_prefix("0x").unwrap_or(private_key);
+    let pk_bytes = alloy::hex::decode(pk_hex).context("invalid private key (expected hex)")?;
+    let signer = PrivateKeySigner::from_slice(&pk_bytes)
         .context("invalid private key (failed to construct signer)")?;
-    let from = ethers::signers::Signer::address(&wallet);
+    let from = signer.address();
+    let wallet = EthereumWallet::from(signer);
 
-    // Resolve chain id once so the signer can include it in the EIP-155
-    // signature (anvil rejects legacy txs without chain id).
-    //
-    // Override Provider's polling interval (default 7s, tuned for mainnet)
-    // so per-tx receipt polling doesn't dominate bundle latency on anvil's
-    // instamine or reth's sub-second block time.
-    let provider = Provider::<Http>::try_from(l1_rpc_url)
-        .context("connect L1 provider")?
-        .interval(std::time::Duration::from_millis(50));
-    let chain_id = provider
-        .get_chainid()
-        .await
-        .context("eth_chainId")?
-        .as_u64();
-    let client =
-        ethers::middleware::SignerMiddleware::new(provider, wallet.with_chain_id(chain_id));
+    // Build provider with signer. ProviderBuilder::new() includes
+    // recommended fillers (chain_id, gas, nonce); we override nonce and gas
+    // manually per-tx below so those fillers are effectively a no-op for
+    // the fields we set.
+    let provider = ProviderBuilder::new()
+        .wallet(wallet)
+        .connect_http(l1_rpc_url.parse().context("invalid L1 RPC URL")?);
 
     logger::info(format!(
         "Replaying {} tx(s) under broadcaster {:#x}",
@@ -109,8 +100,11 @@ async fn execute_one_bundle(
 
     // Fetch starting nonce once and assign nonces locally — avoids a
     // serialised `eth_getTransactionCount(pending)` round-trip per tx.
-    let base_nonce = client
-        .get_transaction_count(from, Some(BlockNumber::Pending.into()))
+    // Must use Pending (not Latest) so in-flight txs from this address
+    // don't cause nonce reuse if the signer already has pending mempool txs.
+    let base_nonce = provider
+        .get_transaction_count(from)
+        .block_id(alloy::eips::BlockNumberOrTag::Pending.into())
         .await
         .context("eth_getTransactionCount(pending)")?;
 
@@ -134,7 +128,7 @@ async fn execute_one_bundle(
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `data`"))?;
         let data = Bytes::from(
-            ethers::utils::hex::decode(data_hex.trim_start_matches("0x"))
+            alloy::hex::decode(data_hex.trim_start_matches("0x"))
                 .with_context(|| format!("Safe tx #{idx} `data` is not valid hex"))?,
         );
         let value_str = tx
@@ -149,43 +143,39 @@ async fn execute_one_bundle(
         // gas limit, ~30M on a quiet local chain). Apply
         // `GAS_ESTIMATE_BUFFER_BPS` headroom, clamped to
         // `PER_TX_GAS_LIMIT_CAP` to stay below the block gas limit.
-        let estimate_req: ethers::types::transaction::eip2718::TypedTransaction =
-            TransactionRequest::new()
-                .from(from)
-                .to(to)
-                .data(data.clone())
-                .value(value)
-                .into();
-        let estimated = client
-            .estimate_gas(&estimate_req, None)
+        let estimated: u64 = provider
+            .estimate_gas(
+                TransactionRequest::default()
+                    .with_from(from)
+                    .with_to(to)
+                    .with_input(data.clone())
+                    .with_value(value),
+            )
             .await
             .with_context(|| format!("eth_estimateGas for Safe tx #{idx} (to {to:#x})"))?;
-        let buffered =
-            estimated.saturating_mul(U256::from(GAS_ESTIMATE_BUFFER_BPS)) / U256::from(10_000);
-        let gas_limit = std::cmp::min(buffered, U256::from(PER_TX_GAS_LIMIT_CAP));
+        let buffered = estimated.saturating_mul(GAS_ESTIMATE_BUFFER_BPS) / 10_000;
+        let gas_limit = std::cmp::min(buffered, PER_TX_GAS_LIMIT_CAP);
 
-        let req = TransactionRequest::new()
-            .from(from)
-            .to(to)
-            .data(data)
-            .value(value)
-            .chain_id(chain_id)
-            .gas(gas_limit)
-            .gas_price(1_000_000_000u64)
-            .nonce(base_nonce + idx);
+        let req = TransactionRequest::default()
+            .with_from(from)
+            .with_to(to)
+            .with_input(data)
+            .with_value(value)
+            .with_nonce(base_nonce + idx as u64)
+            .with_gas_limit(gas_limit)
+            .with_gas_price(1_000_000_000u128);
 
-        let pending = client
-            .send_transaction(req, None)
+        let pending = provider
+            .send_transaction(req)
             .await
             .with_context(|| format!("eth_sendTransaction for Safe tx #{idx} (to {to:#x})"))?;
-        let tx_hash = pending.tx_hash();
+        let tx_hash = *pending.tx_hash();
         let receipt = pending
+            .get_receipt()
             .await
-            .with_context(|| format!("await receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?
-            .ok_or_else(|| anyhow::anyhow!("no receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?;
-        let status = receipt.status.unwrap_or_default();
+            .with_context(|| format!("await receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?;
         anyhow::ensure!(
-            status == 1.into(),
+            receipt.status(),
             "Safe tx #{idx} (hash {tx_hash:#x}) reverted (status=0)",
         );
     }
@@ -198,12 +188,14 @@ async fn execute_one_bundle(
 /// (`"0"`, `"1000"`) or a hex string (`"0x0"`, `"0x10"`). Accept both.
 fn parse_decimal_or_hex_u256(raw: &str) -> anyhow::Result<U256> {
     let trimmed = raw.trim();
-    if let Some(hex) = trimmed.strip_prefix("0x") {
-        if hex.is_empty() {
-            return Ok(U256::zero());
+    if let Some(hex_str) = trimmed.strip_prefix("0x") {
+        if hex_str.is_empty() {
+            return Ok(U256::ZERO);
         }
-        U256::from_str_radix(hex, 16).with_context(|| format!("invalid hex u256 {trimmed:?}"))
+        U256::from_str_radix(hex_str, 16).with_context(|| format!("invalid hex u256 {trimmed:?}"))
     } else {
-        U256::from_dec_str(trimmed).with_context(|| format!("invalid decimal u256 {trimmed:?}"))
+        trimmed
+            .parse::<U256>()
+            .with_context(|| format!("invalid decimal u256 {trimmed:?}"))
     }
 }

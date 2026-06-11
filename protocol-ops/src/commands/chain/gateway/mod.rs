@@ -4,9 +4,9 @@ use clap::Subcommand;
 
 use crate::common::forge::{Forge, ForgeRunner, ForgeScriptArg};
 
-pub(crate) mod convert;
-pub(crate) mod migrate_from;
-pub(crate) mod migrate_to;
+pub mod convert;
+pub mod migrate_from;
+pub mod migrate_to;
 
 /// Gateway operations: converting a chain into a gateway or migrating a chain to/from one.
 #[derive(Subcommand, Debug)]
@@ -26,7 +26,7 @@ pub use convert::ConvertArgs;
 pub use migrate_from::MigrateFromCommands;
 pub use migrate_to::MigrateToCommands;
 
-pub(crate) async fn run(args: GatewayCommands) -> anyhow::Result<()> {
+pub async fn run(args: GatewayCommands) -> anyhow::Result<()> {
     match args {
         GatewayCommands::Convert(cmd) => convert::run_convert(cmd).await,
         GatewayCommands::MigrateTo(cmd) => migrate_to::run_migrate_to(cmd).await,

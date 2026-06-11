@@ -1,26 +1,18 @@
-use ethers::{
-    contract::BaseContract,
-    types::{Address, H256},
-};
-use lazy_static::lazy_static;
+use alloy::primitives::{Address, B256};
+use alloy::sol_types::SolCall;
 use serde::Serialize;
 
-use crate::abi::IDEPLOYCTMABI_ABI;
+use crate::common::abi::IDeployCTMAbi;
+use crate::common::forge::scripts::{
+    deploy_ctm::{DeployCTMConfig, DeployCTMOutput, DEPLOY_CTM_SCRIPT_PARAMS},
+    deploy_ecosystem::InitialDeploymentConfig,
+};
 use crate::common::{
     forge::{Forge, ForgeRunner},
     traits::{ReadConfig, SaveConfig},
     wallets::Wallet,
 };
-use crate::config::forge_interface::{
-    deploy_ctm::{input::DeployCTMConfig, output::DeployCTMOutput},
-    deploy_ecosystem::input::InitialDeploymentConfig,
-    script_params::DEPLOY_CTM_SCRIPT_PARAMS,
-};
 use crate::types::{L1Network, VMOption};
-
-lazy_static! {
-    static ref DEPLOY_CTM_FUNCTIONS: BaseContract = BaseContract::from(IDEPLOYCTMABI_ABI.clone());
-}
 
 /// Input parameters for deploying CTM contracts.
 #[derive(Debug, Clone, Serialize)]
@@ -31,8 +23,8 @@ pub struct CtmDeployInput {
     pub reuse_gov_and_admin: bool,
     pub with_testnet_verifier: bool,
     pub with_legacy_bridge: bool,
-    pub zk_token_asset_id: Option<H256>,
-    pub create2_factory_salt: Option<H256>,
+    pub zk_token_asset_id: Option<B256>,
+    pub create2_factory_salt: Option<B256>,
 }
 
 /// Deploy CTM contracts.
@@ -64,14 +56,14 @@ pub fn deploy(
     );
 
     let input_path = DEPLOY_CTM_SCRIPT_PARAMS.input(&runner.foundry_scripts_path);
-    deploy_config.save(&runner.shell, input_path)?;
+    deploy_config.save(input_path)?;
 
-    let calldata = DEPLOY_CTM_FUNCTIONS
-        .encode(
-            "runWithBridgehub",
-            (input.bridgehub, input.reuse_gov_and_admin),
-        )
-        .map_err(|e| anyhow::anyhow!("Failed to encode calldata: {}", e))?;
+    let calldata = IDeployCTMAbi::runWithBridgehubCall {
+        bridgehub: input.bridgehub,
+        reuseGovAndAdmin: input.reuse_gov_and_admin,
+    }
+    .abi_encode()
+    .into();
 
     let forge = Forge::new(&runner.foundry_scripts_path)
         .script(
@@ -91,5 +83,5 @@ pub fn deploy(
     runner.run(forge)?;
 
     let output_path = DEPLOY_CTM_SCRIPT_PARAMS.output(&runner.foundry_scripts_path);
-    DeployCTMOutput::read(&runner.shell, output_path)
+    DeployCTMOutput::read(output_path)
 }
