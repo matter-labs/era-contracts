@@ -33,7 +33,9 @@ contract ZKsyncOSVerifierFriTest is Test {
 
     function test_computeStatementVersionedHash() public view {
         bytes32 rawHash = keccak256(abi.encodePacked(PUBLIC_INPUT_HASH, RECURSION_CHAIN_HASH));
-        bytes32 expected = bytes32((uint256(rawHash) & ((1 << 248) - 1)) | (uint256(FRI_STATEMENT_HASH_VERSION) << 248));
+        bytes32 expected = bytes32(
+            (uint256(rawHash) & ((1 << 248) - 1)) | (uint256(FRI_STATEMENT_HASH_VERSION) << 248)
+        );
 
         assertEq(verifier.computeStatementVersionedHash(PUBLIC_INPUT_HASH), expected);
         assertEq(uint8(expected[0]), FRI_STATEMENT_HASH_VERSION);

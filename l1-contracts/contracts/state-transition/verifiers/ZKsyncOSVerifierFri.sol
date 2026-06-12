@@ -67,8 +67,9 @@ contract ZKsyncOSVerifierFri is IVerifier {
         // The ZKsync OS FRI precompile expects raw 32-byte calldata (just the
         // statement hash, no function selector), so a typed interface call is
         // not possible here and a raw `staticcall` is used instead.
-        (bool success, bytes memory returnData) =
-            ZKSYNC_OS_FRI_PRECOMPILE_ADDR.staticcall(abi.encodePacked(statementVersionedHash));
+        (bool success, bytes memory returnData) = ZKSYNC_OS_FRI_PRECOMPILE_ADDR.staticcall(
+            abi.encodePacked(statementVersionedHash)
+        );
         if (!success || returnData.length != 32) {
             revert InvalidProof();
         }
@@ -95,11 +96,10 @@ contract ZKsyncOSVerifierFri is IVerifier {
     }
 
     /// @notice Computes the public-input hash used by ZKsync OS recursive verification.
-    function computeZKsyncOSHash(uint256 initialHash, uint256[] calldata _publicInputs)
-        public
-        pure
-        returns (uint256 result)
-    {
+    function computeZKsyncOSHash(
+        uint256 initialHash,
+        uint256[] calldata _publicInputs
+    ) public pure returns (uint256 result) {
         uint256 publicInputsLength = _publicInputs.length;
         result = initialHash;
 
