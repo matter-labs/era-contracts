@@ -189,18 +189,22 @@ library SystemContractsProcessing {
         // NOTE: L2WrappedBaseToken is intentionally NOT in this list. v31 must not touch the
         // WrappedBaseToken impl on either VM, so it is excluded from both the force-deployment list
         // and the factory deps (this list feeds Era + ZKsyncOS force deployments and factory deps).
-        ids[0] = CoreContract.L2Bridgehub;
-        ids[1] = CoreContract.L2AssetRouter;
-        ids[2] = CoreContract.L2NativeTokenVault;
-        ids[3] = CoreContract.L2MessageRoot;
-        ids[4] = CoreContract.L2MessageVerification;
-        ids[5] = CoreContract.L2ChainAssetHandler;
-        ids[6] = CoreContract.L2InteropRootStorage;
-        ids[7] = CoreContract.BaseTokenHolder;
-        ids[8] = CoreContract.L2AssetTracker;
-        ids[9] = CoreContract.InteropCenter;
-        ids[10] = CoreContract.InteropHandler;
-        ids[11] = CoreContract.GWAssetTracker;
+        uint256 i = 0;
+        ids[i++] = CoreContract.L2Bridgehub;
+        ids[i++] = CoreContract.L2AssetRouter;
+        ids[i++] = CoreContract.L2NativeTokenVault;
+        ids[i++] = CoreContract.L2MessageRoot;
+        ids[i++] = CoreContract.L2MessageVerification;
+        ids[i++] = CoreContract.L2ChainAssetHandler;
+        ids[i++] = CoreContract.L2InteropRootStorage;
+        ids[i++] = CoreContract.BaseTokenHolder;
+        ids[i++] = CoreContract.L2AssetTracker;
+        ids[i++] = CoreContract.InteropCenter;
+        ids[i++] = CoreContract.InteropHandler;
+        ids[i++] = CoreContract.GWAssetTracker;
+        // Under-filling would silently leave `CoreContract(0)` entries; over-filling
+        // already reverts with an out-of-bounds access on the fixed-length array.
+        require(i == FIXED_ADDRESS_CORE_CONTRACTS_COUNT, "fixed-address core contract count mismatch");
     }
 
     /// @notice System contracts that have l1-contracts EVM bytecodes and need ZKsyncOS proxy upgrades.
