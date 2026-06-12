@@ -24,18 +24,18 @@ contract SetZKsyncOSChainConfigTest is AdminTest {
                     setFriProofVerificationEnabled
     //////////////////////////////////////////////////////////////*/
 
-    function test_setFriProofVerificationEnabled_revertWhen_calledByNonChainTypeManager() public {
-        address nonChainTypeManager = makeAddr("nonChainTypeManager");
+    function test_setFriProofVerificationEnabled_revertWhen_calledByNonAdmin() public {
+        address nonAdmin = makeAddr("nonAdmin");
 
-        vm.startPrank(nonChainTypeManager);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonChainTypeManager));
+        vm.startPrank(nonAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonAdmin));
         adminFacet.setFriProofVerificationEnabled(true);
     }
 
     function test_setFriProofVerificationEnabled_revertWhen_notZKsyncOS() public {
         utilsFacet.util_setZksyncOS(false);
 
-        vm.startPrank(utilsFacet.util_getChainTypeManager());
+        vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectRevert(NotZKsyncOS.selector);
         adminFacet.setFriProofVerificationEnabled(true);
     }
@@ -44,7 +44,7 @@ contract SetZKsyncOSChainConfigTest is AdminTest {
         utilsFacet.util_setTotalBatchesCommitted(2);
         utilsFacet.util_setTotalBatchesVerified(1);
 
-        vm.startPrank(utilsFacet.util_getChainTypeManager());
+        vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectRevert(abi.encodeWithSelector(ZKsyncOSChainConfigUpdateWithUnverifiedBatches.selector, 1, 2));
         adminFacet.setFriProofVerificationEnabled(true);
     }
@@ -54,7 +54,7 @@ contract SetZKsyncOSChainConfigTest is AdminTest {
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit NewFriProofVerificationEnabled(false, true);
 
-        vm.startPrank(utilsFacet.util_getChainTypeManager());
+        vm.startPrank(utilsFacet.util_getAdmin());
         adminFacet.setFriProofVerificationEnabled(true);
 
         assertTrue(utilsFacet.util_getZKsyncOSChainConfig().friProofVerificationEnabled);
