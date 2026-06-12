@@ -23,11 +23,12 @@ import {EmergencyStageUpgradeCalldata} from "./EmergencyStageUpgradeCalldata.s.s
 ///
 /// The v31 Era AdminFacet was generated with ROLLUP_DA_MANAGER =
 /// 0x064ac968CCad1948fceE025fD59c20b153c88072, which has no code on Sepolia and
-/// cannot be deployed deterministically after the fact. This proposal deploys a
-/// fresh v31-compatible Era RollupDAManager, deploys a new AdminFacet pointing at
-/// it, patches already-upgraded Era chains, and replaces the Era CTM stored v31
-/// upgrade cut and chain creation params for chains still upgrading from 0.29.4
-/// or created after the fix.
+/// cannot be deployed deterministically after the fact. The replacement
+/// RollupDAManager and AdminFacet are predeployed and verified before the
+/// emergency proposal. The proposal then accepts RollupDAManager ownership,
+/// configures the allowed DA pairs, patches already-upgraded Era chains, and
+/// replaces the Era CTM stored v31 upgrade cut and chain creation params for
+/// chains still upgrading from 0.29.4 or created after the fix.
 contract EmergencyEraV31RollupDAManagerFix is EmergencyStageUpgradeCalldata {
     address internal constant ERA_CTM = 0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b;
     address internal constant BAD_ERA_ROLLUP_DA_MANAGER = 0x064ac968CCad1948fceE025fD59c20b153c88072;
@@ -52,16 +53,47 @@ contract EmergencyEraV31RollupDAManagerFix is EmergencyStageUpgradeCalldata {
     bytes32 internal constant ERA_ADMIN_FACET_SALT = keccak256("stage-v31-era-admin-facet-fix-2026-06-11");
 
     function runAddresses() external pure {
-        (address rollupDAManager, address adminFacet) = deterministicAddresses();
+        (address ownerWrapper, address rollupDAManager, address adminFacet) = deterministicDeploymentAddresses();
+        console2.log("RollupDAManager owner wrapper:", ownerWrapper);
         console2.log("New Era RollupDAManager:", rollupDAManager);
         console2.log("New Era AdminFacet:", adminFacet);
         console2.log("PUH / Era CTM owner:", address(PUH));
     }
 
+    /// @notice Emits the two deterministic CREATE2 transactions to send before the emergency proposal.
+    /// @dev The RollupDAManager deployment uses Create2AndTransfer so PUH becomes pending owner.
+    function runPredeployCalldata() external view {
+        (address ownerWrapper, address rollupDAManager, address adminFacet) = deterministicDeploymentAddresses();
+        _checkPredeployState(ownerWrapper, rollupDAManager, adminFacet);
+
+        bytes memory rollupDAManagerData = _rollupDAManagerDeploymentCalldata(address(PUH));
+        bytes memory adminFacetData = _adminFacetDeploymentCalldata(rollupDAManager);
+
+        console2.log("================ ERA V31 ROLLUP DA MANAGER FIX PREDEPLOY ================");
+        console2.log("RollupDAManager owner wrapper:", ownerWrapper);
+        console2.log("New Era RollupDAManager:", rollupDAManager);
+        console2.log("New Era AdminFacet:", adminFacet);
+        console2.log("");
+        console2.log("---- TX 1: deploy RollupDAManager via Create2AndTransfer wrapper ----");
+        console2.log("To  (deterministic CREATE2 factory):", Utils.DETERMINISTIC_CREATE2_ADDRESS);
+        console2.log("Value: 0");
+        console2.log("Data:");
+        console2.logBytes(rollupDAManagerData);
+        console2.log("");
+        console2.log("---- TX 2: deploy AdminFacet ----");
+        console2.log("To  (deterministic CREATE2 factory):", Utils.DETERMINISTIC_CREATE2_ADDRESS);
+        console2.log("Value: 0");
+        console2.log("Data:");
+        console2.logBytes(adminFacetData);
+        console2.log("");
+        console2.log("---- Verification commands ----");
+        _logVerifyCommands(ownerWrapper, rollupDAManager, adminFacet);
+    }
+
     /// @notice Emits the approveHash txs and final EmergencyUpgradeBoard calldata.
     function runCalldata() external view {
-        (address rollupDAManager, address adminFacet) = deterministicAddresses();
-        _checkPreconditions(rollupDAManager, adminFacet);
+        (, address rollupDAManager, address adminFacet) = deterministicDeploymentAddresses();
+        _checkEmergencyPreconditions(rollupDAManager, adminFacet);
 
         IProtocolUpgradeHandler.Call[] memory calls = buildCalls();
 
@@ -83,8 +115,10 @@ contract EmergencyEraV31RollupDAManagerFix is EmergencyStageUpgradeCalldata {
     /// @notice Executes the proposal on the local fork, then verifies affected-chain postconditions.
     /// @dev This is a local simulation helper only. Do not run with --broadcast.
     function runForkSimulation() external {
-        (address rollupDAManager, address adminFacet) = deterministicAddresses();
-        _checkPreconditions(rollupDAManager, adminFacet);
+        (address ownerWrapper, address rollupDAManager, address adminFacet) = deterministicDeploymentAddresses();
+        _checkPredeployState(ownerWrapper, rollupDAManager, adminFacet);
+        _deployPrerequisitesOnFork(rollupDAManager, adminFacet);
+        _checkEmergencyPreconditions(rollupDAManager, adminFacet);
         _assertStageProofsSetDAPairFailsBeforeFix();
 
         bytes32 correctedEraV31CutHash = keccak256(abi.encode(_correctedEraV31Cut(adminFacet)));
@@ -104,24 +138,18 @@ contract EmergencyEraV31RollupDAManagerFix is EmergencyStageUpgradeCalldata {
     }
 
     function buildCalls() public view returns (IProtocolUpgradeHandler.Call[] memory calls) {
-        (address rollupDAManager, address adminFacet) = deterministicAddresses();
+        (, address rollupDAManager, address adminFacet) = deterministicDeploymentAddresses();
         Diamond.DiamondCutData memory adminPatchCut = _adminFacetReplacementCut(adminFacet);
         Diamond.DiamondCutData memory correctedEraV31Cut = _correctedEraV31Cut(adminFacet);
         ChainCreationParams memory correctedChainCreationParams = _correctedEraChainCreationParams(adminFacet);
 
-        calls = new IProtocolUpgradeHandler.Call[](9);
+        calls = new IProtocolUpgradeHandler.Call[](7);
 
         calls[0] = IProtocolUpgradeHandler.Call({
-            target: Utils.DETERMINISTIC_CREATE2_ADDRESS,
-            value: 0,
-            data: _rollupDAManagerDeploymentCalldata(address(PUH))
-        });
-
-        calls[1] = IProtocolUpgradeHandler.Call({
             target: rollupDAManager, value: 0, data: abi.encodeCall(IOwnable.acceptOwnership, ())
         });
 
-        calls[2] = IProtocolUpgradeHandler.Call({
+        calls[1] = IProtocolUpgradeHandler.Call({
             target: rollupDAManager,
             value: 0,
             data: abi.encodeCall(
@@ -129,7 +157,7 @@ contract EmergencyEraV31RollupDAManagerFix is EmergencyStageUpgradeCalldata {
             )
         });
 
-        calls[3] = IProtocolUpgradeHandler.Call({
+        calls[2] = IProtocolUpgradeHandler.Call({
             target: rollupDAManager,
             value: 0,
             data: abi.encodeCall(
@@ -137,29 +165,25 @@ contract EmergencyEraV31RollupDAManagerFix is EmergencyStageUpgradeCalldata {
             )
         });
 
-        calls[4] = IProtocolUpgradeHandler.Call({
-            target: Utils.DETERMINISTIC_CREATE2_ADDRESS, value: 0, data: _adminFacetDeploymentCalldata(rollupDAManager)
-        });
-
-        calls[5] = IProtocolUpgradeHandler.Call({
+        calls[3] = IProtocolUpgradeHandler.Call({
             target: ERA_CTM,
             value: 0,
             data: abi.encodeCall(IChainTypeManager.executeUpgrade, (CHAIN_STAGE_VALIDIUM, adminPatchCut))
         });
 
-        calls[6] = IProtocolUpgradeHandler.Call({
+        calls[4] = IProtocolUpgradeHandler.Call({
             target: ERA_CTM,
             value: 0,
             data: abi.encodeCall(IChainTypeManager.executeUpgrade, (CHAIN_STAGE_PROOFS, adminPatchCut))
         });
 
-        calls[7] = IProtocolUpgradeHandler.Call({
+        calls[5] = IProtocolUpgradeHandler.Call({
             target: ERA_CTM,
             value: 0,
             data: abi.encodeCall(IChainTypeManager.setUpgradeDiamondCut, (correctedEraV31Cut, ERA_OLD_PROTOCOL_VERSION))
         });
 
-        calls[8] = IProtocolUpgradeHandler.Call({
+        calls[6] = IProtocolUpgradeHandler.Call({
             target: ERA_CTM,
             value: 0,
             data: abi.encodeCall(IChainTypeManager.setChainCreationParams, (correctedChainCreationParams))
@@ -167,10 +191,18 @@ contract EmergencyEraV31RollupDAManagerFix is EmergencyStageUpgradeCalldata {
     }
 
     function deterministicAddresses() public pure returns (address rollupDAManager, address adminFacet) {
+        (, rollupDAManager, adminFacet) = deterministicDeploymentAddresses();
+    }
+
+    function deterministicDeploymentAddresses()
+        public
+        pure
+        returns (address ownerWrapper, address rollupDAManager, address adminFacet)
+    {
         bytes memory managerInitCode = type(RollupDAManager).creationCode;
         bytes memory ownerWrapperInitCode = _rollupDAManagerOwnerWrapperInitCode(address(PUH));
 
-        address ownerWrapper = vm.computeCreate2Address(
+        ownerWrapper = vm.computeCreate2Address(
             ERA_ROLLUP_DA_MANAGER_SALT, keccak256(ownerWrapperInitCode), Utils.DETERMINISTIC_CREATE2_ADDRESS
         );
         rollupDAManager = vm.computeCreate2Address(ERA_ROLLUP_DA_MANAGER_SALT, keccak256(managerInitCode), ownerWrapper);
@@ -188,10 +220,12 @@ contract EmergencyEraV31RollupDAManagerFix is EmergencyStageUpgradeCalldata {
     }
 
     function _rollupDAManagerOwnerWrapperInitCode(address owner) internal pure returns (bytes memory) {
-        return abi.encodePacked(
-            type(Create2AndTransfer).creationCode,
-            abi.encode(type(RollupDAManager).creationCode, ERA_ROLLUP_DA_MANAGER_SALT, owner)
-        );
+        return
+            abi.encodePacked(type(Create2AndTransfer).creationCode, _rollupDAManagerOwnerWrapperConstructorArgs(owner));
+    }
+
+    function _rollupDAManagerOwnerWrapperConstructorArgs(address owner) internal pure returns (bytes memory) {
+        return abi.encode(type(RollupDAManager).creationCode, ERA_ROLLUP_DA_MANAGER_SALT, owner);
     }
 
     function _adminFacetDeploymentCalldata(address rollupDAManager) internal pure returns (bytes memory) {
@@ -199,10 +233,59 @@ contract EmergencyEraV31RollupDAManagerFix is EmergencyStageUpgradeCalldata {
     }
 
     function _adminFacetInitCode(address rollupDAManager) internal pure returns (bytes memory) {
-        return
-            abi.encodePacked(
-                type(AdminFacet).creationCode, abi.encode(SEPOLIA_CHAIN_ID, RollupDAManager(rollupDAManager))
-            );
+        return abi.encodePacked(type(AdminFacet).creationCode, _adminFacetConstructorArgs(rollupDAManager));
+    }
+
+    function _adminFacetConstructorArgs(address rollupDAManager) internal pure returns (bytes memory) {
+        return abi.encode(SEPOLIA_CHAIN_ID, RollupDAManager(rollupDAManager));
+    }
+
+    function _deployPrerequisitesOnFork(address rollupDAManager, address adminFacet) internal {
+        if (rollupDAManager.code.length == 0) {
+            (bool success,) = Utils.DETERMINISTIC_CREATE2_ADDRESS.call(_rollupDAManagerDeploymentCalldata(address(PUH)));
+            require(success, "RollupDAManager predeploy failed");
+        }
+
+        if (adminFacet.code.length == 0) {
+            (bool success,) = Utils.DETERMINISTIC_CREATE2_ADDRESS.call(_adminFacetDeploymentCalldata(rollupDAManager));
+            require(success, "AdminFacet predeploy failed");
+        }
+    }
+
+    function _logVerifyCommands(address ownerWrapper, address rollupDAManager, address adminFacet) internal view {
+        _logVerifyCommand(
+            ownerWrapper,
+            "deploy-scripts/utils/deploy/Create2AndTransfer.sol:Create2AndTransfer",
+            _rollupDAManagerOwnerWrapperConstructorArgs(address(PUH))
+        );
+        _logVerifyCommand(
+            rollupDAManager, "contracts/state-transition/data-availability/RollupDAManager.sol:RollupDAManager", ""
+        );
+        _logVerifyCommand(
+            adminFacet,
+            "contracts/state-transition/chain-deps/facets/Admin.sol:AdminFacet",
+            _adminFacetConstructorArgs(rollupDAManager)
+        );
+    }
+
+    function _logVerifyCommand(address contractAddr, string memory contractName, bytes memory constructorArgs)
+        internal
+        view
+    {
+        string memory command = string.concat(
+            "forge verify-contract --chain-id ",
+            vm.toString(SEPOLIA_CHAIN_ID),
+            " ",
+            vm.toString(contractAddr),
+            " ",
+            contractName
+        );
+
+        if (constructorArgs.length != 0) {
+            command = string.concat(command, " --constructor-args ", vm.toString(constructorArgs));
+        }
+
+        console2.log(command);
     }
 
     function _adminFacetReplacementCut(address adminFacet) internal view returns (Diamond.DiamondCutData memory cut) {
@@ -393,15 +476,47 @@ contract EmergencyEraV31RollupDAManagerFix is EmergencyStageUpgradeCalldata {
         );
     }
 
-    function _checkPreconditions(address rollupDAManager, address adminFacet) internal view {
+    function _checkPredeployState(address ownerWrapper, address rollupDAManager, address adminFacet) internal view {
+        _checkCommonPreconditions();
+
+        if (ownerWrapper.code.length != 0) {
+            require(rollupDAManager.code.length != 0, "owner wrapper deployed but manager missing");
+            require(
+                Create2AndTransfer(ownerWrapper).deployedAddress() == rollupDAManager,
+                "owner wrapper deployed unexpected manager"
+            );
+        }
+
+        if (rollupDAManager.code.length != 0) {
+            require(ownerWrapper.code.length != 0, "manager deployed without owner wrapper");
+            require(
+                IOwnable(rollupDAManager).pendingOwner() == address(PUH)
+                    || IOwnable(rollupDAManager).owner() == address(PUH),
+                "RollupDAManager is not assigned to PUH"
+            );
+        }
+
+        if (adminFacet.code.length != 0) {
+            require(IAdmin(adminFacet).getRollupDAManager() == rollupDAManager, "AdminFacet RollupDAManager mismatch");
+        }
+    }
+
+    function _checkEmergencyPreconditions(address rollupDAManager, address adminFacet) internal view {
+        _checkCommonPreconditions();
+        require(rollupDAManager.code.length != 0, "new Era RollupDAManager is not deployed");
+        require(adminFacet.code.length != 0, "new Era AdminFacet is not deployed");
+        require(IOwnable(rollupDAManager).pendingOwner() == address(PUH), "PUH is not RollupDAManager pending owner");
+        require(IOwnable(rollupDAManager).owner() != address(PUH), "PUH already owns RollupDAManager");
+        require(IAdmin(adminFacet).getRollupDAManager() == rollupDAManager, "AdminFacet RollupDAManager mismatch");
+    }
+
+    function _checkCommonPreconditions() internal view {
         IChainTypeManager eraCTM = IChainTypeManager(ERA_CTM);
 
         require(block.chainid == SEPOLIA_CHAIN_ID, "run against Sepolia/fork");
         require(Utils.DETERMINISTIC_CREATE2_ADDRESS.code.length != 0, "CREATE2 factory missing");
         require(BAD_ERA_ROLLUP_DA_MANAGER.code.length == 0, "bad Era manager unexpectedly has code");
         require(BAD_ERA_ADMIN_FACET.code.length != 0, "bad Era AdminFacet missing");
-        require(rollupDAManager.code.length == 0, "new Era RollupDAManager already deployed");
-        require(adminFacet.code.length == 0, "new Era AdminFacet already deployed");
         require(IOwnable(ERA_CTM).owner() == address(PUH), "PUH is not Era CTM owner");
         require(eraCTM.getProtocolVersion(CHAIN_STAGE_VALIDIUM) == V31_PROTOCOL_VERSION, "stage-validium is not v31");
         require(eraCTM.getProtocolVersion(CHAIN_STAGE_PROOFS) == V31_PROTOCOL_VERSION, "stage-proofs is not v31");
