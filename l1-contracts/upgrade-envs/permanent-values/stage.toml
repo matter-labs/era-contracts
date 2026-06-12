@@ -24,7 +24,7 @@ governance_kind = "puh"
 # `[[ctm_contracts.ctms]]` array below.
 ctm_proxy_addr = "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b"
 l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
-rollup_da_manager = "0x064ac968CCad1948fceE025fD59c20b153c88072"
+rollup_da_manager = "0x5af0d94e50b271005AF1687e363FD104771EAe9d"
 
 # v31 multi-CTM list, consumed by `scripts/v31-simulate-upgrade.ts`.
 # Schema mirrors `protocol-ops ecosystem upgrade-prepare-all --ctm-config`:
@@ -36,7 +36,7 @@ rollup_da_manager = "0x064ac968CCad1948fceE025fD59c20b153c88072"
 proxy = "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b"
 is_zk_sync_os = false
 bytecodes_supplier = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
-rollup_da_manager = "0x064ac968CCad1948fceE025fD59c20b153c88072"
+rollup_da_manager = "0x5af0d94e50b271005AF1687e363FD104771EAe9d"
 
 [[ctm_contracts.ctms]]
 # Atlas (ZKsyncOS) CTM (witness chain: 2702)

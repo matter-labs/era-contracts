@@ -49,6 +49,18 @@ export interface ChainBalanceSnapshot {
   gwChainBalance?: string;
 }
 
+export interface TbmAccountingSnapshot {
+  chainId: number;
+  assetId: string;
+  l1SourceBefore: string;
+  l1SourceAfter: string;
+  gwChainBefore: string;
+  gwChainAfter: string;
+  gwPendingBefore: string;
+  gwPendingAfter: string;
+  migratedAmount: string;
+}
+
 export interface CTMDeployedAddresses {
   chainTypeManager: string;
   chainAdmin: string;
@@ -120,6 +132,8 @@ export interface DeploymentState {
   testTokens?: Record<number, string>;
   /** L1 address of the custom ERC20 base token, keyed by chain ID. */
   customBaseTokens?: Record<number, string>;
+  /** Pre/post accounting captured during setup TBM, keyed by `${chainId}:${assetId.toLowerCase()}`. */
+  tbmAccountingSnapshots?: Record<string, TbmAccountingSnapshot>;
   zkToken?: {
     l1Address: string;
     assetId: string;
