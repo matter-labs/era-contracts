@@ -2,7 +2,12 @@
 
 pragma solidity 0.8.28;
 
-import {FeeParams, IVerifier, VerifierParams, ZKsyncOSChainConfig} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {
+    FeeParams,
+    IVerifier,
+    VerifierParams,
+    ZKsyncOSChainConfig
+} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";

@@ -173,9 +173,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setFriProofVerificationEnabled(
-        bool _friProofVerificationEnabled
-    ) external onlyChainTypeManager onlyL1 onlyZKsyncOS {
+    function setFriProofVerificationEnabled(bool _friProofVerificationEnabled) external onlyAdmin onlyL1 onlyZKsyncOS {
         _enforceNoUnverifiedBatchesForChainConfigUpdate();
 
         bool oldFriProofVerificationEnabled = s.zksyncOSChainConfig.friProofVerificationEnabled;
