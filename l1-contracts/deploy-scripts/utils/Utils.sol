@@ -943,6 +943,142 @@ library Utils {
         console.logBytes32(txHash);
     }
 
+    function runGovernanceL1L2DirectTransaction(
+        uint256 l1GasPrice,
+        address governor,
+        bytes32 salt,
+        bytes memory l2Calldata,
+        uint256 l2GasLimit,
+        bytes[] memory factoryDeps,
+        address dstAddress,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy
+    ) internal returns (bytes32 txHash) {
+        (
+            L2TransactionRequestDirect memory l2TransactionRequestDirect,
+            uint256 requiredValueToDeploy
+        ) = prepareL1L2Transaction(
+                PrepareL1L2TransactionParams({
+                    l1GasPrice: l1GasPrice,
+                    l2Calldata: l2Calldata,
+                    l2GasLimit: l2GasLimit,
+                    l2Value: 0,
+                    factoryDeps: factoryDeps,
+                    dstAddress: dstAddress,
+                    chainId: chainId,
+                    bridgehubAddress: bridgehubAddress,
+                    l1SharedBridgeProxy: l1SharedBridgeProxy,
+                    refundRecipient: msg.sender
+                })
+            );
+
+        requiredValueToDeploy = approveBaseTokenGovernance(
+            IL1Bridgehub(bridgehubAddress),
+            l1SharedBridgeProxy,
+            governor,
+            salt,
+            chainId,
+            requiredValueToDeploy
+        );
+
+        bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
+            IL1Bridgehub.requestL2TransactionDirect,
+            (l2TransactionRequestDirect)
+        );
+
+        console.log("Executing transaction");
+        vm.recordLogs();
+        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequestDirectCalldata, requiredValueToDeploy, 0);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        console.log("Transaction executed successfully! Extracting logs...");
+
+        address expectedDiamondProxyAddress = IL1Bridgehub(bridgehubAddress).getZKChain(chainId);
+
+        txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
+
+        console.log("L2 Transaction hash is ");
+        console.logBytes32(txHash);
+    }
+
+    function runGovernanceL1L2TwoBridgesTransaction(
+        uint256 l1GasPrice,
+        address governor,
+        bytes32 salt,
+        uint256 l2GasLimit,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy,
+        address secondBridgeAddress,
+        uint256 secondBridgeValue,
+        bytes memory secondBridgeCalldata
+    ) internal returns (bytes32 txHash) {
+        (
+            L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
+            uint256 requiredValueToDeploy
+        ) = prepareL1L2TransactionTwoBridges(
+                l1GasPrice,
+                l2GasLimit,
+                chainId,
+                bridgehubAddress,
+                secondBridgeAddress,
+                secondBridgeValue,
+                secondBridgeCalldata,
+                msg.sender
+            );
+
+        requiredValueToDeploy = approveBaseTokenGovernance(
+            IL1Bridgehub(bridgehubAddress),
+            l1SharedBridgeProxy,
+            governor,
+            salt,
+            chainId,
+            requiredValueToDeploy
+        );
+
+        bytes memory l2TransactionRequestCalldata = abi.encodeCall(
+            IL1Bridgehub.requestL2TransactionTwoBridges,
+            (l2TransactionRequest)
+        );
+
+        console.log("Executing transaction");
+        vm.recordLogs();
+        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequestCalldata, requiredValueToDeploy, 0);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        console.log("Transaction executed successfully! Extracting logs...");
+
+        address expectedDiamondProxyAddress = IL1Bridgehub(bridgehubAddress).getZKChain(chainId);
+
+        txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
+
+        console.log("L2 Transaction hash is ");
+        console.logBytes32(txHash);
+    }
+
+    function approveBaseTokenGovernance(
+        IL1Bridgehub bridgehub,
+        address l1SharedBridgeProxy,
+        address governor,
+        bytes32 salt,
+        uint256 chainId,
+        uint256 amountToApprove
+    ) internal returns (uint256 ethAmountToPass) {
+        address baseTokenAddress = bridgehub.baseToken(chainId);
+        if (ADDRESS_ONE != baseTokenAddress) {
+            console.log("Base token not ETH, approving");
+            IERC20 baseToken = IERC20(baseTokenAddress);
+
+            bytes memory approvalCalldata = abi.encodeCall(baseToken.approve, (l1SharedBridgeProxy, amountToApprove));
+
+            executeUpgrade(governor, salt, address(baseToken), approvalCalldata, 0, 0);
+
+            ethAmountToPass = 0;
+        } else {
+            console.log("Base token is ETH, no need to approve");
+            ethAmountToPass = amountToApprove;
+        }
+    }
+
     function prepareApproveBaseTokenAdminCalls(
         IL1Bridgehub bridgehub,
         address l1SharedBridgeProxy,

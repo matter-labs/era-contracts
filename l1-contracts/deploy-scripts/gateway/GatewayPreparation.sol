@@ -4,17 +4,19 @@ pragma solidity 0.8.28;
 // solhint-disable no-console, gas-custom-errors, reason-string
 
 import {Script, console2 as console} from "forge-std/Script.sol";
+import {stdToml} from "forge-std/StdToml.sol";
 
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {BridgehubBurnCTMAssetData, IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {BridgehubBurnCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "contracts/common/Config.sol";
 
-import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2_BRIDGEHUB_ADDRESS, Utils} from "../utils/Utils.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -341,7 +343,7 @@ contract GatewayPreparation is Script {
 
         // TODO(EVM-925): it is deployed without any restrictions.
         address l2ChainAdminAddress = Utils.deployThroughL1({
-            bytecode: ContractsBytecodesLib.readChainAdminBytecode(),
+            bytecode: ContractsBytecodesLib.getCreationCodeEra("ChainAdmin"),
             constructorargs: abi.encode(new address[](0)),
             create2salt: bytes32(0),
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -419,7 +421,8 @@ contract GatewayPreparation is Script {
             config.sharedBridgeProxy,
             config.sharedBridgeProxy,
             0,
-            secondBridgeData
+            secondBridgeData,
+            msg.sender
         );
 
         saveOutput(l2TxHash);
@@ -474,7 +477,8 @@ contract GatewayPreparation is Script {
             l2ChainAdmin,
             config.gatewayChainId,
             config.bridgehub,
-            config.sharedBridgeProxy
+            config.sharedBridgeProxy,
+            msg.sender
         );
 
         saveOutput(l2TxHash);
@@ -491,7 +495,7 @@ contract GatewayPreparation is Script {
     ) public {
         initializeConfig();
 
-        L1Nullifier l1Nullifier = L1Nullifier(config.proxies.l1Nullifier);
+        L1Nullifier l1Nullifier = L1Nullifier(config.l1NullifierProxy);
         IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehub);
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
         vm.broadcast();
@@ -532,7 +536,8 @@ contract GatewayPreparation is Script {
             chainAdminOnGateway,
             config.gatewayChainId,
             config.bridgehub,
-            config.sharedBridgeProxy
+            config.sharedBridgeProxy,
+            msg.sender
         );
 
         saveOutput(l2TxHash);
@@ -548,7 +553,7 @@ contract GatewayPreparation is Script {
     ) public {
         initializeConfig();
 
-        bytes memory data = abi.encodeCall(ValidatorTimelock.addValidator, (chainId, validatorAddress));
+        bytes memory data = abi.encodeCall(ValidatorTimelock.addValidatorForChainId, (chainId, validatorAddress));
 
         bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
             _getL1GasPrice(),
@@ -560,7 +565,8 @@ contract GatewayPreparation is Script {
             chainAdminOnGateway,
             config.gatewayChainId,
             config.bridgehub,
-            config.sharedBridgeProxy
+            config.sharedBridgeProxy,
+            msg.sender
         );
 
         saveOutput(l2TxHash);
@@ -584,7 +590,8 @@ contract GatewayPreparation is Script {
             addr,
             config.gatewayChainId,
             config.bridgehub,
-            config.sharedBridgeProxy
+            config.sharedBridgeProxy,
+            msg.sender
         );
 
         // We record L2 tx hash only for governance operations

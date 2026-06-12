@@ -110,3 +110,6 @@ suppressed_warnings = ["txorigin"]
 [profile.invariant_tests_l2context_ci.invariant]
 runs = 2
 depth = 1000
+
+[lint]
+lint_on_build = false
