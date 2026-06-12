@@ -62,6 +62,12 @@ uint256 constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = 1 hours;
 /// @dev Shift to apply to verify public input before verifying.
 uint256 constant PUBLIC_INPUT_SHIFT = 32;
 
+/// @dev Gateway-only FRI precompile address in ZKsync OS.
+address constant ZKSYNC_OS_FRI_PRECOMPILE_ADDR = address(0x7003);
+
+/// @dev FRI statement hash version used by the current ZKsync OS verifier.
+uint8 constant ZKSYNC_OS_FRI_STATEMENT_HASH_VERSION = 1;
+
 /// @dev The maximum number of L2 gas that a user can request for an L2 transaction
 uint256 constant MAX_GAS_PER_TRANSACTION = 80_000_000;
 

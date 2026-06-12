@@ -10,12 +10,13 @@ import {
     InvalidProof,
     InvalidProofFormat
 } from "contracts/common/L1ContractErrors.sol";
+import {ZKSYNC_OS_FRI_PRECOMPILE_ADDR, ZKSYNC_OS_FRI_STATEMENT_HASH_VERSION} from "contracts/common/Config.sol";
 
 contract ZKsyncOSVerifierFriTest is Test {
     ZKsyncOSVerifierFri internal verifier;
 
-    address internal constant FRI_PRECOMPILE_ADDR = address(0x7003);
-    uint8 internal constant FRI_STATEMENT_HASH_VERSION = 1;
+    address internal constant FRI_PRECOMPILE_ADDR = ZKSYNC_OS_FRI_PRECOMPILE_ADDR;
+    uint8 internal constant FRI_STATEMENT_HASH_VERSION = ZKSYNC_OS_FRI_STATEMENT_HASH_VERSION;
 
     bytes32 internal constant PUBLIC_INPUT_HASH = 0xf8bf9c0063d60a4ad23ee001554fa8de9e4022e0c9c7633b64b693af43808b94;
     bytes32 internal constant RECURSION_CHAIN_HASH = 0x5476c643939eb00bdcffd3857c31a15f0a213407e4f1807dc69e64cde11c403b;
@@ -124,11 +125,39 @@ contract ZKsyncOSVerifierFriTest is Test {
         verifier.verify(publicInputs, proof);
     }
 
+    function test_verify_revertsWhenPrecompileReturnsNonBooleanWord() public {
+        (uint256[] memory publicInputs, uint256[] memory proof, bytes32 statementHash) = _validInputs();
+
+        vm.mockCall(FRI_PRECOMPILE_ADDR, abi.encodePacked(statementHash), abi.encode(uint256(2)));
+
+        vm.expectRevert(InvalidProof.selector);
+        verifier.verify(publicInputs, proof);
+    }
+
+    function test_verify_revertsWhenPrecompileReturnsLongData() public {
+        (uint256[] memory publicInputs, uint256[] memory proof, bytes32 statementHash) = _validInputs();
+
+        vm.mockCall(FRI_PRECOMPILE_ADDR, abi.encodePacked(statementHash), abi.encode(uint256(1), uint256(1)));
+
+        vm.expectRevert(InvalidProof.selector);
+        verifier.verify(publicInputs, proof);
+    }
+
     function test_verify_revertsOnEmptyPublicInputs() public {
         uint256[] memory publicInputs = new uint256[](0);
         uint256[] memory proof = _validProof();
 
         vm.expectRevert(EmptyPublicInputsLength.selector);
+        verifier.verify(publicInputs, proof);
+    }
+
+    function test_verify_revertsOnMultiplePublicInputs() public {
+        uint256[] memory publicInputs = new uint256[](2);
+        publicInputs[0] = uint256(PUBLIC_INPUT_HASH) >> 32;
+        publicInputs[1] = 1;
+        uint256[] memory proof = _validProof();
+
+        vm.expectRevert(InvalidProofFormat.selector);
         verifier.verify(publicInputs, proof);
     }
 
