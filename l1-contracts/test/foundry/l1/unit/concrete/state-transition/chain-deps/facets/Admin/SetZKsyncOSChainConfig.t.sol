@@ -9,7 +9,7 @@ import {
     ZKsyncOSChainConfigUpdateWithUnverifiedBatches,
     ZKsyncOSMaxTxGasLimitTooLow
 } from "contracts/common/L1ContractErrors.sol";
-import {NotZKsyncOS} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {NotSettlementLayer, NotZKsyncOS} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract SetZKsyncOSChainConfigTest is AdminTest {
     event NewFriProofVerificationEnabled(bool oldFriProofVerificationEnabled, bool newFriProofVerificationEnabled);
@@ -37,6 +37,14 @@ contract SetZKsyncOSChainConfigTest is AdminTest {
 
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectRevert(NotZKsyncOS.selector);
+        adminFacet.setFriProofVerificationEnabled(true);
+    }
+
+    function test_setFriProofVerificationEnabled_revertWhen_notSettlementLayer() public {
+        utilsFacet.util_setSettlementLayer(makeAddr("settlementLayer"));
+
+        vm.startPrank(utilsFacet.util_getAdmin());
+        vm.expectRevert(NotSettlementLayer.selector);
         adminFacet.setFriProofVerificationEnabled(true);
     }
 
@@ -83,6 +91,14 @@ contract SetZKsyncOSChainConfigTest is AdminTest {
 
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectRevert(NotZKsyncOS.selector);
+        adminFacet.setZKsyncOSMaxTxGasLimit(ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT);
+    }
+
+    function test_setZKsyncOSMaxTxGasLimit_revertWhen_notSettlementLayer() public {
+        utilsFacet.util_setSettlementLayer(makeAddr("settlementLayer"));
+
+        vm.startPrank(utilsFacet.util_getAdmin());
+        vm.expectRevert(NotSettlementLayer.selector);
         adminFacet.setZKsyncOSMaxTxGasLimit(ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT);
     }
 
