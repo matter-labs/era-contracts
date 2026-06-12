@@ -476,6 +476,10 @@ error ZeroChainId();
 error ZeroUpgradeTimestamp();
 // 0x601b6882
 error ZKChainLimitReached();
+// 0xb2cabab5
+error ZKsyncOSChainConfigUpdateWithUnverifiedBatches(uint256 batchesVerified, uint256 batchesCommitted);
+// 0x7e34baaf
+error ZKsyncOSMaxTxGasLimitTooLow();
 // 0x646ac57e
 error ZKsyncOSNotForceDeployForExistingContract(address);
 // 0xb24b1ccb

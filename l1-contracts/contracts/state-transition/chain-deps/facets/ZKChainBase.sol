@@ -25,6 +25,7 @@ import {
     SYSTEM_UPGRADE_L2_TX_TYPE,
     ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
+    ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
     L2DACommitmentScheme,
     DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH
 } from "../../../common/Config.sol";
@@ -213,6 +214,14 @@ contract ZKChainBase is ReentrancyGuard {
 
     function _getUpgradeTxType() internal view returns (uint256) {
         return s.zksyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
+    }
+
+    /// @notice Returns the effective ZKsync OS single-transaction gas limit (EIP-7825).
+    /// @dev `0` in storage means the value was never set explicitly (chains deployed before the
+    /// field was introduced) and falls back to the default cap.
+    function _getZKsyncOSMaxTxGasLimit() internal view returns (uint64) {
+        uint64 storedMaxTxGasLimit = s.zksyncOSChainConfig.maxTxGasLimit;
+        return storedMaxTxGasLimit == 0 ? ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT : storedMaxTxGasLimit;
     }
 
     /// @notice Returns whether deposits are currently paused.
