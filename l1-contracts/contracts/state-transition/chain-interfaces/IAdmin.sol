@@ -35,14 +35,16 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
 
     /// @notice Enable or disable ZKsync OS FRI proof verification (the Gateway FRI precompile).
-    /// @dev Only for ZKsync OS chains. The flag is part of the runtime chain config committed into
-    /// each batch proof public input, so it can only change when all committed batches are verified.
+    /// @dev Only for ZKsync OS chains, callable on the active settlement layer instance. The flag is
+    /// part of the runtime chain config committed into each batch proof public input, so it can only
+    /// change when all committed batches are verified.
     /// @param _friProofVerificationEnabled Whether FRI proof verification is enabled
     function setFriProofVerificationEnabled(bool _friProofVerificationEnabled) external;
 
     /// @notice Change the ZKsync OS single-transaction gas limit (EIP-7825).
-    /// @dev Only for ZKsync OS chains. The limit is part of the runtime chain config committed into
-    /// each batch proof public input, so it can only change when all committed batches are verified.
+    /// @dev Only for ZKsync OS chains, callable on the active settlement layer instance. The limit is
+    /// part of the runtime chain config committed into each batch proof public input, so it can only
+    /// change when all committed batches are verified.
     /// @param _newMaxTxGasLimit The new single-transaction gas limit; must not be below
     /// `ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`
     function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external;
