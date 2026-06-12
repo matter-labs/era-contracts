@@ -582,4 +582,32 @@ mod tests {
         let atlas_salt = per_ctm.get(&atlas).expect("ZKsyncOS CTM salt");
         assert_ne!(era_salt, atlas_salt, "per-CTM salts must be distinct");
     }
+
+    /// Same as `stage_env_config_reads_create2_salts` but for mainnet —
+    /// without per-CTM entries the prepare falls back to random salts and
+    /// the regen stops being reproducible.
+    #[test]
+    fn mainnet_env_config_reads_create2_salts() {
+        let cfg = EnvConfig::load("mainnet").expect("load mainnet env config");
+
+        let core_salt = cfg
+            .v31_create2_factory_salt()
+            .expect("read core salt")
+            .expect("mainnet.toml must declare [contracts] create2_factory_salt");
+        assert_ne!(core_salt, H256::zero());
+
+        let per_ctm = cfg
+            .v31_create2_factory_salt_per_ctm()
+            .expect("read per-CTM salts");
+        assert_eq!(per_ctm.len(), 2);
+        let era: Address = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"
+            .parse()
+            .unwrap();
+        let atlas: Address = "0x1adf137f59949c9081157d5dE1e002D1c992071F"
+            .parse()
+            .unwrap();
+        let era_salt = per_ctm.get(&era).expect("Era CTM salt");
+        let atlas_salt = per_ctm.get(&atlas).expect("ZKsyncOS CTM salt");
+        assert_ne!(era_salt, atlas_salt, "per-CTM salts must be distinct");
+    }
 }

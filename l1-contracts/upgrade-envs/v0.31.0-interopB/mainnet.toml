@@ -56,6 +56,18 @@ rollup_da_manager = "0x5E12D7E0bB68029afbeC83ccB9E8eDE6019ef073"
 chain_type_manager_proxy_admin = "0x0A8a176B6F5962122C6E8F8815278f873D74021f"
 rollup_sl_da_validator = "0x595b8C88B9e5f3a4c596C3e81BE6e11D53Bb9200"
 
+# Per-CTM CREATE2 salts. Each CTM prepare deploys a `GovernanceUpgradeTimer`
+# whose constructor args are env-wide constants — without a CTM-distinct
+# salt every CTM would land the timer at the same CREATE2 address, and
+# gov-replay's second `startTimer()` would revert.
+# NOTE: rotate these (together with `create2_factory_salt` above) on every
+# regen — reusing a salt collides with already-deployed CREATE2 addresses.
+[create2_factory_salts]
+# Era CTM
+"0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C" = "0xd93600da02313bab9de70ef4ca32f1397e32764b5c1d4fcec317717fff515cc9"
+# ZKsync OS (Atlas) CTM
+"0x1adf137f59949c9081157d5dE1e002D1c992071F" = "0x2bb3435f739fae8c8edc3d8b91f33261b972ef3301ab8edcc3cd48237ca6bbd9"
+
 [V29]
 encoded_old_validator_timelocks = "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000050000000000000000000000003db52ce065f728011ac6732222270b3f2360d919000000000000000000000000a0425d71cb1d6fb80e65a5361a04096e0672de03000000000000000000000000a8cb082a5a689e0d594d7da1e2d72a3d63adc1bd0000000000000000000000005d8ba173dc6c3c90c8f7c04c9288bef5fdbad06e0000000000000000000000008c0bfc04ada21fd496c55b8c50331f904306f564"
 encoded_old_gateway_validator_timelocks = "0x00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000001000000000000000000000000b83fdd24f40cb2aa5cc9c2a2a0c06e50fa9b4cea"

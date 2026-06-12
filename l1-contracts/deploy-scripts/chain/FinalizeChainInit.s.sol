@@ -27,6 +27,7 @@ contract FinalizeChainInit is AdminFunctions, IFinalizeChainInit {
         if (_params.shouldSetDaValidatorPair) {
             setDAValidatorPair(
                 _params.bridgehub,
+                _params.accessControlRestriction,
                 _params.chainId,
                 _params.l1DaValidator,
                 _params.l2DaCommitmentScheme,
