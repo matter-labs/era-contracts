@@ -128,6 +128,11 @@ uint256 constant L1_TX_INTRINSIC_PUBDATA_ZKSYNC_OS = 351;
 /// This value is big enough to cover computational native resources usage for any operations.
 uint256 constant FREE_TX_NATIVE_PER_GAS = 10_000;
 
+/// @dev The default ZKsync OS single-transaction gas limit (EIP-7825, 2^24). This is both the
+/// default per-tx gas cap and the lower bound for any chain-configured value: a chain may raise
+/// the cap above Ethereum's limit but must not set it below.
+uint64 constant ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT = uint64(1) << 24;
+
 /// @dev The mask which should be applied to the packed batch and L2 block timestamp in order
 /// to obtain the L2 block timestamp. Applying this mask is equivalent to calculating modulo 2**128
 uint256 constant PACKED_L2_BLOCK_TIMESTAMP_MASK = 0xffffffffffffffffffffffffffffffff;

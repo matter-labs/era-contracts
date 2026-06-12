@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
-import {PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
+import {PubdataPricingMode, ZKsyncOSChainConfig} from "../chain-deps/ZKChainStorage.sol";
 import {IZKChainBase} from "./IZKChainBase.sol";
 import {L2DACommitmentScheme} from "../../common/Config.sol";
 
@@ -127,6 +127,10 @@ interface IGetters is IZKChainBase {
 
     /// @return The maximum number of L2 gas that a user can request for L1 -> L2 transactions
     function getPriorityTxMaxGasLimit() external view returns (uint256);
+
+    /// @return The effective runtime chain config for ZKsync OS chains, with the default
+    /// single-transaction gas limit substituted when the value was never set explicitly.
+    function getZKsyncOSChainConfig() external view returns (ZKsyncOSChainConfig memory);
 
     /// @return Whether a withdrawal has been finalized.
     /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.

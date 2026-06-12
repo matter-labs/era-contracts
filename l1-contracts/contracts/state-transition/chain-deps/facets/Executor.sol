@@ -299,16 +299,27 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
-    /// @dev Gets zk proof public input for ZKSync OS
+    /// @dev Gets zk proof public input for ZKSync OS.
+    /// @dev Mirrors the ZKsync OS `BatchPublicInput` encoding: between the state commitments and the
+    /// batch output hash the chain config is committed as three 32-byte big-endian words, in order:
+    /// `chain_id`, `fri_proof_verification_enabled` (0/1) and `max_tx_gas_limit`. The values are read
+    /// from storage, so they must match the configuration ZKsync OS executed the batch with.
     function _getBatchProofPublicInputZKsyncOS(
         bytes32 _prevBatchStateCommitment,
         bytes32 _currentBatchStateCommitment,
         bytes32 _currentBatchCommitment
-    ) internal pure returns (uint256) {
+    ) internal view returns (uint256) {
         return
             uint256(
                 keccak256(
-                    abi.encodePacked(_prevBatchStateCommitment, _currentBatchStateCommitment, _currentBatchCommitment)
+                    abi.encodePacked(
+                        _prevBatchStateCommitment,
+                        _currentBatchStateCommitment,
+                        s.chainId,
+                        uint256(s.zksyncOSChainConfig.friProofVerificationEnabled ? 1 : 0),
+                        uint256(_getZKsyncOSMaxTxGasLimit()),
+                        _currentBatchCommitment
+                    )
                 )
             ) >> PUBLIC_INPUT_SHIFT;
     }
