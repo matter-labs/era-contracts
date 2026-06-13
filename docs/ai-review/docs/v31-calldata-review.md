@@ -38,17 +38,17 @@ it has been checked.
 Use these phases to orient the detailed procedure below. They are review phases,
 not the same thing as the v31 governance Stage 0/1/2 calldata blocks.
 
-| Phase                                | What it proves                                                                                                              | Detailed steps                               |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| Package integrity                    | the package is complete, ordered, signed by the right actors, and free of stale calldata                                    | Steps 1-3                                    |
-| Address book and governance envelope | targets, owners, wrappers, operation hashes, and nested stage calls resolve to the reviewed source of truth                 | Steps 4-6 and 15                             |
-| Deployed contracts and constructors  | deployed bytecode, CREATE2 addresses, constructor args, proxy init args, and proxy admins are correct                       | Steps 12-13                                  |
-| Core L1 upgrade calls                | proxy upgrades, MessageRoot init, `setAddresses`, AssetTracker/NTV wiring, and migration pause/unpause are correct          | Steps 7 and 14                               |
-| CTM and chain creation params        | `setChainCreationParams`, genesis values, fixed force deployment data, and ZK token asset ID are correct                    | Step 8                                       |
-| Protocol upgrade payload             | `setNewVersionUpgrade`, facet cuts, `ProposedUpgrade`, L2 upgrade tx, factory deps, and `IL2V31Upgrade.upgrade` are correct | Steps 9-11                                   |
-| Per-chain phases                     | timestamp and per-chain `upgradeChainFromVersion` bundles match the phase-order evidence                                    | Step 16                                      |
-| Stage3 and token migration           | token registration and balance migration calls match the reviewed token list and state                                      | Step 17                                      |
-| Evidence and sign-off                | every decoded item has an evidence row, and all gaps or blockers are explicit                                               | Final evidence table, blockers, and sign-off |
+| Phase                                | What it proves                                                                                                                                                                   | Detailed steps                               |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Package integrity                    | the package is complete, ordered, signed by the right actors, and free of stale calldata                                                                                         | Steps 1-3                                    |
+| Address book and governance envelope | targets, owners, wrappers, operation hashes, and nested stage calls resolve to the reviewed source of truth                                                                      | Steps 4-6 and 15                             |
+| Deployed contracts and constructors  | deployed bytecode, CREATE2 addresses, constructor args, proxy init args, and proxy admins are correct                                                                            | Steps 12-13                                  |
+| Core L1 upgrade calls                | proxy upgrades, MessageRoot init, `setAddresses`, ChainRegistrationSender/AssetTracker ownership, NTV wiring, ValidatorTimelock upgrade, and migration pause/unpause are correct | Steps 7 and 14                               |
+| CTM and chain creation params        | `setChainCreationParams`, genesis values, fixed force deployment data, and ZK token asset ID are correct                                                                         | Step 8                                       |
+| Protocol upgrade payload             | `setNewVersionUpgrade`, facet cuts, `ProposedUpgrade`, L2 upgrade tx, factory deps, and `IL2V31Upgrade.upgrade` are correct                                                      | Steps 9-11                                   |
+| Per-chain phases                     | timestamp and per-chain `upgradeChainFromVersion` bundles match the phase-order evidence                                                                                         | Step 16                                      |
+| Stage3 and token migration           | token registration and balance migration calls match the reviewed token list and state                                                                                           | Step 17                                      |
+| Evidence and sign-off                | every decoded item has an evidence row, and all gaps or blockers are explicit                                                                                                    | Final evidence table, blockers, and sign-off |
 
 Complete the phases in order. If a conditional phase is absent, such as Gateway
 or Stage3, record that it is absent rather than skipping it silently.
@@ -79,33 +79,36 @@ When a later step says "expected", use this table first. Do not search other
 repositories unless the table explicitly points outside the reviewed
 `era-contracts` checkout.
 
-| Value                                   | Authoritative source                                                                                                                        | Cross-check                                                                                                                           |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `ecosystem.toml`                        | provided package, or regenerated from the reviewed commit with the same `protocol_ops ecosystem upgrade-prepare-all` command                | file header and manifest command match reviewed calldata package                                                                      |
-| stage 0/1/2 `Call[]`                    | `[governance_calls].stage0_calls`, `stage1_calls`, `stage2_calls` in `ecosystem.toml`                                                       | decoded calls match the Safe/governance wrapper bytes                                                                                 |
-| global phase order                      | package order, root manifest, governance wrapper order, CI command log, or exact rollout command                                            | every referenced phase file exists once; no stale phase dirs                                                                          |
-| Safe/EOA bundle target                  | `manifest.json.bundles[].target` and Safe transaction target                                                                                | for Safes, `getOwners()` and `getThreshold()` at the review block; for owners/executors, target matches the on-chain owner path below |
-| governance owner / executor             | `Bridgehub.owner()`, CTM/proxy-admin owners, and wrapper target decoded from calldata                                                       | owner address has expected code/EOA type; Safe owners and threshold are reviewed at the block                                         |
-| L1 chain ID                             | `eth_chainId` at the review RPC/block                                                                                                       | every Safe file `chainId` and decoded L1-chain field matches it                                                                       |
-| Bridgehub proxy                         | `[core.upgrade_addresses.bridgehub].bridgehub_proxy_addr`                                                                                   | has code; equals the Bridgehub used for chain inventory and owner reads                                                               |
-| transparent proxy admin                 | EIP-1967 admin slot of Bridgehub and other v31 transparent proxies                                                                          | all v31 proxy admin slots agree unless a proxy is intentionally not TUPP                                                              |
-| core proxy / implementation addresses   | `[core.upgrade_addresses]`, `[core.upgrade_addresses.bridgehub]`, `[core.upgrade_addresses.bridges]`, and `[core].asset_tracker_proxy_addr` | Stage 1 proxy upgrade calls use exactly these pairs                                                                                   |
-| CTM flavors and order                   | `[ctms.era]`, then `[ctms.zksync_os]` if present in `ecosystem.toml`                                                                        | on-chain CTM `isZKsyncOS()` agrees with the flavor                                                                                    |
-| CTM state-transition addresses          | `[ctms.<flavor>.state_transition]` and `[ctms.<flavor>.deployed_addresses]`                                                                 | Stage 0/1 CTM calls and deployment provenance reference these addresses                                                               |
-| old/new protocol versions               | `[ctms.<flavor>.contracts_config].old_protocol_version` and `new_protocol_version`                                                          | old version equals CTM/chain state at the review block; new version is v31                                                            |
-| chain inventory                         | `Bridgehub.getAllZKChainChainIDs()`, `chainTypeManager(chainId)`, and `getZKChain(chainId)` at the review block                             | every reviewed CTM has a representative chain; every registered reviewed chain has the expected old version                           |
-| per-chain phase values                  | phase `manifest.json` metadata, otherwise decoded phase calldata plus exact rollout command/CI command log                                  | chain ID, chain admin target, timestamp, and protocol version all agree                                                               |
-| v31 genesis values                      | reviewed v31 env config under `l1-contracts/upgrade-envs/v0.31.0-*` and decoded `setChainCreationParams`                                    | genesis root/index/commitment match the selected CTM flavor                                                                           |
-| bytecode hashes and contract names      | reviewed `AllContractsHashes.json` plus Forge artifacts in the reviewed commit                                                              | decoded bytecode hashes map to one expected file, no aliases guessed from names                                                       |
-| BytecodesSupplier                       | `[ctms.<flavor>.state_transition].bytecodes_supplier_addr`                                                                                  | all L2 factory deps are published when RPC is available                                                                               |
-| Era chain ID in fixed force deployments | reviewed env config `era_chain_id` and representative Era chain state                                                                       | `FixedForceDeploymentsData.eraChainId` matches even for ZKsync OS CTMs                                                                |
-| ZK token asset ID                       | reviewed `upgrade-envs/permanent-values/<env>.toml` `zk_token_asset_id`, or explicit stage input when reviewing a nonstandard package       | `NativeTokenVault.tokenAddress(assetId)` and Stage3 registrations agree                                                               |
-| CREATE2 factory                         | transaction target; standard factory is `0x4e59b44847b379578588920ca78fbf26c0b4956c`                                                        | factory calldata is raw `salt ++ init_code`, not selector calldata                                                                    |
-| CREATE2 salts and deployed addresses    | replayed prepare bundle `executed-bundles.json`, or equivalent ordered tx log                                                               | salt, init code, constructor args, and computed address match artifact references                                                     |
-| Gateway config                          | `[new_gateway]` in `ecosystem.toml` and reviewed env config                                                                                 | Stage 2 Gateway appendage values and priority txs match                                                                               |
-| Stage3 token list                       | stage3 command input, phase metadata, reviewed stage/permanent env config, or explicit package input                                        | token/address/asset registrations and balances match; absent list is a gap                                                            |
-| receipts and post-state                 | L1 receipts, Safe service/export data, fork execution log, and post-state block hash                                                        | required only for post-execution sign-off                                                                                             |
-| optional PUVT output                    | local `protocol_ops ecosystem verify-upgrade` run from the reviewed commit/tool commit                                                      | supporting evidence only; manual evidence rows still required                                                                         |
+| Value                                     | Authoritative source                                                                                                                        | Cross-check                                                                                                                           |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `ecosystem.toml`                          | provided package, or regenerated from the reviewed commit with the same `protocol_ops ecosystem upgrade-prepare-all` command                | file header and manifest command match reviewed calldata package                                                                      |
+| stage 0/1/2 `Call[]`                      | `[governance_calls].stage0_calls`, `stage1_calls`, `stage2_calls` in `ecosystem.toml`                                                       | decoded calls match the Safe/governance wrapper bytes                                                                                 |
+| global phase order                        | package order, root manifest, governance wrapper order, CI command log, or exact rollout command                                            | every referenced phase file exists once; no stale phase dirs                                                                          |
+| Safe/EOA bundle target                    | `manifest.json.bundles[].target` and Safe transaction target                                                                                | for Safes, `getOwners()` and `getThreshold()` at the review block; for owners/executors, target matches the on-chain owner path below |
+| governance owner / executor               | `Bridgehub.owner()`, CTM/proxy-admin owners, and wrapper target decoded from calldata                                                       | owner address has expected code/EOA type; Safe owners and threshold are reviewed at the block                                         |
+| L1 chain ID                               | `eth_chainId` at the review RPC/block                                                                                                       | every Safe file `chainId` and decoded L1-chain field matches it                                                                       |
+| Bridgehub proxy                           | `[core.upgrade_addresses.bridgehub].bridgehub_proxy_addr`                                                                                   | has code; equals the Bridgehub used for chain inventory and owner reads                                                               |
+| transparent proxy admin                   | EIP-1967 admin slot of Bridgehub and other v31 transparent proxies                                                                          | all v31 proxy admin slots agree unless a proxy is intentionally not TUPP                                                              |
+| core proxy / implementation addresses     | `[core.upgrade_addresses]`, `[core.upgrade_addresses.bridgehub]`, `[core.upgrade_addresses.bridges]`, and `[core].asset_tracker_proxy_addr` | Stage 1 proxy upgrade calls use exactly these pairs                                                                                   |
+| CTM flavors and order                     | `[ctms.era]`, then `[ctms.zksync_os]` if present in `ecosystem.toml`                                                                        | on-chain CTM `isZKsyncOS()` agrees with the flavor                                                                                    |
+| CTM state-transition addresses            | `[ctms.<flavor>.state_transition]` and `[ctms.<flavor>.deployed_addresses]`                                                                 | Stage 0/1 CTM calls and deployment provenance reference these addresses                                                               |
+| ValidatorTimelock proxy/impl per CTM      | `[ctms.<flavor>.state_transition].validator_timelock_addr` and `validator_timelock_implementation_addr`                                     | Stage 1 per-CTM block `block_start + 5` upgrades this proxy through its proxy admin                                                   |
+| PUH upgrade addresses (PUH-governed envs) | `[puh_guardians].new_puh_impl` and `[puh_guardians].new_guardians` in `ecosystem.toml`                                                      | Stage 0 PUH pair args; PUVT verifies decoded args against these values and checks new impl immutables                                 |
+| legacy GW decommission intervals          | `[[legacy_gateway.chain_intervals]]` in `upgrade-envs/permanent-values/<env>.toml`                                                          | Stage 2 decommission prefix; absent when `[legacy_gateway]` is not present                                                            |
+| old/new protocol versions                 | `[ctms.<flavor>.contracts_config].old_protocol_version` and `new_protocol_version`                                                          | old version equals CTM/chain state at the review block; new version is v31                                                            |
+| chain inventory                           | `Bridgehub.getAllZKChainChainIDs()`, `chainTypeManager(chainId)`, and `getZKChain(chainId)` at the review block                             | every reviewed CTM has a representative chain; every registered reviewed chain has the expected old version                           |
+| per-chain phase values                    | phase `manifest.json` metadata, otherwise decoded phase calldata plus exact rollout command/CI command log                                  | chain ID, chain admin target, timestamp, and protocol version all agree                                                               |
+| v31 genesis values                        | reviewed v31 env config under `l1-contracts/upgrade-envs/v0.31.0-*` and decoded `setChainCreationParams`                                    | genesis root/index/commitment match the selected CTM flavor                                                                           |
+| bytecode hashes and contract names        | reviewed `AllContractsHashes.json` plus Forge artifacts in the reviewed commit                                                              | decoded bytecode hashes map to one expected file, no aliases guessed from names                                                       |
+| BytecodesSupplier                         | `[ctms.<flavor>.state_transition].bytecodes_supplier_addr`                                                                                  | all L2 factory deps are published when RPC is available                                                                               |
+| Era chain ID in fixed force deployments   | reviewed env config `era_chain_id` and representative Era chain state                                                                       | `FixedForceDeploymentsData.eraChainId` matches even for ZKsync OS CTMs                                                                |
+| ZK token asset ID                         | reviewed `upgrade-envs/permanent-values/<env>.toml` `zk_token_asset_id`, or explicit stage input when reviewing a nonstandard package       | `NativeTokenVault.tokenAddress(assetId)` and Stage3 registrations agree                                                               |
+| CREATE2 factory                           | transaction target; standard factory is `0x4e59b44847b379578588920ca78fbf26c0b4956c`                                                        | factory calldata is raw `salt ++ init_code`, not selector calldata                                                                    |
+| CREATE2 salts and deployed addresses      | replayed prepare bundle `executed-bundles.json`, or equivalent ordered tx log                                                               | salt, init code, constructor args, and computed address match artifact references                                                     |
+| Gateway config                            | `[new_gateway]` in `ecosystem.toml` and reviewed env config                                                                                 | Stage 2 Gateway appendage values and priority txs match                                                                               |
+| Stage3 token list                         | stage3 command input, phase metadata, reviewed stage/permanent env config, or explicit package input                                        | token/address/asset registrations and balances match; absent list is a gap                                                            |
+| receipts and post-state                   | L1 receipts, Safe service/export data, fork execution log, and post-state block hash                                                        | required only for post-execution sign-off                                                                                             |
+| optional PUVT output                      | local `protocol_ops ecosystem verify-upgrade` run from the reviewed commit/tool commit                                                      | supporting evidence only; manual evidence rows still required                                                                         |
 
 Calldata alone can prove byte-level decode and source compatibility. Full
 review additionally needs a state anchor because the same bytes can be correct
@@ -317,27 +320,31 @@ documents an exact false positive and a strong manual substitute check.
 Build an address table before decoding stage semantics. Use `ecosystem.toml`,
 live L1 state, and the reviewed source.
 
-| Name                                          | Source                                                                                                            | Required check                                                 |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `bridgehub_proxy`                             | `[core.upgrade_addresses.bridgehub].bridgehub_proxy_addr`                                                         | has code; all Bridgehub RPC reads use this address             |
-| `transparent_proxy_admin`                     | EIP-1967 admin slot of `bridgehub_proxy`                                                                          | same admin owns all reviewed v31 TUPP proxies                  |
-| `chain_asset_handler_proxy`                   | `[core.upgrade_addresses.bridgehub].chain_asset_handler_proxy_addr`                                               | has code and is the Stage 0/2 migration target                 |
-| `l1_asset_router_proxy`                       | `[core.upgrade_addresses.bridges].l1_asset_router_proxy_addr`                                                     | `Bridgehub.assetRouter()` agrees when callable                 |
-| `native_token_vault`                          | `[core.upgrade_addresses].native_token_vault_addr`                                                                | `L1AssetRouter.nativeTokenVault()` agrees after Stage 1/replay |
-| `asset_tracker_proxy`                         | `[core].asset_tracker_proxy_addr`                                                                                 | accepts ownership before NTV is wired to it                    |
-| `ctm_deployment_tracker_proxy`                | `[core.upgrade_addresses.bridgehub].ctm_deployment_tracker_proxy_addr`                                            | upgraded before CTM asset registration                         |
-| `message_root_proxy`                          | `[core.upgrade_addresses.bridgehub].message_root_proxy_addr`                                                      | upgraded with `initializeL1V31Upgrade()`                       |
-| each CTM proxy                                | Stage 1 CTM proxy argument, plus `[ctms.<flavor>.state_transition].chain_type_manager_proxy` when serialized      | protocol version and proxy admin match the matrix sources      |
-| each CTM timer/validator                      | `[ctms.<flavor>.deployed_addresses]`                                                                              | used in stage call blocks                                      |
-| representative chain diamond per CTM flavor   | Bridgehub chain inventory                                                                                         | used for current facet and protocol-version checks             |
-| each verifier/default/genesis/diamond address | `[ctms.<flavor>.state_transition]`                                                                                | used in chain params and upgrade params                        |
-| BytecodesSupplier per CTM flavor              | `[ctms.<flavor>.state_transition].bytecodes_supplier_addr`                                                        | used for factory-dep publication checks                        |
-| PermissionlessValidator per CTM flavor        | `[ctms.<flavor>.state_transition].permissionless_validator_addr` when serialized, otherwise deployment provenance | checked against CTM implementation immutable                   |
-| EIP7702Checker                                | `[ctms.<flavor>.state_transition].eip7702_checker_addr` when serialized, otherwise deployment provenance          | constructor arg for v31 MailboxFacet                           |
-| `new_gateway.*`, if present                   | `[new_gateway]`                                                                                                   | drives Stage 2 Gateway bring-up calls                          |
+| Name                                          | Source                                                                                                                  | Required check                                                             |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `bridgehub_proxy`                             | `[core.upgrade_addresses.bridgehub].bridgehub_proxy_addr`                                                               | has code; all Bridgehub RPC reads use this address                         |
+| `transparent_proxy_admin`                     | `[core.upgrade_addresses.shared].transparent_proxy_admin`; cross-check against EIP-1967 admin slot of `bridgehub_proxy` | same admin owns all reviewed v31 TUPP proxies                              |
+| `chain_asset_handler_proxy`                   | `[core.upgrade_addresses.bridgehub].chain_asset_handler_proxy_addr`                                                     | has code and is the Stage 0/2 migration target                             |
+| `chain_registration_sender_proxy`             | `[core.upgrade_addresses.bridgehub].chain_registration_sender_proxy_addr`                                               | pending owner is governance; `acceptOwnership()` called in Stage 1 index 7 |
+| `l1_asset_router_proxy`                       | `[core.upgrade_addresses.bridges].l1_asset_router_proxy_addr`                                                           | `Bridgehub.assetRouter()` agrees when callable                             |
+| `l1_nullifier_proxy`                          | `[core.upgrade_addresses.bridges].l1_nullifier_proxy_addr`                                                              | EIP-1967 proxy admin equals `transparent_proxy_admin`                      |
+| `native_token_vault`                          | `[core.upgrade_addresses].native_token_vault_addr`                                                                      | `L1AssetRouter.nativeTokenVault()` agrees after Stage 1/replay             |
+| `asset_tracker_proxy`                         | `[core].asset_tracker_proxy_addr`                                                                                       | accepts ownership before NTV is wired to it                                |
+| `ctm_deployment_tracker_proxy`                | `[core.upgrade_addresses.bridgehub].ctm_deployment_tracker_proxy_addr`                                                  | upgraded before CTM asset registration                                     |
+| `message_root_proxy`                          | `[core.upgrade_addresses.bridgehub].message_root_proxy_addr`                                                            | upgraded with `initializeL1V31Upgrade()`                                   |
+| each CTM proxy                                | Stage 1 CTM proxy argument, plus `[ctms.<flavor>.state_transition].chain_type_manager_proxy` when serialized            | protocol version and proxy admin match the matrix sources                  |
+| each CTM timer/validator                      | `[ctms.<flavor>.deployed_addresses]`                                                                                    | used in stage call blocks                                                  |
+| ValidatorTimelock proxy per CTM               | `[ctms.<flavor>.state_transition].validator_timelock_addr`                                                              | Stage 1 per-CTM upgrade; proxy admin fetched from EIP-1967 slot            |
+| ValidatorTimelock implementation per CTM      | `[ctms.<flavor>.state_transition].validator_timelock_implementation_addr`                                               | new impl adds `UPGRADER_ROLE` and `upgradeChainFromVersion`                |
+| representative chain diamond per CTM flavor   | Bridgehub chain inventory                                                                                               | used for current facet and protocol-version checks                         |
+| each verifier/default/genesis/diamond address | `[ctms.<flavor>.state_transition]`                                                                                      | used in chain params and upgrade params                                    |
+| BytecodesSupplier per CTM flavor              | `[ctms.<flavor>.state_transition].bytecodes_supplier_addr`                                                              | used for factory-dep publication checks                                    |
+| PermissionlessValidator per CTM flavor        | `[ctms.<flavor>.state_transition].permissionless_validator_addr` when serialized, otherwise deployment provenance       | checked against CTM implementation immutable                               |
+| EIP7702Checker                                | `[ctms.<flavor>.state_transition].eip7702_checker_addr` when serialized, otherwise deployment provenance                | constructor arg for v31 MailboxFacet                                       |
+| `new_gateway.*` (required in v31)             | `[new_gateway]`                                                                                                         | drives Stage 2 Gateway bring-up calls (mandatory 16-call block)            |
 
-Check proxy admin slots for v31 proxies. The EIP-1967 admin slot of these
-proxies must equal `transparent_proxy_admin` where present:
+Check proxy admin slots for v31 proxies. The EIP-1967 admin slot of the core
+proxies must equal `transparent_proxy_admin`:
 
 - `bridgehub_proxy`
 - `l1_nullifier_proxy`
@@ -346,7 +353,13 @@ proxies must equal `transparent_proxy_admin` where present:
 - `message_root_proxy`
 - `ctm_deployment_tracker_proxy`
 - `chain_asset_handler_proxy`
-- each `[ctms.<flavor>.state_transition].chain_type_manager_proxy`
+- `chain_registration_sender_proxy`
+
+For CTM and ValidatorTimelock proxies, each CTM flavor may use a per-CTM proxy
+admin that differs from the global `transparent_proxy_admin`. PUVT reads the
+EIP-1967 slot of each CTM proxy and VT proxy at verification time and uses
+whatever it finds as the expected call target. Record the actual admin address
+for each CTM proxy and VT proxy as part of the evidence.
 
 Also record:
 
@@ -399,50 +412,73 @@ Artifact CTM order is deterministic: `[ctms.era]` first, then
 sections uses that single flavor. Any other CTM flavor label or disagreement
 between CTM flavor and on-chain CTM behavior is a blocker.
 
-If the environment is PUH-governed, Stage 0 has two additional trailing calls:
+If the environment is PUH-governed, Stage 0 has two additional calls immediately after the timer block
+(`base_count = 1 + N` where `N = number_of_ctms`):
 
-| Offset           | Target                          | Selector                                | Extra checks                                                            |
-| ---------------- | ------------------------------- | --------------------------------------- | ----------------------------------------------------------------------- |
-| `base_count`     | `Bridgehub.owner()` proxy admin | `upgradeAndCall(address,address,bytes)` | `proxy == Bridgehub.owner()`, `data` empty, new implementation has code |
-| `base_count + 1` | `Bridgehub.owner()`             | `updateGuardians(address)`              | new Guardians address has code                                          |
+| Offset           | Target                          | Selector                                | Extra checks                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------- | ------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `base_count`     | `Bridgehub.owner()` proxy admin | `upgradeAndCall(address,address,bytes)` | `proxy == Bridgehub.owner()`, `data` empty, `implementation == [puh_guardians].new_puh_impl`; PUVT also reads 10 immutable getters on the new impl (`L2_PROTOCOL_GOVERNOR`, `CHAIN_TYPE_MANAGER`, `BRIDGE_HUB`, `L1_NULLIFIER`, `L1_ASSET_ROUTER`, `L1_NATIVE_TOKEN_VAULT`, `CHAIN_ASSET_HANDLER`, `ERA_CHAIN_TYPE_MANAGER`, `ZKSYNC_OS_CHAIN_TYPE_MANAGER`, `ERA_CHAIN_ID`) and asserts they match expected values |
+| `base_count + 1` | `Bridgehub.owner()`             | `updateGuardians(address)`              | `_newGuardians == [puh_guardians].new_guardians`; new Guardians address has code                                                                                                                                                                                                                                                                                                                                    |
 
-Expected Stage 0 count is:
+Detect PUH governance by reading `Bridgehub.owner()` and checking that its EIP-1967 admin slot is
+non-zero (the owner is a TUPP-style proxy, i.e. ProtocolUpgradeHandler).
 
-- `1 + number_of_ctms` for non-PUH governance;
-- `1 + number_of_ctms + 2` for PUH-governed environments.
+Additionally, when a prior `transferOwnership()` ceremony left CTM pending owners outstanding (the
+`pre-governance-accept-ownerships` step), Stage 0 ends with `P` `acceptOwnership()` calls
+(`0x79ba5097`). Each targets a CTM proxy whose `pendingOwner()` was left outstanding by the
+ownership ceremony; they complete the two-step transfer before governance executes. These calls form
+a strict tail starting at `base_count + 2` (PUH) or `base_count` (non-PUH). PUVT enforces this
+position, queries live `pendingOwner()` on each registered CTM proxy to build the expected target
+list, then asserts the tail matches exactly — no duplicates, no extras, no missing targets.
 
-Any other Stage 0 call is a blocker.
+Record each `acceptOwnership()` target and confirm it is a CTM proxy in the address book as an
+independent cross-check.
+
+Expected Stage 0 count is `1 + N + P` for non-PUH governance, `1 + N + 2 + P` for PUH-governed
+environments, where `P ≥ 0`.
+
+Any call that is not `pauseMigration`, `startTimer`, the PUH pair (when applicable), or a
+pre-governance `acceptOwnership` is a blocker.
 
 ## Step 7: Verify Stage 1 Shape
 
-Stage 1 has a 10-call ecosystem prefix followed by one 5-call block per CTM.
+Stage 1 has an 11-call ecosystem prefix followed by one 6-call block per CTM.
 
 Prefix:
 
-| Index | Target                      | Selector                                | Required payload check                                                                     |
-| ----- | --------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `0`   | `transparent_proxy_admin`   | `upgrade(address,address)`              | `bridgehub_proxy -> bridgehub_implementation_addr`                                         |
-| `1`   | `transparent_proxy_admin`   | `upgrade(address,address)`              | `l1_nullifier_proxy -> l1_nullifier_implementation_addr`                                   |
-| `2`   | `transparent_proxy_admin`   | `upgrade(address,address)`              | `l1_asset_router_proxy -> l1_asset_router_implementation_addr`                             |
-| `3`   | `transparent_proxy_admin`   | `upgrade(address,address)`              | `native_token_vault -> native_token_vault_implementation_addr`                             |
-| `4`   | `transparent_proxy_admin`   | `upgradeAndCall(address,address,bytes)` | `message_root_proxy -> message_root_implementation_addr`, inner `initializeL1V31Upgrade()` |
-| `5`   | `transparent_proxy_admin`   | `upgrade(address,address)`              | `ctm_deployment_tracker_proxy -> ctm_deployment_tracker_implementation_addr`               |
-| `6`   | `transparent_proxy_admin`   | `upgrade(address,address)`              | `chain_asset_handler_proxy -> chain_asset_handler_implementation_addr`                     |
-| `7`   | `asset_tracker_proxy`       | `acceptOwnership()`                     | zero value                                                                                 |
-| `8`   | `native_token_vault`        | `setAssetTracker(address)`              | argument equals call 7 target                                                              |
-| `9`   | `chain_asset_handler_proxy` | `setAddresses()`                        | zero value                                                                                 |
+| Index | Target                            | Selector                                | Required payload check                                                                     |
+| ----- | --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `0`   | `transparent_proxy_admin`         | `upgrade(address,address)`              | `bridgehub_proxy -> bridgehub_implementation_addr`                                         |
+| `1`   | `transparent_proxy_admin`         | `upgrade(address,address)`              | `l1_nullifier_proxy -> l1_nullifier_implementation_addr`                                   |
+| `2`   | `transparent_proxy_admin`         | `upgrade(address,address)`              | `l1_asset_router_proxy -> l1_asset_router_implementation_addr`                             |
+| `3`   | `transparent_proxy_admin`         | `upgrade(address,address)`              | `native_token_vault -> native_token_vault_implementation_addr`                             |
+| `4`   | `transparent_proxy_admin`         | `upgradeAndCall(address,address,bytes)` | `message_root_proxy -> message_root_implementation_addr`, inner `initializeL1V31Upgrade()` |
+| `5`   | `transparent_proxy_admin`         | `upgrade(address,address)`              | `ctm_deployment_tracker_proxy -> ctm_deployment_tracker_implementation_addr`               |
+| `6`   | `transparent_proxy_admin`         | `upgrade(address,address)`              | `chain_asset_handler_proxy -> chain_asset_handler_implementation_addr`                     |
+| `7`   | `chain_registration_sender_proxy` | `acceptOwnership()`                     | zero value; completes two-step ownership transfer to governance                            |
+| `8`   | `asset_tracker_proxy`             | `acceptOwnership()`                     | zero value                                                                                 |
+| `9`   | `native_token_vault`              | `setAssetTracker(address)`              | argument equals call 8 target (`asset_tracker_proxy`)                                      |
+| `10`  | `chain_asset_handler_proxy`       | `setAddresses()`                        | zero value                                                                                 |
 
-For each CTM `i`, `block_start = 10 + 5 * i`:
+For each CTM `i`, `block_start = 11 + 6 * i`:
 
-| Index             | Target                      | Selector                      | Required payload check                          |
-| ----------------- | --------------------------- | ----------------------------- | ----------------------------------------------- |
-| `block_start + 0` | CTM timer                   | `checkDeadline()`             | CTM timer address from artifact                 |
-| `block_start + 1` | CTM upgrade stage validator | `checkMigrationsPaused()`     | validator address from artifact                 |
-| `block_start + 2` | CTM proxy admin             | `upgrade(address,address)`    | CTM proxy and implementation match CTM artifact |
-| `block_start + 3` | CTM proxy                   | `setChainCreationParams(...)` | perform Step 8                                  |
-| `block_start + 4` | CTM proxy                   | `setNewVersionUpgrade(...)`   | perform Steps 9 and 10                          |
+| Index             | Target                        | Selector                      | Required payload check                                                                                                                                                                                    |
+| ----------------- | ----------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `block_start + 0` | CTM timer                     | `checkDeadline()`             | `[ctms.<flavor>.deployed_addresses].l1_governance_upgrade_timer`                                                                                                                                          |
+| `block_start + 1` | CTM upgrade stage validator   | `checkMigrationsPaused()`     | `[ctms.<flavor>.deployed_addresses].upgrade_stage_validator`                                                                                                                                              |
+| `block_start + 2` | CTM proxy admin               | `upgrade(address,address)`    | CTM proxy and implementation match `[ctms.<flavor>.state_transition]`                                                                                                                                     |
+| `block_start + 3` | CTM proxy                     | `setChainCreationParams(...)` | perform Step 8                                                                                                                                                                                            |
+| `block_start + 4` | CTM proxy                     | `setNewVersionUpgrade(...)`   | perform Steps 9, 10, and 11                                                                                                                                                                               |
+| `block_start + 5` | ValidatorTimelock proxy admin | `upgrade(address,address)`    | PUVT verifies `proxy == validator_timelock_addr` and `impl == validator_timelock_implementation_addr` from the artifact; call target is the proxy admin read from the EIP-1967 admin slot of the VT proxy |
 
-Expected Stage 1 count is `10 + 5 * number_of_ctms`. Any extra or missing call
+PUVT decodes the VT upgrade call and verifies the `proxy` and `implementation` args against the
+artifact. The call target (proxy admin) is read from the EIP-1967 slot of the VT proxy at
+verification time; it may differ from `transparent_proxy_admin` and from the CTM proxy admin.
+Verify the implementation address maps to the expected ValidatorTimelock v31 artifact in
+`AllContractsHashes.json` — the new implementation adds `UPGRADER_ROLE` and
+`upgradeChainFromVersion`.
+
+Expected Stage 1 count is `11 + 6 * number_of_ctms`. Any extra or missing call
 is a blocker.
 
 ## Step 8: Verify `setChainCreationParams`
@@ -500,13 +536,19 @@ Verify each field:
 
 - `l1ChainId` equals RPC chain ID;
 - `eraChainId` equals the matrix Era chain ID, even when the reviewed CTM
-  flavor is ZKsync OS;
-- `gatewayChainId` is recorded and matches the intended Gateway topology;
+  flavor is ZKsync OS (PUVT skips this check when `--era-chain-id` is not
+  supplied; verify manually when the tool flag is absent);
+- `gatewayChainId` is recorded; PUVT logs it as informational but does not
+  assert the value — verify manually that it matches the intended Gateway
+  topology;
 - `l1AssetRouter` equals `l1_asset_router_proxy`;
 - `l2TokenProxyBytecodeHash` maps to `l1-contracts/BeaconProxy`;
 - `aliasedL1Governance` equals the L1-to-L2 alias of the actual governance
   executor: the PUH proxy for PUH-governed environments, otherwise the
-  Governance owner/executor address used by the artifact;
+  Governance owner/executor address used by the artifact. PUVT verifies this
+  when `aliased_protocol_upgrade_handler_proxy` is present in the address book;
+  when it is absent (non-PUH environments), PUVT issues a warning and logs the
+  observed value — verify manually in that case;
 - `maxNumberOfZKChains` is `100`;
 - every `*BytecodeInfo` field maps to the expected v31 L2/core contract for
   the CTM flavor;
@@ -584,8 +626,10 @@ Then verify:
 - added selectors are derived from the reviewed v31 facet ABIs/runtime bytecode;
 - exclude the tooling-only `getName()` selector `0x17d7de7c` from facet-cut
   comparison;
-- `isFreezable` values match the reviewed v31 facet table and the old diamond
-  state for removed selectors.
+- `isFreezable` values for `Add` operations match the reviewed v31 facet table;
+  for `Remove` operations the `isFreezable` field in the calldata is ignored by
+  `_removeFunctions` (it does not consume the parameter), so any value there is
+  a no-op and need not match the old on-chain state.
 
 If no representative chain can be inspected, record the gap. Do not claim exact
 facet-cut verification.
@@ -622,8 +666,11 @@ Check the outer `ProposedUpgrade`:
 - bootloader hash maps to `Bootloader`;
 - default account hash maps to `system-contracts/DefaultAccount`;
 - EVM emulator hash maps to `EvmEmulator`;
-- `verifier` equals the CTM verifier address;
-- verifier params are zero;
+- `verifier` is `address(0)` — the field is deprecated; `BaseZkSyncUpgrade.upgrade`
+  never reads it and instead fetches the verifier from CTM via
+  `protocolVersionVerifier(newProtocolVersion)`, which was set by the
+  `setNewVersionUpgrade` `verifier` argument verified in Step 9;
+- `verifierParams` is all-zero — deprecated, kept only for ABI compatibility;
 - `l1ContractsUpgradeCalldata` is empty;
 - `postUpgradeCalldata` is empty;
 - `upgradeTimestamp` is zero.
@@ -761,14 +808,16 @@ At minimum, v31 provenance must cover:
 
 - core implementations: Bridgehub, L1AssetRouter, L1Nullifier,
   NativeTokenVault, AssetTracker, CTMDeploymentTracker, MessageRoot,
-  ChainAssetHandler, GovernanceUpgradeTimer, and EIP7702Checker;
+  ChainAssetHandler, ChainRegistrationSender, GovernanceUpgradeTimer, and EIP7702Checker;
 - for Sepolia stage, MessageRoot may intentionally resolve to the
   `l1-contracts/L1MessageRootStageSepolia` implementation variant; this must
   come from the reviewed rollout source, not from a post-hoc label;
-- per-CTM contracts: ChainTypeManager implementation, BytecodesSupplier proxy,
-  PermissionlessValidator proxy, verifier pair, Dual/Testnet verifier,
-  DiamondInit, L1GenesisUpgrade, settlement-layer default upgrade, and the
-  six v31 facets;
+- per-CTM contracts: ChainTypeManager implementation, ValidatorTimelock
+  proxy and implementation (implementation deployed by `CTMUpgrade_v31.s.sol`
+  and referenced via `validator_timelock_implementation_addr` in the artifact),
+  BytecodesSupplier proxy, PermissionlessValidator proxy, verifier pair,
+  Dual/Testnet verifier, DiamondInit, L1GenesisUpgrade, settlement-layer
+  default upgrade, and the six v31 facets;
 - constructor or initializer args sourced from the reviewed artifact and live
   state: L1 chain ID, Bridgehub, WETH token, L1AssetRouter, L1Nullifier,
   MessageRoot, Era chain ID, Era diamond, governance owner/executor, CTM
@@ -813,6 +862,8 @@ integration chain, also verify execution evidence at a post-state point:
 - Stage 2 leaves `ChainAssetHandler.migrationPaused() == false`, each reviewed
   CTM `protocolVersion()` at v31, and each `UpgradeStageValidator` call
   `checkProtocolUpgradePresence()` / `checkMigrationsUnpaused()` succeeds;
+- when the legacy-GW decommission prefix was present, `Bridgehub.settlementLayerStatus(old_gw_chain_id)` is `false`;
+- when `[new_gateway]` was present, `Bridgehub.settlementLayerStatus(new_gw_chain_id)` is `true`;
 - every Gateway priority transaction has `NewPriorityRequest` /
   `NewPriorityRequestId` evidence from the target chain diamond and matching
   L2 execution or proof status, when the reviewed environment exposes it.
@@ -820,20 +871,75 @@ integration chain, also verify execution evidence at a post-state point:
 ## Step 14: Verify Stage 2
 
 Stage 2 unpauses migration and checks upgrade presence after chains are
-upgraded.
+upgraded. Its shape is: an optional legacy-GW decommission prefix, followed by
+the canonical section, followed by a mandatory 16-call Gateway bring-up block
+(v31 PUVT requires `[new_gateway]`).
 
-Canonical shape:
+### Legacy-GW decommission prefix (conditional)
+
+When `upgrade-envs/permanent-values/<env>.toml` has a `[legacy_gateway]` section,
+Stage 2 starts with `M + 1` decommission calls where `M` is the number of
+`[[legacy_gateway.chain_intervals]]` entries:
+
+| Index    | Target                      | Selector                                                                                         | Extra checks                                 |
+| -------- | --------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| `0..M-1` | `chain_asset_handler_proxy` | `setHistoricalMigrationInterval(uint256,uint256,(uint256,uint256,uint256,uint256,uint256,bool))` | one per `[[legacy_gateway.chain_intervals]]` |
+| `M`      | `bridgehub_proxy`           | `setSettlementLayerStatus(uint256,bool)`                                                         | second arg is `false`; blacklists the old GW |
+
+Decode each `setHistoricalMigrationInterval` call:
+
+```bash
+cast calldata-decode \
+  "setHistoricalMigrationInterval(uint256,uint256,(uint256,uint256,uint256,uint256,uint256,bool))" \
+  <call_data>
+```
+
+Match the decoded arguments against the corresponding
+`[[legacy_gateway.chain_intervals]]` entry in `permanent-values/<env>.toml`:
+
+- arg 1 (`_chainId`) = `chain_id`;
+- arg 2 (`_migrationNumber`) = `0` (always zero in the current flow);
+- `interval.migrateToGWBatchNumber` = `migrate_to_sl_batch`;
+- `interval.migrateFromGWBatchNumber` = `migrate_from_sl_batch`;
+- `interval.settlementLayerBatchLowerBound` = `sl_batch_lower_bound`;
+- `interval.settlementLayerBatchUpperBound` = `sl_batch_upper_bound`;
+- `interval.settlementLayerChainId` = `legacy_gateway.chain_id`;
+- `interval.isActive` = `false`.
+
+The `setSettlementLayerStatus` call must use `legacy_gateway.chain_id` as the
+first argument and `false` as the second.
+
+**PUVT coverage:** PUVT fully decodes and verifies every argument of each
+`setHistoricalMigrationInterval` call against the corresponding
+`[[legacy_gateway.chain_intervals]]` entry (all eight fields, including
+`isActive == false` and `migrationNumber == 0`). PUVT also verifies that the
+`setSettlementLayerStatus` call uses `legacy_gateway.chain_id` as the first
+argument and `false` as the second. Mismatches are hard errors. The manual
+decoding instructions above are for independent confirmation.
+
+If `[legacy_gateway]` is absent, the decommission prefix is not present.
+Record its absence as expected; any `setHistoricalMigrationInterval` or
+blacklisting `setSettlementLayerStatus` call in a non-legacy-GW package is a
+blocker.
+
+Let `D = M + 1` when the prefix is present, `D = 0` when absent.
+
+### Canonical section
 
 | Index         | Target                          | Selector                         | Extra checks |
 | ------------- | ------------------------------- | -------------------------------- | ------------ |
-| `0`           | `chain_asset_handler_proxy`     | `unpauseMigration()`             | zero value   |
-| `1 + 2*i`     | CTM `i` upgrade stage validator | `checkProtocolUpgradePresence()` | one per CTM  |
-| `1 + 2*i + 1` | CTM `i` upgrade stage validator | `checkMigrationsUnpaused()`      | one per CTM  |
+| `D`           | `chain_asset_handler_proxy`     | `unpauseMigration()`             | zero value   |
+| `D + 1 + 2*i` | CTM `i` upgrade stage validator | `checkProtocolUpgradePresence()` | one per CTM  |
+| `D + 2 + 2*i` | CTM `i` upgrade stage validator | `checkMigrationsUnpaused()`      | one per CTM  |
 
-Canonical count is `1 + 2 * number_of_ctms`.
+Canonical section count is `1 + 2 * N` (not counting the decommission prefix).
 
-If `[new_gateway]` is present, Stage 2 appends a 15-call Gateway bring-up
-block. Complete the Gateway appendix after the canonical Stage 2 checks.
+Total Stage 2 expected call count is `D + 1 + 2 * N + 16`. Any extra or
+missing call is a blocker.
+
+**Note:** v31 PUVT requires `[new_gateway]` to be present. A missing gateway
+block is a hard error — PUVT does not accept a 12-call (no-gateway) Stage 2.
+Complete the Gateway appendix after the canonical Stage 2 checks.
 
 ## Step 15: Verify Governance Wrappers
 
@@ -996,46 +1102,75 @@ reviewed commit.
 
 Use this appendix only when `[new_gateway]` is present.
 
-Expected 15-call block:
+This block is appended by `write_merged_ecosystem_toml` from the output of
+`GatewayVotePreparation.s.sol`. It starts with a `registerLegacyToken` prefix
+injected by the merge step, then a `setSettlementLayerStatus(newGwChainId, true)`
+call at offset 1 that whitelists the new GW chain ID as a valid settlement layer,
+then the bring-up priority transactions interleaved with base-token approvals.
 
-| Offset | Target                         | Selector                                     | Required check                                                    |
-| ------ | ------------------------------ | -------------------------------------------- | ----------------------------------------------------------------- |
-| `0`    | `asset_tracker_proxy`          | `registerLegacyToken(bytes32)`               | asset ID matches the matrix ZK token asset ID                     |
-| `1`    | base token                     | `approve(address,uint256)`                   | spender is L1 AssetRouter; all approve targets match              |
-| `2`    | `bridgehub_proxy`              | `requestL2TransactionDirect(...)`            | inner `addChainTypeManager(new_gw_ctm)` to L2 Bridgehub `0x10002` |
-| `3`    | `l1_asset_router_proxy`        | `setAssetDeploymentTracker(bytes32,address)` | asset ID and tracker address match `[new_gateway]`                |
-| `4`    | `ctm_deployment_tracker_proxy` | `registerCTMAssetOnL1(address)`              | argument matches `[new_gateway]` CTM asset                        |
-| `5`    | base token                     | `approve(address,uint256)`                   | same approve target family                                        |
-| `6`    | `bridgehub_proxy`              | `requestL2TransactionTwoBridges(...)`        | decode and verify set-asset-handler payload                       |
-| `7`    | base token                     | `approve(address,uint256)`                   | same approve target family                                        |
-| `8`    | `bridgehub_proxy`              | `requestL2TransactionTwoBridges(...)`        | decode and verify GW CTM registration payload                     |
-| `9`    | base token                     | `approve(address,uint256)`                   | same approve target family                                        |
-| `10`   | `bridgehub_proxy`              | `requestL2TransactionDirect(...)`            | inner `acceptOwnership()` on GW RollupDAManager                   |
-| `11`   | base token                     | `approve(address,uint256)`                   | same approve target family                                        |
-| `12`   | `bridgehub_proxy`              | `requestL2TransactionDirect(...)`            | inner `acceptOwnership()` on GW ServerNotifier                    |
-| `13`   | base token                     | `approve(address,uint256)`                   | same approve target family                                        |
-| `14`   | `bridgehub_proxy`              | `requestL2TransactionDirect(...)`            | inner `setGatewaySettlementFee(...)` on GW asset tracker          |
+Expected 16-call block:
+
+| Offset | Target                         | Selector                                     | Required check                                                                   |
+| ------ | ------------------------------ | -------------------------------------------- | -------------------------------------------------------------------------------- |
+| `0`    | `asset_tracker_proxy`          | `registerLegacyToken(bytes32)`               | asset ID matches the matrix ZK token asset ID                                    |
+| `1`    | `bridgehub_proxy`              | `setSettlementLayerStatus(uint256,bool)`     | second arg is `true`; whitelists the new GW chain ID as a valid settlement layer |
+| `2`    | base token                     | `approve(address,uint256)`                   | spender is L1 AssetRouter; all 6 approve targets must be the same base token     |
+| `3`    | `bridgehub_proxy`              | `requestL2TransactionDirect(...)`            | inner `addChainTypeManager(new_gw_ctm)` to L2 Bridgehub `0x10002`                |
+| `4`    | `l1_asset_router_proxy`        | `setAssetDeploymentTracker(bytes32,address)` | asset ID and tracker address match `[new_gateway]`                               |
+| `5`    | `ctm_deployment_tracker_proxy` | `registerCTMAssetOnL1(address)`              | argument matches `[new_gateway]` CTM asset                                       |
+| `6`    | base token                     | `approve(address,uint256)`                   | same approve target family                                                       |
+| `7`    | `bridgehub_proxy`              | `requestL2TransactionTwoBridges(...)`        | decode and verify set-asset-handler payload                                      |
+| `8`    | base token                     | `approve(address,uint256)`                   | same approve target family                                                       |
+| `9`    | `bridgehub_proxy`              | `requestL2TransactionTwoBridges(...)`        | decode and verify GW CTM registration payload                                    |
+| `10`   | base token                     | `approve(address,uint256)`                   | same approve target family                                                       |
+| `11`   | `bridgehub_proxy`              | `requestL2TransactionDirect(...)`            | inner `acceptOwnership()` on GW RollupDAManager                                  |
+| `12`   | base token                     | `approve(address,uint256)`                   | same approve target family                                                       |
+| `13`   | `bridgehub_proxy`              | `requestL2TransactionDirect(...)`            | inner `acceptOwnership()` on GW ServerNotifier                                   |
+| `14`   | base token                     | `approve(address,uint256)`                   | same approve target family                                                       |
+| `15`   | `bridgehub_proxy`              | `requestL2TransactionDirect(...)`            | inner `setGatewaySettlementFee(...)` on GW asset tracker                         |
+
+The approve calls are at offsets 2, 6, 8, 10, 12, 14 (six total). The priority
+transaction calls are at offsets 3, 7, 9, 11, 13, 15 (six total).
 
 Use the Gateway row in the Value Source Matrix for chain ID, CTM asset,
 base-token asset ID, settlement fee, L2 gas limit, pubdata limit, and refund
 recipient.
-The six `approve(address,uint256)` calls must all target the resolved base
-token, approve only the matrix L1 AssetRouter spender path, and use amounts
-justified by the priority transactions.
+
+**Approve calls:** PUVT decodes each `approve` call, verifies the `spender`
+equals `l1_asset_router_proxy`, and checks that all six share the same token
+target.
 
 For every Gateway priority transaction:
 
-- chain ID is the new Gateway chain ID;
-- all priority transactions in the block target the same L2 chain;
-- L2 gas limit and pubdata limit match `[new_gateway]` or the reviewed env
-  config;
-- `l2Contract` matches the L2 target named by the appendix row or `[new_gateway]`;
-- `l2Calldata` selector and arguments are decoded;
+- chain ID is the new Gateway chain ID; PUVT verifies all six share the same
+  chain ID;
+- L2 gas limit equals `MAX_PRIORITY_TX_GAS_LIMIT` (72,000,000) and pubdata
+  limit equals `L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT` (800); PUVT verifies
+  these against hardcoded constants;
 - `factoryDeps` are empty unless explicitly expected;
 - refund recipient matches `[new_gateway]` or the reviewed env config.
 
-Decode the two-bridges calls and settlement-fee call; they carry nested routing,
-asset-handling, and fee data that should not be accepted from selectors alone.
+**PUVT coverage:** PUVT deep-decodes inner payloads for all six priority
+transactions and both two-bridge calls:
+
+- Offsets 3, 11, 13, 15: verifies `l2Contract` is L2 Bridgehub `0x10002` (offset 3),
+  GW RollupDAManager (offset 11), GW ServerNotifier (offset 13), or GW asset
+  tracker `0x10010` (offset 15); verifies the inner `l2Calldata` selector for
+  each; also verifies the GW CTM address argument of the offset 3
+  `addChainTypeManager` call.
+- Offset 7 (`requestL2TransactionTwoBridges`): verifies `secondBridgeAddress`
+  equals `l1_asset_router_proxy`; decodes `secondBridgeCalldata` and verifies
+  asset ID equals the representative CTM asset ID and handler equals
+  `L2_CHAIN_ASSET_HANDLER_ADDR`.
+- Offset 9 (`requestL2TransactionTwoBridges`): verifies `secondBridgeAddress`
+  equals `ctm_deployment_tracker_proxy`; decodes `secondBridgeCalldata` and
+  verifies both L1 CTM and L2 CTM addresses.
+- Offset 15 (`requestL2TransactionDirect`): decodes inner calldata and verifies
+  the settlement fee value matches the reviewed env config.
+
+Manually verify the refund recipient using the Gateway row in the Value Source
+Matrix. L2 gas limit and pubdata limit are verified by PUVT against hardcoded
+constants.
 
 ## Final Evidence Table
 
@@ -1043,26 +1178,29 @@ Fill one row per handoff item, derived evidence source, calldata block, or
 nested blob. For full pre-signing or post-execution sign-off, first add rows
 showing where each live-state or replay-dependent conclusion came from.
 
-| ID                                             | Artifact path | Decoded as                   | Expected source                        | Result | Notes |
-| ---------------------------------------------- | ------------- | ---------------------------- | -------------------------------------- | ------ | ----- |
-| `handoff.commit`                               |               | source anchor                | reviewed `era-contracts` commit        |        |       |
-| `handoff.calldata`                             |               | calldata set                 | provided files / ordered calldata list |        |       |
-| `evidence.phase-order`                         |               | global order                 | package / wrapper / command log        |        |       |
-| `evidence.signers`                             |               | Safe owners / threshold      | block-pinned Safe state                |        |       |
-| `evidence.pre-state`                           |               | live-state anchor            | block-pinned RPC / snapshot            |        |       |
-| `evidence.assets`                              |               | token and asset inventory    | Value Source Matrix asset rows         |        |       |
-| `manifest[0]`                                  |               | bundle metadata              | manifest/Safe shape                    |        |       |
-| `safe[0].tx[0]`                                |               | top-level transaction        | manifest/address book                  |        |       |
-| `stage0.call[0]`                               |               | `pauseMigration()`           | Stage 0 table                          |        |       |
-| `stage1.call[block+3]`                         |               | `setChainCreationParams`     | matrix CTM/genesis rows                |        |       |
-| `stage1.call[block+4].diamondCut.initCalldata` |               | `DefaultUpgrade.upgrade`     | reviewed v31 source                    |        |       |
-| `proposedUpgrade.l2ProtocolUpgradeTx.data`     |               | complex upgrader call        | reviewed v31 source                    |        |       |
-| `fixedForceDeploymentsData`                    |               | struct fields                | matrix chain/token/bytecode rows       |        |       |
-| `stage2.gateway[6]`                            |               | two-bridges priority tx      | matrix Gateway row                     |        |       |
-| `governance.wrapper`                           |               | proposal envelope            | governance source                      |        |       |
-| `chain.timestamp`                              |               | `setUpgradeTimestamp`        | matrix per-chain phase values          |        |       |
-| `chain.upgrade`                                |               | `upgradeChainFromVersion`    | matrix per-chain and CTM rows          |        |       |
-| `stage3.tx[0]`                                 |               | token registration/migration | matrix Stage3 token-list row           |        |       |
+| ID                                                   | Artifact path | Decoded as                           | Expected source                        | Result | Notes |
+| ---------------------------------------------------- | ------------- | ------------------------------------ | -------------------------------------- | ------ | ----- |
+| `handoff.commit`                                     |               | source anchor                        | reviewed `era-contracts` commit        |        |       |
+| `handoff.calldata`                                   |               | calldata set                         | provided files / ordered calldata list |        |       |
+| `evidence.phase-order`                               |               | global order                         | package / wrapper / command log        |        |       |
+| `evidence.signers`                                   |               | Safe owners / threshold              | block-pinned Safe state                |        |       |
+| `evidence.pre-state`                                 |               | live-state anchor                    | block-pinned RPC / snapshot            |        |       |
+| `evidence.assets`                                    |               | token and asset inventory            | Value Source Matrix asset rows         |        |       |
+| `manifest[0]`                                        |               | bundle metadata                      | manifest/Safe shape                    |        |       |
+| `safe[0].tx[0]`                                      |               | top-level transaction                | manifest/address book                  |        |       |
+| `stage0.call[0]`                                     |               | `pauseMigration()`                   | Stage 0 table                          |        |       |
+| `stage1.call[block_start+3]`                         |               | `setChainCreationParams`             | matrix CTM/genesis rows                |        |       |
+| `stage1.call[block_start+4].diamondCut.initCalldata` |               | `DefaultUpgrade.upgrade`             | reviewed v31 source                    |        |       |
+| `stage1.call[block_start+5]`                         |               | `ValidatorTimelock upgrade`          | matrix `validator_timelock_*` rows     |        |       |
+| `proposedUpgrade.l2ProtocolUpgradeTx.data`           |               | complex upgrader call                | reviewed v31 source                    |        |       |
+| `fixedForceDeploymentsData`                          |               | struct fields                        | matrix chain/token/bytecode rows       |        |       |
+| `stage2.decommission[0..M-1]`                        |               | `setHistoricalMigrationInterval`     | `[[legacy_gateway.chain_intervals]]`   |        |       |
+| `stage2.decommission[M]`                             |               | `setSettlementLayerStatus(id,false)` | `legacy_gateway.chain_id`              |        |       |
+| `stage2.gateway[7]`                                  |               | two-bridges priority tx              | matrix Gateway row                     |        |       |
+| `governance.wrapper`                                 |               | proposal envelope                    | governance source                      |        |       |
+| `chain.timestamp`                                    |               | `setUpgradeTimestamp`                | matrix per-chain phase values          |        |       |
+| `chain.upgrade`                                      |               | `upgradeChainFromVersion`            | matrix per-chain and CTM rows          |        |       |
+| `stage3.tx[0]`                                       |               | token registration/migration         | matrix Stage3 token-list row           |        |       |
 
 ## Blockers
 
@@ -1078,6 +1216,8 @@ Treat any of these as a signing blocker:
 - protocol version mismatch;
 - CTM flavor mismatch;
 - proxy upgrade points at an unexpected implementation;
+- per-CTM Stage 1 block is missing the ValidatorTimelock upgrade at `block_start + 5`, or its
+  proxy/implementation/proxy-admin args do not match the address book;
 - proxy admin slot mismatch;
 - CREATE2 salt, deployed address, bytecode file, or constructor args mismatch;
 - bytecode hash missing from reviewed `AllContractsHashes.json`;
@@ -1087,4 +1227,8 @@ Treat any of these as a signing blocker:
   deployment calldata;
 - dangerous test-only beacon is nonzero;
 - ZK token asset ID is zero or does not match the matrix value;
+- legacy-GW decommission prefix present in a non-legacy-GW package, or absent
+  in a legacy-GW package; any decoded `setHistoricalMigrationInterval` argument
+  does not match the corresponding `[[legacy_gateway.chain_intervals]]` entry;
+  `setSettlementLayerStatus` second argument is not `false`;
 - tool cross-check warnings that the reviewer cannot independently close.
