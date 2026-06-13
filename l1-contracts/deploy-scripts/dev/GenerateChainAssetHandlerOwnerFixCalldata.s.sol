@@ -8,34 +8,34 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Call} from "contracts/governance/Common.sol";
 
-/// @title GenerateBridgehubOwnerFixCalldata
+/// @title GenerateChainAssetHandlerOwnerFixCalldata
 /// @author Matter Labs
-/// @notice Generates the governance calldata that repairs the misconfigured Bridgehub proxy
-///         whose `_owner` is `address(0)` (the `initialize` call never set an owner).
+/// @notice Generates the governance calldata that repairs the misconfigured L1ChainAssetHandler
+///         proxy whose `_owner` is `address(0)` (the `initialize` call never set an owner).
 ///
 /// The fix is a single Governance operation (multicall) containing two calls on the proxy's
 /// `ProxyAdmin`:
 ///   1. `upgradeAndCall(proxy, tempImpl, forceSetOwner(newOwner))`
-///        -> points the proxy at the temporary `BridgehubOwnerForceUpdate` implementation and,
-///           atomically, calls `forceSetOwner`, which writes the OpenZeppelin `_owner` slot.
+///        -> points the proxy at the temporary `ChainAssetHandlerOwnerForceUpdate` implementation
+///           and, atomically, calls `forceSetOwner`, which writes the OpenZeppelin `_owner` slot.
 ///   2. `upgrade(proxy, originalImpl)`
 ///        -> points the proxy back at the original implementation.
 ///
 /// Because both calls live in one operation they execute atomically: the temporary
 /// implementation is only installed for the duration of call (1).
 ///
-/// The script emits a JSON array (to `script-out/bridgehub-owner-fix-calldata.json`) describing
-/// the two transactions the EOA owner of the Governance contract must send:
+/// The script emits a JSON array (to `script-out/chain-asset-handler-owner-fix-calldata.json`)
+/// describing the two transactions the EOA owner of the Governance contract must send:
 ///   - `scheduleTransparent(operation, 0)`
 ///   - `execute(operation)`
 /// (`minDelay` on the target Governance is 0, so the operation is executable in the same block.)
 ///
 /// All addresses default to the ZKsync Sepolia deployment that needs fixing and can be
 /// overridden via environment variables.
-contract GenerateBridgehubOwnerFixCalldata is Script {
+contract GenerateChainAssetHandlerOwnerFixCalldata is Script {
     struct Config {
         string network;
-        address proxy; // the TransparentUpgradeableProxy whose owner is address(0)
+        address proxy; // the L1ChainAssetHandler TransparentUpgradeableProxy whose owner is address(0)
         address proxyAdmin; // the proxy's ProxyAdmin
         address governance; // the Governance contract that owns the ProxyAdmin
         address governanceOwner; // the EOA that owns the Governance contract (tx sender)
@@ -47,14 +47,15 @@ contract GenerateBridgehubOwnerFixCalldata is Script {
 
     function _config() internal view returns (Config memory c) {
         c.network = vm.envOr("NETWORK", string("sepolia"));
-        c.proxy = vm.envOr("BRIDGEHUB_PROXY", 0xDfA2193b161d7bd45FC81b4E80225eebDc3CF96C);
+        // L1ChainAssetHandler proxy (== Bridgehub(0xc4fd...).chainAssetHandler()).
+        c.proxy = vm.envOr("CHAIN_ASSET_HANDLER_PROXY", 0xDfA2193b161d7bd45FC81b4E80225eebDc3CF96C);
         c.proxyAdmin = vm.envOr("PROXY_ADMIN", 0xE00456791Da489418355B0a6b27965A54c7C01d2);
         c.governance = vm.envOr("GOVERNANCE", 0xcf96aAb01347BA96050F39Ff6dcbC6138b462b58);
         c.governanceOwner = vm.envOr("GOVERNANCE_OWNER", 0x5555555590930f501c88B73Ea43B3EEb5A71643c);
         c.originalImpl = vm.envOr("ORIGINAL_IMPL", 0xC32FCA197a5E2F29CC7A072F38ebde31F1E9354F);
-        c.tempImpl = vm.envOr("TEMP_IMPL", 0xA28C7C88037e42103e606477d2754A50D87B9E0A);
+        c.tempImpl = vm.envOr("TEMP_IMPL", 0x23a460AaFfB492781aE2D61c1c331A61C055e9Cf);
         c.newOwner = vm.envOr("NEW_OWNER", 0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D);
-        c.salt = vm.envOr("SALT", keccak256(abi.encodePacked("BridgehubOwnerFix", c.proxy, c.newOwner)));
+        c.salt = vm.envOr("SALT", keccak256(abi.encodePacked("ChainAssetHandlerOwnerFix", c.proxy, c.newOwner)));
     }
 
     function run() external {
@@ -86,7 +87,7 @@ contract GenerateBridgehubOwnerFixCalldata is Script {
         _log(c, forceSetOwnerData, upgradeAndCallData, upgradeData);
 
         string memory json = _buildJson(c, scheduleData, executeData);
-        string memory outPath = "script-out/bridgehub-owner-fix-calldata.json";
+        string memory outPath = "script-out/chain-asset-handler-owner-fix-calldata.json";
         vm.writeFile(outPath, json);
         console.log("Wrote calldata JSON to:", outPath);
     }
@@ -97,15 +98,15 @@ contract GenerateBridgehubOwnerFixCalldata is Script {
         bytes memory upgradeAndCallData,
         bytes memory upgradeData
     ) internal pure {
-        console.log("== Bridgehub owner fix calldata ==");
-        console.log("network:           ", c.network);
-        console.log("proxy (Bridgehub): ", c.proxy);
-        console.log("proxyAdmin:        ", c.proxyAdmin);
-        console.log("governance:        ", c.governance);
-        console.log("governanceOwner:   ", c.governanceOwner);
-        console.log("originalImpl:      ", c.originalImpl);
-        console.log("tempImpl:          ", c.tempImpl);
-        console.log("newOwner:          ", c.newOwner);
+        console.log("== L1ChainAssetHandler owner fix calldata ==");
+        console.log("network:                    ", c.network);
+        console.log("proxy (L1ChainAssetHandler):", c.proxy);
+        console.log("proxyAdmin:                 ", c.proxyAdmin);
+        console.log("governance:                 ", c.governance);
+        console.log("governanceOwner:            ", c.governanceOwner);
+        console.log("originalImpl:               ", c.originalImpl);
+        console.log("tempImpl:                   ", c.tempImpl);
+        console.log("newOwner:                   ", c.newOwner);
         console.log("salt:");
         console.logBytes32(c.salt);
         console.log("forceSetOwner data:");
@@ -122,7 +123,7 @@ contract GenerateBridgehubOwnerFixCalldata is Script {
         bytes memory executeData
     ) internal pure returns (string memory) {
         string memory step1 = _txObject(
-            "[1/2] Schedule the governance operation that fixes the Bridgehub owner (delay 0).",
+            "[1/2] Schedule the governance operation that fixes the L1ChainAssetHandler owner (delay 0).",
             c.network,
             c.governanceOwner,
             c.governance,
