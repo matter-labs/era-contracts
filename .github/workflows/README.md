@@ -1,6 +1,6 @@
-# Calldata Generation Workflows
+# Protocol Ops Workflows
 
-Each `generate-*.yaml` workflow invokes a `protocol_ops` subcommand via
+Each workflow invokes a `protocol_ops` subcommand via
 `protocol-ops.sh --tag <docker-tag>` (the wrapper forwards the rest of the
 args to `protocol_ops` unless the first post-flag word is `forge`/`cast`).
 
@@ -17,23 +17,26 @@ args to `protocol_ops` unless the first post-flag word is `forge`/`cast`).
 | `generate-upgrade-calldata-prepare`             | `protocol-ops ecosystem upgrade-prepare`                                |
 | `generate-upgrade-calldata-governance`          | `protocol-ops ecosystem upgrade-governance` (stages 0+1+2)              |
 | `generate-migrate-to-gw-phase0-pause`           | `protocol-ops chain gateway migrate-to phase-0-pause-deposits`          |
-| `generate-migrate-to-gw-phase1-submit`          | `protocol-ops chain gateway migrate-to phase-1-submit`                  |
-| `generate-migrate-to-gw-phase2-finalize`        | `protocol-ops chain gateway migrate-to phase-2-finalize`                |
-| `generate-migrate-to-gw-phase3-validators`      | `protocol-ops chain gateway migrate-to phase-3-validators`              |
+| `generate-migrate-to-gw-phase1-wait-ready`      | `protocol-ops chain gateway migrate-to phase-1-wait-ready`              |
+| `generate-migrate-to-gw-phase2-submit`          | `protocol-ops chain gateway migrate-to phase-2-submit`                  |
+| `generate-migrate-to-gw-phase3-finalize`        | `protocol-ops chain gateway migrate-to phase-3-finalize`                |
+| `generate-migrate-to-gw-phase4-validators`      | `protocol-ops chain gateway migrate-to phase-4-validators`              |
 | `generate-migrate-from-gw-phase0-pause`         | `protocol-ops chain gateway migrate-from phase-0-pause-deposits`        |
-| `generate-migrate-from-gw-phase1-submit`        | `protocol-ops chain gateway migrate-from phase-1-submit`                |
-| `generate-migrate-from-gw-phase2-finalize`      | `protocol-ops chain gateway migrate-from phase-2-finalize`              |
-| `generate-migrate-from-gw-phase3-set-da`        | `protocol-ops chain gateway migrate-from phase-3-set-da-validator-pair` |
+| `generate-migrate-from-gw-phase1-wait-ready`    | `protocol-ops chain gateway migrate-from phase-1-wait-ready`            |
+| `generate-migrate-from-gw-phase2-submit`        | `protocol-ops chain gateway migrate-from phase-2-submit`                |
+| `generate-migrate-from-gw-phase3-finalize`      | `protocol-ops chain gateway migrate-from phase-3-finalize`              |
+| `generate-migrate-from-gw-phase4-set-da`        | `protocol-ops chain gateway migrate-from phase-4-set-da-validator-pair` |
 
 ## Execute workflows
 
 | Workflow                        | Purpose                                                                                                                                                                                                                                   |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `execute-deployer-safe-bundles` | Apply Safe bundles whose `target` is the ecosystem deployer EOA (bundles from the chain-init workflow, the upgrade-prepare workflow, and the migrate-to/from phase-2-finalize workflows). Signs with `DEPLOYER_PRIVATE_KEY_<env>` secret. |
+| `execute-deployer-safe-bundles` | Apply Safe bundles whose `target` is the ecosystem deployer EOA (bundles from the chain-init workflow, the upgrade-prepare workflow, and the migrate-to/from phase-3-finalize workflows). Signs with `DEPLOYER_PRIVATE_KEY_<env>` secret. |
 
 ## Conventions
 
-- **All workflows** share: `environment`, `protocol_ops_tag`, `l1_rpc_url`
+- **All workflows** share: `environment`, `protocol_ops_tag`
+- **Calldata-generating workflows** also take `l1_rpc_url`
 - **Integration-test-only** env vars (e.g. `L1_DIAMOND_CUT_DATA`) are NOT workflow inputs
 - **v30-only** overrides are marked `[v30 only]` in descriptions and `TODO(v30-removal)` in code
 - **Artifact names**:

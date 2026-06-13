@@ -1,18 +1,27 @@
 //! Migrate a chain *from* a gateway settlement layer back to L1.
 //!
-//! Mirrors [`super::migrate_to`] in the reverse direction. Exposed as four
-//! phase-level subcommands, each emitting one Safe bundle:
+//! Mirrors [`super::migrate_to`] in the reverse direction. Exposed as five
+//! phase-level subcommands. Phases 0, 2, 3, and 4 emit Safe bundles; phase
+//! 1 is a live RPC wait:
 //!
 //!   phase-0-pause-deposits        pause deposits + notify server (chain admin signs both)
-//!   phase-1-submit                send the L1→gateway-L2 start-migration priority tx (chain admin)
-//!   phase-2-finalize              finalize on L1 once the gateway has executed+settled (deployer)
-//!   phase-3-set-da-validator-pair re-set the chain's L1 DA validator pair (chain admin)
+//!   phase-1-wait-ready            wait for the server migration boundary to drain on gateway
+//!   phase-2-submit                send the L1→gateway-L2 start-migration priority tx (chain admin)
+//!   phase-3-finalize              finalize on L1 once the gateway has executed+settled (deployer)
+//!   phase-4-set-da-validator-pair re-set the chain's L1 DA validator pair (chain admin)
 //!
 //! Phase 0 reuses `migrate_to::stage_pause_deposits` because deposits have to
 //! be paused from the L1 side before the Migrator facet on the gateway will
-//! accept the withdrawal priority tx. Phases 1–3 are thin wrappers around a
-//! single stage each; the phase names stay to keep the CLI symmetric with
-//! `migrate-to` and to match the per-phase workflow split.
+//! accept the withdrawal priority tx. It also captures the pre-phase-0
+//! `zks_lastSettlementChangeBlock` value into output metadata. Phase 1 waits
+//! for the notified server to report a newer settlement-change boundary and
+//! for the chain server's finalized block to reach the block immediately
+//! before that boundary.
+//! Phases 2 and 4 are thin wrappers around a single stage each. Phase 3 also
+//! owns the live waits needed before finalizing, because the L1 fork must be
+//! created only after the gateway migration batch is executed on L1. The phase
+//! names stay to keep the CLI symmetric with `migrate-to` and to match the
+//! per-phase workflow split.
 
 use anyhow::Context;
 use clap::{Parser, Subcommand};
@@ -21,6 +30,10 @@ use ethers::utils::hex;
 use serde::{Deserialize, Serialize};
 
 use super::migrate_to::{stage_pause_deposits, wait_for_l2_tx_receipt};
+use super::migration_ready::{
+    get_last_settlement_change_block, wait_for_settlement_change_ready,
+    DEFAULT_MIGRATION_READY_POLL_INTERVAL_SECS, DEFAULT_MIGRATION_READY_TIMEOUT_SECS,
+};
 use crate::abi::{BridgehubAbi, IChainTypeManagerAbi};
 use crate::commands::output::write_output_if_requested;
 use crate::common::addresses::L2_L1_MESSENGER;
@@ -39,32 +52,40 @@ use crate::types::L2DACommitmentScheme;
 #[command(after_long_help = "\
 Phases (run in order, with the required waits between them):
   phase-0-pause-deposits         Pause deposits + notify the chain server (chain admin)
-  phase-1-submit                 Submit the L1→gateway-L2 start-migration priority tx (chain admin)
-  phase-2-finalize               Finalize on L1 after gateway has executed and settled (deployer)
-  phase-3-set-da-validator-pair  Re-set the chain's L1 DA validator pair (chain admin)")]
+  phase-1-wait-ready             Wait for the server settlement-change boundary to be executed on gateway
+  phase-2-submit                 Submit the L1→gateway-L2 start-migration priority tx (chain admin)
+  phase-3-finalize               Finalize on L1 after gateway has executed and settled (deployer)
+  phase-4-set-da-validator-pair  Re-set the chain's L1 DA validator pair (chain admin)")]
 pub enum MigrateFromCommands {
     /// Phase 0: pause-deposits + notify-server. The gateway's Migrator facet
     /// requires deposits paused before the withdrawal priority tx can
     /// execute; notify-server tells the chain server to stop producing new
-    /// batches. Chain admin signs both.
+    /// batches. The command also records the pre-phase-0
+    /// `zks_lastSettlementChangeBlock` value as
+    /// `previous_settlement_change_block` for phase 1. Chain admin signs both.
     #[command(name = "phase-0-pause-deposits")]
     Phase0PauseDeposits(Phase0PauseDepositsArgs),
-    /// Phase 1: send the start-migration L1→gateway-L2 priority tx. The
+    /// Phase 1: wait until the chain server has reported the settlement
+    /// change block and the chain server reports the pre-boundary block as
+    /// finalized on its current settlement layer.
+    #[command(name = "phase-1-wait-ready")]
+    Phase1WaitReady(Phase1WaitReadyArgs),
+    /// Phase 2: send the start-migration L1→gateway-L2 priority tx. The
     /// caller must capture the L2 priority tx hash from the L1 receipt's
-    /// `NewPriorityRequest` event and pass it to phase-2 via
+    /// `NewPriorityRequest` event and pass it to phase-3 via
     /// `--migration-l2-tx-hash`.
-    #[command(name = "phase-1-submit")]
-    Phase1Submit(Phase1SubmitArgs),
-    /// Phase 2: finalize the migration on L1 once the gateway has executed
+    #[command(name = "phase-2-submit")]
+    Phase2Submit(Phase2SubmitArgs),
+    /// Phase 3: finalize the migration on L1 once the gateway has executed
     /// and settled the withdrawal. Deployer signs (the call is caller-funded,
     /// not admin-gated).
-    #[command(name = "phase-2-finalize")]
-    Phase2Finalize(Phase2FinalizeArgs),
-    /// Phase 3: re-set the chain's L1 DA validator pair. After migrating
+    #[command(name = "phase-3-finalize")]
+    Phase3Finalize(Phase3FinalizeArgs),
+    /// Phase 4: re-set the chain's L1 DA validator pair. After migrating
     /// back, the chain settles on L1 and the pair must be restored so
     /// batches commit with the correct DA scheme.
-    #[command(name = "phase-3-set-da-validator-pair")]
-    Phase3SetDaValidatorPair(Phase3SetDaValidatorPairArgs),
+    #[command(name = "phase-4-set-da-validator-pair")]
+    Phase4SetDaValidatorPair(Phase4SetDaValidatorPairArgs),
 }
 
 // ── Phase args ────────────────────────────────────────────────────────────
@@ -78,10 +99,43 @@ pub struct Phase0PauseDepositsArgs {
     #[clap(flatten)]
     #[serde(flatten)]
     pub topology: EcosystemChainArgs,
+
+    /// Migrating chain server RPC URL. Used to capture the pre-phase-0
+    /// `zks_lastSettlementChangeBlock` baseline into the output metadata.
+    #[clap(long)]
+    pub chain_rpc_url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
-pub struct Phase1SubmitArgs {
+pub struct Phase1WaitReadyArgs {
+    /// Numeric chain id of the targeted ZK chain.
+    #[clap(long, help_heading = "Topology")]
+    pub chain_id: u64,
+
+    /// Migrating chain server RPC URL. The server must expose
+    /// `zks_lastSettlementChangeBlock` and support `eth_getBlockByNumber`
+    /// with the `finalized` tag.
+    #[clap(long)]
+    pub chain_rpc_url: String,
+
+    /// Value of `zks_lastSettlementChangeBlock` captured by phase 0 before
+    /// its Safe bundle was applied. This phase waits for a strictly newer
+    /// block so an older migration-to boundary cannot satisfy the
+    /// migrate-from wait.
+    #[clap(long)]
+    pub previous_settlement_change_block: u64,
+
+    /// Overall timeout for the wait.
+    #[clap(long, default_value_t = DEFAULT_MIGRATION_READY_TIMEOUT_SECS)]
+    pub timeout_secs: u64,
+
+    /// Poll interval for the chain server checks.
+    #[clap(long, default_value_t = DEFAULT_MIGRATION_READY_POLL_INTERVAL_SECS)]
+    pub poll_interval_secs: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Parser)]
+pub struct Phase2SubmitArgs {
     #[clap(flatten)]
     #[serde(flatten)]
     pub shared: SharedRunArgs,
@@ -111,7 +165,7 @@ pub struct Phase1SubmitArgs {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
-pub struct Phase2FinalizeArgs {
+pub struct Phase3FinalizeArgs {
     #[clap(flatten)]
     #[serde(flatten)]
     pub shared: SharedRunArgs,
@@ -131,15 +185,15 @@ pub struct Phase2FinalizeArgs {
     #[clap(long)]
     pub gateway_rpc_url: String,
 
-    /// L2 priority tx hash on the gateway, produced by phase-1-submit's L1
+    /// L2 priority tx hash on the gateway, produced by phase-2-submit's L1
     /// transaction. Extract from the `NewPriorityRequest` event in the
-    /// phase-1 L1 receipt.
+    /// phase-2 L1 receipt.
     #[clap(long)]
     pub migration_l2_tx_hash: H256,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
-pub struct Phase3SetDaValidatorPairArgs {
+pub struct Phase4SetDaValidatorPairArgs {
     #[clap(flatten)]
     #[serde(flatten)]
     pub shared: SharedRunArgs,
@@ -164,10 +218,11 @@ pub struct Phase3SetDaValidatorPairArgs {
 pub async fn run(cmd: MigrateFromCommands) -> anyhow::Result<()> {
     match cmd {
         MigrateFromCommands::Phase0PauseDeposits(args) => run_phase0_pause_deposits(args).await,
-        MigrateFromCommands::Phase1Submit(args) => run_phase1_submit(args).await,
-        MigrateFromCommands::Phase2Finalize(args) => run_phase2_finalize(args).await,
-        MigrateFromCommands::Phase3SetDaValidatorPair(args) => {
-            run_phase3_set_da_validator_pair(args).await
+        MigrateFromCommands::Phase1WaitReady(args) => run_phase1_wait_ready(args).await,
+        MigrateFromCommands::Phase2Submit(args) => run_phase2_submit(args).await,
+        MigrateFromCommands::Phase3Finalize(args) => run_phase3_finalize(args).await,
+        MigrateFromCommands::Phase4SetDaValidatorPair(args) => {
+            run_phase4_set_da_validator_pair(args).await
         }
     }
 }
@@ -177,6 +232,14 @@ pub async fn run(cmd: MigrateFromCommands) -> anyhow::Result<()> {
 pub async fn run_phase0_pause_deposits(args: Phase0PauseDepositsArgs) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
+    let previous_settlement_change_block = get_last_settlement_change_block(&args.chain_rpc_url)
+        .await
+        .context("read pre-phase-0 zks_lastSettlementChangeBlock")?
+        .unwrap_or(0);
+
+    logger::info(format!(
+        "Pre-phase-0 settlement-change block: {previous_settlement_change_block}"
+    ));
 
     // Pause-deposits is shared with the to-gateway flow: it's the same L1
     // `pauseDepositsBeforeInitiatingMigration` call either direction.
@@ -192,14 +255,61 @@ pub async fn run_phase0_pause_deposits(args: Phase0PauseDepositsArgs) -> anyhow:
         &args.shared,
         &runner,
         &serde_json::json!({}),
-        &serde_json::json!({ "chain_id": chain_id }),
+        &serde_json::json!({
+            "chain_id": chain_id,
+            "previous_settlement_change_block": previous_settlement_change_block,
+        }),
     )
     .await
 }
 
-// ── Phase 1: submit ───────────────────────────────────────────────────────
+// ── Phase 1: wait for server readiness ───────────────────────────────────
 
-pub async fn run_phase1_submit(args: Phase1SubmitArgs) -> anyhow::Result<()> {
+pub async fn run_phase1_wait_ready(args: Phase1WaitReadyArgs) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        args.timeout_secs > 0,
+        "--timeout-secs must be greater than 0"
+    );
+    anyhow::ensure!(
+        args.poll_interval_secs > 0,
+        "--poll-interval-secs must be greater than 0"
+    );
+    anyhow::ensure!(
+        args.previous_settlement_change_block > 0,
+        "--previous-settlement-change-block must be greater than 0"
+    );
+
+    logger::step("Waiting for migration FROM gateway readiness");
+    logger::info(format!("Chain ID: {}", args.chain_id));
+    logger::info(format!("Chain RPC URL: {}", args.chain_rpc_url));
+    logger::info(format!(
+        "Previous settlement-change block: {}",
+        args.previous_settlement_change_block
+    ));
+
+    let readiness = wait_for_settlement_change_ready(
+        &args.chain_rpc_url,
+        Some(args.previous_settlement_change_block),
+        args.timeout_secs,
+        args.poll_interval_secs,
+        "migration FROM gateway",
+    )
+    .await
+    .context("Waiting for migration FROM gateway readiness")?;
+
+    logger::success("Migration FROM gateway readiness confirmed");
+    logger::info(format!(
+        "Settlement-change block {}; finalized block {} (required >= {})",
+        readiness.settlement_change_block,
+        readiness.finalized_block,
+        readiness.required_finalized_block,
+    ));
+    Ok(())
+}
+
+// ── Phase 2: submit ───────────────────────────────────────────────────────
+
+pub async fn run_phase2_submit(args: Phase2SubmitArgs) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
@@ -213,10 +323,10 @@ pub async fn run_phase1_submit(args: Phase1SubmitArgs) -> anyhow::Result<()> {
         &args.shared,
     )
     .await
-    .context("phase-1 submit stage")?;
+    .context("phase-2 submit stage")?;
 
     write_output_if_requested(
-        "chain.gateway.migrate-from.phase-1-submit",
+        "chain.gateway.migrate-from.phase-2-submit",
         &args.shared,
         &runner,
         &serde_json::json!({}),
@@ -228,10 +338,10 @@ pub async fn run_phase1_submit(args: Phase1SubmitArgs) -> anyhow::Result<()> {
     .await
 }
 
-// ── Phase 3: set-da-validator-pair ────────────────────────────────────────
+// ── Phase 4: set-da-validator-pair ────────────────────────────────────────
 
-pub async fn run_phase3_set_da_validator_pair(
-    args: Phase3SetDaValidatorPairArgs,
+pub async fn run_phase4_set_da_validator_pair(
+    args: Phase4SetDaValidatorPairArgs,
 ) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
@@ -244,10 +354,10 @@ pub async fn run_phase3_set_da_validator_pair(
         args.l2_da_commitment_scheme,
     )
     .await
-    .context("phase-3 set-da-validator-pair stage")?;
+    .context("phase-4 set-da-validator-pair stage")?;
 
     write_output_if_requested(
-        "chain.gateway.migrate-from.phase-3-set-da-validator-pair",
+        "chain.gateway.migrate-from.phase-4-set-da-validator-pair",
         &args.shared,
         &runner,
         &serde_json::json!({}),
@@ -355,7 +465,7 @@ pub(crate) async fn stage_submit_from(
     logger::success("Migration from gateway submitted");
     logger::info(
         "Next: capture the L2 priority tx hash from the L1 receipt and pass it \
-         to phase-2-finalize via `--migration-l2-tx-hash`",
+         to phase-3-finalize via `--migration-l2-tx-hash`",
     );
     Ok(gateway_chain_id)
 }
@@ -403,9 +513,9 @@ pub(crate) async fn stage_set_da_validator_pair_from(
     Ok(())
 }
 
-// ── Phase 2: finalize ─────────────────────────────────────────────────────
+// ── Phase 3: finalize ─────────────────────────────────────────────────────
 //
-// Phase 2 has a subtle ordering requirement that the other phases don't:
+// Phase 3 has a subtle ordering requirement that the other phases don't:
 // the forge runner must be constructed *after* we've observed the gateway's
 // migration batch as executed on real L1. With `--simulate`, `ForgeRunner`
 // forks L1 at a single block height; any L1 state change after fork creation
@@ -414,7 +524,7 @@ pub(crate) async fn stage_set_da_validator_pair_from(
 // the fork must include the `executeBatches` tx — otherwise it reverts with
 // `InvalidProof()`.
 
-pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()> {
+pub async fn run_phase3_finalize(args: Phase3FinalizeArgs) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     // Resolve the gateway chain ID off real L1 BEFORE creating the forge
     // runner. With `--simulate`, `ForgeRunner::new` forks L1 via anvil at a
@@ -535,7 +645,7 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
         .context("finishMigrateChainFromGateway failed")?;
 
     write_output_if_requested(
-        "chain.gateway.migrate-from.phase-2-finalize",
+        "chain.gateway.migrate-from.phase-3-finalize",
         &args.shared,
         &runner,
         &serde_json::json!({}),

@@ -1,5 +1,5 @@
-All calldata-generation composite scripts have been retired. Each generate-*
-workflow invokes `protocol_ops` via `protocol-ops.sh --tag <docker-tag>`
+All protocol-ops composite scripts have been retired. Each workflow invokes
+`protocol_ops` via `protocol-ops.sh --tag <docker-tag>`
 (the wrapper forwards all remaining args verbatim to `protocol_ops` unless
 the first post-flag word is `forge` or `cast`). Most workflows pass
 `--ecosystem /contracts/env/ecosystem.yaml --chain <name> …` explicitly.
@@ -26,17 +26,20 @@ Mapping (workflow -> protocol-ops command):
   generate-gateway-convert-calldata              <-> chain gateway convert
   generate-upgrade-calldata-prepare              <-> ecosystem upgrade-prepare
   generate-upgrade-calldata-governance           <-> ecosystem upgrade-governance (stages 0+1+2)
-  generate-migrate-to-gw-phase0-pause      <-> chain gateway migrate-to phase-0-pause-deposits
-  generate-migrate-to-gw-phase1-submit     <-> chain gateway migrate-to phase-1-submit
-  generate-migrate-to-gw-phase2-finalize   <-> chain gateway migrate-to phase-2-finalize
-  generate-migrate-to-gw-phase3-validators <-> chain gateway migrate-to phase-3-validators
-  generate-migrate-from-gw-phase0-pause    <-> chain gateway migrate-from phase-0-pause-deposits
-  generate-migrate-from-gw-phase1-submit   <-> chain gateway migrate-from phase-1-submit
-  generate-migrate-from-gw-phase2-finalize <-> chain gateway migrate-from phase-2-finalize
-  generate-migrate-from-gw-phase3-set-da   <-> chain gateway migrate-from phase-3-set-da-validator-pair
+  generate-migrate-to-gw-phase0-pause       <-> chain gateway migrate-to phase-0-pause-deposits
+  generate-migrate-to-gw-phase1-wait-ready  <-> chain gateway migrate-to phase-1-wait-ready
+  generate-migrate-to-gw-phase2-submit      <-> chain gateway migrate-to phase-2-submit
+  generate-migrate-to-gw-phase3-finalize    <-> chain gateway migrate-to phase-3-finalize
+  generate-migrate-to-gw-phase4-validators  <-> chain gateway migrate-to phase-4-validators
+  generate-migrate-from-gw-phase0-pause     <-> chain gateway migrate-from phase-0-pause-deposits
+  generate-migrate-from-gw-phase1-wait-ready <-> chain gateway migrate-from phase-1-wait-ready
+  generate-migrate-from-gw-phase2-submit    <-> chain gateway migrate-from phase-2-submit
+  generate-migrate-from-gw-phase3-finalize  <-> chain gateway migrate-from phase-3-finalize
+  generate-migrate-from-gw-phase4-set-da    <-> chain gateway migrate-from phase-4-set-da-validator-pair
 
 Conventions:
-- All workflows share: environment, protocol_ops_tag, l1_rpc_url
+- All workflows share: environment, protocol_ops_tag
+- Calldata-generating workflows also take l1_rpc_url
 - Artifact names:
   - per-chain workflows: safe-bundles-{operation}-{chain_name}-{environment}
   - ecosystem-wide workflows (upgrade-prepare / upgrade-governance):

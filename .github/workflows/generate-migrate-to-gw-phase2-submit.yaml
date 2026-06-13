@@ -1,4 +1,4 @@
-name: "Migrate from Gateway: Phase 1 — Submit"
+name: "Migrate to Gateway: Phase 2 - Submit"
 
 on:
   workflow_dispatch:
@@ -16,8 +16,16 @@ on:
         description: "L1 RPC URL"
         required: true
         type: string
+      gateway_rpc_url:
+        description: "Gateway L2 RPC URL"
+        required: true
+        type: string
       chain_name:
-        description: "Chain name to migrate back from gateway"
+        description: "Chain name to migrate"
+        required: true
+        type: string
+      gateway_chain_id:
+        description: "Gateway chain ID (settlement layer to migrate to)"
         required: true
         type: string
       refund_recipient:
@@ -43,20 +51,22 @@ jobs:
       EXTRA_MOUNTS: ${{ github.workspace }}/environments/${{ inputs.environment }}:/contracts/env
     steps:
       - uses: actions/checkout@v4
-      - name: Run phase 1 (submit)
+      - name: Run phase 2 (submit)
         run: |
           mkdir -p "$WORK_DIR"
           bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
-            chain gateway migrate-from phase-1-submit \
-            --l1-rpc-url       "${{ inputs.l1_rpc_url }}" \
-            --ecosystem        /contracts/env/ecosystem.yaml \
-            --chain            "${{ inputs.chain_name }}" \
-            --l1-gas-price     "${{ inputs.l1_gas_price }}" \
+            chain gateway migrate-to phase-2-submit \
+            --l1-rpc-url      "${{ inputs.l1_rpc_url }}" \
+            --ecosystem       /contracts/env/ecosystem.yaml \
+            --chain           "${{ inputs.chain_name }}" \
+            --gateway-chain-id "${{ inputs.gateway_chain_id }}" \
+            --gateway-rpc-url "${{ inputs.gateway_rpc_url }}" \
+            --l1-gas-price    "${{ inputs.l1_gas_price }}" \
             --refund-recipient "${{ inputs.refund_recipient }}" \
             --out /contracts/work/session/safe
       - uses: actions/upload-artifact@v4
         with:
-          name: safe-bundles-migrate-from-gw-phase1-${{ inputs.chain_name }}-${{ inputs.environment }}
+          name: safe-bundles-migrate-to-gw-phase2-${{ inputs.chain_name }}-${{ inputs.environment }}
           path: ${{ env.WORK_DIR }}/safe/
           if-no-files-found: error
           retention-days: 30

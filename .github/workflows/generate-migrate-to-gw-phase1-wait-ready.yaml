@@ -1,0 +1,50 @@
+name: "Migrate to Gateway: Phase 1 - Wait Ready"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [stage, stage-interop-tests, sepolia, mainnet]
+      protocol_ops_tag:
+        description: "protocol-ops Docker image tag"
+        required: true
+        type: string
+      chain_id:
+        description: "Numeric chain ID to migrate"
+        required: true
+        type: string
+      chain_rpc_url:
+        description: "Migrating chain server RPC URL"
+        required: true
+        type: string
+      timeout_secs:
+        description: "Maximum seconds to wait for readiness"
+        required: false
+        type: string
+        default: "300"
+      poll_interval_secs:
+        description: "Seconds between readiness polls"
+        required: false
+        type: string
+        default: "2"
+
+permissions:
+  contents: read
+
+jobs:
+  wait-ready:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run phase 1 (wait-ready)
+        run: |
+          bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
+            chain gateway migrate-to phase-1-wait-ready \
+            --chain-id "${{ inputs.chain_id }}" \
+            --chain-rpc-url "${{ inputs.chain_rpc_url }}" \
+            --timeout-secs "${{ inputs.timeout_secs }}" \
+            --poll-interval-secs "${{ inputs.poll_interval_secs }}"

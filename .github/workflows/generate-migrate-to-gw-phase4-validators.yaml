@@ -1,4 +1,4 @@
-name: "Migrate to Gateway: Phase 3 — Validators"
+name: "Migrate to Gateway: Phase 4 - Validators"
 
 on:
   workflow_dispatch:
@@ -65,11 +65,11 @@ jobs:
       EXTRA_MOUNTS: ${{ github.workspace }}/environments/${{ inputs.environment }}:/contracts/env
     steps:
       - uses: actions/checkout@v4
-      - name: Run phase 3 (validators + set-da)
+      - name: Run phase 4 (validators + set-da)
         run: |
           mkdir -p "$WORK_DIR"
           bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
-            chain gateway migrate-to phase-3-validators \
+            chain gateway migrate-to phase-4-validators \
             --l1-rpc-url      "${{ inputs.l1_rpc_url }}" \
             --ecosystem       /contracts/env/ecosystem.yaml \
             --chain           "${{ inputs.chain_name }}" \
@@ -83,7 +83,7 @@ jobs:
             --out /contracts/work/session/safe
       - uses: actions/upload-artifact@v4
         with:
-          name: safe-bundles-migrate-to-gw-phase3-${{ inputs.chain_name }}-${{ inputs.environment }}
+          name: safe-bundles-migrate-to-gw-phase4-${{ inputs.chain_name }}-${{ inputs.environment }}
           path: ${{ env.WORK_DIR }}/safe/
           if-no-files-found: error
           retention-days: 30
