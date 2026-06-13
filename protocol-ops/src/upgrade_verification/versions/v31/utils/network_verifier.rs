@@ -169,6 +169,27 @@ impl NetworkVerifier {
         })
     }
 
+    /// L1-only constructor for narrow verifiers that only need Ethereum
+    /// transaction provenance. The gateway provider is pointed at the same RPC
+    /// so existing struct users can stay non-optional.
+    pub async fn new_l1_only(l1_rpc: String) -> anyhow::Result<Self> {
+        let l1_provider = RootProvider::new_http(l1_rpc.parse().context("invalid L1 RPC URL")?);
+        let l1_chain_id = l1_provider
+            .get_chain_id()
+            .await
+            .context("failed to fetch L1 chain id")?;
+
+        Ok(Self {
+            l1_provider: l1_provider.clone(),
+            era_chain_id: 0,
+            l1_chain_id,
+            gateway_chain_id: l1_chain_id,
+            gw_provider: l1_provider,
+            create2_constructor_params: HashMap::new(),
+            create2_known_bytecodes: HashMap::new(),
+        })
+    }
+
     /// Walk a `transactions.txt`-style hash list and turn each successful
     /// CREATE2-factory tx into a `(deployed address → contract file +
     /// constructor args)` entry.
