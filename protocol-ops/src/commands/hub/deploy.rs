@@ -1,24 +1,24 @@
+use crate::common::abi::IDeployL1CoreContractsAbi;
+use crate::common::forge::scripts::{
+    deploy_ecosystem::{DeployL1Config, DeployL1CoreContractsOutput, InitialDeploymentConfig},
+    DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION,
+};
 use crate::common::{
     forge::ForgeRunner,
     traits::{ReadConfig, SaveConfig},
     wallets::Wallet,
 };
-use crate::config::forge_interface::{
-    deploy_ecosystem::{
-        input::{DeployL1Config, InitialDeploymentConfig},
-        output::DeployL1CoreContractsOutput,
-    },
-    script_params::DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION,
-};
-use ethers::types::{Address, H256};
+use alloy::primitives::{Address, B256};
+use alloy::sol_types::SolCall;
+use serde::Serialize;
 
 /// Input parameters for deploying hub contracts.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DeployInput {
     pub owner: Address,
     pub era_chain_id: u64,
     pub with_legacy_bridge: bool,
-    pub create2_factory_salt: Option<H256>,
+    pub create2_factory_salt: Option<B256>,
 }
 
 /// Deploy hub contracts and return the output.
@@ -40,12 +40,23 @@ pub fn deploy(
         input.with_legacy_bridge,
     );
 
-    let input_path = DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION.input(&runner.foundry_scripts_path);
-    deploy_config.save(&runner.shell, &input_path)?;
+    let input_path = runner.input_path(&DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION)?;
+    deploy_config.save(&input_path)?;
 
+    // protocol-ops always states the script's IO paths explicitly (the
+    // conventional ones unless a per-run --subdir is set); the `run()`
+    // wrapper with baked-in paths is for manual forge use.
     let forge = runner
-        .script(&DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION)
-        .with_broadcast()
+        .script_with_calldata(
+            &DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION,
+            IDeployL1CoreContractsAbi::runInnerCall {
+                inputPath: runner
+                    .script_rel_path(DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION.input_rel()),
+                outputPath: runner
+                    .script_rel_path(DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION.output_rel()),
+            }
+            .abi_encode(),
+        )
         .with_wallet(auth)
         .with_env(
             "CREATE2_FACTORY_SALT",
@@ -54,7 +65,6 @@ pub fn deploy(
 
     runner.run(forge)?;
 
-    let output_path =
-        DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION.output(&runner.foundry_scripts_path);
-    DeployL1CoreContractsOutput::read(&runner.shell, output_path)
+    let output_path = runner.output_path(&DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION);
+    DeployL1CoreContractsOutput::read(output_path)
 }

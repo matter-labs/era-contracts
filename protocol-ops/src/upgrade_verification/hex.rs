@@ -1,5 +1,5 @@
+use alloy::hex;
 use anyhow::Context;
-use ethers::utils::hex;
 
 pub(crate) fn decode_required_hex(field: &str, value: &str) -> anyhow::Result<Vec<u8>> {
     let trimmed = value.trim();

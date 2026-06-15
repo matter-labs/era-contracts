@@ -35,6 +35,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use serde_json::{json, Value};
 
+use crate::common::files::save_json_file;
 use crate::common::forge::{split_into_bundles, ForgeRunner, SafeBundle};
 use crate::common::logger;
 
@@ -74,10 +75,11 @@ where
 
 /// Fetch the L1 chain ID from the given RPC URL.
 async fn fetch_l1_chain_id(l1_rpc_url: &str) -> anyhow::Result<u64> {
-    use ethers::providers::{Http, Middleware, Provider};
-    let provider = Provider::<Http>::try_from(l1_rpc_url)?;
-    let chain_id = provider.get_chainid().await?;
-    Ok(chain_id.as_u64())
+    use crate::common::ethereum::get_provider;
+    use alloy::providers::Provider;
+    let provider = get_provider(l1_rpc_url)?;
+    let chain_id = provider.get_chain_id().await?;
+    Ok(chain_id)
 }
 
 /// Write one Safe Transaction Builder JSON file per bundle under `dir`, plus
@@ -147,9 +149,7 @@ fn write_safe_bundles_dir(
             "transactions": safe_txs,
         });
 
-        std::fs::write(&filepath, serde_json::to_string_pretty(&envelope)?).map_err(|e| {
-            anyhow::anyhow!("Failed to write safe file '{}': {e}", filepath.display())
-        })?;
+        save_json_file(&filepath, &envelope)?;
 
         let entry = json!({
             "index": idx,
@@ -167,12 +167,7 @@ fn write_safe_bundles_dir(
         "bundles": bundle_entries,
         "metadata": metadata_entries,
     });
-    std::fs::write(&manifest_path, serde_json::to_string_pretty(&manifest)?).map_err(|e| {
-        anyhow::anyhow!(
-            "Failed to write manifest '{}': {e}",
-            manifest_path.display()
-        )
-    })?;
+    save_json_file(&manifest_path, &manifest)?;
 
     Ok(())
 }

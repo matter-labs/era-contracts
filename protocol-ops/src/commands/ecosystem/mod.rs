@@ -21,16 +21,16 @@ use crate::{
     commands::ecosystem::verify_upgrade::VerifyUpgradeArgs,
 };
 
-pub(crate) mod broadcast;
-pub(crate) mod init;
-pub(crate) mod new_gateway_prepare;
-pub(crate) mod simulator;
-pub(crate) mod stage3;
-pub(crate) mod upgrade;
-pub(crate) mod v31_upgrade_full;
-pub(crate) mod v31_upgrade_inner;
-pub(crate) mod verify_upgrade;
-pub(crate) mod zk_governance;
+pub mod broadcast;
+pub mod init;
+pub mod new_gateway_prepare;
+pub mod simulator;
+pub mod stage3;
+pub mod upgrade;
+pub mod v31_upgrade_full;
+pub mod v31_upgrade_inner;
+pub mod verify_upgrade;
+pub mod zk_governance;
 
 #[derive(Subcommand, Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -78,7 +78,7 @@ pub enum EcosystemCommands {
     GovernanceTomlToSimulator(GovernanceTomlToSimulatorArgs),
 }
 
-pub(crate) async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
+pub async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
     match args {
         EcosystemCommands::Init(args) => init::run(args).await,
         EcosystemCommands::UpgradePrepareAll(args) => upgrade::run_upgrade_prepare_all(args).await,

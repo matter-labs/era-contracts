@@ -1,17 +1,18 @@
+use alloy::primitives::{Address, B256};
+use alloy::sol_types::SolCall;
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 
 use crate::commands::ctm::deploy::{deploy, CtmDeployInput};
 use crate::commands::hub::register_ctm::{register_ctm, RegisterCtmInput};
 
-use crate::commands::output::write_output_if_requested;
+use crate::common::abi::AdminFunctionsAbi;
 use crate::common::env_config::EnvConfig;
+use crate::common::forge::scripts::{deploy_ctm::DeployCTMOutput, ADMIN_FUNCTIONS_INVOCATION};
+use crate::common::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
-use crate::config::forge_interface::deploy_ctm::output::DeployCTMOutput;
-use crate::config::forge_interface::script_params::ADMIN_FUNCTIONS_INVOCATION;
 use crate::types::VMOption;
 
 // ── CLI args ────────────────────────────────────────────────────────────────
@@ -62,10 +63,10 @@ pub struct CtmInitArgs {
     /// ZK token asset ID (defaults from env's `zk_token_asset_id` when
     /// `--env` is set).
     #[clap(long, help_heading = "Advanced input")]
-    pub zk_token_asset_id: Option<H256>,
+    pub zk_token_asset_id: Option<B256>,
     /// CREATE2 factory salt
     #[clap(long, help_heading = "Advanced input")]
-    pub create2_factory_salt: Option<H256>,
+    pub create2_factory_salt: Option<B256>,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
@@ -170,19 +171,25 @@ pub async fn ctm_init(
     logger::step("Accepting ownership of CTM contracts...");
     let accept_scripts = [
         runner
-            .with_script_call(
+            .script_with_calldata(
                 &ADMIN_FUNCTIONS_INVOCATION,
-                "governanceAcceptOwner",
-                (deployed.governance_addr, ctm_proxy),
-            )?
+                AdminFunctionsAbi::governanceAcceptOwnerCall {
+                    _governor: deployed.governance_addr,
+                    _target: ctm_proxy,
+                }
+                .abi_encode(),
+            )
             .with_wallet(owner)
             .with_timing_label("ctm.accept_owner"),
         runner
-            .with_script_call(
+            .script_with_calldata(
                 &ADMIN_FUNCTIONS_INVOCATION,
-                "chainAdminAcceptAdmin",
-                (deployed.chain_admin, ctm_proxy),
-            )?
+                AdminFunctionsAbi::chainAdminAcceptAdminCall {
+                    _chainAdmin: deployed.chain_admin,
+                    _target: ctm_proxy,
+                }
+                .abi_encode(),
+            )
             .with_wallet(owner)
             .with_timing_label("ctm.accept_admin"),
     ];
@@ -211,6 +218,6 @@ pub struct CtmInitInput {
     pub reuse_gov_and_admin: bool,
     pub with_testnet_verifier: bool,
     pub with_legacy_bridge: bool,
-    pub zk_token_asset_id: Option<H256>,
-    pub create2_factory_salt: Option<H256>,
+    pub zk_token_asset_id: Option<B256>,
+    pub create2_factory_salt: Option<B256>,
 }

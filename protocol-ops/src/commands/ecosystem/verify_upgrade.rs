@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use alloy::primitives::{keccak256, Address, FixedBytes, U256};
+use alloy::primitives::{keccak256, Address, FixedBytes};
 use clap::{Parser, ValueEnum};
 
 use crate::common::env_config::{default_protocol_ops_out_dir, EnvConfig, GovernanceKind};
@@ -124,14 +124,12 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.permanent_values_path.display()
         )
     })?;
-    let zk_token_asset_id = FixedBytes::<32>::from_slice(zk_token_asset_id.as_bytes());
-    let create2_factory_eth = env_cfg.create2_factory().ok_or_else(|| {
+    let create2_factory = env_cfg.create2_factory().ok_or_else(|| {
         anyhow::anyhow!(
             "{} is missing `[permanent_contracts] create2_factory_addr`",
             env_cfg.permanent_values_path.display()
         )
     })?;
-    let create2_factory = Address::from_slice(create2_factory_eth.as_bytes());
     let new_gateway = env_cfg.new_gateway().ok_or_else(|| {
         anyhow::anyhow!(
             "{} is missing required `[new_gateway]` config for v31 verification",
@@ -140,7 +138,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     })?;
     let new_gateway_chain_id = new_gateway.chain_id;
     let new_gateway_representative_chain_id = new_gateway.ctm_representative_chain_id;
-    let new_gateway_settlement_fee = ethers_u256_to_alloy(new_gateway.settlement_fee);
+    let new_gateway_settlement_fee = new_gateway.settlement_fee;
 
     // Collect every pinned CREATE2 salt declared in the env config — the Core
     // salt from `[contracts] create2_factory_salt` plus the per-CTM salts under
@@ -148,10 +146,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     // in this set.
     let mut expected_salts: Vec<FixedBytes<32>> = Vec::new();
     if let Some(core_salt) = env_cfg.v31_create2_factory_salt()? {
-        expected_salts.push(FixedBytes::<32>::from_slice(core_salt.as_bytes()));
+        expected_salts.push(core_salt);
     }
     for salt in env_cfg.v31_create2_factory_salt_per_ctm()?.values() {
-        expected_salts.push(FixedBytes::<32>::from_slice(salt.as_bytes()));
+        expected_salts.push(*salt);
     }
     if env_cfg.governance_kind() == GovernanceKind::Puh {
         // The PUH/Guardians/SecurityCouncil/EmergencyUpgradeBoard redeploy uses
@@ -261,12 +259,6 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     logger::outro(format!("{}", result));
     verification_result?;
     result.ensure_success()
-}
-
-fn ethers_u256_to_alloy(value: ethers::types::U256) -> U256 {
-    let mut bytes = [0u8; 32];
-    value.to_big_endian(&mut bytes);
-    U256::from_be_bytes(bytes)
 }
 
 fn print_encoded_upgrade_data(label: &str, stage_calls_hex: &str) {

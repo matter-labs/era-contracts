@@ -23,8 +23,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+use alloy::primitives::{Address, B256, U256};
 use anyhow::Context;
-use ethers::types::{Address, H256, U256};
 use serde::Deserialize;
 
 use crate::common::paths::resolve_l1_contracts_path;
@@ -40,7 +40,7 @@ pub struct PermanentValues {
     #[serde(default)]
     pub l1_chain_id: Option<u64>,
     #[serde(default)]
-    pub zk_token_asset_id: Option<H256>,
+    pub zk_token_asset_id: Option<B256>,
     pub core_contracts: CoreContracts,
     #[serde(default)]
     pub ctm_contracts: Option<CtmContracts>,
@@ -96,7 +96,7 @@ pub struct NewGatewayConfig {
     pub chain_id: u64,
     /// Initial `gatewaySettlementFee` (wrapped-ZK wei) to write to the GW's
     /// `GWAssetTracker.setGatewaySettlementFee` via L1→L2 priority tx.
-    /// Quoted with a `0x` prefix in TOML — ethers's `U256` serde reads quoted
+    /// Quoted with a `0x` prefix in TOML — alloy's `U256` serde reads quoted
     /// strings as hex (raw decimal in quotes is treated as a hex literal),
     /// so the TOML value must look like `settlement_fee = "0x3b9aca00"`.
     pub settlement_fee: U256,
@@ -297,7 +297,7 @@ impl EnvConfig {
     /// alongside the rest of the v31 inputs so re-prepares are reproducible.
     /// Re-reads the TOML each call rather than caching, so editing the file
     /// between commands is reflected without restarting the CLI.
-    pub fn v31_create2_factory_salt(&self) -> anyhow::Result<Option<H256>> {
+    pub fn v31_create2_factory_salt(&self) -> anyhow::Result<Option<B256>> {
         if !self.v31_input_path.exists() {
             return Ok(None);
         }
@@ -313,7 +313,7 @@ impl EnvConfig {
     /// salt every regen prevents the broadcaster from colliding with previously
     /// executed op ids that still sit in the on-chain `Done` map. When absent,
     /// returns `None` and the forge scripts default to `bytes32(0)`.
-    pub fn v31_legacy_gov_salt(&self) -> anyhow::Result<Option<H256>> {
+    pub fn v31_legacy_gov_salt(&self) -> anyhow::Result<Option<B256>> {
         if !self.v31_input_path.exists() {
             return Ok(None);
         }
@@ -328,7 +328,7 @@ impl EnvConfig {
     /// local-fixture path — `v31_upgrade_inner` will fall back to random
     /// salts in that case). Re-reads the TOML each call (see
     /// `v31_create2_factory_salt`).
-    pub fn v31_create2_factory_salt_per_ctm(&self) -> anyhow::Result<HashMap<Address, H256>> {
+    pub fn v31_create2_factory_salt_per_ctm(&self) -> anyhow::Result<HashMap<Address, B256>> {
         if !self.v31_input_path.exists() {
             return Ok(HashMap::new());
         }
@@ -376,7 +376,7 @@ impl EnvConfig {
         self.permanent.core_contracts.governance_kind
     }
 
-    pub fn zk_token_asset_id(&self) -> Option<H256> {
+    pub fn zk_token_asset_id(&self) -> Option<B256> {
         self.permanent.zk_token_asset_id
     }
 
@@ -410,15 +410,15 @@ fn parse_v31_upgrade_input(content: &str) -> V31UpgradeInputs {
 }
 
 /// Read `[contracts] create2_factory_salt` from a v31 input TOML.
-fn read_core_create2_salt(content: &str) -> Option<H256> {
+fn read_core_create2_salt(content: &str) -> Option<B256> {
     read_h256_under_contracts(content, "create2_factory_salt")
 }
 
-fn read_core_legacy_gov_salt(content: &str) -> Option<H256> {
+fn read_core_legacy_gov_salt(content: &str) -> Option<B256> {
     read_h256_under_contracts(content, "legacy_gov_salt")
 }
 
-fn read_h256_under_contracts(content: &str, key: &str) -> Option<H256> {
+fn read_h256_under_contracts(content: &str, key: &str) -> Option<B256> {
     let mut in_contracts = false;
     for raw in content.lines() {
         let line = raw.trim();
@@ -439,7 +439,7 @@ fn read_h256_under_contracts(content: &str, key: &str) -> Option<H256> {
 }
 
 /// Read every `"0x<addr>" = "0x<h256>"` entry under `[create2_factory_salts]`.
-fn read_create2_salts_per_ctm(content: &str) -> HashMap<Address, H256> {
+fn read_create2_salts_per_ctm(content: &str) -> HashMap<Address, B256> {
     let mut out = HashMap::new();
     let mut current_section: Option<String> = None;
     for raw in content.lines() {
@@ -470,7 +470,7 @@ fn parse_section_header(line: &str) -> Option<String> {
 
 /// Match a TOML line of the form `"0x<addr>" = "0x<h256>"` (with optional
 /// trailing comment). Returns the parsed address + salt.
-fn match_addr_keyed_h256(line: &str) -> Option<(Address, H256)> {
+fn match_addr_keyed_h256(line: &str) -> Option<(Address, B256)> {
     let line = line.split('#').next()?.trim();
     if !line.starts_with('"') {
         return None;
@@ -484,7 +484,7 @@ fn match_addr_keyed_h256(line: &str) -> Option<(Address, H256)> {
     let val_end = after_quote.find('"')?;
     let val = &after_quote[..val_end];
     let addr: Address = key.parse().ok()?;
-    let salt: H256 = val.parse().ok()?;
+    let salt: B256 = val.parse().ok()?;
     Some((addr, salt))
 }
 
@@ -509,7 +509,7 @@ fn match_unquoted_uint(line: &str, key: &str) -> Option<u64> {
     value.parse().ok()
 }
 
-fn match_quoted_h256(line: &str, key: &str) -> Option<H256> {
+fn match_quoted_h256(line: &str, key: &str) -> Option<B256> {
     let prefix = format!("{key} = \"");
     if !line.starts_with(&prefix) {
         return None;
@@ -566,7 +566,7 @@ mod tests {
             .v31_create2_factory_salt()
             .expect("read core salt")
             .expect("stage.toml must declare [contracts] create2_factory_salt");
-        assert_ne!(core_salt, H256::zero());
+        assert_ne!(core_salt, B256::ZERO);
 
         let per_ctm = cfg
             .v31_create2_factory_salt_per_ctm()

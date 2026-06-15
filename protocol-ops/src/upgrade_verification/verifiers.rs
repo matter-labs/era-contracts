@@ -4,7 +4,7 @@ use alloy::{
     sol,
     sol_types::SolCall,
 };
-use colored::Colorize;
+use console::style;
 use serde::Deserialize;
 use std::fmt::{self, Display};
 use std::fs;
@@ -149,12 +149,9 @@ impl Verifiers {
             let per_ctm = EnvConfig::load(env.as_str())
                 .and_then(|cfg| cfg.v31_create2_factory_salt_per_ctm())
                 .unwrap_or_default();
-            // env_config uses ethers H160 keys; compare via raw bytes to avoid
-            // an ethers import here.
             per_ctm
-                .iter()
-                .find(|(addr, _)| addr.as_bytes() == new_gateway_representative_ctm.as_slice())
-                .map(|(_, h)| FixedBytes::<32>::from_slice(h.as_bytes()))
+                .get(&new_gateway_representative_ctm)
+                .copied()
                 .unwrap_or_default()
         };
 
@@ -273,17 +270,17 @@ impl VerificationResult {
     }
 
     pub(crate) fn report_ok(&self, info: &str) {
-        println!("{} {}", "[OK]: ".green(), info);
+        println!("{} {}", style("[OK]: ").green(), info);
     }
 
     pub(crate) fn report_warn(&mut self, warn: &str) {
         self.warnings += 1;
-        println!("{} {}", "[WARN]:".yellow(), warn);
+        println!("{} {}", style("[WARN]:").yellow(), warn);
     }
 
     pub(crate) fn report_error(&mut self, error: &str) {
         self.errors += 1;
-        println!("{} {}", "[ERROR]:".red(), error);
+        println!("{} {}", style("[ERROR]:").red(), error);
     }
 
     pub(crate) fn ensure_success(&self) -> anyhow::Result<()> {
@@ -545,7 +542,7 @@ impl Display for VerificationResult {
             write!(
                 f,
                 "{} errors: {}, warnings: {} - result: {}",
-                "ERROR".red(),
+                style("ERROR").red(),
                 self.errors,
                 self.warnings,
                 self.result
@@ -554,12 +551,12 @@ impl Display for VerificationResult {
             write!(
                 f,
                 "{} warnings: {} - result: {}",
-                "WARN".yellow(),
+                style("WARN").yellow(),
                 self.warnings,
                 self.result
             )
         } else {
-            write!(f, "{} - result: {}", "OK".green(), self.result)
+            write!(f, "{} - result: {}", style("OK").green(), self.result)
         }
     }
 }

@@ -1,21 +1,26 @@
+use alloy::hex;
+use alloy::primitives::{Address, Bytes, B256, U256};
+use alloy::sol_types::SolCall;
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::{Address, Bytes, U256};
-use ethers::utils::hex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::commands::output::write_output_if_requested;
+use crate::common::abi::{
+    AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi,
+    IGatewayVotePreparationAbi,
+};
 use crate::common::addresses::{DEFAULT_ZK_TOKEN_ASSET_ID, ZERO_ADDRESS, ZERO_BYTES32};
-use crate::common::paths;
-use crate::common::EcosystemChainArgs;
-use crate::common::SharedRunArgs;
-use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
-use crate::config::forge_interface::script_params::{
+use crate::common::forge::scripts::{
     ADMIN_FUNCTIONS_INVOCATION, DEPLOY_GATEWAY_TRANSACTION_FILTERER_INVOCATION,
     GATEWAY_UTILS_INVOCATION, GATEWAY_VOTE_PREPARATION_INVOCATION,
     GATEWAY_VOTE_PREPARATION_SCRIPT_PATH,
 };
+use crate::common::output::write_output_if_requested;
+use crate::common::paths;
+use crate::common::EcosystemChainArgs;
+use crate::common::SharedRunArgs;
+use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
 
 /// Convert a relative TOML path to the form expected by forge env vars (`/`-prefixed).
 fn forge_env_path(rel: &str) -> String {
@@ -27,18 +32,21 @@ fn forge_env_path(rel: &str) -> String {
 /// Run deploy-filterer on an existing `runner` with `sender` already prepared
 /// (must be the chain admin owner EOA). Reusable from the fine-grained CLI
 /// entry point and the phase-level `chain gateway convert` command.
-pub(crate) async fn stage_deploy_filterer(
+pub async fn stage_deploy_filterer(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     bridgehub: Address,
     chain_id: u64,
 ) -> anyhow::Result<()> {
     let script = runner
-        .with_script_call(
+        .script_with_calldata(
             &DEPLOY_GATEWAY_TRANSACTION_FILTERER_INVOCATION,
-            "deployAndSetOnChain",
-            (bridgehub, chain_id),
-        )?
+            DeployGatewayTransactionFiltererAbi::deployAndSetOnChainCall {
+                bridgehub,
+                chainId: U256::from(chain_id),
+            }
+            .abi_encode(),
+        )
         .with_wallet(sender);
 
     logger::step("Deploying gateway transaction filterer");
@@ -58,7 +66,7 @@ pub(crate) async fn stage_deploy_filterer(
 /// Run grant-whitelist on an existing `runner`. `sender` must be the chain
 /// admin owner EOA. Auto-includes the CTM deployment tracker and governance
 /// address in the whitelist in addition to `extra_grantees`.
-pub(crate) async fn stage_grant_whitelist(
+pub async fn stage_grant_whitelist(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     bridgehub: Address,
@@ -105,11 +113,16 @@ pub(crate) async fn stage_grant_whitelist(
     }
 
     let script = runner
-        .with_script_call(
+        .script_with_calldata(
             &ADMIN_FUNCTIONS_INVOCATION,
-            "grantGatewayWhitelist",
-            (bridgehub, chain_id, all_grantees.clone(), true),
-        )?
+            AdminFunctionsAbi::grantGatewayWhitelistCall {
+                _bridgehub: bridgehub,
+                _chainId: U256::from(chain_id),
+                _grantees: all_grantees.clone(),
+                _shouldSend: true,
+            }
+            .abi_encode(),
+        )
         .with_wallet(sender);
 
     logger::step("Granting gateway whitelist");
@@ -136,7 +149,10 @@ fn dump_force_deployments(runner: &mut ForgeRunner, ctm_proxy: Address) -> anyho
     let dump_toml_rel = "/script-out/force-deployments-dump.toml";
 
     let script = runner
-        .with_script_call(&GATEWAY_UTILS_INVOCATION, "dumpForceDeployments", ctm_proxy)?
+        .script_with_calldata(
+            &GATEWAY_UTILS_INVOCATION,
+            GatewayUtilsAbi::dumpForceDeploymentsCall { _ctm: ctm_proxy }.abi_encode(),
+        )
         .with_env("FORCE_DEPLOYMENTS_DUMP_TOML_REL_PATH", dump_toml_rel);
 
     logger::info(format!(
@@ -167,7 +183,7 @@ fn dump_force_deployments(runner: &mut ForgeRunner, ctm_proxy: Address) -> anyho
 }
 
 /// Inputs for the vote-prepare stage.
-pub(crate) struct VotePrepareInputs<'a> {
+pub struct VotePrepareInputs<'a> {
     pub ctm_representative_chain_id: u64,
     pub vote_preparation_toml: &'a str,
     pub refund_recipient: Address,
@@ -181,13 +197,13 @@ pub(crate) struct VotePrepareInputs<'a> {
     /// `DefaultCTMUpgrade.s.sol:913`).
     pub force_deployments_data_override: Option<Bytes>,
     /// CREATE2 salt for the GW CTM deploy. When `None`, uses bytes32(0).
-    pub create2_salt: Option<ethers::types::H256>,
+    pub create2_salt: Option<B256>,
 }
 
 /// Run vote-prepare on an existing `runner`. `sender` must be the whitelisted
 /// deployer EOA (= `refund_recipient`) — the script deploys gateway CTM
 /// contracts and pays for L1→L2 priority txs from that EOA's balance.
-pub(crate) async fn stage_vote_prepare(
+pub async fn stage_vote_prepare(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     bridgehub: Address,
@@ -276,7 +292,7 @@ validator_timelock_execution_delay = 0
         fd = force_deployments_data,
         gw_create2_salt = inputs
             .create2_salt
-            .map(|s| format!("{s:#066x}"))
+            .map(|s| format!("{s:#x}"))
             .unwrap_or_else(|| ZERO_BYTES32.to_string()),
     );
 
@@ -296,11 +312,14 @@ validator_timelock_execution_delay = 0
     );
 
     let script = runner
-        .with_script_call(
+        .script_with_calldata(
             &GATEWAY_VOTE_PREPARATION_INVOCATION,
-            "run",
-            (bridgehub, inputs.ctm_representative_chain_id),
-        )?
+            IGatewayVotePreparationAbi::runCall {
+                bridgehubProxy: bridgehub,
+                ctmRepresentativeChainId: U256::from(inputs.ctm_representative_chain_id),
+            }
+            .abi_encode(),
+        )
         .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
         .with_env(
             "GATEWAY_VOTE_PREPARATION_INPUT",
@@ -353,7 +372,7 @@ struct VotePreparationOutput {
 
 /// Run governance-execute on an existing `runner`. `sender` must be the
 /// governance contract's owner EOA.
-pub(crate) async fn stage_governance_execute(
+pub async fn stage_governance_execute(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     bridgehub: Address,
@@ -385,11 +404,14 @@ pub(crate) async fn stage_governance_execute(
     );
 
     let script = runner
-        .with_script_call(
+        .script_with_calldata(
             &ADMIN_FUNCTIONS_INVOCATION,
-            "governanceExecuteCalls",
-            (encoded_calls, governance_address),
-        )?
+            AdminFunctionsAbi::governanceExecuteCallsCall {
+                _callsToExecute: encoded_calls,
+                _governanceAddr: governance_address,
+            }
+            .abi_encode(),
+        )
         .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
         .with_wallet(sender);
 
@@ -408,7 +430,7 @@ pub(crate) async fn stage_governance_execute(
 
 /// Run revoke-whitelist on an existing `runner`. `sender` must be the chain
 /// admin owner EOA.
-pub(crate) async fn stage_revoke_whitelist(
+pub async fn stage_revoke_whitelist(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     bridgehub: Address,
@@ -424,11 +446,16 @@ pub(crate) async fn stage_revoke_whitelist(
     // `activeRestrictions`. Thread the ACR address through for production
     // chains so the sender is the ACR's `defaultAdmin`.
     let script = runner
-        .with_script_call(
+        .script_with_calldata(
             &ADMIN_FUNCTIONS_INVOCATION,
-            "revokeGatewayWhitelist",
-            (bridgehub, chain_id, revoke_address, true),
-        )?
+            AdminFunctionsAbi::revokeGatewayWhitelistCall {
+                _bridgehub: bridgehub,
+                _chainId: U256::from(chain_id),
+                _address: revoke_address,
+                _shouldSend: true,
+            }
+            .abi_encode(),
+        )
         .with_wallet(sender);
 
     logger::step("Revoking gateway whitelist");

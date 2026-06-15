@@ -1,15 +1,24 @@
+use alloy::primitives::{Address, U256};
+use alloy::sol_types::SolCall;
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 
-use crate::commands::output::write_output_if_requested;
+use crate::common::abi::AdminFunctionsAbi;
 use crate::common::addresses::ZERO_ADDRESS;
+use crate::common::forge::scripts::ADMIN_FUNCTIONS_INVOCATION;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::SharedRunArgs;
-use crate::config::forge_interface::script_params::ADMIN_FUNCTIONS_INVOCATION;
 use crate::types::L2DACommitmentScheme;
+
+#[derive(Serialize)]
+struct SetDaValidatorPairOutput {
+    chain_id: u64,
+    admin_address: Address,
+    l1_da_validator: Address,
+    l2_da_commitment_scheme: L2DACommitmentScheme,
+}
 
 /// Set the DA validator pair for an L1-settling chain.
 ///
@@ -55,14 +64,6 @@ pub struct ChainSetDaValidatorPairArgs {
     pub shared: SharedRunArgs,
 }
 
-#[derive(Serialize)]
-struct ChainSetDaValidatorPairOutputPayload {
-    chain_id: u64,
-    admin_address: Address,
-    l1_da_validator: Address,
-    l2_da_commitment_scheme: L2DACommitmentScheme,
-}
-
 pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
@@ -80,18 +81,18 @@ pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
         .await?;
 
     let forge = runner
-        .with_script_call(
+        .script_with_calldata(
             &ADMIN_FUNCTIONS_INVOCATION,
-            "setDAValidatorPair",
-            (
-                bridgehub,
-                args.access_control_restriction,
-                ethers::types::U256::from(chain_id),
-                args.l1_da_validator,
-                args.l2_da_commitment_scheme as u8,
-                true,
-            ),
-        )?
+            AdminFunctionsAbi::setDAValidatorPairCall {
+                _bridgehub: bridgehub,
+                _accessControlRestriction: args.access_control_restriction,
+                _chainId: U256::from(chain_id),
+                _l1DaValidator: args.l1_da_validator,
+                _l2DaCommitmentScheme: args.l2_da_commitment_scheme as u8,
+                _shouldSend: true,
+            }
+            .abi_encode(),
+        )
         .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
         .with_wallet(&sender);
 
@@ -112,19 +113,17 @@ pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
         .run(forge)
         .context("Failed to execute forge script for set-da-validator-pair")?;
 
-    let empty_input = serde_json::json!({});
-    let out_payload = ChainSetDaValidatorPairOutputPayload {
-        chain_id,
-        admin_address,
-        l1_da_validator: args.l1_da_validator,
-        l2_da_commitment_scheme: args.l2_da_commitment_scheme,
-    };
-    write_output_if_requested(
+    crate::common::output::write_output_if_requested(
         "chain.set-da-validator-pair",
         &args.shared,
         &runner,
-        &empty_input,
-        &out_payload,
+        &serde_json::json!({}),
+        &SetDaValidatorPairOutput {
+            chain_id,
+            admin_address,
+            l1_da_validator: args.l1_da_validator,
+            l2_da_commitment_scheme: args.l2_da_commitment_scheme,
+        },
     )
     .await?;
 

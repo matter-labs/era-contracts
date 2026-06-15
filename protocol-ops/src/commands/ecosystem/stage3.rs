@@ -19,16 +19,18 @@
 //! env's `owner_address` because on stage / mainnet that's the
 //! ProtocolUpgradeHandler contract (governance), not a signable EOA.
 
+use alloy::primitives::{Address, Bytes};
+use alloy::sol_types::SolCall;
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-use crate::commands::output::write_output_if_requested;
+use crate::common::abi::ICoreUpgradeV31Abi;
 use crate::common::env_config::default_protocol_ops_out_dir;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
+use crate::common::output::write_output_if_requested;
 use crate::common::paths::resolve_l1_contracts_path;
 use crate::common::SharedRunArgs;
 
@@ -108,13 +110,13 @@ pub async fn run(mut args: Stage3Args) -> anyhow::Result<()> {
         );
     }
     let script_rel = Path::new(STAGE3_SCRIPT);
+    let calldata = ICoreUpgradeV31Abi::stage3Call {
+        bridgehubProxy: bridgehub,
+    }
+    .abi_encode();
     let mut script = runner
         .script_path_from_root(&l1_contracts_path, script_rel)
-        .with_contract_call(
-            &crate::abi_contracts::CORE_UPGRADE_V31_CONTRACT,
-            "stage3",
-            (bridgehub,),
-        )?
+        .with_calldata(&Bytes::from(calldata))
         .with_broadcast()
         .with_ffi()
         .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)

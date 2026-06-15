@@ -5,7 +5,6 @@ pub fn log_error(error: anyhow::Error) {
 
     if error.chain().count() > 1 {
         logger::warn(
-            // "Caused by:",
             error
                 .chain()
                 .skip(1)

@@ -31,6 +31,7 @@ l1-contracts/broadcast/*
 l1-contracts/script-config/*
 l1-contracts/snapshots/*
 !l1-contracts/script-config/artifacts
+!l1-contracts/script-config/v31-bridged-tokens.toml
 l1-contracts/script-out/*
 # protocol-ops auto-emits per-signer Safe-bundle JSONs + a manifest.json
 # index per --out invocation. Those are debug artifacts; the merged
