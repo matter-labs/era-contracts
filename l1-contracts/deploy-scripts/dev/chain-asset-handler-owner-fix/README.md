@@ -117,22 +117,27 @@ Every address and the salt can be overridden via env vars
 (`CHAIN_ASSET_HANDLER_PROXY`, `PROXY_ADMIN`, `GOVERNANCE`, `GOVERNANCE_OWNER`, `ORIGINAL_IMPL`,
 `TEMP_IMPL`, `NEW_OWNER`, `SALT`, `NETWORK`).
 
-### 3. (Optional) simulate the fix on a fork
+### 3. Simulate the fix on a fork (and assert the outcome)
+
+Run the bundled script — it forks the given RPC, sends the two transactions from `calldata.json`
+(impersonating the Governance owner via anvil "unlocked" accounts), and asserts that afterwards the
+implementation is restored to the original impl and `owner()` returns the intended new owner:
 
 ```bash
-anvil --fork-url $SEPOLIA_RPC --port 8546 &
-GOV=0xcf96aAb01347BA96050F39Ff6dcbC6138b462b58
-OWNER=0x5555555590930f501c88B73Ea43B3EEb5A71643c
-PROXY=0xDfA2193b161d7bd45FC81b4E80225eebDc3CF96C
-L=http://127.0.0.1:8546
-cast rpc anvil_setBalance  $OWNER 0xde0b6b3a7640000 --rpc-url $L
-cast rpc anvil_impersonateAccount $OWNER --rpc-url $L
-cast send $GOV "$(jq -r '.[0].data' deploy-scripts/dev/chain-asset-handler-owner-fix/calldata.json)" --from $OWNER --unlocked --rpc-url $L
-cast send $GOV "$(jq -r '.[1].data' deploy-scripts/dev/chain-asset-handler-owner-fix/calldata.json)" --from $OWNER --unlocked --rpc-url $L
-cast call $PROXY 'owner()(address)' --rpc-url $L
-# -> 0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D
+RPC_URL=$SEPOLIA_RPC ./deploy-scripts/dev/chain-asset-handler-owner-fix/simulate-on-fork.sh
 ```
 
-This exact flow was run against a Sepolia fork: `owner()` went from `0x0` to
-`0x803e…471D` and the implementation slot was restored to the original
-`0xC32F…9354F`.
+Expected output:
+
+```
+owner() after:        0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D  (expected 0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D)
+implementation after: 0xc32fca197a5e2f29cc7a072f38ebde31f1e9354f  (expected 0xC32FCA197a5E2F29CC7A072F38ebde31F1E9354F)
+PASS: owner() is the intended new owner
+PASS: implementation restored to the original impl
+PASS: proxy is functional on the restored implementation (migrationPaused() callable)
+
+ALL CHECKS PASSED ✅
+```
+
+The script exits non-zero if any assertion fails. All targets (proxy, governance, expected impl,
+new owner) can be overridden via env vars — see the header of `simulate-on-fork.sh`.
