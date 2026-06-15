@@ -9,7 +9,6 @@ use crate::common::{
     wallets::Wallet,
 };
 use alloy::primitives::{Address, B256};
-use alloy::sol_types::SolCall;
 use serde::Serialize;
 
 /// Input parameters for deploying hub contracts.
@@ -47,16 +46,12 @@ pub fn deploy(
     // conventional ones unless a per-run --subdir is set); the `run()`
     // wrapper with baked-in paths is for manual forge use.
     let forge = runner
-        .script_with_calldata(
-            &DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION,
-            IDeployL1CoreContractsAbi::runInnerCall {
-                inputPath: runner
-                    .script_rel_path(DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION.input_rel()),
-                outputPath: runner
-                    .script_rel_path(DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION.output_rel()),
-            }
-            .abi_encode(),
-        )
+        .script_call(IDeployL1CoreContractsAbi::runInnerCall {
+            inputPath: runner
+                .script_rel_path(DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION.input_rel()),
+            outputPath: runner
+                .script_rel_path(DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION.output_rel()),
+        })
         .with_wallet(auth)
         .with_env(
             "CREATE2_FACTORY_SALT",

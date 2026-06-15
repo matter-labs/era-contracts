@@ -1,5 +1,4 @@
 use alloy::primitives::{Address, B256};
-use alloy::sol_types::SolCall;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
@@ -7,9 +6,7 @@ use crate::commands::hub::deploy::{deploy, DeployInput};
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::output::write_output_if_requested;
 
-use crate::common::forge::scripts::{
-    deploy_ecosystem::DeployL1CoreContractsOutput, ADMIN_FUNCTIONS_INVOCATION,
-};
+use crate::common::forge::scripts::deploy_ecosystem::DeployL1CoreContractsOutput;
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet, SharedRunArgs};
 
 // ── CLI args ────────────────────────────────────────────────────────────────
@@ -97,25 +94,17 @@ pub async fn hub_init(
     let bridgehub = deployed.bridgehub.bridgehub_proxy_addr;
     let accept_scripts = [
         runner
-            .script_with_calldata(
-                &ADMIN_FUNCTIONS_INVOCATION,
-                AdminFunctionsAbi::chainAdminAcceptAdminCall {
-                    _chainAdmin: deployed.chain_admin,
-                    _target: bridgehub,
-                }
-                .abi_encode(),
-            )
+            .script_call(AdminFunctionsAbi::chainAdminAcceptAdminCall {
+                _chainAdmin: deployed.chain_admin,
+                _target: bridgehub,
+            })
             .with_wallet(owner)
             .with_timing_label("hub.accept_admin"),
         runner
-            .script_with_calldata(
-                &ADMIN_FUNCTIONS_INVOCATION,
-                AdminFunctionsAbi::governanceAcceptOwnerAggregatedCall {
-                    _governor: deployed.governance_addr,
-                    _bridgehub: bridgehub,
-                }
-                .abi_encode(),
-            )
+            .script_call(AdminFunctionsAbi::governanceAcceptOwnerAggregatedCall {
+                _governor: deployed.governance_addr,
+                _bridgehub: bridgehub,
+            })
             .with_wallet(owner)
             .with_timing_label("hub.accept_owner_aggregated"),
     ];

@@ -10,7 +10,7 @@ use xshell::{cmd, Shell};
 
 use super::script::{ForgeScript, ForgeScriptArg, ForgeScriptArgs};
 // Forge is defined in the parent module (mod.rs); use the full path to avoid confusion.
-use crate::common::forge::scripts::ForgeScriptParams;
+use crate::common::forge::scripts::{ForgeScriptParams, ScriptCall};
 use crate::common::forge::Forge;
 use crate::common::{
     anvil,
@@ -309,6 +309,16 @@ impl ForgeRunner {
     ) -> ForgeScript {
         self.script(invocation)
             .with_calldata(&calldata.into())
+            .with_broadcast()
+    }
+
+    /// Build a broadcasting script invocation from a typed [`ScriptCall`].
+    ///
+    /// The invocation is derived from the call type; encoding is handled here.
+    /// Prefer this over [`Self::script_with_calldata`] for inline call sites.
+    pub fn script_call<C: ScriptCall>(&self, call: C) -> ForgeScript {
+        self.script(C::invocation())
+            .with_calldata(&call.abi_encode().into())
             .with_broadcast()
     }
 

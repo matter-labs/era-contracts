@@ -17,7 +17,6 @@
 use alloy::dyn_abi::DynSolValue;
 use alloy::hex;
 use alloy::primitives::{Address, Bytes, B256, U256};
-use alloy::sol_types::SolCall;
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
@@ -25,7 +24,6 @@ use serde::{Deserialize, Serialize};
 use super::migrate_to::{stage_pause_deposits, wait_for_l2_tx_receipt};
 use crate::common::abi::{AdminFunctionsAbi, BridgehubAbi, GatewayUtilsAbi, IChainTypeManagerAbi};
 use crate::common::addresses::L2_L1_MESSENGER;
-use crate::common::forge::scripts::{ADMIN_FUNCTIONS_INVOCATION, GATEWAY_UTILS_INVOCATION};
 use crate::common::output::write_output_if_requested;
 use crate::common::EcosystemChainArgs;
 use crate::common::SharedRunArgs;
@@ -282,15 +280,11 @@ pub async fn stage_notify_server_from(
     let sender = runner.prepare_chain_admin(bridgehub, chain_id).await?;
 
     let script = runner
-        .script_with_calldata(
-            &ADMIN_FUNCTIONS_INVOCATION,
-            AdminFunctionsAbi::notifyServerMigrationFromGatewayCall {
-                _bridgehub: bridgehub,
-                _chainId: U256::from(chain_id),
-                _shouldSend: true,
-            }
-            .abi_encode(),
-        )
+        .script_call(AdminFunctionsAbi::notifyServerMigrationFromGatewayCall {
+            _bridgehub: bridgehub,
+            _chainId: U256::from(chain_id),
+            _shouldSend: true,
+        })
         .with_wallet(&sender);
 
     logger::step("Notifying server about migration from gateway");
@@ -345,19 +339,15 @@ pub async fn stage_submit_from(
     );
 
     let script = runner
-        .script_with_calldata(
-            &ADMIN_FUNCTIONS_INVOCATION,
-            AdminFunctionsAbi::startMigrateChainFromGatewayCall {
-                _bridgehub: bridgehub,
-                _l1GasPrice: U256::from(l1_gas_price),
-                _l2ChainId: U256::from(chain_id),
-                _gatewayChainId: U256::from(gateway_chain_id),
-                _l1DiamondCutData: l1_diamond_cut_data,
-                _refundRecipient: refund_recipient,
-                _shouldSend: true,
-            }
-            .abi_encode(),
-        )
+        .script_call(AdminFunctionsAbi::startMigrateChainFromGatewayCall {
+            _bridgehub: bridgehub,
+            _l1GasPrice: U256::from(l1_gas_price),
+            _l2ChainId: U256::from(chain_id),
+            _gatewayChainId: U256::from(gateway_chain_id),
+            _l1DiamondCutData: l1_diamond_cut_data,
+            _refundRecipient: refund_recipient,
+            _shouldSend: true,
+        })
         .with_wallet(&sender);
 
     logger::step("Submitting chain migration FROM gateway");
@@ -397,18 +387,14 @@ pub async fn stage_set_da_validator_pair_from(
     // settlement layer is L1 and `Admin.setDAValidatorPair` is callable
     // directly via the L1 chain admin.
     let script = runner
-        .script_with_calldata(
-            &ADMIN_FUNCTIONS_INVOCATION,
-            AdminFunctionsAbi::setDAValidatorPairCall {
-                _bridgehub: bridgehub,
-                _accessControlRestriction: access_control_restriction,
-                _chainId: U256::from(chain_id),
-                _l1DaValidator: l1_da_validator,
-                _l2DaCommitmentScheme: l2_da_commitment_scheme as u8,
-                _shouldSend: true,
-            }
-            .abi_encode(),
-        )
+        .script_call(AdminFunctionsAbi::setDAValidatorPairCall {
+            _bridgehub: bridgehub,
+            _accessControlRestriction: access_control_restriction,
+            _chainId: U256::from(chain_id),
+            _l1DaValidator: l1_da_validator,
+            _l2DaCommitmentScheme: l2_da_commitment_scheme as u8,
+            _shouldSend: true,
+        })
         .with_wallet(&sender);
 
     logger::step("Setting L1 DA validator pair (post-migration)");
@@ -528,20 +514,16 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
     // Step 4: call finishMigrateChainFromGateway via forge (deployer key).
     logger::step("Finalizing migration on L1 (finishMigrateChainFromGateway)");
     let script = runner
-        .script_with_calldata(
-            &GATEWAY_UTILS_INVOCATION,
-            GatewayUtilsAbi::finishMigrateChainFromGatewayCall {
-                bridgehubAddr: bridgehub,
-                migratingChainId: U256::from(chain_id),
-                gatewayChainId: U256::from(gateway_chain_id),
-                l2BatchNumber: U256::from(withdrawal.l2_batch_number),
-                l2MessageIndex: U256::from(withdrawal.l2_message_index),
-                l2TxNumberInBatch: withdrawal.l2_tx_number_in_batch,
-                message: withdrawal.message.clone(),
-                merkleProof: withdrawal.merkle_proof.clone(),
-            }
-            .abi_encode(),
-        )
+        .script_call(GatewayUtilsAbi::finishMigrateChainFromGatewayCall {
+            bridgehubAddr: bridgehub,
+            migratingChainId: U256::from(chain_id),
+            gatewayChainId: U256::from(gateway_chain_id),
+            l2BatchNumber: U256::from(withdrawal.l2_batch_number),
+            l2MessageIndex: U256::from(withdrawal.l2_message_index),
+            l2TxNumberInBatch: withdrawal.l2_tx_number_in_batch,
+            message: withdrawal.message.clone(),
+            merkleProof: withdrawal.merkle_proof.clone(),
+        })
         .with_ffi()
         .with_wallet(&sender);
     runner

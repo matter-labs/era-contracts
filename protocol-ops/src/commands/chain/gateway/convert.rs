@@ -1,6 +1,5 @@
 use alloy::hex;
 use alloy::primitives::{Address, Bytes, B256, U256};
-use alloy::sol_types::SolCall;
 use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
@@ -11,11 +10,7 @@ use crate::common::abi::{
     IGatewayVotePreparationAbi,
 };
 use crate::common::addresses::{DEFAULT_ZK_TOKEN_ASSET_ID, ZERO_ADDRESS, ZERO_BYTES32};
-use crate::common::forge::scripts::{
-    ADMIN_FUNCTIONS_INVOCATION, DEPLOY_GATEWAY_TRANSACTION_FILTERER_INVOCATION,
-    GATEWAY_UTILS_INVOCATION, GATEWAY_VOTE_PREPARATION_INVOCATION,
-    GATEWAY_VOTE_PREPARATION_SCRIPT_PATH,
-};
+use crate::common::forge::scripts::GATEWAY_VOTE_PREPARATION_SCRIPT_PATH;
 use crate::common::output::write_output_if_requested;
 use crate::common::paths;
 use crate::common::EcosystemChainArgs;
@@ -39,13 +34,11 @@ pub async fn stage_deploy_filterer(
     chain_id: u64,
 ) -> anyhow::Result<()> {
     let script = runner
-        .script_with_calldata(
-            &DEPLOY_GATEWAY_TRANSACTION_FILTERER_INVOCATION,
+        .script_call(
             DeployGatewayTransactionFiltererAbi::deployAndSetOnChainCall {
                 bridgehub,
                 chainId: U256::from(chain_id),
-            }
-            .abi_encode(),
+            },
         )
         .with_wallet(sender);
 
@@ -113,16 +106,12 @@ pub async fn stage_grant_whitelist(
     }
 
     let script = runner
-        .script_with_calldata(
-            &ADMIN_FUNCTIONS_INVOCATION,
-            AdminFunctionsAbi::grantGatewayWhitelistCall {
-                _bridgehub: bridgehub,
-                _chainId: U256::from(chain_id),
-                _grantees: all_grantees.clone(),
-                _shouldSend: true,
-            }
-            .abi_encode(),
-        )
+        .script_call(AdminFunctionsAbi::grantGatewayWhitelistCall {
+            _bridgehub: bridgehub,
+            _chainId: U256::from(chain_id),
+            _grantees: all_grantees.clone(),
+            _shouldSend: true,
+        })
         .with_wallet(sender);
 
     logger::step("Granting gateway whitelist");
@@ -149,10 +138,7 @@ fn dump_force_deployments(runner: &mut ForgeRunner, ctm_proxy: Address) -> anyho
     let dump_toml_rel = "/script-out/force-deployments-dump.toml";
 
     let script = runner
-        .script_with_calldata(
-            &GATEWAY_UTILS_INVOCATION,
-            GatewayUtilsAbi::dumpForceDeploymentsCall { _ctm: ctm_proxy }.abi_encode(),
-        )
+        .script_call(GatewayUtilsAbi::dumpForceDeploymentsCall { _ctm: ctm_proxy })
         .with_env("FORCE_DEPLOYMENTS_DUMP_TOML_REL_PATH", dump_toml_rel);
 
     logger::info(format!(
@@ -312,14 +298,10 @@ validator_timelock_execution_delay = 0
     );
 
     let script = runner
-        .script_with_calldata(
-            &GATEWAY_VOTE_PREPARATION_INVOCATION,
-            IGatewayVotePreparationAbi::runCall {
-                bridgehubProxy: bridgehub,
-                ctmRepresentativeChainId: U256::from(inputs.ctm_representative_chain_id),
-            }
-            .abi_encode(),
-        )
+        .script_call(IGatewayVotePreparationAbi::runCall {
+            bridgehubProxy: bridgehub,
+            ctmRepresentativeChainId: U256::from(inputs.ctm_representative_chain_id),
+        })
         .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
         .with_env(
             "GATEWAY_VOTE_PREPARATION_INPUT",
@@ -404,14 +386,10 @@ pub async fn stage_governance_execute(
     );
 
     let script = runner
-        .script_with_calldata(
-            &ADMIN_FUNCTIONS_INVOCATION,
-            AdminFunctionsAbi::governanceExecuteCallsCall {
-                _callsToExecute: encoded_calls,
-                _governanceAddr: governance_address,
-            }
-            .abi_encode(),
-        )
+        .script_call(AdminFunctionsAbi::governanceExecuteCallsCall {
+            _callsToExecute: encoded_calls,
+            _governanceAddr: governance_address,
+        })
         .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
         .with_wallet(sender);
 
@@ -446,16 +424,12 @@ pub async fn stage_revoke_whitelist(
     // `activeRestrictions`. Thread the ACR address through for production
     // chains so the sender is the ACR's `defaultAdmin`.
     let script = runner
-        .script_with_calldata(
-            &ADMIN_FUNCTIONS_INVOCATION,
-            AdminFunctionsAbi::revokeGatewayWhitelistCall {
-                _bridgehub: bridgehub,
-                _chainId: U256::from(chain_id),
-                _address: revoke_address,
-                _shouldSend: true,
-            }
-            .abi_encode(),
-        )
+        .script_call(AdminFunctionsAbi::revokeGatewayWhitelistCall {
+            _bridgehub: bridgehub,
+            _chainId: U256::from(chain_id),
+            _address: revoke_address,
+            _shouldSend: true,
+        })
         .with_wallet(sender);
 
     logger::step("Revoking gateway whitelist");

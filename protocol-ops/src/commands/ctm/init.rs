@@ -1,5 +1,4 @@
 use alloy::primitives::{Address, B256};
-use alloy::sol_types::SolCall;
 use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
@@ -9,7 +8,7 @@ use crate::commands::hub::register_ctm::{register_ctm, RegisterCtmInput};
 
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::env_config::EnvConfig;
-use crate::common::forge::scripts::{deploy_ctm::DeployCTMOutput, ADMIN_FUNCTIONS_INVOCATION};
+use crate::common::forge::scripts::deploy_ctm::DeployCTMOutput;
 use crate::common::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
@@ -171,25 +170,17 @@ pub async fn ctm_init(
     logger::step("Accepting ownership of CTM contracts...");
     let accept_scripts = [
         runner
-            .script_with_calldata(
-                &ADMIN_FUNCTIONS_INVOCATION,
-                AdminFunctionsAbi::governanceAcceptOwnerCall {
-                    _governor: deployed.governance_addr,
-                    _target: ctm_proxy,
-                }
-                .abi_encode(),
-            )
+            .script_call(AdminFunctionsAbi::governanceAcceptOwnerCall {
+                _governor: deployed.governance_addr,
+                _target: ctm_proxy,
+            })
             .with_wallet(owner)
             .with_timing_label("ctm.accept_owner"),
         runner
-            .script_with_calldata(
-                &ADMIN_FUNCTIONS_INVOCATION,
-                AdminFunctionsAbi::chainAdminAcceptAdminCall {
-                    _chainAdmin: deployed.chain_admin,
-                    _target: ctm_proxy,
-                }
-                .abi_encode(),
-            )
+            .script_call(AdminFunctionsAbi::chainAdminAcceptAdminCall {
+                _chainAdmin: deployed.chain_admin,
+                _target: ctm_proxy,
+            })
             .with_wallet(owner)
             .with_timing_label("ctm.accept_admin"),
     ];

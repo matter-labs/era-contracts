@@ -1,13 +1,11 @@
 use alloy::primitives::{Address, B256, U256};
 use alloy::providers::Provider;
-use alloy::sol_types::SolCall;
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
 use crate::common::abi::{AdminFunctionsAbi, GatewayUtilsAbi};
 use crate::common::addresses::{GATEWAY_L2_BRIDGEHUB, L2_BOOTLOADER};
-use crate::common::forge::scripts::{ADMIN_FUNCTIONS_INVOCATION, GATEWAY_UTILS_INVOCATION};
 use crate::common::output::write_output_if_requested;
 use crate::common::EcosystemChainArgs;
 use crate::common::SharedRunArgs;
@@ -64,14 +62,12 @@ pub async fn stage_pause_deposits(
     // fork is ephemeral, but the Safe bundle is built from forge's broadcast
     // log, so the admin tx must be in there for downstream replay.
     let script = runner
-        .script_with_calldata(
-            &ADMIN_FUNCTIONS_INVOCATION,
+        .script_call(
             AdminFunctionsAbi::pauseDepositsBeforeInitiatingMigrationCall {
                 _bridgehub: bridgehub,
                 _chainId: U256::from(chain_id),
                 _shouldSend: true,
-            }
-            .abi_encode(),
+            },
         )
         .with_wallet(&sender);
 
@@ -98,15 +94,11 @@ pub async fn stage_notify_server(
     // See pause-deposits for the rationale — always broadcast in simulate too
     // so the tx shows up in the bundle's --out / Safe file.
     let script = runner
-        .script_with_calldata(
-            &ADMIN_FUNCTIONS_INVOCATION,
-            AdminFunctionsAbi::notifyServerMigrationToGatewayCall {
-                _bridgehub: bridgehub,
-                _chainId: U256::from(chain_id),
-                _shouldSend: true,
-            }
-            .abi_encode(),
-        )
+        .script_call(AdminFunctionsAbi::notifyServerMigrationToGatewayCall {
+            _bridgehub: bridgehub,
+            _chainId: U256::from(chain_id),
+            _shouldSend: true,
+        })
         .with_wallet(&sender);
 
     logger::step("Notifying server about migration");
@@ -140,19 +132,15 @@ pub async fn stage_submit(
     // fork-switches to `gateway_rpc_url` to read the gateway-side CTM's
     // diamond cut data before constructing the migration message.
     let script = runner
-        .script_with_calldata(
-            &ADMIN_FUNCTIONS_INVOCATION,
-            AdminFunctionsAbi::migrateChainToGatewayCall {
-                _bridgehub: bridgehub,
-                _l1GasPrice: U256::from(l1_gas_price),
-                _l2ChainId: U256::from(chain_id),
-                _gatewayChainId: U256::from(gateway_chain_id),
-                _gatewayRpcUrl: gateway_rpc_url,
-                _refundRecipient: refund_recipient,
-                _shouldSend: true,
-            }
-            .abi_encode(),
-        )
+        .script_call(AdminFunctionsAbi::migrateChainToGatewayCall {
+            _bridgehub: bridgehub,
+            _l1GasPrice: U256::from(l1_gas_price),
+            _l2ChainId: U256::from(chain_id),
+            _gatewayChainId: U256::from(gateway_chain_id),
+            _gatewayRpcUrl: gateway_rpc_url,
+            _refundRecipient: refund_recipient,
+            _shouldSend: true,
+        })
         .with_wallet(&sender);
 
     logger::step("Submitting chain migration to gateway");
@@ -235,20 +223,16 @@ pub async fn stage_enable_validators(
     for validator in &validators {
         logger::info(format!("Enabling validator {:#x}", validator));
         let script = runner
-            .script_with_calldata(
-                &ADMIN_FUNCTIONS_INVOCATION,
-                AdminFunctionsAbi::enableValidatorViaGatewayCall {
-                    _bridgehub: bridgehub,
-                    _l1GasPrice: U256::from(inputs.l1_gas_price),
-                    _l2ChainId: U256::from(chain_id),
-                    _gatewayChainId: U256::from(gateway_chain_id),
-                    _validatorAddress: *validator,
-                    _gatewayValidatorTimelock: gw_validator_timelock,
-                    _refundRecipient: sender.address,
-                    _shouldSend: true,
-                }
-                .abi_encode(),
-            )
+            .script_call(AdminFunctionsAbi::enableValidatorViaGatewayCall {
+                _bridgehub: bridgehub,
+                _l1GasPrice: U256::from(inputs.l1_gas_price),
+                _l2ChainId: U256::from(chain_id),
+                _gatewayChainId: U256::from(gateway_chain_id),
+                _validatorAddress: *validator,
+                _gatewayValidatorTimelock: gw_validator_timelock,
+                _refundRecipient: sender.address,
+                _shouldSend: true,
+            })
             .with_wallet(&sender);
         runner
             .run(script)
@@ -296,21 +280,17 @@ pub async fn stage_set_da_validator_pair(
     ));
 
     let script = runner
-        .script_with_calldata(
-            &ADMIN_FUNCTIONS_INVOCATION,
-            AdminFunctionsAbi::setDAValidatorPairWithGatewayCall {
-                _bridgehub: bridgehub,
-                _l1GasPrice: U256::from(inputs.l1_gas_price),
-                _l2ChainId: U256::from(chain_id),
-                _gatewayChainId: U256::from(gateway_chain_id),
-                _l1DAValidator: inputs.l1_da_validator,
-                _l2DACommitmentScheme: inputs.l2_da_commitment_scheme as u8,
-                _chainDiamondProxyOnGateway: chain_diamond_on_gw,
-                _refundRecipient: sender.address,
-                _shouldSend: true,
-            }
-            .abi_encode(),
-        )
+        .script_call(AdminFunctionsAbi::setDAValidatorPairWithGatewayCall {
+            _bridgehub: bridgehub,
+            _l1GasPrice: U256::from(inputs.l1_gas_price),
+            _l2ChainId: U256::from(chain_id),
+            _gatewayChainId: U256::from(gateway_chain_id),
+            _l1DAValidator: inputs.l1_da_validator,
+            _l2DACommitmentScheme: inputs.l2_da_commitment_scheme as u8,
+            _chainDiamondProxyOnGateway: chain_diamond_on_gw,
+            _refundRecipient: sender.address,
+            _shouldSend: true,
+        })
         .with_wallet(&sender);
 
     runner
@@ -1021,24 +1001,20 @@ pub async fn finalize_migration(
     {
         let merkle_proof = crate::common::ethereum::parse_merkle_proof(&proof.merkle_proof)?;
         let script = runner
-            .script_with_calldata(
-                &GATEWAY_UTILS_INVOCATION,
-                GatewayUtilsAbi::finishMigrateChainToGatewayCall {
-                    params: GatewayUtilsAbi::FinishMigrateChainToGatewayParams {
-                        bridgehubAddr: bridgehub,
-                        l2TxNumberInBatch: proof.l2_tx_number_in_batch,
-                        txStatus: 1,
-                        l2TxHash: priority_op_hash,
-                        migratingChainId: U256::from(chain_id),
-                        gatewayChainId: U256::from(gateway_chain_id),
-                        l2BatchNumber: U256::from(proof.batch_number),
-                        l2MessageIndex: U256::from(proof.l2_message_index),
-                        gatewayRpcUrl: gateway_rpc_url.to_string(),
-                        merkleProof: merkle_proof,
-                    },
-                }
-                .abi_encode(),
-            )
+            .script_call(GatewayUtilsAbi::finishMigrateChainToGatewayCall {
+                params: GatewayUtilsAbi::FinishMigrateChainToGatewayParams {
+                    bridgehubAddr: bridgehub,
+                    l2TxNumberInBatch: proof.l2_tx_number_in_batch,
+                    txStatus: 1,
+                    l2TxHash: priority_op_hash,
+                    migratingChainId: U256::from(chain_id),
+                    gatewayChainId: U256::from(gateway_chain_id),
+                    l2BatchNumber: U256::from(proof.batch_number),
+                    l2MessageIndex: U256::from(proof.l2_message_index),
+                    gatewayRpcUrl: gateway_rpc_url.to_string(),
+                    merkleProof: merkle_proof,
+                },
+            })
             .with_ffi()
             .with_wallet(&sender);
         runner

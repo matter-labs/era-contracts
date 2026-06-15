@@ -14,9 +14,7 @@ use crate::common::forge::scripts::{
         ConsensusRegistryOutput, DefaultL2UpgradeOutput, Multicall3Output, TimestampAsserterOutput,
     },
     register_chain::{NewChainParams, RegisterChainL1Config, RegisterChainOutput},
-    DEPLOY_L2_CONTRACTS_INVOCATION, DEPLOY_PAYMASTER_INVOCATION, ENABLE_EVM_EMULATOR_INVOCATION,
-    FINALIZE_CHAIN_INIT_INVOCATION, REGISTER_CHAIN_INVOCATION, REGISTER_ON_ALL_CHAINS_INVOCATION,
-    SETUP_LEGACY_BRIDGE_INVOCATION,
+    DEPLOY_L2_CONTRACTS_INVOCATION, DEPLOY_PAYMASTER_INVOCATION, REGISTER_CHAIN_INVOCATION,
 };
 use crate::common::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
@@ -243,25 +241,21 @@ pub async fn chain_init(
     logger::step("Finalizing chain admin operations...");
     runner.run(
         runner
-            .script_with_calldata(
-                &FINALIZE_CHAIN_INIT_INVOCATION,
-                IFinalizeChainInitAbi::finalizeChainInitCall {
-                    _params: IFinalizeChainInitAbi::FinalizeChainInitParams {
-                        chainAdmin: chain_admin,
-                        accessControlRestriction: register_output.access_control_restriction_addr,
-                        diamondProxy: diamond_proxy,
-                        bridgehub: input.bridgehub,
-                        chainId: U256::from(input.chain_params.chain_id.as_u64()),
-                        l1DaValidator: input.l1_da_validator,
-                        tokenMultiplierSetter: token_multiplier_setter,
-                        l2DaCommitmentScheme: commitment_scheme as u8,
-                        shouldUnpauseDeposits: should_unpause_deposits,
-                        shouldSetDaValidatorPair: should_set_da_validator_pair,
-                        shouldMakePermanentRollup: input.make_permanent_rollup,
-                    },
-                }
-                .abi_encode(),
-            )
+            .script_call(IFinalizeChainInitAbi::finalizeChainInitCall {
+                _params: IFinalizeChainInitAbi::FinalizeChainInitParams {
+                    chainAdmin: chain_admin,
+                    accessControlRestriction: register_output.access_control_restriction_addr,
+                    diamondProxy: diamond_proxy,
+                    bridgehub: input.bridgehub,
+                    chainId: U256::from(input.chain_params.chain_id.as_u64()),
+                    l1DaValidator: input.l1_da_validator,
+                    tokenMultiplierSetter: token_multiplier_setter,
+                    l2DaCommitmentScheme: commitment_scheme as u8,
+                    shouldUnpauseDeposits: should_unpause_deposits,
+                    shouldSetDaValidatorPair: should_set_da_validator_pair,
+                    shouldMakePermanentRollup: input.make_permanent_rollup,
+                },
+            })
             .with_wallet(owner),
     )?;
 
@@ -405,14 +399,10 @@ fn enable_evm_emulator_step(
     diamond_proxy: Address,
 ) -> anyhow::Result<()> {
     let forge = runner
-        .script_with_calldata(
-            &ENABLE_EVM_EMULATOR_INVOCATION,
-            IEnableEvmEmulatorAbi::chainAllowEvmEmulationCall {
-                chainAdmin: chain_admin,
-                target: diamond_proxy,
-            }
-            .abi_encode(),
-        )
+        .script_call(IEnableEvmEmulatorAbi::chainAllowEvmEmulationCall {
+            chainAdmin: chain_admin,
+            target: diamond_proxy,
+        })
         .with_wallet(auth);
 
     runner.run(forge)?;
@@ -476,14 +466,10 @@ fn deploy_paymaster_step(
     chain_id: u64,
 ) -> anyhow::Result<Address> {
     let forge = runner
-        .script_with_calldata(
-            &DEPLOY_PAYMASTER_INVOCATION,
-            IDeployPaymasterAbi::runCall {
-                _bridgehub: bridgehub,
-                _chainId: U256::from(chain_id),
-            }
-            .abi_encode(),
-        )
+        .script_call(IDeployPaymasterAbi::runCall {
+            _bridgehub: bridgehub,
+            _chainId: U256::from(chain_id),
+        })
         .with_wallet(auth);
 
     runner.run(forge)?;
@@ -500,14 +486,10 @@ fn _register_on_all_chains_step(
     chain_id: u64,
 ) -> anyhow::Result<()> {
     let forge = runner
-        .script_with_calldata(
-            &REGISTER_ON_ALL_CHAINS_INVOCATION,
-            IRegisterOnAllChainsAbi::registerOnOtherChainsCall {
-                _bridgehub: bridgehub,
-                _chainId: U256::from(chain_id),
-            }
-            .abi_encode(),
-        )
+        .script_call(IRegisterOnAllChainsAbi::registerOnOtherChainsCall {
+            _bridgehub: bridgehub,
+            _chainId: U256::from(chain_id),
+        })
         .with_wallet(auth);
 
     runner.run(forge)?;
@@ -521,14 +503,10 @@ fn setup_legacy_bridge_step(
     chain_id: u64,
 ) -> anyhow::Result<()> {
     let forge = runner
-        .script_with_calldata(
-            &SETUP_LEGACY_BRIDGE_INVOCATION,
-            ISetupLegacyBridgeAbi::runCall {
-                _bridgehub: bridgehub,
-                _chainId: U256::from(chain_id),
-            }
-            .abi_encode(),
-        )
+        .script_call(ISetupLegacyBridgeAbi::runCall {
+            _bridgehub: bridgehub,
+            _chainId: U256::from(chain_id),
+        })
         .with_wallet(auth);
 
     runner.run(forge)?;

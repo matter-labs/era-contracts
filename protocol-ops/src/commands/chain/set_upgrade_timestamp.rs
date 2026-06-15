@@ -1,12 +1,10 @@
 use alloy::primitives::{Address, U256};
-use alloy::sol_types::SolCall;
 use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::addresses::ZERO_ADDRESS;
-use crate::common::forge::scripts::ADMIN_FUNCTIONS_INVOCATION;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::SharedRunArgs;
@@ -73,18 +71,14 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         .await?;
 
     let forge = runner
-        .script_with_calldata(
-            &ADMIN_FUNCTIONS_INVOCATION,
-            AdminFunctionsAbi::adminScheduleUpgradeCall {
-                _adminAddr: admin_address,
-                _accessControlRestriction: args.access_control_restriction,
-                _bridgehub: bridgehub,
-                _chainId: U256::from(chain_id),
-                _newProtocolVersion: new_protocol_version,
-                _timestamp: upgrade_timestamp,
-            }
-            .abi_encode(),
-        )
+        .script_call(AdminFunctionsAbi::adminScheduleUpgradeCall {
+            _adminAddr: admin_address,
+            _accessControlRestriction: args.access_control_restriction,
+            _bridgehub: bridgehub,
+            _chainId: U256::from(chain_id),
+            _newProtocolVersion: new_protocol_version,
+            _timestamp: upgrade_timestamp,
+        })
         // `--broadcast` against the anvil fork. In this mode the
         // target RPC is the anvil fork, so "broadcast" produces no real-chain
         // effect — it just records the tx in forge's run file so protocol-ops can

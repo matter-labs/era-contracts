@@ -1,7 +1,14 @@
 use std::path::PathBuf;
 
 use alloy::primitives::{Address, B256};
+use alloy::sol_types::SolCall;
 use serde::{Deserialize, Serialize};
+
+use crate::common::abi::{
+    AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi,
+    IDeployL1CoreContractsAbi, IDeployPaymasterAbi, IEnableEvmEmulatorAbi, IFinalizeChainInitAbi,
+    IGatewayVotePreparationAbi, IRegisterOnAllChainsAbi, ISetupLegacyBridgeAbi,
+};
 
 pub mod admin;
 pub mod deploy_ctm;
@@ -191,6 +198,54 @@ pub static REGISTER_ON_ALL_CHAINS_INVOCATION: ForgeScriptParams = ForgeScriptPar
 )
 .with_ffi()
 .with_rpc_url();
+
+/// Links a typed [`SolCall`] to its [`ForgeScriptParams`] invocation.
+/// Implemented via the [`script_calls!`] table — do not implement by hand.
+pub trait ScriptCall: SolCall {
+    fn invocation() -> &'static ForgeScriptParams;
+}
+
+macro_rules! script_calls {
+    ($($call:ty => $inv:path),+ $(,)?) => {
+        $(impl ScriptCall for $call {
+            fn invocation() -> &'static ForgeScriptParams { &$inv }
+        })+
+    };
+}
+
+script_calls! {
+    // AdminFunctions
+    AdminFunctionsAbi::pauseDepositsBeforeInitiatingMigrationCall       => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::notifyServerMigrationToGatewayCall               => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::migrateChainToGatewayCall                        => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::enableValidatorViaGatewayCall                    => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::setDAValidatorPairWithGatewayCall                => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::notifyServerMigrationFromGatewayCall             => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::startMigrateChainFromGatewayCall                 => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::setDAValidatorPairCall                           => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::grantGatewayWhitelistCall                        => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::governanceExecuteCallsCall                       => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::revokeGatewayWhitelistCall                       => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::adminScheduleUpgradeCall                         => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::governanceAcceptOwnerCall                        => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::chainAdminAcceptAdminCall                        => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::governanceAcceptOwnerAggregatedCall              => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::ensureCtmsAndProxyAdminsOwnedByGovernanceWithWrapsCall => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::executeOwnableCallsWithWrapsCall                 => ADMIN_FUNCTIONS_INVOCATION,
+    // GatewayUtils
+    GatewayUtilsAbi::finishMigrateChainFromGatewayCall                 => GATEWAY_UTILS_INVOCATION,
+    GatewayUtilsAbi::finishMigrateChainToGatewayCall                   => GATEWAY_UTILS_INVOCATION,
+    GatewayUtilsAbi::dumpForceDeploymentsCall                          => GATEWAY_UTILS_INVOCATION,
+    // Other scripts
+    DeployGatewayTransactionFiltererAbi::deployAndSetOnChainCall        => DEPLOY_GATEWAY_TRANSACTION_FILTERER_INVOCATION,
+    IGatewayVotePreparationAbi::runCall                                 => GATEWAY_VOTE_PREPARATION_INVOCATION,
+    IFinalizeChainInitAbi::finalizeChainInitCall                        => FINALIZE_CHAIN_INIT_INVOCATION,
+    IEnableEvmEmulatorAbi::chainAllowEvmEmulationCall                   => ENABLE_EVM_EMULATOR_INVOCATION,
+    IDeployPaymasterAbi::runCall                                        => DEPLOY_PAYMASTER_INVOCATION,
+    IRegisterOnAllChainsAbi::registerOnOtherChainsCall                  => REGISTER_ON_ALL_CHAINS_INVOCATION,
+    ISetupLegacyBridgeAbi::runCall                                      => SETUP_LEGACY_BRIDGE_INVOCATION,
+    IDeployL1CoreContractsAbi::runInnerCall                             => DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION,
+}
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Create2Addresses {

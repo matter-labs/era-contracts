@@ -1,12 +1,10 @@
 use alloy::primitives::{Address, U256};
-use alloy::sol_types::SolCall;
 use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::addresses::ZERO_ADDRESS;
-use crate::common::forge::scripts::ADMIN_FUNCTIONS_INVOCATION;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::SharedRunArgs;
@@ -81,18 +79,14 @@ pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
         .await?;
 
     let forge = runner
-        .script_with_calldata(
-            &ADMIN_FUNCTIONS_INVOCATION,
-            AdminFunctionsAbi::setDAValidatorPairCall {
-                _bridgehub: bridgehub,
-                _accessControlRestriction: args.access_control_restriction,
-                _chainId: U256::from(chain_id),
-                _l1DaValidator: args.l1_da_validator,
-                _l2DaCommitmentScheme: args.l2_da_commitment_scheme as u8,
-                _shouldSend: true,
-            }
-            .abi_encode(),
-        )
+        .script_call(AdminFunctionsAbi::setDAValidatorPairCall {
+            _bridgehub: bridgehub,
+            _accessControlRestriction: args.access_control_restriction,
+            _chainId: U256::from(chain_id),
+            _l1DaValidator: args.l1_da_validator,
+            _l2DaCommitmentScheme: args.l2_da_commitment_scheme as u8,
+            _shouldSend: true,
+        })
         .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
         .with_wallet(&sender);
 

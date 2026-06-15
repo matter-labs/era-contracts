@@ -11,13 +11,11 @@ use std::{fs, path::Path};
 
 use alloy::hex;
 use alloy::primitives::Bytes;
-use alloy::sol_types::SolCall;
 use anyhow::Context;
 use serde::Deserialize;
 
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::env_config::{NewGatewayConfig, OwnableProxyEntry};
-use crate::common::forge::scripts::ADMIN_FUNCTIONS_INVOCATION;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::wallets::Wallet;
@@ -148,14 +146,12 @@ impl<'a> V31UpgradeFull<'a> {
         let wraps = encode_owner_wraps(&self.ownable_proxies);
         runner.run(
             runner
-                .script_with_calldata(
-                    &ADMIN_FUNCTIONS_INVOCATION,
+                .script_call(
                     AdminFunctionsAbi::ensureCtmsAndProxyAdminsOwnedByGovernanceWithWrapsCall {
                         _bridgehub: self.inner.bridgehub(),
                         _governance: governance,
                         _wraps: wraps,
-                    }
-                    .abi_encode(),
+                    },
                 )
                 .with_wallet(deployer),
         )?;
@@ -186,14 +182,10 @@ impl<'a> V31UpgradeFull<'a> {
             ));
             runner.run(
                 runner
-                    .script_with_calldata(
-                        &ADMIN_FUNCTIONS_INVOCATION,
-                        AdminFunctionsAbi::executeOwnableCallsWithWrapsCall {
-                            _callsToExecute: Bytes::from(encoded_calls),
-                            _wraps: wraps.clone(),
-                        }
-                        .abi_encode(),
-                    )
+                    .script_call(AdminFunctionsAbi::executeOwnableCallsWithWrapsCall {
+                        _callsToExecute: Bytes::from(encoded_calls),
+                        _wraps: wraps.clone(),
+                    })
                     .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
                     .with_wallet(deployer),
             )?;
