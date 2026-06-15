@@ -594,7 +594,7 @@ mod tests {
             .v31_create2_factory_salt()
             .expect("read core salt")
             .expect("mainnet.toml must declare [contracts] create2_factory_salt");
-        assert_ne!(core_salt, H256::zero());
+        assert_ne!(core_salt, B256::ZERO);
 
         let per_ctm = cfg
             .v31_create2_factory_salt_per_ctm()
