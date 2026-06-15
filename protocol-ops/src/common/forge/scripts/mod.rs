@@ -10,7 +10,6 @@ use crate::common::abi::{
     IGatewayVotePreparationAbi, IRegisterOnAllChainsAbi, ISetupLegacyBridgeAbi,
 };
 
-pub mod admin;
 pub mod deploy_ctm;
 pub mod deploy_ecosystem;
 pub mod deploy_l2_contracts;
@@ -232,6 +231,8 @@ script_calls! {
     AdminFunctionsAbi::governanceAcceptOwnerAggregatedCall              => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::ensureCtmsAndProxyAdminsOwnedByGovernanceWithWrapsCall => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::executeOwnableCallsWithWrapsCall                 => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::upgradeChainFromCTMCall                          => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::updateValidatorCall                              => ADMIN_FUNCTIONS_INVOCATION,
     // GatewayUtils
     GatewayUtilsAbi::finishMigrateChainFromGatewayCall                 => GATEWAY_UTILS_INVOCATION,
     GatewayUtilsAbi::finishMigrateChainToGatewayCall                   => GATEWAY_UTILS_INVOCATION,

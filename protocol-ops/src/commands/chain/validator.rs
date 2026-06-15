@@ -1,8 +1,9 @@
-use alloy::primitives::Address;
+use alloy::primitives::{Address, U256};
 use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
+use crate::common::abi::AdminFunctionsAbi;
 use crate::common::addresses::ZERO_ADDRESS;
 use crate::common::logger;
 use crate::common::SharedRunArgs;
@@ -83,17 +84,20 @@ async fn run_update(args: ChainValidatorArgs, add: bool) -> anyhow::Result<()> {
     logger::info(format!("Validator address: {:#x}", args.validator_address));
     logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));
 
-    crate::common::admin_functions::update_validator(
-        &mut runner,
-        admin_address,
-        &sender,
-        args.access_control_restriction,
-        validator_timelock,
-        chain_id,
-        args.validator_address,
-        add,
-    )
-    .with_context(|| format!("Failed to {} validator", if add { "add" } else { "remove" }))?;
+    let script = runner
+        .script_call(AdminFunctionsAbi::updateValidatorCall {
+            _adminAddr: admin_address,
+            _accessControlRestriction: args.access_control_restriction,
+            _validatorTimelock: validator_timelock,
+            _chainId: U256::from(chain_id),
+            _validatorAddress: args.validator_address,
+            _addValidator: add,
+        })
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
+        .with_wallet(&sender);
+    runner
+        .run(script)
+        .with_context(|| format!("Failed to {} validator", if add { "add" } else { "remove" }))?;
 
     let command = if add {
         "chain.add-validator"

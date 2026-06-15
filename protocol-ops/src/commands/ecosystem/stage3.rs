@@ -83,9 +83,9 @@ pub async fn run(mut args: Stage3Args) -> anyhow::Result<()> {
     // `scripts/discover-legacy-bridged-tokens.ts`), point the forge script at
     // it via `UPGRADE_BRIDGED_TOKENS_INPUT_OVERRIDE`. That way the discovered
     // list flows into `registerBridgedTokensInNTV` without anyone hand-editing
-    // `script-config/v31-bridged-tokens.toml`. We only set the override when
-    // the file actually exists so local fixtures (which don't have a per-env
-    // tokens file) still fall back to the committed `script-config/` default.
+    // the committed default. We only set the override when the file actually
+    // exists so local fixtures still fall back to the committed
+    // `upgrade-envs/v0.31.0-interopB/local-bridged-tokens.toml` default.
     let bridged_tokens_override = env_cfg.as_ref().and_then(|cfg| {
         let rel = format!(
             "/upgrade-envs/v0.31.0-interopB/{}-bridged-tokens.toml",
@@ -106,7 +106,7 @@ pub async fn run(mut args: Stage3Args) -> anyhow::Result<()> {
         logger::info(format!("Bridged tokens input (per-env override): {rel}"));
     } else {
         logger::info(
-            "Bridged tokens input: script-config/v31-bridged-tokens.toml (committed default)",
+            "Bridged tokens input: upgrade-envs/v0.31.0-interopB/local-bridged-tokens.toml (committed default)",
         );
     }
     let script_rel = Path::new(STAGE3_SCRIPT);

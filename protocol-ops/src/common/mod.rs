@@ -1,6 +1,5 @@
 pub mod abi;
 pub mod addresses;
-pub mod admin_functions;
 pub mod anvil;
 pub mod args;
 pub mod cmd;

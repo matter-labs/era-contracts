@@ -3,6 +3,7 @@ use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
+use crate::common::abi::AdminFunctionsAbi;
 use crate::common::addresses::ZERO_ADDRESS;
 use crate::common::env_config::default_protocol_ops_out_dir;
 use crate::common::forge::ForgeRunner;
@@ -140,14 +141,17 @@ async fn run_one(
     // real-chain effect — it just records the tx in forge's run file so
     // protocol-ops can extract it into the Safe bundle. Without this the Safe
     // output would be empty.
-    crate::common::admin_functions::upgrade_chain_from_ctm(
-        &mut runner,
-        &sender,
-        chain_address,
-        admin_address,
-        access_control_restriction,
-    )
-    .context("Failed to execute forge script for chain upgrade")?;
+    let script = runner
+        .script_call(AdminFunctionsAbi::upgradeChainFromCTMCall {
+            _chainAddress: chain_address,
+            _adminAddr: admin_address,
+            _accessControlRestriction: access_control_restriction,
+        })
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
+        .with_wallet(&sender);
+    runner
+        .run(script)
+        .context("Failed to execute forge script for chain upgrade")?;
 
     crate::common::output::write_output_if_requested(
         "chain.upgrade",
