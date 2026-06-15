@@ -3,3 +3,7 @@ zkout
 lib
 cache-forge
 broadcast
+# Plain-text RPC URL list (one per line) consumed by the anvil-interop harness.
+# Prettier tries to parse it as JSON because of the .json extension and chokes
+# on the second URL.
+test/anvil-interop/config/fork-l2-rpcs.json

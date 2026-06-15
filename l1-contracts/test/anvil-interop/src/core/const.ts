@@ -1,5 +1,6 @@
-// Must match the actual Anvil L1 chain ID (31337 = 0x7a69)
-export const L1_CHAIN_ID = 31337;
+// Anvil L1 chain ID is a runtime value (synthetic harness uses 31337; fork-mode
+// probes the upstream chain). Read it via `runtimeConfig.l1ChainId` from
+// `./runtime-config` instead of importing a constant from here.
 
 export const ETH_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000001";
 

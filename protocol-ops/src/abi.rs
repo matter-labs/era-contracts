@@ -19,6 +19,22 @@ abigen!(
 );
 
 abigen!(
+    ChainTypeManagerBaseAbi,
+    r#"[
+        function L1_BYTECODES_SUPPLIER() view returns (address)
+    ]"#,
+    event_derives(serde::Deserialize, serde::Serialize)
+);
+
+abigen!(
+    TestnetVerifierAbi,
+    r#"[
+        function IS_TESTNET_VERIFIER() view returns (bool)
+    ]"#,
+    event_derives(serde::Deserialize, serde::Serialize)
+);
+
+abigen!(
     ZkChainAbi,
     "../l1-contracts/zkstack-out/IZKChain.sol/IZKChain.json",
     event_derives(serde::Deserialize, serde::Serialize)
@@ -64,6 +80,14 @@ abigen!(
 abigen!(
     IChainAdminAbi,
     "../l1-contracts/zkstack-out/IChainAdmin.sol/IChainAdmin.json",
+    event_derives(serde::Deserialize, serde::Serialize)
+);
+
+abigen!(
+    AccessControlDefaultAdminRulesAbi,
+    r#"[
+        function defaultAdmin() view returns (address)
+    ]"#,
     event_derives(serde::Deserialize, serde::Serialize)
 );
 
@@ -136,6 +160,24 @@ abigen!(
 abigen!(
     IGatewayMigrateTokenBalancesAbi,
     "../l1-contracts/zkstack-out/IGatewayMigrateTokenBalances.sol/IGatewayMigrateTokenBalances.json",
+    event_derives(serde::Deserialize, serde::Serialize)
+);
+
+abigen!(
+    IFinalizeChainInitAbi,
+    "../l1-contracts/zkstack-out/IFinalizeChainInit.sol/IFinalizeChainInit.json",
+    event_derives(serde::Deserialize, serde::Serialize)
+);
+
+abigen!(
+    ICoreUpgradeV31Abi,
+    "../l1-contracts/zkstack-out/IUpgradeV31.sol/ICoreUpgradeV31.json",
+    event_derives(serde::Deserialize, serde::Serialize)
+);
+
+abigen!(
+    ICTMUpgradeV31Abi,
+    "../l1-contracts/zkstack-out/IUpgradeV31.sol/ICTMUpgradeV31.json",
     event_derives(serde::Deserialize, serde::Serialize)
 );
 

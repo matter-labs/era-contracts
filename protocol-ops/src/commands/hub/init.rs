@@ -2,12 +2,12 @@ use clap::Parser;
 use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 
-use crate::commands::hub::accept_ownership::{accept_ownership, AcceptOwnershipInput};
 use crate::commands::hub::deploy::{deploy, DeployInput};
 use crate::commands::output::write_output_if_requested;
 
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet, SharedRunArgs};
 use crate::config::forge_interface::deploy_ecosystem::output::DeployL1CoreContractsOutput;
+use crate::config::forge_interface::script_params::ADMIN_FUNCTIONS_INVOCATION;
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 
@@ -91,12 +91,26 @@ pub async fn hub_init(
 
     logger::step("Accepting ownership of Bridgehub contracts...");
     let deployed = &output.deployed_addresses;
-    let accept_input = AcceptOwnershipInput {
-        bridgehub: deployed.bridgehub.bridgehub_proxy_addr,
-        governance: deployed.governance_addr,
-        chain_admin: deployed.chain_admin,
-    };
-    accept_ownership(runner, owner, &accept_input).await?;
+    let bridgehub = deployed.bridgehub.bridgehub_proxy_addr;
+    let accept_scripts = [
+        runner
+            .with_script_call(
+                &ADMIN_FUNCTIONS_INVOCATION,
+                "chainAdminAcceptAdmin",
+                (deployed.chain_admin, bridgehub),
+            )?
+            .with_wallet(owner)
+            .with_timing_label("hub.accept_admin"),
+        runner
+            .with_script_call(
+                &ADMIN_FUNCTIONS_INVOCATION,
+                "governanceAcceptOwnerAggregated",
+                (deployed.governance_addr, bridgehub),
+            )?
+            .with_wallet(owner)
+            .with_timing_label("hub.accept_owner_aggregated"),
+    ];
+    runner.run_scripts(accept_scripts)?;
 
     Ok(output)
 }
