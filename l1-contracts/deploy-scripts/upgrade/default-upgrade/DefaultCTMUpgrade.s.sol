@@ -7,6 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Utils} from "../../utils/Utils.sol";
@@ -16,6 +17,7 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -44,11 +46,19 @@ import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {DefaultL2UpgradeStrategy} from "./DefaultL2UpgradeStrategy.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
+
+interface IAdminPreV31 {
+    function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
+}
 
 /// @notice Script used for default CTM upgrade flow. Should be run after Ecosystem upgrade
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
 contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     using stdToml for string;
+
+    uint256 internal constant ERA_TEST_CREATE_CHAIN_ID = 555;
+    uint256 internal constant ZKSYNC_OS_TEST_CREATE_CHAIN_ID = 556;
 
     // solhint-disable-next-line gas-struct-packing
     struct UpgradeDeployedAddresses {
@@ -205,6 +215,13 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
 
+        if (toml.keyExists("$.era_chain_id")) {
+            config.eraChainId = toml.readUint("$.era_chain_id");
+        }
+        if (toml.keyExists("$.legacy_gateway.chain_id")) {
+            config.eraGatewayChainId = toml.readUint("$.legacy_gateway.chain_id");
+        }
+
         PermanentCTMConfig memory permanentConfig = PermanentCTMConfig({
             ctmProxy: ctmProxy,
             bytecodesSupplier: bytecodesSupplier,
@@ -324,6 +341,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
     function getGatewayConfig() public virtual returns (GatewayConfig memory) {
         return gatewayConfig;
+    }
+
+    function getGovernanceUpgradeTimerInitialDelay() public view virtual returns (uint256) {
+        return newConfig.governanceUpgradeTimerInitialDelay;
+    }
+
+    function getTestnetVerifier() public view virtual returns (bool) {
+        return config.testnetVerifier;
     }
 
     /// @notice This function is meant to only be used in tests
@@ -505,6 +530,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         Call[][] memory allCalls = new Call[][](1);
         allCalls[0] = prepareUpgradeServerNotifierCall();
         calls = UpgradeUtils.mergeCallsArray(allCalls);
+
+        address chainAdmin = IOwnable(calls[0].target).owner();
+        address chainAdminOwner = IOwnable(chainAdmin).owner();
+        vm.serializeAddress("ctm_admin_calls", "chain_admin", chainAdmin);
+        vm.serializeAddress("ctm_admin_calls", "chain_admin_owner", chainAdminOwner);
 
         string memory ctmAdminCallsSerialized = vm.serializeBytes(
             "ctm_admin_calls",
@@ -749,10 +779,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         address proxyAddress,
         address newImplementationAddress
     ) internal virtual returns (Call memory call) {
-        require(coreAddresses.shared.transparentProxyAdmin != address(0), "transparentProxyAdmin not newConfigured");
+        require(ctmAddresses.admin.transparentProxyAdmin != address(0), "ctm transparentProxyAdmin not set");
 
         call = Call({
-            target: coreAddresses.shared.transparentProxyAdmin,
+            target: ctmAddresses.admin.transparentProxyAdmin,
             data: abi.encodeCall(
                 ProxyAdmin.upgrade,
                 (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress)
@@ -792,22 +822,28 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
         admin = IZKChain(chainDiamondProxyAddress).getAdmin();
 
-        calls = new Call[](1);
-        calls[0] = Call({
-            target: chainDiamondProxyAddress,
-            data: abi.encodeCall(
+        (, uint32 oldProtocolVersionMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(oldProtocolVersion));
+        // Pre-v31 chain diamonds only expose the legacy 2-arg selector; the v31 selector reverts with "F".
+        bytes memory upgradeCallData = oldProtocolVersionMinor < 31
+            ? abi.encodeCall(IAdminPreV31.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData))
+            : abi.encodeCall(
                 IAdmin.upgradeChainFromVersion,
                 (chainDiamondProxyAddress, oldProtocolVersion, upgradeCutData)
-            ),
-            value: 0
-        });
+            );
+
+        calls = new Call[](1);
+        calls[0] = Call({target: chainDiamondProxyAddress, data: upgradeCallData, value: 0});
     }
 
     /// @notice Tests that it is possible to create a new chain with the new version
+    function getDefaultTestCreateChainId() public view virtual returns (uint256) {
+        return config.isZKsyncOS ? ZKSYNC_OS_TEST_CREATE_CHAIN_ID : ERA_TEST_CREATE_CHAIN_ID;
+    }
+
     function TESTONLY_prepareCreateChainCall() private returns (Call[] memory calls, address admin) {
         admin = getBridgehubAdmin();
         calls = new Call[](1);
-        calls[0] = prepareCreateNewChainCall(555)[0];
+        calls[0] = prepareCreateNewChainCall(getDefaultTestCreateChainId())[0];
     }
 
     function deployUpgradeStageValidator() internal {
@@ -837,6 +873,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             "chain_type_manager_implementation_addr",
             ctmAddresses.stateTransition.implementations.chainTypeManager
         );
+        vm.serializeAddress(
+            "state_transition",
+            "chain_type_manager_proxy",
+            ctmAddresses.stateTransition.proxies.chainTypeManager
+        );
         // Also save as state_transition_implementation_addr for backwards compatibility with zkstack CLI
         vm.serializeAddress(
             "state_transition",
@@ -852,6 +893,16 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             ctmAddresses.stateTransition.facets.executorFacet
         );
         vm.serializeAddress("state_transition", "getters_facet_addr", ctmAddresses.stateTransition.facets.gettersFacet);
+        vm.serializeAddress(
+            "state_transition",
+            "migrator_facet_addr",
+            ctmAddresses.stateTransition.facets.migratorFacet
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "committer_facet_addr",
+            ctmAddresses.stateTransition.facets.committerFacet
+        );
         vm.serializeAddress("state_transition", "diamond_init_addr", ctmAddresses.stateTransition.facets.diamondInit);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress(
@@ -879,6 +930,19 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             "bytecodes_supplier_addr",
             ctmAddresses.stateTransition.proxies.bytecodesSupplier
         );
+        vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
+        vm.serializeAddress(
+            "state_transition",
+            "permissionless_validator_addr",
+            ctmAddresses.stateTransition.proxies.permissionlessValidator
+        );
+        if (ctmAddresses.stateTransition.implementations.serverNotifier != address(0)) {
+            vm.serializeAddress(
+                "state_transition",
+                "server_notifier_implementation_addr",
+                ctmAddresses.stateTransition.implementations.serverNotifier
+            );
+        }
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
@@ -888,11 +952,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         // Serialize newly deployed upgrade addresses
         vm.serializeAddress("deployed_addresses", "chain_admin", discoveredEraZkChain.chainAdmin);
         vm.serializeAddress("deployed_addresses", "access_control_restriction_addr", address(0));
-        vm.serializeAddress(
-            "deployed_addresses",
-            "transparent_proxy_admin",
-            coreAddresses.shared.transparentProxyAdmin
-        );
+        vm.serializeAddress("deployed_addresses", "transparent_proxy_admin", ctmAddresses.admin.transparentProxyAdmin);
         vm.serializeAddress("deployed_addresses", "rollup_l1_da_validator_addr", discoveredEraZkChain.l1DAValidator);
         vm.serializeAddress("deployed_addresses", "validium_l1_da_validator_addr", address(0));
         vm.serializeAddress(
@@ -908,12 +968,21 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             upgradeAddresses.upgradeTimer
         );
 
+        vm.serializeAddress("admin", "timer_governance_addr", config.ownerAddress);
+        string memory admin = vm.serializeAddress("admin", "ecosystem_admin_addr", newConfig.ecosystemAdminAddress);
+
         // Serialize generated upgrade data
         vm.serializeBytes("contracts_newConfig", "diamond_cut_data", newlyGeneratedData.diamondCutData);
         vm.serializeBytes("contracts_newConfig", "force_deployments_data", generatedData.forceDeploymentsData);
 
         // Serialize protocol version info (needed for upgrade)
         vm.serializeUint("contracts_newConfig", "new_protocol_version", getNewProtocolVersion());
+        vm.serializeUint(
+            "contracts_newConfig",
+            "governance_upgrade_timer_initial_delay",
+            newConfig.governanceUpgradeTimerInitialDelay
+        );
+        vm.serializeBool("contracts_newConfig", "is_testnet", config.testnetVerifier);
         string memory contractsConfig = vm.serializeUint(
             "contracts_newConfig",
             "old_protocol_version",
@@ -924,6 +993,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "state_transition", stateTransition);
         vm.serializeString("root", "contracts_config", contractsConfig);
+        vm.serializeString("root", "admin", admin);
         string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
 
         vm.writeToml(toml, outputPath);

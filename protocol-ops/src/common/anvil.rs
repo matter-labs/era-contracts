@@ -125,3 +125,102 @@ fn pick_unused_port() -> anyhow::Result<u16> {
     // There is a small TOCTOU window, but acceptable for dev/test tooling.
     Ok(port)
 }
+
+/// Bump anvil's L1 timestamp by `seconds` and mine a new block so the
+/// increase is reflected in subsequent calls' `block.timestamp`. Used to
+/// step over `GovernanceUpgradeTimer` deadlines between v31 stage 0 and
+/// stage 1 governance replays — stage 1's `checkDeadline()` requires
+/// `block.timestamp >= deadline` set by stage 0.
+pub async fn evm_increase_time_and_mine(rpc_url: &str, seconds: u64) -> anyhow::Result<()> {
+    let provider = get_ethers_provider(rpc_url)?;
+    provider
+        .request::<_, serde_json::Value>("evm_increaseTime", json!([seconds]))
+        .await
+        .with_context(|| format!("evm_increaseTime({seconds}) failed against {rpc_url}"))?;
+    provider
+        .request::<_, serde_json::Value>("evm_mine", json!([]))
+        .await
+        .with_context(|| format!("evm_mine failed against {rpc_url}"))?;
+    Ok(())
+}
+
+/// Take an EVM state snapshot via `evm_snapshot`. Returns the snapshot id
+/// (hex-encoded uint256) to pass back to [`evm_revert`].
+///
+/// Anvil supports both `evm_snapshot` (geth-style) and `anvil_snapshot`; we
+/// use the geth-style name since reth/hardhat-node accept it too.
+pub async fn evm_snapshot(rpc_url: &str) -> anyhow::Result<String> {
+    let provider = get_ethers_provider(rpc_url)?;
+    let id: serde_json::Value = provider
+        .request("evm_snapshot", json!([]))
+        .await
+        .with_context(|| format!("evm_snapshot failed against {rpc_url}"))?;
+    let id_str = id
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("evm_snapshot returned non-string: {id}"))?
+        .to_string();
+    Ok(id_str)
+}
+
+/// Revert the EVM state to a prior snapshot. Note: anvil discards the
+/// snapshot after revert, so each snapshot id is single-use.
+pub async fn evm_revert(rpc_url: &str, snapshot_id: &str) -> anyhow::Result<()> {
+    let provider = get_ethers_provider(rpc_url)?;
+    let ok: bool = provider
+        .request("evm_revert", json!([snapshot_id]))
+        .await
+        .with_context(|| format!("evm_revert({snapshot_id}) failed against {rpc_url}"))?;
+    anyhow::ensure!(
+        ok,
+        "evm_revert({snapshot_id}) returned false — snapshot not found / already consumed"
+    );
+    Ok(())
+}
+
+/// Send a transaction via `eth_sendTransaction` from `sender` against an
+/// anvil fork with auto-impersonate enabled. Bypasses forge entirely so the
+/// tx does NOT land in any forge broadcast log (and therefore not in any
+/// downstream Safe-bundle JSON), while still mutating the fork state.
+///
+/// Use this to apply governance-style calls on the prepare fork to bring
+/// it into a "post-stage-N" state without polluting the deployer's bundle.
+///
+/// Reverts on the wire are surfaced as `anyhow::Error` (receipt status != 1).
+pub async fn send_impersonated_tx(
+    rpc_url: &str,
+    sender: ethers::types::Address,
+    to: ethers::types::Address,
+    data: ethers::types::Bytes,
+    gas_limit: u64,
+) -> anyhow::Result<ethers::types::H256> {
+    use ethers::providers::Middleware;
+    use ethers::types::{TransactionRequest, U256};
+
+    let provider = get_ethers_provider(rpc_url)?;
+
+    // Explicit `from` keys impersonation on anvil's `--auto-impersonate` path.
+    let req = TransactionRequest::new()
+        .from(sender)
+        .to(to)
+        .data(data)
+        .value(U256::zero())
+        .gas(gas_limit);
+
+    let pending = provider
+        .send_transaction(req, None)
+        .await
+        .with_context(|| {
+            format!("eth_sendTransaction (impersonated {sender:#x} → {to:#x}) failed")
+        })?;
+    let tx_hash = pending.tx_hash();
+    let receipt = pending
+        .await
+        .with_context(|| format!("await receipt for impersonated tx {tx_hash:#x}"))?
+        .ok_or_else(|| anyhow::anyhow!("no receipt for impersonated tx {tx_hash:#x}"))?;
+    let status = receipt.status.unwrap_or_default();
+    anyhow::ensure!(
+        status == 1.into(),
+        "impersonated tx {tx_hash:#x} reverted ({sender:#x} → {to:#x})",
+    );
+    Ok(tx_hash)
+}
