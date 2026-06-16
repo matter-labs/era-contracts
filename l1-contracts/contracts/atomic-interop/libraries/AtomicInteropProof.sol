@@ -56,13 +56,13 @@ library AtomicInteropProof {
             _proof.messageIndex,
             _proof.messageProof
         );
-        bool included = IndexedMerkleTreeLib.verifyInclusion(
-            _proof.chainImtRoot,
-            _commitValue,
-            _proof.leaf,
-            _proof.imtLeafIndex,
-            _proof.imtProof
-        );
+        bool included = IndexedMerkleTreeLib.verifyInclusion({
+            _root: _proof.chainImtRoot,
+            _value: _commitValue,
+            _leaf: _proof.leaf,
+            _leafIndex: _proof.imtLeafIndex,
+            _proof: _proof.imtProof
+        });
         if (!included) revert ProofInclusionFailed(_proof.chainImtRoot, _commitValue);
     }
 
@@ -91,13 +91,13 @@ library AtomicInteropProof {
             _proof.messageIndex,
             _proof.messageProof
         );
-        bool absent = IndexedMerkleTreeLib.verifyNonInclusion(
-            _proof.chainImtRoot,
-            _commitValue,
-            _proof.lowLeaf,
-            _proof.lowLeafIndex,
-            _proof.imtProof
-        );
+        bool absent = IndexedMerkleTreeLib.verifyNonInclusion({
+            _root: _proof.chainImtRoot,
+            _value: _commitValue,
+            _lowLeaf: _proof.lowLeaf,
+            _lowLeafIndex: _proof.lowLeafIndex,
+            _lowLeafProof: _proof.imtProof
+        });
         if (!absent) revert ProofNonInclusionFailed(_proof.chainImtRoot, _commitValue);
     }
 
@@ -120,13 +120,13 @@ library AtomicInteropProof {
             sender: L2_INTEROP_COMMITMENT_TREE_ADDR,
             data: abi.encode(_chainImtRoot, _rootTimestamp)
         });
-        bool ok = L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared(
-            _sourceChainId,
-            _batchNumber,
-            _messageIndex,
-            message,
-            _messageProof
-        );
+        bool ok = L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared({
+            _chainId: _sourceChainId,
+            _blockOrBatchNumber: _batchNumber,
+            _index: _messageIndex,
+            _message: message,
+            _proof: _messageProof
+        });
         if (!ok) revert ProofRootMessageInclusionFailed(_sourceChainId, _batchNumber);
     }
 }

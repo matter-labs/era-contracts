@@ -181,10 +181,7 @@ contract IndexedMerkleTreeTest is Test {
         IMTLeaf memory leaf = imt.leafAt(idx);
         bytes32[] memory proof = imt.merklePath(idx);
 
-        assertTrue(
-            imt.verifyInclusion(imt.root(), 200, leaf, idx, proof),
-            "present value verifies inclusion"
-        );
+        assertTrue(imt.verifyInclusion(imt.root(), 200, leaf, idx, proof), "present value verifies inclusion");
     }
 
     function test_verifyInclusion_falseForWrongValue() public {
@@ -217,9 +214,7 @@ contract IndexedMerkleTreeTest is Test {
         bytes32 currentRoot = imt.root();
         bytes32[] memory shortProof = new bytes32[](IMT_DEPTH - 1);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(IMTProofWrongLength.selector, IMT_DEPTH, IMT_DEPTH - 1)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IMTProofWrongLength.selector, IMT_DEPTH, IMT_DEPTH - 1));
         imt.verifyInclusion(currentRoot, 100, leaf, 1, shortProof);
     }
 
@@ -284,9 +279,7 @@ contract IndexedMerkleTreeTest is Test {
         bytes32 currentRoot = imt.root();
         bytes32[] memory longProof = new bytes32[](IMT_DEPTH + 1);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(IMTProofWrongLength.selector, IMT_DEPTH, IMT_DEPTH + 1)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IMTProofWrongLength.selector, IMT_DEPTH, IMT_DEPTH + 1));
         imt.verifyNonInclusion(currentRoot, 400, low, 1, longProof);
     }
 }

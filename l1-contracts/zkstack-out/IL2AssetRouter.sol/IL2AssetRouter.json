@@ -46,6 +46,34 @@
   },
   {
     "type": "function",
+    "name": "atomicBridgeBurn",
+    "inputs": [
+      {
+        "name": "_destChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_originalCaller",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_burnData",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "finalizeDepositLegacyBridge",
     "inputs": [
       {
@@ -127,6 +155,29 @@
       }
     ],
     "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "recoverAtomicBurn",
+    "inputs": [
+      {
+        "name": "_destChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_recoverData",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",

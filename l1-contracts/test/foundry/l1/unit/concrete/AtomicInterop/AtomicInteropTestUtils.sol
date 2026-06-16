@@ -37,12 +37,7 @@ contract MockAtomicAssetRouter {
     uint256 public lastChainId;
     bytes32 public lastAssetId;
 
-    function atomicBridgeBurn(
-        uint256 _destChainId,
-        bytes32 _assetId,
-        address,
-        bytes calldata
-    ) external {
+    function atomicBridgeBurn(uint256 _destChainId, bytes32 _assetId, address, bytes calldata) external {
         ++atomicBurnCount;
         lastChainId = _destChainId;
         lastAssetId = _assetId;
