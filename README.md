@@ -34,7 +34,7 @@ See [LICENSE-MIT](LICENSE-MIT) for details.
 - [Discord](https://join.zksync.dev/)
 - [Mirror](https://zksync.mirror.xyz/)
 
-## Disclaimer
+## Security Disclaimer
 
 ZKsync Era has been through lots of testing and audits. Although it is live, it is still in alpha state and will go
 through more audits and bug bounties programs. We would love to hear our community's thoughts and suggestions about it!
