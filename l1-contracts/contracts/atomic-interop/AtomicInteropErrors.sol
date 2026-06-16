@@ -3,32 +3,14 @@ pragma solidity ^0.8.21;
 
 import {SpecState} from "./IAtomicInterop.sol";
 
-// ── GlobalInteropIMT (L1) errors ────────────────────────────────────────────────────
-error GlobalImtZeroBridgehub();
-/// @dev Production submitter check: the caller is not the chain's diamond proxy (from the Bridgehub).
-/// @dev Kept defined so the temporary "anyone may submit" stub in `submitChainRoot` is trivial to remove.
-error GlobalImtNotChainDiamond(address sender, uint256 chainId);
-error GlobalImtZeroRoot();
-/// @dev Batch numbers must be strictly consecutive (no gaps).
-error GlobalImtNonConsecutiveBatch(uint256 chainId, uint256 expected, uint256 provided);
-error GlobalImtUnknownBlock(uint256 blockNumber);
-
-// ── L2InteropCommitmentTree (indexed merkle tree) errors ─────────────────────────────
+// ── L2InteropCommitmentTree errors ───────────────────────────────────────────────────
+// Value / low-nullifier validation now lives in {IndexedMerkleTreeLib} (the IMT engine) and surfaces
+// its own `IMT*` errors; only the shell's ACL / init errors remain here.
 error CommitmentTreeAlreadyInitialized();
 error CommitmentTreeNotAppender(address sender);
 error CommitmentTreeZeroAppender();
-error CommitmentTreeZeroValue();
-/// @dev The supplied low-nullifier's value is not strictly below the value being inserted.
-error CommitmentTreeLowNullifierNotBelow(uint256 value, uint256 lowValue);
-/// @dev The value being inserted is not strictly below the low-nullifier's nextValue (already present or wrong nullifier).
-error CommitmentTreeLowNullifierNotAbove(uint256 value, uint256 nextValue);
 
-// ── L2GlobalInteropRootImporter errors ──────────────────────────────────────────────
-error ImporterZeroRoot();
-error ImporterRootMismatch(uint256 l1BlockNumber, bytes32 stored, bytes32 provided);
-error ImporterBlockNotImported(uint256 l1BlockNumber);
-
-// ── AtomicFlowEscrow errors ─────────────────────────────────────────────────────────
+// ── AtomicFlowEscrow errors ──────────────────────────────────────────────────────────
 error EscrowAlreadyInitialized();
 error EscrowDepositorMismatch(address sender, address depositor);
 error EscrowSpecAlreadyCommitted(bytes32 specHash);
@@ -52,15 +34,17 @@ error EscrowSpecNotCommittedLocally(bytes32 specHash, SpecState actual);
 /// @dev A spec originating on another chain has no inclusion proof.
 error EscrowMissingProof(bytes32 specHash);
 
-// ── AtomicInteropProof library errors ───────────────────────────────────────────────
+// ── AtomicInteropProof library errors ────────────────────────────────────────────────
+/// @dev The proof's `sourceChainId` does not match the spec's origin chain.
 error ProofChainMismatch(uint256 expected, uint256 actual);
-error ProofInclusionFailed(bytes32 expectedRoot, bytes32 computedRoot);
-error ProofGlobalInclusionFailed(bytes32 expectedRoot, bytes32 computedRoot);
+/// @dev The commitment tree's `(root, timestamp)` message could not be proven against the imported
+/// interop root for `(chainId, batchNumber)`.
+error ProofRootMessageInclusionFailed(uint256 chainId, uint256 batchNumber);
+/// @dev The authenticated root snapshot is newer than the deadline (inclusion path).
 error ProofDeadlineExceeded(uint256 timestamp, uint64 deadline);
+/// @dev The authenticated root snapshot is not strictly after the deadline (non-inclusion path).
 error ProofDeadlineNotExceeded(uint256 timestamp, uint64 deadline);
-/// @dev The included leaf's value does not equal the commit value being proven.
-error ProofValueMismatch(uint256 expected, uint256 actual);
-/// @dev The low-nullifier leaf's value is not strictly below the target (so it cannot certify absence).
-error ProofLowNullifierNotBelow(uint256 value, uint256 lowValue);
-/// @dev The target value is not strictly below the low-nullifier's `nextValue` (so the target could be present).
-error ProofLowNullifierNotAbove(uint256 value, uint256 nextValue);
+/// @dev The commit value is not a member of the authenticated root.
+error ProofInclusionFailed(bytes32 root, uint256 value);
+/// @dev The low-nullifier does not certify absence of the commit value in the authenticated root.
+error ProofNonInclusionFailed(bytes32 root, uint256 value);

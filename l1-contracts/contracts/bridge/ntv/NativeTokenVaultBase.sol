@@ -212,6 +212,27 @@ abstract contract NativeTokenVaultBase is
         emit BridgeMint(_chainId, _assetId, receiver, amount);
     }
 
+    /// @inheritdoc INativeTokenVaultBase
+    /// @dev Reuses the `bridgeMint` branches (unlock for an origin-native asset, re-mint for a bridged
+    /// one), so it reverses the `bridgeBurn` that locked/burned the funds at `commitSend`. `_chainId`
+    /// must be the destination chain used at burn time so `_handleBridgeFromChain` undoes the matching
+    /// `_handleBridgeToChain`.
+    function bridgeRecoverFailedTransfer(
+        uint256 _chainId,
+        bytes32 _assetId,
+        bytes calldata _data
+    ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused {
+        address receiver;
+        uint256 amount;
+        if (originChainId[_assetId] == block.chainid) {
+            (receiver, amount) = _bridgeMintNativeToken(_chainId, _assetId, _data);
+        } else {
+            (receiver, amount) = _bridgeMintBridgedToken(_chainId, _assetId, _data);
+        }
+        // solhint-disable-next-line func-named-parameters
+        emit BridgeRecoverFailedTransfer(_chainId, _assetId, receiver, amount);
+    }
+
     function _bridgeMintBridgedToken(
         uint256 _chainId,
         bytes32 _assetId,

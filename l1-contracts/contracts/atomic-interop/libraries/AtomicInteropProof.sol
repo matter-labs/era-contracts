@@ -1,149 +1,132 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Merkle} from "../../common/libraries/Merkle.sol";
-import {ImtInclusionProof, ImtNonInclusionProof, IndexedLeaf, ATOMIC_COMMIT_LEAF_TAG} from "../IAtomicInterop.sol";
+import {IndexedMerkleTreeLib} from "../../common/libraries/IndexedMerkleTree.sol";
+import {ImtInclusionProof, ImtNonInclusionProof, ATOMIC_COMMIT_LEAF_TAG} from "../IAtomicInterop.sol";
+import {L2Message} from "../../common/Messaging.sol";
+import {L2_MESSAGE_VERIFICATION} from "../../common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_INTEROP_COMMITMENT_TREE_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {
     ProofChainMismatch,
+    ProofRootMessageInclusionFailed,
     ProofDeadlineExceeded,
     ProofDeadlineNotExceeded,
-    ProofGlobalInclusionFailed,
     ProofInclusionFailed,
-    ProofLowNullifierNotAbove,
-    ProofLowNullifierNotBelow,
-    ProofValueMismatch
+    ProofNonInclusionFailed
 } from "../AtomicInteropErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Pure verification helpers for the L1-free atomic interop flow.
+/// @notice Cross-chain authentication for the L1-free atomic interop flow.
 ///
-/// All proofs are resolved against a *global interop-IMT root* that the verifying L2 imported
-/// from L1. The escrow resolves the imported root and its L1 timestamp for a given block number
-/// and hands them to these helpers, keeping this library free of any storage reads.
-///
-/// The per-chain interop IMT is an **Indexed Merkle Tree**: each {IndexedLeaf} stores its `value`
-/// plus a pointer (`nextValue`, `nextIndex`) to the next-larger value, forming a sorted linked
-/// list over the append-only leaf array. This yields O(log n) proofs for *both* membership (a
-/// normal Merkle path to the leaf whose `value` matches) and non-membership (a Merkle path to the
-/// single "low nullifier" leaf that brackets the absent value).
-///
-/// The global IMT is a `FullMerkle` tree whose leaves are per-chain IMT roots, updated in place;
-/// the off-chain engine reconstructs the historical version matching the imported root.
+/// A flow leg's commit value lives in its origin chain's {L2InteropCommitmentTree} (an Indexed
+/// Merkle Tree). On every insert that tree publishes `abi.encode(root, block.timestamp)` to L1 via
+/// the L2->L1 messenger. The verifying chain authenticates that single message against the interop
+/// root it imported for `(sourceChainId, batchNumber)` — which it only holds once the source batch
+/// has settled, so the bundled timestamp is covered by the batch validity proof and cannot be
+/// forged. Membership (inclusion) and non-membership (low-nullifier) against the authenticated root
+/// are delegated to {IndexedMerkleTreeLib}, the single shared IMT engine.
 library AtomicInteropProof {
     /// @notice The value inserted into a chain's IMT when a flow leg is committed.
     function commitValue(bytes32 _flowId, bytes32 _specHash) internal pure returns (uint256) {
         return uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, _flowId, _specHash)));
     }
 
-    /// @notice Hash of an indexed-tree leaf (the value stored at a tree slot).
-    function indexedLeafHash(IndexedLeaf calldata _leaf) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_leaf.value, _leaf.nextValue, _leaf.nextIndex));
-    }
-
-    /// @notice Leaf placed into the global IMT for a chain. Binds the chain's IMT root to its id so
-    /// a root cannot be replayed under a different chain.
-    function globalLeaf(uint256 _chainId, bytes32 _chainImtRoot) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(_chainImtRoot, _chainId));
-    }
-
-    /// @notice Verifies that `_commitValue` is included in the chain's interop IMT, that the IMT
-    /// root is contained in `_importedGlobalRoot`, and that the import happened in time.
+    /// @notice Verifies `_commitValue` is present in `_proof.sourceChainId`'s IMT as of an
+    /// authenticated root whose bundled timestamp is `<= _deadline`.
     function verifyInclusion(
         ImtInclusionProof calldata _proof,
         uint256 _expectedChainId,
         uint256 _commitValue,
-        bytes32 _importedGlobalRoot,
-        uint256 _importedTimestamp,
         uint64 _deadline
-    ) internal pure {
-        if (_proof.chainId != _expectedChainId) {
-            revert ProofChainMismatch(_expectedChainId, _proof.chainId);
+    ) internal view {
+        if (_proof.sourceChainId != _expectedChainId) {
+            revert ProofChainMismatch(_expectedChainId, _proof.sourceChainId);
         }
-        if (_importedTimestamp > _deadline) {
-            revert ProofDeadlineExceeded(_importedTimestamp, _deadline);
+        if (_proof.rootTimestamp > _deadline) {
+            revert ProofDeadlineExceeded(_proof.rootTimestamp, _deadline);
         }
-        if (_proof.leaf.value != _commitValue) {
-            revert ProofValueMismatch(_commitValue, _proof.leaf.value);
-        }
-
-        bytes32 computedChainRoot = Merkle.calculateRoot(
-            _proof.imtProof,
+        // solhint-disable-next-line func-named-parameters
+        _authenticateRoot(
+            _proof.sourceChainId,
+            _proof.batchNumber,
+            _proof.chainImtRoot,
+            _proof.rootTimestamp,
+            _proof.messageTxNumberInBatch,
+            _proof.messageIndex,
+            _proof.messageProof
+        );
+        bool included = IndexedMerkleTreeLib.verifyInclusion(
+            _proof.chainImtRoot,
+            _commitValue,
+            _proof.leaf,
             _proof.imtLeafIndex,
-            indexedLeafHash(_proof.leaf)
+            _proof.imtProof
         );
-        if (computedChainRoot != _proof.chainImtRoot) {
-            revert ProofInclusionFailed(_proof.chainImtRoot, computedChainRoot);
-        }
-
-        bytes32 computedGlobalRoot = Merkle.calculateRoot(
-            _proof.globalProof,
-            _proof.globalLeafIndex,
-            globalLeaf(_proof.chainId, _proof.chainImtRoot)
-        );
-        if (computedGlobalRoot != _importedGlobalRoot) {
-            revert ProofGlobalInclusionFailed(_importedGlobalRoot, computedGlobalRoot);
-        }
+        if (!included) revert ProofInclusionFailed(_proof.chainImtRoot, _commitValue);
     }
 
-    /// @notice Verifies, in O(log n), that `_commitValue` is absent from the chain's interop IMT
-    /// across the deadline boundary, so the flow can no longer finalize.
-    /// @param _proof The non-inclusion (low-nullifier) proof.
-    /// @param _expectedChainId The chain that would have owned the commit value.
-    /// @param _commitValue The value that must be absent.
-    /// @param _globalRootBefore Imported global root with L1 timestamp `<= _deadline`.
-    /// @param _timestampBefore L1 timestamp of `_globalRootBefore`.
-    /// @param _globalRootAfter Imported global root with L1 timestamp `> _deadline`.
-    /// @param _timestampAfter L1 timestamp of `_globalRootAfter`.
-    /// @param _deadline The flow deadline.
-    // solhint-disable-next-line func-named-parameters
+    /// @notice Verifies `_commitValue` is absent from `_proof.sourceChainId`'s IMT as of an
+    /// authenticated root whose bundled timestamp is `> _deadline` — so the leg can no longer be
+    /// committed in time and the flow cannot finalize.
     function verifyNonInclusion(
         ImtNonInclusionProof calldata _proof,
         uint256 _expectedChainId,
         uint256 _commitValue,
-        bytes32 _globalRootBefore,
-        uint256 _timestampBefore,
-        bytes32 _globalRootAfter,
-        uint256 _timestampAfter,
         uint64 _deadline
-    ) internal pure {
-        if (_proof.chainId != _expectedChainId) {
-            revert ProofChainMismatch(_expectedChainId, _proof.chainId);
+    ) internal view {
+        if (_proof.sourceChainId != _expectedChainId) {
+            revert ProofChainMismatch(_expectedChainId, _proof.sourceChainId);
         }
-        if (_timestampBefore > _deadline) {
-            revert ProofDeadlineExceeded(_timestampBefore, _deadline);
+        if (_proof.rootTimestamp <= _deadline) {
+            revert ProofDeadlineNotExceeded(_proof.rootTimestamp, _deadline);
         }
-        if (_timestampAfter <= _deadline) {
-            revert ProofDeadlineNotExceeded(_timestampAfter, _deadline);
-        }
+        // solhint-disable-next-line func-named-parameters
+        _authenticateRoot(
+            _proof.sourceChainId,
+            _proof.batchNumber,
+            _proof.chainImtRoot,
+            _proof.rootTimestamp,
+            _proof.messageTxNumberInBatch,
+            _proof.messageIndex,
+            _proof.messageProof
+        );
+        bool absent = IndexedMerkleTreeLib.verifyNonInclusion(
+            _proof.chainImtRoot,
+            _commitValue,
+            _proof.lowLeaf,
+            _proof.lowLeafIndex,
+            _proof.imtProof
+        );
+        if (!absent) revert ProofNonInclusionFailed(_proof.chainImtRoot, _commitValue);
+    }
 
-        // Low-nullifier bracket: lowLeaf.value < commitValue < lowLeaf.nextValue (or nextValue == 0,
-        // meaning lowLeaf is the current maximum). This certifies `_commitValue` is not in the tree.
-        if (_proof.lowLeaf.value >= _commitValue) {
-            revert ProofLowNullifierNotBelow(_commitValue, _proof.lowLeaf.value);
-        }
-        if (_proof.lowLeaf.nextValue != 0 && _commitValue >= _proof.lowLeaf.nextValue) {
-            revert ProofLowNullifierNotAbove(_commitValue, _proof.lowLeaf.nextValue);
-        }
-
-        // The low-nullifier leaf must be a member of the chain IMT root.
-        bytes32 lowHash = indexedLeafHash(_proof.lowLeaf);
-        bytes32 computedChainRoot = Merkle.calculateRoot(_proof.imtProof, _proof.lowLeafIndex, lowHash);
-        if (computedChainRoot != _proof.chainImtRoot) {
-            revert ProofInclusionFailed(_proof.chainImtRoot, computedChainRoot);
-        }
-
-        // The same chain IMT root must appear in a global root before the deadline and in one after
-        // it: the chain settled nothing new across the boundary, so the value could not have been
-        // inserted in time.
-        bytes32 gLeaf = globalLeaf(_proof.chainId, _proof.chainImtRoot);
-        bytes32 computedBefore = Merkle.calculateRoot(_proof.globalProofG1, _proof.globalLeafIndex, gLeaf);
-        if (computedBefore != _globalRootBefore) {
-            revert ProofGlobalInclusionFailed(_globalRootBefore, computedBefore);
-        }
-        bytes32 computedAfter = Merkle.calculateRoot(_proof.globalProofG2, _proof.globalLeafIndex, gLeaf);
-        if (computedAfter != _globalRootAfter) {
-            revert ProofGlobalInclusionFailed(_globalRootAfter, computedAfter);
-        }
+    /// @dev Reconstructs and authenticates the commitment tree's `(root, timestamp)` L2->L1 message
+    /// against the interop root imported for `(_sourceChainId, _batchNumber)`. Pinning the sender to
+    /// {L2_INTEROP_COMMITMENT_TREE_ADDR} (identical on every chain) binds the root to the real tree;
+    /// the interop-root channel binds it to `_sourceChainId`. The `abi.encode` here must match what
+    /// {L2InteropCommitmentTree} publishes.
+    function _authenticateRoot(
+        uint256 _sourceChainId,
+        uint256 _batchNumber,
+        bytes32 _chainImtRoot,
+        uint256 _rootTimestamp,
+        uint16 _messageTxNumberInBatch,
+        uint256 _messageIndex,
+        bytes32[] calldata _messageProof
+    ) private view {
+        L2Message memory message = L2Message({
+            txNumberInBatch: _messageTxNumberInBatch,
+            sender: L2_INTEROP_COMMITMENT_TREE_ADDR,
+            data: abi.encode(_chainImtRoot, _rootTimestamp)
+        });
+        bool ok = L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared(
+            _sourceChainId,
+            _batchNumber,
+            _messageIndex,
+            message,
+            _messageProof
+        );
+        if (!ok) revert ProofRootMessageInclusionFailed(_sourceChainId, _batchNumber);
     }
 }

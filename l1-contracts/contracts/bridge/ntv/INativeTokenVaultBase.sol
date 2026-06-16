@@ -40,4 +40,21 @@ interface INativeTokenVaultBase {
 
     /// @notice Tries to register a token from the provided `_burnData` and reverts if it is not possible.
     function tryRegisterTokenFromBurnData(bytes calldata _burnData, bytes32 _expectedAssetId) external;
+
+    /// @notice Emitted when a failed/expired atomic-interop transfer is recovered to the depositor.
+    event BridgeRecoverFailedTransfer(
+        uint256 indexed chainId,
+        bytes32 indexed assetId,
+        address receiver,
+        uint256 amount
+    );
+
+    /// @notice Returns a failed/expired atomic-interop transfer's funds to the depositor: unlock for an
+    /// origin-native asset, re-mint for a bridged one — reversing the `bridgeBurn` performed at commit.
+    /// @dev Callable only by the asset router, which gates it on a proven IMT non-inclusion (timeout).
+    /// @param _chainId The chain the asset was being bridged to at burn time (so the chain-balance
+    /// accounting reverses correctly).
+    /// @param _assetId The asset being recovered.
+    /// @param _data Bridge-mint-formatted data whose receiver is the original depositor.
+    function bridgeRecoverFailedTransfer(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable;
 }
