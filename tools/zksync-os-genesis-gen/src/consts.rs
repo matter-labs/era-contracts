@@ -124,9 +124,8 @@ const L2_MESSAGE_VERIFICATION: Address = Address(FixedBytes::<20>(hex_literal::h
 const L2_INTEROP_COMMITMENT_TREE: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000010012"
 )));
-const L2_GLOBAL_INTEROP_ROOT_IMPORTER: Address = Address(FixedBytes::<20>(hex_literal::hex!(
-    "0000000000000000000000000000000000010013"
-)));
+// 0x10013 is reserved (formerly L2GlobalInteropRootImporter; removed when atomic proofs were re-based
+// on the interop-root / MessageRoot channel).
 const L2_ATOMIC_FLOW_ESCROW: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000010014"
 )));
@@ -240,10 +239,6 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 25] = [
     (
         L2_INTEROP_COMMITMENT_TREE,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2InteropCommitmentTree")),
-    ),
-    (
-        L2_GLOBAL_INTEROP_ROOT_IMPORTER,
-        ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2GlobalInteropRootImporter")),
     ),
     (
         L2_ATOMIC_FLOW_ESCROW,

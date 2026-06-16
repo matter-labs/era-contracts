@@ -18,7 +18,6 @@ import {
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
-    L2_GLOBAL_INTEROP_ROOT_IMPORTER_ADDR,
     L2_ATOMIC_FLOW_ESCROW_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2BaseTokenBase} from "../l2-system/interfaces/IL2BaseTokenBase.sol";
@@ -464,20 +463,19 @@ library L2GenesisForceDeploymentsHelper {
         // For ZKOS: mints via MINT_BASE_TOKEN_HOOK and transfers to holder.
         IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
 
-        // Atomic interop (L1-free): wire the escrow to its commitment tree + global-root importer,
-        // and the tree to the escrow. Only ZKsync OS chains predeploy these (see the genesis gen
-        // tool); the global-root importer is permissionless and needs no initialization.
+        // Atomic interop (L1-free): wire the escrow to its commitment tree (and the tree to the
+        // escrow), plus the reverse link so the escrow can drive AR/NTV burns (source), mints
+        // (destination), and recovery (timeout). Only ZKsync OS chains predeploy these (see the
+        // genesis gen tool).
         if (_isZKsyncOS) {
             L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initialize(L2_ATOMIC_FLOW_ESCROW_ADDR);
             AtomicFlowEscrow(L2_ATOMIC_FLOW_ESCROW_ADDR).initialize(
                 L2_INTEROP_COMMITMENT_TREE_ADDR,
-                L2_GLOBAL_INTEROP_ROOT_IMPORTER_ADDR,
                 L2_ASSET_ROUTER_ADDR,
                 L2_NATIVE_TOKEN_VAULT_ADDR
             );
-            // Wire the reverse link so the escrow can drive AR/NTV burns (source) and mints
-            // (destination) at execute() time. The genesis force-deployment runs as the complex
-            // upgrader, which `setAtomicFlowEscrow` authorises for this one-shot genesis wiring.
+            // The genesis force-deployment runs as the complex upgrader, which `setAtomicFlowEscrow`
+            // authorises for this one-shot genesis wiring.
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).setAtomicFlowEscrow(L2_ATOMIC_FLOW_ESCROW_ADDR);
         }
     }

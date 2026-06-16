@@ -1,22 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
-import {IndexedLeaf} from "./IAtomicInterop.sol";
+import {IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Per-chain **Indexed Merkle Tree** of interop commit values. Whenever a participant does
-/// their part in a flow, the leg's commit value is inserted here. Each {IndexedLeaf} points to the
+/// their part in a flow, the leg's commit value is inserted here. Each {IMTLeaf} points to the
 /// next-larger value in the tree, so the structure supports O(log n) proofs of both membership and
-/// non-membership (via a "low nullifier" leaf). The chain's current root is what the operator
-/// exposes on L1 (into {IGlobalInteropIMT}) when the batch settles; the full leaf set is the IMT
-/// preimage the DA commitment covers, which the off-chain IMT engine reads back to build proofs.
+/// non-membership (via a "low nullifier" leaf). On every insert the tree publishes
+/// `abi.encode(root, block.timestamp)` to L1 via the L2->L1 messenger; consuming chains authenticate
+/// that message against the interop root they imported for the settling batch (see
+/// {AtomicInteropProof}), which is what makes the root and its snapshot timestamp trustworthy.
 ///
 /// Deployed in L2 userspace (CREATE2), so it has no constructor — wiring is done in `initialize`.
 interface IL2InteropCommitmentTree {
-    /// @notice Emitted whenever a leaf slot is written (the head seed, a low-nullifier repoint, or a
-    /// freshly appended value). Replaying these in index order reconstructs the tree at any point.
-    event LeafUpdated(uint256 indexed index, uint256 value, uint256 nextValue, uint256 nextIndex, bytes32 root);
+    /// @notice Emitted after a new root is published to L1: the `{0,0,0}` head seed at `initialize`,
+    /// then one per inserted value. `timestamp` is the `block.timestamp` bundled into the published
+    /// message.
+    event RootPublished(uint256 indexed leafIndex, bytes32 root, uint256 timestamp);
 
     /// @notice Insert `_value` into the indexed tree. Callable only by the configured appender.
     /// @param _value The value to insert (a domain-tagged commit value, never 0).
@@ -34,7 +36,10 @@ interface IL2InteropCommitmentTree {
     function leafCount() external view returns (uint256);
 
     /// @notice The leaf stored at `_index`.
-    function leafAt(uint256 _index) external view returns (IndexedLeaf memory);
+    function leafAt(uint256 _index) external view returns (IMTLeaf memory);
+
+    /// @notice The fixed-depth Merkle path (siblings, leaf level up) for the leaf at `_index`.
+    function merklePath(uint256 _index) external view returns (bytes32[] memory);
 
     /// @notice The address allowed to insert (the escrow).
     function appender() external view returns (address);

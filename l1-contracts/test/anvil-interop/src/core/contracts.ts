@@ -73,9 +73,9 @@ const ARTIFACTS = {
   TestnetERC20Token: "TestnetERC20Token.sol/TestnetERC20Token.json",
   L1FlowLinker: "L1FlowLinker.sol/L1FlowLinker.json",
   L2FlowEscrow: "L2FlowEscrow.sol/L2FlowEscrow.json",
-  GlobalInteropIMT: "GlobalInteropIMT.sol/GlobalInteropIMT.json",
+  // L1-free atomic interop (IMT engine B). The global IMT + importer were removed on-chain;
+  // the per-chain commitment-tree root is now carried by the standard interop-root channel.
   L2InteropCommitmentTree: "L2InteropCommitmentTree.sol/L2InteropCommitmentTree.json",
-  L2GlobalInteropRootImporter: "L2GlobalInteropRootImporter.sol/L2GlobalInteropRootImporter.json",
   AtomicFlowEscrow: "AtomicFlowEscrow.sol/AtomicFlowEscrow.json",
   L2MessageVerification: "L2MessageVerification.sol/L2MessageVerification.json",
   L2InteropRootStorage: "L2InteropRootStorage.sol/L2InteropRootStorage.json",

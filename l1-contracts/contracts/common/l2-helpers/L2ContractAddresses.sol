@@ -142,8 +142,8 @@ address constant L2_BASE_TOKEN_HOLDER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET +
 /// @dev The address of the per-chain atomic-interop commitment tree (Indexed Merkle Tree).
 address constant L2_INTEROP_COMMITMENT_TREE_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x12);
 
-/// @dev The address of the atomic-interop global-root importer (imports L1 global IMT roots).
-address constant L2_GLOBAL_INTEROP_ROOT_IMPORTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x13);
+/// @dev 0x13 is reserved: it formerly held the atomic-interop global-root importer, removed when atomic
+/// proofs were re-based on the interop-root / MessageRoot channel. Left unused to avoid address reuse.
 
 /// @dev The address of the atomic-interop flow escrow.
 address constant L2_ATOMIC_FLOW_ESCROW_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x14);
