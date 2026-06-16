@@ -20,7 +20,8 @@ import {
     AdminZero,
     InitialForceDeploymentMismatch,
     NotAPatchUpgrade,
-    OutdatedProtocolVersion
+    OutdatedProtocolVersion,
+    ProtocolVersionMismatch
 } from "./L1StateTransitionErrors.sol";
 import {
     ChainAlreadyLive,
@@ -37,6 +38,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TxStatus} from "../common/Messaging.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "./libraries/ProposedUpgradeLib.sol";
 import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
+import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 
 /// @title Chain Type Manager Base contract
 /// @author Matter Labs
@@ -444,6 +446,9 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         if (previousProtocolVersion != _oldProtocolVersion) {
             revert OutdatedProtocolVersion(previousProtocolVersion, _oldProtocolVersion);
         }
+        // Ensure the version embedded in the upgrade cut matches the version being registered, so the chain
+        // cannot end up on a version whose deadline was never opened here (which would brick commits).
+        _validateUpgradeCutProtocolVersion(_cutData.initCalldata, _newProtocolVersion);
         _setProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
         _setProtocolVersionDeadline(_newProtocolVersion, type(uint256).max);
         protocolVersion = _newProtocolVersion;
@@ -452,6 +457,37 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         _setProtocolVersionVerifier(_newProtocolVersion, _verifier);
         // Emit event with backward compatible hack.
         emit NewUpgradeCutData(_newProtocolVersion, _cutData);
+    }
+
+    /// @dev Ensures that the protocol version embedded in an upgrade cut matches the version being registered.
+    /// @param _initCalldata the `initCalldata` of the diamond cut stored for the upgrade
+    /// @param _newProtocolVersion the protocol version the upgrade is registered for
+    /// @dev Standard upgrade cuts call `IDefaultUpgrade.upgrade(ProposedUpgrade)`, and the embedded
+    /// `ProposedUpgrade.newProtocolVersion` is the version the chain actually moves to when the cut executes.
+    /// If it differs from `_newProtocolVersion`, the chain lands on a version whose deadline is never opened
+    /// here, so the commit-time `protocolVersionIsActive` check bricks. Only cuts that carry such a proposal
+    /// are validated; other cuts (empty / custom init) cannot trigger this mechanism and are left untouched
+    /// (so this does not constrain non-`DefaultUpgrade` flows).
+    function _validateUpgradeCutProtocolVersion(bytes memory _initCalldata, uint256 _newProtocolVersion) internal pure {
+        if (_initCalldata.length < 4) {
+            return;
+        }
+        bytes4 selector;
+        // The first 4 bytes of `initCalldata` are the function selector (left-aligned in the first word).
+        assembly {
+            selector := mload(add(_initCalldata, 0x20))
+        }
+        if (selector != IDefaultUpgrade.upgrade.selector) {
+            return;
+        }
+        // Strip the selector and decode the single `ProposedUpgrade` argument.
+        ProposedUpgrade memory proposedUpgrade = abi.decode(
+            UnsafeBytes.readRemainingBytes(_initCalldata, 4),
+            (ProposedUpgrade)
+        );
+        if (proposedUpgrade.newProtocolVersion != _newProtocolVersion) {
+            revert ProtocolVersionMismatch(proposedUpgrade.newProtocolVersion, _newProtocolVersion);
+        }
     }
 
     /// @dev check that the protocolVersion is active
@@ -563,6 +599,18 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @param _zkPorterIsAvailable whether the zkPorter mode is available
     function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external onlyOwner {
         IZKChain(getZKChain(_chainId)).setPorterAvailability(_zkPorterIsAvailable);
+    }
+
+    /// @dev setPriorityModeTransactionFilterer for the specified chain
+    /// @dev `AdminFacet.setPriorityModeTransactionFilterer` is gated by `onlyChainTypeManager`, so without
+    /// this forwarder it would be unreachable post-deployment (mirrors the sibling CTM-only setters above).
+    /// @param _chainId the chainId of the chain
+    /// @param _priorityModeTransactionFilterer the new priority mode transaction filterer
+    function setPriorityModeTransactionFilterer(
+        uint256 _chainId,
+        address _priorityModeTransactionFilterer
+    ) external onlyOwner {
+        IZKChain(getZKChain(_chainId)).setPriorityModeTransactionFilterer(_priorityModeTransactionFilterer);
     }
 
     /// @notice Deactivates Priority Mode for the specified chain.

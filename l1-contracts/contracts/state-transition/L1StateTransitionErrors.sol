@@ -98,6 +98,8 @@ error OutdatedProtocolVersion(uint256 protocolVersion, uint256 currentProtocolVe
 error PriorityModeAlreadyAllowed();
 // 0xfe26193e
 error PriorityQueueNotFullyProcessed();
+// 0x89a9f9af
+error ProtocolVersionMismatch(uint256 embeddedVersion, uint256 expectedVersion);
 // 0xc59d372c
 error ProtocolVersionNotUpToDate(uint256 currentProtocolVersion, uint256 protocolVersion);
 // 0x2dc9747d

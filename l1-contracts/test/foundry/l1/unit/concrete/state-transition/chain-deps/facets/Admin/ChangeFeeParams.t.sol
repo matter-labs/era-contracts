@@ -8,6 +8,7 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {
     FeeParamsChangeTooLarge,
     InvalidPubdataPricingMode,
+    MaxBatchCapacityIsZero,
     PriorityTxPubdataExceedsMaxPubDataPerBatch,
     TokenMultiplierChangeTooFrequent,
     Unauthorized
@@ -106,6 +107,43 @@ contract ChangeFeeParamsTest is AdminTest {
         vm.expectRevert(PriorityTxPubdataExceedsMaxPubDataPerBatch.selector);
 
         vm.startPrank(chainTypeManager);
+        adminFacet.changeFeeParams(newFeeParams);
+    }
+
+    /// @dev A zero `maxPubdataPerBatch` is a divisor in the L2 gas-price derivation, so it must be rejected at
+    /// configuration time (catching the fat-finger) rather than later bricking the L1->L2 fee path with a
+    /// division-by-zero panic. `priorityTxMaxPubdata` is also zero here so the ordering check passes and we
+    /// reach the capacity check.
+    function test_revertWhen_maxPubdataPerBatchIsZero() public {
+        address chainTypeManager = utilsFacet.util_getChainTypeManager();
+        FeeParams memory newFeeParams = FeeParams({
+            pubdataPricingMode: PubdataPricingMode.Rollup,
+            batchOverheadL1Gas: 1_000_000,
+            maxPubdataPerBatch: 0,
+            maxL2GasPerBatch: 80_000_000,
+            priorityTxMaxPubdata: 0,
+            minimalL2GasPrice: 250_000_000
+        });
+
+        vm.prank(chainTypeManager);
+        vm.expectRevert(MaxBatchCapacityIsZero.selector);
+        adminFacet.changeFeeParams(newFeeParams);
+    }
+
+    /// @dev Same as above, for a zero `maxL2GasPerBatch`.
+    function test_revertWhen_maxL2GasPerBatchIsZero() public {
+        address chainTypeManager = utilsFacet.util_getChainTypeManager();
+        FeeParams memory newFeeParams = FeeParams({
+            pubdataPricingMode: PubdataPricingMode.Rollup,
+            batchOverheadL1Gas: 1_000_000,
+            maxPubdataPerBatch: 110_000,
+            maxL2GasPerBatch: 0,
+            priorityTxMaxPubdata: 99_000,
+            minimalL2GasPrice: 250_000_000
+        });
+
+        vm.prank(chainTypeManager);
+        vm.expectRevert(MaxBatchCapacityIsZero.selector);
         adminFacet.changeFeeParams(newFeeParams);
     }
 
