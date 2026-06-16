@@ -23,24 +23,26 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use alloy::hex;
+use alloy::primitives::{Address, Bytes, B256};
+use alloy::sol_types::SolCall;
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::{Address, Bytes, H256};
-use ethers::utils::hex;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::ecosystem::v31_upgrade_full::V31UpgradeFull;
 use crate::commands::ecosystem::v31_upgrade_inner::{CtmInputs, V31PrepareInputs, V31UpgradeInner};
-use crate::commands::output::write_output_if_requested;
-use crate::common::forge::ForgeRunner;
-use crate::common::logger;
-use crate::common::paths;
-use crate::common::wallets::Wallet;
-use crate::common::SharedRunArgs;
-use crate::config::forge_interface::script_params::{
+use crate::common::abi::AdminFunctionsAbi;
+use crate::common::forge::scripts::{
     ADMIN_FUNCTIONS_INVOCATION, CORE_UPGRADE_V31_SCRIPT_PATH, CTM_UPGRADE_V31_SCRIPT_PATH,
     UPGRADE_V31_CORE_OUTPUT_PATH, UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH,
 };
+use crate::common::forge::ForgeRunner;
+use crate::common::logger;
+use crate::common::output::write_output_if_requested;
+use crate::common::paths;
+use crate::common::wallets::Wallet;
+use crate::common::SharedRunArgs;
 
 // ── upgrade-governance (stages 0 + 1 + 2 on one fork) ─────────────────────
 
@@ -141,7 +143,7 @@ pub async fn run_upgrade_governance(mut args: UpgradeGovernanceArgs) -> anyhow::
         }
     };
 
-    let contracts_path = resolve_l1_contracts_path(&paths::contracts_root())?;
+    let contracts_path = paths::resolve_l1_contracts_path()?;
     let toml_refs: Vec<&Path> = args.governance_toml.iter().map(|p| p.as_path()).collect();
 
     let governance_address = replay_governance_stages(
@@ -218,7 +220,7 @@ pub async fn replay_governance_stages(
     if governance_tomls.is_empty() {
         anyhow::bail!("at least one --governance-toml must be provided");
     }
-    let mut governance_addr = Address::zero();
+    let mut governance_addr = Address::ZERO;
     for stage in 0..=2u8 {
         for toml_path in governance_tomls {
             governance_addr = stage_governance_execute(
@@ -274,22 +276,28 @@ async fn stage_governance_execute(
         governance_addr
     ));
 
-    let helper = match governance_kind {
-        crate::common::env_config::GovernanceKind::Legacy => "governanceExecuteCalls",
-        crate::common::env_config::GovernanceKind::Puh => "governanceExecuteCallsDirect",
+    let encoded_calls = Bytes::from(
+        hex::decode(encoded_calls_hex.trim_start_matches("0x"))
+            .context("invalid governance calls hex")?,
+    );
+    let calldata = match governance_kind {
+        crate::common::env_config::GovernanceKind::Legacy => {
+            AdminFunctionsAbi::governanceExecuteCallsCall {
+                _callsToExecute: encoded_calls,
+                _governanceAddr: governance_addr,
+            }
+            .abi_encode()
+        }
+        crate::common::env_config::GovernanceKind::Puh => {
+            AdminFunctionsAbi::governanceExecuteCallsDirectCall {
+                _callsToExecute: encoded_calls,
+                _governanceAddr: governance_addr,
+            }
+            .abi_encode()
+        }
     };
     let script = runner
-        .with_script_call(
-            &ADMIN_FUNCTIONS_INVOCATION,
-            helper,
-            (
-                Bytes::from(
-                    hex::decode(encoded_calls_hex.trim_start_matches("0x"))
-                        .context("invalid governance calls hex")?,
-                ),
-                governance_addr,
-            ),
-        )?
+        .script_with_calldata(&ADMIN_FUNCTIONS_INVOCATION, calldata)
         .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
         .with_wallet(sender);
 
@@ -302,25 +310,6 @@ async fn stage_governance_execute(
 
     logger::success(format!("Governance stage {} completed", stage));
     Ok(governance_addr)
-}
-
-pub fn resolve_l1_contracts_path(repo_root: &Path) -> anyhow::Result<PathBuf> {
-    let direct = repo_root.join("l1-contracts");
-    if direct.exists() {
-        return Ok(direct);
-    }
-
-    let nested = repo_root.join("contracts").join("l1-contracts");
-    if nested.exists() {
-        return Ok(nested);
-    }
-
-    anyhow::bail!(
-        "Could not resolve l1-contracts path under {} (tried {} and {})",
-        repo_root.display(),
-        direct.display(),
-        nested.display()
-    )
 }
 
 // ── upgrade-prepare-all (split-flow orchestrator) ──────────────────────────
@@ -358,7 +347,7 @@ pub struct UpgradePrepareAllArgs {
     pub ctm_proxies: Vec<Address>,
 
     #[clap(long)]
-    pub create2_factory_salt: Option<H256>,
+    pub create2_factory_salt: Option<B256>,
 
     #[clap(
         long,
@@ -653,7 +642,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 cfg.env
             );
         }
-        let zero = Address::zero();
+        let zero = Address::ZERO;
         for (i, e) in entries.iter().enumerate() {
             if e.bytecodes_supplier == Some(zero) {
                 anyhow::bail!(
@@ -695,7 +684,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     let mut runner = ForgeRunner::new(&args.shared)?;
     let deployer = runner.prepare_sender(deployer_address).await?;
 
-    let contracts_path = resolve_l1_contracts_path(&paths::contracts_root())?;
+    let contracts_path = paths::resolve_l1_contracts_path()?;
 
     let create2_factory_salt_per_ctm = match env_cfg.as_ref() {
         Some(cfg) => {
@@ -948,14 +937,14 @@ fn write_merged_ecosystem_toml(
     extra_stage0: &[crate::common::governance_calls::GovernanceCall],
     zk_governance: Option<&crate::commands::ecosystem::zk_governance::ZkGovernanceOutcome>,
     new_gateway_tomls: &[PathBuf],
-    zk_token_asset_id: ethers::types::H256,
+    zk_token_asset_id: B256,
     dst: &Path,
 ) -> anyhow::Result<()> {
+    use alloy::primitives::{keccak256, U256};
+
     use crate::common::governance_calls::{
         empty_calls_hex, encode_calls, merge_call_array_hex, GovernanceCall,
     };
-    use ethers::types::U256;
-    use ethers::utils::hex;
     use toml::value::{Table, Value};
 
     if let Some(parent) = dst.parent() {
@@ -1067,13 +1056,13 @@ fn write_merged_ecosystem_toml(
     // deployed on the gateway (e.g. both Era + ZKsyncOS).
     let new_gateway_body: Option<Table> = if !new_gateway_tomls.is_empty() {
         let asset_tracker = read_asset_tracker_proxy_from_core(core_toml)?;
-        let selector = &ethers::utils::id("registerLegacyToken(bytes32)")[..4];
+        let selector = &keccak256(b"registerLegacyToken(bytes32)")[..4];
         let mut data = Vec::with_capacity(36);
         data.extend_from_slice(selector);
-        data.extend_from_slice(zk_token_asset_id.as_bytes());
+        data.extend_from_slice(zk_token_asset_id.as_slice());
         let prefix = vec![GovernanceCall {
             target: asset_tracker,
-            value: U256::zero(),
+            value: U256::ZERO,
             data,
         }];
         stage2.push(format!("0x{}", hex::encode(encode_calls(&prefix))));

@@ -1,10 +1,13 @@
 use std::path::{Path, PathBuf};
 
+use alloy::primitives::{Address, Bytes, B256, U256};
+use alloy::providers::Provider;
+use alloy::signers::local::PrivateKeySigner;
 use clap::{Parser, ValueEnum};
-use ethers::{contract::BaseContract, core::abi::Tokenize, core::types::Bytes, utils::hex};
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
+use crate::common::ethereum::get_provider;
 use crate::common::wallets::Wallet;
 
 /// ForgeScript is a wrapper around the forge script command.
@@ -59,21 +62,9 @@ impl ForgeScript {
 
     pub fn with_calldata(mut self, calldata: &Bytes) -> Self {
         self.args.add_arg(ForgeScriptArg::Sig {
-            sig: hex::encode(calldata),
+            sig: alloy::hex::encode(calldata.as_ref()),
         });
         self
-    }
-
-    pub fn with_contract_call<T: Tokenize>(
-        self,
-        contract: &BaseContract,
-        function: &str,
-        args: T,
-    ) -> anyhow::Result<Self> {
-        let calldata = contract
-            .encode(function, args)
-            .map_err(|error| anyhow::anyhow!("failed to encode {}: {}", function, error))?;
-        Ok(self.with_calldata(&calldata))
     }
 
     pub fn with_gas_limit(mut self, gas_limit: u64) -> Self {
@@ -107,7 +98,40 @@ impl ForgeScript {
             .with_unlocked()
     }
 
-    pub(crate) fn sig(&self) -> Option<String> {
+    /// Adds the private key of the deployer account.
+    pub fn with_private_key(mut self, private_key: B256) -> Self {
+        self.args.add_arg(ForgeScriptArg::PrivateKey {
+            private_key: alloy::hex::encode(private_key),
+        });
+        self
+    }
+
+    // Do not start the script if balance is not enough
+    pub fn private_key(&self) -> anyhow::Result<Option<PrivateKeySigner>> {
+        for a in &self.args.args {
+            if let ForgeScriptArg::PrivateKey { private_key } = a {
+                let key: B256 = private_key
+                    .parse()
+                    .map_err(|e| anyhow::anyhow!("invalid private key hex: {e}"))?;
+                let signer = PrivateKeySigner::from_bytes(&key)
+                    .map_err(|e| anyhow::anyhow!("invalid private key: {e}"))?;
+                return Ok(Some(signer));
+            }
+        }
+        Ok(None)
+    }
+
+    pub fn rpc_url(&self) -> Option<String> {
+        self.args.args.iter().find_map(|a| {
+            if let ForgeScriptArg::RpcUrl { url } = a {
+                Some(url.clone())
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn sig(&self) -> Option<String> {
         self.args.args.iter().find_map(|a| {
             if let ForgeScriptArg::Sig { sig } = a {
                 Some(sig.clone())
@@ -117,22 +141,38 @@ impl ForgeScript {
         })
     }
 
-    pub(crate) fn is_broadcast(&self) -> bool {
+    pub fn is_broadcast(&self) -> bool {
         self.args
             .args
             .iter()
             .any(|a| matches!(a, ForgeScriptArg::Broadcast))
     }
 
-    pub(crate) fn needs_bridgehub_skip(&self) -> bool {
+    pub fn address(&self) -> anyhow::Result<Option<Address>> {
+        Ok(self.private_key()?.map(|k| k.address()))
+    }
+
+    pub async fn get_the_balance(&self) -> anyhow::Result<Option<U256>> {
+        let Some(rpc_url) = self.rpc_url() else {
+            return Ok(None);
+        };
+        let Some(signer) = self.private_key()? else {
+            return Ok(None);
+        };
+        let provider = get_provider(&rpc_url)?;
+        let balance = provider.get_balance(signer.address()).await?;
+        Ok(Some(balance))
+    }
+
+    pub fn needs_bridgehub_skip(&self) -> bool {
         self.script_path == Path::new("deploy-scripts/DeployCTM.s.sol")
     }
 
-    pub(crate) fn script_name(&self) -> &Path {
+    pub fn script_name(&self) -> &Path {
         &self.script_path
     }
 
-    pub(crate) fn base_path(&self) -> &Path {
+    pub fn base_path(&self) -> &Path {
         &self.base_path
     }
 }
@@ -160,6 +200,10 @@ pub enum ForgeScriptArg {
         api_key: String,
     },
     Ffi,
+    #[strum(to_string = "private-key={private_key}")]
+    PrivateKey {
+        private_key: String,
+    },
     #[strum(to_string = "rpc-url={url}")]
     RpcUrl {
         url: String,

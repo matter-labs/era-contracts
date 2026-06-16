@@ -1,12 +1,12 @@
+use alloy::primitives::{Address, U256};
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::{Address, U256};
 use serde::{Deserialize, Serialize};
 
-use crate::commands::output::write_output_if_requested;
+use crate::common::abi::AdminFunctionsAbi;
 use crate::common::addresses::ZERO_ADDRESS;
-use crate::common::{forge::ForgeRunner, logger, SharedRunArgs};
-use crate::config::forge_interface::script_params::ADMIN_FUNCTIONS_INVOCATION;
+use crate::common::logger;
+use crate::common::SharedRunArgs;
 
 /// Shared args for add-validator / remove-validator.
 ///
@@ -49,7 +49,7 @@ pub async fn run_remove(args: ChainValidatorArgs) -> anyhow::Result<()> {
 
 async fn run_update(args: ChainValidatorArgs, add: bool) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
-    let mut runner = ForgeRunner::new(&args.shared)?;
+    let mut runner = crate::common::forge::ForgeRunner::new(&args.shared)?;
 
     // `AdminFunctions.updateValidator` → `Utils.adminExecute` internally
     // `vm.startBroadcast(adminOwner)` (or the AccessControlRestriction default
@@ -84,23 +84,19 @@ async fn run_update(args: ChainValidatorArgs, add: bool) -> anyhow::Result<()> {
     logger::info(format!("Validator address: {:#x}", args.validator_address));
     logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));
 
+    let script = runner
+        .script_call(AdminFunctionsAbi::updateValidatorCall {
+            _adminAddr: admin_address,
+            _accessControlRestriction: args.access_control_restriction,
+            _validatorTimelock: validator_timelock,
+            _chainId: U256::from(chain_id),
+            _validatorAddress: args.validator_address,
+            _addValidator: add,
+        })
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
+        .with_wallet(&sender);
     runner
-        .run(
-            runner
-                .with_script_call(
-                    &ADMIN_FUNCTIONS_INVOCATION,
-                    "updateValidator",
-                    (
-                        admin_address,
-                        args.access_control_restriction,
-                        validator_timelock,
-                        U256::from(chain_id),
-                        args.validator_address,
-                        add,
-                    ),
-                )?
-                .with_wallet(&sender),
-        )
+        .run(script)
         .with_context(|| format!("Failed to {} validator", if add { "add" } else { "remove" }))?;
 
     let command = if add {
@@ -108,7 +104,7 @@ async fn run_update(args: ChainValidatorArgs, add: bool) -> anyhow::Result<()> {
     } else {
         "chain.remove-validator"
     };
-    write_output_if_requested(
+    crate::common::output::write_output_if_requested(
         command,
         &args.shared,
         &runner,

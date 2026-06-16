@@ -18,14 +18,16 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use alloy::network::TransactionBuilder;
+use alloy::primitives::{keccak256, Address, Bytes, B256, U256};
+use alloy::providers::Provider;
+use alloy::rpc::types::TransactionRequest;
+use alloy::sol_types::SolValue;
 use anyhow::Context;
-use ethers::abi::{encode as abi_encode, Token};
-use ethers::providers::{Http, Middleware, Provider};
-use ethers::types::{Address, H256, U256};
-use ethers::utils::keccak256;
 use serde::Deserialize;
 
 use crate::common::env_config::EnvConfig;
+use crate::common::ethereum::get_provider;
 use crate::common::forge::ForgeRunner;
 use crate::common::governance_calls::GovernanceCall;
 use crate::common::l1_contracts::resolve_governance;
@@ -33,7 +35,7 @@ use crate::common::logger;
 use crate::common::wallets::Wallet;
 
 /// EIP-1967 admin slot: keccak256("eip1967.proxy.admin") - 1
-const EIP1967_ADMIN_SLOT: H256 = H256([
+const EIP1967_ADMIN_SLOT: B256 = B256::new([
     0xb5, 0x31, 0x27, 0x68, 0x4a, 0x56, 0x8b, 0x31, 0x73, 0xae, 0x13, 0xb9, 0xf8, 0xa6, 0x01, 0x6e,
     0x24, 0x3e, 0x63, 0xb6, 0xe8, 0xee, 0x11, 0x78, 0xd6, 0xa7, 0x17, 0x85, 0x0b, 0x5d, 0x61, 0x03,
 ]);
@@ -76,7 +78,7 @@ pub struct ZkGovernanceInputs<'a> {
     pub create2_factory_override: Option<Address>,
     /// CREATE2 salt shared by all four redeployed contracts. `None` =
     /// `keccak256(GOV_SALT_SEED)`. Rotate this to move the whole set.
-    pub gov_salt_override: Option<H256>,
+    pub gov_salt_override: Option<B256>,
     pub zk_governance_dir: PathBuf,
     /// ZKsync OS ChainTypeManager proxy address. Required by
     /// `DeployPUHAndGuardians.s.sol` — the old PUH has no getter for this.
@@ -140,7 +142,7 @@ pub async fn deploy_puh_guardians(
         });
     let gov_salt = inputs
         .gov_salt_override
-        .unwrap_or_else(|| H256::from(keccak256(GOV_SALT_SEED)));
+        .unwrap_or_else(|| keccak256(GOV_SALT_SEED));
 
     // Resolve --zk-governance-dir relative to the contracts root (`paths::contracts_root()`),
     // so the default `../../zk-governance` works regardless of shell cwd. Some
@@ -272,22 +274,22 @@ pub async fn deploy_puh_guardians(
     let stage0_calls = vec![
         GovernanceCall {
             target: proxy_admin,
-            value: U256::zero(),
+            value: U256::ZERO,
             data: encode_proxy_admin_upgrade(puh_proxy, new_puh_impl),
         },
         GovernanceCall {
             target: puh_proxy,
-            value: U256::zero(),
+            value: U256::ZERO,
             data: encode_puh_update_security_council(new_security_council),
         },
         GovernanceCall {
             target: puh_proxy,
-            value: U256::zero(),
+            value: U256::ZERO,
             data: encode_puh_update_guardians(new_guardians),
         },
         GovernanceCall {
             target: puh_proxy,
-            value: U256::zero(),
+            value: U256::ZERO,
             data: encode_puh_update_emergency_board(new_emergency_upgrade_board),
         },
     ];
@@ -311,30 +313,23 @@ struct DeployOutput {
     new_emergency_upgrade_board: Address,
 }
 
-fn http_provider(rpc: &str) -> anyhow::Result<Provider<Http>> {
-    Provider::<Http>::try_from(rpc).with_context(|| format!("invalid RPC URL: {rpc}"))
-}
-
 async fn resolve_chain_asset_handler(rpc: &str, bridgehub: Address) -> anyhow::Result<Address> {
-    let provider = http_provider(rpc)?;
+    let provider = get_provider(rpc)?;
     let result = provider
         .call(
-            &ethers::types::transaction::eip2718::TypedTransaction::Legacy(
-                ethers::types::transaction::request::TransactionRequest::default()
-                    .to(bridgehub)
-                    .data(BRIDGEHUB_CHAIN_ASSET_HANDLER_SELECTOR.to_vec()),
-            ),
-            None,
+            TransactionRequest::default()
+                .with_to(bridgehub)
+                .with_input(BRIDGEHUB_CHAIN_ASSET_HANDLER_SELECTOR.to_vec()),
         )
         .await
         .context("bridgehub.chainAssetHandler() call failed")?;
-    if result.0.len() < 32 {
+    if result.len() < 32 {
         anyhow::bail!(
             "bridgehub.chainAssetHandler() returned short data ({} bytes)",
-            result.0.len()
+            result.len()
         );
     }
-    let addr = Address::from_slice(&result.0[12..32]);
+    let addr = Address::from_slice(&result[12..32]);
     if addr.is_zero() {
         anyhow::bail!("bridgehub.chainAssetHandler() returned 0x0 — v31 prepare hasn't run yet");
     }
@@ -342,12 +337,13 @@ async fn resolve_chain_asset_handler(rpc: &str, bridgehub: Address) -> anyhow::R
 }
 
 async fn read_eip1967_admin(rpc: &str, proxy: Address) -> anyhow::Result<Address> {
-    let provider = http_provider(rpc)?;
+    let provider = get_provider(rpc)?;
     let raw = provider
-        .get_storage_at(proxy, EIP1967_ADMIN_SLOT, None)
+        .get_storage_at(proxy, U256::from_be_bytes(EIP1967_ADMIN_SLOT.0))
         .await
-        .context("eth_getStorageAt(EIP-1967 admin slot) failed")?;
-    let addr = Address::from_slice(&raw.0[12..32]);
+        .context("eth_getStorageAt(EIP-1967 admin slot) failed")?
+        .to_be_bytes::<32>();
+    let addr = Address::from_slice(&raw[12..32]);
     if addr.is_zero() {
         anyhow::bail!("EIP-1967 admin slot of {proxy:#x} is empty — proxy not initialized?");
     }
@@ -357,11 +353,9 @@ async fn read_eip1967_admin(rpc: &str, proxy: Address) -> anyhow::Result<Address
 fn encode_proxy_admin_upgrade(proxy: Address, new_impl: Address) -> Vec<u8> {
     let mut buf = Vec::with_capacity(4 + 32 * 4);
     buf.extend_from_slice(&PROXY_ADMIN_UPGRADE_AND_CALL_SELECTOR);
-    buf.extend_from_slice(&abi_encode(&[
-        Token::Address(proxy),
-        Token::Address(new_impl),
-        Token::Bytes(Vec::new()),
-    ]));
+    // Matches Solidity `abi.encode(address, address, bytes)` (empty bytes for
+    // the post-upgrade call).
+    buf.extend_from_slice(&(proxy, new_impl, Bytes::new()).abi_encode_params());
     buf
 }
 
@@ -382,6 +376,7 @@ fn encode_puh_update_emergency_board(new_board: Address) -> Vec<u8> {
 fn encode_address_setter(selector: [u8; 4], addr: Address) -> Vec<u8> {
     let mut buf = Vec::with_capacity(4 + 32);
     buf.extend_from_slice(&selector);
-    buf.extend_from_slice(&abi_encode(&[Token::Address(addr)]));
+    // Single left-padded 32-byte word, same as `abi.encode(address)`.
+    buf.extend_from_slice(&addr.abi_encode());
     buf
 }

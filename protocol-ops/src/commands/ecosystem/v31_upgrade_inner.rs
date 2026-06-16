@@ -17,10 +17,11 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use alloy::primitives::{Address, Bytes, B256};
+use alloy::sol_types::SolCall;
 use anyhow::Context;
-use ethers::types::{Address, H256};
 
-use crate::abi_contracts::{CORE_UPGRADE_V31_CONTRACT, CTM_UPGRADE_V31_CONTRACT};
+use crate::common::abi::{ICTMUpgradeV31Abi, ICoreUpgradeV31Abi};
 use crate::common::wallets::Wallet;
 use crate::common::{forge::ForgeRunner, logger};
 
@@ -46,7 +47,7 @@ pub struct V31PrepareInputs {
     /// Target CTMs. One forge invocation per entry.
     pub ctms: Vec<CtmInputs>,
     /// Optional CREATE2 salt for the Core prepare; random if `None`.
-    pub create2_factory_salt: Option<H256>,
+    pub create2_factory_salt: Option<B256>,
     /// Optional per-CTM CREATE2 salts. Keyed by CTM proxy address. Each CTM
     /// prepare must use a distinct salt because the contracts it deploys
     /// (notably `GovernanceUpgradeTimer`) have env-wide identical constructor
@@ -55,7 +56,7 @@ pub struct V31PrepareInputs {
     /// `[create2_factory_salts]` table in `upgrade-envs/v0.31.0-interopB/
     /// <env>.toml`; missing entries fall back to a random salt (legacy
     /// local-fixture path).
-    pub create2_factory_salt_per_ctm: Option<HashMap<Address, H256>>,
+    pub create2_factory_salt_per_ctm: Option<HashMap<Address, B256>>,
     /// Upgrade config TOML path relative to `l1-contracts/`.
     pub upgrade_input_path: String,
     /// Output TOML path for the core forge call (relative to l1-contracts/).
@@ -72,7 +73,7 @@ pub struct V31PrepareInputs {
     /// ZK token asset ID used by CTM prepare. For named envs this comes from
     /// `upgrade-envs/permanent-values/<env>.toml`; otherwise it is explicitly
     /// supplied or falls back only for networks with a canonical value.
-    pub zk_token_asset_id: H256,
+    pub zk_token_asset_id: B256,
 }
 
 /// Output of the prepare phase: the TOMLs each forge invocation wrote, in
@@ -207,24 +208,27 @@ impl<'a> V31UpgradeInner<'a> {
             .join(inputs.core_output_path.trim_start_matches('/'));
         let _ = fs::remove_file(&core_output_path);
 
-        let create2_salt = inputs.create2_factory_salt.unwrap_or_else(H256::random);
+        let create2_salt = inputs
+            .create2_factory_salt
+            .unwrap_or_else(|| B256::from(rand::random::<[u8; 32]>()));
 
         let script = runner
             .script_path_from_root(
                 self.contracts_path,
                 Path::new(inputs.core_script_path.trim_start_matches('/')),
             )
-            .with_contract_call(
-                &CORE_UPGRADE_V31_CONTRACT,
-                "noGovernancePrepare",
-                ((
-                    self.bridgehub,
-                    is_zk_sync_os,
-                    create2_salt,
-                    inputs.upgrade_input_path.clone(),
-                    inputs.core_output_path.clone(),
-                ),),
-            )?
+            .with_calldata(&Bytes::from(
+                ICoreUpgradeV31Abi::noGovernancePrepareCall {
+                    _params: ICoreUpgradeV31Abi::CoreUpgradeParams {
+                        bridgehubProxyAddress: self.bridgehub,
+                        isZKsyncOS: is_zk_sync_os,
+                        create2FactorySalt: create2_salt,
+                        upgradeInputPath: inputs.upgrade_input_path.clone(),
+                        outputPath: inputs.core_output_path.clone(),
+                    },
+                }
+                .abi_encode(),
+            ))
             .with_broadcast()
             .with_ffi()
             .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
@@ -370,7 +374,7 @@ impl<'a> V31UpgradeInner<'a> {
             .create2_factory_salt_per_ctm
             .as_ref()
             .and_then(|m| m.get(&ctm_proxy).copied())
-            .unwrap_or_else(H256::random);
+            .unwrap_or_else(|| B256::from(rand::random::<[u8; 32]>()));
         logger::info(format!(
             "Per-CTM create2 salt: {create2_salt:#x} (ctm={ctm_proxy:#x})"
         ));
@@ -387,22 +391,23 @@ impl<'a> V31UpgradeInner<'a> {
                 self.contracts_path,
                 Path::new(inputs.ctm_script_path.trim_start_matches('/')),
             )
-            .with_contract_call(
-                &CTM_UPGRADE_V31_CONTRACT,
-                "noGovernancePrepare",
-                ((
-                    ctm_proxy,
-                    bytecodes_supplier,
-                    is_zk_sync_os,
-                    rollup_da_manager,
-                    create2_salt,
-                    inputs.upgrade_input_path.clone(),
-                    output_path_str.clone(),
-                    governance,
-                    chain_registration_sender,
-                    inputs.zk_token_asset_id,
-                ),),
-            )?
+            .with_calldata(&Bytes::from(
+                ICTMUpgradeV31Abi::noGovernancePrepareCall {
+                    _params: ICTMUpgradeV31Abi::CTMUpgradeParams {
+                        ctmProxy: ctm_proxy,
+                        bytecodesSupplier: bytecodes_supplier,
+                        isZKsyncOS: is_zk_sync_os,
+                        rollupDAManager: rollup_da_manager,
+                        create2FactorySalt: create2_salt,
+                        upgradeInputPath: inputs.upgrade_input_path.clone(),
+                        outputPath: output_path_str.clone(),
+                        governance,
+                        chainRegistrationSender: chain_registration_sender,
+                        zkTokenAssetId: inputs.zk_token_asset_id,
+                    },
+                }
+                .abi_encode(),
+            ))
             .with_broadcast()
             .with_ffi()
             .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)

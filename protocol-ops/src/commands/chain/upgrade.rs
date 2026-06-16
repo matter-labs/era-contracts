@@ -1,15 +1,21 @@
+use alloy::primitives::Address;
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 
-use crate::commands::output::write_output_if_requested;
+use crate::common::abi::AdminFunctionsAbi;
 use crate::common::addresses::ZERO_ADDRESS;
 use crate::common::env_config::default_protocol_ops_out_dir;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::SharedRunArgs;
-use crate::config::forge_interface::script_params::ADMIN_FUNCTIONS_INVOCATION;
+
+#[derive(Serialize)]
+struct ChainUpgradeOutput {
+    chain_address: Address,
+    admin_address: Address,
+    access_control_restriction: Address,
+}
 
 /// Chain-level CTM upgrade, prepare-only.
 ///
@@ -44,13 +50,6 @@ pub struct ChainUpgradeArgs {
     #[clap(flatten)]
     #[serde(flatten)]
     pub shared: SharedRunArgs,
-}
-
-#[derive(Serialize)]
-struct ChainUpgradeOutputPayload {
-    chain_address: Address,
-    admin_address: Address,
-    access_control_restriction: Address,
 }
 
 pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
@@ -126,20 +125,6 @@ async fn run_one(
         .prepare_chain_admin_broadcaster(bridgehub, chain_id, access_control_restriction)
         .await?;
 
-    let forge = runner
-        .with_script_call(
-            &ADMIN_FUNCTIONS_INVOCATION,
-            "upgradeChainFromCTM",
-            (chain_address, admin_address, access_control_restriction),
-        )?
-        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
-        // `--broadcast` against the anvil fork. In this mode the
-        // target RPC is the anvil fork, so "broadcast" produces no real-chain
-        // effect — it just records the tx in forge's run file so protocol-ops can
-        // extract it into the Safe bundle. Without this the Safe output would be
-        // empty.
-        .with_wallet(&sender);
-
     logger::step(format!(
         "chain {chain_id}: upgradeChainFromCTM Safe bundle (simulation)"
     ));
@@ -151,17 +136,35 @@ async fn run_one(
     ));
     logger::info(format!("RPC URL: {}", shared.l1_rpc_url));
 
+    // `--broadcast` against the anvil fork (applied inside the helper). In this
+    // mode the target RPC is the anvil fork, so "broadcast" produces no
+    // real-chain effect — it just records the tx in forge's run file so
+    // protocol-ops can extract it into the Safe bundle. Without this the Safe
+    // output would be empty.
+    let script = runner
+        .script_call(AdminFunctionsAbi::upgradeChainFromCTMCall {
+            _chainAddress: chain_address,
+            _adminAddr: admin_address,
+            _accessControlRestriction: access_control_restriction,
+        })
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
+        .with_wallet(&sender);
     runner
-        .run(forge)
+        .run(script)
         .context("Failed to execute forge script for chain upgrade")?;
 
-    let empty_input = serde_json::json!({});
-    let out_payload = ChainUpgradeOutputPayload {
-        chain_address,
-        admin_address,
-        access_control_restriction,
-    };
-    write_output_if_requested("chain.upgrade", shared, &runner, &empty_input, &out_payload).await?;
+    crate::common::output::write_output_if_requested(
+        "chain.upgrade",
+        shared,
+        &runner,
+        &serde_json::json!({}),
+        &ChainUpgradeOutput {
+            chain_address,
+            admin_address,
+            access_control_restriction,
+        },
+    )
+    .await?;
 
     logger::success(format!("Chain {chain_id} upgrade prepared"));
     Ok(())

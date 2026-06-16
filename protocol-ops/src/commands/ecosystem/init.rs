@@ -1,16 +1,18 @@
+use alloy::primitives::{Address, B256};
 use clap::Parser;
-use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 
-use crate::commands::ctm::init::{ctm_init, CtmInitInput};
-use crate::commands::hub::init::{hub_init, HubInitInput};
+use crate::commands::ctm::init::ctm_init;
+use crate::commands::ctm::init::CtmInitInput;
+use crate::commands::hub::init::hub_init;
+use crate::commands::hub::init::HubInitInput;
 
-use crate::commands::output::write_output_if_requested;
 use crate::common::env_config::EnvConfig;
+use crate::common::forge::scripts::deploy_ctm::DeployCTMOutput;
+use crate::common::forge::scripts::deploy_ecosystem::DeployL1CoreContractsOutput;
+use crate::common::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
-use crate::config::forge_interface::deploy_ctm::output::DeployCTMOutput;
-use crate::config::forge_interface::deploy_ecosystem::output::DeployL1CoreContractsOutput;
 use crate::types::VMOption;
 
 // ── CLI args ────────────────────────────────────────────────────────────────
@@ -56,10 +58,10 @@ pub struct EcosystemInitArgs {
     /// ZK token asset ID (defaults from env's `zk_token_asset_id` when
     /// `--env` is set).
     #[clap(long, help_heading = "Advanced input")]
-    pub zk_token_asset_id: Option<H256>,
+    pub zk_token_asset_id: Option<B256>,
     /// CREATE2 factory salt (random by default).
     #[clap(long, help_heading = "Advanced input")]
-    pub create2_factory_salt: Option<H256>,
+    pub create2_factory_salt: Option<B256>,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
@@ -164,8 +166,8 @@ pub struct EcosystemInitInput {
     pub vm_type: VMOption,
     pub with_testnet_verifier: bool,
     pub with_legacy_bridge: bool,
-    pub zk_token_asset_id: Option<H256>,
-    pub create2_factory_salt: Option<H256>,
+    pub zk_token_asset_id: Option<B256>,
+    pub create2_factory_salt: Option<B256>,
 }
 
 #[derive(Serialize)]
