@@ -17,11 +17,11 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use alloy::primitives::{Address, B256};
+use alloy::primitives::{Address, Bytes, B256};
+use alloy::sol_types::SolCall;
 use anyhow::Context;
 
 use crate::common::abi::{ICTMUpgradeV31Abi, ICoreUpgradeV31Abi};
-use crate::common::forge::scripts::{CORE_UPGRADE_V31_SCRIPT_PATH, CTM_UPGRADE_V31_SCRIPT_PATH};
 use crate::common::wallets::Wallet;
 use crate::common::{forge::ForgeRunner, logger};
 
@@ -61,6 +61,10 @@ pub struct V31PrepareInputs {
     pub upgrade_input_path: String,
     /// Output TOML path for the core forge call (relative to l1-contracts/).
     pub core_output_path: String,
+    /// `CoreUpgrade_v31` script path (relative to `l1-contracts/`).
+    pub core_script_path: String,
+    /// `CTMUpgrade_v31` script path (relative to `l1-contracts/`).
+    pub ctm_script_path: String,
     /// Override for `isZKsyncOS` used by the CORE prepare (separate from
     /// per-CTM overrides because Core itself is CTM-agnostic but the script
     /// signature still needs the flag). When `None`, auto-resolved from any
@@ -163,7 +167,7 @@ impl<'a> V31UpgradeInner<'a> {
         deployer: &Wallet,
         inputs: &V31PrepareInputs,
     ) -> anyhow::Result<PathBuf> {
-        ensure_script_exists(self.contracts_path, CORE_UPGRADE_V31_SCRIPT_PATH)?;
+        ensure_script_exists(self.contracts_path, &inputs.core_script_path)?;
 
         // CTM is needed only to resolve `isZKsyncOS` — Core itself is
         // CTM-agnostic. Pick the first registered CTM as a witness, or skip
@@ -209,15 +213,25 @@ impl<'a> V31UpgradeInner<'a> {
             .unwrap_or_else(|| B256::from(rand::random::<[u8; 32]>()));
 
         let script = runner
-            .script_call(ICoreUpgradeV31Abi::noGovernancePrepareCall {
-                _params: ICoreUpgradeV31Abi::CoreUpgradeParams {
-                    bridgehubProxyAddress: self.bridgehub,
-                    isZKsyncOS: is_zk_sync_os,
-                    create2FactorySalt: create2_salt,
-                    upgradeInputPath: inputs.upgrade_input_path.clone(),
-                    outputPath: inputs.core_output_path.clone(),
-                },
-            })
+            .script_path_from_root(
+                self.contracts_path,
+                Path::new(inputs.core_script_path.trim_start_matches('/')),
+            )
+            .with_calldata(&Bytes::from(
+                ICoreUpgradeV31Abi::noGovernancePrepareCall {
+                    _params: ICoreUpgradeV31Abi::CoreUpgradeParams {
+                        bridgehubProxyAddress: self.bridgehub,
+                        isZKsyncOS: is_zk_sync_os,
+                        create2FactorySalt: create2_salt,
+                        upgradeInputPath: inputs.upgrade_input_path.clone(),
+                        outputPath: inputs.core_output_path.clone(),
+                    },
+                }
+                .abi_encode(),
+            ))
+            .with_broadcast()
+            .with_ffi()
+            .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
             .with_disable_labels()
             .with_wallet(deployer);
 
@@ -236,7 +250,7 @@ impl<'a> V31UpgradeInner<'a> {
         inputs: &V31PrepareInputs,
         ctm: &CtmInputs,
     ) -> anyhow::Result<(PathBuf, bool)> {
-        ensure_script_exists(self.contracts_path, CTM_UPGRADE_V31_SCRIPT_PATH)?;
+        ensure_script_exists(self.contracts_path, &inputs.ctm_script_path)?;
 
         let ctm_proxy = ctm.proxy;
 
@@ -373,20 +387,30 @@ impl<'a> V31UpgradeInner<'a> {
         let _ = fs::remove_file(&ctm_output_path);
 
         let script = runner
-            .script_call(ICTMUpgradeV31Abi::noGovernancePrepareCall {
-                _params: ICTMUpgradeV31Abi::CTMUpgradeParams {
-                    ctmProxy: ctm_proxy,
-                    bytecodesSupplier: bytecodes_supplier,
-                    isZKsyncOS: is_zk_sync_os,
-                    rollupDAManager: rollup_da_manager,
-                    create2FactorySalt: create2_salt,
-                    upgradeInputPath: inputs.upgrade_input_path.clone(),
-                    outputPath: output_path_str.clone(),
-                    governance,
-                    chainRegistrationSender: chain_registration_sender,
-                    zkTokenAssetId: inputs.zk_token_asset_id,
-                },
-            })
+            .script_path_from_root(
+                self.contracts_path,
+                Path::new(inputs.ctm_script_path.trim_start_matches('/')),
+            )
+            .with_calldata(&Bytes::from(
+                ICTMUpgradeV31Abi::noGovernancePrepareCall {
+                    _params: ICTMUpgradeV31Abi::CTMUpgradeParams {
+                        ctmProxy: ctm_proxy,
+                        bytecodesSupplier: bytecodes_supplier,
+                        isZKsyncOS: is_zk_sync_os,
+                        rollupDAManager: rollup_da_manager,
+                        create2FactorySalt: create2_salt,
+                        upgradeInputPath: inputs.upgrade_input_path.clone(),
+                        outputPath: output_path_str.clone(),
+                        governance,
+                        chainRegistrationSender: chain_registration_sender,
+                        zkTokenAssetId: inputs.zk_token_asset_id,
+                    },
+                }
+                .abi_encode(),
+            ))
+            .with_broadcast()
+            .with_ffi()
+            .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
             .with_disable_labels()
             .with_wallet(deployer);
 

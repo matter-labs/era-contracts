@@ -34,7 +34,8 @@ use crate::commands::ecosystem::v31_upgrade_full::V31UpgradeFull;
 use crate::commands::ecosystem::v31_upgrade_inner::{CtmInputs, V31PrepareInputs, V31UpgradeInner};
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::forge::scripts::{
-    ADMIN_FUNCTIONS_INVOCATION, UPGRADE_V31_CORE_OUTPUT_PATH, UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH,
+    ADMIN_FUNCTIONS_INVOCATION, CORE_UPGRADE_V31_SCRIPT_PATH, CTM_UPGRADE_V31_SCRIPT_PATH,
+    UPGRADE_V31_CORE_OUTPUT_PATH, UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH,
 };
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
@@ -359,6 +360,12 @@ pub struct UpgradePrepareAllArgs {
     /// root). Defaults to the canonical `script-out/v31-upgrade-core.toml`.
     #[clap(long, default_value = UPGRADE_V31_CORE_OUTPUT_PATH, hide = true)]
     pub core_output_path: String,
+
+    #[clap(long, default_value = CORE_UPGRADE_V31_SCRIPT_PATH, hide = true)]
+    pub core_script_path: String,
+
+    #[clap(long, default_value = CTM_UPGRADE_V31_SCRIPT_PATH, hide = true)]
+    pub ctm_script_path: String,
 
     /// Path to a TOML file describing per-CTM inputs (proxy + optional
     /// overrides). Mutually exclusive with the legacy single-CTM flags
@@ -702,6 +709,8 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         create2_factory_salt_per_ctm,
         upgrade_input_path: args.upgrade_input_path.clone(),
         core_output_path: args.core_output_path.clone(),
+        core_script_path: args.core_script_path.clone(),
+        ctm_script_path: args.ctm_script_path.clone(),
         core_is_zk_sync_os_override,
         zk_token_asset_id,
     };
