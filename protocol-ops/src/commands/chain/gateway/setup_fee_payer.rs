@@ -16,27 +16,32 @@
 use std::str::FromStr;
 use std::time::Duration;
 
+use alloy::eips::BlockNumberOrTag;
+use alloy::network::{EthereumWallet, TransactionBuilder};
+use alloy::primitives::{address, Address, B256, U256};
+use alloy::providers::{Provider, ProviderBuilder};
+use alloy::rpc::types::TransactionRequest;
+use alloy::signers::local::PrivateKeySigner;
 use anyhow::Context;
 use clap::Parser;
-use ethers::middleware::SignerMiddleware;
-use ethers::providers::{Http, Middleware, Provider};
-use ethers::signers::{LocalWallet, Signer};
-use ethers::types::{Address, BlockNumber, TransactionRequest, H256, U256};
 use serde::{Deserialize, Serialize};
 
-use crate::abi::IGWAssetTrackerAbi;
-use crate::commands::output::write_output_if_requested;
+use crate::common::abi::IGWAssetTrackerAbi;
 use crate::common::logger;
+use crate::common::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 
 /// `GW_ASSET_TRACKER_ADDR` from `contracts/common/l2-helpers/L2ContractAddresses.sol`
 /// (`BUILT_IN_CONTRACTS_OFFSET + 0x10 = 0x10000 + 0x10 = 0x10010`).
-const GW_ASSET_TRACKER_ADDR_HEX: &str = "0x0000000000000000000000000000000000010010";
+const GW_ASSET_TRACKER_ADDR: Address = address!("0x0000000000000000000000000000000000010010");
 
 /// Cap per-tx gas at 8M — `setSettlementFeePayerAgreement` is a single
 /// storage write so this is comfortably above what it needs but well under
 /// any reasonable block gas limit.
 const GAS_LIMIT: u64 = 8_000_000;
+
+/// Receipt polling interval against the Gateway RPC.
+const RECEIPT_POLL_INTERVAL_MS: u64 = 50;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct SetupFeePayerArgs {
@@ -76,30 +81,32 @@ struct SetupFeePayerOutput {
 }
 
 pub async fn run(args: SetupFeePayerArgs) -> anyhow::Result<()> {
-    let pk_h256 = H256::from_str(args.private_key.as_str())
+    let pk_b256 = B256::from_str(args.private_key.as_str())
         .context("invalid --private-key (expected 0x-prefixed hex)")?;
-    let wallet = LocalWallet::from_bytes(pk_h256.as_bytes())
+    let signer = PrivateKeySigner::from_bytes(&pk_b256)
         .context("invalid --private-key (failed to construct signer)")?;
-    let payer = Signer::address(&wallet);
+    let payer = signer.address();
 
-    let provider = Provider::<Http>::try_from(args.gw_rpc_url.as_str())
-        .context("connect Gateway L2 provider")?
-        .interval(Duration::from_millis(50));
+    let provider = ProviderBuilder::new()
+        .wallet(EthereumWallet::from(signer))
+        .connect_http(
+            args.gw_rpc_url
+                .parse()
+                .context("connect Gateway L2 provider")?,
+        );
+    provider
+        .client()
+        .set_poll_interval(Duration::from_millis(RECEIPT_POLL_INTERVAL_MS));
     let gw_chain_id = provider
-        .get_chainid()
+        .get_chain_id()
         .await
-        .context("eth_chainId on Gateway RPC")?
-        .as_u64();
-    let client = SignerMiddleware::new(provider, wallet.with_chain_id(gw_chain_id));
+        .context("eth_chainId on Gateway RPC")?;
 
-    let asset_tracker_addr: Address = GW_ASSET_TRACKER_ADDR_HEX.parse().unwrap();
     let agreed = !args.revoke;
-    let calldata = IGWAssetTrackerAbi::new(asset_tracker_addr, client.provider().clone().into())
-        .set_settlement_fee_payer_agreement(args.chain_id.into(), agreed)
+    let calldata = IGWAssetTrackerAbi::new(GW_ASSET_TRACKER_ADDR, provider.clone())
+        .setSettlementFeePayerAgreement(U256::from(args.chain_id), agreed)
         .calldata()
-        .ok_or_else(|| {
-            anyhow::anyhow!("failed to encode setSettlementFeePayerAgreement calldata")
-        })?;
+        .clone();
 
     logger::step(format!(
         "{} settlement-fee-payer agreement for chain {} on GW (chainId {})",
@@ -108,34 +115,41 @@ pub async fn run(args: SetupFeePayerArgs) -> anyhow::Result<()> {
         gw_chain_id,
     ));
     logger::info(format!("Payer (msg.sender):  {payer:#x}"));
-    logger::info(format!("GWAssetTracker:      {asset_tracker_addr:#x}"));
+    logger::info(format!("GWAssetTracker:      {GW_ASSET_TRACKER_ADDR:#x}"));
 
-    let nonce = client
-        .get_transaction_count(payer, Some(BlockNumber::Pending.into()))
+    let nonce = provider
+        .get_transaction_count(payer)
+        .block_id(BlockNumberOrTag::Pending.into())
         .await
         .context("eth_getTransactionCount(pending)")?;
+    // Setting `gas_price` explicitly keeps this a legacy (non-EIP-1559) tx,
+    // same shape the previous implementation signed.
+    let gas_price = provider
+        .get_gas_price()
+        .await
+        .context("eth_gasPrice on Gateway RPC")?;
 
-    let req = TransactionRequest::new()
-        .from(payer)
-        .to(asset_tracker_addr)
-        .data(calldata)
-        .value(U256::zero())
-        .chain_id(gw_chain_id)
-        .gas(GAS_LIMIT)
-        .nonce(nonce);
+    let req = TransactionRequest::default()
+        .with_from(payer)
+        .with_to(GW_ASSET_TRACKER_ADDR)
+        .with_input(calldata)
+        .with_value(U256::ZERO)
+        .with_chain_id(gw_chain_id)
+        .with_gas_limit(GAS_LIMIT)
+        .with_nonce(nonce)
+        .with_gas_price(gas_price);
 
-    let pending = client
-        .send_transaction(req, None)
+    let pending = provider
+        .send_transaction(req)
         .await
         .context("eth_sendTransaction for setSettlementFeePayerAgreement")?;
-    let tx_hash = pending.tx_hash();
+    let tx_hash = *pending.tx_hash();
     let receipt = pending
+        .get_receipt()
         .await
-        .context("await receipt for setSettlementFeePayerAgreement")?
-        .ok_or_else(|| anyhow::anyhow!("no receipt for setSettlementFeePayerAgreement"))?;
-    let status = receipt.status.unwrap_or_default();
+        .context("await receipt for setSettlementFeePayerAgreement")?;
     anyhow::ensure!(
-        status == 1.into(),
+        receipt.status(),
         "setSettlementFeePayerAgreement reverted (tx {tx_hash:#x})",
     );
 

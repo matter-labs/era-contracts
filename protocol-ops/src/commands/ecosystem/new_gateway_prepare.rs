@@ -34,18 +34,22 @@
 
 use std::path::{Path, PathBuf};
 
+use alloy::hex;
+use alloy::primitives::{keccak256, Address, Bytes, B256, U256};
+use alloy::sol_types::SolValue;
 use anyhow::Context;
-use ethers::types::{Address, Bytes};
-use ethers::utils::hex;
 use serde::Deserialize;
 
 use crate::commands::chain::gateway::convert::{stage_vote_prepare, VotePrepareInputs};
 use crate::commands::ecosystem::v31_upgrade_inner::CtmPrepareEntry;
+use crate::common::abi::{
+    BridgehubAbi, IL1AssetRouterAbi, IL1NativeTokenVaultAbi, TestnetERC20TokenAbi,
+};
 use crate::common::anvil::{
     evm_increase_time_and_mine, evm_revert, evm_snapshot, send_impersonated_tx, set_balance,
 };
 use crate::common::env_config::NewGatewayConfig;
-use crate::common::ethereum::get_ethers_provider;
+use crate::common::ethereum::get_provider;
 use crate::common::forge::ForgeRunner;
 use crate::common::governance_calls::decode_calls;
 use crate::common::logger;
@@ -77,8 +81,8 @@ pub async fn prepare_new_gateway(
     new_gw: &NewGatewayConfig,
     ctm_representative_chain_id: u64,
     ctm_tomls: &[CtmPrepareEntry],
-    zk_token_asset_id: ethers::types::H256,
-    gw_create2_salt: Option<ethers::types::H256>,
+    zk_token_asset_id: B256,
+    gw_create2_salt: Option<B256>,
 ) -> anyhow::Result<PathBuf> {
     let refund_recipient = new_gw.refund_recipient.unwrap_or(deployer.address);
 
@@ -148,7 +152,7 @@ pub async fn prepare_new_gateway(
     //   1. Snapshot the fork.
     //   2. Replay gov stages 0+1 from the just-emitted core + per-CTM
     //      TOMLs as raw `eth_sendTransaction` from the impersonated
-    //      governance address. Direct ethers bypasses forge entirely so
+    //      governance address. Direct RPC bypasses forge entirely so
     //      these txs don't land in any broadcast log.
     //   3. Run GatewayVotePreparation — the source CTM is now v31 on the
     //      fork, so the require + on-chain reads succeed. Its broadcast
@@ -187,7 +191,7 @@ pub async fn prepare_new_gateway(
     // `L1AssetTracker.handleChainBalanceIncreaseOnL1` → `_requireRegistered`.
     // In production this registration happens in stage3 (post-governance),
     // but our prepare-time replay needs it earlier. The function is public
-    // (anyone can call), so a direct ethers tx is enough.
+    // (anyone can call), so a direct RPC tx is enough.
     let asset_tracker = read_asset_tracker_proxy(core_toml)
         .with_context(|| format!("read asset_tracker_proxy_addr from {}", core_toml.display()))?;
     prime_zk_token_registration(&runner.rpc_url, asset_tracker, zk_token_asset_id)
@@ -394,45 +398,31 @@ pub const ZK_FUNDING_WEI_HEX: &str = "0xc9f2c9cd04674edea40000000";
 async fn fund_zk_via_bridge_mint(
     rpc_url: &str,
     bridgehub: Address,
-    zk_token_asset_id: ethers::types::H256,
+    zk_token_asset_id: B256,
     deployer: Address,
 ) -> anyhow::Result<()> {
-    use ethers::types::U256;
-
-    let provider = get_ethers_provider(rpc_url)?;
+    let provider = get_provider(rpc_url)?;
     // Resolve token + NTV: bridgehub → assetRouter → NTV → tokenAddress(assetId).
-    let bh = ethers::contract::Contract::new(
-        bridgehub,
-        ethers::abi::parse_abi(&["function assetRouter() view returns (address)"]).unwrap(),
-        provider.clone(),
-    );
+    let bh = BridgehubAbi::new(bridgehub, provider.clone());
     let asset_router: Address = bh
-        .method::<_, Address>("assetRouter", ())?
+        .assetRouter()
         .call()
         .await
         .context("bridgehub.assetRouter()")?;
-    let ar = ethers::contract::Contract::new(
-        asset_router,
-        ethers::abi::parse_abi(&["function nativeTokenVault() view returns (address)"]).unwrap(),
-        provider.clone(),
-    );
+    let ar = IL1AssetRouterAbi::new(asset_router, provider.clone());
     let ntv: Address = ar
-        .method::<_, Address>("nativeTokenVault", ())?
+        .nativeTokenVault()
         .call()
         .await
         .context("assetRouter.nativeTokenVault()")?;
-    let ntv_c = ethers::contract::Contract::new(
-        ntv,
-        ethers::abi::parse_abi(&["function tokenAddress(bytes32) view returns (address)"]).unwrap(),
-        provider.clone(),
-    );
+    let ntv_c = IL1NativeTokenVaultAbi::new(ntv, provider.clone());
     let zk_token: Address = ntv_c
-        .method::<_, Address>("tokenAddress", zk_token_asset_id)?
+        .tokenAddress(zk_token_asset_id)
         .call()
         .await
         .context("NTV.tokenAddress(zkTokenAssetId)")?;
     anyhow::ensure!(
-        zk_token != Address::zero(),
+        zk_token != Address::ZERO,
         "NTV.tokenAddress({zk_token_asset_id:#x}) returned zero — assetId not registered on this fork"
     );
 
@@ -450,11 +440,8 @@ async fn fund_zk_via_bridge_mint(
         .context("anvil_setBalance(NTV)")?;
 
     // ABI-encode bridgeMint(address,uint256) and send as the NTV via auto-impersonate.
-    let selector = &ethers::utils::id("bridgeMint(address,uint256)")[..4];
-    let args = ethers::abi::encode(&[
-        ethers::abi::Token::Address(deployer),
-        ethers::abi::Token::Uint(amount),
-    ]);
+    let selector = &keccak256(b"bridgeMint(address,uint256)")[..4];
+    let args = (deployer, amount).abi_encode_params();
     let mut calldata = Vec::with_capacity(4 + args.len());
     calldata.extend_from_slice(selector);
     calldata.extend_from_slice(&args);
@@ -463,7 +450,7 @@ async fn fund_zk_via_bridge_mint(
         rpc_url,
         ntv,
         zk_token,
-        ethers::types::Bytes::from(calldata),
+        Bytes::from(calldata),
         GOV_REPLAY_GAS_LIMIT,
     )
     .await
@@ -471,14 +458,12 @@ async fn fund_zk_via_bridge_mint(
 
     // Sanity-check the mint via balanceOf so a future ABI / NTV-address drift
     // surfaces here, not as a downstream "burn amount exceeds balance" deep
-    // inside the forge run.
-    let token = ethers::contract::Contract::new(
-        zk_token,
-        ethers::abi::parse_abi(&["function balanceOf(address) view returns (uint256)"]).unwrap(),
-        provider,
-    );
+    // inside the forge run. `TestnetERC20TokenAbi` is reused purely for its
+    // standard ERC20 `balanceOf` surface — the token itself is a
+    // BridgedStandardERC20.
+    let token = TestnetERC20TokenAbi::new(zk_token, provider);
     let bal: U256 = token
-        .method::<_, U256>("balanceOf", deployer)?
+        .balanceOf(deployer)
         .call()
         .await
         .context("balanceOf(deployer) after bridgeMint")?;
@@ -492,19 +477,19 @@ async fn fund_zk_via_bridge_mint(
 /// Call `L1AssetTracker.registerLegacyToken(zkTokenAssetId)` so the GW's
 /// first L1→L2 priority tx (which charges ZK as the base token) can pass
 /// the `_requireRegistered` gate. The function is public — anyone can call
-/// it — so a single direct-ethers tx from an anvil-default EOA is enough.
+/// it — so a single direct RPC tx from an anvil-default EOA is enough.
 /// We send outside forge so it doesn't land in any Safe bundle; the
 /// production stage-3 phase later re-applies this registration cleanly
 /// through the standard flow against the fresh real-L1 state.
 async fn prime_zk_token_registration(
     rpc_url: &str,
     asset_tracker: Address,
-    zk_token_asset_id: ethers::types::H256,
+    zk_token_asset_id: B256,
 ) -> anyhow::Result<()> {
-    let selector = &ethers::utils::id("registerLegacyToken(bytes32)")[..4];
+    let selector = &keccak256(b"registerLegacyToken(bytes32)")[..4];
     let mut calldata = Vec::with_capacity(36);
     calldata.extend_from_slice(selector);
-    calldata.extend_from_slice(zk_token_asset_id.as_bytes());
+    calldata.extend_from_slice(zk_token_asset_id.as_slice());
 
     // Any EOA works; default-anvil account 0 has known unlimited funding
     // via `set_balance`. We don't use the deployer EOA here because

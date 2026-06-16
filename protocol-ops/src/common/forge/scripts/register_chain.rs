@@ -1,9 +1,19 @@
-use ethers::types::{Address, H256};
+use alloy::primitives::{Address, B256};
 use serde::{Deserialize, Serialize};
 
+use crate::common::forge::scripts::Create2Addresses;
 use crate::common::traits::FileConfigTrait;
-use crate::config::forge_interface::Create2Addresses;
 use crate::types::{DAValidatorType, L2ChainId, VMOption};
+
+pub use super::REGISTER_CHAIN_INVOCATION as REGISTER_CHAIN_SCRIPT_PARAMS;
+
+pub use super::DEPLOY_PAYMASTER_INVOCATION as DEPLOY_PAYMASTER_SCRIPT_PARAMS;
+
+pub use super::SETUP_LEGACY_BRIDGE_INVOCATION as SETUP_LEGACY_BRIDGE;
+
+pub use super::ENABLE_EVM_EMULATOR_INVOCATION as ENABLE_EVM_EMULATOR_PARAMS;
+
+// ── Input types ──────────────────────────────────────────────────────────────
 
 /// Chain parameters
 #[derive(Debug, Clone, Serialize)]
@@ -29,30 +39,13 @@ pub struct RegisterChainL1Config {
     initialize_legacy_bridge: bool,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct ChainL1Config {
-    pub chain_chain_id: L2ChainId,
-    pub base_token_addr: Address,
-    pub bridgehub_create_new_chain_salt: u64,
-    pub validium_mode: bool,
-    pub validator_sender_operator_eth: Address,
-    pub validator_sender_operator_blobs_eth: Address,
-    pub validator_sender_operator_prove: Address,
-    pub validator_sender_operator_execute: Address,
-    pub base_token_gas_price_multiplier_nominator: u64,
-    pub base_token_gas_price_multiplier_denominator: u64,
-    pub governance_security_council_address: Address,
-    pub governance_min_delay: u64,
-    pub allow_evm_emulator: bool,
-}
-
 impl FileConfigTrait for RegisterChainL1Config {}
 
 impl RegisterChainL1Config {
     pub fn new(
         chain_params: &NewChainParams,
         create2_factory_addr: Address,
-        create2_factory_salt: Option<H256>,
+        create2_factory_salt: Option<B256>,
         initialize_legacy_bridge: bool,
         evm_emulator: bool,
     ) -> anyhow::Result<Self> {
@@ -73,11 +66,11 @@ impl RegisterChainL1Config {
                 validator_sender_operator_eth: chain_params.prove_operator,
                 validator_sender_operator_blobs_eth: chain_params.commit_operator,
                 validator_sender_operator_prove: match chain_params.vm_type {
-                    VMOption::EraVM => Address::zero(),
+                    VMOption::EraVM => Address::ZERO,
                     VMOption::ZKSyncOsVM => chain_params.prove_operator,
                 },
                 validator_sender_operator_execute: match chain_params.vm_type {
-                    VMOption::EraVM => Address::zero(),
+                    VMOption::EraVM => Address::ZERO,
                     VMOption::ZKSyncOsVM => chain_params.execute_operator,
                 },
                 allow_evm_emulator: evm_emulator,
@@ -85,9 +78,41 @@ impl RegisterChainL1Config {
             owner_address: chain_params.owner,
             contracts: Create2Addresses {
                 create2_factory_addr,
-                create2_factory_salt: create2_factory_salt.unwrap_or_else(H256::random),
+                create2_factory_salt: create2_factory_salt
+                    .unwrap_or_else(|| B256::from(rand::random::<[u8; 32]>())),
             },
             initialize_legacy_bridge,
         })
     }
 }
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ChainL1Config {
+    pub chain_chain_id: L2ChainId,
+    pub base_token_addr: Address,
+    pub bridgehub_create_new_chain_salt: u64,
+    pub validium_mode: bool,
+    pub validator_sender_operator_eth: Address,
+    pub validator_sender_operator_blobs_eth: Address,
+    pub validator_sender_operator_prove: Address,
+    pub validator_sender_operator_execute: Address,
+    pub base_token_gas_price_multiplier_nominator: u64,
+    pub base_token_gas_price_multiplier_denominator: u64,
+    pub governance_security_council_address: Address,
+    pub governance_min_delay: u64,
+    pub allow_evm_emulator: bool,
+}
+
+// ── Output types ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RegisterChainOutput {
+    pub diamond_proxy_addr: Address,
+    pub governance_addr: Address,
+    pub chain_admin_addr: Address,
+    pub l2_legacy_shared_bridge_addr: Option<Address>,
+    pub access_control_restriction_addr: Address,
+    pub chain_proxy_admin_addr: Address,
+}
+
+impl FileConfigTrait for RegisterChainOutput {}

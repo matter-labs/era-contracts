@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
+use alloy::primitives::B256;
 use clap::ValueEnum;
-use ethers::types::H256;
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
 
@@ -52,13 +52,13 @@ impl L1Network {
     /// addresses (bridgehub, CTMs, etc.) and makes it discoverable by anyone
     /// onboarding a new chain. Only `Localhost` returns a built-in constant
     /// because interop tests deterministically deploy the token themselves.
-    pub fn zk_token_asset_id(&self) -> anyhow::Result<H256> {
+    pub fn zk_token_asset_id(&self) -> anyhow::Result<B256> {
         match self {
             L1Network::Localhost => {
                 // When testing locally, we deploy the ZK token inside interop tests, so we need to derive its asset id
                 // from LOCAL_ZK_TOKEN_ADDRESS.
                 let _ = LOCAL_ZK_TOKEN_ADDRESS;
-                Ok(H256::from_str(LOCAL_ZK_TOKEN_ASSET_ID).unwrap())
+                Ok(B256::from_str(LOCAL_ZK_TOKEN_ASSET_ID).unwrap())
             }
             L1Network::Sepolia | L1Network::Holesky | L1Network::Mainnet => anyhow::bail!(
                 "no canonical ZK token asset ID for {self}; pass --zk-token-asset-id or use --env with zk_token_asset_id in permanent-values"

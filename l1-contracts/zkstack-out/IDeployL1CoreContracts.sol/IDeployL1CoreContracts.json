@@ -305,5 +305,23 @@
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "runInner",
+    "inputs": [
+      {
+        "name": "inputPath",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "outputPath",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   }
 ]

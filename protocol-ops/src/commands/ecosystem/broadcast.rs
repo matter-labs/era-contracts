@@ -17,10 +17,10 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+use alloy::primitives::{Address, B256};
+use alloy::signers::local::PrivateKeySigner;
 use anyhow::Context;
 use clap::Parser;
-use ethers::signers::{LocalWallet, Signer};
-use ethers::types::{Address, H256};
 use serde::Deserialize;
 
 use crate::commands::dev::execute_safe::{execute_one_bundle, execute_one_bundle_unlocked};
@@ -184,10 +184,10 @@ fn parse_keys(raw: &[String]) -> anyhow::Result<HashMap<Address, String>> {
         let declared: Address = addr_str
             .parse()
             .with_context(|| format!("--key address `{addr_str}` is not a valid address"))?;
-        let pk_h256: H256 = key_str
+        let pk_b256: B256 = key_str
             .parse()
             .with_context(|| format!("--key for {declared:#x} is not a valid 32-byte hex"))?;
-        let wallet = LocalWallet::from_bytes(pk_h256.as_bytes())
+        let wallet = PrivateKeySigner::from_bytes(&pk_b256)
             .with_context(|| format!("--key for {declared:#x} is not a valid signer"))?;
         let derived = wallet.address();
         if derived != declared {

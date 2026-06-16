@@ -1,11 +1,12 @@
 mod cast_transactions;
 mod runner;
 mod script;
+pub mod scripts;
 use std::path::{Path, PathBuf};
 
 pub use cast_transactions::{split_into_bundles, SafeBundle};
 pub use runner::ForgeRunner;
-pub use script::{ForgeScript, ForgeScriptArgs};
+pub use script::{ForgeScript, ForgeScriptArg, ForgeScriptArgs};
 
 /// Default gas limit for forge scripts that execute L1→L2 or governance transactions.
 pub const DEFAULT_SCRIPT_GAS_LIMIT: u64 = 1_000_000_000_000;
