@@ -141,9 +141,10 @@ async function runParallelWorker(label: string, specs: string[], portOffset: num
         );
         // Use in-memory output if log file isn't available yet
         const tail = readLogTail(logPath);
-        const inMemoryTail = tail !== "log file not found"
-          ? tail
-          : Buffer.concat(outputChunks).toString("utf-8").split("\n").slice(-40).join("\n");
+        const inMemoryTail =
+          tail !== "log file not found"
+            ? tail
+            : Buffer.concat(outputChunks).toString("utf-8").split("\n").slice(-40).join("\n");
         reject(
           new Error(
             `${label} failed with exit code ${code ?? "unknown"}. Log: ${logPath}\n` +

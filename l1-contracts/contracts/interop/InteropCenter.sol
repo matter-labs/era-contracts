@@ -23,7 +23,8 @@ import {
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 
 import {SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_INTEROP_ATTRIBUTES} from "../common/Config.sol";
-import {L2_BOOTLOADER_ADDRESS} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_SIMULATOR_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {ISimulator} from "./ISimulator.sol";
 import {
     BUNDLE_IDENTIFIER,
     BalanceChange,
@@ -471,7 +472,13 @@ contract InteropCenter is
         bytes memory interopBundleBytes = abi.encode(bundle);
         bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
 
-        // Send the L2→L1 message for the bundle.
+        // Sim-mode assertion (no gating): if a simulation is currently active and this bundle
+        // wasn't pre-staged, the Simulator reverts. In auto-record mode (no pre-staging) the
+        // Simulator records the bundle hash + raw bytes for later commitment. State changes
+        // proceed unconditionally — they're rolled back wholesale when `Simulator.runPlan`'s
+        // outer revert fires.
+        _checkSimulation(bundleHash, _destinationChainId, interopBundleBytes);
+
         bytes32 msgHash = _sendBundleToL1(interopBundleBytes, bundle.calls.length);
 
         _emitMessageSent({
@@ -794,5 +801,31 @@ contract InteropCenter is
         _getZKToken().safeTransfer(_receiver, amount);
 
         emit ZKFeesClaimed(msg.sender, _receiver, amount);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                       Simulation hook (atomicity)
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev If `Simulator` is deployed on this chain and currently in simulation mode, ask it
+    /// whether `_bundleHash` matches one of the pre-staged expected bundle hashes for the
+    /// active flow. Returns true on match (caller proceeds), reverts on mismatch (sim is
+    /// active but bundle isn't expected), returns false when sim isn't active or `Simulator`
+    /// isn't deployed.
+    /// @dev Non-view because the Simulator may write to its own transient storage in
+    /// auto-record mode (no pre-staged hashes — first bundle's hash + bytes are captured for
+    /// commitment by the outer `simulate` frame).
+    function _checkSimulation(
+        bytes32 _bundleHash,
+        uint256 _destChainId,
+        bytes memory _bundleBytes
+    ) internal returns (bool) {
+        address sim = L2_SIMULATOR_ADDR;
+        uint256 codeLen;
+        assembly {
+            codeLen := extcodesize(sim)
+        }
+        if (codeLen == 0) return false;
+        return ISimulator(sim).checkSimulation(_bundleHash, _destChainId, _bundleBytes);
     }
 }

@@ -139,6 +139,18 @@ address constant GW_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x1
 /// @dev The address of the base token holder contract that holds chain's base token reserves.
 address constant L2_BASE_TOKEN_HOLDER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x11);
 
+/// @dev The address of the atomicity Simulator that escrows assets per flowId. See
+/// `interop/Simulator.sol` and the `atomicity_using_da_and_onchain_simulation` design doc.
+address constant L2_SIMULATOR_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x12);
+
+/// @dev The address of the Indexed Merkle Tree fact recorder. Atomicity contracts call into it
+/// to record `(sender, fact)` pairs and publish the new IMT root via L2->L1 logs.
+address constant L2_IMT_FACT_RECORDER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x13);
+
+/// @dev The address of the asset escrow that holds locked funds for in-flight Simulator flows.
+/// Only callable by `L2_SIMULATOR_ADDR`.
+address constant L2_FLOW_ASSET_ESCROW_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x14);
+
 ////////////////////////////////////////////////////////////
 // ZKsync OS genesis contracts
 ////////////////////////////////////////////////////////////
