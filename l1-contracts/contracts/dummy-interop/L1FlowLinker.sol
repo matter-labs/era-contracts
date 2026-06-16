@@ -44,16 +44,27 @@ import {
 contract L1FlowLinker is IL1FlowLinker, ReentrancyGuard {
     IL1Bridgehub public immutable BRIDGEHUB;
 
-    /// @dev Override flag fixed at construction. When true, `recordFinalitySignal` skips
-    /// the `BRIDGEHUB.proveL2MessageInclusion` call and treats every commit-log payload
-    /// as included. The Bridgehub address is still the real one set at construction —
-    /// this knob only short-circuits the verification step.
+    /// @dev Linker owner — only address allowed to flip `bypassMessageVerification`. Set
+    /// to `msg.sender` of the constructor (the deployer). No transfer mechanism is exposed
+    /// because rotating this dummy contract's authority isn't a goal of the design.
+    address public immutable OWNER;
+
+    /// @dev Override flag. When true, `recordFinalitySignal` skips the
+    /// `BRIDGEHUB.proveL2MessageInclusion` call and treats every commit-log payload as
+    /// included. The Bridgehub address remains the real one — this knob only
+    /// short-circuits the verification step.
     ///
-    /// Intended for testnet demos on chains where the inclusion-proof RPC isn't available
-    /// (e.g. current zksync-os testnet nodes). A linker deployed with this flag set is NOT
-    /// safe for any real-value flow because anyone can forge commit logs by simply
-    /// submitting an off-chain CommitProof; production deployments MUST set this to false.
-    bool public immutable BYPASS_MESSAGE_VERIFICATION;
+    /// Mutable (not immutable) so an operator can start a deployment in bypass mode for
+    /// testnet demos where the inclusion-proof RPC isn't available yet (e.g. current
+    /// zksync-os testnet nodes), then flip it off later once proofs become fetchable
+    /// without redeploying the linker + escrows + L2 stack.
+    ///
+    /// A linker with this flag true is NOT safe for any real-value flow — anyone can
+    /// forge commit logs by submitting an off-chain `CommitProof` whose `message.sender`
+    /// matches the registered escrow. Production deployments MUST keep this false.
+    bool public bypassMessageVerification;
+
+    event BypassMessageVerificationSet(bool value);
 
     /// @dev Per-chain L2 escrow addresses. Populated by `initialize`. Used as both the
     /// expected commit-log `sender` (in `_ingestOneCommit`) and the `l2Contract` target of
@@ -87,7 +98,17 @@ contract L1FlowLinker is IL1FlowLinker, ReentrancyGuard {
 
     constructor(IL1Bridgehub _bridgehub, bool _bypassMessageVerification) reentrancyGuardInitializer {
         BRIDGEHUB = _bridgehub;
-        BYPASS_MESSAGE_VERIFICATION = _bypassMessageVerification;
+        OWNER = msg.sender;
+        bypassMessageVerification = _bypassMessageVerification;
+        emit BypassMessageVerificationSet(_bypassMessageVerification);
+    }
+
+    /// @notice Flip the bypass flag. Restricted to the deployer (`OWNER`) so a stray
+    /// caller can't turn verification back on (denial of service) or off (forge commits).
+    function setBypassMessageVerification(bool _value) external {
+        require(msg.sender == OWNER, "L1FlowLinker: not owner");
+        bypassMessageVerification = _value;
+        emit BypassMessageVerificationSet(_value);
     }
 
     /// @inheritdoc IL1FlowLinker
@@ -230,12 +251,12 @@ contract L1FlowLinker is IL1FlowLinker, ReentrancyGuard {
         }
         if (!_isParticipant(_flowId, _proof.chainId)) revert CommitChainNotInParticipants(_proof.chainId);
 
-        // BYPASS_MESSAGE_VERIFICATION = true short-circuits inclusion proof check for
+        // bypassMessageVerification = true short-circuits inclusion proof check for
         // testnet demos on chains where the proof RPC isn't available. The caller-supplied
         // `_proof.message.sender` / `.data` are still checked below (sender vs. escrowOf,
         // tag/flowId/specHash via abi.decode), so a forged commit at least has to match
         // the per-chain escrow address and the registered flowId's spec set.
-        if (!BYPASS_MESSAGE_VERIFICATION) {
+        if (!bypassMessageVerification) {
             bool included = BRIDGEHUB.proveL2MessageInclusion({
                 _chainId: _proof.chainId,
                 _batchNumber: _proof.blockOrBatchNumber,
