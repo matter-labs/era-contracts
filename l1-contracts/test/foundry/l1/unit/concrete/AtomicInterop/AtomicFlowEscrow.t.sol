@@ -4,10 +4,8 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
-import {GlobalInteropIMT} from "contracts/atomic-interop/GlobalInteropIMT.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {IL2InteropCommitmentTree} from "contracts/atomic-interop/IL2InteropCommitmentTree.sol";
-import {L2GlobalInteropRootImporter} from "contracts/atomic-interop/L2GlobalInteropRootImporter.sol";
 import {AtomicFlowEscrow} from "contracts/atomic-interop/AtomicFlowEscrow.sol";
 import {
     SendSpec,
@@ -15,6 +13,7 @@ import {
     ImtInclusionProof,
     ImtNonInclusionProof
 } from "contracts/atomic-interop/IAtomicInterop.sol";
+import {IAtomicFlowEscrow} from "contracts/atomic-interop/IAtomicFlowEscrow.sol";
 import {
     EscrowDepositorMismatch,
     EscrowSelfDestination,
@@ -22,33 +21,36 @@ import {
     EscrowSpecAlreadyCommitted,
     EscrowSpecNotExecutable
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
-import {ProofDeadlineExceeded, ProofLowNullifierNotAbove} from "contracts/atomic-interop/AtomicInteropErrors.sol";
-import {
-    AtomicInteropTestUtils,
-    FullMerkleWrapper,
-    IndexedImtProver,
-    MockAtomicAssetRouter,
-    MockBridgehub
-} from "./AtomicInteropTestUtils.sol";
+import {ProofDeadlineExceeded, ProofNonInclusionFailed} from "contracts/atomic-interop/AtomicInteropErrors.sol";
+import {AtomicInteropTestUtils, MockAtomicAssetRouter} from "./AtomicInteropTestUtils.sol";
 
-/// @notice End-to-end tests for the L1-free atomic interop flow. Submitting chain roots to L1 and
-/// importing global roots to L2 are permissionless (temporary stubs), so these tests submit/import
-/// without privileged senders. `authorize` requires inclusion proofs ONLY for specs that originate
-/// on another chain — specs committed on the verifying chain are checked via local state.
+/// @notice End-to-end tests for the L1-free atomic interop flow under the burn/recover + message-proof
+/// model. Two chains (A, B) each run a real {L2InteropCommitmentTree} (IMT engine), an
+/// {AtomicFlowEscrow}, and a {MockAtomicAssetRouter} that records the escrow's AR calls.
+///
+/// Proofs are built from REAL tree state: `chainImtRoot = tree.root()`, `leaf/lowLeaf = tree.leafAt`,
+/// `imtProof = tree.merklePath`. The cross-chain authentication of the `(root, timestamp)` message —
+/// `proveL2MessageInclusionShared` — is mocked to `true` here; that authentication is exercised
+/// end-to-end in the separate anvil-interop suite. `rootTimestamp` is the only knob we vary against the
+/// deadline (<= deadline for inclusion, > deadline for non-inclusion); the message proof fields are
+/// dummies because the verification call is mocked.
+///
+/// For the canonical 2-leg swap: a depositor (alice) commits the AB leg on chain A (A = source of AB,
+/// destination of BA); carol commits BA on chain B (B = source of BA, destination of AB).
 contract AtomicFlowEscrowTest is Test {
     uint256 internal constant CHAIN_A = 271;
     uint256 internal constant CHAIN_B = 272;
     uint64 internal constant DEADLINE = 2000;
 
-    GlobalInteropIMT internal registry;
-    MockBridgehub internal bridgehub;
-    IndexedImtProver internal prover;
+    // Dummy message-proof fields: the verification call is mocked to true, so these are not inspected.
+    uint256 internal constant DUMMY_BATCH = 1;
+    uint256 internal constant DUMMY_MSG_INDEX = 0;
+    uint16 internal constant DUMMY_TX_IN_BATCH = 0;
+
     address internal ntv = makeAddr("ntv");
 
     L2InteropCommitmentTree internal treeA;
     L2InteropCommitmentTree internal treeB;
-    L2GlobalInteropRootImporter internal importerA;
-    L2GlobalInteropRootImporter internal importerB;
     AtomicFlowEscrow internal escrowA;
     AtomicFlowEscrow internal escrowB;
     MockAtomicAssetRouter internal arA;
@@ -62,12 +64,10 @@ contract AtomicFlowEscrowTest is Test {
     address internal dave = makeAddr("dave");
 
     function setUp() public {
-        bridgehub = new MockBridgehub();
-        registry = new GlobalInteropIMT(address(bridgehub));
-        prover = new IndexedImtProver();
+        AtomicInteropTestUtils.installSystemMocks();
 
-        (treeA, importerA, escrowA, arA) = _deployStack();
-        (treeB, importerB, escrowB, arB) = _deployStack();
+        (treeA, escrowA, arA) = _deployStack();
+        (treeB, escrowB, arB) = _deployStack();
 
         tokenA = new TestnetERC20Token("TokenA", "TKA", 18);
         tokenB = new TestnetERC20Token("TokenB", "TKB", 18);
@@ -77,19 +77,15 @@ contract AtomicFlowEscrowTest is Test {
 
     function _deployStack()
         internal
-        returns (
-            L2InteropCommitmentTree tree,
-            L2GlobalInteropRootImporter importer,
-            AtomicFlowEscrow escrow,
-            MockAtomicAssetRouter ar
-        )
+        returns (L2InteropCommitmentTree tree, AtomicFlowEscrow escrow, MockAtomicAssetRouter ar)
     {
         tree = new L2InteropCommitmentTree();
-        importer = new L2GlobalInteropRootImporter(); // permissionless; no initialize
         escrow = new AtomicFlowEscrow();
         ar = new MockAtomicAssetRouter();
         tree.initialize(address(escrow));
-        escrow.initialize(address(tree), address(importer), address(ar), ntv);
+        // ntv can be an arbitrary address: the mock AR does not pull through it, and the escrow only
+        // `safeIncreaseAllowance`s the (real) origin token to it.
+        escrow.initialize(address(tree), address(ar), ntv);
     }
 
     function _specAB() internal view returns (SendSpec memory) {
@@ -108,48 +104,74 @@ contract AtomicFlowEscrowTest is Test {
         (SendSpec[] memory specs, bytes32[] memory specHashes) = _sorted(ab, ba);
         bytes32 flowId = AtomicInteropTestUtils.computeFlowId(specHashes, _chainIds(), DEADLINE);
 
+        // 1. Commit each source leg on its origin chain.
+        uint256 aliceBefore = tokenA.balanceOf(alice);
+        uint256 carolBefore = tokenB.balanceOf(carol);
         _commitSend(escrowA, tokenA, treeA, CHAIN_A, alice, flowId, ab);
         _commitSend(escrowB, tokenB, treeB, CHAIN_B, carol, flowId, ba);
-        assertEq(tokenA.balanceOf(address(escrowA)), 100, "source A locked");
-        assertEq(tokenB.balanceOf(address(escrowB)), 50, "source B locked");
-
-        _exposeAndImport(100, 1500);
-
-        // authorize only needs proofs for specs that did NOT originate on the verifying chain.
-        ImtInclusionProof[] memory proofsA = _remoteProofs(specs, flowId, 100, CHAIN_A);
-        ImtInclusionProof[] memory proofsB = _remoteProofs(specs, flowId, 100, CHAIN_B);
-
-        vm.chainId(CHAIN_A);
-        escrowA.authorize(flowId, specs, _chainIds(), DEADLINE, proofsA);
-        vm.chainId(CHAIN_B);
-        escrowB.authorize(flowId, specs, _chainIds(), DEADLINE, proofsB);
 
         bytes32 hAB = AtomicInteropTestUtils.specHashOf(ab);
         bytes32 hBA = AtomicInteropTestUtils.specHashOf(ba);
-        assertTrue(escrowA.specState(flowId, hAB) == SpecState.Executable, "AB executable on A (source)");
+
+        // Source legs are Committed (terminal on the happy path), tokens pulled, AR burn routed once.
+        assertTrue(escrowA.specState(flowId, hAB) == SpecState.Committed, "AB committed on A (source)");
+        assertTrue(escrowB.specState(flowId, hBA) == SpecState.Committed, "BA committed on B (source)");
+        assertEq(arA.atomicBurnCount(), 1, "source burn routed via AR on A");
+        assertEq(arB.atomicBurnCount(), 1, "source burn routed via AR on B");
+        assertEq(arA.lastChainId(), CHAIN_B, "AB burn references dest chain B");
+        assertEq(arB.lastChainId(), CHAIN_A, "BA burn references dest chain A");
+        assertEq(tokenA.balanceOf(alice), aliceBefore - 100, "alice's tokens pulled");
+        assertEq(tokenB.balanceOf(carol), carolBefore - 50, "carol's tokens pulled");
+        assertEq(tokenA.balanceOf(address(escrowA)), 100, "source A locked in escrow");
+        assertEq(tokenB.balanceOf(address(escrowB)), 50, "source B locked in escrow");
+
+        // 2. Authorize the destination legs: on chain X the verifying escrow checks its own source leg
+        //    via local state and the remote leg via an inclusion proof (rootTimestamp <= deadline).
+        ImtInclusionProof[] memory proofsA = _remoteInclusionProofs(specs, flowId, CHAIN_A, 1500);
+        ImtInclusionProof[] memory proofsB = _remoteInclusionProofs(specs, flowId, CHAIN_B, 1500);
+
+        vm.chainId(CHAIN_A);
+        // A is the destination of BA -> expect FlowAuthorized(hBA).
+        vm.expectEmit(true, true, false, false);
+        emit IAtomicFlowEscrow.FlowAuthorized(flowId, hBA);
+        escrowA.authorize(flowId, specs, _chainIds(), DEADLINE, proofsA);
+
+        vm.chainId(CHAIN_B);
+        // B is the destination of AB -> expect FlowAuthorized(hAB).
+        vm.expectEmit(true, true, false, false);
+        emit IAtomicFlowEscrow.FlowAuthorized(flowId, hAB);
+        escrowB.authorize(flowId, specs, _chainIds(), DEADLINE, proofsB);
+
         assertTrue(escrowB.specState(flowId, hAB) == SpecState.Executable, "AB executable on B (dest)");
+        assertTrue(escrowA.specState(flowId, hBA) == SpecState.Executable, "BA executable on A (dest)");
+        // Source legs are untouched by authorize (terminal at Committed).
+        assertTrue(escrowA.specState(flowId, hAB) == SpecState.Committed, "AB stays Committed on A (source)");
+        assertTrue(escrowB.specState(flowId, hBA) == SpecState.Committed, "BA stays Committed on B (source)");
 
-        vm.chainId(CHAIN_A);
-        escrowA.execute(flowId, ab);
+        // 3. Execute the destination legs: mint to recipient via AR finalizeDeposit, referencing origin.
         vm.chainId(CHAIN_B);
+        vm.expectEmit(true, true, false, false);
+        emit IAtomicFlowEscrow.FlowExecuted(flowId, hAB);
         escrowB.execute(flowId, ab);
-        assertTrue(escrowA.specState(flowId, hAB) == SpecState.Executed);
-        assertTrue(escrowB.specState(flowId, hAB) == SpecState.Executed);
-        assertEq(arA.indirectCallCount(), 1, "source burn routed via AR on A");
-        assertEq(arB.finalizeDepositCount(), 1, "destination mint routed via AR on B");
-        assertEq(arB.lastChainId(), CHAIN_A, "dest mint references origin chain");
 
-        vm.chainId(CHAIN_B);
-        escrowB.execute(flowId, ba);
         vm.chainId(CHAIN_A);
+        vm.expectEmit(true, true, false, false);
+        emit IAtomicFlowEscrow.FlowExecuted(flowId, hBA);
         escrowA.execute(flowId, ba);
-        assertTrue(escrowB.specState(flowId, hBA) == SpecState.Executed);
-        assertTrue(escrowA.specState(flowId, hBA) == SpecState.Executed);
-        assertEq(arB.indirectCallCount(), 1, "source burn routed via AR on B");
+
+        assertTrue(escrowB.specState(flowId, hAB) == SpecState.Executed, "AB executed on B");
+        assertTrue(escrowA.specState(flowId, hBA) == SpecState.Executed, "BA executed on A");
+        assertEq(arB.finalizeDepositCount(), 1, "destination mint routed via AR on B");
         assertEq(arA.finalizeDepositCount(), 1, "destination mint routed via AR on A");
+        assertEq(arB.lastChainId(), CHAIN_A, "AB dest mint references origin chain A");
+        assertEq(arA.lastChainId(), CHAIN_B, "BA dest mint references origin chain B");
+
+        // There is NO source execute: source legs remain Committed.
+        assertTrue(escrowA.specState(flowId, hAB) == SpecState.Committed, "no source execute on A");
+        assertTrue(escrowB.specState(flowId, hBA) == SpecState.Committed, "no source execute on B");
     }
 
-    function test_authorize_revertsWhenImportedAfterDeadline() public {
+    function test_authorize_revertsWhenInclusionProofPastDeadline() public {
         SendSpec memory ab = _specAB();
         SendSpec memory ba = _specBA();
         (SendSpec[] memory specs, bytes32[] memory specHashes) = _sorted(ab, ba);
@@ -157,11 +179,13 @@ contract AtomicFlowEscrowTest is Test {
 
         _commitSend(escrowA, tokenA, treeA, CHAIN_A, alice, flowId, ab);
         _commitSend(escrowB, tokenB, treeB, CHAIN_B, carol, flowId, ba);
-        _exposeAndImport(100, 5000); // after deadline
 
-        ImtInclusionProof[] memory proofsA = _remoteProofs(specs, flowId, 100, CHAIN_A);
+        // The remote inclusion proof carries a root snapshot AFTER the deadline.
+        uint256 lateTs = 5000;
+        ImtInclusionProof[] memory proofsA = _remoteInclusionProofs(specs, flowId, CHAIN_A, lateTs);
+
         vm.chainId(CHAIN_A);
-        vm.expectRevert(abi.encodeWithSelector(ProofDeadlineExceeded.selector, 5000, DEADLINE));
+        vm.expectRevert(abi.encodeWithSelector(ProofDeadlineExceeded.selector, lateTs, DEADLINE));
         escrowA.authorize(flowId, specs, _chainIds(), DEADLINE, proofsA);
     }
 
@@ -171,9 +195,10 @@ contract AtomicFlowEscrowTest is Test {
         _commitSend(escrowA, tokenA, treeA, CHAIN_A, alice, flowId, ab);
 
         bytes32 hAB = AtomicInteropTestUtils.specHashOf(ab);
-        vm.chainId(CHAIN_A);
-        vm.expectRevert(abi.encodeWithSelector(EscrowSpecNotExecutable.selector, hAB, SpecState.Committed));
-        escrowA.execute(flowId, ab);
+        // execute on the destination chain B (AB's dest) before authorize -> not Executable (Unset).
+        vm.chainId(CHAIN_B);
+        vm.expectRevert(abi.encodeWithSelector(EscrowSpecNotExecutable.selector, hAB, SpecState.Unset));
+        escrowB.execute(flowId, ab);
     }
 
     // ── Timeout / refund path ───────────────────────────────────────────────────────────
@@ -184,22 +209,27 @@ contract AtomicFlowEscrowTest is Test {
         (SendSpec[] memory specs, bytes32[] memory specHashes) = _sorted(ab, ba);
         bytes32 flowId = AtomicInteropTestUtils.computeFlowId(specHashes, _chainIds(), DEADLINE);
 
-        // A commits; B never does (its IMT holds only the head leaf -> low-nullifier for any value).
+        // A commits AB; B never commits BA -> B's IMT holds only the head leaf (low-nullifier for BA).
         _commitSend(escrowA, tokenA, treeA, CHAIN_A, alice, flowId, ab);
-        _exposeAndImportForRefund();
 
-        ImtNonInclusionProof memory proof = _nonInclusion(treeB, CHAIN_B, flowId, ba);
-
-        uint256 aliceBefore = tokenA.balanceOf(alice);
-        vm.chainId(CHAIN_A);
-        escrowA.authorizeRefund(flowId, specs, _chainIds(), DEADLINE, _missingIdx(specs, CHAIN_B), proof);
+        // Non-inclusion of BA against B's tree, with a post-deadline root snapshot.
+        ImtNonInclusionProof memory proof = _nonInclusion(treeB, CHAIN_B, flowId, ba, 5000);
 
         bytes32 hAB = AtomicInteropTestUtils.specHashOf(ab);
-        assertTrue(escrowA.specState(flowId, hAB) == SpecState.Revertable);
+        vm.chainId(CHAIN_A);
+        vm.expectEmit(true, true, false, false);
+        emit IAtomicFlowEscrow.FlowRefundAuthorized(flowId, hAB);
+        escrowA.authorizeRefund(flowId, specs, _chainIds(), DEADLINE, _missingIdx(specs, CHAIN_B), proof);
+        assertTrue(escrowA.specState(flowId, hAB) == SpecState.Revertable, "AB revertable on A");
 
+        // Claim the refund -> AR recoverAtomicBurn routed once, state Reverted. (Tokens are not actually
+        // moved back by the mock AR, so we assert via recoverCount/state, not balances.)
+        vm.expectEmit(true, true, true, false);
+        emit IAtomicFlowEscrow.FlowRefunded(flowId, hAB, alice);
         escrowA.claimRefund(flowId, ab);
-        assertEq(tokenA.balanceOf(alice), aliceBefore + 100, "alice refunded");
-        assertTrue(escrowA.specState(flowId, hAB) == SpecState.Reverted);
+        assertEq(arA.recoverCount(), 1, "refund recover routed via AR on A");
+        assertEq(arA.lastChainId(), CHAIN_B, "recover references original dest chain B");
+        assertTrue(escrowA.specState(flowId, hAB) == SpecState.Reverted, "AB reverted on A");
     }
 
     function test_authorizeRefund_revertsIfLegActuallyPresent() public {
@@ -210,25 +240,26 @@ contract AtomicFlowEscrowTest is Test {
 
         _commitSend(escrowA, tokenA, treeA, CHAIN_A, alice, flowId, ab);
         _commitSend(escrowB, tokenB, treeB, CHAIN_B, carol, flowId, ba); // BA IS present on B
-        _exposeAndImportForRefund();
 
+        // Build a non-inclusion proof for BA against B's tree using the head as low-nullifier and a
+        // post-deadline timestamp. Because BA's value IS present, the low-nullifier cannot bracket it,
+        // so verifyNonInclusion fails -> ProofNonInclusionFailed.
         uint256 baValue = AtomicInteropTestUtils.commitValue(flowId, AtomicInteropTestUtils.specHashOf(ba));
-        FullMerkleWrapper mirror = prover.mirror(treeB);
         ImtNonInclusionProof memory proof = ImtNonInclusionProof({
-            chainId: CHAIN_B,
+            sourceChainId: CHAIN_B,
+            batchNumber: DUMMY_BATCH,
             chainImtRoot: treeB.root(),
-            lowLeaf: treeB.leafAt(0),
+            rootTimestamp: 5000, // past deadline so the deadline check passes
+            messageTxNumberInBatch: DUMMY_TX_IN_BATCH,
+            messageIndex: DUMMY_MSG_INDEX,
+            messageProof: new bytes32[](0),
+            lowLeaf: treeB.leafAt(0), // head leaf: value 0, next 100... does not bracket a present value
             lowLeafIndex: 0,
-            imtProof: mirror.path(0),
-            globalLeafIndex: registry.leafIndexOf(CHAIN_B),
-            l1BlockNumberBeforeDeadline: 100,
-            globalProofG1: registry.merklePathForChain(CHAIN_B),
-            l1BlockNumberAfterDeadline: 200,
-            globalProofG2: registry.merklePathForChain(CHAIN_B)
+            imtProof: treeB.merklePath(0)
         });
 
         vm.chainId(CHAIN_A);
-        vm.expectRevert(abi.encodeWithSelector(ProofLowNullifierNotAbove.selector, baValue, baValue));
+        vm.expectRevert(abi.encodeWithSelector(ProofNonInclusionFailed.selector, treeB.root(), baValue));
         escrowA.authorizeRefund(flowId, specs, _chainIds(), DEADLINE, _missingIdx(specs, CHAIN_B), proof);
     }
 
@@ -309,7 +340,7 @@ contract AtomicFlowEscrowTest is Test {
         SendSpec memory _spec
     ) internal {
         uint256 value = AtomicInteropTestUtils.commitValue(_flowId, AtomicInteropTestUtils.specHashOf(_spec));
-        uint256 lowNull = prover.lowNullifierIndex(_tree, value);
+        uint256 lowNull = AtomicInteropTestUtils.lowNullifierIndex(_tree, value);
         vm.chainId(_chainId);
         vm.prank(_payer);
         _token.approve(address(_escrow), _spec.amount);
@@ -317,34 +348,14 @@ contract AtomicFlowEscrowTest is Test {
         _escrow.commitSend(_flowId, _spec, lowNull);
     }
 
-    function _exposeAndImport(uint256 _l1Block, uint256 _timestamp) internal {
-        bytes32 rootA = treeA.root();
-        bytes32 rootB = treeB.root();
-        registry.submitChainRoot(CHAIN_A, 1, rootA);
-        registry.submitChainRoot(CHAIN_B, 1, rootB);
-        bytes32 gRoot = registry.globalRoot();
-        importerA.importGlobalRoot(_l1Block, _timestamp, gRoot);
-        importerB.importGlobalRoot(_l1Block, _timestamp, gRoot);
-    }
-
-    function _exposeAndImportForRefund() internal {
-        bytes32 rootA = treeA.root();
-        bytes32 rootB = treeB.root();
-        registry.submitChainRoot(CHAIN_A, 1, rootA);
-        registry.submitChainRoot(CHAIN_B, 1, rootB);
-        bytes32 gRoot = registry.globalRoot();
-        importerA.importGlobalRoot(100, 1500, gRoot); // before deadline
-        importerA.importGlobalRoot(200, 5000, gRoot); // after deadline
-    }
-
-    /// @dev Inclusion proofs for the specs whose origin is NOT `_thisChain`, in sorted order — these
-    /// are the only specs that need a proof when authorizing on `_thisChain`.
-    function _remoteProofs(
+    /// @dev Inclusion proofs for the specs whose origin is NOT `_thisChain`, in sorted spec order — the
+    /// only specs needing a proof when authorizing on `_thisChain` (local specs are checked via state).
+    function _remoteInclusionProofs(
         SendSpec[] memory _specs,
         bytes32 _flowId,
-        uint256 _l1Block,
-        uint256 _thisChain
-    ) internal returns (ImtInclusionProof[] memory proofs) {
+        uint256 _thisChain,
+        uint256 _rootTimestamp
+    ) internal view returns (ImtInclusionProof[] memory proofs) {
         uint256 cnt;
         for (uint256 i = 0; i < _specs.length; ++i) {
             if (_specs[i].originChainId != _thisChain) ++cnt;
@@ -353,7 +364,7 @@ contract AtomicFlowEscrowTest is Test {
         uint256 j;
         for (uint256 i = 0; i < _specs.length; ++i) {
             if (_specs[i].originChainId != _thisChain) {
-                proofs[j++] = _inclusion(_specs[i], _flowId, _l1Block);
+                proofs[j++] = _inclusion(_specs[i], _flowId, _rootTimestamp);
             }
         }
     }
@@ -361,22 +372,23 @@ contract AtomicFlowEscrowTest is Test {
     function _inclusion(
         SendSpec memory _spec,
         bytes32 _flowId,
-        uint256 _l1Block
-    ) internal returns (ImtInclusionProof memory) {
+        uint256 _rootTimestamp
+    ) internal view returns (ImtInclusionProof memory) {
         IL2InteropCommitmentTree tree = _spec.originChainId == CHAIN_A ? treeA : treeB;
         uint256 value = AtomicInteropTestUtils.commitValue(_flowId, AtomicInteropTestUtils.specHashOf(_spec));
-        uint256 idx = prover.indexOfValue(tree, value);
-        FullMerkleWrapper mirror = prover.mirror(tree);
+        uint256 idx = AtomicInteropTestUtils.indexOfValue(tree, value);
         return
             ImtInclusionProof({
-                chainId: _spec.originChainId,
+                sourceChainId: _spec.originChainId,
+                batchNumber: DUMMY_BATCH,
                 chainImtRoot: tree.root(),
+                rootTimestamp: _rootTimestamp,
+                messageTxNumberInBatch: DUMMY_TX_IN_BATCH,
+                messageIndex: DUMMY_MSG_INDEX,
+                messageProof: new bytes32[](0),
                 leaf: tree.leafAt(idx),
                 imtLeafIndex: idx,
-                imtProof: mirror.path(idx),
-                globalLeafIndex: registry.leafIndexOf(_spec.originChainId),
-                globalProof: registry.merklePathForChain(_spec.originChainId),
-                l1BlockNumber: _l1Block
+                imtProof: tree.merklePath(idx)
             });
     }
 
@@ -384,23 +396,23 @@ contract AtomicFlowEscrowTest is Test {
         IL2InteropCommitmentTree _tree,
         uint256 _chainId,
         bytes32 _flowId,
-        SendSpec memory _spec
-    ) internal returns (ImtNonInclusionProof memory) {
+        SendSpec memory _spec,
+        uint256 _rootTimestamp
+    ) internal view returns (ImtNonInclusionProof memory) {
         uint256 value = AtomicInteropTestUtils.commitValue(_flowId, AtomicInteropTestUtils.specHashOf(_spec));
-        uint256 lowIdx = prover.lowNullifierIndex(_tree, value);
-        FullMerkleWrapper mirror = prover.mirror(_tree);
+        uint256 lowIdx = AtomicInteropTestUtils.lowNullifierIndex(_tree, value);
         return
             ImtNonInclusionProof({
-                chainId: _chainId,
+                sourceChainId: _chainId,
+                batchNumber: DUMMY_BATCH,
                 chainImtRoot: _tree.root(),
+                rootTimestamp: _rootTimestamp,
+                messageTxNumberInBatch: DUMMY_TX_IN_BATCH,
+                messageIndex: DUMMY_MSG_INDEX,
+                messageProof: new bytes32[](0),
                 lowLeaf: _tree.leafAt(lowIdx),
                 lowLeafIndex: lowIdx,
-                imtProof: mirror.path(lowIdx),
-                globalLeafIndex: registry.leafIndexOf(_chainId),
-                l1BlockNumberBeforeDeadline: 100,
-                globalProofG1: registry.merklePathForChain(_chainId),
-                l1BlockNumberAfterDeadline: 200,
-                globalProofG2: registry.merklePathForChain(_chainId)
+                imtProof: _tree.merklePath(lowIdx)
             });
     }
 }
