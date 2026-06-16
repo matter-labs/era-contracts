@@ -157,15 +157,18 @@ impl FixedForceDeploymentsData {
             ));
         }
 
-        let era_chain_id = verifiers.era_chain_id;
+        // The force-deployment's eraChainId is the LEGACY Era (e.g. testnet 270),
+        // not the registered era_chain_id — it configures the L2 system contracts'
+        // legacy-Era handling, mirroring the core withdrawal contracts.
+        let era_chain_id = verifiers.legacy_era_chain_id;
         if U256::from(era_chain_id) != self.eraChainId {
             result.report_error(&format!(
-                "FixedForceDeploymentsData eraChainId mismatch: expected {}, got {}",
+                "FixedForceDeploymentsData eraChainId mismatch: expected legacy era {}, got {}",
                 era_chain_id, self.eraChainId
             ));
         } else {
             result.report_ok(&format!(
-                "FixedForceDeploymentsData eraChainId matches env era_chain_id ({era_chain_id})"
+                "FixedForceDeploymentsData eraChainId matches legacy era chain id ({era_chain_id})"
             ));
         }
 

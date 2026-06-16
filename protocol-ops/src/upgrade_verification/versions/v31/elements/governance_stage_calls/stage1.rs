@@ -65,9 +65,34 @@ fn ctm_block_start(ctm_index: usize, call_offset: usize) -> usize {
     call_offset + STAGE1_GENERATED_PREFIX_LEN + ctm_index * STAGE1_PER_CTM_LEN
 }
 
-fn stage1_call_offset(verifiers: &Verifiers) -> usize {
-    usize::from(verifiers.env.is_stage())
+/// Find the stage-1 per-CTM block start for `ctm` by matching its upgrade timer
+/// (offset 0 of each block). The prepare emits per-CTM blocks in env-config CTM
+/// order, which can differ from `artifact.ctms` order, so match by target
+/// rather than asserting a fixed `ctm_index` position (per-CTM upgrade order is
+/// cosmetic — each CTM is upgraded independently).
+fn find_ctm_block_start(
+    ctm: &CtmArtifact,
+    calls: &CallList,
+    call_offset: usize,
+    num_ctms: usize,
+    result: &mut VerificationResult,
+) -> Option<usize> {
+    let timer = required_ctm_address(
+        ctm,
+        &["deployed_addresses", "l1_governance_upgrade_timer"],
+        result,
+    )?;
+    (0..num_ctms)
+        .map(|k| ctm_block_start(k, call_offset))
+        .find(|&block| calls.elems.get(block).is_some_and(|c| c.target == timer))
 }
+
+/// v31's `DefaultCoreUpgrade.prepareStage1GovernanceCalls` prepends one leading
+/// `pauseMigration()` re-assert to stage-1 in EVERY env: on stage's
+/// EmergencyUpgradeBoard path it counters the board's built-in unpause, and on
+/// the standard governance path (testnet, mainnet) it harmlessly re-asserts the
+/// stage-0 pause. So all generated stage-1 calls are shifted by one in all envs.
+const STAGE1_LEADING_PAUSE_OFFSET: usize = 1;
 
 impl GovernanceStage1Calls {
     /// Stage 1 — proxy impl swaps for the 7 core contracts (incl. MessageRoot
@@ -102,22 +127,19 @@ impl GovernanceStage1Calls {
         const ACCEPT_ASSET_TRACKER_OWNERSHIP: usize = 8;
         const SET_ASSET_TRACKER: usize = 9;
 
-        let call_offset = stage1_call_offset(verifiers);
+        let call_offset = STAGE1_LEADING_PAUSE_OFFSET;
         let mut errors = 0;
-        if verifiers.env.is_stage() {
-            // Stage executes stage1 through EmergencyUpgradeBoard, whose
-            // emergency path unpauses migrations before forwarding the calls.
-            // Re-pause first so the later checkMigrationsPaused() calls still
-            // validate the intended stage0 state.
-            errors += verify_call_by_name(
-                &self.calls,
-                0,
-                "chain_asset_handler_proxy",
-                "pauseMigration()",
-                verifiers,
-                result,
-            );
-        }
+        // DefaultCoreUpgrade prepends a leading pauseMigration() re-assert to
+        // stage-1 in every env (see STAGE1_LEADING_PAUSE_OFFSET), so verify it
+        // unconditionally at index 0.
+        errors += verify_call_by_name(
+            &self.calls,
+            0,
+            "chain_asset_handler_proxy",
+            "pauseMigration()",
+            verifiers,
+            result,
+        );
         for (index, target, method) in [
             // Upgrade Bridgehub proxy.
             (0, "transparent_proxy_admin", "upgrade(address,address)"),
@@ -163,8 +185,17 @@ impl GovernanceStage1Calls {
         //   +3 CTM proxy.setChainCreationParams(...)
         //   +4 CTM proxy.setNewVersionUpgrade(...)
         //   +5 VT proxy admin.upgrade(VT proxy, new impl)
-        for (ctm_index, ctm) in ctms.iter().enumerate() {
-            let block = ctm_block_start(ctm_index, call_offset);
+        for ctm in ctms.iter() {
+            let Some(block) =
+                find_ctm_block_start(ctm, &self.calls, call_offset, ctms.len(), result)
+            else {
+                result.report_error(&format!(
+                    "Stage-1 per-CTM block for {} not found (no block whose first call targets its upgrade timer)",
+                    ctm.flavor.label()
+                ));
+                errors += STAGE1_PER_CTM_LEN;
+                continue;
+            };
             let timer_label = format!("{}.upgrade_timer", ctm.flavor.label());
             let validator_label = format!("{}.upgrade_stage_validator", ctm.flavor.label());
             let ctm_proxy_label = format!("{}.chain_type_manager_proxy", ctm.flavor.label());
@@ -340,7 +371,7 @@ impl GovernanceStage1Calls {
         const UPGRADE_CTM_DEPLOYMENT_TRACKER: usize = 5;
         const UPGRADE_CHAIN_ASSET_HANDLER: usize = 6;
 
-        let call_offset = stage1_call_offset(verifiers);
+        let call_offset = STAGE1_LEADING_PAUSE_OFFSET;
         let mut errors = 0;
 
         for (index, proxy_name, implementation_name) in [
@@ -402,10 +433,19 @@ impl GovernanceStage1Calls {
         // Per-CTM block: CTM proxy upgrade, setChainCreationParams,
         // setNewVersionUpgrade. Validated against each CTM's own
         // chain_upgrade_diamond_cut + contracts_config.
-        for (i, ctm) in artifact.ctms.iter().enumerate() {
-            let block = ctm_block_start(i, call_offset);
+        for ctm in artifact.ctms.iter() {
+            let Some(block) =
+                find_ctm_block_start(ctm, &self.calls, call_offset, artifact.ctms.len(), result)
+            else {
+                result.report_error(&format!(
+                    "Stage-1 per-CTM payload block for {} not found",
+                    ctm.flavor.label()
+                ));
+                errors += 1;
+                continue;
+            };
             result.print_info(&format!(
-                "-- CTM[{i}] = {} ----------------------",
+                "-- CTM = {} ----------------------",
                 ctm.flavor.label()
             ));
             errors += verify_ctm_upgrade_call_args(

@@ -502,7 +502,14 @@ pub(crate) async fn verify_v31_provenance(
             panic!("Failed to call Bridgehub.getZKChain({era_chain_id}) for provenance: {err}")
         });
     if era_diamond_proxy == Address::ZERO {
-        panic!("Bridgehub.getZKChain({era_chain_id}) returned address(0) for provenance");
+        // Split-era envs: the legacy core era (e.g. testnet 270) is not a
+        // registered chain on the bridgehub, so its diamond is address(0) —
+        // which is exactly what the preserved core-contract ctors carry. Accept
+        // it; the L1AssetRouter / L1Nullifier ctor checks below compare the
+        // deployed eraDiamondProxy against this same address(0).
+        result.report_ok(&format!(
+            "Legacy era chain {era_chain_id} has no registered diamond (address(0)) — expected for split-era envs"
+        ));
     }
 
     let governance = bridgehub
@@ -543,8 +550,18 @@ pub(crate) async fn verify_v31_provenance(
         .await?;
     }
 
-    verify_v31_new_gateway_ctm_provenance(artifact, verifiers, era_chain_id, l1_chain_id, result)
+    // New-Gateway CTM provenance only applies when the upgrade brings up a
+    // Gateway. Gateway-less envs omit `[new_gateway]` from the artifact.
+    if artifact.new_gateway.is_some() {
+        verify_v31_new_gateway_ctm_provenance(
+            artifact,
+            verifiers,
+            era_chain_id,
+            l1_chain_id,
+            result,
+        )
         .await?;
+    }
 
     let governance_admin = verifiers.network_verifier.get_proxy_admin(governance).await;
     if governance_admin != Address::ZERO {

@@ -1,7 +1,22 @@
 #!/bin/bash
-# Regenerate the v31 stage upgrade calldata against a fresh anvil fork of
-# Sepolia, replay it under impersonation, and run PUVT (`ecosystem
-# verify-upgrade`) against the artifacts.
+# Regenerate a v31 upgrade calldata set against a fresh anvil fork of Sepolia,
+# replay it under impersonation, and run PUVT (`ecosystem verify-upgrade`)
+# against the artifacts.
+#
+# Works for every env. Pass the env as the first positional arg
+# (default: stage):
+#
+#   ./regen-and-verify.sh            # stage   (port 29545)
+#   ./regen-and-verify.sh testnet    # testnet (port 29547)
+#   ./regen-and-verify.sh mainnet    # mainnet (port 29549)
+#
+# All env-specific inputs are derived from the canonical config TOMLs so this
+# script never drifts from the source of truth:
+#   - bridgehub  ← upgrade-envs/v0.31.0-interopB/<env>.toml  bridgehub_proxy_address
+#   - ZK asset   ← upgrade-envs/permanent-values/<env>.toml  zk_token_asset_id
+#   - gateway?   ← upgrade-envs/permanent-values/<env>.toml  [new_gateway] table
+# Only the per-env anvil PORT is hard-mapped below (so parallel runs of
+# different envs don't collide).
 #
 # Required env vars:
 #   L1_FORK_URL                          — Sepolia RPC URL to fork
@@ -13,8 +28,8 @@
 # a signable EOA).
 #
 # Usage:
-#   DEPLOYER_PK=0xabcd… L1_FORK_URL=https://… ./regen-and-verify-stage.sh
-#   DEPLOYER_PK_FILE=~/.test_pk L1_FORK_URL=https://… ./regen-and-verify-stage.sh
+#   DEPLOYER_PK=0xabcd… L1_FORK_URL=https://… ./regen-and-verify.sh
+#   DEPLOYER_PK_FILE=~/.test_pk L1_FORK_URL=https://… ./regen-and-verify.sh testnet
 
 set -euo pipefail
 
@@ -23,18 +38,52 @@ if [[ -z "${L1_FORK_URL:-}" ]]; then
   exit 1
 fi
 
-PORT=29545
+# First positional arg selects the env (default: stage). Each env gets a
+# distinct anvil port so stage/testnet/mainnet rehearsals can run in parallel
+# without colliding (and a KEEP_ANVIL fork of one is never reused by another).
+ENV="${1:-stage}"
+case "$ENV" in
+  stage) PORT=29545 ;;
+  testnet) PORT=29547 ;;
+  mainnet) PORT=29549 ;;
+  *)
+    echo "Unknown env '$ENV' (expected: stage | testnet | mainnet)" >&2
+    exit 1
+    ;;
+esac
 RPC="http://localhost:$PORT"
+echo "Env:          $ENV (anvil port $PORT)"
+
 # Write per-run artifacts (prepare bundles, executed.json, anvil log)
 # directly to `upgrade-envs/v0.31.0-interopB/output/<env>/` so the merged
 # `ecosystem.toml` produced by `upgrade-prepare-all` lands at the tracked
-# path (`output/stage/ecosystem.toml`) — the canonical artifact reviewers
+# path (`output/<env>/ecosystem.toml`) — the canonical artifact reviewers
 # diff. `.gitignore` already excludes `output/**/*.safe.json` +
 # `output/**/manifest.json`, so the per-run safe bundles + manifest stay
 # untracked; only the merged TOML is committed.
 L1_CONTRACTS_DIR="$(cd "$(dirname "$0")"/../.. && pwd)"
-OUT="$L1_CONTRACTS_DIR/upgrade-envs/v0.31.0-interopB/output/stage"
-BRIDGEHUB="0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
+OUT="$L1_CONTRACTS_DIR/upgrade-envs/v0.31.0-interopB/output/$ENV"
+PERMANENT_VALUES="$L1_CONTRACTS_DIR/upgrade-envs/permanent-values/$ENV.toml"
+V31_INPUT="$L1_CONTRACTS_DIR/upgrade-envs/v0.31.0-interopB/$ENV.toml"
+for f in "$PERMANENT_VALUES" "$V31_INPUT"; do
+  [[ -f "$f" ]] || { echo "config not found: $f" >&2; exit 1; }
+done
+
+read_toml_str() {
+  # $1 = file, $2 = key (top-level scalar string in TOML — `key = "0x…"`)
+  python3 -c "
+import re, sys
+m = re.search(r'^${2}\s*=\s*[\"\']([^\"\']+)', open('${1}').read(), re.MULTILINE)
+print(m.group(1) if m else '', end='')
+"
+}
+
+# Bridgehub is the one address the prepare wrapper needs on the CLI; pull it
+# from the env's v31 input so we don't keep a per-env copy in this script.
+BRIDGEHUB="$(read_toml_str "$V31_INPUT" bridgehub_proxy_address)"
+[[ -z "$BRIDGEHUB" ]] && { echo "bridgehub_proxy_address not found in $V31_INPUT" >&2; exit 1; }
+echo "Bridgehub:    $BRIDGEHUB"
+
 # Deployer EOA — derived from the broadcast signer's private key, supplied
 # by the caller. We deliberately *don't* pull this from the env config: the
 # env's `owner_address` is governance (PUH, a contract), not a signable EOA.
@@ -58,24 +107,30 @@ if [[ -z "${DEPLOYER_PK:-}" ]]; then
 fi
 DEPLOYER="$(cast wallet address --private-key "$DEPLOYER_PK")"
 echo "Deployer EOA: $DEPLOYER"
-# Pull env-specific values from the canonical config TOMLs so this script
-# doesn't drift from the source of truth when stage/mainnet/testnet update.
-PERMANENT_VALUES="$L1_CONTRACTS_DIR/upgrade-envs/permanent-values/stage.toml"
-read_toml_str() {
-  # $1 = file, $2 = key (top-level scalar string in TOML — `key = "0x…"`)
-  python3 -c "
-import re, sys
-m = re.search(r'^${2}\s*=\s*[\"\']([^\"\']+)', open('${1}').read(), re.MULTILINE)
-print(m.group(1) if m else '', end='')
-"
-}
+
 ZK_ASSET_ID="$(read_toml_str "$PERMANENT_VALUES" zk_token_asset_id)"
 [[ -z "$ZK_ASSET_ID" ]] && { echo "zk_token_asset_id not found in $PERMANENT_VALUES" >&2; exit 1; }
 echo "ZK asset id:  $ZK_ASSET_ID"
-# Gateway RPC — PUVT uses it for read-only GW-side checks.
+
+# Does this env have a new Gateway? Gateway-ful envs (stage, mainnet) have a
+# `[new_gateway]` table in permanent-values; their ZK token is the new-GW base
+# token (NTV-mintable) and bundle 5's GW priority tx burns it, so ZK funding
+# MUST succeed. Gateway-less envs (testnet) omit the table; their ZK token is
+# L1-native (a plain ERC20, not NTV-mintable → bridgeMint reverts) and no GW
+# priority tx burns ZK, so the funding is both impossible and unnecessary.
+if grep -qE '^\[new_gateway\]' "$PERMANENT_VALUES"; then
+  HAS_GATEWAY=1
+else
+  HAS_GATEWAY=0
+fi
+echo "New gateway:  $([[ "$HAS_GATEWAY" == "1" ]] && echo yes || echo "no (ZK funding best-effort)")"
+
+# Gateway RPC — PUVT uses it for read-only GW-side checks (only exercised on
+# gateway-ful envs; gateway-less envs treat [new_gateway] as absent and skip
+# them, so the URL is just a reachable placeholder there). The default points
+# at stage's gateway — override GW_RPC_URL for other gateway-ful envs.
 GW_RPC_URL="${GW_RPC_URL:-https://zksync-os-stage-gateway.zksync.dev}"
 echo "GW RPC:       $GW_RPC_URL"
-# zk-governance commit for PUH/Guardians bytecode verification.
 # zk-governance commit whose AllContractsHashes.json PUVT uses to verify
 # PUH/Guardians bytecodes. Override via ZK_GOVERNANCE_COMMIT env var; the
 # default points to the latest kl/v31-puh-guardians-redeploy on upstream
@@ -170,7 +225,7 @@ if [[ "$SKIP_PREPARE" == "1" && -f "$OUT/prepare/manifest.json" ]]; then
 else
   echo "=== Step 1: upgrade-prepare-all (this takes ~12 min) ==="
   "$PROTOCOL_OPS" ecosystem upgrade-prepare-all \
-    --env stage \
+    --env "$ENV" \
     --bridgehub "$BRIDGEHUB" \
     --l1-rpc-url "$RPC" \
     --deployer-address "$DEPLOYER" \
@@ -191,7 +246,7 @@ if [[ "$SKIP_BROADCAST" == "1" && -f "$OUT/fork-rehearsal/executed.json" ]]; the
   [[ -f "$OUT/transactions.txt" ]] && cat "$OUT/transactions.txt" >> "$COMBINED_TXLOG"
   [[ -f "$OUT/fork-rehearsal/transactions.txt" ]] && cat "$OUT/fork-rehearsal/transactions.txt" >> "$COMBINED_TXLOG"
   "$PROTOCOL_OPS" ecosystem verify-upgrade \
-    --env stage \
+    --env "$ENV" \
     --ecosystem-toml "$OUT/ecosystem.toml" \
     --l1-rpc-url "$RPC" \
     --gw-rpc-url "$GW_RPC_URL" \
@@ -220,10 +275,23 @@ echo "Bundle targets:"
 echo "$TARGETS" | sed 's/^/  /'
 for TARGET in $TARGETS; do
   cast rpc anvil_setBalance "$TARGET" 0x21e19e0c9bab2400000 --rpc-url "$RPC" >/dev/null
-  echo "  bridgeMint($TARGET, $FUND_AMOUNT)"
-  cast send --from "$NTV" --unlocked "$ZK_TOKEN" \
-    "bridgeMint(address,uint256)" "$TARGET" "$FUND_AMOUNT" \
-    --rpc-url "$RPC" >/dev/null
+  if [[ "$HAS_GATEWAY" == "1" ]]; then
+    # Gateway-ful env: ZK is the NTV-mintable new-GW base token and bundle 5's
+    # GW priority tx burns it — funding must succeed.
+    echo "  bridgeMint($TARGET, $FUND_AMOUNT)"
+    cast send --from "$NTV" --unlocked "$ZK_TOKEN" \
+      "bridgeMint(address,uint256)" "$TARGET" "$FUND_AMOUNT" \
+      --rpc-url "$RPC" >/dev/null
+  else
+    # Gateway-less env: the ZK token is L1-native (a plain ERC20, not
+    # NTV-mintable, so bridgeMint reverts Unauthorized(NTV)) and unnecessary —
+    # no GW priority tx burns ZK. Tolerate the revert; the ETH gas funding
+    # above is all the fork replay needs.
+    echo "  bridgeMint($TARGET, $FUND_AMOUNT) [best-effort]"
+    cast send --from "$NTV" --unlocked "$ZK_TOKEN" \
+      "bridgeMint(address,uint256)" "$TARGET" "$FUND_AMOUNT" \
+      --rpc-url "$RPC" >/dev/null 2>&1 || true
+  fi
 done
 
 # Register the ZK token assetId in L1AssetTracker so bundle 5's GW priority
@@ -271,7 +339,7 @@ COMBINED_TXLOG="$FORK_DIR/transactions.combined.txt"
 [[ -f "$REAL_TXLOG" ]] && cat "$REAL_TXLOG" >> "$COMBINED_TXLOG"
 [[ -f "$FORK_TXLOG" ]] && cat "$FORK_TXLOG" >> "$COMBINED_TXLOG"
 "$PROTOCOL_OPS" ecosystem verify-upgrade \
-  --env stage \
+  --env "$ENV" \
   --ecosystem-toml "$OUT/ecosystem.toml" \
   --l1-rpc-url "$RPC" \
   --gw-rpc-url "$GW_RPC_URL" \

@@ -223,7 +223,9 @@ contract AdminFunctions is Script, IAdminFunctions {
         // calls here and persist them so protocol-ops folds them into stage 0
         // of governance_calls in the merged ecosystem.toml. Sized to
         // chainIds.length (max possible), trimmed before serialization.
-        Call[] memory acceptCalls = new Call[](chainIds.length);
+        // Sized for up to two deferred accepts per CTM (the CTM proxy + its
+        // ValidatorTimelock), each Ownable2Step transfer deferring its accept.
+        Call[] memory acceptCalls = new Call[](chainIds.length * 2);
         uint256 acceptCount = 0;
 
         for (uint256 i = 0; i < chainIds.length; i++) {
@@ -249,6 +251,21 @@ contract AdminFunctions is Script, IAdminFunctions {
                     value: 0,
                     data: abi.encodeCall(Ownable2Step.acceptOwnership, ())
                 });
+            }
+
+            // Transfer the CTM's ValidatorTimelock to governance too. Extracted
+            // to a helper (and scoped) to keep this function under the EVM
+            // stack-depth limit. The helper returns the VT address when a
+            // stage-0 acceptOwnership() is pending, else address(0).
+            {
+                address vtToAccept = _ensureValidatorTimelockOwnedByGovernance(ctm, _governance, _wraps);
+                if (vtToAccept != address(0)) {
+                    acceptCalls[acceptCount++] = Call({
+                        target: vtToAccept,
+                        value: 0,
+                        data: abi.encodeCall(Ownable2Step.acceptOwnership, ())
+                    });
+                }
             }
 
             _ensureProxyAdminOwnedByGovernance(ctm, _governance, _wraps);
@@ -287,6 +304,32 @@ contract AdminFunctions is Script, IAdminFunctions {
             return;
         }
         _issueAsOwner(paOwner, proxyAdmin, abi.encodeCall(IOwnableSingleStep.transferOwnership, (_governance)), _wraps);
+    }
+
+    /// Helper: transfer a CTM's ValidatorTimelock (reached via
+    /// `validatorTimelockPostV29()`, since `validatorTimelock()` returns
+    /// address(0) pre-v31) to `_governance`. The VT is Ownable2Step, so the
+    /// transfer sets pendingOwner now (issued by its current owner) and the
+    /// accept is deferred to stage-0 governance. Returns the VT address when an
+    /// accept is pending (so the caller appends the deferred acceptOwnership),
+    /// else address(0). No-op when the VT is already governance-owned.
+    function _ensureValidatorTimelockOwnedByGovernance(
+        address _ctm,
+        address _governance,
+        OwnerWrap[] memory _wraps
+    ) private returns (address) {
+        address vt = IChainTypeManager(_ctm).validatorTimelockPostV29();
+        if (vt == address(0)) {
+            return address(0);
+        }
+        Ownable2Step vtOwnable = Ownable2Step(vt);
+        if (vtOwnable.owner() != _governance && vtOwnable.pendingOwner() != _governance) {
+            _issueAsOwner(vtOwnable.owner(), vt, abi.encodeCall(Ownable2Step.transferOwnership, (_governance)), _wraps);
+        }
+        if (vtOwnable.pendingOwner() == _governance) {
+            return vt;
+        }
+        return address(0);
     }
 
     /// Persist the trimmed `acceptOwnership()` Call list to a TOML so

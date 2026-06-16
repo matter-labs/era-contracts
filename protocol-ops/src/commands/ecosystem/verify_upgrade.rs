@@ -105,12 +105,15 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.v31_input_path.display()
         )
     })?;
-    let legacy_gateway_chain_id = env_cfg.legacy_gateway_chain_id().ok_or_else(|| {
-        anyhow::anyhow!(
-            "{} is missing `[legacy_gateway] chain_id`",
-            env_cfg.permanent_values_path.display()
-        )
-    })?;
+    // Legacy Era chain id for the core withdrawal contracts. Defaults to
+    // `era_chain_id` on single-era envs; split-era testnets set it explicitly
+    // (e.g. 270 legacy vs 301 registered) in permanent-values.
+    let legacy_era_chain_id = env_cfg.legacy_era_chain_id().unwrap_or(era_chain_id);
+    // `[legacy_gateway]` is optional: gateway-less envs (e.g. a testnet that
+    // never had a Gateway) omit it. When absent the legacy GW chain id defaults
+    // to 0 — the v31 FixedForceDeployments check then expects eraGatewayChainId
+    // == 0 and stage 2 emits no decommission/blacklist prefix.
+    let legacy_gateway_chain_id = env_cfg.legacy_gateway_chain_id().unwrap_or(0);
     let legacy_gateway_chain_intervals = env_cfg.legacy_gateway_chain_intervals().to_vec();
     let l1_chain_id = env_cfg.l1_chain_id().ok_or_else(|| {
         anyhow::anyhow!(
@@ -132,15 +135,19 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         )
     })?;
     let create2_factory = Address::from_slice(create2_factory_eth.as_bytes());
-    let new_gateway = env_cfg.new_gateway().ok_or_else(|| {
-        anyhow::anyhow!(
-            "{} is missing required `[new_gateway]` config for v31 verification",
-            env_cfg.permanent_values_path.display()
-        )
-    })?;
-    let new_gateway_chain_id = new_gateway.chain_id;
-    let new_gateway_representative_chain_id = new_gateway.ctm_representative_chain_id;
-    let new_gateway_settlement_fee = ethers_u256_to_alloy(new_gateway.settlement_fee);
+    // `[new_gateway]` is optional: gateway-less envs omit it (no GW CTM deploy /
+    // whitelist). When absent we pass sentinels; the v31 verifier gates every
+    // new-Gateway check on the artifact's `[new_gateway]` block, which is
+    // likewise absent, so these values are never read.
+    let (new_gateway_chain_id, new_gateway_representative_chain_id, new_gateway_settlement_fee) =
+        match env_cfg.new_gateway() {
+            Some(ng) => (
+                ng.chain_id,
+                ng.ctm_representative_chain_id,
+                ethers_u256_to_alloy(ng.settlement_fee),
+            ),
+            None => (0u64, 0u64, U256::ZERO),
+        };
 
     // Collect every pinned CREATE2 salt declared in the env config — the Core
     // salt from `[contracts] create2_factory_salt` plus the per-CTM salts under
@@ -231,6 +238,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         args.contracts_commit.as_deref(),
         args.zk_governance_commit.as_str(),
         era_chain_id,
+        legacy_era_chain_id,
         legacy_gateway_chain_id,
         &legacy_gateway_chain_intervals,
         new_gateway_chain_id,

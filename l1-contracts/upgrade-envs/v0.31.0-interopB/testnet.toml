@@ -1,0 +1,78 @@
+# v31 (v0.31.0-interopB) upgrade input — TESTNET (ZKsync-OS testnet on Sepolia).
+#
+# Governance is the ProtocolUpgradeHandler (PUH) 0x803e5E7a…; bridgehub
+# 0xc4FD2580… and the Era CTM are PUH-owned. Era = chain 301 (v29 CTM
+# 0x3Cc81628…), ZKsyncOS/Atlas = CTM 0x54D55e74… (witness 8022833, v30). The
+# v31 upgrade moves both CTMs to protocol version 0x1f00000000.
+#
+# NO gateway in this upgrade: there is no `[new_gateway]` block in
+# permanent-values/testnet.toml (so no GW CTM deploy / whitelist), and no
+# `[legacy_gateway]` block (so no settlement-layer blacklist) — testnet never
+# had a Gateway to retire.
+era_chain_id = 301
+testnet_verifier = true
+governance_upgrade_timer_initial_delay = 1200
+owner_address = "0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D"
+
+# This should always be false for non-loadtest environments.
+support_l2_legacy_shared_bridge_test = false
+
+# Nominal only — kept for parity with stage.toml / mainnet.toml. The v31 prepare
+# resolves each CTM's real transition from chain: Era (301) 0x1d00000004 and
+# Atlas 0x1e00000001 both upgrade to 0x1f00000000.
+old_protocol_version = 0x1d00000000
+
+priority_txs_l2_gas_limit = 2000000
+max_expected_l1_gas_price = 50000000000
+
+# NOTE: no `message_root_stage_sepolia_variant` — that is a stage-only carve-out
+# for Era (chain 270) still settling on the stage Gateway (123) at upgrade time.
+# Testnet has no Gateway, so the canonical L1MessageRoot is used.
+
+[contracts]
+governance_min_delay = 0
+
+max_number_of_chains = 100
+create2_factory_salt = "0x5dc245f87cfb442fd9708ef92ffc48fc6c4fd9c244c14fee977513a0efb67ab2"
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+# Per-regen salt for legacy `Governance.sol` ceremonies (Atlas CTM owner wrap).
+legacy_gov_salt = "0xe70f186430cdbc7d2c79907aa541ace289eb107e336ae219b2100d2272fd76b0"
+validator_timelock_execution_delay = 0
+genesis_root = "0xe167dcb28722cee8fc953ea70d8fb2adaffe2806d9fd194da79bd84e19adbae3"
+genesis_rollup_leaf_index = 84
+genesis_batch_commitment = "0xafde914ddb8d8a1e757fcbe6e7d7960723566e15fb7df11204bb15880d1a1a41"
+recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+priority_tx_max_gas_limit = 72000000
+diamond_init_pubdata_pricing_mode = 0
+diamond_init_batch_overhead_l1_gas = 1000000
+diamond_init_max_pubdata_per_batch = 120000
+diamond_init_max_l2_gas_per_batch = 80000000
+diamond_init_priority_tx_max_pubdata = 99000
+diamond_init_minimal_l2_gas_price = 250000000
+bootloader_hash = "0x01000911c4db4fe62c98e180cfa7e9b3a22fb15f505905d4bf36192f481551e6"
+default_aa_hash = "0x010005f73e7c299ed73db937843643bdc276cbc2cc8596287e1e0cf3afc60252"
+evm_emulator_hash = "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63"
+bridgehub_proxy_address = "0xc4FD2580C3487bba18D63f50301020132342fdbD"
+rollup_da_manager = "0xB168490e38E5E7e1B8eB256a701Ee8314Cbf0E15"
+
+# Env-stable testnet security council (carried forward from v0.29/v0.30 testnet
+# configs; not the PUH's securityCouncil()).
+governance_security_council_address = "0x25Ab0397DA109A50C8921A1d4a034e0973602469"
+latest_protocol_version = 0x1d00000002
+l1_bytecodes_supplier_addr = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
+protocol_upgrade_handler_proxy_address = "0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D"
+
+[tokens]
+token_weth_address = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"
+
+# Per-CTM CREATE2 salts. Each CTM prepare deploys a `GovernanceUpgradeTimer`
+# whose constructor args are env-wide constants — without a CTM-distinct salt
+# every CTM would land the timer at the same CREATE2 address and gov-replay's
+# second startTimer() would revert. Keyed by CTM proxy address.
+[create2_factory_salts]
+# Era CTM (witness chain 301)
+"0x3Cc81628a14C824057a97C1B4Ab17758E5D18864" = "0x84d1fa17a6625e070e5cfbf7632e3d173a797ceaf6a9347d65329d6c225616f8"
+# ZKsync OS (Atlas) CTM (witness chain 8022833)
+"0x54D55e74De9c6003E7a68a1fE70E633f05761eb5" = "0x16dc8588072a5ec0ff019d32312d1f1036342ef4ed0117dfd20e572afdbed4e6"

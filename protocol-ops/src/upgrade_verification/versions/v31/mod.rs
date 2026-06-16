@@ -93,6 +93,7 @@ pub(crate) async fn verify(
     contracts_commit: Option<&str>,
     zk_governance_commit: &str,
     era_chain_id: u64,
+    legacy_era_chain_id: u64,
     legacy_gateway_chain_id: u64,
     legacy_gateway_chain_intervals: &[ChainInterval],
     new_gateway_chain_id: u64,
@@ -114,6 +115,7 @@ pub(crate) async fn verify(
         contracts_commit,
         zk_governance_commit,
         era_chain_id,
+        legacy_era_chain_id,
         legacy_gateway_chain_id,
         legacy_gateway_chain_intervals,
         new_gateway_chain_id,
@@ -164,10 +166,13 @@ pub(crate) async fn verify(
 
     verify_v31_artifact_state(artifact, &verifiers, create2_factory, result).await?;
 
+    // Deployment provenance verifies the core withdrawal contracts
+    // (L1AssetRouter/L1Nullifier/MailboxFacet), whose `eraChainId` ctor arg is
+    // the LEGACY era (270 on split-era testnet), not the registered era.
     verify_v31_provenance(
         artifact,
         &verifiers,
-        era_chain_id,
+        legacy_era_chain_id,
         legacy_gateway_chain_id,
         result,
     )

@@ -69,26 +69,39 @@ impl GovernanceStage0Calls {
             result,
         );
 
-        // Calls 1..=N — per-CTM GovernanceUpgradeTimer.startTimer().
-        // One call per `[ctms.<flavor>]` block, in artifact order.
-        for (ctm_index, ctm) in artifact.ctms.iter().enumerate() {
+        // Calls 1..=N — per-CTM GovernanceUpgradeTimer.startTimer(), one per CTM.
+        // The prepare emits these in env-config CTM order, which can differ from
+        // `artifact.ctms` order, so match each CTM's timer to its startTimer call
+        // by target (order-independent) rather than asserting a fixed position.
+        let timer_window_end = (1 + artifact.ctms.len()).min(self.calls.elems.len());
+        for ctm in artifact.ctms.iter() {
             let timer_label = format!("{}.upgrade_timer", ctm.flavor.label());
-            if let Some(timer) = required_ctm_address(
+            let Some(timer) = required_ctm_address(
                 ctm,
                 &["deployed_addresses", "l1_governance_upgrade_timer"],
                 result,
-            ) {
-                errors += verify_call_by_address(
-                    &self.calls,
-                    1 + ctm_index,
-                    timer,
-                    &timer_label,
-                    "startTimer()",
-                    verifiers,
-                    result,
-                );
-            } else {
+            ) else {
                 errors += 1;
+                continue;
+            };
+            match (1..timer_window_end).find(|&idx| self.calls.elems[idx].target == timer) {
+                Some(idx) => {
+                    errors += verify_call_by_address(
+                        &self.calls,
+                        idx,
+                        timer,
+                        &timer_label,
+                        "startTimer()",
+                        verifiers,
+                        result,
+                    );
+                }
+                None => {
+                    result.report_error(&format!(
+                        "Stage-0 startTimer() call for {timer_label} ({timer}) not found in the timer window [1, {timer_window_end})"
+                    ));
+                    errors += 1;
+                }
             }
         }
 
@@ -373,41 +386,51 @@ async fn collect_pre_governance_accept_ownership_targets(
     governance: Address,
     result: &mut VerificationResult,
 ) -> anyhow::Result<Vec<Address>> {
-    let mut unique_ctms = Vec::new();
+    // Candidates: each CTM proxy plus its ValidatorTimelock. v31's
+    // `ensureCtmsAndProxyAdminsOwnedByGovernance` transfers both to governance
+    // (Ownable2Step) and defers the accept to stage 0; include any whose
+    // pendingOwner is governance at prepare time.
+    let mut candidates: Vec<Address> = Vec::new();
     for ctm in &artifact.ctms {
-        let Some(ctm_proxy) = required_ctm_address(
+        if let Some(ctm_proxy) = required_ctm_address(
             ctm,
             &["state_transition", "chain_type_manager_proxy"],
             result,
-        ) else {
-            continue;
-        };
-        if ctm_proxy == Address::ZERO {
-            result.report_error(&format!(
-                "{}.chain_type_manager_proxy must not be zero while deriving stage-0 deferred acceptOwnership targets",
-                ctm.flavor.label()
-            ));
-            continue;
+        ) {
+            if ctm_proxy == Address::ZERO {
+                result.report_error(&format!(
+                    "{}.chain_type_manager_proxy must not be zero while deriving stage-0 deferred acceptOwnership targets",
+                    ctm.flavor.label()
+                ));
+            } else if !candidates.contains(&ctm_proxy) {
+                candidates.push(ctm_proxy);
+            }
         }
-        if !unique_ctms.contains(&ctm_proxy) {
-            unique_ctms.push(ctm_proxy);
+        if let Some(vt) = required_ctm_address(
+            ctm,
+            &["state_transition", "validator_timelock_addr"],
+            result,
+        ) {
+            if vt != Address::ZERO && !candidates.contains(&vt) {
+                candidates.push(vt);
+            }
         }
     }
 
     let provider = verifiers.network_verifier.get_l1_provider();
     let mut targets = Vec::new();
-    for ctm in unique_ctms {
-        let pending_owner = Ownable2Step::new(ctm, provider.clone())
+    for candidate in candidates {
+        let pending_owner = Ownable2Step::new(candidate, provider.clone())
             .pendingOwner()
             .call()
             .await
             .with_context(|| {
                 format!(
-                    "read ChainTypeManager.pendingOwner() for {ctm} while deriving stage-0 deferred acceptOwnership targets"
+                    "read pendingOwner() for {candidate} while deriving stage-0 deferred acceptOwnership targets"
                 )
             })?;
         if pending_owner == governance {
-            targets.push(ctm);
+            targets.push(candidate);
         }
     }
 

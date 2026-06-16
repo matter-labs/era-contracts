@@ -152,7 +152,12 @@ pub(crate) async fn verify_v31_artifact_state(
 
     verify_l1_chain_id(verifiers, result).await;
     result
-        .expect_deployed_bytecode(verifiers, &create2_factory, CREATE2_FACTORY_CONTRACT_NAME)
+        .expect_deployed_bytecode(
+            verifiers,
+            &create2_factory,
+            CREATE2_FACTORY_CONTRACT_NAME,
+            false,
+        )
         .await;
     verify_v31_proxy_admins(artifact, verifiers, result).await?;
     verify_v31_core_wiring(artifact, verifiers, result).await?;
@@ -190,8 +195,17 @@ async fn verify_v31_proxy_admins(
         &["upgrade_addresses", "shared", "transparent_proxy_admin"],
     )?;
 
+    // The core `transparent_proxy_admin` is a pre-existing contract that v31
+    // does not redeploy. On split-era/legacy testnets it predates the current
+    // repo, so its bytecode hash won't match the current TransparentProxyAdmin
+    // — tolerate as a warning (its ownership is verified separately below).
     result
-        .expect_deployed_bytecode(verifiers, &expected_core_admin, "TransparentProxyAdmin")
+        .expect_deployed_bytecode(
+            verifiers,
+            &expected_core_admin,
+            "TransparentProxyAdmin",
+            true,
+        )
         .await;
 
     let admin_slot = match FixedBytes::<32>::from_hex(EIP1967_PROXY_ADMIN_SLOT) {
@@ -384,7 +398,9 @@ async fn verify_v31_core_wiring(
             "Failed to call L1AssetRouter.owner() for core wiring checks: {err}"
         )),
     }
-    let era_chain_id = U256::from(verifiers.era_chain_id);
+    // L1AssetRouter is a core withdrawal contract: its ERA_CHAIN_ID() is the
+    // LEGACY era (270 on split-era testnet), not the registered era (301).
+    let era_chain_id = U256::from(verifiers.legacy_era_chain_id);
     match asset_router.ERA_CHAIN_ID().call().await {
         Ok(actual) => {
             expect_debug_eq(result, "L1AssetRouter.eraChainId()", &actual, &era_chain_id);
@@ -567,15 +583,25 @@ async fn verify_v31_validator_timelocks(
             )),
         }
 
-        let owner_view = Ownable::new(validator_timelock, provider.clone());
-        match owner_view.owner().call().await {
-            Ok(actual) => expect_address_eq(
-                result,
-                &format!("{label}.ValidatorTimelock.owner()"),
-                actual,
-                expected_owner,
-            ),
-            Err(err) => result.report_error(&format!(
+        // v31 transfers the VT to governance via an Ownable2Step handoff whose
+        // acceptOwnership() is a stage-0 governance call — not executed on this
+        // fork. So accept either a completed transfer (owner == governance) or a
+        // pending one (pendingOwner == governance, accept deferred to stage 0).
+        let vt_ownable = Ownable2Step::new(validator_timelock, provider.clone());
+        match (
+            vt_ownable.owner().call().await,
+            vt_ownable.pendingOwner().call().await,
+        ) {
+            (Ok(owner), _) if owner == expected_owner => result.report_ok(&format!(
+                "{label}.ValidatorTimelock.owner() matches expected ({expected_owner})"
+            )),
+            (Ok(_), Ok(pending)) if pending == expected_owner => result.report_ok(&format!(
+                "{label}.ValidatorTimelock ownership transfer to {expected_owner} is pending (acceptOwnership deferred to stage 0)"
+            )),
+            (Ok(owner), _) => result.report_error(&format!(
+                "{label}.ValidatorTimelock.owner() mismatch: expected {expected_owner} (or pendingOwner), got {owner}"
+            )),
+            (Err(err), _) => result.report_error(&format!(
                 "Failed to call {label}.ValidatorTimelock.owner(): {err}"
             )),
         }
