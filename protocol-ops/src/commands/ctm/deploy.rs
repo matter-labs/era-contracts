@@ -1,5 +1,4 @@
 use alloy::primitives::{Address, B256};
-use alloy::sol_types::SolCall;
 use anyhow::bail;
 use serde::Serialize;
 
@@ -65,16 +64,14 @@ pub fn deploy(
     // protocol-ops always states the script's IO paths explicitly (the
     // conventional ones unless a per-run --subdir is set); `runWithBridgehub`
     // with its baked-in paths is for manual forge use.
-    let calldata = IDeployCTMAbi::runInnerCall {
-        inputPath: runner.script_rel_path(DEPLOY_CTM_INVOCATION.input_rel()),
-        outputPath: runner.script_rel_path(DEPLOY_CTM_INVOCATION.output_rel()),
-        bridgehub: input.bridgehub,
-        reuseGovAndAdmin: input.reuse_gov_and_admin,
-        skipL1Deployments: false,
-    }
-    .abi_encode();
     let forge = runner
-        .script_with_calldata(&DEPLOY_CTM_INVOCATION, calldata)
+        .script_call(IDeployCTMAbi::runInnerCall {
+            inputPath: runner.script_rel_path(DEPLOY_CTM_INVOCATION.input_rel()),
+            outputPath: runner.script_rel_path(DEPLOY_CTM_INVOCATION.output_rel()),
+            bridgehub: input.bridgehub,
+            reuseGovAndAdmin: input.reuse_gov_and_admin,
+            skipL1Deployments: false,
+        })
         .with_wallet(auth)
         .with_env(
             "CREATE2_FACTORY_SALT",

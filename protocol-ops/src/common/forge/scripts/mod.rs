@@ -5,9 +5,10 @@ use alloy::sol_types::SolCall;
 use serde::{Deserialize, Serialize};
 
 use crate::common::abi::{
-    AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi,
-    IDeployL1CoreContractsAbi, IDeployPaymasterAbi, IEnableEvmEmulatorAbi, IFinalizeChainInitAbi,
-    IGatewayVotePreparationAbi, IRegisterOnAllChainsAbi, ISetupLegacyBridgeAbi,
+    AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi, ICTMUpgradeV31Abi,
+    ICoreUpgradeV31Abi, IDeployCTMAbi, IDeployL1CoreContractsAbi, IDeployPaymasterAbi,
+    IEnableEvmEmulatorAbi, IFinalizeChainInitAbi, IGatewayVotePreparationAbi,
+    IRegisterOnAllChainsAbi, ISetupLegacyBridgeAbi,
 };
 
 pub mod deploy_ctm;
@@ -198,6 +199,27 @@ pub static REGISTER_ON_ALL_CHAINS_INVOCATION: ForgeScriptParams = ForgeScriptPar
 .with_ffi()
 .with_rpc_url();
 
+pub static CORE_UPGRADE_V31_INVOCATION: ForgeScriptParams =
+    ForgeScriptParams::new("", "", CORE_UPGRADE_V31_SCRIPT_PATH)
+        .with_ffi()
+        .with_rpc_url()
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT);
+
+pub static STAGE3_CORE_UPGRADE_V31_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
+    "",
+    "",
+    "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol:CoreUpgrade_v31",
+)
+.with_ffi()
+.with_rpc_url()
+.with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT);
+
+pub static CTM_UPGRADE_V31_INVOCATION: ForgeScriptParams =
+    ForgeScriptParams::new("", "", CTM_UPGRADE_V31_SCRIPT_PATH)
+        .with_ffi()
+        .with_rpc_url()
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT);
+
 /// Links a typed [`SolCall`] to its [`ForgeScriptParams`] invocation.
 /// Implemented via the [`script_calls!`] table — do not implement by hand.
 pub trait ScriptCall: SolCall {
@@ -246,6 +268,12 @@ script_calls! {
     IRegisterOnAllChainsAbi::registerOnOtherChainsCall                  => REGISTER_ON_ALL_CHAINS_INVOCATION,
     ISetupLegacyBridgeAbi::runCall                                      => SETUP_LEGACY_BRIDGE_INVOCATION,
     IDeployL1CoreContractsAbi::runInnerCall                             => DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION,
+    // DeployCTM
+    IDeployCTMAbi::runInnerCall                                         => DEPLOY_CTM_INVOCATION,
+    // v31 upgrade scripts
+    ICoreUpgradeV31Abi::noGovernancePrepareCall                         => CORE_UPGRADE_V31_INVOCATION,
+    ICoreUpgradeV31Abi::stage3Call                                      => STAGE3_CORE_UPGRADE_V31_INVOCATION,
+    ICTMUpgradeV31Abi::noGovernancePrepareCall                          => CTM_UPGRADE_V31_INVOCATION,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

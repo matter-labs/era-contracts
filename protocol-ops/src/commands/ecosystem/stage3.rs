@@ -19,12 +19,10 @@
 //! env's `owner_address` because on stage / mainnet that's the
 //! ProtocolUpgradeHandler contract (governance), not a signable EOA.
 
-use alloy::primitives::{Address, Bytes};
-use alloy::sol_types::SolCall;
+use alloy::primitives::Address;
 use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 
 use crate::common::abi::ICoreUpgradeV31Abi;
 use crate::common::env_config::default_protocol_ops_out_dir;
@@ -33,8 +31,6 @@ use crate::common::logger;
 use crate::common::output::write_output_if_requested;
 use crate::common::paths::resolve_l1_contracts_path;
 use crate::common::SharedRunArgs;
-
-const STAGE3_SCRIPT: &str = "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol:CoreUpgrade_v31";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct Stage3Args {
@@ -109,17 +105,10 @@ pub async fn run(mut args: Stage3Args) -> anyhow::Result<()> {
             "Bridged tokens input: upgrade-envs/v0.31.0-interopB/local-bridged-tokens.toml (committed default)",
         );
     }
-    let script_rel = Path::new(STAGE3_SCRIPT);
-    let calldata = ICoreUpgradeV31Abi::stage3Call {
-        bridgehubProxy: bridgehub,
-    }
-    .abi_encode();
     let mut script = runner
-        .script_path_from_root(&l1_contracts_path, script_rel)
-        .with_calldata(&Bytes::from(calldata))
-        .with_broadcast()
-        .with_ffi()
-        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
+        .script_call(ICoreUpgradeV31Abi::stage3Call {
+            bridgehubProxy: bridgehub,
+        })
         .with_wallet(&sender);
     if let Some(rel) = bridged_tokens_override {
         script = script.with_env("UPGRADE_BRIDGED_TOKENS_INPUT_OVERRIDE", rel);
