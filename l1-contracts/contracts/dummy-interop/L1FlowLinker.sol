@@ -6,7 +6,6 @@ import {IL2FlowEscrow} from "./IL2FlowEscrow.sol";
 import {COMMIT_LOG_TAG} from "./IDummyFlow.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {L2TransactionRequestDirect} from "../core/bridgehub/IBridgehubBase.sol";
-import {IMessageVerification} from "../common/interfaces/IMessageVerification.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {
     ChainsNotSorted,
@@ -44,7 +43,17 @@ import {
 /// only in V1.
 contract L1FlowLinker is IL1FlowLinker, ReentrancyGuard {
     IL1Bridgehub public immutable BRIDGEHUB;
-    IMessageVerification public immutable MESSAGE_VERIFICATION;
+
+    /// @dev Override flag fixed at construction. When true, `recordFinalitySignal` skips
+    /// the `BRIDGEHUB.proveL2MessageInclusion` call and treats every commit-log payload
+    /// as included. The Bridgehub address is still the real one set at construction —
+    /// this knob only short-circuits the verification step.
+    ///
+    /// Intended for testnet demos on chains where the inclusion-proof RPC isn't available
+    /// (e.g. current zksync-os testnet nodes). A linker deployed with this flag set is NOT
+    /// safe for any real-value flow because anyone can forge commit logs by simply
+    /// submitting an off-chain CommitProof; production deployments MUST set this to false.
+    bool public immutable BYPASS_MESSAGE_VERIFICATION;
 
     /// @dev Per-chain L2 escrow addresses. Populated by `initialize`. Used as both the
     /// expected commit-log `sender` (in `_ingestOneCommit`) and the `l2Contract` target of
@@ -76,9 +85,9 @@ contract L1FlowLinker is IL1FlowLinker, ReentrancyGuard {
     /// commit log). Used by `executeFlow` to route mint-dispatches.
     mapping(bytes32 flowId => mapping(bytes32 specHash => uint256)) internal _destChainOf;
 
-    constructor(IL1Bridgehub _bridgehub, IMessageVerification _messageVerification) reentrancyGuardInitializer {
+    constructor(IL1Bridgehub _bridgehub, bool _bypassMessageVerification) reentrancyGuardInitializer {
         BRIDGEHUB = _bridgehub;
-        MESSAGE_VERIFICATION = _messageVerification;
+        BYPASS_MESSAGE_VERIFICATION = _bypassMessageVerification;
     }
 
     /// @inheritdoc IL1FlowLinker
@@ -221,14 +230,21 @@ contract L1FlowLinker is IL1FlowLinker, ReentrancyGuard {
         }
         if (!_isParticipant(_flowId, _proof.chainId)) revert CommitChainNotInParticipants(_proof.chainId);
 
-        bool included = MESSAGE_VERIFICATION.proveL2MessageInclusionShared({
-            _chainId: _proof.chainId,
-            _blockOrBatchNumber: _proof.blockOrBatchNumber,
-            _index: _proof.messageIndex,
-            _message: _proof.message,
-            _proof: _proof.merkleProof
-        });
-        if (!included) revert CommitLogNotIncluded(_proof.chainId);
+        // BYPASS_MESSAGE_VERIFICATION = true short-circuits inclusion proof check for
+        // testnet demos on chains where the proof RPC isn't available. The caller-supplied
+        // `_proof.message.sender` / `.data` are still checked below (sender vs. escrowOf,
+        // tag/flowId/specHash via abi.decode), so a forged commit at least has to match
+        // the per-chain escrow address and the registered flowId's spec set.
+        if (!BYPASS_MESSAGE_VERIFICATION) {
+            bool included = BRIDGEHUB.proveL2MessageInclusion({
+                _chainId: _proof.chainId,
+                _batchNumber: _proof.blockOrBatchNumber,
+                _index: _proof.messageIndex,
+                _message: _proof.message,
+                _proof: _proof.merkleProof
+            });
+            if (!included) revert CommitLogNotIncluded(_proof.chainId);
+        }
 
         (bytes4 tag, bytes32 logFlowId, uint256 destChainId, bytes32 specHash) = abi.decode(
             _proof.message.data,

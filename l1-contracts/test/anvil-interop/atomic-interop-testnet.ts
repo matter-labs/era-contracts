@@ -36,7 +36,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { BigNumber, Contract, ContractFactory, ethers, providers, Wallet } from "ethers";
 import { getAbi, getCreationBytecode } from "./src/core/contracts";
-import { deployPrivateInteropStack, registerRemoteRouters } from "./src/helpers/private-interop-deployer";
+import { deployPrivateInteropStack } from "./src/helpers/private-interop-deployer";
 import {
   buildSendSpec,
   computeFlowId,
@@ -53,7 +53,17 @@ import { encodeNtvAssetId } from "./src/core/data-encoding";
 const L1_CHAIN_ID = 11155111;
 const L1_RPC = process.env.SEPOLIA_RPC ?? "https://ethereum-sepolia-rpc.publicnode.com";
 const L1_BRIDGEHUB = "0xc4FD2580C3487bba18D63f50301020132342fdbD";
-const L1_MESSAGE_ROOT = "0xe7047cD9979D053ceb6dB637bc0383b87A3C7f58";
+
+// BYPASS_VERIFICATION=1 deploys the linker with `_bypassMessageVerification = true`,
+// so `recordFinalitySignal` skips the call to `IMessageVerification.proveL2MessageInclusionShared`
+// and accepts the commit-log payload at face value. The MESSAGE_VERIFICATION address
+// is still the real L1MessageRoot (Bridgehub-managed) — no mock contracts are deployed.
+//
+// Needed because the current zksync-os testnet chains (creator_testnet, zksync_os_testnet)
+// don't expose the EraVM-style `zks_getL2ToL1LogProof` RPC, so the real-proof flow
+// can't complete there today. Everything else (commitSend logs on each L2, executeFlow
+// priority dispatch, settle on each L2 driving real AR/NTV burn+mint) is unchanged.
+const BYPASS_VERIFICATION = process.env.BYPASS_VERIFICATION === "1";
 
 interface ChainCfg {
   name: string;
@@ -78,6 +88,10 @@ const CHAINS: ChainCfg[] = [
 ];
 
 const ETH_PER_L2_DEPOSIT = ethers.utils.parseEther("0.05");
+// Direct L2 / L1 txs should land in seconds — if they don't, something is wrong (gas
+// underpriced, RPC issue, mempool stuck). Fail fast rather than wait forever. The
+// L1->L2 priority-tx flow has its own (much longer) polling loop.
+const FAST_TX_TIMEOUT_MS = 60_000;
 const TEST_TOKEN_AMOUNT = ethers.utils.parseUnits("100", 18);
 const SWAP_AMOUNT = ethers.utils.parseUnits("10", 18);
 const FLOW_DEADLINE_SECONDS = 24 * 60 * 60; // 24h - generous; verify-batch wait may take hours
@@ -86,8 +100,13 @@ const L2_GAS_PER_PUBDATA = 800;
 const L1_PRIORITY_GAS_PRICE = ethers.utils.parseUnits("50", "gwei");
 
 // Keep state OUTSIDE outputs/ — the anvil interop suite's cleanup.sh wipes that
-// directory wholesale. atomic-interop-state/ is gitignore'd separately.
-const STATE_FILE = path.join(__dirname, "atomic-interop-state", "atomic-interop-testnet.json");
+// directory wholesale. atomic-interop-state/ is gitignore'd separately. Bypass-mode
+// runs persist to a separate file so the real-verifier deployment record stays intact.
+const STATE_FILE = path.join(
+  __dirname,
+  "atomic-interop-state",
+  BYPASS_VERIFICATION ? "atomic-interop-testnet-bypass.json" : "atomic-interop-testnet.json"
+);
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Persisted state
@@ -124,8 +143,8 @@ interface State {
   l1: {
     chainId: number;
     bridgehub: string;
-    messageRoot: string;
     linker?: string;
+    bypassVerification?: boolean;
   };
   chains: Record<string, PerChainState>;
   swap?: {
@@ -152,7 +171,7 @@ interface SendSpecJSON {
 function loadState(): State {
   if (!fs.existsSync(STATE_FILE)) {
     return {
-      l1: { chainId: L1_CHAIN_ID, bridgehub: L1_BRIDGEHUB, messageRoot: L1_MESSAGE_ROOT },
+      l1: { chainId: L1_CHAIN_ID, bridgehub: L1_BRIDGEHUB, bypassVerification: BYPASS_VERIFICATION },
       chains: {},
     };
   }
@@ -206,14 +225,34 @@ function specFromJSON(_j: SendSpecJSON): SendSpec {
   };
 }
 
+/**
+ * Wait for a tx receipt with a fixed timeout. ethers' default `.wait()` waits forever,
+ * which masks problems like underpriced gas. If the tx is genuinely going to land slowly
+ * (e.g. an L1->L2 priority tx), poll with a different mechanism instead.
+ */
+async function waitFast(
+  _provider: providers.JsonRpcProvider,
+  _txHash: string,
+  _label: string,
+  _timeoutMs: number = FAST_TX_TIMEOUT_MS
+): Promise<ethers.providers.TransactionReceipt> {
+  const r = await _provider.waitForTransaction(_txHash, 1, _timeoutMs);
+  if (!r) {
+    throw new Error(`${_label}: tx ${_txHash} not confirmed within ${_timeoutMs}ms — likely hung (underpriced gas / RPC stuck).`);
+  }
+  if (r.status === 0) {
+    throw new Error(`${_label}: tx ${_txHash} reverted (status 0). Check trace: cast run ${_txHash} -r <rpc>`);
+  }
+  return r;
+}
+
 async function gasOverridesForL2(_provider: providers.JsonRpcProvider) {
   const gp = await _provider.getGasPrice();
-  // zksync_os_testnet charges pubdata gas for the deployed bytecode. Rough cost:
-  // (bytecode bytes) × 800 + exec ≈ 25M for the 22KB PrivateL2NativeTokenVault. 50M
-  // gives ~2× headroom and isn't so large that small deploys waste wallet ETH on
-  // pre-charged-but-unused gas.
+  // zksync_os_testnet charges pubdata gas for the deployed bytecode at a rate that
+  // varies per chain — empirically ~2000-3000 gas/byte. Need >45M for a 22KB contract.
+  // 100M gives headroom for the largest contracts (~45KB).
   return {
-    deploy: { gasPrice: gp.mul(2), gasLimit: 50_000_000, type: 0 },
+    deploy: { gasPrice: gp.mul(2), gasLimit: 100_000_000, type: 0 },
     init: { gasPrice: gp.mul(2), gasLimit: 10_000_000, type: 0 },
   };
 }
@@ -307,7 +346,7 @@ async function bridgeEth(): Promise<void> {
       },
       { value: mintValue, gasLimit: 1_000_000 }
     );
-    await tx.wait();
+    await waitFast(l1Provider, tx.hash, `[${c.name}] bridge-eth deposit on L1`);
     // Don't store the tx hash for one-shot top-ups — that slot is for the original
     // first-funding deposit which the rest of the pipeline keys off of.
     if (!forceDeposit) {
@@ -360,10 +399,10 @@ async function deployL2(): Promise<void> {
     const gp = await provider.getGasPrice();
     const factory = new ContractFactory(getAbi("L2FlowEscrow"), getCreationBytecode("L2FlowEscrow"), wallet);
     console.log(`[${c.name}] deploying L2FlowEscrow at nonce ${nonce}...`);
-    // zksync-os charges gas for pubdata of the deployed bytecode (~7956 bytes × 800 gas/byte
-    // for L1 publication = ~6.4M gas). Use 30M to match the Private interop deployer's headroom.
-    const escrow = await factory.deploy({ gasPrice: gp.mul(2), gasLimit: 30_000_000, type: 0 });
-    await escrow.deployed();
+    // zksync-os charges gas for pubdata of the deployed bytecode. The per-byte rate
+    // varies between chains; use 50M to match the rest of the deploy budgets.
+    const escrow = await factory.deploy({ gasPrice: gp.mul(2), gasLimit: 50_000_000, type: 0 });
+    await waitFast(provider, escrow.deployTransaction.hash, `[${c.name}] L2FlowEscrow deploy`);
     cs.escrowAddress = escrow.address;
     saveState(state);
     console.log(`  escrow: ${escrow.address}`);
@@ -418,18 +457,36 @@ async function wireL2(): Promise<void> {
   const pk = getPk();
   const state = loadState();
 
-  // Cross-register remote AR addresses.
-  const chainsWithStack = CHAINS.filter((c) => state.chains[String(c.chainId)].privateStack);
-  if (chainsWithStack.length === CHAINS.length) {
-    const addresses: Record<number, ReturnType<typeof statePrivateStackOrThrow>> = {};
-    for (const c of chainsWithStack) addresses[c.chainId] = statePrivateStackOrThrow(state, c);
-    const gp = await new providers.JsonRpcProvider(chainsWithStack[0].rpcUrl).getGasPrice();
-    console.log("Cross-registering remote routers...");
-    await registerRemoteRouters(chainsWithStack, addresses, pk, console.log, {
-      gasPrice: gp.mul(2),
-      gasLimit: 1_000_000,
-      type: 0,
-    });
+  // Cross-register remote AR addresses. We bypass the shared `registerRemoteRouters`
+  // helper because it takes a single gas-override blob — and L2 gas prices vary widely
+  // between testnets (zksync_os_testnet is ~6× creator_testnet at time of writing), so
+  // using one chain's price for the other leaves the underpriced tx hung in mempool.
+  // Per-chain gas price + idempotent skip-if-already-registered keeps this safe to retry.
+  for (const c of CHAINS) {
+    const cs = chainState(state, c);
+    if (!cs.privateStack) continue;
+    const provider = new providers.JsonRpcProvider(c.rpcUrl);
+    const wallet = new Wallet(pk, provider);
+    const gp = await provider.getGasPrice();
+    const ar = new Contract(cs.privateStack.assetRouter, getAbi("PrivateL2AssetRouter"), wallet);
+    for (const other of CHAINS) {
+      if (other.chainId === c.chainId) continue;
+      const otherCs = state.chains[String(other.chainId)];
+      if (!otherCs?.privateStack) continue;
+      const current: string = await ar.remoteRouterAddress(other.chainId);
+      if (current !== ethers.constants.AddressZero) {
+        console.log(`[${c.name}] remote router for ${other.chainId} already ${current}, skipping.`);
+        continue;
+      }
+      console.log(`[${c.name}] setRemoteRouter(${other.chainId}, ${otherCs.privateStack.assetRouter})...`);
+      const tx = await ar.setRemoteRouter(other.chainId, otherCs.privateStack.assetRouter, {
+        gasPrice: gp.mul(2),
+        gasLimit: 1_000_000,
+        type: 0,
+      });
+      await waitFast(provider, tx.hash, `[${c.name}] setRemoteRouter(${other.chainId})`);
+      console.log(`  ${tx.hash}`);
+    }
   }
 
   // For each chain: initialize escrow + setAtomicFlowEscrow on the private AR.
@@ -450,25 +507,31 @@ async function wireL2(): Promise<void> {
     const gp = await provider.getGasPrice();
     const gas = { gasPrice: gp.mul(2), gasLimit: 1_000_000, type: 0 };
 
-    console.log(`[${c.name}] initializing escrow at ${cs.escrowAddress}...`);
     const escrow = new Contract(cs.escrowAddress, getAbi("L2FlowEscrow"), wallet);
-    await (await escrow.initialize(state.l1.linker, cs.privateStack.assetRouter, cs.privateStack.ntv, gas)).wait();
+    const currentLinker: string = await escrow.L1_LINKER();
+    if (currentLinker === ethers.constants.AddressZero) {
+      console.log(`[${c.name}] initializing escrow at ${cs.escrowAddress}...`);
+      const initTx = await escrow.initialize(state.l1.linker, cs.privateStack.assetRouter, cs.privateStack.ntv, gas);
+      await waitFast(provider, initTx.hash, `[${c.name}] escrow.initialize`);
+    } else {
+      console.log(`[${c.name}] escrow already initialized (linker=${currentLinker}), skipping.`);
+    }
 
-    console.log(`[${c.name}] setting atomicFlowEscrow on private AR...`);
     const ar = new Contract(cs.privateStack.assetRouter, getAbi("PrivateL2AssetRouter"), wallet);
-    await (await ar.setAtomicFlowEscrow(cs.escrowAddress, gas)).wait();
+    const currentAfe: string = await ar.atomicFlowEscrow();
+    if (currentAfe === ethers.constants.AddressZero) {
+      console.log(`[${c.name}] setting atomicFlowEscrow on private AR...`);
+      const setTx = await ar.setAtomicFlowEscrow(cs.escrowAddress, gas);
+      await waitFast(provider, setTx.hash, `[${c.name}] setAtomicFlowEscrow`);
+    } else {
+      console.log(`[${c.name}] AR.atomicFlowEscrow already set (${currentAfe}), skipping.`);
+    }
 
     cs.wired = true;
     saveState(state);
     console.log(`  wired.`);
   }
   console.log("wire-l2 done.");
-}
-
-function statePrivateStackOrThrow(_state: State, _c: ChainCfg) {
-  const ps = _state.chains[String(_c.chainId)].privateStack;
-  if (!ps) throw new Error(`[${_c.name}] no private stack in state`);
-  return ps;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -495,15 +558,16 @@ async function deployL1(): Promise<void> {
 
   const l1Provider = new providers.JsonRpcProvider(L1_RPC);
   const wallet = new Wallet(pk, l1Provider);
-  console.log(`Deploying L1FlowLinker on Sepolia (bridgehub=${L1_BRIDGEHUB}, messageRoot=${L1_MESSAGE_ROOT})...`);
+  console.log(`Deploying L1FlowLinker on Sepolia (bridgehub=${L1_BRIDGEHUB}, bypassVerification=${BYPASS_VERIFICATION})...`);
   const factory = new ContractFactory(getAbi("L1FlowLinker"), getCreationBytecode("L1FlowLinker"), wallet);
-  const linker = await factory.deploy(L1_BRIDGEHUB, L1_MESSAGE_ROOT);
-  await linker.deployed();
+  const linker = await factory.deploy(L1_BRIDGEHUB, BYPASS_VERIFICATION);
+  await waitFast(l1Provider, linker.deployTransaction.hash, "L1FlowLinker deploy");
   console.log(`  linker: ${linker.address}`);
 
   console.log(`Initializing linker with per-chain escrows:`);
   for (let i = 0; i < initChainIds.length; i++) console.log(`  chain ${initChainIds[i]} → ${initEscrows[i]}`);
-  await (await linker.initialize(initChainIds, initEscrows)).wait();
+  const initTx = await linker.initialize(initChainIds, initEscrows);
+  await waitFast(l1Provider, initTx.hash, "L1FlowLinker.initialize");
 
   state.l1.linker = linker.address;
   saveState(state);
@@ -525,16 +589,20 @@ async function deployTokens(): Promise<void> {
     const provider = new providers.JsonRpcProvider(c.rpcUrl);
     const wallet = new Wallet(pk, provider);
     const gp = await provider.getGasPrice();
-    const gas = { gasPrice: gp.mul(2), gasLimit: 5_000_000, type: 0 };
+    // 30M for the deploy: zksync_os charges pubdata at runtime gas rate, so even a 3KB
+    // ERC20 needs ~10M+ to cover the pubdata-cost check on top of constructor exec.
+    const deployGas = { gasPrice: gp.mul(2), gasLimit: 30_000_000, type: 0 };
+    const gas = { gasPrice: gp.mul(2), gasLimit: 2_000_000, type: 0 };
 
     if (!cs.testTokenAddress) {
       console.log(`[${c.name}] deploying TestnetERC20Token...`);
       const factory = new ContractFactory(getAbi("TestnetERC20Token"), getCreationBytecode("TestnetERC20Token"), wallet);
-      const token = await factory.deploy(`AtomicTest-${c.chainId}`, `ATM${c.chainId}`, 18, gas);
-      await token.deployed();
+      const token = await factory.deploy(`AtomicTest-${c.chainId}`, `ATM${c.chainId}`, 18, deployGas);
+      await waitFast(provider, token.deployTransaction.hash, `[${c.name}] TestnetERC20Token deploy`);
       cs.testTokenAddress = token.address;
       saveState(state);
-      await (await token.mint(wallet.address, TEST_TOKEN_AMOUNT, gas)).wait();
+      const mintTx = await token.mint(wallet.address, TEST_TOKEN_AMOUNT, gas);
+      await waitFast(provider, mintTx.hash, `[${c.name}] token.mint`);
       console.log(`  token=${token.address}, minted ${ethers.utils.formatUnits(TEST_TOKEN_AMOUNT, 18)} ATM${c.chainId} to ${wallet.address}`);
     }
 
@@ -544,7 +612,10 @@ async function deployTokens(): Promise<void> {
     const existingAssetId: string = await ntv.assetId(cs.testTokenAddress!);
     if (existingAssetId === ethers.constants.HashZero) {
       console.log(`[${c.name}] registering token with private NTV...`);
-      await (await ntv.registerToken(cs.testTokenAddress!, gas)).wait();
+      // registerToken writes asset metadata to the NTV's state and may emit L2->L1 logs
+      // that incur pubdata gas. Use the bigger deploy-grade budget on zksync_os.
+      const regTx = await ntv.registerToken(cs.testTokenAddress!, deployGas);
+      await waitFast(provider, regTx.hash, `[${c.name}] ntv.registerToken`);
     }
     const assetId: string = await ntv.assetId(cs.testTokenAddress!);
     if (assetId === ethers.constants.HashZero) throw new Error(`[${c.name}] NTV failed to assign assetId after registerToken`);
@@ -620,7 +691,7 @@ async function commit(): Promise<void> {
   if (!state.swap.registerTxHash) {
     console.log(`Registering flow on L1...`);
     const tx = await linker.registerFlow(flowId, sortedChainIds, deadline);
-    await tx.wait();
+    await waitFast(l1Provider, tx.hash, "L1 registerFlow");
     state.swap.registerTxHash = tx.hash;
     saveState(state);
     console.log(`  L1 registerFlow: ${tx.hash}`);
@@ -643,13 +714,14 @@ async function commit(): Promise<void> {
     const allowance: BigNumber = await token.allowance(wallet2.address, cs.escrowAddress!);
     if (allowance.lt(SWAP_AMOUNT)) {
       console.log(`[${src.name}] approving token to escrow...`);
-      await (await token.approve(cs.escrowAddress!, SWAP_AMOUNT, gas)).wait();
+      const apTx = await token.approve(cs.escrowAddress!, SWAP_AMOUNT, gas);
+      await waitFast(provider, apTx.hash, `[${src.name}] token.approve`);
     }
 
     const escrow = new Contract(cs.escrowAddress!, getAbi("L2FlowEscrow"), wallet2);
     console.log(`[${src.name}] commitSend...`);
     const tx = await escrow.commitSend(flowId, specs[i], gas);
-    const receipt = await tx.wait();
+    const receipt = await waitFast(provider, tx.hash, `[${src.name}] commitSend`);
     cs.commitTxHash = tx.hash;
     cs.commitL2BatchNumber = (receipt as ethers.providers.TransactionReceipt & { l1BatchNumber?: number }).l1BatchNumber ?? undefined;
     saveState(state);
@@ -672,6 +744,34 @@ async function waitVerify(): Promise<void> {
       continue;
     }
     const l2Provider = new providers.JsonRpcProvider(c.rpcUrl);
+
+    if (BYPASS_VERIFICATION) {
+      // Bypass-mode linker accepts any (batch, index, proof) so long as
+      // message.sender == escrowOf[chainId] and message.data decodes to the right
+      // (tag, flowId, destChainId, specHash). Pull the message bytes from the commit
+      // receipt's L1MessageSent event; everything else is stubbed.
+      console.log(`[${c.name}] BYPASS_VERIFICATION=1 — pulling L1MessageSent payload from commit receipt (no proof RPC poll).`);
+      const receipt = await l2Provider.getTransactionReceipt(cs.commitTxHash!);
+      if (!receipt) throw new Error(`[${c.name}] commit tx ${cs.commitTxHash} receipt not found`);
+      const msgLog = receipt.logs.find((l) =>
+        l.topics[0] === ethers.utils.id("L1MessageSent(address,bytes32,bytes)")
+      );
+      if (!msgLog) throw new Error(`[${c.name}] no L1MessageSent log in commit tx ${cs.commitTxHash}`);
+      const [messageBytes] = ethers.utils.defaultAbiCoder.decode(["bytes"], msgLog.data) as [string];
+      cs.commitL2BatchNumber = 0;
+      cs.commitL2MessageIndex = 0;
+      cs.commitL2TxNumberInBatch = 0;
+      cs.commitMerkleProof = [];
+      cs.commitLogMessage = {
+        txNumberInBatch: 0,
+        sender: cs.escrowAddress!,
+        data: messageBytes,
+      };
+      saveState(state);
+      console.log(`  payload (${messageBytes.length / 2 - 1} bytes) captured; verification skipped.`);
+      continue;
+    }
+
     console.log(`[${c.name}] polling zks_getL2ToL1LogProof for commitSend tx ${cs.commitTxHash}...`);
     const proof = await pollLogProof(l2Provider, cs.commitTxHash!);
     cs.commitL2BatchNumber = proof.l1BatchNumber;
@@ -780,7 +880,7 @@ async function finalize(): Promise<void> {
   });
   console.log("recordFinalitySignal on L1...");
   const tx = await linker.recordFinalitySignal(state.swap.flowId, proofs);
-  await tx.wait();
+  await waitFast(l1Provider, tx.hash, "L1 recordFinalitySignal");
   state.swap.recordFinalityTxHash = tx.hash;
   saveState(state);
   console.log(`  L1 tx: ${tx.hash}`);
@@ -824,7 +924,7 @@ async function executeFlow(): Promise<void> {
   }
   console.log(`executeFlow: sending ${ethers.utils.formatEther(total)} ETH (sum of per-chain mintValues)...`);
   const tx = await linker.executeFlow(state.swap.flowId, execParams, { value: total });
-  const receipt = await tx.wait();
+  const receipt = await waitFast(l1Provider, tx.hash, "L1 executeFlow");
   state.swap.executeFlowTxHash = tx.hash;
   saveState(state);
   console.log(`  L1 tx: ${tx.hash}`);
@@ -912,34 +1012,50 @@ async function settle(): Promise<void> {
   if (!state.swap) throw new Error("No swap.");
   for (const c of CHAINS) {
     const cs = chainState(state, c);
-    if (cs.settleTxHash) {
-      console.log(`[${c.name}] already settled: ${cs.settleTxHash}`);
-      continue;
-    }
     const provider = new providers.JsonRpcProvider(c.rpcUrl);
     const wallet = new Wallet(pk, provider);
     const escrow = new Contract(cs.escrowAddress!, getAbi("L2FlowEscrow"), wallet);
     const gp = await provider.getGasPrice();
-    const gas = { gasPrice: gp.mul(2), gasLimit: 3_000_000, type: 0 };
+    // First-time inbound mint deploys a BridgedStandardERC20 shim via the NTV, which is
+    // pubdata-heavy on zksync_os (charges roughly 2k gas per byte of new code). 30M gives
+    // headroom for that path; later mints to existing shims will use a small fraction.
+    const gas = { gasPrice: gp.mul(2), gasLimit: 30_000_000, type: 0 };
+
+    // SpecState.Executed = 3 (see IDummyFlow.sol). Skip any leg already in that state
+    // so the phase can be retried after a partial failure without reverting on the
+    // already-settled legs.
+    const EXECUTED = 3;
 
     // Settle this chain's outbound spec (if any).
     const ownSpecJ = state.swap.specsBySender[String(c.chainId)];
     if (ownSpecJ) {
       const s = specFromJSON(ownSpecJ);
-      console.log(`[${c.name}] execute() outbound...`);
-      const tx = await escrow.execute(state.swap.flowId, s, gas);
-      await tx.wait();
-      cs.settleTxHash = tx.hash;
-      saveState(state);
+      const specHash = computeSpecHash(s);
+      const st: number = await escrow.bundleState(state.swap.flowId, specHash);
+      if (st === EXECUTED) {
+        console.log(`[${c.name}] outbound spec already Executed, skipping.`);
+      } else {
+        console.log(`[${c.name}] execute() outbound...`);
+        const tx = await escrow.execute(state.swap.flowId, s, gas);
+        await waitFast(provider, tx.hash, `[${c.name}] execute outbound`);
+        cs.settleTxHash = tx.hash;
+        saveState(state);
+      }
     }
     // Settle inbound specs (destChainId == this chain).
     for (const [src, specJ] of Object.entries(state.swap.specsBySender)) {
       if (src === String(c.chainId)) continue;
       const s = specFromJSON(specJ);
       if (s.destChainId.toNumber() !== c.chainId) continue;
+      const specHash = computeSpecHash(s);
+      const st: number = await escrow.bundleState(state.swap.flowId, specHash);
+      if (st === EXECUTED) {
+        console.log(`[${c.name}] inbound from ${src} already Executed, skipping.`);
+        continue;
+      }
       console.log(`[${c.name}] execute() inbound from ${src}...`);
       const tx = await escrow.execute(state.swap.flowId, s, gas);
-      await tx.wait();
+      await waitFast(provider, tx.hash, `[${c.name}] execute inbound from ${src}`);
       console.log(`  ${tx.hash}`);
     }
   }

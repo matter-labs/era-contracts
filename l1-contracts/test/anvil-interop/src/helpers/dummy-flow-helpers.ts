@@ -91,32 +91,24 @@ export function computeFlowId(
 }
 
 /**
- * Deploy `MockL2MessageVerification` + `L1FlowLinker` on L1. The mock verifier accepts any
- * inclusion proof — fine for anvil tests where the real cross-chain settlement pipeline
- * doesn't run.
+ * Deploy `L1FlowLinker` on L1 with `BYPASS_MESSAGE_VERIFICATION = true` for anvil tests.
+ * The linker uses the real Bridgehub as its inclusion-proof source, but the bypass flag
+ * short-circuits the call so anvil tests don't need a real cross-chain settlement
+ * pipeline running.
  */
 export async function deployL1FlowStack(
   l1Provider: providers.JsonRpcProvider,
   l1Bridgehub: string
 ): Promise<{
   linker: Contract;
-  mockVerifier: Contract;
 }> {
   const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
 
-  const mockVerifierFactory = new ContractFactory(
-    getAbi("MockL2MessageVerification"),
-    getCreationBytecode("MockL2MessageVerification"),
-    wallet
-  );
-  const mockVerifier = await mockVerifierFactory.deploy();
-  await mockVerifier.deployed();
-
   const linkerFactory = new ContractFactory(getAbi("L1FlowLinker"), getCreationBytecode("L1FlowLinker"), wallet);
-  const linker = await linkerFactory.deploy(l1Bridgehub, mockVerifier.address);
+  const linker = await linkerFactory.deploy(l1Bridgehub, true);
   await linker.deployed();
 
-  return { linker, mockVerifier };
+  return { linker };
 }
 
 /**

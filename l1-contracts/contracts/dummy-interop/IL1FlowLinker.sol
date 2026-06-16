@@ -4,7 +4,7 @@ pragma solidity ^0.8.21;
 import {L2Message} from "../common/Messaging.sol";
 
 /// @notice Inclusion proof bundle for one chain's commit log. The linker re-verifies each
-/// via `IMessageVerification.proveL2MessageInclusionShared`.
+/// via the existing L1 Bridgehub's `proveL2MessageInclusion` mailbox forwarder.
 struct CommitProof {
     uint256 chainId;
     uint256 blockOrBatchNumber;
@@ -35,7 +35,7 @@ enum FlowState {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice L1-side flow coordinator. Owns flow lifecycle, verifies per-chain commit logs
-/// against the existing L1 `IMessageVerification`, and dispatches L1→L2 priority txs via
+/// against the existing L1 Bridgehub's mailbox forwarder, and dispatches L1→L2 priority txs via
 /// `Bridgehub` to authorize per-chain settlement (or refunds).
 ///
 /// `flowId` is a cryptographic commitment to the full spec set:
