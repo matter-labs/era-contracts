@@ -38,6 +38,7 @@ import {
     InvalidDAForPermanentRollup,
     InvalidL2DACommitmentScheme,
     InvalidPubdataPricingMode,
+    MaxBatchCapacityIsZero,
     PriorityModeActivationTooEarly,
     PriorityModeIsNotAllowed,
     PriorityModeRequiresPermanentRollup,
@@ -179,6 +180,16 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert PriorityTxPubdataExceedsMaxPubDataPerBatch();
         }
 
+        // `maxPubdataPerBatch` and `maxL2GasPerBatch` are used as divisors when deriving the L2 gas price
+        // (see `_deriveL2GasPriceFromParams`), so a zero value would later brick the L1->L2 fee derivation
+        // with a confusing division-by-zero panic. This is NOT a defense against a malicious privileged actor
+        // — while the chain is in stage 0 the admin can brick fee derivation in many other ways (e.g. a
+        // non-zero but nonsensical value), and that is an accepted trust assumption. The check only turns the
+        // easiest fat-finger (a zero capacity field) into an explicit, early revert at configuration time.
+        if (_newFeeParams.maxPubdataPerBatch == 0 || _newFeeParams.maxL2GasPerBatch == 0) {
+            revert MaxBatchCapacityIsZero();
+        }
+
         FeeParams memory oldFeeParams = s.feeParams;
 
         // we cannot change pubdata pricing mode
@@ -314,6 +325,14 @@ contract AdminFacet is ZKChainBase, IAdmin {
     function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin onlyL1 {
         if (s.priorityModeInfo.canBeActivated) {
             revert NotCompatibleWithPriorityMode();
+        }
+        // The pubdata pricing mode (Rollup vs Validium) is a genesis-time chain property. Flipping it after
+        // batches have been committed would desync the data-availability accounting of already-committed
+        // batches, so it may only be set before the first batch is processed. This is the single path that
+        // can change the mode (`changeFeeParams` rejects any change to it), so enforce the precondition that
+        // until now lived only in the `IAdmin.setPubdataPricingMode` NatSpec.
+        if (s.totalBatchesCommitted != 0) {
+            revert InvalidPubdataPricingMode();
         }
         s.feeParams.pubdataPricingMode = _pricingMode;
         emit PubdataPricingModeUpdate(_pricingMode);

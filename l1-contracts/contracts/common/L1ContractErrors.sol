@@ -242,6 +242,8 @@ error LengthIsNotDivisibleBy32(uint256 length);
 error LogAlreadyProcessed(uint8);
 // 0x43e266b0
 error MalformedBytecode(BytecodeError);
+// 0x2e8e2f4c
+error MaxBatchCapacityIsZero();
 // 0xafbb7a4e
 error MerkleIndexOrHeightMismatch();
 // 0x9bb54c35

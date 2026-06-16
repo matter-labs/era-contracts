@@ -31,4 +31,9 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     function l1AssetTracker() external view returns (IL1AssetTracker);
 
     event TokenBeaconUpdated(address indexed l2TokenBeacon);
+
+    /// @notice Emitted when the AssetTracker component address is set or updated.
+    /// @param oldAssetTracker The previous AssetTracker address (zero on the initial set).
+    /// @param newAssetTracker The new AssetTracker address.
+    event AssetTrackerUpdated(address indexed oldAssetTracker, address indexed newAssetTracker);
 }

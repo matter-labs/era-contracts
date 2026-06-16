@@ -298,4 +298,29 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
 
         assertFalse(utilsFacet.util_getPriorityModeActivated());
     }
+
+    // setPriorityModeTransactionFilterer
+    /// @dev The chain-side `setPriorityModeTransactionFilterer` is gated by `onlyChainTypeManager`, so it is
+    /// only reachable through this CTM forwarder. Without the forwarder the priority-mode transaction filterer
+    /// could never be updated post-deployment (without emergency upgrade).
+    function test_SuccessfulSetPriorityModeTransactionFilterer() public {
+        address chainAddress = createNewChain(getDiamondCutData(diamondInit));
+        UtilsFacet utilsFacet = UtilsFacet(chainAddress);
+        address newFilterer = makeAddr("priorityModeFilterer");
+
+        _mockGetZKChainFromBridgehub(chainAddress);
+
+        vm.prank(governor);
+        chainContractAddress.setPriorityModeTransactionFilterer(chainId, newFilterer);
+
+        assertEq(utilsFacet.util_getPriorityModeTransactionFilterer(), newFilterer);
+    }
+
+    function test_RevertWhen_SetPriorityModeTransactionFiltererUnauthorized() public {
+        address randomUser = makeAddr("randomUser");
+
+        vm.prank(randomUser);
+        vm.expectRevert("Ownable: caller is not the owner");
+        chainContractAddress.setPriorityModeTransactionFilterer(chainId, makeAddr("priorityModeFilterer"));
+    }
 }
