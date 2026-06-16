@@ -1,23 +1,27 @@
 /**
- * IMT engine CLI.
+ * IMT engine CLI (L1-free atomic interop, IMT engine B).
  *
- * Given an RPC URL and an item, produces the proofs the AtomicFlowEscrow needs against the per-chain
- * Indexed Merkle Tree and the L1 historical global IMT.
+ * Given an RPC URL and an item, produces the proofs the {AtomicFlowEscrow} needs against a chain's
+ * per-chain {L2InteropCommitmentTree}. The global IMT + L1 registry are gone: a chain's IMT root is
+ * carried by the standard interop-root channel and authenticated via the `(root, timestamp)` L2->L1
+ * message, so a proof only references the source chain's tree plus a snapshot timestamp.
  *
  * Subcommands:
  *   value          --flow-id <0x> --spec-hash <0x>
  *                  Compute the commit value for a (flowId, specHash).
  *
  *   low-nullifier  --l2-rpc <url> --tree <addr> --value <0x|dec> [--l2-block <n>]
- *                  Low-nullifier index to pass to commitPart when inserting `value`.
+ *                  Low-nullifier index to pass to commitSend when inserting `value`.
  *
- *   full-proof     --l1-rpc <url> --l2-rpc <url> --tree <addr> --registry <addr>
- *                  --chain-id <n> --value <0x|dec> --l1-block <n> [--l2-block <n>]
- *                  Inclusion proof (ImtInclusionProof JSON) for AtomicFlowEscrow.finalize.
+ *   full-proof     --l2-rpc <url> --tree <addr> --chain-id <n> --value <0x|dec>
+ *                  --root-timestamp <unix> [--l2-block <n>]
+ *                  Inclusion proof (ImtInclusionProof JSON) for AtomicFlowEscrow.authorize.
+ *                  `root-timestamp` must be <= the flow deadline.
  *
- *   non-inclusion  --l1-rpc <url> --l2-rpc <url> --tree <addr> --registry <addr>
- *                  --chain-id <n> --value <0x|dec> --l1-block-before <n> --l1-block-after <n> [--l2-block <n>]
- *                  O(log n) non-inclusion proof (ImtNonInclusionProof JSON) for AtomicFlowEscrow.refund.
+ *   non-inclusion  --l2-rpc <url> --tree <addr> --chain-id <n> --value <0x|dec>
+ *                  --root-timestamp <unix> [--l2-block <n>]
+ *                  O(log n) non-inclusion proof (ImtNonInclusionProof JSON) for
+ *                  AtomicFlowEscrow.authorizeRefund. `root-timestamp` must be > the flow deadline.
  */
 
 import { providers } from "ethers";
@@ -26,7 +30,6 @@ import {
   buildNonInclusionProof,
   commitValue,
   commitmentTree,
-  globalRegistry,
   lowNullifierIndexFor,
 } from "./src/helpers/imt-engine-lib";
 
@@ -75,14 +78,12 @@ async function main(): Promise<void> {
     }
 
     case "full-proof": {
-      const l1Provider = new providers.JsonRpcProvider(require_(flags, "l1-rpc"));
       const l2Provider = new providers.JsonRpcProvider(require_(flags, "l2-rpc"));
       const proof = await buildInclusionProof({
         l2Tree: commitmentTree(require_(flags, "tree"), l2Provider),
-        registry: globalRegistry(require_(flags, "registry"), l1Provider),
         chainId: require_(flags, "chain-id"),
         value: require_(flags, "value"),
-        l1Block: Number(require_(flags, "l1-block")),
+        rootTimestamp: Number(require_(flags, "root-timestamp")),
         l2BlockTag: flags["l2-block"] ? Number(flags["l2-block"]) : undefined,
       });
       print(proof);
@@ -90,15 +91,12 @@ async function main(): Promise<void> {
     }
 
     case "non-inclusion": {
-      const l1Provider = new providers.JsonRpcProvider(require_(flags, "l1-rpc"));
       const l2Provider = new providers.JsonRpcProvider(require_(flags, "l2-rpc"));
       const proof = await buildNonInclusionProof({
         l2Tree: commitmentTree(require_(flags, "tree"), l2Provider),
-        registry: globalRegistry(require_(flags, "registry"), l1Provider),
         chainId: require_(flags, "chain-id"),
         value: require_(flags, "value"),
-        l1BlockBefore: Number(require_(flags, "l1-block-before")),
-        l1BlockAfter: Number(require_(flags, "l1-block-after")),
+        rootTimestamp: Number(require_(flags, "root-timestamp")),
         l2BlockTag: flags["l2-block"] ? Number(flags["l2-block"]) : undefined,
       });
       print(proof);

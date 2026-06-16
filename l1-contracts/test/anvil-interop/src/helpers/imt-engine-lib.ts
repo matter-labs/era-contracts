@@ -1,27 +1,36 @@
 /**
- * IMT engine library — the off-chain counterpart of the on-chain atomic-interop proof system.
+ * IMT engine library — the off-chain counterpart of the L1-free atomic-interop proof system.
  *
- * It reconstructs, from event logs, the per-chain **Indexed Merkle Tree** ({L2InteropCommitmentTree})
- * and the L1 global interop IMT ({GlobalInteropIMT}), and produces the proofs {AtomicFlowEscrow}
- * verifies:
+ * It implements **IMT engine B** ({IndexedMerkleTreeLib}) exactly, so the harness can:
+ *   - reproduce, byte-for-byte, the per-chain {L2InteropCommitmentTree} root and Merkle paths from
+ *     the tree's live leaf set (verified against `tree.root()` / `tree.merklePath(i)` over RPC),
+ *   - compute the low-nullifier index needed to `commitSend` (insert) a value,
+ *   - build the {ImtInclusionProof} / {ImtNonInclusionProof} structs {AtomicFlowEscrow} verifies.
  *
- *   - the low-nullifier index needed to `commitPart` (insert) a value;
- *   - an O(log n) inclusion proof that a commit value is in a chain's IMT and that the chain's IMT
- *     root is in a global root the L2 imported in time;
- *   - an O(log n) non-inclusion proof (low nullifier) for the timeout/refund path.
+ * Engine B specifics (must match contracts/common/libraries/IndexedMerkleTree.sol):
+ *   - fixed depth 32 (`IMT_DEPTH`); 2^32 leaf slots,
+ *   - leaf is `IMTLeaf { uint256 value; uint256 nextIndex; uint256 nextValue }` — NOTE the field
+ *     order (value, nextIndex, nextValue),
+ *   - leaf hash = keccak256(abi.encode(value, nextIndex, nextValue)),
+ *   - sparse tree with precomputed zero-subtree hashes: zeros[0] = hashLeaf({0,0,0}),
+ *     zeros[i+1] = efficientHash(zeros[i], zeros[i]) where efficientHash(a,b) = keccak256(a ++ b),
+ *   - the commitment tree seeds the {0,0,0} head at index 0 (`setup`), then appends each inserted
+ *     leaf and repoints its low-nullifier (`insert`).
  *
- * Trees are complete binary Merkle trees hashing with keccak256(left || right) and padding empty
- * slots with the cascading zero of {IMT_EMPTY_LEAF} = bytes32(0). The chain IMT leaf hash is
- * keccak256(abi.encode(uint256 value, uint256 nextValue, uint256 nextIndex)), matching
- * {AtomicInteropProof.indexedLeafHash}.
+ * The cross-chain `(root, timestamp)` message that authenticates a chain's IMT root is verified
+ * on-chain via {L2_MESSAGE_VERIFICATION}.proveL2MessageInclusionShared. On the anvil harness that
+ * address hosts {MockL2MessageVerification}, which always returns true — so the message-proof fields
+ * of a proof are well-formed placeholders (the IMT membership / low-nullifier layer and the
+ * `rootTimestamp` deadline check are the parts actually exercised). This mirrors the Foundry
+ * AtomicFlowEscrow tests, which mock the same call and build proofs from real tree state.
  */
 
 import type { providers, Wallet } from "ethers";
-import { BigNumber, Contract, ethers, utils } from "ethers";
+import { BigNumber, Contract, utils } from "ethers";
 import { getAbi } from "../core/contracts";
 
-/** Empty-leaf / zero value shared by every tree. */
-export const IMT_EMPTY_LEAF: string = ethers.constants.HashZero;
+/** Fixed depth of the Indexed Merkle Tree — matches IMT_DEPTH in IndexedMerkleTree.sol. */
+export const IMT_DEPTH = 32;
 
 /** Domain tag for commit values: bytes4(keccak256("AtomicInterop.commit.v1")). */
 export const ATOMIC_COMMIT_LEAF_TAG: string = utils
@@ -38,35 +47,43 @@ export interface SendSpec {
   depositor: string;
 }
 
-/** Indexed-tree leaf. Fields are uint256, serialized as decimal strings. */
-export interface IndexedLeaf {
+/** Indexed-tree leaf, fields as uint256 decimal strings, in the on-chain field order. */
+export interface IMTLeaf {
   value: string;
-  nextValue: string;
   nextIndex: string;
+  nextValue: string;
 }
 
-export interface InclusionProof {
-  chainId: string;
+/**
+ * Mirror of `ImtInclusionProof` in IAtomicInterop.sol. The IMT part (chainImtRoot/leaf/imtLeafIndex/
+ * imtProof) is built from the engine; the message-inclusion part (batchNumber/messageIndex/
+ * messageProof/messageTxNumberInBatch) authenticates the `(root, timestamp)` L2->L1 message.
+ */
+export interface ImtInclusionProof {
+  sourceChainId: string;
+  batchNumber: string;
   chainImtRoot: string;
-  leaf: IndexedLeaf;
+  rootTimestamp: string;
+  messageTxNumberInBatch: number;
+  messageIndex: string;
+  messageProof: string[];
+  leaf: IMTLeaf;
   imtLeafIndex: number;
   imtProof: string[];
-  globalLeafIndex: number;
-  globalProof: string[];
-  l1BlockNumber: number;
 }
 
-export interface NonInclusionProof {
-  chainId: string;
+/** Mirror of `ImtNonInclusionProof` in IAtomicInterop.sol. */
+export interface ImtNonInclusionProof {
+  sourceChainId: string;
+  batchNumber: string;
   chainImtRoot: string;
-  lowLeaf: IndexedLeaf;
+  rootTimestamp: string;
+  messageTxNumberInBatch: number;
+  messageIndex: string;
+  messageProof: string[];
+  lowLeaf: IMTLeaf;
   lowLeafIndex: number;
   imtProof: string[];
-  globalLeafIndex: number;
-  l1BlockNumberBeforeDeadline: number;
-  globalProofG1: string[];
-  l1BlockNumberAfterDeadline: number;
-  globalProofG2: string[];
 }
 
 // ── Leaf / id derivations (must match AtomicInteropProof / AtomicFlowEscrow) ──────────────
@@ -78,16 +95,14 @@ export function commitValue(flowId: string, specHash: string): string {
   );
 }
 
-export function indexedLeafHash(leaf: IndexedLeaf): string {
+/** Leaf hash in the engine's canonical layout: keccak256(abi.encode(value, nextIndex, nextValue)). */
+export function indexedLeafHash(leaf: IMTLeaf): string {
   return utils.keccak256(
-    utils.defaultAbiCoder.encode(["uint256", "uint256", "uint256"], [leaf.value, leaf.nextValue, leaf.nextIndex])
+    utils.defaultAbiCoder.encode(["uint256", "uint256", "uint256"], [leaf.value, leaf.nextIndex, leaf.nextValue])
   );
 }
 
-export function globalLeaf(chainId: BigNumber | number | string, chainImtRoot: string): string {
-  return utils.keccak256(utils.solidityPack(["bytes32", "uint256"], [chainImtRoot, BigNumber.from(chainId)]));
-}
-
+/** specHash = keccak256(abi.encode(SendSpec)) — must match AtomicFlowEscrow / the SendSpec layout. */
 export function specHashOf(spec: SendSpec): string {
   return utils.keccak256(
     utils.defaultAbiCoder.encode(
@@ -107,6 +122,7 @@ export function specHashOf(spec: SendSpec): string {
   );
 }
 
+/** flowId = keccak256(abi.encode(sortedSpecHashes, sortedChainIds, deadline)). */
 export function computeFlowId(
   specHashes: string[],
   chainIds: (BigNumber | number | string)[],
@@ -120,98 +136,127 @@ export function computeFlowId(
   );
 }
 
-// ── Complete binary Merkle tree (matches FullMerkle / DynamicIncrementalMerkle) ───────────
+// ── Engine B: zeros / leaf hashing / root / path ──────────────────────────────────────────
 
-function hashPair(left: string, right: string): string {
+/** efficientHash(a, b) = keccak256(a ++ b) over the two 32-byte siblings — matches Merkle.sol. */
+function efficientHash(left: string, right: string): string {
   return utils.keccak256(utils.concat([left, right]));
 }
 
-interface BuiltTree {
-  root: string;
-  levels: string[][];
-  zeros: string[];
+/**
+ * Precomputed zero-subtree hashes, length IMT_DEPTH + 1.
+ *   zeros[0] = hashLeaf({0,0,0}); zeros[i+1] = efficientHash(zeros[i], zeros[i]).
+ */
+export function computeZeros(): string[] {
+  const zeros: string[] = new Array(IMT_DEPTH + 1);
+  zeros[0] = indexedLeafHash({ value: "0", nextIndex: "0", nextValue: "0" });
+  for (let i = 0; i < IMT_DEPTH; i++) {
+    zeros[i + 1] = efficientHash(zeros[i], zeros[i]);
+  }
+  return zeros;
 }
 
-/** Builds a complete binary tree from an ordered leaf-hash set, padding with the zero cascade. */
-export function buildTree(leafHashes: string[]): BuiltTree {
-  if (leafHashes.length === 0) {
-    return { root: IMT_EMPTY_LEAF, levels: [[]], zeros: [IMT_EMPTY_LEAF] };
-  }
-  const levels: string[][] = [leafHashes.slice()];
-  const zeros: string[] = [IMT_EMPTY_LEAF];
-  let level = leafHashes.slice();
-  let h = 0;
-  while (level.length > 1) {
-    const next: string[] = [];
-    for (let i = 0; i < level.length; i += 2) {
-      const left = level[i];
-      const right = i + 1 < level.length ? level[i + 1] : zeros[h];
-      next.push(hashPair(left, right));
+const ZEROS = computeZeros();
+
+/**
+ * Sparse fixed-depth Indexed Merkle Tree reconstructed from the index-ordered leaf set
+ * `leaves[0..leafCount-1]` (index 0 is the {0,0,0} head). Mirrors the on-chain `IMT` storage:
+ * `nodes[level][index]` holds written nodes, and unwritten siblings default to `zeros[level]`.
+ */
+export class IndexedMerkleTree {
+  /** Index-ordered leaves (leaf 0 = head). */
+  readonly leaves: IMTLeaf[];
+  /** nodes[level] : Map<index, hash> — only the populated path nodes are materialized. */
+  private readonly nodes: Array<Map<number, string>>;
+
+  constructor(leaves: IMTLeaf[]) {
+    this.leaves = leaves;
+    this.nodes = Array.from({ length: IMT_DEPTH + 1 }, () => new Map<number, string>());
+    // Level 0: write each leaf hash at its index.
+    for (let i = 0; i < leaves.length; i++) {
+      this.nodes[0].set(i, indexedLeafHash(leaves[i]));
     }
-    zeros.push(hashPair(zeros[h], zeros[h]));
-    level = next;
-    levels.push(level);
-    h++;
+    // Build every higher level from the parents of populated children (and their zero-filled
+    // siblings), so a node is materialized iff at least one descendant leaf is populated. This
+    // matches the on-chain `_updatePath` write set and therefore yields identical roots / paths.
+    for (let level = 0; level < IMT_DEPTH; level++) {
+      const parents = new Set<number>();
+      for (const childIndex of this.nodes[level].keys()) {
+        parents.add(childIndex >> 1);
+      }
+      for (const parentIndex of parents) {
+        const leftIndex = parentIndex * 2;
+        const left = this.nodeAt(level, leftIndex);
+        const right = this.nodeAt(level, leftIndex + 1);
+        this.nodes[level + 1].set(parentIndex, efficientHash(left, right));
+      }
+    }
   }
-  return { root: level[0], levels, zeros };
+
+  /** Read a node, falling back to the level's zero hash when unwritten. */
+  private nodeAt(level: number, index: number): string {
+    return this.nodes[level].get(index) ?? ZEROS[level];
+  }
+
+  /** The current IMT root (level IMT_DEPTH, index 0). */
+  root(): string {
+    return this.nodeAt(IMT_DEPTH, 0);
+  }
+
+  /** Fixed-depth Merkle path (32 siblings, leaf level up) for the leaf at `index`. */
+  merklePath(index: number): string[] {
+    const path: string[] = new Array(IMT_DEPTH);
+    let idx = index;
+    for (let level = 0; level < IMT_DEPTH; level++) {
+      const siblingIdx = idx % 2 === 0 ? idx + 1 : idx - 1;
+      path[level] = this.nodeAt(level, siblingIdx);
+      idx = Math.floor(idx / 2);
+    }
+    return path;
+  }
 }
 
-export function merklePath(tree: BuiltTree, index: number): string[] {
-  const proof: string[] = [];
-  const height = tree.levels.length - 1;
+/** Verify a leaf's Merkle path resolves to `root` — mirrors Merkle.calculateRootMemory. */
+export function calculateRoot(path: string[], index: number, leafHash: string): string {
+  let current = leafHash;
   let idx = index;
-  for (let level = 0; level < height; level++) {
-    const siblingIndex = idx ^ 1;
-    const nodes = tree.levels[level];
-    proof.push(siblingIndex < nodes.length ? nodes[siblingIndex] : tree.zeros[level]);
-    idx >>= 1;
+  for (let level = 0; level < path.length; level++) {
+    current = idx % 2 === 0 ? efficientHash(current, path[level]) : efficientHash(path[level], current);
+    idx = Math.floor(idx / 2);
   }
-  return proof;
+  return current;
 }
 
-// ── Contract handles ───────────────────────────────────────────────────────────────────────
+// ── Contract handle ────────────────────────────────────────────────────────────────────────
 
 export function commitmentTree(address: string, provider: providers.Provider | Wallet): Contract {
   return new Contract(address, getAbi("L2InteropCommitmentTree"), provider);
 }
 
-export function globalRegistry(address: string, provider: providers.Provider | Wallet): Contract {
-  return new Contract(address, getAbi("GlobalInteropIMT"), provider);
-}
+// ── Chain indexed-tree reconstruction (over RPC) ─────────────────────────────────────────
 
-// ── Chain indexed-tree reconstruction ────────────────────────────────────────────────────
-
-interface ChainImt {
-  leaves: IndexedLeaf[]; // index-ordered, includes the head leaf at index 0
-  tree: BuiltTree;
-  root: string;
-}
-
-/** Reconstructs a chain's indexed IMT as of `blockTag` by replaying `LeafUpdated` events. */
-export async function reconstructChainImt(tree: Contract, blockTag?: number): Promise<ChainImt> {
-  const toBlock = blockTag ?? (await tree.provider.getBlockNumber());
-  const events = await tree.queryFilter(tree.filters.LeafUpdated(), 0, toBlock);
-  // Order by (block, logIndex); last write per index wins.
-  events.sort((a, b) => a.blockNumber - b.blockNumber || a.logIndex - b.logIndex);
-  const byIndex = new Map<number, IndexedLeaf>();
-  for (const e of events) {
-    byIndex.set(e.args!.index.toNumber(), {
-      value: e.args!.value.toString(),
-      nextValue: e.args!.nextValue.toString(),
-      nextIndex: e.args!.nextIndex.toString(),
-    });
+/**
+ * Reconstructs a chain's indexed IMT by reading its live leaf set (`leafCount` + `leafAt`). The
+ * engine then reproduces the root / paths, which a caller can assert against `tree.root()` /
+ * `tree.merklePath(i)` to confirm the off-chain engine matches the on-chain one.
+ */
+export async function reconstructChainImt(
+  tree: Contract,
+  blockTag?: number
+): Promise<{ leaves: IMTLeaf[]; engine: IndexedMerkleTree; root: string }> {
+  const overrides = blockTag !== undefined ? { blockTag } : {};
+  const count: number = (await tree.leafCount(overrides)).toNumber();
+  const leaves: IMTLeaf[] = [];
+  for (let i = 0; i < count; i++) {
+    const l = await tree.leafAt(i, overrides);
+    leaves.push({ value: l.value.toString(), nextIndex: l.nextIndex.toString(), nextValue: l.nextValue.toString() });
   }
-  const size = byIndex.size;
-  const leaves: IndexedLeaf[] = [];
-  for (let i = 0; i < size; i++) {
-    leaves.push(byIndex.get(i) ?? { value: "0", nextValue: "0", nextIndex: "0" });
-  }
-  const built = buildTree(leaves.map(indexedLeafHash));
-  return { leaves, tree: built, root: built.root };
+  const engine = new IndexedMerkleTree(leaves);
+  return { leaves, engine, root: engine.root() };
 }
 
-/** Index of the low-nullifier leaf for `value`: `L.value < value < L.nextValue` (or nextValue 0). */
-export function findLowNullifierIndex(leaves: IndexedLeaf[], value: string): number {
+/** Index of the low-nullifier leaf for `value`: `L.value < value` and (`L.nextValue == 0` or `value < L.nextValue`). */
+export function findLowNullifierIndex(leaves: IMTLeaf[], value: string): number {
   const v = BigNumber.from(value);
   for (let i = 0; i < leaves.length; i++) {
     const lv = BigNumber.from(leaves[i].value);
@@ -221,109 +266,139 @@ export function findLowNullifierIndex(leaves: IndexedLeaf[], value: string): num
   throw new Error(`no low nullifier for value ${value} (already present or empty tree)`);
 }
 
-/** Convenience: low-nullifier index for inserting `value` into the current tree (for commitPart). */
+/** Index of the leaf holding `value`. Returns -1 if absent. */
+export function findValueIndex(leaves: IMTLeaf[], value: string): number {
+  const v = BigNumber.from(value);
+  return leaves.findIndex((l) => BigNumber.from(l.value).eq(v));
+}
+
+/** Convenience: low-nullifier index for inserting `value` into the current tree (for commitSend). */
 export async function lowNullifierIndexFor(tree: Contract, value: string, blockTag?: number): Promise<number> {
   const imt = await reconstructChainImt(tree, blockTag);
   return findLowNullifierIndex(imt.leaves, value);
 }
 
-// ── Global tree reconstruction ───────────────────────────────────────────────────────────
-
-interface GlobalSnapshot {
-  leaves: string[];
-  leafIndexOf: Map<string, number>;
-  chainRootOf: Map<string, string>;
-  root: string;
-}
-
-/** Reconstructs the in-place global tree as of L1 block `l1Block`. */
-export async function reconstructGlobal(registry: Contract, l1Block: number): Promise<GlobalSnapshot> {
-  const registered = await registry.queryFilter(registry.filters.ChainRegistered(), 0, l1Block);
-  const submitted = await registry.queryFilter(registry.filters.ChainRootSubmitted(), 0, l1Block);
-
-  const leafIndexOf = new Map<string, number>();
-  for (const e of registered) {
-    leafIndexOf.set(BigNumber.from(e.args!.chainId).toString(), e.args!.leafIndex.toNumber());
-  }
-  const chainRootOf = new Map<string, string>();
-  const sorted = submitted.slice().sort((a, b) => a.blockNumber - b.blockNumber || a.logIndex - b.logIndex);
-  for (const e of sorted) {
-    chainRootOf.set(BigNumber.from(e.args!.chainId).toString(), e.args!.chainImtRoot as string);
-  }
-
-  const leaves: string[] = new Array(leafIndexOf.size).fill(IMT_EMPTY_LEAF);
-  for (const [chainId, idx] of leafIndexOf.entries()) {
-    const root = chainRootOf.get(chainId);
-    if (root) leaves[idx] = globalLeaf(chainId, root);
-  }
-  return { leaves, leafIndexOf, chainRootOf, root: buildTree(leaves).root };
-}
-
 // ── Proof builders ────────────────────────────────────────────────────────────────────────
 
-/** Full inclusion proof for `value` in `chainId`'s IMT, anchored to the global root at `l1Block`. */
+/**
+ * Well-formed placeholder for the `(root, timestamp)` L2->L1 message-inclusion proof. On the anvil
+ * harness {MockL2MessageVerification} accepts any such message, so the batch / index / proof fields
+ * are not inspected; the IMT layer and the `rootTimestamp` deadline check are what's verified.
+ */
+function messageProofPlaceholder(): {
+  batchNumber: string;
+  messageIndex: string;
+  messageTxNumberInBatch: number;
+  messageProof: string[];
+} {
+  return { batchNumber: "1", messageIndex: "0", messageTxNumberInBatch: 0, messageProof: [] };
+}
+
+/**
+ * Build an {ImtInclusionProof} for `value` against `chainId`'s live IMT, carrying a root snapshot
+ * timestamp of `rootTimestamp` (must be <= the flow deadline for `authorize` to accept it).
+ */
 export async function buildInclusionProof(params: {
   l2Tree: Contract;
-  registry: Contract;
   chainId: BigNumber | number | string;
   value: string;
-  l1Block: number;
+  rootTimestamp: number;
   l2BlockTag?: number;
-}): Promise<InclusionProof> {
-  const { l2Tree, registry, chainId, value, l1Block, l2BlockTag } = params;
+}): Promise<ImtInclusionProof> {
+  const { l2Tree, chainId, value, rootTimestamp, l2BlockTag } = params;
   const imt = await reconstructChainImt(l2Tree, l2BlockTag);
-  const v = BigNumber.from(value);
-  const idx = imt.leaves.findIndex((l) => BigNumber.from(l.value).eq(v));
+  const idx = findValueIndex(imt.leaves, value);
   if (idx < 0) throw new Error(`value ${value} not found in chain ${chainId.toString()} IMT`);
 
-  const snapshot = await reconstructGlobal(registry, l1Block);
-  const cid = BigNumber.from(chainId).toString();
-  const globalLeafIndex = snapshot.leafIndexOf.get(cid);
-  if (globalLeafIndex === undefined) throw new Error(`chain ${cid} not registered at L1 block ${l1Block}`);
-  const globalTree = buildTree(snapshot.leaves);
+  // Sanity: our reconstructed root must equal the on-chain root, else the proof would not verify.
+  const onChainRoot: string = await l2Tree.root(l2BlockTag !== undefined ? { blockTag: l2BlockTag } : {});
+  if (imt.root.toLowerCase() !== onChainRoot.toLowerCase()) {
+    throw new Error(`off-chain IMT root ${imt.root} != on-chain root ${onChainRoot} for chain ${chainId.toString()}`);
+  }
 
   return {
-    chainId: cid,
+    sourceChainId: BigNumber.from(chainId).toString(),
     chainImtRoot: imt.root,
+    rootTimestamp: rootTimestamp.toString(),
     leaf: imt.leaves[idx],
     imtLeafIndex: idx,
-    imtProof: merklePath(imt.tree, idx),
-    globalLeafIndex,
-    globalProof: merklePath(globalTree, globalLeafIndex),
-    l1BlockNumber: l1Block,
+    imtProof: imt.engine.merklePath(idx),
+    ...messageProofPlaceholder(),
   };
 }
 
-/** O(log n) non-inclusion proof that `value` is absent from `chainId`'s IMT across the deadline. */
+/**
+ * Build an {ImtNonInclusionProof} proving `value` is absent from `chainId`'s live IMT, carrying a
+ * post-deadline root snapshot timestamp `rootTimestamp` (must be > the flow deadline for
+ * `authorizeRefund` to accept it). O(log n) via the low-nullifier bracket.
+ */
 export async function buildNonInclusionProof(params: {
   l2Tree: Contract;
-  registry: Contract;
   chainId: BigNumber | number | string;
   value: string;
-  l1BlockBefore: number;
-  l1BlockAfter: number;
+  rootTimestamp: number;
   l2BlockTag?: number;
-}): Promise<NonInclusionProof> {
-  const { l2Tree, registry, chainId, value, l1BlockBefore, l1BlockAfter, l2BlockTag } = params;
+}): Promise<ImtNonInclusionProof> {
+  const { l2Tree, chainId, value, rootTimestamp, l2BlockTag } = params;
   const imt = await reconstructChainImt(l2Tree, l2BlockTag);
   const lowIndex = findLowNullifierIndex(imt.leaves, value); // throws if value present
 
-  const cid = BigNumber.from(chainId).toString();
-  const before = await reconstructGlobal(registry, l1BlockBefore);
-  const after = await reconstructGlobal(registry, l1BlockAfter);
-  const globalLeafIndex = before.leafIndexOf.get(cid);
-  if (globalLeafIndex === undefined) throw new Error(`chain ${cid} not registered at L1 block ${l1BlockBefore}`);
+  const onChainRoot: string = await l2Tree.root(l2BlockTag !== undefined ? { blockTag: l2BlockTag } : {});
+  if (imt.root.toLowerCase() !== onChainRoot.toLowerCase()) {
+    throw new Error(`off-chain IMT root ${imt.root} != on-chain root ${onChainRoot} for chain ${chainId.toString()}`);
+  }
 
   return {
-    chainId: cid,
+    sourceChainId: BigNumber.from(chainId).toString(),
     chainImtRoot: imt.root,
+    rootTimestamp: rootTimestamp.toString(),
     lowLeaf: imt.leaves[lowIndex],
     lowLeafIndex: lowIndex,
-    imtProof: merklePath(imt.tree, lowIndex),
-    globalLeafIndex,
-    l1BlockNumberBeforeDeadline: l1BlockBefore,
-    globalProofG1: merklePath(buildTree(before.leaves), globalLeafIndex),
-    l1BlockNumberAfterDeadline: l1BlockAfter,
-    globalProofG2: merklePath(buildTree(after.leaves), globalLeafIndex),
+    imtProof: imt.engine.merklePath(lowIndex),
+    ...messageProofPlaceholder(),
   };
+}
+
+// ── Tuple encoders (ordered for ethers contract calls) ────────────────────────────────────
+
+/** SendSpec tuple in struct field order (destChainId, recipient, originChainId, originToken, amount, erc20Data, depositor). */
+export function specTuple(s: SendSpec): unknown[] {
+  return [s.destChainId, s.recipient, s.originChainId, s.originToken, s.amount, s.erc20Data, s.depositor];
+}
+
+/** IMTLeaf tuple in struct field order (value, nextIndex, nextValue). */
+export function leafTuple(l: IMTLeaf): unknown[] {
+  return [l.value, l.nextIndex, l.nextValue];
+}
+
+/** ImtInclusionProof tuple in struct field order. */
+export function inclusionProofTuple(p: ImtInclusionProof): unknown[] {
+  return [
+    p.sourceChainId,
+    p.batchNumber,
+    p.chainImtRoot,
+    p.rootTimestamp,
+    p.messageTxNumberInBatch,
+    p.messageIndex,
+    p.messageProof,
+    leafTuple(p.leaf),
+    p.imtLeafIndex,
+    p.imtProof,
+  ];
+}
+
+/** ImtNonInclusionProof tuple in struct field order. */
+export function nonInclusionProofTuple(p: ImtNonInclusionProof): unknown[] {
+  return [
+    p.sourceChainId,
+    p.batchNumber,
+    p.chainImtRoot,
+    p.rootTimestamp,
+    p.messageTxNumberInBatch,
+    p.messageIndex,
+    p.messageProof,
+    leafTuple(p.lowLeaf),
+    p.lowLeafIndex,
+    p.imtProof,
+  ];
 }
