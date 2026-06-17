@@ -29,6 +29,7 @@ import {MAX_TOKEN_BALANCE} from "contracts/bridge/asset-tracker/IAssetTrackerBas
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {AssetAlreadyRegistered, AssetIdNotRegistered} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {L2BaseTokenZKOS} from "contracts/l2-system/zksync-os/L2BaseTokenZKOS.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
@@ -614,5 +615,58 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         (bool isSaved, uint256 amount) = L2AssetTracker(L2_ASSET_TRACKER_ADDR).totalPreV31TotalSupply(assetId);
         assertTrue(isSaved, "totalPreV31TotalSupply.isSaved should be true");
         assertEq(amount, totalSupply, "totalPreV31TotalSupply.amount should match token totalSupply");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════════
+    //  Regression: `handleFinalizeBaseTokenBridgingOnL2` must not read the base-token
+    //  `totalSupply()` while the pre-V31 supply is still pending backfill.
+    //
+    //  `_needToForceSetAssetMigrationOnL2` reads `totalSupply()` as a proxy for "no deposit
+    //  finalized yet". On a ZKsync OS chain upgraded from a pre-v31 version, the base token's
+    //  `totalSupply()` reverts with `BaseTokenPreV31TotalSupplyNotSet` until it is backfilled,
+    //  so before the fix the first base-token deposit finalization reverted. With a real
+    //  `L2BaseTokenZKOS` at the base-token address (whose `totalSupply()` genuinely reverts
+    //  while the backfill is pending) the finalization must still succeed.
+    // ════════════════════════════════════════════════════════════════════════════════
+    function test_handleFinalizeBaseTokenBridgingOnL2_succeedsWhileBackfillPending() public {
+        bytes32 baseTokenAssetId = keccak256("zkos_base_token_pending_backfill");
+        uint256 l1ChainId = 1;
+
+        // Use the real ZKsync OS base token: its `totalSupply()` reverts while the pre-V31
+        // supply has not been backfilled, so no mock is needed for the behaviour under test.
+        vm.etch(address(L2_BASE_TOKEN_SYSTEM_CONTRACT), address(new L2BaseTokenZKOS()).code);
+
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("L1_CHAIN_ID()").checked_write(l1ChainId);
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("needBaseTokenTotalSupplyBackfill()").checked_write(true);
+        stdstore
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig("originChainId(bytes32)")
+            .with_key(baseTokenAssetId)
+            .checked_write(l1ChainId);
+
+        // Register the base token exactly as the V31 upgrade does for an existing chain.
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2_ASSET_TRACKER.registerBaseTokenDuringUpgrade();
+
+        // Settle on L1 so the deposit is accounted (same mock the sibling base-token tests use).
+        vm.mockCall(
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
+            abi.encode(l1ChainId)
+        );
+
+        uint256 depositsBefore = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
+
+        // The asset migration number is 0 (never set), which is exactly the path that reached the
+        // reverting `totalSupply()` read before the fix; the finalization must now succeed.
+        vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
+        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(l1ChainId, 300);
+
+        assertEq(
+            _readTotalSuccessfulDepositsFromL1(baseTokenAssetId) - depositsBefore,
+            300,
+            "base-token deposit should be recorded while the supply is pending backfill"
+        );
     }
 }
