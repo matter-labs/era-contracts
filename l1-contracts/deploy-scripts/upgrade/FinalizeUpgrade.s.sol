@@ -9,9 +9,7 @@ import {Call as GovernanceCall} from "contracts/governance/Common.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {MulticallWithGas} from "../utils/MulticallWithGas.sol";
 import {IFinalizeUpgrade} from "contracts/script-interfaces/IFinalizeUpgrade.sol";
 
@@ -31,41 +29,26 @@ contract FinalizeUpgrade is Script, IFinalizeUpgrade {
         }
     }
 
+    /// @dev The legacy shared-bridge fund migration
+    /// (`transferFundsFromSharedBridge` / `updateChainBalancesFromSharedBridge`)
+    /// was removed from `L1NativeTokenVault` once the migration completed on all
+    /// envs, so this only registers the tokens that are still unknown to the NTV.
     function initTokens(
         address payable l1NativeTokenVault,
         address[] calldata tokens,
         uint256[] calldata chains
     ) external {
-        // We do not change this method
         L1NativeTokenVault vault = L1NativeTokenVault(l1NativeTokenVault);
-        address nullifier = address(vault.L1_NULLIFIER());
 
         for (uint256 i = 0; i < tokens.length; i++) {
             if (vault.assetId(tokens[i]) == bytes32(0)) {
                 if (tokens[i] != ETH_TOKEN_ADDRESS) {
-                    uint256 balance = IERC20(tokens[i]).balanceOf(nullifier);
-                    if (balance != 0) {
-                        vm.broadcast();
-                        vault.transferFundsFromSharedBridge(tokens[i]);
-                    } else {
-                        vm.broadcast();
-                        vault.registerToken(tokens[i]);
-                    }
+                    vm.broadcast();
+                    vault.registerToken(tokens[i]);
                 } else {
                     vm.broadcast();
                     vault.registerEthToken();
-
-                    uint256 balance = address(nullifier).balance;
-                    if (balance != 0) {
-                        vm.broadcast();
-                        vault.transferFundsFromSharedBridge(tokens[i]);
-                    }
                 }
-            }
-
-            for (uint256 j = 0; j < chains.length; j++) {
-                vm.broadcast();
-                vault.updateChainBalancesFromSharedBridge(tokens[i], chains[j]);
             }
         }
     }
@@ -172,50 +155,25 @@ contract FinalizeUpgrade is Script, IFinalizeUpgrade {
             // ---------------------------------------------------
             // 2. Combine logic of initTokens
             // ---------------------------------------------------
+            // The legacy shared-bridge fund migration
+            // (`transferFundsFromSharedBridge` / `updateChainBalancesFromSharedBridge`)
+            // was removed from `L1NativeTokenVault` once the migration completed
+            // on all envs, so only the registration calls remain here.
             L1NativeTokenVault vault = L1NativeTokenVault(params.l1NativeTokenVault);
-            address nullifier = address(vault.L1_NULLIFIER());
 
             for (uint256 i = currentPosition; i < params.tokens.length && i < currentEnd; i++) {
                 console.log("Processing token: ", params.tokens[i]);
 
                 // Check if token is already registered
                 if (vault.assetId(params.tokens[i]) == bytes32(0)) {
-                    // If not, we either register or transfer funds
                     if (params.tokens[i] != ETH_TOKEN_ADDRESS) {
-                        uint256 balance = IERC20(params.tokens[i]).balanceOf(nullifier);
-                        if (balance != 0) {
-                            // aggregator call: vault.transferFundsFromSharedBridge(tokens[i])
-                            bytes memory data = abi.encodeWithSelector(
-                                vault.transferFundsFromSharedBridge.selector,
-                                params.tokens[i]
-                            );
-                            callIndex = addCall(calls, callIndex, params.l1NativeTokenVault, data);
-                        } else {
-                            // aggregator call: vault.registerToken(tokens[i])
-                            bytes memory data = abi.encodeWithSelector(vault.registerToken.selector, params.tokens[i]);
-                            callIndex = addCall(calls, callIndex, params.l1NativeTokenVault, data);
-                        }
+                        // aggregator call: vault.registerToken(tokens[i])
+                        bytes memory data = abi.encodeWithSelector(vault.registerToken.selector, params.tokens[i]);
+                        callIndex = addCall(calls, callIndex, params.l1NativeTokenVault, data);
                     } else {
                         // aggregator call: vault.registerEthToken()
-                        {
-                            bytes memory data = abi.encodeWithSelector(vault.registerEthToken.selector);
-                            callIndex = addCall(calls, callIndex, params.l1NativeTokenVault, data);
-                        }
-
-                        if (callIndex == MAX_CALLS_PER_BATCH) {
-                            flushBatch(params.aggregator, calls, callIndex);
-                            callIndex = 0;
-                        }
-
-                        uint256 balance = address(nullifier).balance;
-                        if (balance != 0) {
-                            // aggregator call: vault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS)
-                            bytes memory data = abi.encodeWithSelector(
-                                vault.transferFundsFromSharedBridge.selector,
-                                params.tokens[i]
-                            );
-                            callIndex = addCall(calls, callIndex, params.l1NativeTokenVault, data);
-                        }
+                        bytes memory data = abi.encodeWithSelector(vault.registerEthToken.selector);
+                        callIndex = addCall(calls, callIndex, params.l1NativeTokenVault, data);
                     }
 
                     // Flush if needed
@@ -223,34 +181,6 @@ contract FinalizeUpgrade is Script, IFinalizeUpgrade {
                         flushBatch(params.aggregator, calls, callIndex);
                         callIndex = 0;
                     }
-                }
-            }
-
-            currentPosition = saturatingSub(currentPosition, params.tokens.length);
-            currentEnd = saturatingSub(currentEnd, params.tokens.length);
-
-            for (uint256 i = currentPosition; i < params.pairToken.length && i < currentEnd; i++) {
-                uint256 chain = params.pairChainId[i];
-                address token = params.pairToken[i];
-
-                console.log("Processing pair: ");
-                console.log("\tChain: ", chain);
-                console.log("\tToken: ", token);
-
-                if (L1Nullifier(nullifier).chainBalance(chain, token) == 0) {
-                    continue;
-                }
-
-                bytes memory data = abi.encodeWithSelector(
-                    vault.updateChainBalancesFromSharedBridge.selector,
-                    token,
-                    chain
-                );
-                callIndex = addCall(calls, callIndex, params.l1NativeTokenVault, data);
-
-                if (callIndex == MAX_CALLS_PER_BATCH) {
-                    flushBatch(params.aggregator, calls, callIndex);
-                    callIndex = 0;
                 }
             }
         }

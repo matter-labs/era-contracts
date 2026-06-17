@@ -2,7 +2,6 @@ use clap::Subcommand;
 
 use crate::commands::hub::init::HubInitArgs;
 
-pub mod accept_ownership;
 pub mod deploy;
 pub mod init;
 pub mod register_ctm;

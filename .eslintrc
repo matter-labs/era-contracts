@@ -15,6 +15,8 @@
     "**/lib/*",
     "lib/*",
     "l1-contracts/scripts/verify-l2-contracts.ts",
-    "system-contracts/scripts/utils.ts"
+    "system-contracts/scripts/utils.ts",
+    "**/dist/**",
+    "**/node_modules/**"
   ]
 }

@@ -1400,6 +1400,16 @@
     "evmDeployedBytecodeLength": 15156
   },
   {
+    "contractName": "l1-contracts/L1MessageRootStageSepolia",
+    "zkBytecodeHash": "0x0100079b2c31ebc46e89dc1b320995949179b30f53aeceb462624ea113ae4f00",
+    "zkBytecodePath": "/l1-contracts/zkout/L1MessageRootStageSepolia.sol/L1MessageRootStageSepolia.json",
+    "evmBytecodeHash": "0xc08bf3c93a11ad850ca79bbe1212086c170caca0517188ffbb275e73f4ea911c",
+    "evmBytecodePath": "/l1-contracts/out/L1MessageRootStageSepolia.sol/L1MessageRootStageSepolia.json",
+    "evmDeployedBytecodeHash": "0x6b1efe2c868b1490e2678e9266d64ce5697117cf9122cfc532fee43d065332bf",
+    "evmDeployedBytecodeBlakeHash": "0x9212d96840b063851167d79e18cde2b90d3633eb96e69397b78f1e10d9eb0b25",
+    "evmDeployedBytecodeLength": 15190
+  },
+  {
     "contractName": "l1-contracts/L1MessengerZKOS",
     "zkBytecodeHash": "0x01000079a64e0a760271ce4c400224be245f44c19175093a2e7c015a176910d8",
     "zkBytecodePath": "/l1-contracts/zkout/L1MessengerZKOS.sol/L1MessengerZKOS.json",

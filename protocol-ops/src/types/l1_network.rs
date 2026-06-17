@@ -5,6 +5,8 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
 
+use crate::common::addresses::{LOCAL_ZK_TOKEN_ADDRESS, LOCAL_ZK_TOKEN_ASSET_ID};
+
 #[derive(
     Copy,
     Clone,
@@ -40,26 +42,27 @@ impl L1Network {
         }
     }
 
-    /// TODO: remove, define these in a separate ecosystems/chains registry
-    pub fn zk_token_asset_id(&self) -> B256 {
+    /// `zk_token_asset_id` for live networks is intentionally read from
+    /// `permanent-values/<env>.toml` rather than hard-coded here. There is no
+    /// single "canonical" Sepolia or Mainnet ZK asset ID — the same L1
+    /// network hosts multiple deployments (stage uses a different ZkTokenV2
+    /// instance than testnet, mainnet has its own), and inlining a constant
+    /// in this enum forces a code change every time a new env appears. The
+    /// per-env TOML keeps the asset ID next to the other env-specific
+    /// addresses (bridgehub, CTMs, etc.) and makes it discoverable by anyone
+    /// onboarding a new chain. Only `Localhost` returns a built-in constant
+    /// because interop tests deterministically deploy the token themselves.
+    pub fn zk_token_asset_id(&self) -> anyhow::Result<B256> {
         match self {
             L1Network::Localhost => {
                 // When testing locally, we deploy the ZK token inside interop tests, so we need to derive its asset id
-                // The address where ZK will be deployed at is 0x8207187d1682B3ebaF2e1bdE471aC9d5B886fD93
-                B256::from_str("0x50c8daa176d24869d010ad74c2d374427601375ca2264e94f73784e299d572d4")
-                    .unwrap()
+                // from LOCAL_ZK_TOKEN_ADDRESS.
+                let _ = LOCAL_ZK_TOKEN_ADDRESS;
+                Ok(B256::from_str(LOCAL_ZK_TOKEN_ASSET_ID).unwrap())
             }
-            L1Network::Sepolia => {
-                // https://sepolia.etherscan.io/address/0x2569600E58850a0AaD61F7Dd2569516C3d909521#readProxyContract#F3
-                B256::from_str("0x0d643837c76916220dfe0d5e971cfc3dc2c7569b3ce12851c8e8f17646d86bca")
-                    .unwrap()
-            }
-            L1Network::Mainnet => {
-                // https://etherscan.io/address/0x66A5cFB2e9c529f14FE6364Ad1075dF3a649C0A5#readProxyContract#F3
-                B256::from_str("0x83e2fbc0a739b3c765de4c2b4bf8072a71ea8fbb09c8cf579c71425d8bc8804a")
-                    .unwrap()
-            }
-            L1Network::Holesky => B256::ZERO,
+            L1Network::Sepolia | L1Network::Holesky | L1Network::Mainnet => anyhow::bail!(
+                "no canonical ZK token asset ID for {self}; pass --zk-token-asset-id or use --env with zk_token_asset_id in permanent-values"
+            ),
         }
     }
 }

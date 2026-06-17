@@ -34,6 +34,7 @@ impl Forge {
             script_path: path.to_path_buf(),
             args,
             envs: Vec::new(),
+            timing_label: None,
         }
     }
 }

@@ -38,6 +38,7 @@ async function main(): Promise<void> {
     const testTokens = stateAfterSetup.testTokens;
     const privateInteropAddresses = stateAfterSetup.privateInteropAddresses;
     const customBaseTokens = stateAfterSetup.customBaseTokens;
+    const tbmAccountingSnapshots = stateAfterSetup.tbmAccountingSnapshots;
     const zkToken = stateAfterSetup.zkToken;
 
     // Stop all chains — this triggers Anvil's --dump-state file writes.
@@ -51,6 +52,7 @@ async function main(): Promise<void> {
       testTokens,
       privateInteropAddresses,
       customBaseTokens,
+      tbmAccountingSnapshots,
       zkToken,
     };
     fs.writeFileSync(path.join(stateDir, "addresses.json"), JSON.stringify(addresses, null, 2));

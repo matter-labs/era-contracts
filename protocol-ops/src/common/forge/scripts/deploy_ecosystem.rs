@@ -3,14 +3,11 @@ use std::str::FromStr;
 use alloy::primitives::{Address, B256, U256};
 use serde::{Deserialize, Serialize};
 
-use crate::common::forge::scripts::{Create2Addresses, ForgeScriptParams};
+use crate::common::addresses::MAINNET_WETH_ADDRESS;
+use crate::common::forge::scripts::Create2Addresses;
 use crate::common::traits::FileConfigTrait;
 
-pub const DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
-    input: "script-config/config-deploy-l1.toml",
-    output: "script-out/output-deploy-l1.toml",
-    script_path: "deploy-scripts/ecosystem/DeployL1CoreContracts.s.sol",
-};
+pub use super::DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION as DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS;
 
 // ── Input types ──────────────────────────────────────────────────────────────
 
@@ -35,8 +32,7 @@ impl Default for InitialDeploymentConfig {
             governance_min_delay: 0,
             max_number_of_chains: 100,
             validator_timelock_execution_delay: 0,
-            token_weth_address: Address::from_str("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
-                .unwrap(),
+            token_weth_address: Address::from_str(MAINNET_WETH_ADDRESS).unwrap(),
             bridgehub_create_new_chain_salt: 0,
             gateway_settlement_fee: U256::from(1000000000u64),
         }

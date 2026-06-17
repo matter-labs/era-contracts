@@ -20,7 +20,6 @@ alloy = { version = "2.0.5", features = [
     "dyn-abi",
     "rpc-types",
     "network",
-    "json-abi",
     "contract",
     "transport-http",
     "eips",
@@ -33,7 +32,11 @@ human-panic = "2.0"
 clap = { version = "4.5", features = ["derive", "wrap_help", "string"] }
 cliclack = "0.5"
 console = "0.16"
+# Used by the v31 upgrade_verification (PUVT) tree: bytecode fetching and
+# facet selector extraction. Kept out of #2210's slim dep set on purpose.
+evmole = "0.6.2"
 rand = "0.10"
+reqwest = { version = "0.12", features = ["blocking"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.9"

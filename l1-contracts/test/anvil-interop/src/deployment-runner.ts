@@ -16,6 +16,7 @@ import type {
   DeploymentState,
   L2ChainInfo,
   PriorityRequestData,
+  TbmAccountingSnapshot,
 } from "./core/types";
 import { getChainIdsByRole, timeIt } from "./core/utils";
 import { getAbi, getCreationBytecode } from "./core/contracts";
@@ -24,7 +25,7 @@ import { getInteropSourcePrivateKey, isLiveInteropMode } from "./core/accounts";
 import { encodeNtvAssetId } from "./core/data-encoding";
 import { deployTestTokens } from "./helpers/deploy-test-token";
 import { depositERC20ToL2 } from "./helpers/l1-deposit-helper";
-import { registerAndMigrateTestTokens } from "./helpers/token-balance-migration-helper";
+import { registerAndMigrateTestTokens, tbmAccountingSnapshotKey } from "./helpers/token-balance-migration-helper";
 import { asViemAddress, createLiveZksyncSdk } from "./helpers/temp-sdk";
 
 const ZERO_ADDRESS = ethers.constants.AddressZero;
@@ -702,7 +703,8 @@ export class DeploymentRunner {
       throw new Error(`addresses.json not found in ${stateDir}`);
     }
     const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf-8"));
-    const { l1Addresses, ctmAddresses, chainAddresses, testTokens, customBaseTokens, zkToken } = addresses;
+    const { l1Addresses, ctmAddresses, chainAddresses, testTokens, customBaseTokens, tbmAccountingSnapshots, zkToken } =
+      addresses;
 
     // Decompress hex-gzip state files to native JSON for --load-state CLI.
     // This is more portable than anvil_loadState RPC across anvil versions.
@@ -759,6 +761,9 @@ export class DeploymentRunner {
     }
     if (customBaseTokens) {
       state.customBaseTokens = customBaseTokens;
+    }
+    if (tbmAccountingSnapshots) {
+      state.tbmAccountingSnapshots = tbmAccountingSnapshots;
     }
     if (zkToken) {
       state.zkToken = zkToken;
@@ -897,12 +902,14 @@ export class DeploymentRunner {
 
     const gatewaySetup = new GatewaySetup(l1RpcUrl, l1Addresses, ctmAddresses);
 
-    const gatewayCTMAddr = await gatewaySetup.designateAsGateway(
+    const gatewaySetupResult = await gatewaySetup.designateAsGateway(
       gatewayChainId,
       gwRpcUrl,
       gwSettledChainIds,
       l2ChainRpcUrls
     );
+    this.saveTbmAccountingSnapshots(gatewaySetupResult.tbmAccountingSnapshots);
+    const gatewayCTMAddr = gatewaySetupResult.gatewayCTMAddr;
 
     console.log(`  Gateway CTM: ${gatewayCTMAddr}`);
 
@@ -960,7 +967,7 @@ export class DeploymentRunner {
         const gwDiamondProxy = state.chainAddresses!.find((c) => c.chainId === gatewayConfig.chainId)!.diamondProxy;
         const l2ChainRpcUrls = new Map(state.chains!.l2.map((c) => [c.chainId, c.rpcUrl]));
 
-        await registerAndMigrateTestTokens({
+        const tbmAccountingSnapshots = await registerAndMigrateTestTokens({
           gwSettledChainIds,
           l2ChainRpcUrls,
           testTokens: state.testTokens,
@@ -971,6 +978,7 @@ export class DeploymentRunner {
           chainAddresses: state.chainAddresses!,
           logger: (line) => console.log(line),
         });
+        this.saveTbmAccountingSnapshots(tbmAccountingSnapshots);
       }
     }
 
@@ -978,6 +986,19 @@ export class DeploymentRunner {
     await this.seedWrappedZkOnEthChains(stateAfterTbm);
 
     return result;
+  }
+
+  private saveTbmAccountingSnapshots(snapshots: TbmAccountingSnapshot[] | undefined): void {
+    if (!snapshots || snapshots.length === 0) {
+      return;
+    }
+
+    const state = this.loadState();
+    state.tbmAccountingSnapshots = state.tbmAccountingSnapshots || {};
+    for (const snapshot of snapshots) {
+      state.tbmAccountingSnapshots[tbmAccountingSnapshotKey(snapshot.chainId, snapshot.assetId)] = snapshot;
+    }
+    this.saveState(state);
   }
 }
 

@@ -2,11 +2,12 @@ use alloy::primitives::{Address, B256};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-use crate::commands::ctm::deploy::CtmDeployInput;
 use crate::commands::ctm::init::ctm_init;
-use crate::commands::hub::deploy::DeployInput;
+use crate::commands::ctm::init::CtmInitInput;
 use crate::commands::hub::init::hub_init;
+use crate::commands::hub::init::HubInitInput;
 
+use crate::common::env_config::EnvConfig;
 use crate::common::forge::scripts::deploy_ctm::DeployCTMOutput;
 use crate::common::forge::scripts::deploy_ecosystem::DeployL1CoreContractsOutput;
 use crate::common::output::write_output_if_requested;
@@ -18,7 +19,15 @@ use crate::types::VMOption;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct EcosystemInitArgs {
-    /// Owner address for the deployed contracts (default: deployer)
+    /// Per-env preset (`stage` / `testnet` / `mainnet` / `local`). Loads
+    /// `upgrade-envs/permanent-values/<env>.toml` and supplies defaults for
+    /// `--zk-token-asset-id`, `--era-chain-id`, and `--owner` when those flags
+    /// are omitted. Explicit flags still win.
+    #[clap(long, help_heading = "Topology")]
+    pub env: Option<String>,
+
+    /// Owner address for the deployed contracts (default: deployer, or env's
+    /// `owner_address` when `--env` is set).
     #[clap(long, help_heading = "Signers")]
     pub owner: Option<Address>,
 
@@ -34,9 +43,9 @@ pub struct EcosystemInitArgs {
     pub shared: SharedRunArgs,
 
     // Advanced input
-    /// Era chain ID
-    #[clap(long, default_value_t = 270, help_heading = "Advanced input")]
-    pub era_chain_id: u64,
+    /// Era chain ID (default: 270, or env's `era_chain_id` when `--env` is set).
+    #[clap(long, help_heading = "Advanced input")]
+    pub era_chain_id: Option<u64>,
     /// VM type: zksyncos (default) or eravm
     #[clap(long, value_enum, default_value_t = VMOption::ZKSyncOsVM, help_heading = "Advanced input")]
     pub vm_type: VMOption,
@@ -46,10 +55,11 @@ pub struct EcosystemInitArgs {
     /// Enable support for legacy bridge testing (default: false)
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_legacy_bridge: bool,
-    /// ZK token asset ID
+    /// ZK token asset ID (defaults from env's `zk_token_asset_id` when
+    /// `--env` is set).
     #[clap(long, help_heading = "Advanced input")]
     pub zk_token_asset_id: Option<B256>,
-    /// CREATE2 factory salt (random by default)
+    /// CREATE2 factory salt (random by default).
     #[clap(long, help_heading = "Advanced input")]
     pub create2_factory_salt: Option<B256>,
 }
@@ -57,18 +67,34 @@ pub struct EcosystemInitArgs {
 // ── run() ───────────────────────────────────────────────────────────────────
 
 pub async fn run(args: EcosystemInitArgs) -> anyhow::Result<()> {
+    let env_cfg = match args.env.as_deref() {
+        Some(env) => Some(EnvConfig::load(env)?),
+        None => None,
+    };
+
     let mut runner = ForgeRunner::new(&args.shared)?;
     let sender = runner.prepare_sender(args.deployer_address).await?;
-    let owner = Wallet::resolve(args.owner, None, &sender)?;
+    let owner_override = args
+        .owner
+        .or_else(|| env_cfg.as_ref().and_then(|c| c.owner_address()));
+    let owner = Wallet::resolve(owner_override, None, &sender)?;
+
+    let era_chain_id = args
+        .era_chain_id
+        .or_else(|| env_cfg.as_ref().and_then(|c| c.era_chain_id()))
+        .unwrap_or(270);
+    let zk_token_asset_id = args
+        .zk_token_asset_id
+        .or_else(|| env_cfg.as_ref().and_then(|c| c.zk_token_asset_id()));
 
     let input = EcosystemInitInput {
         sender: sender.address,
         owner: owner.address,
-        era_chain_id: args.era_chain_id,
+        era_chain_id,
         vm_type: args.vm_type,
         with_testnet_verifier: args.with_testnet_verifier,
         with_legacy_bridge: args.with_legacy_bridge,
-        zk_token_asset_id: args.zk_token_asset_id,
+        zk_token_asset_id,
         create2_factory_salt: args.create2_factory_salt,
     };
     let output = ecosystem_init(&mut runner, &sender, &owner, &input).await?;
@@ -102,7 +128,7 @@ pub async fn ecosystem_init(
     // `Utils.DETERMINISTIC_CREATE2_ADDRESS` — no override needed.
 
     // Initialize Bridgehub contracts
-    let hub_input = DeployInput {
+    let hub_input = HubInitInput {
         owner: owner.address,
         era_chain_id: input.era_chain_id,
         with_legacy_bridge: input.with_legacy_bridge,
@@ -112,7 +138,7 @@ pub async fn ecosystem_init(
     let bridgehub_addr = hub_output.deployed_addresses.bridgehub.bridgehub_proxy_addr;
 
     // Initialize CTM contracts
-    let ctm_input = CtmDeployInput {
+    let ctm_input = CtmInitInput {
         bridgehub: bridgehub_addr,
         owner: owner.address,
         vm_type: input.vm_type,

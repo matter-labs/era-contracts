@@ -118,6 +118,28 @@ pub async fn resolve_all_chain_ids(
         .collect()
 }
 
+/// Enumerate every CTM proxy currently registered under `bridgehub` by
+/// iterating its `getAllZKChainChainIDs()` and looking up each chain's
+/// `chainTypeManager`. Returns deduped addresses in first-seen order, with
+/// the first chain that uses each as a witness (handy for downstream
+/// auto-resolution of rollup-DA-manager).
+pub async fn discover_all_ctms(
+    l1_rpc_url: &str,
+    bridgehub: Address,
+) -> anyhow::Result<Vec<(Address, u64)>> {
+    let chain_ids = resolve_all_chain_ids(l1_rpc_url, bridgehub).await?;
+    let mut out: Vec<(Address, u64)> = Vec::new();
+    for cid in chain_ids {
+        let ctm = resolve_ctm_proxy(l1_rpc_url, bridgehub, cid)
+            .await
+            .with_context(|| format!("resolving CTM for chain {cid}"))?;
+        if !out.iter().any(|(a, _)| *a == ctm) {
+            out.push((ctm, cid));
+        }
+    }
+    Ok(out)
+}
+
 /// Resolve `ctm.L1_BYTECODES_SUPPLIER()` → bytecodes supplier address.
 ///
 /// This getter is on the concrete `ChainTypeManagerBase` but not in the
@@ -204,6 +226,23 @@ pub async fn resolve_chain_admin_owner(
         .await
         .with_context(|| format!("ChainAdmin({admin:#x}).owner() call failed"))?;
     ensure_nonzero(eoa, "ChainAdmin.owner()")
+}
+
+/// Resolve `AccessControlDefaultAdminRules.defaultAdmin()` for the ACR-backed
+/// ChainAdmin path used by `Utils.adminExecuteCalls`.
+pub async fn resolve_access_control_default_admin(
+    l1_rpc_url: &str,
+    access_control_restriction: Address,
+) -> anyhow::Result<Address> {
+    use crate::common::abi::AccessControlDefaultAdminRulesAbi;
+    let acr =
+        AccessControlDefaultAdminRulesAbi::new(access_control_restriction, provider(l1_rpc_url)?);
+    let admin = acr.defaultAdmin().call().await.with_context(|| {
+        format!(
+            "AccessControlRestriction({access_control_restriction:#x}).defaultAdmin() call failed"
+        )
+    })?;
+    ensure_nonzero(admin, "AccessControlRestriction.defaultAdmin()")
 }
 
 /// Resolve `Governance(bridgehub.owner()).owner()` → EOA that controls the

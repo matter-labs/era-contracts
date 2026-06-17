@@ -1,23 +1,14 @@
 use alloy::primitives::{Address, B256};
 use serde::{Deserialize, Serialize};
 
-use crate::common::forge::scripts::ForgeScriptParams;
 use crate::common::traits::FileConfigTrait;
 use crate::types::VMOption;
 
 use super::deploy_ecosystem::InitialDeploymentConfig;
 
-pub const DEPLOY_CTM_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
-    input: "script-config/config-deploy-ctm.toml",
-    output: "script-out/output-deploy-ctm.toml",
-    script_path: "deploy-scripts/ctm/DeployCTM.s.sol",
-};
+pub use super::DEPLOY_CTM_INVOCATION as DEPLOY_CTM_SCRIPT_PARAMS;
 
-pub const REGISTER_CTM_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
-    input: "script-config/config-register-ctm-l1.toml",
-    output: "script-out/register-ctm-l1.toml",
-    script_path: "deploy-scripts/ecosystem/RegisterCTM.s.sol",
-};
+pub use super::REGISTER_CTM_INVOCATION as REGISTER_CTM_SCRIPT_PARAMS;
 
 // ── Input types ──────────────────────────────────────────────────────────────
 

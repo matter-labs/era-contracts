@@ -38,6 +38,15 @@ pub struct SharedRunArgs {
     #[clap(long, help_heading = "Output")]
     pub out: Option<PathBuf>,
 
+    /// Optional subdirectory for all of this run's forge script IO. When
+    /// set, script inputs/outputs and broadcast files are placed under
+    /// `script-config/<subdir>/`, `script-out/<subdir>/` and
+    /// `broadcast/<subdir>/` inside the contracts checkout, so concurrent
+    /// runs don't collide. Default: the conventional fixed paths.
+    #[clap(long, help_heading = "Execution")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subdir: Option<String>,
+
     #[clap(flatten)]
     #[serde(flatten)]
     pub forge_args: ForgeScriptArgs,

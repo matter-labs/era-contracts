@@ -1,5 +1,9 @@
+#[cfg(test)]
+use crate::common::addresses::DEFAULT_TEST_WALLET_ADDRESS;
 use alloy::primitives::{Address, B256};
-use alloy::signers::local::{coins_bip39::English, MnemonicBuilder, PrivateKeySigner};
+use alloy::signers::local::PrivateKeySigner;
+#[cfg(test)]
+use alloy::signers::local::{coins_bip39::English, MnemonicBuilder};
 use anyhow::Context as _;
 use serde::{Deserialize, Serialize};
 
@@ -122,6 +126,7 @@ impl Wallet {
         }
     }
 
+    #[cfg(test)]
     pub fn from_mnemonic(mnemonic: &str, base_path: &str, index: u32) -> anyhow::Result<Self> {
         let signer = MnemonicBuilder::<English>::default()
             .phrase(mnemonic)
@@ -142,28 +147,13 @@ impl Wallet {
 // Wallets YAML schema (used by `apply` to load operator keys for each chain)
 // ---------------------------------------------------------------------------
 
+// Wallet's Debug impl redacts PrivateKeySigner automatically.
 #[derive(Debug, serde::Deserialize)]
-pub struct SimpleWallet {
-    pub address: String,
-}
-
-#[derive(serde::Deserialize)]
 pub struct ChainWallets {
-    pub owner: SimpleWallet,
-    pub operator_commit_sk: String,
-    pub operator_prove_sk: String,
-    pub operator_execute_sk: String,
-}
-
-impl std::fmt::Debug for ChainWallets {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ChainWallets")
-            .field("owner", &self.owner)
-            .field("operator_commit_sk", &"[REDACTED]")
-            .field("operator_prove_sk", &"[REDACTED]")
-            .field("operator_execute_sk", &"[REDACTED]")
-            .finish()
-    }
+    pub owner: Wallet,
+    pub operator_commit_sk: Wallet,
+    pub operator_prove_sk: Wallet,
+    pub operator_execute_sk: Wallet,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -191,7 +181,7 @@ fn test_load_localhost_wallets() {
     .unwrap();
     assert_eq!(
         wallet.address,
-        "0xa61464658AfeAf65CccaaFD3a512b69A83B77618"
+        DEFAULT_TEST_WALLET_ADDRESS
             .parse::<alloy::primitives::Address>()
             .unwrap()
     );

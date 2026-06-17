@@ -4,7 +4,13 @@ import type { MultiChainTokenTransferParams, MultiChainTokenTransferResult } fro
 import type { PrivateInteropAddresses } from "./private-interop-deployer";
 import { getAbi } from "../core/contracts";
 import { encodeEvmAddress } from "./erc7930";
-import { indirectCallAttr, interopCallValueAttr, sendInteropBundle, executeBundle } from "./interop-helpers";
+import {
+  indirectCallAttr,
+  interopCallValueAttr,
+  sendInteropBundle,
+  executeBundle,
+  getInteropProtocolFee,
+} from "./interop-helpers";
 import { ANVIL_DEFAULT_PRIVATE_KEY, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR } from "../core/const";
 import { encodeNtvAssetId, encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
 import { createBalanceTrackerFromState } from "./balance-tracker";
@@ -128,13 +134,12 @@ export async function executeTokenTransfer(
   log(`\n⏱️  [${elapsed()}] Sending token transfer via InteropCenter...`);
   log(`   Target: L2AssetRouter at ${L2_ASSET_ROUTER_ADDR}`);
 
+  const interopFee = await getInteropProtocolFee(sourceProvider);
   const sendResult = await sendInteropBundle({
     sourceProvider,
     destinationChainId: targetChainId,
     callStarters: [callStarter],
-    // Protocol fee defaults to 0 in the test environment (InteropCenter constructor default).
-    // If the fee is ever set to non-zero, this value must include it.
-    value: BigNumber.from(0),
+    value: interopFee,
   });
   log(`\n   Transaction sent: cast run ${sendResult.txHash} -r ${sourceChain.rpcUrl}`);
   log(`   ✅ Transaction confirmed in block ${sendResult.receipt.blockNumber} [${elapsed()}]`);

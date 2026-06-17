@@ -199,6 +199,15 @@ pub mod i_register_ctm {
 }
 pub use i_register_ctm::IRegisterCTMAbi;
 
+pub mod i_deploy_l1_core_contracts {
+    alloy::sol!(
+        #[sol(rpc)]
+        IDeployL1CoreContractsAbi,
+        "../l1-contracts/zkstack-out/IDeployL1CoreContracts.sol/IDeployL1CoreContracts.json"
+    );
+}
+pub use i_deploy_l1_core_contracts::IDeployL1CoreContractsAbi;
+
 pub mod i_register_on_all_chains {
     alloy::sol!(
         #[sol(rpc)]
@@ -326,3 +335,58 @@ pub mod testnet_verifier {
     );
 }
 pub use testnet_verifier::ITestnetVerifier;
+
+pub mod access_control_default_admin_rules {
+    alloy::sol!(
+        #[sol(rpc)]
+        interface AccessControlDefaultAdminRulesAbi {
+            function defaultAdmin() external view returns (address);
+        }
+    );
+}
+pub use access_control_default_admin_rules::AccessControlDefaultAdminRulesAbi;
+
+pub mod i_core_upgrade_v31 {
+    alloy::sol!(
+        #[sol(rpc)]
+        ICoreUpgradeV31Abi,
+        "../l1-contracts/zkstack-out/IUpgradeV31.sol/ICoreUpgradeV31.json"
+    );
+}
+pub use i_core_upgrade_v31::ICoreUpgradeV31Abi;
+
+pub mod i_ctm_upgrade_v31 {
+    alloy::sol!(
+        #[sol(rpc)]
+        ICTMUpgradeV31Abi,
+        "../l1-contracts/zkstack-out/IUpgradeV31.sol/ICTMUpgradeV31.json"
+    );
+}
+pub use i_ctm_upgrade_v31::ICTMUpgradeV31Abi;
+
+pub mod i_finalize_chain_init {
+    // Hand-declared: the artifact JSON's `enum L2DACommitmentScheme`
+    // internalType breaks sol!'s JSON path, so the struct is declared inline
+    // with `uint8` (identical ABI encoding). Field order verified against
+    // zkstack-out/IFinalizeChainInit.sol/IFinalizeChainInit.json.
+    alloy::sol!(
+        interface IFinalizeChainInitAbi {
+            struct FinalizeChainInitParams {
+                address chainAdmin;
+                address accessControlRestriction;
+                address diamondProxy;
+                address bridgehub;
+                uint256 chainId;
+                address l1DaValidator;
+                address tokenMultiplierSetter;
+                uint8 l2DaCommitmentScheme;
+                bool shouldUnpauseDeposits;
+                bool shouldSetDaValidatorPair;
+                bool shouldMakePermanentRollup;
+            }
+
+            function finalizeChainInit(FinalizeChainInitParams _params) external;
+        }
+    );
+}
+pub use i_finalize_chain_init::IFinalizeChainInitAbi;

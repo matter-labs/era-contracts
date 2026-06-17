@@ -169,7 +169,7 @@ pub async fn apply_manifest_from(
             })?;
         }
 
-        execute_one_bundle(&bundle_path, l1_rpc_url, key).await?;
+        execute_one_bundle(&bundle_path, l1_rpc_url, key, None).await?;
     }
 
     logger::success("All bundles applied.");

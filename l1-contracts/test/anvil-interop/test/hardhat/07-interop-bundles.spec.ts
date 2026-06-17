@@ -9,7 +9,7 @@ import {
   getInteropSourceAddress,
   isLiveInteropMode,
 } from "../../src/core/accounts";
-import { INTEROP_CENTER_ADDR, L2_ASSET_ROUTER_ADDR } from "../../src/core/const";
+import { ANVIL_INTEROP_PROTOCOL_FEE_WEI, INTEROP_CENTER_ADDR, L2_ASSET_ROUTER_ADDR } from "../../src/core/const";
 import { encodeEvmAddress } from "../../src/helpers/erc7930";
 import {
   sendInteropBundle,
@@ -22,7 +22,11 @@ import {
   useFixedFeeAttr,
   getTokenTransferData,
   getInteropProtocolFee,
-  getAccumulatedZkFees,
+  setInteropProtocolFee,
+  snapshotAccumulatedProtocolFees,
+  expectAccumulatedProtocolFeeDelta,
+  snapshotAccumulatedZkFees,
+  expectAccumulatedZkFeeDelta,
   getZkInteropFee,
   getZkTokenAssetId,
   getZkTokenAddress,
@@ -54,6 +58,7 @@ const ERC20_TOKEN_MIN = BigNumber.from(100);
 const ERC20_TOKEN_MAX = BigNumber.from(10000);
 const ROUNDTRIP_TOKEN_TRANSFER_AMOUNT = ethers.utils.parseUnits("1", 18);
 const EXCESS_MSG_VALUE_DELTA = BigNumber.from(1);
+const ANVIL_INTEROP_PROTOCOL_FEE = BigNumber.from(ANVIL_INTEROP_PROTOCOL_FEE_WEI);
 
 /**
  * 07 - Interop Bundles (sendBundle / executeBundle)
@@ -141,6 +146,11 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     }
     l1Provider = new ethers.providers.JsonRpcProvider(l1RpcUrl);
 
+    if (!isLiveInteropMode()) {
+      await setInteropProtocolFee(sourceProvider, ANVIL_INTEROP_PROTOCOL_FEE);
+      await setInteropProtocolFee(destProvider, ANVIL_INTEROP_PROTOCOL_FEE);
+    }
+
     sourceTokenAddress = state.testTokens![sourceChainId];
     sourceAssetId = await getAssetIdForToken(sourceProvider, sourceTokenAddress);
 
@@ -199,6 +209,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     const bundleAttributes = [executionAddressAttr(getInteropSourceAddress())];
 
     const balBefore = await captureBalance(sourceProvider);
+    const protocolFeesBefore = !isLiveInteropMode() ? await snapshotAccumulatedProtocolFees(sourceProvider) : undefined;
 
     const sendResult = await sendInteropBundle({
       sourceProvider,
@@ -214,6 +225,15 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     expect(sendResult.interopBundle, "single direct call: interopBundle should exist").to.not.be.null;
 
     expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "single direct call");
+    if (protocolFeesBefore) {
+      await expectAccumulatedProtocolFeeDelta(
+        sourceProvider,
+        protocolFeesBefore,
+        sendResult.receipt,
+        interopFee,
+        "single direct call"
+      );
+    }
 
     console.log("   [send] Single direct call bundle sent");
 
@@ -254,6 +274,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     await approveToken(sourceProvider, sourceZkTokenAddress, INTEROP_CENTER_ADDR, zkInteropFee);
 
     const balBefore = await captureBalance(sourceProvider, sourceZkTokenAddress);
+    const accumulatedZkFeesBefore = await snapshotAccumulatedZkFees(sourceProvider);
     const sendResult = await sendInteropBundle({
       sourceProvider,
       destinationChainId: destChainId,
@@ -269,9 +290,13 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       "single direct call fixed fee: sender ZK token should decrease by the fixed fee"
     ).to.be.true;
 
-    const minedBlock = await sourceProvider.getBlock(sendResult.receipt.blockNumber);
-    const accumulatedZkFees = await getAccumulatedZkFees(sourceProvider, minedBlock.miner);
-    expect(accumulatedZkFees.gte(zkInteropFee), "coinbase should accumulate the fixed ZK fee").to.be.true;
+    await expectAccumulatedZkFeeDelta(
+      sourceProvider,
+      accumulatedZkFeesBefore,
+      sendResult.receipt,
+      zkInteropFee,
+      "single direct call fixed fee"
+    );
 
     const recipientBefore = await getNativeBalance(destProvider, dummyRecipient1);
     const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);

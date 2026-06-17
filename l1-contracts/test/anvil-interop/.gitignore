@@ -12,3 +12,6 @@ node_modules/
 # atomic-os-demo local config + run state
 atomic-os-demo.env
 .atomic-os-demo/
+
+# Fork-mode L2 RPC map (developer-local)
+config/fork-l2-rpcs.json

@@ -1,9 +1,10 @@
-use crate::common::forge::scripts::deploy_ecosystem::{
-    DeployL1Config, DeployL1CoreContractsOutput, InitialDeploymentConfig,
-    DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS,
+use crate::common::abi::IDeployL1CoreContractsAbi;
+use crate::common::forge::scripts::{
+    deploy_ecosystem::{DeployL1Config, DeployL1CoreContractsOutput, InitialDeploymentConfig},
+    DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION,
 };
 use crate::common::{
-    forge::{Forge, ForgeRunner},
+    forge::ForgeRunner,
     traits::{ReadConfig, SaveConfig},
     wallets::Wallet,
 };
@@ -38,18 +39,19 @@ pub fn deploy(
         input.with_legacy_bridge,
     );
 
-    let input_path =
-        DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS.input(&runner.foundry_scripts_path);
+    let input_path = runner.input_path(&DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION)?;
     deploy_config.save(&input_path)?;
 
-    let forge = Forge::new(&runner.foundry_scripts_path)
-        .script(
-            &DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS.script(),
-            runner.forge_args.clone(),
-        )
-        .with_ffi()
-        .with_rpc_url(runner.rpc_url.clone())
-        .with_broadcast()
+    // protocol-ops always states the script's IO paths explicitly (the
+    // conventional ones unless a per-run --subdir is set); the `run()`
+    // wrapper with baked-in paths is for manual forge use.
+    let forge = runner
+        .script_call(IDeployL1CoreContractsAbi::runInnerCall {
+            inputPath: runner
+                .script_rel_path(DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION.input_rel()),
+            outputPath: runner
+                .script_rel_path(DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION.output_rel()),
+        })
         .with_wallet(auth)
         .with_env(
             "CREATE2_FACTORY_SALT",
@@ -58,7 +60,6 @@ pub fn deploy(
 
     runner.run(forge)?;
 
-    let output_path =
-        DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS.output(&runner.foundry_scripts_path);
+    let output_path = runner.output_path(&DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION);
     DeployL1CoreContractsOutput::read(output_path)
 }

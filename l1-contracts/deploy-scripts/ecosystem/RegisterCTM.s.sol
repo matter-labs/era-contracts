@@ -43,7 +43,7 @@ contract RegisterCTM is Script, IRegisterCTM {
         address bridgehub,
         address chainTypeManagerProxy,
         bool shouldSend
-    ) internal {
+    ) public {
         string memory root = vm.projectRoot();
 
         registerChainTypeManager(outputPath, bridgehub, chainTypeManagerProxy, shouldSend);

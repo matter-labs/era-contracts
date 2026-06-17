@@ -1,5 +1,6 @@
-// Must match the actual Anvil L1 chain ID (31337 = 0x7a69)
-export const L1_CHAIN_ID = 31337;
+// Anvil L1 chain ID is a runtime value (synthetic harness uses 31337; fork-mode
+// probes the upstream chain). Read it via `runtimeConfig.l1ChainId` from
+// `./runtime-config` instead of importing a constant from here.
 
 export const ETH_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000001";
 export const LEGACY_SHARED_BRIDGE_PLACEHOLDER = "0x0000000000000000000000000000000000000002";
@@ -57,6 +58,17 @@ export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFf
 // Default gas limits for test transactions
 export const INTEROP_SEND_BUNDLE_GAS_LIMIT = 500_000;
 export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
+// 7 gwei, used by Anvil interop specs to exercise the non-zero dynamic fee path.
+export const ANVIL_INTEROP_PROTOCOL_FEE_WEI = "7000000000";
+
+// Base-token priority tx parameters used by the Anvil interop harness.
+export const ANVIL_INTEROP_BASE_TOKEN_PRIORITY_TX_GAS_LIMIT = 1_000_000;
+// Fixed L1 gas price matching the Anvil interop helpers' priority tx base-cost calculation.
+export const ANVIL_INTEROP_PRIORITY_TX_L1_GAS_PRICE_WEI = 50_000_000_000n;
+// Mirrors contracts/common/Config.sol::REQUIRED_L2_GAS_PRICE_PER_PUBDATA.
+export const ANVIL_INTEROP_REQUIRED_L2_GAS_PRICE_PER_PUBDATA = 800;
+// Two-bridges base-token accounting funds the outer and inner priority requests.
+export const ANVIL_INTEROP_TWO_BRIDGES_PRIORITY_REQUEST_COUNT = 2;
 
 // Default TestnetERC20Token deployment parameters for interop test helpers
 export const TEST_TOKEN_DECIMALS = 18;

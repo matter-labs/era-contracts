@@ -14,24 +14,20 @@
 //! single stage each; the phase names stay to keep the CLI symmetric with
 //! `migrate-to` and to match the per-phase workflow split.
 
-use std::path::Path;
-
+use alloy::dyn_abi::DynSolValue;
 use alloy::hex;
-use alloy::primitives::{Address, Bytes, B256};
+use alloy::primitives::{Address, Bytes, B256, U256};
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
-use super::build_admin_functions_script;
 use super::migrate_to::{stage_pause_deposits, wait_for_l2_tx_receipt};
+use crate::common::abi::{AdminFunctionsAbi, BridgehubAbi, GatewayUtilsAbi, IChainTypeManagerAbi};
+use crate::common::addresses::L2_L1_MESSENGER;
 use crate::common::output::write_output_if_requested;
-use crate::common::paths;
 use crate::common::EcosystemChainArgs;
 use crate::common::SharedRunArgs;
-use crate::common::{
-    forge::{Forge, ForgeRunner, ForgeScriptArg},
-    logger,
-};
+use crate::common::{forge::ForgeRunner, logger};
 use crate::types::L2DACommitmentScheme;
 
 /// Sentinel error type for a reverted L2 priority tx.
@@ -190,7 +186,7 @@ pub async fn run(cmd: MigrateFromCommands) -> anyhow::Result<()> {
 // ── Phase 0: pause-deposits + notify-server ───────────────────────────────
 
 pub async fn run_phase0_pause_deposits(args: Phase0PauseDepositsArgs) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     // Pause-deposits is shared with the to-gateway flow: it's the same L1
@@ -215,7 +211,7 @@ pub async fn run_phase0_pause_deposits(args: Phase0PauseDepositsArgs) -> anyhow:
 // ── Phase 1: submit ───────────────────────────────────────────────────────
 
 pub async fn run_phase1_submit(args: Phase1SubmitArgs) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     let gateway_chain_id = stage_submit_from(
@@ -248,7 +244,7 @@ pub async fn run_phase1_submit(args: Phase1SubmitArgs) -> anyhow::Result<()> {
 pub async fn run_phase3_set_da_validator_pair(
     args: Phase3SetDaValidatorPairArgs,
 ) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     stage_set_da_validator_pair_from(
@@ -283,20 +279,13 @@ pub async fn stage_notify_server_from(
 ) -> anyhow::Result<()> {
     let sender = runner.prepare_chain_admin(bridgehub, chain_id).await?;
 
-    let contracts_path = paths::resolve_l1_contracts_path()?;
-    let should_send = "true".to_string();
-
-    let script = build_admin_functions_script(
-        &contracts_path,
-        runner,
-        "notifyServerMigrationFromGateway(address,uint256,bool)",
-        vec![
-            format!("{:#x}", bridgehub),
-            chain_id.to_string(),
-            should_send,
-        ],
-    )?
-    .with_wallet(&sender);
+    let script = runner
+        .script_call(AdminFunctionsAbi::notifyServerMigrationFromGatewayCall {
+            _bridgehub: bridgehub,
+            _chainId: U256::from(chain_id),
+            _shouldSend: true,
+        })
+        .with_wallet(&sender);
 
     logger::step("Notifying server about migration from gateway");
     logger::info(format!("Chain ID: {}", chain_id));
@@ -327,9 +316,6 @@ pub async fn stage_submit_from(
             .context("Failed to resolve gateway chain ID from bridgehub")?;
     logger::info(format!("Gateway chain ID (from L1): {gateway_chain_id}"));
 
-    let contracts_path = paths::resolve_l1_contracts_path()?;
-    let should_send = "true".to_string();
-
     let l1_diamond_cut_data_hex = match l1_diamond_cut_data {
         Some(provided) => format!("0x{}", provided.trim_start_matches("0x")),
         None => {
@@ -347,22 +333,22 @@ pub async fn stage_submit_from(
             format!("0x{}", hex::encode(&bytes))
         }
     };
+    let l1_diamond_cut_data = Bytes::from(
+        hex::decode(l1_diamond_cut_data_hex.trim_start_matches("0x"))
+            .context("invalid L1 diamond cut data hex")?,
+    );
 
-    let script = build_admin_functions_script(
-        &contracts_path,
-        runner,
-        "startMigrateChainFromGateway(address,uint256,uint256,uint256,bytes,address,bool)",
-        vec![
-            format!("{:#x}", bridgehub),
-            l1_gas_price.to_string(),
-            chain_id.to_string(),
-            gateway_chain_id.to_string(),
-            l1_diamond_cut_data_hex,
-            format!("{:#x}", refund_recipient),
-            should_send,
-        ],
-    )?
-    .with_wallet(&sender);
+    let script = runner
+        .script_call(AdminFunctionsAbi::startMigrateChainFromGatewayCall {
+            _bridgehub: bridgehub,
+            _l1GasPrice: U256::from(l1_gas_price),
+            _l2ChainId: U256::from(chain_id),
+            _gatewayChainId: U256::from(gateway_chain_id),
+            _l1DiamondCutData: l1_diamond_cut_data,
+            _refundRecipient: refund_recipient,
+            _shouldSend: true,
+        })
+        .with_wallet(&sender);
 
     logger::step("Submitting chain migration FROM gateway");
     logger::info(format!("Chain ID: {}", chain_id));
@@ -388,28 +374,28 @@ pub async fn stage_set_da_validator_pair_from(
     l1_da_validator: Address,
     l2_da_commitment_scheme: L2DACommitmentScheme,
 ) -> anyhow::Result<()> {
-    let sender = runner.prepare_chain_admin(bridgehub, chain_id).await?;
-    let contracts_path = paths::resolve_l1_contracts_path()?;
+    // migrate_from has no `--access-control-restriction` flag — chains that
+    // migrate off the gateway use the Ownable ChainAdmin path. If/when that
+    // changes, lift the flag into this helper too.
+    let access_control_restriction = Address::ZERO;
+    let sender = runner
+        .prepare_chain_admin_broadcaster(bridgehub, chain_id, access_control_restriction)
+        .await?;
 
     // Use the existing Admin.setDAValidatorPair flow (NOT the gateway-routed
     // setDAValidatorPairWithGateway) — after migrating back, the chain's
     // settlement layer is L1 and `Admin.setDAValidatorPair` is callable
     // directly via the L1 chain admin.
-    let should_send = "true".to_string();
-
-    let script = build_admin_functions_script(
-        &contracts_path,
-        runner,
-        "setDAValidatorPair(address,uint256,address,uint8,bool)",
-        vec![
-            format!("{:#x}", bridgehub),
-            chain_id.to_string(),
-            format!("{:#x}", l1_da_validator),
-            (l2_da_commitment_scheme as u8).to_string(),
-            should_send,
-        ],
-    )?
-    .with_wallet(&sender);
+    let script = runner
+        .script_call(AdminFunctionsAbi::setDAValidatorPairCall {
+            _bridgehub: bridgehub,
+            _accessControlRestriction: access_control_restriction,
+            _chainId: U256::from(chain_id),
+            _l1DaValidator: l1_da_validator,
+            _l2DaCommitmentScheme: l2_da_commitment_scheme as u8,
+            _shouldSend: true,
+        })
+        .with_wallet(&sender);
 
     logger::step("Setting L1 DA validator pair (post-migration)");
     runner
@@ -432,7 +418,7 @@ pub async fn stage_set_da_validator_pair_from(
 // `InvalidProof()`.
 
 pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     // Resolve the gateway chain ID off real L1 BEFORE creating the forge
     // runner. With `--simulate`, `ForgeRunner::new` forks L1 via anvil at a
     // single block height; any L1 state change after the fork is created is
@@ -449,7 +435,6 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
     .await
     .context("Failed to resolve gateway chain ID from bridgehub")?;
     logger::info(format!("Gateway chain ID (from L1): {gateway_chain_id}"));
-    let contracts_path = paths::resolve_l1_contracts_path()?;
 
     // Step 1: wait for the priority tx to execute on the gateway.
     logger::step("Waiting for migration tx to execute on gateway");
@@ -528,38 +513,18 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
 
     // Step 4: call finishMigrateChainFromGateway via forge (deployer key).
     logger::step("Finalizing migration on L1 (finishMigrateChainFromGateway)");
-    let mut sa = args.shared.forge_args.clone();
-    sa.add_arg(ForgeScriptArg::Sig {
-        sig:
-            "finishMigrateChainFromGateway(address,uint256,uint256,uint256,uint256,uint16,bytes,bytes32[])"
-                .to_string(),
-    });
-    sa.add_arg(ForgeScriptArg::RpcUrl {
-        url: runner.rpc_url.clone(),
-    });
-    sa.add_arg(ForgeScriptArg::Broadcast);
-    sa.add_arg(ForgeScriptArg::Ffi);
-    let proof_str = format!(
-        "[{}]",
-        withdrawal
-            .merkle_proof
-            .iter()
-            .map(|h| format!("{h:#x}"))
-            .collect::<Vec<_>>()
-            .join(",")
-    );
-    sa.additional_args.extend([
-        format!("{:#x}", bridgehub),
-        chain_id.to_string(),
-        gateway_chain_id.to_string(),
-        withdrawal.l2_batch_number.to_string(),
-        withdrawal.l2_message_index.to_string(),
-        withdrawal.l2_tx_number_in_batch.to_string(),
-        format!("0x{}", hex::encode(&withdrawal.message.0)),
-        proof_str,
-    ]);
-    let script = Forge::new(&contracts_path)
-        .script(Path::new("deploy-scripts/gateway/GatewayUtils.s.sol"), sa)
+    let script = runner
+        .script_call(GatewayUtilsAbi::finishMigrateChainFromGatewayCall {
+            bridgehubAddr: bridgehub,
+            migratingChainId: U256::from(chain_id),
+            gatewayChainId: U256::from(gateway_chain_id),
+            l2BatchNumber: U256::from(withdrawal.l2_batch_number),
+            l2MessageIndex: U256::from(withdrawal.l2_message_index),
+            l2TxNumberInBatch: withdrawal.l2_tx_number_in_batch,
+            message: withdrawal.message.clone(),
+            merkleProof: withdrawal.merkle_proof.clone(),
+        })
+        .with_ffi()
         .with_wallet(&sender);
     runner
         .run(script)
@@ -590,9 +555,7 @@ fn l1_message_sent_topic() -> B256 {
 
 /// L1 Messenger system contract address on L2 (`0x...8008`).
 fn l1_messenger_address() -> Address {
-    "0x0000000000000000000000000000000000008008"
-        .parse()
-        .unwrap()
+    L2_L1_MESSENGER.parse().unwrap()
 }
 
 #[derive(Debug)]
@@ -818,7 +781,7 @@ async fn get_finalize_withdrawal_params(
     // `event L1MessageSent(address indexed _sender, bytes32 indexed _hash, bytes _message);`
     // Both `_sender` and `_hash` are indexed — they live in `topics[1..=2]`, not
     // in `data`. The `data` payload carries ONLY the `bytes _message` field.
-    use alloy::dyn_abi::{DynSolType, DynSolValue};
+    use alloy::dyn_abi::DynSolType;
     let bytes_type = DynSolType::Bytes;
     let decoded = bytes_type
         .abi_decode(&log_data)
@@ -866,7 +829,6 @@ async fn wait_for_gateway_batch_executed_on_l1(
     use crate::common::abi::ZkChainAbi;
     use crate::common::ethereum::get_provider;
     use crate::common::l1_contracts;
-    use alloy::primitives::U256;
 
     let provider = get_provider(l1_rpc_url).context("connect L1 provider")?;
     let gateway_diamond = l1_contracts::resolve_zk_chain(l1_rpc_url, bridgehub, gateway_chain_id)
@@ -912,41 +874,27 @@ async fn resolve_l1_diamond_cut_data(
 ) -> anyhow::Result<Vec<u8>> {
     use crate::common::ethereum::get_provider;
     use alloy::dyn_abi::DynSolType;
-    use alloy::primitives::{keccak256, Bytes as AlloyBytes, U256};
+    use alloy::primitives::keccak256;
     use alloy::providers::Provider;
-    use alloy::rpc::types::transaction::TransactionInput;
-    use alloy::rpc::types::{Filter, TransactionRequest};
+    use alloy::rpc::types::Filter;
 
     let provider = get_provider(l1_rpc_url)?;
 
     // 1) bridgehub.chainTypeManager(chainId)
-    // selector = keccak256("chainTypeManager(uint256)")[..4] + abi-encode(chainId)
-    let selector = &keccak256(b"chainTypeManager(uint256)")[..4];
-    let mut data = selector.to_vec();
-    data.extend_from_slice(&U256::from(chain_id).to_be_bytes::<32>());
-    let tx = TransactionRequest::default()
-        .to(bridgehub)
-        .input(TransactionInput::new(AlloyBytes::from(data)));
-    let result = provider
-        .call(tx)
+    let bridgehub = BridgehubAbi::new(bridgehub, provider.clone());
+    let ctm = bridgehub
+        .chainTypeManager(U256::from(chain_id))
+        .call()
         .await
         .context("bridgehub.chainTypeManager call")?;
-    anyhow::ensure!(result.len() >= 32, "chainTypeManager returned <32 bytes");
-    let ctm = Address::from_slice(&result[12..32]);
 
     // 2) ctm.getProtocolVersion(chainId)
-    let selector = &keccak256(b"getProtocolVersion(uint256)")[..4];
-    let mut data = selector.to_vec();
-    data.extend_from_slice(&U256::from(chain_id).to_be_bytes::<32>());
-    let tx = TransactionRequest::default()
-        .to(ctm)
-        .input(TransactionInput::new(AlloyBytes::from(data)));
-    let result = provider
-        .call(tx)
+    let ctm_contract = IChainTypeManagerAbi::new(ctm, provider.clone());
+    let protocol_version = ctm_contract
+        .getProtocolVersion(U256::from(chain_id))
+        .call()
         .await
         .context("ctm.getProtocolVersion call")?;
-    anyhow::ensure!(result.len() >= 32, "getProtocolVersion returned <32 bytes");
-    let protocol_version = U256::from_be_slice(&result[..32]);
 
     // 3) scan CTM for NewUpgradeCutData(protocolVersion, ...)
     let topic0 =

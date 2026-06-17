@@ -1,14 +1,9 @@
 use alloy::primitives::Address;
 use serde::{Deserialize, Serialize};
 
-use crate::common::forge::scripts::ForgeScriptParams;
 use crate::common::traits::FileConfigTrait;
 
-pub const DEPLOY_L2_CONTRACTS_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
-    input: "script-config/config-deploy-l2-contracts.toml",
-    output: "script-out/output-deploy-l2-contracts.toml",
-    script_path: "deploy-scripts/chain/DeployL2Contracts.sol",
-};
+pub use super::DEPLOY_L2_CONTRACTS_INVOCATION as DEPLOY_L2_CONTRACTS_SCRIPT_PARAMS;
 
 // ── Output types ─────────────────────────────────────────────────────────────
 

@@ -1,33 +1,17 @@
 use alloy::primitives::{Address, B256};
 use serde::{Deserialize, Serialize};
 
-use crate::common::forge::scripts::{Create2Addresses, ForgeScriptParams};
+use crate::common::forge::scripts::Create2Addresses;
 use crate::common::traits::FileConfigTrait;
 use crate::types::{DAValidatorType, L2ChainId, VMOption};
 
-pub const REGISTER_CHAIN_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
-    input: "script-config/register-zk-chain.toml",
-    output: "script-out/output-register-zk-chain.toml",
-    script_path: "deploy-scripts/ctm/RegisterZKChain.s.sol",
-};
+pub use super::REGISTER_CHAIN_INVOCATION as REGISTER_CHAIN_SCRIPT_PARAMS;
 
-pub const DEPLOY_PAYMASTER_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
-    input: "script-config/config-deploy-paymaster.toml",
-    output: "script-out/output-deploy-paymaster.toml",
-    script_path: "deploy-scripts/chain/DeployPaymaster.s.sol",
-};
+pub use super::DEPLOY_PAYMASTER_INVOCATION as DEPLOY_PAYMASTER_SCRIPT_PARAMS;
 
-pub const SETUP_LEGACY_BRIDGE: ForgeScriptParams = ForgeScriptParams {
-    input: "script-config/setup-legacy-bridge.toml",
-    output: "script-out/setup-legacy-bridge.toml",
-    script_path: "deploy-scripts/dev/SetupLegacyBridge.s.sol",
-};
+pub use super::SETUP_LEGACY_BRIDGE_INVOCATION as SETUP_LEGACY_BRIDGE;
 
-pub const ENABLE_EVM_EMULATOR_PARAMS: ForgeScriptParams = ForgeScriptParams {
-    input: "script-config/enable-evm-emulator.toml",
-    output: "script-out/output-enable-evm-emulator.toml",
-    script_path: "deploy-scripts/chain/EnableEvmEmulator.s.sol",
-};
+pub use super::ENABLE_EVM_EMULATOR_INVOCATION as ENABLE_EVM_EMULATOR_PARAMS;
 
 // ── Input types ──────────────────────────────────────────────────────────────
 

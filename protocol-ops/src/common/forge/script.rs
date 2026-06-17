@@ -11,16 +11,19 @@ use crate::common::ethereum::get_provider;
 use crate::common::wallets::Wallet;
 
 /// ForgeScript is a wrapper around the forge script command.
+#[derive(Clone)]
 pub struct ForgeScript {
     pub(crate) base_path: PathBuf,
     pub(crate) script_path: PathBuf,
     pub(crate) args: ForgeScriptArgs,
     pub(crate) envs: Vec<(String, String)>,
+    pub(crate) timing_label: Option<String>,
 }
 
 impl ForgeScript {
-    pub fn wallet_args_passed(&self) -> bool {
-        self.args.wallet_args_passed()
+    pub fn with_timing_label(mut self, label: impl Into<String>) -> Self {
+        self.timing_label = Some(label.into());
+        self
     }
 
     /// Add the ffi flag to the forge script command.
@@ -57,18 +60,6 @@ impl ForgeScript {
         self
     }
 
-    pub fn with_signature(mut self, signature: &str) -> Self {
-        self.args.add_arg(ForgeScriptArg::Sig {
-            sig: signature.to_string(),
-        });
-        self
-    }
-
-    pub fn with_zksync(mut self) -> Self {
-        self.args.add_arg(ForgeScriptArg::Zksync);
-        self
-    }
-
     pub fn with_calldata(mut self, calldata: &Bytes) -> Self {
         self.args.add_arg(ForgeScriptArg::Sig {
             sig: alloy::hex::encode(calldata.as_ref()),
@@ -78,6 +69,17 @@ impl ForgeScript {
 
     pub fn with_gas_limit(mut self, gas_limit: u64) -> Self {
         self.args.add_arg(ForgeScriptArg::GasLimit { gas_limit });
+        self
+    }
+
+    /// Skip forge's post-run label collection. After every script run forge
+    /// queries Sourcify (+ Etherscan if a key is configured) to map every
+    /// traced address to its contract name. Those lookups frequently hang
+    /// for 5–30+ minutes per CTM today, even though the underlying script
+    /// work has finished. `--disable-labels` skips the lookups entirely;
+    /// `--silent` only suppresses the printout (the work still runs).
+    pub fn with_disable_labels(mut self) -> Self {
+        self.args.add_arg(ForgeScriptArg::DisableLabels);
         self
     }
 
@@ -188,27 +190,6 @@ const PROHIBITED_ARGS: [&str; 10] = [
     "-s",
 ];
 
-const WALLET_ARGS: [&str; 18] = [
-    "-a",
-    "--from",
-    "-i",
-    "--private-keys",
-    "--private-key",
-    "--mnemonics",
-    "--mnemonic-passphrases",
-    "--mnemonic-derivation-paths",
-    "--mnemonic-indexes",
-    "--keystore",
-    "--account",
-    "--password",
-    "--password-file",
-    "-l",
-    "--ledger",
-    "-t",
-    "--trezor",
-    "--aws",
-];
-
 /// Set of known forge script arguments necessary for execution.
 #[derive(Display, Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[strum(serialize_all = "kebab-case", prefix = "--")]
@@ -241,7 +222,6 @@ pub enum ForgeScriptArg {
         url: String,
     },
     Verify,
-    Resume,
     #[strum(to_string = "sender={address}")]
     Sender {
         address: String,
@@ -250,6 +230,8 @@ pub enum ForgeScriptArg {
     GasLimit {
         gas_limit: u64,
     },
+    DisableLabels,
+    Silent,
     Unlocked,
     Zksync,
     #[strum(to_string = "skip={skip_path}")]
@@ -384,16 +366,6 @@ impl ForgeScriptArgs {
             return;
         }
         self.args.push(arg);
-    }
-
-    pub fn wallet_args_passed(&self) -> bool {
-        self.additional_args
-            .iter()
-            .any(|arg| WALLET_ARGS.contains(&arg.as_ref()))
-    }
-
-    pub fn with_zksync(&mut self) {
-        self.zksync = true;
     }
 }
 

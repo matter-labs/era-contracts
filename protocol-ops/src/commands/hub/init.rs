@@ -2,8 +2,8 @@ use alloy::primitives::{Address, B256};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-use crate::commands::hub::accept_ownership::{accept_ownership, AcceptOwnershipInput};
 use crate::commands::hub::deploy::{deploy, DeployInput};
+use crate::common::abi::AdminFunctionsAbi;
 use crate::common::output::write_output_if_requested;
 
 use crate::common::forge::scripts::deploy_ecosystem::DeployL1CoreContractsOutput;
@@ -46,7 +46,7 @@ pub async fn run(args: HubInitArgs) -> anyhow::Result<()> {
     let sender = runner.prepare_sender(args.deployer_address).await?;
     let owner = Wallet::resolve(args.owner, None, &sender)?;
 
-    let input = DeployInput {
+    let input = HubInitInput {
         owner: owner.address,
         era_chain_id: args.era_chain_id,
         with_legacy_bridge: args.with_legacy_bridge,
@@ -62,26 +62,53 @@ pub async fn run(args: HubInitArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Input parameters for hub init.
+#[derive(Debug, Clone, Serialize)]
+pub struct HubInitInput {
+    pub owner: Address,
+    pub era_chain_id: u64,
+    pub with_legacy_bridge: bool,
+    pub create2_factory_salt: Option<B256>,
+}
+
 /// Initialize hub: deploy contracts and accept ownership.
 pub async fn hub_init(
     runner: &mut ForgeRunner,
     deployer: &Wallet,
     owner: &Wallet,
-    input: &DeployInput,
+    input: &HubInitInput,
 ) -> anyhow::Result<DeployL1CoreContractsOutput> {
     logger::step("Deploying Bridgehub contracts...");
+    let deploy_input = DeployInput {
+        owner: input.owner,
+        era_chain_id: input.era_chain_id,
+        with_legacy_bridge: input.with_legacy_bridge,
+        create2_factory_salt: input.create2_factory_salt,
+    };
     let t = std::time::Instant::now();
-    let output = deploy(runner, deployer, input)?;
+    let output = deploy(runner, deployer, &deploy_input)?;
     logger::info(format!("[timing] hub.deploy: {:.2?}", t.elapsed()));
 
     logger::step("Accepting ownership of Bridgehub contracts...");
     let deployed = &output.deployed_addresses;
-    let accept_input = AcceptOwnershipInput {
-        bridgehub: deployed.bridgehub.bridgehub_proxy_addr,
-        governance: deployed.governance_addr,
-        chain_admin: deployed.chain_admin,
-    };
-    accept_ownership(runner, owner, &accept_input).await?;
+    let bridgehub = deployed.bridgehub.bridgehub_proxy_addr;
+    let accept_scripts = [
+        runner
+            .script_call(AdminFunctionsAbi::chainAdminAcceptAdminCall {
+                _chainAdmin: deployed.chain_admin,
+                _target: bridgehub,
+            })
+            .with_wallet(owner)
+            .with_timing_label("hub.accept_admin"),
+        runner
+            .script_call(AdminFunctionsAbi::governanceAcceptOwnerAggregatedCall {
+                _governor: deployed.governance_addr,
+                _bridgehub: bridgehub,
+            })
+            .with_wallet(owner)
+            .with_timing_label("hub.accept_owner_aggregated"),
+    ];
+    runner.run_scripts(accept_scripts)?;
 
     Ok(output)
 }

@@ -11,24 +11,12 @@ use crate::common::ethereum::get_provider;
 /// Auto-impersonation is on because simulate-mode forge runs always use
 /// `--sender X --unlocked` — the fork must sign for arbitrary addresses.
 ///
-/// The fork always uses chain ID 31337, overriding whatever the parent chain
-/// reports. This is required because `ZKsyncOSTestnetVerifier` asserts
-/// `block.chainid != 1`, so forking a mainnet-chain-ID Anvil would fail.
-/// If the parent chain has chain ID 1, a warning is emitted.
+/// The fork intentionally inherits the parent chain ID. Several deployment
+/// scripts read `block.chainid` while generating calldata, so overriding it
+/// would produce bundles for the wrong source chain.
 pub fn start_anvil_fork(fork_url: &str) -> anyhow::Result<AnvilInstance> {
-    if let Ok(parent_chain_id) = crate::common::ethereum::query_chain_id_sync(fork_url) {
-        if parent_chain_id == 1 {
-            crate::common::logger::warn(
-                "Parent chain has chain ID 1 (mainnet). \
-                 The simulation fork will use chain ID 31337 instead.\n\
-                 If you are using a local Anvil, start it with: anvil --chain-id 31337",
-            );
-        }
-    }
-
     alloy::node_bindings::Anvil::new()
         .fork(fork_url)
-        .chain_id(31337)
         .arg("--auto-impersonate")
         // Scripts like bridgehub multicalls can exceed the 30M default block
         // gas limit; lift it so simulations don't spuriously OOG.
@@ -55,4 +43,113 @@ pub async fn set_balance(rpc_url: &str, address: Address) -> anyhow::Result<()> 
         .await
         .with_context(|| format!("anvil_setBalance({address:#x}) failed against {rpc_url}"))?;
     Ok(())
+}
+
+/// Bump anvil's L1 timestamp by `seconds` and mine a new block so the
+/// increase is reflected in subsequent calls' `block.timestamp`. Used to
+/// step over `GovernanceUpgradeTimer` deadlines between v31 stage 0 and
+/// stage 1 governance replays — stage 1's `checkDeadline()` requires
+/// `block.timestamp >= deadline` set by stage 0.
+pub async fn evm_increase_time_and_mine(rpc_url: &str, seconds: u64) -> anyhow::Result<()> {
+    let provider = get_provider(rpc_url)?;
+    provider
+        .raw_request::<_, serde_json::Value>("evm_increaseTime".into(), json!([seconds]))
+        .await
+        .with_context(|| format!("evm_increaseTime({seconds}) failed against {rpc_url}"))?;
+    provider
+        .raw_request::<_, serde_json::Value>("evm_mine".into(), json!([]))
+        .await
+        .with_context(|| format!("evm_mine failed against {rpc_url}"))?;
+    Ok(())
+}
+
+/// Take an EVM state snapshot via `evm_snapshot`. Returns the snapshot id
+/// (hex-encoded uint256) to pass back to [`evm_revert`].
+///
+/// Anvil supports both `evm_snapshot` (geth-style) and `anvil_snapshot`; we
+/// use the geth-style name since reth/hardhat-node accept it too.
+pub async fn evm_snapshot(rpc_url: &str) -> anyhow::Result<String> {
+    let provider = get_provider(rpc_url)?;
+    let id: serde_json::Value = provider
+        .raw_request("evm_snapshot".into(), json!([]))
+        .await
+        .with_context(|| format!("evm_snapshot failed against {rpc_url}"))?;
+    let id_str = id
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("evm_snapshot returned non-string: {id}"))?
+        .to_string();
+    Ok(id_str)
+}
+
+/// Revert the EVM state to a prior snapshot. Note: anvil discards the
+/// snapshot after revert, so each snapshot id is single-use.
+pub async fn evm_revert(rpc_url: &str, snapshot_id: &str) -> anyhow::Result<()> {
+    let provider = get_provider(rpc_url)?;
+    let ok: bool = provider
+        .raw_request("evm_revert".into(), json!([snapshot_id]))
+        .await
+        .with_context(|| format!("evm_revert({snapshot_id}) failed against {rpc_url}"))?;
+    anyhow::ensure!(
+        ok,
+        "evm_revert({snapshot_id}) returned false — snapshot not found / already consumed"
+    );
+    Ok(())
+}
+
+/// Send a transaction via `eth_sendTransaction` from `sender` against an
+/// anvil fork with auto-impersonate enabled. Bypasses forge entirely so the
+/// tx does NOT land in any forge broadcast log (and therefore not in any
+/// downstream Safe-bundle JSON), while still mutating the fork state.
+///
+/// Use this to apply governance-style calls on the prepare fork to bring
+/// it into a "post-stage-N" state without polluting the deployer's bundle.
+///
+/// Reverts on the wire are surfaced as `anyhow::Error` (receipt status != 1).
+pub async fn send_impersonated_tx(
+    rpc_url: &str,
+    sender: Address,
+    to: Address,
+    data: alloy::primitives::Bytes,
+    gas_limit: u64,
+) -> anyhow::Result<alloy::primitives::B256> {
+    use alloy::network::TransactionBuilder;
+    use alloy::rpc::types::TransactionRequest;
+
+    let provider = get_provider(rpc_url)?;
+
+    // Explicit `from` keys impersonation on anvil's `--auto-impersonate` path.
+    let req = TransactionRequest::default()
+        .with_from(sender)
+        .with_to(to)
+        .with_input(data)
+        .with_value(alloy::primitives::U256::ZERO)
+        .with_gas_limit(gas_limit);
+
+    let pending = provider.send_transaction(req).await.with_context(|| {
+        format!("eth_sendTransaction (impersonated {sender:#x} → {to:#x}) failed")
+    })?;
+    let tx_hash = *pending.tx_hash();
+    let receipt = pending
+        .get_receipt()
+        .await
+        .with_context(|| format!("await receipt for impersonated tx {tx_hash:#x}"))?;
+    anyhow::ensure!(
+        receipt.status(),
+        "impersonated tx {tx_hash:#x} reverted ({sender:#x} → {to:#x})",
+    );
+    Ok(tx_hash)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn start_anvil_fork_does_not_override_parent_chain_id() {
+        let source = include_str!("anvil.rs");
+        let forbidden_builder = [".chain", "_id("].concat();
+
+        assert!(
+            !source.contains(&forbidden_builder),
+            "forked Anvil must inherit the parent chain id because scripts use block.chainid in generated calldata"
+        );
+    }
 }

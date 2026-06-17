@@ -1,8 +1,10 @@
-use alloy::primitives::Address;
+use alloy::primitives::{Address, U256};
 use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
+use crate::common::abi::AdminFunctionsAbi;
+use crate::common::addresses::ZERO_ADDRESS;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::SharedRunArgs;
@@ -18,23 +20,40 @@ struct SetDaValidatorPairOutput {
 
 /// Set the DA validator pair for an L1-settling chain.
 ///
-/// Drives `AdminFunctions.s.sol::setDAValidatorPair` against a forked anvil and
-/// emits a Gnosis Safe Transaction Builder JSON bundle via `--out`. Replay the
-/// bundle via `protocol-ops dev execute-safe` (or any Safe-bundle-aware executor)
-/// to apply it.
+/// Drives `AdminFunctions.s.sol::setDAValidatorPair(bridgehub,
+/// accessControlRestriction, chainId, l1DaValidator, l2DaCommitmentScheme,
+/// true)` against a forked anvil and
+/// emits a Gnosis Safe Transaction Builder JSON bundle via `--out`. Replay
+/// the bundle via `protocol-ops dev execute-safe` (or any Safe-bundle-aware
+/// executor) to apply it.
 ///
-/// For chains that settle on a gateway, use `chain gateway migrate-to`.
+/// Use case: post chain upgrade (e.g. v29 → v31), where the upgrade itself
+/// resets the chain's L1 DA validator and the operator must re-set it
+/// before the chain can commit batches.
+///
+/// For chains that settle on a gateway (rather than directly on L1), use
+/// `chain gateway migrate-to` — the migrate-to flow already invokes the
+/// gateway-aware variant (`setDAValidatorPairWithGateway`) as part of its
+/// Phase 3.
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct ChainSetDaValidatorPairArgs {
     #[clap(flatten)]
     #[serde(flatten)]
     pub topology: crate::common::EcosystemChainArgs,
 
-    /// L1 DA validator contract address.
+    /// AccessControlRestriction contract address.
+    /// Use `ZERO_ADDRESS` for Ownable ChainAdmin.
+    #[clap(long, default_value = ZERO_ADDRESS)]
+    pub access_control_restriction: Address,
+
+    /// L1 DA validator contract address. The post-upgrade `RollupL1DAValidator`
+    /// (or analogous) deployed by the ecosystem upgrade.
     #[clap(long)]
     pub l1_da_validator: Address,
 
-    /// L2 DA commitment scheme.
+    /// L2 DA commitment scheme. For Era v31+: `blobs-and-pubdata-keccak256`
+    /// (rollup, EraVM). For ZKsync OS: `blobs-z-k-sync-os`. For
+    /// no-DA validium chains: `empty-no-d-a`. Etc.
     #[clap(long, value_enum)]
     pub l2_da_commitment_scheme: L2DACommitmentScheme,
 
@@ -44,19 +63,37 @@ pub struct ChainSetDaValidatorPairArgs {
 }
 
 pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
-    let (eco, chain_id) = args.topology.resolve()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     let admin_address =
-        crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, eco.bridgehub, chain_id)
+        crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
             .await
             .context("resolving chain admin from L1")?;
-    let wallet = runner
-        .prepare_chain_admin_owner(eco.bridgehub, chain_id)
+    // `AdminFunctions.setDAValidatorPair` → `Utils.adminExecuteCalls` internally
+    // `vm.startBroadcast(adminOwner)` (or the AccessControlRestriction default
+    // admin when `--access-control-restriction` is set), so Forge's sender must
+    // match that EOA for nonce tracking on the anvil fork.
+    let sender = runner
+        .prepare_chain_admin_broadcaster(bridgehub, chain_id, args.access_control_restriction)
         .await?;
 
-    logger::step("Preparing set-da-validator-pair ops via AdminFunctions.s.sol (simulation)");
-    logger::info(format!("Bridgehub: {:#x}", eco.bridgehub));
+    let forge = runner
+        .script_call(AdminFunctionsAbi::setDAValidatorPairCall {
+            _bridgehub: bridgehub,
+            _accessControlRestriction: args.access_control_restriction,
+            _chainId: U256::from(chain_id),
+            _l1DaValidator: args.l1_da_validator,
+            _l2DaCommitmentScheme: args.l2_da_commitment_scheme as u8,
+            _shouldSend: true,
+        })
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
+        .with_wallet(&sender);
+
+    logger::step(
+        "Preparing set-da-validator-pair Safe bundle via AdminFunctions.s.sol (simulation)",
+    );
+    logger::info(format!("Bridgehub: {:#x}", bridgehub));
     logger::info(format!("Chain ID: {chain_id}"));
     logger::info(format!("Admin address: {:#x}", admin_address));
     logger::info(format!("L1 DA validator: {:#x}", args.l1_da_validator));
@@ -66,15 +103,9 @@ pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
     ));
     logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));
 
-    crate::common::admin_functions::set_da_validator_pair(
-        &mut runner,
-        &wallet,
-        chain_id,
-        eco.bridgehub,
-        args.l1_da_validator,
-        args.l2_da_commitment_scheme,
-    )
-    .context("Failed to run set-da-validator-pair")?;
+    runner
+        .run(forge)
+        .context("Failed to execute forge script for set-da-validator-pair")?;
 
     crate::common::output::write_output_if_requested(
         "chain.set-da-validator-pair",

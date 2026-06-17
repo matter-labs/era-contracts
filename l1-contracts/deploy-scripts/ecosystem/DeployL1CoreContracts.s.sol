@@ -74,7 +74,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         return config;
     }
 
-    function runInner(string memory inputPath, string memory outputPath) internal {
+    function runInner(string memory inputPath, string memory outputPath) public {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);

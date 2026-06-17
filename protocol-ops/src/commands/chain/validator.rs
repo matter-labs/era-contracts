@@ -1,8 +1,10 @@
-use alloy::primitives::Address;
+use alloy::primitives::{Address, U256};
 use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
+use crate::common::abi::AdminFunctionsAbi;
+use crate::common::addresses::ZERO_ADDRESS;
 use crate::common::logger;
 use crate::common::SharedRunArgs;
 
@@ -25,8 +27,8 @@ pub struct ChainValidatorArgs {
     pub topology: crate::common::EcosystemChainArgs,
 
     /// AccessControlRestriction contract address.
-    /// Use `0x0000000000000000000000000000000000000000` for Ownable ChainAdmin.
-    #[clap(long, default_value = "0x0000000000000000000000000000000000000000")]
+    /// Use `ZERO_ADDRESS` for Ownable ChainAdmin.
+    #[clap(long, default_value = ZERO_ADDRESS)]
     pub access_control_restriction: Address,
     /// Validator address to add/remove
     #[clap(long)]
@@ -46,19 +48,23 @@ pub async fn run_remove(args: ChainValidatorArgs) -> anyhow::Result<()> {
 }
 
 async fn run_update(args: ChainValidatorArgs, add: bool) -> anyhow::Result<()> {
-    let (eco, chain_id) = args.topology.resolve()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = crate::common::forge::ForgeRunner::new(&args.shared)?;
 
-    let owner = runner
-        .prepare_chain_admin_owner(eco.bridgehub, chain_id)
+    // `AdminFunctions.updateValidator` → `Utils.adminExecute` internally
+    // `vm.startBroadcast(adminOwner)` (or the AccessControlRestriction default
+    // admin when set), so Forge's sender must match that EOA for nonce tracking
+    // on the anvil fork.
+    let sender = runner
+        .prepare_chain_admin_broadcaster(bridgehub, chain_id, args.access_control_restriction)
         .await?;
     let admin_address =
-        crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, eco.bridgehub, chain_id)
+        crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
             .await
             .context("resolving chain admin from L1")?;
     let validator_timelock = crate::common::l1_contracts::resolve_validator_timelock(
         &runner.rpc_url,
-        eco.bridgehub,
+        bridgehub,
         chain_id,
     )
     .await
@@ -78,24 +84,26 @@ async fn run_update(args: ChainValidatorArgs, add: bool) -> anyhow::Result<()> {
     logger::info(format!("Validator address: {:#x}", args.validator_address));
     logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));
 
+    let script = runner
+        .script_call(AdminFunctionsAbi::updateValidatorCall {
+            _adminAddr: admin_address,
+            _accessControlRestriction: args.access_control_restriction,
+            _validatorTimelock: validator_timelock,
+            _chainId: U256::from(chain_id),
+            _validatorAddress: args.validator_address,
+            _addValidator: add,
+        })
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
+        .with_wallet(&sender);
+    runner
+        .run(script)
+        .with_context(|| format!("Failed to {} validator", if add { "add" } else { "remove" }))?;
+
     let command = if add {
         "chain.add-validator"
     } else {
         "chain.remove-validator"
     };
-
-    crate::common::admin_functions::update_validator(
-        &mut runner,
-        admin_address,
-        &owner,
-        args.access_control_restriction,
-        validator_timelock,
-        chain_id,
-        args.validator_address,
-        add,
-    )
-    .with_context(|| format!("Failed to {} validator", if add { "add" } else { "remove" }))?;
-
     crate::common::output::write_output_if_requested(
         command,
         &args.shared,
