@@ -73,7 +73,7 @@ impl<'a> V31UpgradeFull<'a> {
         deployer: &Wallet,
         inputs: &V31PrepareInputs,
     ) -> anyhow::Result<V31PrepareOutput> {
-        self.run_pre_steps(runner, deployer).await?;
+        self.run_pre_steps(runner, deployer, inputs).await?;
         let mut prepared = self.inner.prepare(runner, deployer, inputs).await?;
         self.run_ctm_admin_steps(runner, deployer, &prepared.ctm_tomls)?;
 
@@ -137,6 +137,7 @@ impl<'a> V31UpgradeFull<'a> {
         &self,
         runner: &mut ForgeRunner,
         deployer: &Wallet,
+        inputs: &V31PrepareInputs,
     ) -> anyhow::Result<()> {
         let governance = crate::common::l1_contracts::resolve_governance(
             &runner.rpc_url,
@@ -144,12 +145,30 @@ impl<'a> V31UpgradeFull<'a> {
         )
         .await?;
         let wraps = encode_owner_wraps(&self.ownable_proxies);
+        // Per-CTM RollupDAManagers to bring under governance (deduped). Sourced
+        // from config (`CtmInputs.rollup_da_manager`) — the same value the Admin
+        // facet embeds — rather than on-chain discovery, which a legacy chain on
+        // the CTM could skew. CTMs that auto-resolve their manager (None) are
+        // skipped; the Solidity side no-ops on already-governance-owned managers.
+        let mut rollup_da_managers: Vec<Address> = Vec::new();
+        for ctm in &inputs.ctms {
+            if let Some(rdm) = ctm.rollup_da_manager {
+                if !rollup_da_managers.contains(&rdm) {
+                    rollup_da_managers.push(rdm);
+                }
+            }
+        }
         runner.run(
             runner
                 .with_script_call(
                     &ADMIN_FUNCTIONS_INVOCATION,
                     "ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps",
-                    (self.inner.bridgehub(), governance, wraps),
+                    (
+                        self.inner.bridgehub(),
+                        governance,
+                        wraps,
+                        rollup_da_managers,
+                    ),
                 )?
                 .with_wallet(deployer),
         )?;

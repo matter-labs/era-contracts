@@ -4900,7 +4900,7 @@ IAdminFunctions
 |----------+------------------------------------------------------------------------------------------------------------+------------|
 | Function | ensureCtmsAndProxyAdminsOwnedByGovernance(address,address)                                                 | 0x60b706f0 |
 |----------+------------------------------------------------------------------------------------------------------------+------------|
-| Function | ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps(address,address,(address,uint8)[])                      | 0x31ca28a2 |
+| Function | ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps(address,address,(address,uint8)[],address[])            | 0xb9c463d4 |
 |----------+------------------------------------------------------------------------------------------------------------+------------|
 | Function | executeOwnableCallsWithWraps(bytes,(address,uint8)[])                                                      | 0xaccce37f |
 |----------+------------------------------------------------------------------------------------------------------------+------------|

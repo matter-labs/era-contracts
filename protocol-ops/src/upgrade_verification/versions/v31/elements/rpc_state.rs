@@ -162,6 +162,7 @@ pub(crate) async fn verify_v31_artifact_state(
     verify_v31_proxy_admins(artifact, verifiers, result).await?;
     verify_v31_core_wiring(artifact, verifiers, result).await?;
     verify_v31_validator_timelocks(artifact, verifiers, result).await?;
+    verify_v31_rollup_da_manager_ownership(artifact, verifiers, result).await?;
     verify_v31_era_fee_params(verifiers, result).await;
     verify_v31_timer_admin_state(artifact, verifiers, result).await?;
     verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await?;
@@ -681,6 +682,54 @@ async fn verify_v31_validator_timelocks(
             )),
             Err(err) => result.report_error(&format!(
                 "Failed to call {label}.ValidatorTimelock.executionDelay(): {err}"
+            )),
+        }
+    }
+    Ok(())
+}
+
+/// Verify each CTM's RollupDAManager is (or is becoming) governance-owned.
+///
+/// v31 transfers each per-CTM RollupDAManager to governance via an Ownable2Step
+/// handoff whose `acceptOwnership()` is a stage-0 governance call (not executed
+/// on this fork). Accept either a completed transfer (owner == governance) or a
+/// pending one (pendingOwner == governance, accept deferred to stage 0). This is
+/// the discoverable-ownership invariant from the stage findings: without it,
+/// post-upgrade permanent-rollup DA-pair management stays with a legacy owner.
+async fn verify_v31_rollup_da_manager_ownership(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> Result<()> {
+    let provider = verifiers.network_verifier.get_l1_provider();
+    let expected_owner = verifiers.bridgehub_owner;
+    for ctm in &artifact.ctms {
+        let label = ctm.flavor.label();
+        let scope = format!("ctms.{label}");
+        let rdm = required_address(
+            &ctm.value,
+            &scope,
+            &["deployed_addresses", "l1_rollup_da_manager"],
+        )?;
+        if rdm == Address::ZERO {
+            continue;
+        }
+        let rdm_ownable = Ownable2Step::new(rdm, provider.clone());
+        match (
+            rdm_ownable.owner().call().await,
+            rdm_ownable.pendingOwner().call().await,
+        ) {
+            (Ok(owner), _) if owner == expected_owner => result.report_ok(&format!(
+                "{label}.RollupDAManager.owner() matches governance ({expected_owner})"
+            )),
+            (Ok(_), Ok(pending)) if pending == expected_owner => result.report_ok(&format!(
+                "{label}.RollupDAManager ownership transfer to {expected_owner} is pending (acceptOwnership deferred to stage 0)"
+            )),
+            (Ok(owner), _) => result.report_error(&format!(
+                "{label}.RollupDAManager.owner() mismatch: expected {expected_owner} (or pendingOwner), got {owner}"
+            )),
+            (Err(err), _) => result.report_error(&format!(
+                "Failed to call {label}.RollupDAManager.owner(): {err}"
             )),
         }
     }
