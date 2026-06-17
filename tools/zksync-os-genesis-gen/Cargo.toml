@@ -26,8 +26,5 @@ anyhow = "1"
 hex = "0.4"
 hex-literal = "1.0.0"
 
-[dev-dependencies]
-tempfile = "3"
-
 # Use workspace to allow using the tool from other workspaces without conflicts
 [workspace]
