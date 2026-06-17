@@ -472,26 +472,13 @@ contract InteropCenter is
             _callCount: callStartersLength
         });
 
-        bytes memory interopBundleBytes = abi.encode(bundle);
-        bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
-
-        // Send the L2→L1 message for the bundle.
-        // Atomic interop: an atomic bundle is NOT published to L1. Its commit value is appended to the
-        // interop IMT via the AtomicFlowManager (the burn already happened above through the normal
-        // `initiateIndirectCall` path); the destination executes it via
-        // `InteropHandler.executeAtomicBundle` once the whole flow is proven committed before the
-        // deadline. Everything else (bundle construction, value collection) is identical.
+        // Hash the bundle and dispatch it: atomic bundles are appended to the interop IMT via the
+        // AtomicFlowManager (not published to L1); normal bundles are published to L1. `_dispatchBundle`
+        // zeroes the atomic send metadata before hashing, so `bundleHash` does NOT depend on
+        // `atomicFlowId` — otherwise `flowId = hash(sortedBundleHashes, ...)` would be uncomputable
+        // off-chain (a circular dependency), since `atomicFlowId` is supposed to equal that `flowId`.
         bytes32 msgHash;
-        if (_bundleAttributes.isAtomic) {
-            IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
-                _flowId: _bundleAttributes.atomicFlowId,
-                _bundleHash: bundleHash,
-                _deadline: _bundleAttributes.atomicDeadline,
-                _lowNullifierIndex: _bundleAttributes.atomicLowNullifierIndex
-            });
-        } else {
-            msgHash = _sendBundleToL1(interopBundleBytes, bundle.calls.length);
-        }
+        (bundleHash, msgHash) = _dispatchBundle(bundle);
 
         _emitMessageSent({
             _calls: bundle.calls,
@@ -549,6 +536,42 @@ contract InteropCenter is
         uint256 /* _callCount */
     ) internal virtual returns (bytes32 msgHash) {
         msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(BUNDLE_IDENTIFIER, _interopBundleBytes));
+    }
+
+    /// @notice Hashes the bundle and dispatches it. An atomic bundle (one carrying the `atomicBundle`
+    /// attribute) has its commit value appended to the interop IMT via the {AtomicFlowManager} and is
+    /// NOT published to L1 — the burn already happened through the normal `initiateIndirectCall` path,
+    /// and the destination executes it via {InteropHandler.executeAtomicBundle}. A normal bundle is
+    /// published to L1 via {_sendBundleToL1}.
+    /// @dev The atomic send fields (`isAtomic`/`atomicFlowId`/`atomicDeadline`/`atomicLowNullifierIndex`)
+    /// are send-side coordination metadata, NOT part of the cross-chain bundle. They are captured and
+    /// then ZEROED in `_bundle` before encoding, so the published/relayed bundle and its `bundleHash`
+    /// are independent of `atomicFlowId`. This is required: `flowId = keccak256(abi.encode(
+    /// sortedBundleHashes, chainIds, deadline))` must be computable off-chain before the send, which is
+    /// impossible if `bundleHash` (a flowId input) itself depends on `atomicFlowId`.
+    function _dispatchBundle(InteropBundle memory _bundle) internal returns (bytes32 bundleHash, bytes32 msgHash) {
+        bool isAtomic = _bundle.bundleAttributes.isAtomic;
+        bytes32 atomicFlowId = _bundle.bundleAttributes.atomicFlowId;
+        uint64 atomicDeadline = _bundle.bundleAttributes.atomicDeadline;
+        uint256 atomicLowNullifierIndex = _bundle.bundleAttributes.atomicLowNullifierIndex;
+        _bundle.bundleAttributes.isAtomic = false;
+        _bundle.bundleAttributes.atomicFlowId = bytes32(0);
+        _bundle.bundleAttributes.atomicDeadline = 0;
+        _bundle.bundleAttributes.atomicLowNullifierIndex = 0;
+
+        bytes memory interopBundleBytes = abi.encode(_bundle);
+        bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
+
+        if (isAtomic) {
+            IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
+                _flowId: atomicFlowId,
+                _bundleHash: bundleHash,
+                _deadline: atomicDeadline,
+                _lowNullifierIndex: atomicLowNullifierIndex
+            });
+        } else {
+            msgHash = _sendBundleToL1(interopBundleBytes, _bundle.calls.length);
+        }
     }
 
     /// @notice Emits ERC-7786 MessageSent events for each call in a bundle.

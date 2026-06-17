@@ -81,10 +81,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     mapping(bytes32 assetId => InteropRoute) public assetInteropRoute;
 
     /// @notice Canonical atomic-flow manager on this chain. Whitelisted to call the AR's
-    /// `recoverAtomicBurn` entry on behalf of a timed-out atomic flow. The source burn flows through
-    /// the normal `initiateIndirectCall` path and destination mints through the interop handler, so no
-    /// other AR entry is gated to the manager. Set once via `setAtomicFlowManager`; remains
-    /// `address(0)` (effectively disabled) on chains that do not opt in to the atomic-flow stack.
+    /// `recoverAtomicBurn` entry (atomic timeout recovery) and, via `onlyAssetRouterCounterpartOrSelf`,
+    /// `finalizeDeposit` (used by a userspace flow escrow registered in this slot, e.g. dummy-interop's
+    /// `L2FlowEscrow`). For the IMT atomic flow the source burn goes through the normal
+    /// `initiateIndirectCall` path and destination mints through the interop handler, so the IMT manager
+    /// does not itself call `finalizeDeposit`. Set once via `setAtomicFlowManager`; remains `address(0)`
+    /// (disabled) on chains that do not opt in to the atomic-flow stack.
     address public atomicFlowManager;
 
     /// @notice Returns the bridgehub contract.
@@ -162,17 +164,22 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _;
     }
 
-    /// @notice Checks that the message sender is the L1 Asset Router or this contract itself.
+    /// @notice Checks that the message sender is the L1 Asset Router, this contract itself, or — if the
+    /// atomic-flow stack is enabled on this chain — the canonical atomic-flow manager. A userspace flow
+    /// escrow (e.g. the dummy-interop `L2FlowEscrow`) registered in the manager slot drives
+    /// destination-side mints via `finalizeDeposit` through this gate.
     modifier onlyAssetRouterCounterpartOrSelf(uint256 _chainId) {
+        bool isAtomicFlowManager = atomicFlowManager != address(0) && msg.sender == atomicFlowManager;
         if (_chainId == L1_CHAIN_ID) {
             if (
                 (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != address(L1_ASSET_ROUTER)) &&
-                msg.sender != address(this)
+                msg.sender != address(this) &&
+                !isAtomicFlowManager
             ) {
                 revert Unauthorized(msg.sender);
             }
         } else {
-            if (msg.sender != address(this)) {
+            if (msg.sender != address(this) && !isAtomicFlowManager) {
                 revert Unauthorized(msg.sender);
             }
         }
