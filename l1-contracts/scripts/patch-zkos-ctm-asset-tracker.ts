@@ -97,6 +97,23 @@ const FIXED_FORCE_DEPLOYMENTS_DATA =
 
 const UNIVERSAL_CONTRACT_UPGRADE_INFO = "tuple(uint8 upgradeType,bytes deployedBytecodeInfo,address newAddress)";
 
+// ChainCreationParams (contracts/state-transition/IChainTypeManager.sol).
+const CHAIN_CREATION_PARAMS =
+  "tuple(address genesisUpgrade,bytes32 genesisBatchHash,uint64 genesisIndexRepeatedStorageChanges," +
+  `bytes32 genesisBatchCommitment,${DIAMOND_CUT_DATA} diamondCut,bytes forceDeploymentsData)`;
+
+// governance Call (contracts/governance/Common.sol).
+const CALL = "tuple(address target,uint256 value,bytes data)";
+
+// Canonical (un-named) signatures used to derive the 4-byte selectors.
+const SIG_SET_CHAIN_CREATION_PARAMS =
+  "setChainCreationParams((address,bytes32,uint64,bytes32,((address,uint8,bool,bytes4[])[],address,bytes),bytes))";
+const SIG_SET_UPGRADE_DIAMOND_CUT = "setUpgradeDiamondCut(((address,uint8,bool,bytes4[])[],address,bytes),uint256)";
+
+function selector(sig: string): string {
+  return ethers.utils.id(sig).slice(0, 10);
+}
+
 // ---------------------------------------------------------------------------
 // Bytecode descriptors
 // ---------------------------------------------------------------------------
@@ -312,11 +329,17 @@ function assertNoStaleReferences(label: string, keccaks: string[], known: Set<st
 // TOML helpers
 // ---------------------------------------------------------------------------
 
-function readEcosystem(filePath: string): {
+interface Ecosystem {
   forceDeploymentsData: string;
   chainUpgradeDiamondCut: string;
   diamondCutData: string;
-} {
+  chainTypeManager: string;
+  genesisUpgrade: string;
+  oldProtocolVersion: string;
+  newProtocolVersion: string;
+}
+
+function readEcosystem(filePath: string): Ecosystem {
   const parsed = toml.parse(fs.readFileSync(filePath, "utf8"));
   const zk = parsed?.ctms?.zksync_os;
   if (!zk) {
@@ -326,7 +349,18 @@ function readEcosystem(filePath: string): {
     forceDeploymentsData: zk.contracts_config.force_deployments_data,
     chainUpgradeDiamondCut: zk.chain_upgrade_diamond_cut,
     diamondCutData: zk.contracts_config.diamond_cut_data,
+    chainTypeManager: zk.state_transition.chain_type_manager_proxy,
+    genesisUpgrade: zk.state_transition.genesis_upgrade_addr,
+    oldProtocolVersion: String(zk.contracts_config.old_protocol_version),
+    newProtocolVersion: String(zk.contracts_config.new_protocol_version),
   };
+}
+
+// `$.genesis_root` from the ZKsyncOS genesis config (a 32-byte state root, not
+// bytecode). Mirrors `ChainCreationParamsLib.getChainCreationParams(.., true)`.
+function readZksyncOsGenesisRoot(): string {
+  const cfg = path.join(REPO_ROOT, "configs/genesis/zksync-os/latest.json");
+  return JSON.parse(fs.readFileSync(cfg, "utf8")).genesis_root;
 }
 
 // ---------------------------------------------------------------------------
@@ -467,12 +501,49 @@ function main() {
     }
   }
 
+  // --- generate the ChainTypeManager calls that apply the patch ---
+  // Mirrors the forge script: setChainCreationParams (chain-creation params,
+  // genesis fields from the ZKsyncOS genesis config, diamond cut reused verbatim)
+  // and setUpgradeDiamondCut (the patched upgrade cut for the old protocol
+  // version). `setNewVersionUpgrade` is intentionally NOT used: the original
+  // proposal already advanced the on-chain protocol version, so it would revert.
+  const diamondCut = abi.decode([DIAMOND_CUT_DATA], eco.diamondCutData)[0];
+  const upgradeCut = abi.decode([DIAMOND_CUT_DATA], chainUpgradeDiamondCutNew)[0];
+  const chainCreationParams = abi.encode(
+    [CHAIN_CREATION_PARAMS],
+    [
+      {
+        genesisUpgrade: eco.genesisUpgrade,
+        genesisBatchHash: readZksyncOsGenesisRoot(),
+        genesisIndexRepeatedStorageChanges: 0,
+        genesisBatchCommitment: ethers.utils.hexZeroPad("0x01", 32),
+        diamondCut,
+        forceDeploymentsData: forceDeploymentsDataNew,
+      },
+    ]
+  );
+
+  const setChainCreationParamsCalldata = selector(SIG_SET_CHAIN_CREATION_PARAMS) + strip0x(chainCreationParams);
+  const setUpgradeDiamondCutCalldata =
+    selector(SIG_SET_UPGRADE_DIAMOND_CUT) +
+    strip0x(abi.encode([DIAMOND_CUT_DATA, "uint256"], [upgradeCut, eco.oldProtocolVersion]));
+
+  const calls = [
+    { target: eco.chainTypeManager, value: 0, data: setChainCreationParamsCalldata },
+    { target: eco.chainTypeManager, value: 0, data: setUpgradeDiamondCutCalldata },
+  ];
+  const governanceCalls = abi.encode([`${CALL}[]`], [calls]);
+  console.log(`  generated ${calls.length} ChainTypeManager calls (setChainCreationParams, setUpgradeDiamondCut)`);
+
   const out = {
     source: {
       hashes: path.relative(REPO_ROOT, hashesPath),
       ecosystem: path.relative(REPO_ROOT, ecosystemPath),
     },
     ctm: "zksync_os",
+    chainTypeManager: ethers.utils.getAddress(eco.chainTypeManager),
+    oldProtocolVersion: eco.oldProtocolVersion,
+    newProtocolVersion: eco.newProtocolVersion,
     changedContracts: changes.map((c) => ({
       contract: c.contract,
       oldKeccak: c.old.keccak,
@@ -482,51 +553,18 @@ function main() {
     })),
     v31DelegateOld: delegateOld ? ethers.utils.getAddress(delegateOld) : null,
     v31DelegateNew: delegateNew ? ethers.utils.getAddress(delegateNew) : null,
-    diamondCutDataUnchanged: eco.diamondCutData,
+    diamondCutData: eco.diamondCutData, // unchanged (facets untouched)
     forceDeploymentsData: forceDeploymentsDataNew,
     chainUpgradeDiamondCut: chainUpgradeDiamondCutNew,
+    chainCreationParams,
+    setChainCreationParamsCalldata,
+    setUpgradeDiamondCutCalldata,
+    governanceCalls,
   };
 
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, JSON.stringify(out, null, 2) + "\n");
-  console.log(`\nAll checks passed. Patched ZKsync OS CTM data written to:\n  ${outputPath}`);
-
-  // Optionally write a fully patched ecosystem.toml (the amended upgrade).
-  // The old ZKsync OS `force_deployments_data` is a substring of the old
-  // `chain_upgrade_diamond_cut`, so we replace the (longer) upgrade-cut value
-  // first; afterwards the only remaining occurrence of the old force-deployments
-  // value is its own standalone key.
-  if (process.env.APPLY === "true") {
-    const appliedPath = process.env.APPLY_OUTPUT || ecosystemPath.replace(/\.toml$/, ".patched.toml");
-    const tomlText = fs.readFileSync(ecosystemPath, "utf8");
-
-    // Restrict the replacement to the `[ctms.zksync_os]` section: the gateway
-    // state transition (`[new_gateway...]`) shares the same force-deployments
-    // blob, but it is a different CTM and is out of scope for this patch.
-    const sectionStart = tomlText.indexOf("[ctms.zksync_os]");
-    if (sectionStart === -1) {
-      throw new Error("apply: [ctms.zksync_os] section not found");
-    }
-    // The section ends at the first top-level table that is not nested under it.
-    const after = tomlText.slice(sectionStart + 1);
-    const nextHeaderRel = after.search(/\n\[(?!ctms\.zksync_os)/);
-    const sectionEnd = nextHeaderRel === -1 ? tomlText.length : sectionStart + 1 + nextHeaderRel;
-
-    let section = tomlText.slice(sectionStart, sectionEnd);
-    const replaceOnce = (label: string, oldVal: string, newVal: string) => {
-      const occurrences = countOccurrences(section, oldVal);
-      if (occurrences !== 1) {
-        throw new Error(`apply: expected exactly one occurrence of ${label} in [ctms.zksync_os], found ${occurrences}`);
-      }
-      section = section.replace(oldVal, newVal);
-    };
-    replaceOnce("chain_upgrade_diamond_cut", eco.chainUpgradeDiamondCut, chainUpgradeDiamondCutNew);
-    replaceOnce("force_deployments_data", eco.forceDeploymentsData, forceDeploymentsDataNew);
-
-    const patchedText = tomlText.slice(0, sectionStart) + section + tomlText.slice(sectionEnd);
-    fs.writeFileSync(appliedPath, patchedText);
-    console.log(`Amended upgrade (zksync_os CTM only) written to:\n  ${appliedPath}`);
-  }
+  console.log(`\nAll checks passed. Patch proposal written to:\n  ${outputPath}`);
 }
 
 main();
