@@ -17,15 +17,6 @@ use zk_os_basic_system::system_implementation::flat_storage_model::{
     ACCOUNT_PROPERTIES_STORAGE_ADDRESS, AccountProperties,
 };
 
-/// Loads the bytecode for a given contract source.
-fn load_bytecode(source: ContractSource) -> Vec<u8> {
-    match source {
-        ContractSource::L1ContractName(name) => l1_contract_name_to_code(name),
-        ContractSource::DAContractName(name) => da_contract_name_to_code(name),
-        ContractSource::Bytecode(bytecode) => bytecode.to_vec(),
-    }
-}
-
 impl InitialGenesisInput {
     /// Loads genesis input by reading Forge artifacts from an explicit directory.
     ///
@@ -33,51 +24,50 @@ impl InitialGenesisInput {
     /// l1-contracts (or the equivalent). Each contract is expected at
     /// `<l1_contracts_out>/<Name>.sol/<Name>.json`.
     pub fn from_forge_artifacts(l1_contracts_out: &std::path::Path) -> anyhow::Result<Self> {
-        use crate::consts::{ContractDeployment, ContractSource, INITIAL_CONTRACTS};
-        use crate::utils::generate_random_address;
+        Self::build_from_source_loader(|source| match source {
+            ContractSource::L1ContractName(name) => load_artifact(l1_contracts_out, name),
+            ContractSource::DAContractName(name) => {
+                anyhow::bail!(
+                    "DA contract '{name}' not supported in from_forge_artifacts; \
+                     pass the DA contracts out dir separately if needed"
+                )
+            }
+            ContractSource::Bytecode(bytes) => Ok(bytes.to_vec()),
+        })
+    }
 
-        let load = |name: &str| -> anyhow::Result<Vec<u8>> {
-            let path = l1_contracts_out.join(format!("{name}.sol/{name}.json"));
-            let content = std::fs::read_to_string(&path)
-                .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
-            let artifact: serde_json::Value = serde_json::from_str(&content)
-                .map_err(|e| anyhow::anyhow!("failed to parse {}: {e}", path.display()))?;
-            let bytecode = artifact["deployedBytecode"]["object"]
-                .as_str()
-                .filter(|&b| b != "0x")
-                .ok_or_else(|| anyhow::anyhow!("no deployed bytecode in artifact for {name}"))?;
-            hex::decode(&bytecode[2..])
-                .map_err(|e| anyhow::anyhow!("failed to decode bytecode for {name}: {e}"))
-        };
+    /// Loads genesis input from the default location relative to the era-contracts root.
+    ///
+    /// Only works when the binary is run from inside the era-contracts directory tree and Forge
+    /// artifacts are already built. External consumers should use `from_forge_artifacts` instead.
+    pub fn local() -> anyhow::Result<Self> {
+        Self::build_from_source_loader(|source| {
+            Ok(match source {
+                ContractSource::L1ContractName(name) => l1_contract_name_to_code(name),
+                ContractSource::DAContractName(name) => da_contract_name_to_code(name),
+                ContractSource::Bytecode(bytes) => bytes.to_vec(),
+            })
+        })
+    }
 
-        let system_proxy_bytecode = load("SystemContractProxy")?;
-        let mut initial_contracts: Vec<(alloy::primitives::Address, alloy::primitives::Bytes)> =
-            Vec::new();
-        let mut proxy_impls: Vec<(alloy::primitives::Address, alloy::primitives::Address)> =
-            Vec::new();
+    /// Shared construction logic. `load` maps a `ContractSource` to its bytecode;
+    /// callers supply different strategies for local paths vs explicit directories.
+    fn build_from_source_loader<F>(load: F) -> anyhow::Result<Self>
+    where
+        F: Fn(&ContractSource) -> anyhow::Result<Vec<u8>>,
+    {
+        let system_proxy_bytecode = load(&ContractSource::L1ContractName("SystemContractProxy"))?;
+        let mut initial_contracts: Vec<(Address, alloy::primitives::Bytes)> = Vec::new();
+        let mut proxy_impls: Vec<(Address, Address)> = Vec::new();
 
         for (addr, deployment) in INITIAL_CONTRACTS.iter() {
-            let load_source = |source: &ContractSource| -> anyhow::Result<Vec<u8>> {
-                match source {
-                    ContractSource::L1ContractName(name) => load(name),
-                    ContractSource::DAContractName(name) => {
-                        anyhow::bail!(
-                            "DA contract '{name}' not supported in from_forge_artifacts; \
-                             pass the DA contracts out dir separately if needed"
-                        )
-                    }
-                    ContractSource::Bytecode(bytes) => Ok(bytes.to_vec()),
-                }
-            };
-
             match deployment {
                 ContractDeployment::Direct(source) => {
-                    let code = load_source(source)?;
-                    initial_contracts
-                        .push((*addr, alloy::primitives::Bytes::from(code)));
+                    let code = load(source)?;
+                    initial_contracts.push((*addr, alloy::primitives::Bytes::from(code)));
                 }
                 ContractDeployment::SystemProxy(source) => {
-                    let impl_bytecode = load_source(source)?;
+                    let impl_bytecode = load(source)?;
                     let impl_addr = generate_random_address(&impl_bytecode);
                     initial_contracts.push((
                         *addr,
@@ -96,50 +86,21 @@ impl InitialGenesisInput {
             additional_storage_raw: Default::default(),
         })
     }
+}
 
-    /// Loads genesis input from the default location relative to the era-contracts root.
-    ///
-    /// Only works when the binary is run from inside the era-contracts directory tree and Forge
-    /// artifacts are already built. External consumers should use `from_forge_artifacts` instead.
-    pub fn local() -> Self {
-        let system_proxy_bytecode = l1_contract_name_to_code("SystemContractProxy");
-
-        let mut initial_contracts: Vec<(Address, alloy::primitives::Bytes)> = Vec::new();
-        // Tracks (proxy_address, impl_address) for all SystemProxy deployments.
-        let mut proxy_impls: Vec<(Address, Address)> = Vec::new();
-
-        for (addr, deployment) in INITIAL_CONTRACTS.iter() {
-            match deployment {
-                ContractDeployment::Direct(source) => {
-                    let code = load_bytecode(*source);
-                    initial_contracts.push((*addr, alloy::primitives::Bytes::from(code)));
-                }
-                ContractDeployment::SystemProxy(source) => {
-                    let impl_bytecode = load_bytecode(*source);
-                    let impl_addr = generate_random_address(&impl_bytecode);
-
-                    // The well-known address holds the proxy skeleton.
-                    initial_contracts.push((
-                        *addr,
-                        alloy::primitives::Bytes::from(system_proxy_bytecode.clone()),
-                    ));
-                    // The implementation lives at the randomly derived address.
-                    initial_contracts.push((
-                        impl_addr,
-                        alloy::primitives::Bytes::from(impl_bytecode),
-                    ));
-
-                    proxy_impls.push((*addr, impl_addr));
-                }
-            }
-        }
-
-        InitialGenesisInput {
-            initial_contracts,
-            additional_storage: construct_additional_storage(&proxy_impls),
-            additional_storage_raw: Default::default(),
-        }
-    }
+/// Reads a Forge JSON artifact and returns the deployed bytecode bytes.
+fn load_artifact(dir: &std::path::Path, name: &str) -> anyhow::Result<Vec<u8>> {
+    let path = dir.join(format!("{name}.sol/{name}.json"));
+    let content = std::fs::read_to_string(&path)
+        .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
+    let artifact: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| anyhow::anyhow!("failed to parse {}: {e}", path.display()))?;
+    let bytecode = artifact["deployedBytecode"]["object"]
+        .as_str()
+        .filter(|&b| b != "0x")
+        .ok_or_else(|| anyhow::anyhow!("no deployed bytecode in artifact for {name}"))?;
+    hex::decode(&bytecode[2..])
+        .map_err(|e| anyhow::anyhow!("failed to decode bytecode for {name}: {e}"))
 }
 
 /// Calculates the Merkle root of a tree of given depth from the provided leaves.
