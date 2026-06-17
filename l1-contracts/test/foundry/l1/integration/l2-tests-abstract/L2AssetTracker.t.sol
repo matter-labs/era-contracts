@@ -38,7 +38,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {L2AssetTrackerData} from "./L2AssetTrackerData.sol";
 import {L2UtilsBase} from "../l2-tests-in-l1-context/L2UtilsBase.sol";
 
-import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, BaseTokenPreV31TotalSupplyNotSet} from "contracts/common/L1ContractErrors.sol";
 import {RAND_ADDRESS} from "test/foundry/TestConstants.sol";
 
 import {LogFinder} from "../utils/LogFinder.sol";
@@ -644,6 +644,13 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             .sig("originChainId(bytes32)")
             .with_key(baseTokenAssetId)
             .checked_write(l1ChainId);
+
+        // Pin down the precondition the fix relies on: while the backfill is pending, the real
+        // base token's `totalSupply()` genuinely reverts with `BaseTokenPreV31TotalSupplyNotSet`.
+        // This is the exact call `_needToForceSetAssetMigrationOnL2` makes, so without the fix the
+        // finalization below reverts with this very error instead of recording the deposit.
+        vm.expectRevert(BaseTokenPreV31TotalSupplyNotSet.selector);
+        IERC20(address(L2_BASE_TOKEN_SYSTEM_CONTRACT)).totalSupply();
 
         // Register the base token exactly as the V31 upgrade does for an existing chain.
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
