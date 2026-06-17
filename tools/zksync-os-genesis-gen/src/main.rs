@@ -1,10 +1,5 @@
-use crate::genesis::build_genesis_root_hash;
-use crate::types::{Genesis, InitialGenesisInput};
 use structopt::StructOpt;
-mod consts;
-mod genesis;
-mod types;
-mod utils;
+use zksync_os_genesis_gen::{build_genesis_root_hash, Genesis, InitialGenesisInput};
 
 const PATH_TO_LOCAL_GENESIS: &str = "../../configs/genesis/zksync-os/latest.json";
 

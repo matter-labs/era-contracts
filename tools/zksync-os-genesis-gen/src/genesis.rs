@@ -27,7 +27,81 @@ fn load_bytecode(source: ContractSource) -> Vec<u8> {
 }
 
 impl InitialGenesisInput {
-    pub(crate) fn local() -> Self {
+    /// Loads genesis input by reading Forge artifacts from an explicit directory.
+    ///
+    /// `l1_contracts_out` must point to the `out/` directory produced by `forge build` in
+    /// l1-contracts (or the equivalent). Each contract is expected at
+    /// `<l1_contracts_out>/<Name>.sol/<Name>.json`.
+    pub fn from_forge_artifacts(l1_contracts_out: &std::path::Path) -> anyhow::Result<Self> {
+        use crate::consts::{ContractDeployment, ContractSource, INITIAL_CONTRACTS};
+        use crate::utils::generate_random_address;
+
+        let load = |name: &str| -> anyhow::Result<Vec<u8>> {
+            let path = l1_contracts_out.join(format!("{name}.sol/{name}.json"));
+            let content = std::fs::read_to_string(&path)
+                .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
+            let artifact: serde_json::Value = serde_json::from_str(&content)
+                .map_err(|e| anyhow::anyhow!("failed to parse {}: {e}", path.display()))?;
+            let bytecode = artifact["deployedBytecode"]["object"]
+                .as_str()
+                .filter(|&b| b != "0x")
+                .ok_or_else(|| anyhow::anyhow!("no deployed bytecode in artifact for {name}"))?;
+            hex::decode(&bytecode[2..])
+                .map_err(|e| anyhow::anyhow!("failed to decode bytecode for {name}: {e}"))
+        };
+
+        let system_proxy_bytecode = load("SystemContractProxy")?;
+        let mut initial_contracts: Vec<(alloy::primitives::Address, alloy::primitives::Bytes)> =
+            Vec::new();
+        let mut proxy_impls: Vec<(alloy::primitives::Address, alloy::primitives::Address)> =
+            Vec::new();
+
+        for (addr, deployment) in INITIAL_CONTRACTS.iter() {
+            let load_source = |source: &ContractSource| -> anyhow::Result<Vec<u8>> {
+                match source {
+                    ContractSource::L1ContractName(name) => load(name),
+                    ContractSource::DAContractName(name) => {
+                        anyhow::bail!(
+                            "DA contract '{name}' not supported in from_forge_artifacts; \
+                             pass the DA contracts out dir separately if needed"
+                        )
+                    }
+                    ContractSource::Bytecode(bytes) => Ok(bytes.to_vec()),
+                }
+            };
+
+            match deployment {
+                ContractDeployment::Direct(source) => {
+                    let code = load_source(source)?;
+                    initial_contracts
+                        .push((*addr, alloy::primitives::Bytes::from(code)));
+                }
+                ContractDeployment::SystemProxy(source) => {
+                    let impl_bytecode = load_source(source)?;
+                    let impl_addr = generate_random_address(&impl_bytecode);
+                    initial_contracts.push((
+                        *addr,
+                        alloy::primitives::Bytes::from(system_proxy_bytecode.clone()),
+                    ));
+                    initial_contracts
+                        .push((impl_addr, alloy::primitives::Bytes::from(impl_bytecode)));
+                    proxy_impls.push((*addr, impl_addr));
+                }
+            }
+        }
+
+        Ok(Self {
+            initial_contracts,
+            additional_storage: construct_additional_storage(&proxy_impls),
+            additional_storage_raw: Default::default(),
+        })
+    }
+
+    /// Loads genesis input from the default location relative to the era-contracts root.
+    ///
+    /// Only works when the binary is run from inside the era-contracts directory tree and Forge
+    /// artifacts are already built. External consumers should use `from_forge_artifacts` instead.
+    pub fn local() -> Self {
         let system_proxy_bytecode = l1_contract_name_to_code("SystemContractProxy");
 
         let mut initial_contracts: Vec<(Address, alloy::primitives::Bytes)> = Vec::new();
@@ -265,6 +339,8 @@ pub fn build_genesis_root_hash(genesis_input: &InitialGenesisInput) -> anyhow::R
         excess_blob_gas: None,
         parent_beacon_block_root: None,
         requests_hash: None,
+        block_access_list_hash: None,
+        slot_number: None,
     };
     build_initial_genesis_commitment(storage_logs, header)
 }
