@@ -5,22 +5,20 @@ import {SendSpec, SpecState, ImtInclusionProof, ImtNonInclusionProof} from "./IA
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Per-chain escrow for the L1-free atomic interop flow.
+/// @notice Per-chain escrow for the L1-free atomic interop flow. Asset mechanics route through the L2
+/// asset router + native token vault; cross-chain authorization is gated by **IMT proofs** against the
+/// interop root the verifying chain imports for a settled source batch (see {AtomicInteropProof}) —
+/// no L1 coordinator.
 ///
-/// Structurally mirrors the L1-coordinated `L2FlowEscrow` (same `commitSend` / `authorize` /
-/// `execute` / refund split and the same asset routing through the L2 asset router + native token
-/// vault), but the authorization step is gated by **IMT proofs** against an imported global
-/// interop-IMT root instead of an aliased L1 linker call:
-///
-///   1. `commitSend` — the source depositor locks tokens and the spec's commit value is inserted
-///      into the chain's indexed interop IMT. When the batch settles, the operator exposes the IMT
-///      root on L1.
-///   2. `authorize` — once a caller can prove (against an imported global root) that *every* spec of
-///      the flow was committed before the deadline, the specs relevant to this chain become
-///      `Executable`. Permissionless.
-///   3. `execute` — performs the asset op via AR/NTV: burn on the source, mint on the destination.
-///   4. `authorizeRefund` / `claimRefund` — the timeout path, gated by an O(log n) non-inclusion
-///      proof.
+///   1. `commitSend` — the source depositor's tokens are pulled and immediately **burned** (origin-
+///      native: locked) through AR/NTV, and the leg's commit value is inserted into this chain's
+///      indexed interop IMT. The source happy path is terminal here (`Committed`); there is no source
+///      `execute`.
+///   2. `authorize` — once a caller proves *every* spec of the flow was committed before the deadline,
+///      this chain's **destination** legs become `Executable`. Permissionless.
+///   3. `execute` — mints the destination leg to its recipient via AR/NTV. Destination-only.
+///   4. `authorizeRefund` / `claimRefund` — the timeout path: prove (O(log n) non-inclusion) that a leg
+///      can no longer be committed in time, then **recover** the burned source funds to the depositor.
 ///
 /// `flowId = keccak256(abi.encode(sortedSpecHashes, sortedChainIds, deadline))`,
 /// `specHash = keccak256(abi.encode(spec))`; both arrays strictly ascending.
@@ -29,22 +27,24 @@ import {SendSpec, SpecState, ImtInclusionProof, ImtNonInclusionProof} from "./IA
 interface IAtomicFlowEscrow {
     event FlowCommitted(bytes32 indexed flowId, bytes32 indexed specHash, address indexed depositor, uint256 leafIndex);
     event FlowAuthorized(bytes32 indexed flowId, bytes32 indexed specHash);
-    event FlowExecuted(bytes32 indexed flowId, bytes32 indexed specHash, bool isSource);
+    event FlowExecuted(bytes32 indexed flowId, bytes32 indexed specHash);
     event FlowRefundAuthorized(bytes32 indexed flowId, bytes32 indexed specHash);
     event FlowRefunded(bytes32 indexed flowId, bytes32 indexed specHash, address indexed depositor);
 
-    /// @notice Lock `_spec.amount` of `_spec.originToken` from `_spec.depositor` and insert the
-    /// spec's commit value into the chain's indexed interop IMT. Caller must be `_spec.depositor`;
-    /// `_spec.originChainId` must be this chain. State `Unset -> Committed`.
+    /// @notice Pull `_spec.amount` of `_spec.originToken` from `_spec.depositor`, burn/lock it through
+    /// AR/NTV, and insert the spec's commit value into the chain's indexed interop IMT. Caller must be
+    /// `_spec.depositor`; `_spec.originChainId` must be this chain. State `Unset -> Committed` (terminal
+    /// on the happy path).
     /// @param _lowNullifierIndex The low-nullifier slot for the commit value (from the IMT engine).
     function commitSend(bytes32 _flowId, SendSpec calldata _spec, uint256 _lowNullifierIndex) external;
 
-    /// @notice Mark this chain's specs of a flow `Executable`, once every spec is proven committed in
-    /// time. Permissionless. Valid prior states: `Unset` (destination) or `Committed` (source).
+    /// @notice Mark this chain's destination legs `Executable`, once every spec of the flow is proven
+    /// committed in time. Permissionless. Destination legs transition `Unset -> Executable`; source
+    /// legs are unaffected (terminal at `Committed`).
     /// @param _specs All specs of the flow, sorted ascending by `specHash`.
     /// @param _chainIds The flow's participant chain ids, strictly ascending.
-    /// @param _deadline The flow deadline (compared against imported L1 timestamps).
-    /// @param _proofs Inclusion proofs aligned 1:1 with `_specs` (each against its origin chain).
+    /// @param _deadline The flow deadline (compared against the authenticated root snapshot timestamp).
+    /// @param _proofs Inclusion proofs for each spec NOT originating on this chain, in spec order.
     function authorize(
         bytes32 _flowId,
         SendSpec[] calldata _specs,
@@ -53,12 +53,13 @@ interface IAtomicFlowEscrow {
         ImtInclusionProof[] calldata _proofs
     ) external;
 
-    /// @notice Settle one leg. Anyone may call with the full `SendSpec`. Requires `Executable`; burns
-    /// via AR/NTV on the source, mints via AR/NTV on the destination. State `Executable -> Executed`.
+    /// @notice Settle a destination leg: mint to its recipient via AR/NTV. Anyone may call with the
+    /// full `SendSpec`. Requires `Executable` and `destChainId == block.chainid`. State
+    /// `Executable -> Executed`.
     function execute(bytes32 _flowId, SendSpec calldata _spec) external;
 
-    /// @notice Mark this chain's source specs `Revertable` for a flow that can no longer finalize,
-    /// proven by a non-inclusion proof for one spec across the deadline boundary. Permissionless.
+    /// @notice Mark this chain's source legs `Revertable` for a flow that can no longer finalize, proven
+    /// by a non-inclusion proof for one spec past the deadline. Permissionless.
     /// @param _missingSpecIndex Index into `_specs` of the spec proven absent.
     function authorizeRefund(
         bytes32 _flowId,
@@ -69,8 +70,8 @@ interface IAtomicFlowEscrow {
         ImtNonInclusionProof calldata _proof
     ) external;
 
-    /// @notice Refund the locked tokens to `_spec.depositor`. Requires `Revertable`.
-    /// State `Revertable -> Reverted`.
+    /// @notice Recover the burned/locked source funds to `_spec.depositor` via AR/NTV. Requires
+    /// `Revertable`. State `Revertable -> Reverted`.
     function claimRefund(bytes32 _flowId, SendSpec calldata _spec) external;
 
     /// @notice Current state of a `(flowId, specHash)` on this chain.
@@ -79,10 +80,7 @@ interface IAtomicFlowEscrow {
     /// @notice The interop commitment tree this escrow inserts into.
     function commitmentTree() external view returns (address);
 
-    /// @notice The global-root importer this escrow verifies proofs against.
-    function importer() external view returns (address);
-
-    /// @notice The L2 asset router used for burns/mints.
+    /// @notice The L2 asset router used for burns/mints/recovery.
     function assetRouter() external view returns (address);
 
     /// @notice The L2 native token vault used for source-side allowances.

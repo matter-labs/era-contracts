@@ -196,14 +196,17 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _;
     }
 
-    /// @notice Checks that the message sender is the interop center, or — if the
-    /// atomic-flow stack is enabled on this chain — the canonical atomic-flow escrow.
-    /// The escrow drives source-side burns by calling `initiateIndirectCall` /
-    /// `bridgehubDepositBaseToken` on behalf of an L1-finalized atomic flow.
+    /// @notice Checks that the message sender is the interop center.
     modifier onlyL2InteropCenter() {
-        if (msg.sender != _interopCenterAddr() && !(atomicFlowEscrow != address(0) && msg.sender == atomicFlowEscrow)) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == _interopCenterAddr(), Unauthorized(msg.sender));
+        _;
+    }
+
+    /// @notice Checks that the message sender is the canonical atomic-flow escrow (only meaningful when
+    /// the atomic-flow stack is enabled on this chain). The escrow drives source-side `atomicBridgeBurn`
+    /// and `recoverAtomicBurn` for the L1-free atomic interop flow.
+    modifier onlyAtomicFlowEscrow() {
+        require(atomicFlowEscrow != address(0) && msg.sender == atomicFlowEscrow, Unauthorized(msg.sender));
         _;
     }
 
@@ -390,6 +393,38 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _finalizeDeposit(_originChainId, _assetId, _transferData, _nativeTokenVaultAddr());
 
         emit DepositFinalizedAssetRouter(_originChainId, _assetId, _transferData);
+    }
+
+    /// @inheritdoc IL2AssetRouter
+    function atomicBridgeBurn(
+        uint256 _destChainId,
+        bytes32 _assetId,
+        address _originalCaller,
+        bytes calldata _burnData
+    ) external onlyAtomicFlowEscrow nonReentrant {
+        // Burn (bridged) or lock (origin-native) via the NTV exactly as a normal bridge would, but
+        // WITHOUT building/dispatching a bridgehub two-bridges request: cross-chain settlement is gated
+        // by an IMT inclusion proof on the destination, not an interop bundle. The returned bridge-mint
+        // calldata is intentionally discarded (nothing is sent to the destination here).
+        // slither-disable-next-line unused-return
+        _burn({
+            _chainId: _destChainId,
+            _nextMsgValue: 0,
+            _assetId: _assetId,
+            _originalCaller: _originalCaller,
+            _transferData: _burnData,
+            _passValue: false,
+            _nativeTokenVault: _nativeTokenVaultAddr()
+        });
+    }
+
+    /// @inheritdoc IL2AssetRouter
+    function recoverAtomicBurn(
+        uint256 _destChainId,
+        bytes32 _assetId,
+        bytes calldata _recoverData
+    ) external onlyAtomicFlowEscrow nonReentrant {
+        IL2NativeTokenVault(_nativeTokenVaultAddr()).bridgeRecoverFailedTransfer(_destChainId, _assetId, _recoverData);
     }
 
     /// @inheritdoc IL2CrossChainSender

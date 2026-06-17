@@ -18,6 +18,28 @@ interface IL2AssetRouter is IAssetRouterBase, IL2CrossChainSender {
 
     function withdraw(bytes32 _assetId, bytes calldata _transferData) external returns (bytes32);
 
+    /// @notice Burns (or locks) an atomic-interop leg's asset on the source chain WITHOUT dispatching a
+    /// bridgehub/interop message — cross-chain settlement is gated by an IMT proof on the destination,
+    /// not an interop bundle. Callable only by the canonical atomic-flow escrow.
+    /// @param _destChainId The destination chain the leg targets (for chain-balance accounting).
+    /// @param _assetId The asset being bridged.
+    /// @param _originalCaller The escrow, which must have approved the native token vault for the amount.
+    /// @param _burnData Bridge-burn-formatted data (amount, receiver, token).
+    function atomicBridgeBurn(
+        uint256 _destChainId,
+        bytes32 _assetId,
+        address _originalCaller,
+        bytes calldata _burnData
+    ) external;
+
+    /// @notice Reverses an `atomicBridgeBurn` for an expired flow, returning the funds to the depositor
+    /// via the native token vault. Callable only by the canonical atomic-flow escrow, which gates it on
+    /// a proven IMT non-inclusion (timeout).
+    /// @param _destChainId The destination chain id used at burn time (for chain-balance accounting).
+    /// @param _assetId The asset being recovered.
+    /// @param _recoverData Bridge-mint-formatted data whose receiver is the original depositor.
+    function recoverAtomicBurn(uint256 _destChainId, bytes32 _assetId, bytes calldata _recoverData) external;
+
     function L1_ASSET_ROUTER() external view returns (IL1AssetRouter);
 
     function BASE_TOKEN_ASSET_ID() external view returns (bytes32);
