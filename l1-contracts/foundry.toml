@@ -8,6 +8,7 @@ test = "test/foundry"
 solc_version = "0.8.28"
 evm_version = "prague"
 fs_permissions = [
+    { access = "read-write", path = "./deploy-scripts/upgrade/v31/patch-total-supply" },
     { access = "read-write", path = "./script-out" },
     { access = "read-write", path = "./test/anvil-interop/" },
     { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-config/" },

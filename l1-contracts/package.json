@@ -109,6 +109,7 @@
     "size": "hardhat size-contracts",
     "errors-lint": "ts-node scripts/errors-lint.ts",
     "selectors": "ts-node ../scripts/selectors.ts",
+    "patch-total-supply:crosscheck": "./deploy-scripts/upgrade/v31/patch-total-supply/run-and-crosscheck.sh",
     "zksync-os-genesis": "ts-node scripts/zksync-os-genesis.ts",
     "write-factory-deps-zksync-os": "ts-node scripts/write-factory-deps-zksync-os.ts",
     "fmt": "prettier --write \"**/*.json\" --cache",
