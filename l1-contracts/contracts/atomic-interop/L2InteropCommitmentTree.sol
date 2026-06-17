@@ -17,11 +17,11 @@ import {
 /// the L2->L1 root publication, while the engine owns the tree storage, insert/update logic, leaf
 /// hashing, and Merkle paths.
 ///
-/// On every insert (and the head seed) it publishes `abi.encode(root, block.timestamp)` to L1 via
-/// the L2->L1 messenger. The bundled timestamp is the snapshot time consuming chains compare to a
-/// flow deadline; its integrity is guaranteed by the batch validity proof, and consuming chains
-/// authenticate the message against the interop root they import for the settling batch (see
-/// {AtomicInteropProof}).
+/// On every insert (and the head seed) it publishes `abi.encode(root)` to L1 via the L2->L1 messenger.
+/// Consuming chains authenticate that message against the interop root they import for the settling
+/// batch (see {AtomicInteropProof}); the snapshot time used for the deadline check is the
+/// settlement-layer block number, derived in-module from the same inclusion proof, so the tree itself
+/// no longer bundles any (operator-set) timestamp.
 ///
 /// Deployed in L2 userspace (no constructor); wiring is done in `initialize`.
 contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
@@ -30,21 +30,21 @@ contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
     /// @dev The append-only indexed tree. `_appender` (below) doubles as the "initialized" flag.
     IMT internal _imt;
 
-    /// @dev The {AtomicFlowEscrow} allowed to insert commit values.
+    /// @dev The {AtomicFlowManager} allowed to insert commit values.
     address internal _appender;
 
     /// @notice One-shot initializer. Sets up the IMT (seeding the `{0,0,0}` head leaf at index 0) and
     /// publishes the seed root.
-    /// @param _escrow The {AtomicFlowEscrow} allowed to insert commit values.
-    function initialize(address _escrow) external {
+    /// @param _manager The {AtomicFlowManager} allowed to insert commit values.
+    function initialize(address _manager) external {
         if (_appender != address(0)) revert CommitmentTreeAlreadyInitialized();
-        if (_escrow == address(0)) revert CommitmentTreeZeroAppender();
-        _appender = _escrow;
+        if (_manager == address(0)) revert CommitmentTreeZeroAppender();
+        _appender = _manager;
 
         _imt.setup();
         bytes32 seedRoot = _imt.root();
         _publishRoot(seedRoot);
-        emit RootPublished(0, seedRoot, block.timestamp);
+        emit RootPublished(0, seedRoot);
     }
 
     /// @inheritdoc IL2InteropCommitmentTree
@@ -54,7 +54,7 @@ contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
         // the engine and surfaces its own `IMT*` errors.
         (newIndex, newRoot) = _imt.insert(_value, _lowNullifierIndex);
         _publishRoot(newRoot);
-        emit RootPublished(newIndex, newRoot, block.timestamp);
+        emit RootPublished(newIndex, newRoot);
     }
 
     /// @inheritdoc IL2InteropCommitmentTree
@@ -82,10 +82,10 @@ contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
         return _appender;
     }
 
-    /// @dev Publishes `abi.encode(root, block.timestamp)` to L1. The encoding must match what
-    /// {AtomicInteropProof} reconstructs when authenticating the message.
+    /// @dev Publishes `abi.encode(root)` to L1. The encoding must match what {AtomicInteropProof}
+    /// reconstructs when authenticating the message.
     function _publishRoot(bytes32 _root) internal {
         // slither-disable-next-line unused-return
-        L2ContractHelper.sendMessageToL1(abi.encode(_root, block.timestamp));
+        L2ContractHelper.sendMessageToL1(abi.encode(_root));
     }
 }

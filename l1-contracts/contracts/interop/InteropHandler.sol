@@ -14,6 +14,9 @@ import {
     L2_COMPLEX_UPGRADER_ADDR
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {IL2NativeTokenVault} from "../bridge/ntv/IL2NativeTokenVault.sol";
+import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {IAtomicFlowManager} from "../atomic-interop/IAtomicFlowManager.sol";
+import {AtomicFinalityProof} from "../atomic-interop/IAtomicInterop.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {ShadowAccount, ShadowAccountCall, ShadowAccountCallType} from "./ShadowAccount.sol";
 import {
@@ -160,6 +163,66 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
         });
 
         // Emit event stating that the bundle was executed.
+        emit BundleExecuted(bundleHash);
+    }
+
+    /// @inheritdoc IInteropHandler
+    function executeAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public {
+        // Same settlement-layer requirement as executeBundle (the GWAssetTracker must be able to
+        // process the execution confirmation).
+        require(
+            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
+            CannotClaimInteropOnL1Settlement()
+        );
+
+        // Decode the bundle, compute its hash, read its status.
+        (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
+
+        // An atomic bundle is never published to L1, so its source chain id is the bundle's own field;
+        // the cross-chain binding comes from the IMT inclusion proof below, not an L1 message.
+        _validateBundleDestinationContext(bundleHash, interopBundle, interopBundle.sourceChainId);
+
+        // Permissioned execution, identical to executeBundle.
+        if (interopBundle.bundleAttributes.executionAddress.length != 0) {
+            (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
+                interopBundle.bundleAttributes.executionAddress
+            );
+            require(
+                (msg.sender == address(this) ||
+                    ((executionChainId == block.chainid || executionChainId == 0) && executionAddress == msg.sender)),
+                ExecutingNotAllowed(
+                    bundleHash,
+                    InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
+                    interopBundle.bundleAttributes.executionAddress
+                )
+            );
+        }
+
+        // Atomic bundles have no verify path (they were never published to L1), so only a fresh bundle
+        // may be executed; replay is then prevented by marking it FullyExecuted below. (A non-atomic
+        // bundle cannot reach here: the gate requires its commit value in an IMT, which only `append`
+        // — i.e. an atomic send — ever writes.)
+        require(status == BundleStatus.Unreceived, BundleAlreadyProcessed(bundleHash));
+
+        // Atomicity gate: replaces executeBundle's L1-message inclusion proof. Proves every leg of the
+        // flow was committed in its source chain's IMT before the deadline, and that this bundle is one
+        // of the flow's legs. Reverts otherwise.
+        IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).requireFlowFinalized(bundleHash, _finality);
+
+        // Mark fully executed (CEI) and execute all calls — identical to executeBundle from here.
+        bundleStatus[bundleHash] = BundleStatus.FullyExecuted;
+        uint256 callsLength = interopBundle.calls.length;
+        for (uint256 i = 0; i < callsLength; ++i) {
+            callStatus[bundleHash][i] = CallStatus.Executed;
+        }
+        _executeCalls({
+            _sourceChainId: interopBundle.sourceChainId,
+            _bundleHash: bundleHash,
+            _interopBundle: interopBundle,
+            _executeAllCalls: true,
+            _providedCallStatus: new CallStatus[](0)
+        });
+
         emit BundleExecuted(bundleHash);
     }
 

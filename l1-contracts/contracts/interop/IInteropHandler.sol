@@ -3,6 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {BundleStatus, CallStatus, MessageInclusionProof} from "../common/Messaging.sol";
+import {AtomicFinalityProof} from "../atomic-interop/IAtomicInterop.sol";
 
 interface IInteropHandler {
     event BundleVerified(bytes32 indexed bundleHash);
@@ -24,6 +25,14 @@ interface IInteropHandler {
     /// @param _bundle ABI-encoded InteropBundle to execute.
     /// @param _proof Inclusion proof for the bundle message.
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) external;
+
+    /// @notice Executes an **atomic interop** bundle: like {executeBundle}, but instead of an
+    /// L1-message inclusion proof it requires (via the AtomicFlowManager) that every leg of the flow
+    /// was committed in its source chain's IMT before the deadline. Atomic bundles are never published
+    /// to L1, so this is their only execution entry point.
+    /// @param _bundle ABI-encoded InteropBundle to execute (must carry the `atomicBundle` attribute).
+    /// @param _finality The flow definition (`flowId`, legs, deadline) + one IMT inclusion proof per leg.
+    function executeAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) external;
 
     /// @notice Verifies receipt of a bundle without executing calls.
     /// @dev Marks bundle as Verified on success.

@@ -3,54 +3,45 @@ pragma solidity ^0.8.21;
 
 import {IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
 
-/// @notice Per-`(flowId, specHash)` lifecycle on each L2 escrow in the L1-free atomic flow.
+/// @notice Per-`(flowId, bundleHash)` source-leg lifecycle on each {AtomicFlowManager} in the
+/// L1-free atomic interop flow.
 ///
-///   Source:      `Unset -> Committed` (happy path: the source burn happens at `commitSend` and is
-///                terminal — there is no source-side `execute`),
-///                `Unset -> Committed -> Revertable -> Reverted` (timeout / refund).
-///   Destination: `Unset -> Executable -> Executed`.
-enum SpecState {
+///   Source happy path: `Unset -> Committed` (the burn happens during `InteropCenter.sendBundle` via
+///   the normal `initiateIndirectCall`; `AtomicFlowManager.append` records the leg as `Committed`,
+///   which is terminal on the happy path — the destination mint is driven by
+///   `InteropHandler.executeAtomicBundle`, which has its own bundle-level replay guard).
+///   Source timeout path: `Unset -> Committed -> Revertable -> Reverted`.
+///
+/// Destination execution is NOT tracked here: the {InteropHandler}'s own `bundleStatus` set is the
+/// double-execute guard, exactly as for a normal interop bundle.
+enum LegState {
     Unset,
     Committed,
-    Executable,
-    Executed,
     Revertable,
     Reverted
 }
 
-/// @notice Declarative description of one cross-chain asset transfer (identical instance known to
-/// source and destination), reused from the L1-coordinated interop stack so the asset mechanics can
-/// route through the asset router / native token vault exactly like `L2FlowEscrow`.
-///
-/// `assetId` is derived externally as
-/// `keccak256(abi.encode(originChainId, L2_NATIVE_TOKEN_VAULT_ADDR, originToken))`.
-/// `depositor` carries the source-side payer so the escrow needs no separate depositor mapping.
-struct SendSpec {
-    uint256 destChainId;
-    address recipient;
-    uint256 originChainId;
-    address originToken;
-    uint256 amount;
-    bytes erc20Data;
-    address depositor;
-}
-
-/// @notice Inclusion proof that a spec's commit value is present in its origin chain's interop IMT
-/// as of a root snapshot that settled no later than the flow deadline.
+/// @notice Inclusion proof that a leg's commit value is present in its source chain's interop IMT
+/// as of a root snapshot that settled no later than the flow deadline (a settlement-layer block
+/// number).
 ///
 /// Authentication has two layers, both resolved against the interop root the verifying chain imported
 /// for `(sourceChainId, batchNumber)`:
-///   1. The origin {L2InteropCommitmentTree}'s `abi.encode(chainImtRoot, rootTimestamp)` L2->L1
-///      message (sender pinned to the canonical commitment-tree address) is proven included; this
-///      authenticates both the root and its bundled timestamp (covered by the batch validity proof).
+///   1. The origin {L2InteropCommitmentTree}'s `abi.encode(chainImtRoot)` L2->L1 message (sender
+///      pinned to the canonical commitment-tree address) is proven included; this authenticates the
+///      root.
 ///   2. `leaf` (with `leaf.value == commitValue`) at `imtLeafIndex` with `imtProof` hashes up to
 ///      `chainImtRoot` (delegated to {IndexedMerkleTreeLib.verifyInclusion}).
-/// The escrow additionally requires `rootTimestamp <= deadline`.
+/// The settlement-layer (SL) block number the root settled at is NOT carried as a struct field — that
+/// would be spoofable. It is parsed in-module from `messageProof` (the same multi-hop proof the
+/// verifier checks) via {MessageHashing._getProofData}, so it is bound to the verified
+/// `interopRoots(SL, slBlock)`. The manager then requires `slBlock <= deadline`.
+/// @dev `batchNumber` is the source chain's top-level batch number passed to the message verifier and
+/// to `_getProofData`.
 struct ImtInclusionProof {
     uint256 sourceChainId;
     uint256 batchNumber;
     bytes32 chainImtRoot;
-    uint256 rootTimestamp;
     uint16 messageTxNumberInBatch;
     uint256 messageIndex;
     bytes32[] messageProof;
@@ -62,16 +53,16 @@ struct ImtInclusionProof {
 /// @notice Non-inclusion proof used on the timeout/refund path. O(log n) thanks to the indexed tree.
 ///
 /// Proves the target commit value was absent from its chain's interop IMT as of an authenticated root
-/// whose bundled `rootTimestamp` is strictly after the deadline. Because the IMT is append-only,
-/// absence in a post-deadline snapshot implies absence at the deadline, so the leg can no longer be
-/// committed in time and the flow cannot finalize. Same two-layer authentication as
-/// {ImtInclusionProof}; membership is replaced by the low-nullifier bracket
+/// whose settlement-layer block number (parsed in-module from `messageProof`) is strictly after the
+/// deadline. Because the IMT is append-only, absence in a post-deadline snapshot implies absence at
+/// the deadline, so the leg can no longer be committed in time and the flow cannot finalize. Same
+/// two-layer authentication as {ImtInclusionProof} (the SL block is likewise derived from the proof,
+/// not a struct field); membership is replaced by the low-nullifier bracket
 /// ({IndexedMerkleTreeLib.verifyNonInclusion}).
 struct ImtNonInclusionProof {
     uint256 sourceChainId;
     uint256 batchNumber;
     bytes32 chainImtRoot;
-    uint256 rootTimestamp;
     uint16 messageTxNumberInBatch;
     uint256 messageIndex;
     bytes32[] messageProof;
@@ -80,6 +71,24 @@ struct ImtNonInclusionProof {
     bytes32[] imtProof;
 }
 
+/// @notice The full atomicity proof a destination needs to execute an atomic bundle: the flow
+/// definition (`flowId`, every leg, `deadline`) plus one IMT inclusion proof per leg. Bundled into a
+/// single calldata struct so `InteropHandler.executeAtomicBundle` / `AtomicFlowManager.requireFlowFinalized`
+/// pass it as one reference.
+/// @param flowId `keccak256(abi.encode(legBundleHashes, chainIds, deadline))` (both arrays ascending).
+/// @param deadline The flow deadline (a settlement-layer block number).
+/// @param legBundleHashes All legs' bundle hashes, strictly ascending.
+/// @param chainIds The flow's participant chain ids, strictly ascending.
+/// @param proofs One inclusion proof per leg, in `legBundleHashes` order.
+struct AtomicFinalityProof {
+    bytes32 flowId;
+    uint64 deadline;
+    bytes32[] legBundleHashes;
+    uint256[] chainIds;
+    ImtInclusionProof[] proofs;
+}
+
 /// @dev Domain tag prepended to the preimage of a commit value so values cannot be confused with
-/// other hashes. `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, specHash)))`.
+/// other hashes.
+/// `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
 bytes4 constant ATOMIC_COMMIT_LEAF_TAG = bytes4(keccak256("AtomicInterop.commit.v1"));

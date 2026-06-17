@@ -18,7 +18,7 @@ import {
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
-    L2_ATOMIC_FLOW_ESCROW_ADDR
+    L2_ATOMIC_FLOW_MANAGER_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2BaseTokenBase} from "../l2-system/interfaces/IL2BaseTokenBase.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
@@ -43,7 +43,7 @@ import {GWAssetTracker} from "../bridge/asset-tracker/GWAssetTracker.sol";
 import {L2ChainAssetHandler} from "../core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {InteropHandler} from "../interop/InteropHandler.sol";
 import {L2InteropCommitmentTree} from "../atomic-interop/L2InteropCommitmentTree.sol";
-import {AtomicFlowEscrow} from "../atomic-interop/AtomicFlowEscrow.sol";
+import {AtomicFlowManager} from "../atomic-interop/AtomicFlowManager.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL2SharedBridgeLegacy} from "../bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {
@@ -463,20 +463,22 @@ library L2GenesisForceDeploymentsHelper {
         // For ZKOS: mints via MINT_BASE_TOKEN_HOOK and transfers to holder.
         IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
 
-        // Atomic interop (L1-free): wire the escrow to its commitment tree (and the tree to the
-        // escrow), plus the reverse link so the escrow can drive AR/NTV burns (source), mints
-        // (destination), and recovery (timeout). Only ZKsync OS chains predeploy these (see the
-        // genesis gen tool).
+        // Atomic interop (L1-free): wire the commitment tree's appender to the AtomicFlowManager, the
+        // manager to the tree / asset router / interop center / interop handler, and whitelist the
+        // manager on the asset router for the timeout recovery path. The manager never custodies funds:
+        // the source burn flows through the normal interop path and destination mints through the
+        // interop handler. Only ZKsync OS chains predeploy these (see the genesis gen tool).
         if (_isZKsyncOS) {
-            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initialize(L2_ATOMIC_FLOW_ESCROW_ADDR);
-            AtomicFlowEscrow(L2_ATOMIC_FLOW_ESCROW_ADDR).initialize(
+            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initialize(L2_ATOMIC_FLOW_MANAGER_ADDR);
+            AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initialize(
                 L2_INTEROP_COMMITMENT_TREE_ADDR,
                 L2_ASSET_ROUTER_ADDR,
-                L2_NATIVE_TOKEN_VAULT_ADDR
+                L2_INTEROP_CENTER_ADDR,
+                L2_INTEROP_HANDLER_ADDR
             );
-            // The genesis force-deployment runs as the complex upgrader, which `setAtomicFlowEscrow`
+            // The genesis force-deployment runs as the complex upgrader, which `setAtomicFlowManager`
             // authorises for this one-shot genesis wiring.
-            L2AssetRouter(L2_ASSET_ROUTER_ADDR).setAtomicFlowEscrow(L2_ATOMIC_FLOW_ESCROW_ADDR);
+            L2AssetRouter(L2_ASSET_ROUTER_ADDR).setAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
         }
     }
 

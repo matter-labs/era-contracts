@@ -145,8 +145,9 @@ address constant L2_INTEROP_COMMITMENT_TREE_ADDR = address(BUILT_IN_CONTRACTS_OF
 /// @dev 0x13 is reserved: it formerly held the atomic-interop global-root importer, removed when atomic
 /// proofs were re-based on the interop-root / MessageRoot channel. Left unused to avoid address reuse.
 
-/// @dev The address of the atomic-interop flow escrow.
-address constant L2_ATOMIC_FLOW_ESCROW_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x14);
+/// @dev The address of the atomic-interop flow manager (coordinator; not an escrow — it never
+/// custodies funds).
+address constant L2_ATOMIC_FLOW_MANAGER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x14);
 
 ////////////////////////////////////////////////////////////
 // ZKsync OS genesis contracts

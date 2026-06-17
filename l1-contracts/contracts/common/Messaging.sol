@@ -230,6 +230,14 @@ struct BundleAttributes {
     bytes executionAddress;
     bytes unbundlerAddress;
     bool useFixedFee;
+    // ── Atomic interop (the `atomicBundle` ERC-7786 attribute) ──
+    // When `isAtomic`, the InteropCenter does NOT publish the bundle to L1: it appends the bundle's
+    // commit value to the interop IMT via the AtomicFlowManager, and the destination executes it via
+    // `InteropHandler.executeAtomicBundle` once the whole flow is proven committed before `deadline`.
+    bool isAtomic;
+    bytes32 atomicFlowId;
+    uint64 atomicDeadline;
+    uint256 atomicLowNullifierIndex;
 }
 
 /// @dev A single call.

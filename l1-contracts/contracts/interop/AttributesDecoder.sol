@@ -17,4 +17,10 @@ library AttributesDecoder {
     function decodeBool(bytes calldata _data) internal pure returns (bool) {
         return abi.decode(_data[4:], (bool));
     }
+
+    function decodeAtomicBundle(
+        bytes calldata _data
+    ) internal pure returns (bytes32 flowId, uint64 deadline, uint256 lowNullifierIndex) {
+        return abi.decode(_data[4:], (bytes32, uint64, uint256));
+    }
 }

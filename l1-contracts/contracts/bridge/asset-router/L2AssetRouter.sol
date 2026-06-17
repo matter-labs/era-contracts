@@ -80,13 +80,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// @notice Tracks interop route (public vs private) per asset, preventing mixing.
     mapping(bytes32 assetId => InteropRoute) public assetInteropRoute;
 
-    /// @notice Canonical atomic-flow escrow on this chain. Whitelisted to call the AR's
-    /// burn (`initiateIndirectCall` / `bridgehubDepositBaseToken`) and mint
-    /// (`finalizeDeposit`) entries on behalf of an L1-finalized atomic flow. See
-    /// `docs/src/specs/design/atomicity_using_l1_finality.md`. Set once via
-    /// `setAtomicFlowEscrow`; remains `address(0)` (effectively disabled) on chains that
-    /// do not opt in to the atomic-flow stack.
-    address public atomicFlowEscrow;
+    /// @notice Canonical atomic-flow manager on this chain. Whitelisted to call the AR's
+    /// `recoverAtomicBurn` entry on behalf of a timed-out atomic flow. The source burn flows through
+    /// the normal `initiateIndirectCall` path and destination mints through the interop handler, so no
+    /// other AR entry is gated to the manager. Set once via `setAtomicFlowManager`; remains
+    /// `address(0)` (effectively disabled) on chains that do not opt in to the atomic-flow stack.
+    address public atomicFlowManager;
 
     /// @notice Returns the bridgehub contract.
     function _bridgehub() internal view virtual override returns (IBridgehubBase) {
@@ -163,22 +162,17 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _;
     }
 
-    /// @notice Checks that the message sender is the L1 Asset Router, this contract
-    /// itself, or — if the atomic-flow stack is enabled on this chain — the canonical
-    /// atomic-flow escrow. The escrow drives destination-side mints by calling
-    /// `finalizeDeposit` on behalf of an L1-finalized atomic flow.
+    /// @notice Checks that the message sender is the L1 Asset Router or this contract itself.
     modifier onlyAssetRouterCounterpartOrSelf(uint256 _chainId) {
-        bool isAtomicFlowEscrow = atomicFlowEscrow != address(0) && msg.sender == atomicFlowEscrow;
         if (_chainId == L1_CHAIN_ID) {
             if (
                 (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != address(L1_ASSET_ROUTER)) &&
-                msg.sender != address(this) &&
-                !isAtomicFlowEscrow
+                msg.sender != address(this)
             ) {
                 revert Unauthorized(msg.sender);
             }
         } else {
-            if (msg.sender != address(this) && !isAtomicFlowEscrow) {
+            if (msg.sender != address(this)) {
                 revert Unauthorized(msg.sender);
             }
         }
@@ -202,11 +196,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _;
     }
 
-    /// @notice Checks that the message sender is the canonical atomic-flow escrow (only meaningful when
-    /// the atomic-flow stack is enabled on this chain). The escrow drives source-side `atomicBridgeBurn`
-    /// and `recoverAtomicBurn` for the L1-free atomic interop flow.
-    modifier onlyAtomicFlowEscrow() {
-        require(atomicFlowEscrow != address(0) && msg.sender == atomicFlowEscrow, Unauthorized(msg.sender));
+    /// @notice Checks that the message sender is the canonical atomic-flow manager (only meaningful when
+    /// the atomic-flow stack is enabled on this chain). The manager drives `recoverAtomicBurn` for the
+    /// L1-free atomic interop flow's timeout path.
+    modifier onlyAtomicFlowManager() {
+        require(atomicFlowManager != address(0) && msg.sender == atomicFlowManager, Unauthorized(msg.sender));
         _;
     }
 
@@ -278,22 +272,22 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         }
     }
 
-    /// @notice Registers the canonical atomic-flow escrow on this chain. One-shot: the
-    /// escrow address is set exactly once, after which the AR's atomic-flow auth gates
+    /// @notice Registers the canonical atomic-flow manager on this chain. One-shot: the
+    /// manager address is set exactly once, after which the AR's atomic-flow auth gates
     /// recognise it. Callable by:
     ///   - the complex upgrader, so the genesis force-deployment wires the canonical
-    ///     predeployed escrow on ZKsync OS out of the box (the upgrader is the genesis caller);
+    ///     predeployed manager on ZKsync OS out of the box (the upgrader is the genesis caller);
     ///   - the owner, so a system AR's aliased L1 governance can opt in post-genesis, and a
-    ///     userspace AR (e.g. `PrivateL2AssetRouter` deployed by an EOA) can wire its own escrow
+    ///     userspace AR (e.g. `PrivateL2AssetRouter` deployed by an EOA) can wire its own manager
     ///     without needing the system upgrader.
-    /// See `atomicFlowEscrow` for the broader design context.
-    function setAtomicFlowEscrow(address _escrow) external {
+    /// See `atomicFlowManager` for the broader design context.
+    function setAtomicFlowManager(address _manager) external {
         if (msg.sender != owner() && msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert Unauthorized(msg.sender);
         }
-        require(atomicFlowEscrow == address(0), Unauthorized(msg.sender));
-        require(_escrow != address(0), EmptyAddress());
-        atomicFlowEscrow = _escrow;
+        require(atomicFlowManager == address(0), Unauthorized(msg.sender));
+        require(_manager != address(0), EmptyAddress());
+        atomicFlowManager = _manager;
     }
 
     /// @inheritdoc IL2AssetRouter
@@ -396,34 +390,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     }
 
     /// @inheritdoc IL2AssetRouter
-    function atomicBridgeBurn(
-        uint256 _destChainId,
-        bytes32 _assetId,
-        address _originalCaller,
-        bytes calldata _burnData
-    ) external onlyAtomicFlowEscrow nonReentrant {
-        // Burn (bridged) or lock (origin-native) via the NTV exactly as a normal bridge would, but
-        // WITHOUT building/dispatching a bridgehub two-bridges request: cross-chain settlement is gated
-        // by an IMT inclusion proof on the destination, not an interop bundle. The returned bridge-mint
-        // calldata is intentionally discarded (nothing is sent to the destination here).
-        // slither-disable-next-line unused-return
-        _burn({
-            _chainId: _destChainId,
-            _nextMsgValue: 0,
-            _assetId: _assetId,
-            _originalCaller: _originalCaller,
-            _transferData: _burnData,
-            _passValue: false,
-            _nativeTokenVault: _nativeTokenVaultAddr()
-        });
-    }
-
-    /// @inheritdoc IL2AssetRouter
     function recoverAtomicBurn(
         uint256 _destChainId,
         bytes32 _assetId,
         bytes calldata _recoverData
-    ) external onlyAtomicFlowEscrow nonReentrant {
+    ) external onlyAtomicFlowManager nonReentrant {
         IL2NativeTokenVault(_nativeTokenVaultAddr()).bridgeRecoverFailedTransfer(_destChainId, _assetId, _recoverData);
     }
 

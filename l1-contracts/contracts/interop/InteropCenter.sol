@@ -23,7 +23,7 @@ import {
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 
 import {SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_INTEROP_ATTRIBUTES} from "../common/Config.sol";
-import {L2_BOOTLOADER_ADDRESS} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_ATOMIC_FLOW_MANAGER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {
     BUNDLE_IDENTIFIER,
     BalanceChange,
@@ -54,6 +54,7 @@ import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
 import {AttributesDecoder} from "./AttributesDecoder.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
+import {IAtomicFlowManager} from "../atomic-interop/IAtomicFlowManager.sol";
 import {ERC7930_V1_MIN_LENGTH} from "./InteropConstants.sol";
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 import {IL2CrossChainSender} from "../bridge/interfaces/IL2CrossChainSender.sol";
@@ -475,7 +476,22 @@ contract InteropCenter is
         bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
 
         // Send the L2→L1 message for the bundle.
-        bytes32 msgHash = _sendBundleToL1(interopBundleBytes, bundle.calls.length);
+        // Atomic interop: an atomic bundle is NOT published to L1. Its commit value is appended to the
+        // interop IMT via the AtomicFlowManager (the burn already happened above through the normal
+        // `initiateIndirectCall` path); the destination executes it via
+        // `InteropHandler.executeAtomicBundle` once the whole flow is proven committed before the
+        // deadline. Everything else (bundle construction, value collection) is identical.
+        bytes32 msgHash;
+        if (_bundleAttributes.isAtomic) {
+            IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
+                _flowId: _bundleAttributes.atomicFlowId,
+                _bundleHash: bundleHash,
+                _deadline: _bundleAttributes.atomicDeadline,
+                _lowNullifierIndex: _bundleAttributes.atomicLowNullifierIndex
+            });
+        } else {
+            msgHash = _sendBundleToL1(interopBundleBytes, bundle.calls.length);
+        }
 
         _emitMessageSent({
             _calls: bundle.calls,
@@ -719,6 +735,20 @@ contract InteropCenter is
                 );
                 attributeUsed[5] = true;
                 callAttributes.shadowAccount = true;
+            } else if (selector == IERC7786Attributes.atomicBundle.selector) {
+                require(!attributeUsed[6], AttributeAlreadySet(selector));
+                require(
+                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
+                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
+                    AttributeViolatesRestriction(selector, uint256(_restriction))
+                );
+                attributeUsed[6] = true;
+                bundleAttributes.isAtomic = true;
+                (
+                    bundleAttributes.atomicFlowId,
+                    bundleAttributes.atomicDeadline,
+                    bundleAttributes.atomicLowNullifierIndex
+                ) = AttributesDecoder.decodeAtomicBundle(_attributes[i]);
             } else {
                 revert IERC7786GatewaySource.UnsupportedAttribute(selector);
             }
@@ -758,7 +788,8 @@ contract InteropCenter is
                 IERC7786Attributes.executionAddress.selector,
                 IERC7786Attributes.unbundlerAddress.selector,
                 IERC7786Attributes.useFixedFee.selector,
-                IERC7786Attributes.shadowAccount.selector
+                IERC7786Attributes.shadowAccount.selector,
+                IERC7786Attributes.atomicBundle.selector
             ];
     }
 

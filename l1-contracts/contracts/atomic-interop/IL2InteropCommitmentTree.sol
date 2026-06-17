@@ -8,17 +8,17 @@ import {IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
 /// @notice Per-chain **Indexed Merkle Tree** of interop commit values. Whenever a participant does
 /// their part in a flow, the leg's commit value is inserted here. Each {IMTLeaf} points to the
 /// next-larger value in the tree, so the structure supports O(log n) proofs of both membership and
-/// non-membership (via a "low nullifier" leaf). On every insert the tree publishes
-/// `abi.encode(root, block.timestamp)` to L1 via the L2->L1 messenger; consuming chains authenticate
-/// that message against the interop root they imported for the settling batch (see
-/// {AtomicInteropProof}), which is what makes the root and its snapshot timestamp trustworthy.
+/// non-membership (via a "low nullifier" leaf). On every insert the tree publishes `abi.encode(root)`
+/// to L1 via the L2->L1 messenger; consuming chains authenticate that message against the interop root
+/// they imported for the settling batch (see {AtomicInteropProof}), which is what makes the root
+/// trustworthy. The snapshot used for deadline checks is the settlement-layer block number, derived
+/// in-module from the inclusion proof — the tree publishes no timestamp.
 ///
 /// Deployed in L2 userspace (CREATE2), so it has no constructor — wiring is done in `initialize`.
 interface IL2InteropCommitmentTree {
     /// @notice Emitted after a new root is published to L1: the `{0,0,0}` head seed at `initialize`,
-    /// then one per inserted value. `timestamp` is the `block.timestamp` bundled into the published
-    /// message.
-    event RootPublished(uint256 indexed leafIndex, bytes32 root, uint256 timestamp);
+    /// then one per inserted value.
+    event RootPublished(uint256 indexed leafIndex, bytes32 root);
 
     /// @notice Insert `_value` into the indexed tree. Callable only by the configured appender.
     /// @param _value The value to insert (a domain-tagged commit value, never 0).
