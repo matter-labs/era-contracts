@@ -190,7 +190,17 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     if let Some(contracts_commit) = &args.contracts_commit {
         logger::info(format!("Contracts commit: {contracts_commit}"));
     } else {
-        logger::info("Contracts hashes: local repository AllContractsHashes.json");
+        // Without a pinned commit, every bytecode-hash provenance check — including
+        // the verifier (Fflonk/Plonk/TestnetVerifier) hashes, which is how the
+        // verification-key correctness is checked (a wrong VK changes the verifier
+        // bytecode and so its keccak) — trusts the LOCAL AllContractsHashes.json.
+        // For a testnet/mainnet signing review the checkout MUST be the reviewed
+        // commit, or pass --contracts-commit to pin it.
+        logger::warn(
+            "No --contracts-commit pinned: bytecode-hash provenance (incl. verifier key-hash \
+             coverage) trusts the local checkout's AllContractsHashes.json — confirm it matches \
+             the reviewed commit, or pass --contracts-commit",
+        );
     }
     logger::info(format!(
         "zk-governance commit: {}",

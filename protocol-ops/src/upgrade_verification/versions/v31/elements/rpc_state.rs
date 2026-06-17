@@ -11,8 +11,8 @@ use crate::upgrade_verification::{
             fee_param_verifier::{FeeParamVerifier, FeeParams},
             network_verifier::{
                 Bridgehub as BridgehubContract, ChainRegistrationSender, ChainTypeManager,
-                L1AssetRouter, L1AssetTracker, Ownable, Ownable2Step, ValidatorTimelock,
-                ZKChainFeeParams,
+                L1AssetRouter, L1AssetTracker, NativeTokenVault, Ownable, Ownable2Step,
+                ValidatorTimelock, ZKChainFeeParams,
             },
         },
         MAX_PRIORITY_TX_GAS_LIMIT, STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID,
@@ -167,8 +167,73 @@ pub(crate) async fn verify_v31_artifact_state(
     verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await?;
     verify_v31_ctm_flavor(artifact, verifiers, result).await?;
     verify_v31_chain_settlement_layers(verifiers, result).await;
+    verify_v31_ntv_beacon_owner(verifiers, result).await;
 
     Ok(())
+}
+
+/// Discoverable-ownership audit: report whether the NativeTokenVault
+/// bridged-token beacon is owned by the ecosystem governance (PUH).
+///
+/// The v31 upgrade does NOT touch this beacon, so this is a WARN-only
+/// discoverability check — a legacy-owned beacon (the stage drift, where it was
+/// owned by an old testnet PUH) is surfaced during the dry run rather than
+/// silently passing. Any remediation is a separate, hand-reviewed transaction
+/// set (old-PUH / old-EmergencyUpgradeBoard path), never part of the v31
+/// upgrade scripts. Read failures degrade to a warning so the check never
+/// blocks a verification.
+async fn verify_v31_ntv_beacon_owner(verifiers: &Verifiers, result: &mut VerificationResult) {
+    let provider = verifiers.network_verifier.get_l1_provider();
+    let bridgehub = BridgehubContract::new(verifiers.bridgehub_address, provider.clone());
+    let asset_router = match bridgehub.assetRouter().call().await {
+        Ok(addr) => addr,
+        Err(err) => {
+            result.report_warn(&format!(
+                "Skipping NTV beacon owner check: Bridgehub.assetRouter() failed: {err}"
+            ));
+            return;
+        }
+    };
+    let ntv = match L1AssetRouter::new(asset_router, provider.clone())
+        .nativeTokenVault()
+        .call()
+        .await
+    {
+        Ok(addr) => addr,
+        Err(err) => {
+            result.report_warn(&format!(
+                "Skipping NTV beacon owner check: AssetRouter.nativeTokenVault() failed: {err}"
+            ));
+            return;
+        }
+    };
+    let beacon = match NativeTokenVault::new(ntv, provider.clone())
+        .bridgedTokenBeacon()
+        .call()
+        .await
+    {
+        Ok(addr) => addr,
+        Err(err) => {
+            result.report_warn(&format!(
+                "Skipping NTV beacon owner check: NativeTokenVault.bridgedTokenBeacon() failed: {err}"
+            ));
+            return;
+        }
+    };
+    match Ownable::new(beacon, provider.clone()).owner().call().await {
+        Ok(owner) if owner == verifiers.bridgehub_owner => result.report_ok(&format!(
+            "NTV bridgedTokenBeacon() ({beacon}) is owned by the ecosystem governance ({owner})"
+        )),
+        Ok(owner) => result.report_warn(&format!(
+            "NTV bridgedTokenBeacon() ({beacon}) owner is {owner}, not the ecosystem governance \
+             ({}) — historical ownership drift; remediate via a separate reviewed transaction set, \
+             not the v31 upgrade scripts",
+            verifiers.bridgehub_owner
+        )),
+        Err(err) => result.report_warn(&format!(
+            "Skipping NTV beacon owner check: bridgedTokenBeacon().owner() failed: {err}"
+        )),
+    }
 }
 
 async fn verify_l1_chain_id(verifiers: &Verifiers, result: &mut VerificationResult) {

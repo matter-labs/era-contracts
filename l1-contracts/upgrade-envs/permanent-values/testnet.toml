@@ -48,14 +48,16 @@ rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 # Testnet is currently pre-v31 (Atlas on v30, Era on v29) — overrides are required
 # because the v31 getters (`ctm.isZKsyncOS()`, `ctm.L1_BYTECODES_SUPPLIER()`) don't
 # exist on either CTM yet.
-# CTM order — KEPT AS Atlas/ZKsyncOS-first. NOTE: stage's permanent-values lists
-# Era first and passes PUVT, so Era-first is the apparent convention; but
-# re-preparing testnet with Era-first regressed PUVT from 3 → 36 errors with a
-# stage-1 cascade ("Too many calls: 24 vs 23", acceptOwnership/setAssetTracker
-# misalignment) — i.e. testnet's stage-1 structure differs from PUVT's
-# expectation in a way that ordering alone doesn't resolve. Left Atlas-first
-# (the cleaner base: only the stage-0 timer-order check + the Atlas-VT owner
-# remain) pending deliberate investigation of the testnet stage-1 difference.
+# CTM order is cosmetic for PUVT: stage-0 timer matching and the stage-1 per-CTM
+# blocks are matched by target (each CTM's upgrade timer), not by position, so
+# Atlas-first vs Era-first does not change the result (see governance_stage_calls
+# stage0.rs / stage1.rs `find_ctm_block_start`). The committed Atlas-first
+# artifact passes PUVT structurally — stage-0/1/2 call counts all match.
+# The one live-state residual a reviewer should expect is the Atlas CTM + Atlas
+# ValidatorTimelock ownership transfer to the PUH being DEFERRED to the stage-0
+# acceptOwnership calls: until those execute, both are owned by the legacy zkOS
+# Governance (0xcf96aAb0…), so PUVT accepts `pendingOwner == PUH` rather than a
+# completed transfer.
 [[ctm_contracts.ctms]]
 # Atlas (ZKsyncOS) CTM (witness chain: 8022833, v30)
 # rollup_da_manager queried via `chain.getRollupDAManager()` on chain 8022833's

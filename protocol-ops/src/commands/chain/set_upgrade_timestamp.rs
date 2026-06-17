@@ -45,6 +45,38 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     let new_protocol_version = parse_u256_arg(&args.new_protocol_version)?;
     let upgrade_timestamp = parse_u256_arg(&args.upgrade_timestamp)?;
 
+    // Guard: `ChainAdmin.setUpgradeTimestamp`'s first argument is the *packed*
+    // target protocol version (e.g. v31 = 0x1f00000000), not the chain id. A
+    // packed version always has a non-zero minor/major field (>= 2^32); every
+    // chain id here fits in the low 32 bits. Reject the classic "chain id in the
+    // version slot" mistake (the stage `6475` decode confusion) before it is
+    // scheduled against the wrong key.
+    anyhow::ensure!(
+        new_protocol_version >= U256::from(1u64 << 32),
+        "new protocol version {new_protocol_version} (0x{new_protocol_version:x}) looks like a \
+         chain id, not a packed protocol version — pass the packed target version \
+         (e.g. v31 = 0x1f00000000 = 133143986176), not the chain id {chain_id}"
+    );
+
+    // Guard: a zero or past timestamp makes the upgrade immediately due,
+    // removing the ServerNotifier observation window. Warn (do not fail) so a
+    // deliberately-immediate schedule is still possible.
+    let now_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    if upgrade_timestamp.is_zero() {
+        logger::warn(
+            "upgrade timestamp is 0 — the chain upgrade is immediately due; the server gets no \
+             observation window for the ServerNotifier event",
+        );
+    } else if upgrade_timestamp < U256::from(now_secs) {
+        logger::warn(format!(
+            "upgrade timestamp {upgrade_timestamp} is in the past (now {now_secs}) — the chain \
+             upgrade is immediately due"
+        ));
+    }
+
     let admin_address =
         crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
             .await

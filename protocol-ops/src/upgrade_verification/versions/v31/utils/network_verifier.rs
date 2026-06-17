@@ -61,6 +61,11 @@ sol! {
     }
 
     #[sol(rpc)]
+    contract NativeTokenVault {
+        function bridgedTokenBeacon() external view returns (address);
+    }
+
+    #[sol(rpc)]
     contract ChainTypeManager {
         function getHyperchain(uint256 _chainId) public view returns (address);
         address public validatorTimelockPostV29;
