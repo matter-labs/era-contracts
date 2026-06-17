@@ -21,8 +21,14 @@ Inside the `[ctms.zksync_os]` section of a prepared upgrade output (e.g.
 | `chain_upgrade_diamond_cut`               | upgrade data          | the upgrade `DiamondCutData` → `ProposedUpgrade` → L2 upgrade tx |
 | `contracts_config.diamond_cut_data`       | chain-creation params | left **unchanged** (it embeds no bytecode descriptor)            |
 
-Only two on-chain descriptors actually changed and are referenced by the ZKsync
-OS CTM data:
+### Which contracts are actually affected
+
+The scripts do **not** hard-code a contract list. Forge reconstructs the data
+from scratch from the real artifacts, and the TypeScript verifier enumerates
+every contract whose descriptor is embedded (all ten `FixedForceDeploymentsData`
+slots + the v31 delegate) and updates any whose embedded descriptor differs from
+`AllContractsHashes.json`. On the current stage env this resolves to exactly two
+contracts:
 
 - **`L2AssetTracker`** — force-deployed via `FixedForceDeploymentsData.assetTrackerBytecodeInfo`.
   Appears in `force_deployments_data` and (twice) in `chain_upgrade_diamond_cut`
@@ -35,9 +41,19 @@ OS CTM data:
 
 The other contracts whose bytecode changed in the PR (`L2ComplexUpgrader`,
 `L2GenesisUpgrade`, `L2GenesisForceDeploymentsHelper`,
-`L2V30TestnetSystemProxiesUpgrade`) are genesis-only and are **not** referenced
-by the ZKsync OS CTM data, so there is nothing to patch for them. Both scripts
-assert this (no stale reference may remain).
+`L2V30TestnetSystemProxiesUpgrade`) are genesis-only: they run during chain
+genesis and are baked into the off-chain-computed `genesisRoot` /
+`genesisBatchCommitment`, not embedded as bytecode descriptors in the CTM
+chain-creation params or upgrade data. They are **not** in the ZKsync OS force
+deployments (`SystemContractsProcessing.getBaseZKsyncOSForceDeployments` /
+`getFixedAddressCoreContracts`) nor in the upgrade `factoryDeps`, so there is
+nothing to patch for them here. This is proven, not assumed: because the forge
+script rebuilds the data from scratch and its output is byte-identical to the
+TypeScript byte-patch (which only touches the differing descriptors), any
+contract referenced by the data that had changed would have made the two outputs
+diverge. The TypeScript completeness check additionally asserts that **every**
+bytecode reference in the patched data resolves to a hash present in
+`AllContractsHashes.json`, so a missed contract would fail loudly.
 
 A ZKsync OS bytecode descriptor is `abi.encode(bytes32 blake2s, uint32 length,
 bytes32 keccak256)` (see `contracts/common/libraries/ZKSyncOSBytecodeInfo.sol`).
@@ -46,19 +62,31 @@ offset, so the patch is a layout-preserving in-place substitution.
 
 ## The two scripts
 
-### 1. Forge — `PatchZkosCtmAssetTracker.s.sol` (bytecode-based)
+### 1. Forge — `PatchZkosCtmAssetTracker.s.sol` (bytecode-based, from scratch)
 
-Inspired by the CTM upgrade scripts (`CTMUpgrade_v31`). It:
+Inspired by the CTM upgrade scripts (`CTMUpgrade_v31`). It **reconstructs the
+CTM data from scratch** out of the real compiled artifacts, using the same code
+paths as the real upgrade:
 
-1. fetches the existing ZKsync OS chain-creation params / upgrade data from the
-   prepared output (so facets and everything else are untouched);
-2. **reconstructs** the new `L2AssetTracker` / `L2V31Upgrade` descriptors from the
-   actual compiled deployed bytecode (`out/`), hashing with the same
-   `scripts/blake2s256.js` helper and `keccak256` the upgrade flow uses;
-3. **sends the message to the bytecode supplier** — `BytecodesSupplier.publishEVMBytecodes`
-   for the two changed bytecodes (broadcast only with `BROADCAST=true`);
-4. regenerates the full ZKsync OS CTM data and writes it to
+1. `force_deployments_data` is rebuilt as a fresh `FixedForceDeploymentsData`:
+   the non-bytecode config (chain ids, addresses, `zkTokenAssetId`, …) is taken
+   from the prepared output, and **every** bytecode descriptor is recomputed from
+   `out/` via `CoreOnGatewayHelper.resolve` + `Utils.getZKOSProxyUpgradeBytecodeInfo`
+   (exactly as `DeployCTM._buildForceDeploymentsData`);
+2. `chain_upgrade_diamond_cut`'s L2 transaction is rebuilt from
+   `SystemContractsProcessing.getBaseZKsyncOSForceDeployments()` + the v31 unsafe
+   delegate + `CoreOnGatewayHelper.getFullListOfFactoryDependencies()` (the
+   `factoryDeps`), mirroring `CTMUpgrade_v31`. The facet cuts, init address and
+   every non-bytecode scalar field are kept from the prepared output — **facets
+   are not changed**;
+3. it **sends the message to the bytecode supplier** —
+   `BytecodesSupplier.publishEVMBytecodes` for the changed bytecodes (broadcast
+   only with `BROADCAST=true`);
+4. writes the regenerated ZKsync OS CTM data to
    `script-out/zkos-ctm-asset-tracker-patch.forge.json`.
+
+Because it reconstructs from the live force-deployment / factory-dep builders,
+any affected contract is picked up automatically — there is no hard-coded list.
 
 ```bash
 cd l1-contracts
@@ -73,12 +101,14 @@ forge script deploy-scripts/upgrade/v31/PatchZkosCtmAssetTracker.s.sol --ffi --s
 > a different toolchain emits different solc metadata and the deployed-bytecode
 > hashes would not match `AllContractsHashes.json`.
 
-### 2. TypeScript — `scripts/patch-zkos-ctm-asset-tracker.ts` (hashes-only)
+### 2. TypeScript — `scripts/patch-zkos-ctm-asset-tracker.ts` (hashes-only, byte-level)
 
-Does the same patch but **never touches the bytecode**. It decodes the existing
-chain-creation params / upgrade data, locates every descriptor that involved the
-old upgrade, rewrites them to the new hashes taken **only from
-`AllContractsHashes.json`**, and double-checks that:
+Produces the same blobs but **never touches the bytecode**. It decodes the
+existing chain-creation params / upgrade data, enumerates every embedded
+descriptor (all ten `FixedForceDeploymentsData` slots + the v31 delegate),
+compares each to `AllContractsHashes.json`, and byte-patches the ones that differ
+(descriptor + the matching `factoryDeps` keccak, plus the recomputed v31 delegate
+address). It then double-checks that:
 
 - every stale descriptor / keccak / delegate address has been replaced, and
 - every bytecode reference in the patched data resolves to a hash present in
@@ -98,10 +128,12 @@ Environment overrides (both scripts): `ECOSYSTEM_TOML`, `HASHES_JSON` (TS only),
 
 ## Verifying the two scripts match
 
-The forge script derives the new hashes from the **real bytecode**; the TS
-script reads them from **`AllContractsHashes.json`**. If they produce identical
-ZKsync OS CTM data, then the hashes file is consistent with the artifacts and the
-patch is complete. Reproduce end-to-end with:
+The forge script reconstructs the data from the **real bytecode**; the TS script
+byte-patches it from **`AllContractsHashes.json`**. The two approaches are
+independent, so identical output proves three things at once: the hashes file is
+consistent with the artifacts, the reconstruction matches the original generation
+logic, and the patch is complete (no affected contract was missed). Reproduce
+end-to-end with:
 
 ```bash
 cd l1-contracts

@@ -10,12 +10,17 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ProposedUpgrade} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
+import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 
 import {Utils} from "../../utils/Utils.sol";
 import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
+import {CoreContract} from "../../ecosystem/CoreContract.sol";
+import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
+import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 
 /// @notice Patch (bytecode-based) for the ZKsync OS chain type manager (CTM)
 ///         upgrade data, motivated by https://github.com/matter-labs/era-contracts/pull/2224.
@@ -30,12 +35,24 @@ import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 /// It is the bytecode-driven counterpart of the hashes-only TypeScript script
 /// `scripts/patch-zkos-ctm-asset-tracker.ts`. Like the CTM upgrade scripts
 /// (e.g. `CTMUpgrade_v31`), it (a) sends the changed bytecodes to the
-/// `BytecodesSupplier`, and (b) regenerates the full CTM data. Crucially it does
-/// NOT change facets: the existing chain-creation params and the upgrade cut are
-/// fetched from the prepared upgrade output and only their bytecode descriptors
-/// are rewritten, derived from the actual compiled bytecode (never the hashes
-/// file). Running this and the TypeScript verifier and diffing the outputs
-/// proves that `AllContractsHashes.json` is consistent with the artifacts.
+/// `BytecodesSupplier`, and (b) **reconstructs the full CTM data from scratch**:
+///   - `force_deployments_data` is rebuilt as a fresh `FixedForceDeploymentsData`
+///     whose every bytecode descriptor is recomputed from the compiled artifacts
+///     via the same `Utils`/`CoreOnGatewayHelper` helpers as
+///     `DeployCTM._buildForceDeploymentsData`;
+///   - the `chain_upgrade_diamond_cut` L2 transaction is rebuilt from the live
+///     `SystemContractsProcessing.getBaseZKsyncOSForceDeployments()` +
+///     `CoreOnGatewayHelper.getFullListOfFactoryDependencies()`, mirroring
+///     `CTMUpgrade_v31`.
+///
+/// Crucially it does NOT change facets: the existing facet cuts, the diamond
+/// init address and every non-bytecode scalar field are fetched from the prepared
+/// upgrade output and reused verbatim. Only the bytecode-derived parts are
+/// reconstructed (from the actual compiled bytecode, never the hashes file). The
+/// TypeScript verifier instead byte-patches the same blobs using only
+/// `AllContractsHashes.json`; diffing the two outputs proves that
+/// `AllContractsHashes.json` is consistent with the artifacts and that the patch
+/// is complete.
 ///
 /// Usage (from `l1-contracts`, requires `--ffi` for the Blake2s256 helper):
 ///   forge script deploy-scripts/upgrade/v31/PatchZkosCtmAssetTracker.s.sol \
@@ -147,30 +164,120 @@ contract PatchZkosCtmAssetTracker is Script {
         console.log("  v31 delegate", _ctx.delegateOld, "->", _ctx.delegateNew);
     }
 
-    function _regenerate(Ctx memory _ctx) internal pure {
-        // force_deployments_data: only the asset-tracker descriptor.
-        _ctx.newForceDeploymentsData = _replace(
-            _ctx.forceDeploymentsData,
-            _ctx.assetTrackerOld.encoded,
-            _ctx.assetTrackerNew.encoded,
-            1
+    function _regenerate(Ctx memory _ctx) internal {
+        _ctx.newForceDeploymentsData = _reconstructForceDeploymentsData(_ctx.forceDeploymentsData);
+        _ctx.newChainUpgradeDiamondCut = _reconstructUpgradeCut(_ctx);
+    }
+
+    // ------------------------------------------------------------------------
+    // From-scratch reconstruction (same code paths as the CTM upgrade scripts)
+    // ------------------------------------------------------------------------
+
+    /// @notice Rebuild `FixedForceDeploymentsData` from scratch: keep the
+    ///         non-bytecode config from the prepared upgrade, recompute every
+    ///         bytecode descriptor from the compiled artifacts. Mirrors
+    ///         `DeployCTM._buildForceDeploymentsData` for ZKsyncOS.
+    function _reconstructForceDeploymentsData(bytes memory _oldFfd) internal returns (bytes memory) {
+        FixedForceDeploymentsData memory data = abi.decode(_oldFfd, (FixedForceDeploymentsData));
+        data.bridgehubBytecodeInfo = _coreBytecodeInfo(CoreContract.L2Bridgehub);
+        data.l2AssetRouterBytecodeInfo = _coreBytecodeInfo(CoreContract.L2AssetRouter);
+        data.l2NtvBytecodeInfo = _coreBytecodeInfo(CoreContract.L2NativeTokenVault);
+        data.messageRootBytecodeInfo = _coreBytecodeInfo(CoreContract.L2MessageRoot);
+        data.beaconDeployerInfo = _coreBytecodeInfo(CoreContract.UpgradeableBeaconDeployer);
+        data.baseTokenHolderBytecodeInfo = _coreBytecodeInfo(CoreContract.BaseTokenHolder);
+        data.chainAssetHandlerBytecodeInfo = _coreBytecodeInfo(CoreContract.L2ChainAssetHandler);
+        data.interopCenterBytecodeInfo = _coreBytecodeInfo(CoreContract.InteropCenter);
+        data.interopHandlerBytecodeInfo = _coreBytecodeInfo(CoreContract.InteropHandler);
+        data.assetTrackerBytecodeInfo = _coreBytecodeInfo(CoreContract.L2AssetTracker);
+        return abi.encode(data);
+    }
+
+    /// @dev ZKsyncOS proxy-upgrade bytecode info for a fixed-address core contract,
+    ///      resolved + hashed exactly like `DeployCTM._getBytecodeInfo`.
+    function _coreBytecodeInfo(CoreContract _id) internal returns (bytes memory) {
+        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, _id);
+        return Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
+    }
+
+    /// @notice Rebuild the ZKsyncOS upgrade `DiamondCutData` from scratch. Facet
+    ///         cuts / init address / scalar fields are taken from the prepared
+    ///         upgrade (facets are NOT changed); the L2 upgrade transaction's
+    ///         force deployments, factory deps and delegate are reconstructed.
+    function _reconstructUpgradeCut(Ctx memory _ctx) internal returns (bytes memory) {
+        Diamond.DiamondCutData memory cut = abi.decode(_ctx.chainUpgradeDiamondCut, (Diamond.DiamondCutData));
+        ProposedUpgrade memory proposed = abi.decode(_sliceFromSelector(cut.initCalldata), (ProposedUpgrade));
+
+        // `ctmDeploymentTracker` is an ecosystem address, taken from the existing
+        // v31 L2 upgrade calldata (not derived from bytecode).
+        (, , bytes memory oldInner) = abi.decode(
+            _sliceFromSelector(proposed.l2ProtocolUpgradeTx.data),
+            (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes)
+        );
+        (, address ctmDeploymentTracker, , ) = abi.decode(_sliceFromSelector(oldInner), (bool, address, bytes, bytes));
+
+        // Reconstruct the force-deployment list exactly as CTMUpgrade_v31 does:
+        // base ZKsyncOS system-proxy upgrades + the single v31 unsafe delegate.
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = SystemContractsProcessing
+            .mergeUniversalForceDeployments(
+                SystemContractsProcessing.getBaseZKsyncOSForceDeployments(),
+                _v31AdditionalForceDeployments()
+            );
+
+        bytes memory v31Info = Utils.getZKOSBytecodeInfoForContract(V31_UPGRADE_FILE, V31_UPGRADE_NAME);
+        address delegateTo = L2GenesisForceDeploymentsHelper.generateRandomAddress(v31Info);
+
+        // Inner v31 calldata embeds the freshly reconstructed force deployments data.
+        bytes memory inner = abi.encodeCall(
+            IL2V31Upgrade.upgrade,
+            (true, ctmDeploymentTracker, _ctx.newForceDeploymentsData, "")
+        );
+        proposed.l2ProtocolUpgradeTx.data = abi.encodeCall(
+            IComplexUpgrader.forceDeployAndUpgradeUniversal,
+            (deployments, delegateTo, inner)
         );
 
-        // chain_upgrade_diamond_cut: descriptors (2x asset tracker, 1x v31), the
-        // standalone keccak hashes in `factoryDeps`, and the derived delegate
-        // address (2 spots). Descriptors are replaced first so the keccak inside
-        // them is rewritten as part of the descriptor.
-        bytes memory cut = _ctx.chainUpgradeDiamondCut;
-        cut = _replace(cut, _ctx.assetTrackerOld.encoded, _ctx.assetTrackerNew.encoded, 2);
-        cut = _replace(cut, _ctx.v31Old.encoded, _ctx.v31New.encoded, 1);
-        cut = _replace(cut, bytes.concat(_ctx.assetTrackerOld.keccak), bytes.concat(_ctx.assetTrackerNew.keccak), 1);
-        cut = _replace(cut, bytes.concat(_ctx.v31Old.keccak), bytes.concat(_ctx.v31New.keccak), 1);
-        cut = _replace(cut, abi.encodePacked(_ctx.delegateOld), abi.encodePacked(_ctx.delegateNew), 2);
-        _ctx.newChainUpgradeDiamondCut = cut;
+        // Reconstruct factory deps from the full dependency list (keccak per dep,
+        // matching BytecodePublisher for ZKsyncOS).
+        CoreContract[] memory additional = new CoreContract[](1);
+        additional[0] = CoreContract.L2V31Upgrade;
+        bytes[] memory deps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(true, additional);
+        uint256[] memory factoryDeps = new uint256[](deps.length);
+        for (uint256 i; i < deps.length; i++) {
+            factoryDeps[i] = uint256(keccak256(deps[i]));
+        }
+        proposed.l2ProtocolUpgradeTx.factoryDeps = factoryDeps;
+
+        cut.initCalldata = abi.encodeCall(DefaultUpgrade.upgrade, (proposed));
+        return abi.encode(cut);
+    }
+
+    /// @dev Mirrors `CTMUpgrade_v31.getV31AdditionalZKsyncOSUniversalForceDeployments`.
+    function _v31AdditionalForceDeployments()
+        internal
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory additional)
+    {
+        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract(V31_UPGRADE_FILE, V31_UPGRADE_NAME);
+        additional = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
+        additional[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
+            upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
+            deployedBytecodeInfo: bytecodeInfo,
+            newAddress: L2GenesisForceDeploymentsHelper.generateRandomAddress(bytecodeInfo)
+        });
     }
 
     function _doubleCheck(Ctx memory _ctx) internal pure {
-        // No stale reference may survive.
+        // The reconstructed data must carry the NEW descriptors...
+        require(
+            _indexOf(_ctx.newForceDeploymentsData, _ctx.assetTrackerNew.encoded, 0) != type(uint256).max,
+            "reconstructed force deployments missing new asset tracker"
+        );
+        require(
+            _indexOf(_ctx.newChainUpgradeDiamondCut, _ctx.assetTrackerNew.encoded, 0) != type(uint256).max &&
+                _indexOf(_ctx.newChainUpgradeDiamondCut, _ctx.v31New.encoded, 0) != type(uint256).max,
+            "reconstructed upgrade cut missing new descriptors"
+        );
+
+        // ...and none of the stale descriptors / keccaks / delegate address.
         _assertAbsent(_ctx.newForceDeploymentsData, _ctx.assetTrackerOld);
         _assertAbsent(_ctx.newChainUpgradeDiamondCut, _ctx.assetTrackerOld);
         _assertAbsent(_ctx.newChainUpgradeDiamondCut, _ctx.v31Old);
@@ -263,36 +370,8 @@ contract PatchZkosCtmAssetTracker is Script {
     }
 
     // ------------------------------------------------------------------------
-    // Byte-accurate, layout-preserving substitution
+    // Verification helpers
     // ------------------------------------------------------------------------
-
-    /// @dev Replaces every occurrence of `_old` with `_new` (equal length) in
-    ///      `_data`, asserting exactly `_expected` occurrences. Equal lengths
-    ///      keep every ABI offset intact (only the descriptor contents change).
-    function _replace(
-        bytes memory _data,
-        bytes memory _old,
-        bytes memory _new,
-        uint256 _expected
-    ) internal pure returns (bytes memory) {
-        require(_old.length == _new.length, "substitution length mismatch");
-        bytes memory out = bytes.concat(_data); // copy
-        uint256 count;
-        uint256 from;
-        while (true) {
-            uint256 idx = _indexOf(out, _old, from);
-            if (idx == type(uint256).max) {
-                break;
-            }
-            for (uint256 j; j < _new.length; j++) {
-                out[idx + j] = _new[j];
-            }
-            count++;
-            from = idx + _new.length;
-        }
-        require(count == _expected, "unexpected occurrence count");
-        return out;
-    }
 
     /// @dev Returns the first index of `_needle` in `_haystack` at or after
     ///      `_start`, or `type(uint256).max` if not found.
