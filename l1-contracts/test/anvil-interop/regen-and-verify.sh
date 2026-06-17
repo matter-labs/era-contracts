@@ -208,7 +208,7 @@ else
     --disable-block-gas-limit \
     --gas-price 1000000000 \
     --fork-url "$L1_FORK_URL" \
-    "${FORK_BLOCK_ARG[@]}" \
+    ${FORK_BLOCK_ARG[@]+"${FORK_BLOCK_ARG[@]}"} \
     >"$OUT/anvil.log" 2>&1 &
   ANVIL_PID=$!
   for _ in $(seq 1 30); do

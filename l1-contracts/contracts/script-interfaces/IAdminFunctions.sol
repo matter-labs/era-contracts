@@ -42,7 +42,8 @@ interface IAdminFunctions {
     function ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps(
         address bridgehub,
         address governance,
-        OwnerWrap[] calldata wraps
+        OwnerWrap[] calldata wraps,
+        address[] calldata rollupDAManagers
     ) external;
 
     function executeOwnableCallsWithWraps(bytes calldata _callsToExecute, OwnerWrap[] calldata _wraps) external;

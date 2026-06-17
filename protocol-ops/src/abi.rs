@@ -35,6 +35,14 @@ abigen!(
 );
 
 abigen!(
+    RollupDAManagerAbi,
+    r#"[
+        function isPairAllowed(address _l1DAValidator, uint8 _l2DACommitmentScheme) view returns (bool)
+    ]"#,
+    event_derives(serde::Deserialize, serde::Serialize)
+);
+
+abigen!(
     ZkChainAbi,
     "../l1-contracts/zkstack-out/IZKChain.sol/IZKChain.json",
     event_derives(serde::Deserialize, serde::Serialize)

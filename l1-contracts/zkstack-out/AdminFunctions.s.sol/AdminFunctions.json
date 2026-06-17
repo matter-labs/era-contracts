@@ -360,6 +360,11 @@
             "internalType": "uint8"
           }
         ]
+      },
+      {
+        "name": "_rollupDAManagers",
+        "type": "address[]",
+        "internalType": "address[]"
       }
     ],
     "outputs": [],

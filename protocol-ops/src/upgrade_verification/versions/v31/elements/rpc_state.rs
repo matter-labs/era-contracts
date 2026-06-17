@@ -11,8 +11,8 @@ use crate::upgrade_verification::{
             fee_param_verifier::{FeeParamVerifier, FeeParams},
             network_verifier::{
                 Bridgehub as BridgehubContract, ChainRegistrationSender, ChainTypeManager,
-                L1AssetRouter, L1AssetTracker, Ownable, Ownable2Step, ValidatorTimelock,
-                ZKChainFeeParams,
+                L1AssetRouter, L1AssetTracker, NativeTokenVault, Ownable, Ownable2Step,
+                ValidatorTimelock, ZKChainFeeParams,
             },
         },
         MAX_PRIORITY_TX_GAS_LIMIT, STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID,
@@ -162,13 +162,79 @@ pub(crate) async fn verify_v31_artifact_state(
     verify_v31_proxy_admins(artifact, verifiers, result).await?;
     verify_v31_core_wiring(artifact, verifiers, result).await?;
     verify_v31_validator_timelocks(artifact, verifiers, result).await?;
+    verify_v31_rollup_da_manager_ownership(artifact, verifiers, result).await?;
     verify_v31_era_fee_params(verifiers, result).await;
     verify_v31_timer_admin_state(artifact, verifiers, result).await?;
     verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await?;
     verify_v31_ctm_flavor(artifact, verifiers, result).await?;
     verify_v31_chain_settlement_layers(verifiers, result).await;
+    verify_v31_ntv_beacon_owner(verifiers, result).await;
 
     Ok(())
+}
+
+/// Discoverable-ownership audit: report whether the NativeTokenVault
+/// bridged-token beacon is owned by the ecosystem governance (PUH).
+///
+/// The v31 upgrade does NOT touch this beacon, so this is a WARN-only
+/// discoverability check — a legacy-owned beacon (the stage drift, where it was
+/// owned by an old testnet PUH) is surfaced during the dry run rather than
+/// silently passing. Any remediation is a separate, hand-reviewed transaction
+/// set (old-PUH / old-EmergencyUpgradeBoard path), never part of the v31
+/// upgrade scripts. Read failures degrade to a warning so the check never
+/// blocks a verification.
+async fn verify_v31_ntv_beacon_owner(verifiers: &Verifiers, result: &mut VerificationResult) {
+    let provider = verifiers.network_verifier.get_l1_provider();
+    let bridgehub = BridgehubContract::new(verifiers.bridgehub_address, provider.clone());
+    let asset_router = match bridgehub.assetRouter().call().await {
+        Ok(addr) => addr,
+        Err(err) => {
+            result.report_warn(&format!(
+                "Skipping NTV beacon owner check: Bridgehub.assetRouter() failed: {err}"
+            ));
+            return;
+        }
+    };
+    let ntv = match L1AssetRouter::new(asset_router, provider.clone())
+        .nativeTokenVault()
+        .call()
+        .await
+    {
+        Ok(addr) => addr,
+        Err(err) => {
+            result.report_warn(&format!(
+                "Skipping NTV beacon owner check: AssetRouter.nativeTokenVault() failed: {err}"
+            ));
+            return;
+        }
+    };
+    let beacon = match NativeTokenVault::new(ntv, provider.clone())
+        .bridgedTokenBeacon()
+        .call()
+        .await
+    {
+        Ok(addr) => addr,
+        Err(err) => {
+            result.report_warn(&format!(
+                "Skipping NTV beacon owner check: NativeTokenVault.bridgedTokenBeacon() failed: {err}"
+            ));
+            return;
+        }
+    };
+    match Ownable::new(beacon, provider.clone()).owner().call().await {
+        Ok(owner) if owner == verifiers.bridgehub_owner => result.report_ok(&format!(
+            "NTV bridgedTokenBeacon() ({beacon}) is owned by the ecosystem governance ({owner})"
+        )),
+        Ok(owner) => result.report_warn(&format!(
+            "NTV bridgedTokenBeacon() ({beacon}) owner is {owner}, not the ecosystem governance \
+             ({}) — historical ownership drift; remediate via a separate reviewed transaction set, \
+             not the v31 upgrade scripts",
+            verifiers.bridgehub_owner
+        )),
+        Err(err) => result.report_warn(&format!(
+            "Skipping NTV beacon owner check: bridgedTokenBeacon().owner() failed: {err}"
+        )),
+    }
 }
 
 async fn verify_l1_chain_id(verifiers: &Verifiers, result: &mut VerificationResult) {
@@ -616,6 +682,54 @@ async fn verify_v31_validator_timelocks(
             )),
             Err(err) => result.report_error(&format!(
                 "Failed to call {label}.ValidatorTimelock.executionDelay(): {err}"
+            )),
+        }
+    }
+    Ok(())
+}
+
+/// Verify each CTM's RollupDAManager is (or is becoming) governance-owned.
+///
+/// v31 transfers each per-CTM RollupDAManager to governance via an Ownable2Step
+/// handoff whose `acceptOwnership()` is a stage-0 governance call (not executed
+/// on this fork). Accept either a completed transfer (owner == governance) or a
+/// pending one (pendingOwner == governance, accept deferred to stage 0). This is
+/// the discoverable-ownership invariant from the stage findings: without it,
+/// post-upgrade permanent-rollup DA-pair management stays with a legacy owner.
+async fn verify_v31_rollup_da_manager_ownership(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> Result<()> {
+    let provider = verifiers.network_verifier.get_l1_provider();
+    let expected_owner = verifiers.bridgehub_owner;
+    for ctm in &artifact.ctms {
+        let label = ctm.flavor.label();
+        let scope = format!("ctms.{label}");
+        let rdm = required_address(
+            &ctm.value,
+            &scope,
+            &["deployed_addresses", "l1_rollup_da_manager"],
+        )?;
+        if rdm == Address::ZERO {
+            continue;
+        }
+        let rdm_ownable = Ownable2Step::new(rdm, provider.clone());
+        match (
+            rdm_ownable.owner().call().await,
+            rdm_ownable.pendingOwner().call().await,
+        ) {
+            (Ok(owner), _) if owner == expected_owner => result.report_ok(&format!(
+                "{label}.RollupDAManager.owner() matches governance ({expected_owner})"
+            )),
+            (Ok(_), Ok(pending)) if pending == expected_owner => result.report_ok(&format!(
+                "{label}.RollupDAManager ownership transfer to {expected_owner} is pending (acceptOwnership deferred to stage 0)"
+            )),
+            (Ok(owner), _) => result.report_error(&format!(
+                "{label}.RollupDAManager.owner() mismatch: expected {expected_owner} (or pendingOwner), got {owner}"
+            )),
+            (Err(err), _) => result.report_error(&format!(
+                "Failed to call {label}.RollupDAManager.owner(): {err}"
             )),
         }
     }

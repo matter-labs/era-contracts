@@ -55,7 +55,12 @@ bootloader_hash = "0x01000911c4db4fe62c98e180cfa7e9b3a22fb15f505905d4bf36192f481
 default_aa_hash = "0x010005f73e7c299ed73db937843643bdc276cbc2cc8596287e1e0cf3afc60252"
 evm_emulator_hash = "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63"
 bridgehub_proxy_address = "0xc4FD2580C3487bba18D63f50301020132342fdbD"
-rollup_da_manager = "0xB168490e38E5E7e1B8eB256a701Ee8314Cbf0E15"
+# No top-level `rollup_da_manager` here: v31 sources the RollupDAManager
+# per-CTM from permanent-values/testnet.toml `[[ctm_contracts.ctms]]`
+# (Era 0x6b7D8FD12eF94485c8E928a055124F94C2B5d411, Atlas
+# 0xC90E4E4897421E9380d734b72221f5485C3fd116). A single env-wide value (carried
+# over from the pre-v31 single-CTM Era flow) is unused in v31 and ambiguous
+# across the two CTMs, so it is intentionally omitted.
 
 # Env-stable testnet security council (carried forward from v0.29/v0.30 testnet
 # configs; not the PUH's securityCouncil()).

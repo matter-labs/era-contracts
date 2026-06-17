@@ -116,6 +116,66 @@ async fn run_one(
         crate::common::l1_contracts::resolve_zk_chain(&runner.rpc_url, bridgehub, chain_id)
             .await
             .context("resolving chain diamond proxy from L1")?;
+
+    // Read-only pre-flights before generating the upgrade calldata. These catch
+    // two failure modes that otherwise surface as cryptic, late errors:
+    //
+    //   - committed == executed: the v31 migration (SettlementLayerV31UpgradeBase)
+    //     assumes no committed-but-unexecuted batches at upgrade time.
+    //   - source-version readiness: the CTM must hold an upgrade cut for the
+    //     chain's *current* protocol version, else `upgradeChainFromVersion`
+    //     reverts with an opaque `NoLogsFound`.
+    let (committed, executed) =
+        crate::common::l1_contracts::resolve_total_batches_committed_executed(
+            &runner.rpc_url,
+            chain_address,
+        )
+        .await
+        .context("reading batch counters for chain-upgrade pre-flight")?;
+    anyhow::ensure!(
+        committed == executed,
+        "chain {chain_id}: cannot upgrade with unexecuted batches \
+         (committed={committed}, executed={executed}); wait until committed == executed \
+         (chain diamond {chain_address:#x})"
+    );
+
+    let ctm = crate::common::l1_contracts::resolve_ctm_proxy(&runner.rpc_url, bridgehub, chain_id)
+        .await
+        .context("resolving CTM for chain-upgrade source-version pre-flight")?;
+    let source_version =
+        crate::common::l1_contracts::resolve_chain_protocol_version(&runner.rpc_url, chain_address)
+            .await
+            .context("reading chain protocol version for chain-upgrade pre-flight")?;
+    let cut_hash = crate::common::l1_contracts::resolve_ctm_upgrade_cut_hash(
+        &runner.rpc_url,
+        ctm,
+        source_version,
+    )
+    .await
+    .context("reading CTM upgrade-cut hash for chain-upgrade pre-flight")?;
+    anyhow::ensure!(
+        cut_hash != [0u8; 32],
+        "chain {chain_id}: CTM {ctm:#x} has no upgrade cut registered for the chain's current \
+         protocol version {source_version} — the chain is on an unsupported source version and \
+         must be caught up (run the prior-version upgrade) before the v31 upgrade"
+    );
+
+    // ZKsync OS chains need a manual post-upgrade backfill. The v31
+    // migration sets `baseTokenHasTotalSupply` automatically only for
+    // non-ZKsync-OS chains; for ZKsync OS it stays false until the chain admin
+    // runs `setZKsyncOSPreV31TotalSupply`. Without it `totalSupply()` reverts and
+    // L1→Gateway token-balance migration is blocked. There is no tooling that
+    // computes the value, so surface the requirement explicitly here.
+    if crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm).await? {
+        logger::warn(format!(
+            "chain {chain_id} is a ZKsync OS chain: AFTER this upgrade executes, the chain admin \
+             MUST run SetZkosPreV31TotalSupply (Admin.setZKsyncOSPreV31TotalSupply) with the \
+             pre-v31 base-token total supply — derive it off-chain as \
+             totalSuccessfulDepositsFromL1 - totalWithdrawalsToL1 at the upgrade boundary. \
+             Skipping it permanently blocks totalSupply()/token-balance migration on this chain."
+        ));
+    }
+
     let admin_address =
         crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
             .await

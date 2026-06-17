@@ -386,10 +386,10 @@ async fn collect_pre_governance_accept_ownership_targets(
     governance: Address,
     result: &mut VerificationResult,
 ) -> anyhow::Result<Vec<Address>> {
-    // Candidates: each CTM proxy plus its ValidatorTimelock. v31's
-    // `ensureCtmsAndProxyAdminsOwnedByGovernance` transfers both to governance
-    // (Ownable2Step) and defers the accept to stage 0; include any whose
-    // pendingOwner is governance at prepare time.
+    // Candidates: each CTM proxy, its ValidatorTimelock, and its
+    // RollupDAManager. v31's `ensureCtmsAndProxyAdminsOwnedByGovernance`
+    // transfers all three to governance (Ownable2Step) and defers the accept to
+    // stage 0; include any whose pendingOwner is governance at prepare time.
     let mut candidates: Vec<Address> = Vec::new();
     for ctm in &artifact.ctms {
         if let Some(ctm_proxy) = required_ctm_address(
@@ -413,6 +413,13 @@ async fn collect_pre_governance_accept_ownership_targets(
         ) {
             if vt != Address::ZERO && !candidates.contains(&vt) {
                 candidates.push(vt);
+            }
+        }
+        if let Some(rdm) =
+            required_ctm_address(ctm, &["deployed_addresses", "l1_rollup_da_manager"], result)
+        {
+            if rdm != Address::ZERO && !candidates.contains(&rdm) {
+                candidates.push(rdm);
             }
         }
     }

@@ -71,6 +71,50 @@ pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
         crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
             .await
             .context("resolving chain admin from L1")?;
+
+    // Read-only pre-flight: print the current pair (a diff for the reviewer) and,
+    // for permanent rollups, the RollupDAManager allow-listing that
+    // `Admin.setDAValidatorPair` enforces. There is no public `isPermanentRollup`
+    // getter, so a disallowed pair is a WARNING here — the forge simulation below
+    // still hard-fails for an actual permanent rollup (`InvalidDAForPermanentRollup`),
+    // but this turns that opaque revert into an actionable message (the stage `499`
+    // failure mode).
+    let diamond =
+        crate::common::l1_contracts::resolve_zk_chain(&runner.rpc_url, bridgehub, chain_id)
+            .await
+            .context("resolving chain diamond proxy for DA pre-flight")?;
+    let (current_l1, current_scheme) =
+        crate::common::l1_contracts::resolve_da_validator_pair(&runner.rpc_url, diamond)
+            .await
+            .context("reading current DA validator pair for pre-flight")?;
+    logger::info(format!(
+        "Current DA validator pair: l1={current_l1:#x} scheme={current_scheme}"
+    ));
+    let rollup_da_manager =
+        crate::common::l1_contracts::resolve_rollup_da_manager(&runner.rpc_url, diamond)
+            .await
+            .context("reading chain RollupDAManager for DA pre-flight")?;
+    let pair_allowed = crate::common::l1_contracts::resolve_is_pair_allowed(
+        &runner.rpc_url,
+        rollup_da_manager,
+        args.l1_da_validator,
+        args.l2_da_commitment_scheme as u8,
+    )
+    .await
+    .context("checking isPairAllowed on the chain's RollupDAManager")?;
+    if pair_allowed {
+        logger::info(format!(
+            "DA pair allowed on RollupDAManager {rollup_da_manager:#x}"
+        ));
+    } else {
+        logger::warn(format!(
+            "DA pair (l1={:#x}, scheme={}) is NOT allowed on the chain's RollupDAManager \
+             {rollup_da_manager:#x} — if this chain is a permanent rollup, \
+             Admin.setDAValidatorPair will revert InvalidDAForPermanentRollup; allow the pair \
+             via RollupDAManager.updateDAPair first",
+            args.l1_da_validator, args.l2_da_commitment_scheme as u8
+        ));
+    }
     // `AdminFunctions.setDAValidatorPair` → `Utils.adminExecuteCalls` internally
     // `vm.startBroadcast(adminOwner)` (or the AccessControlRestriction default
     // admin when `--access-control-restriction` is set), so Forge's sender must

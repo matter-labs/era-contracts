@@ -200,7 +200,8 @@ contract AdminFunctions is Script, IAdminFunctions {
     /// supply a registry entry.
     function ensureCtmsAndProxyAdminsOwnedByGovernance(address _bridgehub, address _governance) public {
         OwnerWrap[] memory empty = new OwnerWrap[](0);
-        ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps(_bridgehub, _governance, empty);
+        address[] memory noRollupDAManagers = new address[](0);
+        ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps(_bridgehub, _governance, empty, noRollupDAManagers);
     }
 
     /// `_wraps` is a registry of contract owners that must be wrapped (since
@@ -208,10 +209,18 @@ contract AdminFunctions is Script, IAdminFunctions {
     /// no code) are broadcast directly; contract owners not present in the
     /// registry cause a hard revert so missing config surfaces immediately
     /// instead of being papered over.
+    ///
+    /// `_rollupDAManagers` are the per-CTM RollupDAManagers (resolved from
+    /// config by the caller — not discovered on-chain, since a CTM may have
+    /// legacy chains pointing at an old manager). Each is transferred to
+    /// `_governance` the same way as the CTM/ValidatorTimelock (Ownable2Step,
+    /// wrapped, accept deferred to stage 0), so post-upgrade DA-pair management
+    /// is governance-controlled rather than left with a legacy owner.
     function ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps(
         address _bridgehub,
         address _governance,
-        OwnerWrap[] memory _wraps
+        OwnerWrap[] memory _wraps,
+        address[] memory _rollupDAManagers
     ) public {
         uint256[] memory chainIds = IL1Bridgehub(_bridgehub).getAllZKChainChainIDs();
         address[] memory seenCtms = new address[](chainIds.length);
@@ -224,8 +233,9 @@ contract AdminFunctions is Script, IAdminFunctions {
         // of governance_calls in the merged ecosystem.toml. Sized to
         // chainIds.length (max possible), trimmed before serialization.
         // Sized for up to two deferred accepts per CTM (the CTM proxy + its
-        // ValidatorTimelock), each Ownable2Step transfer deferring its accept.
-        Call[] memory acceptCalls = new Call[](chainIds.length * 2);
+        // ValidatorTimelock), each Ownable2Step transfer deferring its accept,
+        // plus one per RollupDAManager.
+        Call[] memory acceptCalls = new Call[](chainIds.length * 2 + _rollupDAManagers.length);
         uint256 acceptCount = 0;
 
         for (uint256 i = 0; i < chainIds.length; i++) {
@@ -269,6 +279,37 @@ contract AdminFunctions is Script, IAdminFunctions {
             }
 
             _ensureProxyAdminOwnedByGovernance(ctm, _governance, _wraps);
+        }
+
+        // Transfer each per-CTM RollupDAManager (Ownable2Step) to governance.
+        // The managers are passed explicitly (resolved from config) rather than
+        // discovered on-chain: a CTM may carry legacy chains pointing at an old
+        // manager, whereas the value to govern is the one the v31 Admin facet
+        // embeds. Same handoff as the CTM/ValidatorTimelock — transfer now
+        // (wrapped via the current owner) and defer the acceptOwnership to
+        // stage 0. No-op when already governance-owned (e.g. an env that was
+        // already cleaned up, or a freshly deployed manager).
+        for (uint256 r = 0; r < _rollupDAManagers.length; r++) {
+            address rdm = _rollupDAManagers[r];
+            if (rdm == address(0)) {
+                continue;
+            }
+            Ownable2Step rdmOwnable = Ownable2Step(rdm);
+            if (rdmOwnable.owner() != _governance && rdmOwnable.pendingOwner() != _governance) {
+                _issueAsOwner(
+                    rdmOwnable.owner(),
+                    rdm,
+                    abi.encodeCall(Ownable2Step.transferOwnership, (_governance)),
+                    _wraps
+                );
+            }
+            if (rdmOwnable.pendingOwner() == _governance) {
+                acceptCalls[acceptCount++] = Call({
+                    target: rdm,
+                    value: 0,
+                    data: abi.encodeCall(Ownable2Step.acceptOwnership, ())
+                });
+            }
         }
 
         _savePreGovernanceAcceptOwnershipCalls(acceptCalls, acceptCount);

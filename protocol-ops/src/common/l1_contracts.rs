@@ -9,11 +9,11 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use ethers::providers::{Http, Provider};
-use ethers::types::Address;
+use ethers::types::{Address, U256};
 
 use crate::abi::{
     AccessControlDefaultAdminRulesAbi, BridgehubAbi, ChainTypeManagerBaseAbi, IChainTypeManagerAbi,
-    TestnetVerifierAbi, ZkChainAbi,
+    RollupDAManagerAbi, TestnetVerifierAbi, ZkChainAbi,
 };
 
 fn provider(rpc_url: &str) -> anyhow::Result<Arc<Provider<Http>>> {
@@ -349,6 +349,96 @@ pub async fn resolve_rollup_da_manager(
         .await
         .context("zkChain.getRollupDAManager() call failed")?;
     ensure_nonzero(manager, "zkChain.getRollupDAManager()")
+}
+
+/// Resolve `(zkChain.getTotalBatchesCommitted(), zkChain.getTotalBatchesExecuted())`.
+///
+/// The v31 chain upgrade requires `committed == executed` at upgrade time —
+/// `SettlementLayerV31UpgradeBase` migrates batch state and assumes no
+/// committed-but-unexecuted batches.
+pub async fn resolve_total_batches_committed_executed(
+    l1_rpc_url: &str,
+    zk_chain: Address,
+) -> anyhow::Result<(U256, U256)> {
+    let chain = ZkChainAbi::new(zk_chain, provider(l1_rpc_url)?);
+    let committed = chain
+        .get_total_batches_committed()
+        .call()
+        .await
+        .context("zkChain.getTotalBatchesCommitted() call failed")?;
+    let executed = chain
+        .get_total_batches_executed()
+        .call()
+        .await
+        .context("zkChain.getTotalBatchesExecuted() call failed")?;
+    Ok((committed, executed))
+}
+
+/// Resolve `zkChain.getProtocolVersion()` → the chain diamond's current packed
+/// protocol version.
+pub async fn resolve_chain_protocol_version(
+    l1_rpc_url: &str,
+    zk_chain: Address,
+) -> anyhow::Result<U256> {
+    let chain = ZkChainAbi::new(zk_chain, provider(l1_rpc_url)?);
+    chain
+        .get_protocol_version()
+        .call()
+        .await
+        .context("zkChain.getProtocolVersion() call failed")
+}
+
+/// Resolve `ctm.upgradeCutHash(protocolVersion)` → the registered upgrade-cut
+/// hash for a given *source* protocol version (zero when none is registered).
+///
+/// `Admin.upgradeChainFromVersion` / `GetDiamondCutData` look up the cut by the
+/// chain's current version; a zero hash here is the proactive signal for the
+/// otherwise-cryptic `NoLogsFound` revert — i.e. the chain is on a source
+/// version the CTM cannot upgrade and must be caught up first.
+pub async fn resolve_ctm_upgrade_cut_hash(
+    l1_rpc_url: &str,
+    ctm_proxy: Address,
+    protocol_version: U256,
+) -> anyhow::Result<[u8; 32]> {
+    let ctm = IChainTypeManagerAbi::new(ctm_proxy, provider(l1_rpc_url)?);
+    ctm.upgrade_cut_hash(protocol_version)
+        .call()
+        .await
+        .context("ctm.upgradeCutHash() call failed")
+}
+
+/// Resolve `zkChain.getDAValidatorPair()` → `(l1DAValidator, l2DACommitmentScheme)`.
+/// The scheme is the on-chain `L2DACommitmentScheme` enum encoded as `uint8`.
+pub async fn resolve_da_validator_pair(
+    l1_rpc_url: &str,
+    zk_chain: Address,
+) -> anyhow::Result<(Address, u8)> {
+    let chain = ZkChainAbi::new(zk_chain, provider(l1_rpc_url)?);
+    chain
+        .get_da_validator_pair()
+        .call()
+        .await
+        .context("zkChain.getDAValidatorPair() call failed")
+}
+
+/// Resolve `RollupDAManager.isPairAllowed(l1DAValidator, scheme)`.
+///
+/// `Admin.setDAValidatorPair` reverts `InvalidDAForPermanentRollup` when the
+/// chain is a permanent rollup and the pair is not allowed on its
+/// RollupDAManager — this read surfaces that precondition before generating
+/// calldata.
+pub async fn resolve_is_pair_allowed(
+    l1_rpc_url: &str,
+    rollup_da_manager: Address,
+    l1_da_validator: Address,
+    l2_da_commitment_scheme: u8,
+) -> anyhow::Result<bool> {
+    let manager = RollupDAManagerAbi::new(rollup_da_manager, provider(l1_rpc_url)?);
+    manager
+        .is_pair_allowed(l1_da_validator, l2_da_commitment_scheme)
+        .call()
+        .await
+        .context("RollupDAManager.isPairAllowed() call failed")
 }
 
 /// Resolve `ctm.isZKsyncOS()` → bool.
