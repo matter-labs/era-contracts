@@ -116,7 +116,15 @@ library ProcessLogsTestHelper {
             destinationBaseTokenAssetId: _destinationBaseTokenAssetId,
             interopBundleSalt: _salt,
             calls: calls,
-            bundleAttributes: BundleAttributes({executionAddress: "", unbundlerAddress: "", useFixedFee: false})
+            bundleAttributes: BundleAttributes({
+                executionAddress: "",
+                unbundlerAddress: "",
+                useFixedFee: false,
+                isAtomic: false,
+                atomicFlowId: bytes32(0),
+                atomicDeadline: 0,
+                atomicLowNullifierIndex: 0
+            })
         });
     }
 
@@ -196,7 +204,15 @@ library ProcessLogsTestHelper {
             destinationBaseTokenAssetId: _destinationBaseTokenAssetId,
             interopBundleSalt: _salt,
             calls: calls,
-            bundleAttributes: BundleAttributes({executionAddress: "", unbundlerAddress: "", useFixedFee: false})
+            bundleAttributes: BundleAttributes({
+                executionAddress: "",
+                unbundlerAddress: "",
+                useFixedFee: false,
+                isAtomic: false,
+                atomicFlowId: bytes32(0),
+                atomicDeadline: 0,
+                atomicLowNullifierIndex: 0
+            })
         });
     }
 

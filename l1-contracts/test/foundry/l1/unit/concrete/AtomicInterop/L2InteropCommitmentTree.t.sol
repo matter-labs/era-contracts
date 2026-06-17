@@ -28,7 +28,7 @@ import {AtomicInteropTestUtils} from "./AtomicInteropTestUtils.sol";
 /// succeeds) and registers itself as the appender so it can call `insert` directly.
 contract L2InteropCommitmentTreeTest is Test {
     /// @dev Mirror of the event so tests can `vm.expectEmit` against it.
-    event RootPublished(uint256 indexed leafIndex, bytes32 root, uint256 timestamp);
+    event RootPublished(uint256 indexed leafIndex, bytes32 root);
 
     L2InteropCommitmentTree internal tree;
     address internal stranger = makeAddr("stranger");
@@ -62,10 +62,10 @@ contract L2InteropCommitmentTreeTest is Test {
 
     function test_initialize_publishesSeedRoot() public {
         L2InteropCommitmentTree fresh = new L2InteropCommitmentTree();
-        // The seed root is published at leafIndex 0. We don't pin the exact root/timestamp here (those
-        // are asserted in the insert test); just that the head-seed event is emitted.
+        // The seed root is published at leafIndex 0. We don't pin the exact root here (it is asserted in
+        // the insert test); just that the head-seed event is emitted.
         vm.expectEmit(true, false, false, false);
-        emit RootPublished(0, bytes32(0), 0);
+        emit RootPublished(0, bytes32(0));
         fresh.initialize(address(this));
     }
 
@@ -103,9 +103,10 @@ contract L2InteropCommitmentTreeTest is Test {
     }
 
     function test_insert_emitsRootPublished() public {
-        // The first insert lands at leafIndex 1 and publishes the new root with the current timestamp.
-        // The root is only known after the insert, so rather than pre-arming `vm.expectEmit` we record
-        // logs and assert the full `RootPublished` payload against the values `insert` returns.
+        // The first insert lands at leafIndex 1 and publishes the new root (no timestamp is bundled —
+        // the deadline anchor is the settlement-layer block number, derived later from the proof). The
+        // root is only known after the insert, so rather than pre-arming `vm.expectEmit` we record logs
+        // and assert the full `RootPublished` payload against the values `insert` returns.
         vm.recordLogs();
         (uint256 idx, bytes32 root) = tree.insert(100, 0);
 
@@ -113,14 +114,13 @@ contract L2InteropCommitmentTreeTest is Test {
         assertEq(tree.root(), root, "stored root tracks insert");
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 sig = keccak256("RootPublished(uint256,bytes32,uint256)");
+        bytes32 sig = keccak256("RootPublished(uint256,bytes32)");
         bool found;
         for (uint256 i = 0; i < logs.length; ++i) {
             if (logs[i].topics[0] != sig || logs[i].emitter != address(tree)) continue;
             assertEq(uint256(logs[i].topics[1]), idx, "event leafIndex");
-            (bytes32 evRoot, uint256 evTs) = abi.decode(logs[i].data, (bytes32, uint256));
+            bytes32 evRoot = abi.decode(logs[i].data, (bytes32));
             assertEq(evRoot, root, "event root matches returned root");
-            assertEq(evTs, block.timestamp, "event timestamp is block.timestamp");
             found = true;
         }
         assertTrue(found, "RootPublished emitted on insert");

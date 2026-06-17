@@ -301,7 +301,11 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             BundleAttributes({
                 executionAddress: InteroperableAddress.formatEvmV1(destinationChainId, executor),
                 unbundlerAddress: InteroperableAddress.formatEvmV1(destinationChainId, executor),
-                useFixedFee: false
+                useFixedFee: false,
+                isAtomic: false,
+                atomicFlowId: bytes32(0),
+                atomicDeadline: 0,
+                atomicLowNullifierIndex: 0
             });
     }
 
