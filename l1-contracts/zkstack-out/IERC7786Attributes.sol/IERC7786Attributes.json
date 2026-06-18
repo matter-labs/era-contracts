@@ -1,6 +1,29 @@
 [
   {
     "type": "function",
+    "name": "atomicBundle",
+    "inputs": [
+      {
+        "name": "_flowId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_deadline",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "_lowNullifierIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
     "name": "executionAddress",
     "inputs": [
       {

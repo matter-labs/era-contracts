@@ -79,6 +79,10 @@ const REQUIRED_CONTRACTS = [
   "L1Nullifier.sol",
   "IBaseToken.sol",
   "BaseTokenHolder.sol",
+  // L1-free atomic interop (bundle model) — used by the anvil-interop atomic spec / CLI.
+  "AtomicFlowManager.sol",
+  "IAtomicFlowManager.sol",
+  "L2InteropCommitmentTree.sol",
 ];
 
 async function copyContractAbi(src: string, dest: string): Promise<void> {

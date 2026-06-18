@@ -61,6 +61,115 @@
   },
   {
     "type": "function",
+    "name": "executeAtomicBundle",
+    "inputs": [
+      {
+        "name": "_bundle",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_finality",
+        "type": "tuple",
+        "internalType": "struct AtomicFinalityProof",
+        "components": [
+          {
+            "name": "flowId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "deadline",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "legBundleHashes",
+            "type": "bytes32[]",
+            "internalType": "bytes32[]"
+          },
+          {
+            "name": "chainIds",
+            "type": "uint256[]",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "proofs",
+            "type": "tuple[]",
+            "internalType": "struct ImtInclusionProof[]",
+            "components": [
+              {
+                "name": "sourceChainId",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "batchNumber",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "chainImtRoot",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "messageTxNumberInBatch",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "messageIndex",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "messageProof",
+                "type": "bytes32[]",
+                "internalType": "bytes32[]"
+              },
+              {
+                "name": "leaf",
+                "type": "tuple",
+                "internalType": "struct IMTLeaf",
+                "components": [
+                  {
+                    "name": "value",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                  },
+                  {
+                    "name": "nextIndex",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                  },
+                  {
+                    "name": "nextValue",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                  }
+                ]
+              },
+              {
+                "name": "imtLeafIndex",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "imtProof",
+                "type": "bytes32[]",
+                "internalType": "bytes32[]"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "executeBundle",
     "inputs": [
       {
