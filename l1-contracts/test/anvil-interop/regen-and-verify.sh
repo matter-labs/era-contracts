@@ -112,7 +112,7 @@ ZK_ASSET_ID="$(read_toml_str "$PERMANENT_VALUES" zk_token_asset_id)"
 [[ -z "$ZK_ASSET_ID" ]] && { echo "zk_token_asset_id not found in $PERMANENT_VALUES" >&2; exit 1; }
 echo "ZK asset id:  $ZK_ASSET_ID"
 
-# Does this env have a new Gateway? Gateway-ful envs (stage, mainnet) have a
+# Does this env have a new Gateway? Gateway-enabled envs (stage, mainnet) have a
 # `[new_gateway]` table in permanent-values; their ZK token is the new-GW base
 # token (NTV-mintable) and bundle 5's GW priority tx burns it, so ZK funding
 # MUST succeed. Gateway-less envs (testnet) omit the table; their ZK token is
@@ -126,9 +126,9 @@ fi
 echo "New gateway:  $([[ "$HAS_GATEWAY" == "1" ]] && echo yes || echo "no (ZK funding best-effort)")"
 
 # Gateway RPC — PUVT uses it for read-only GW-side checks (only exercised on
-# gateway-ful envs; gateway-less envs treat [new_gateway] as absent and skip
+# gateway-enabled envs; gateway-less envs treat [new_gateway] as absent and skip
 # them, so the URL is just a reachable placeholder there). The default points
-# at stage's gateway — override GW_RPC_URL for other gateway-ful envs.
+# at stage's gateway — override GW_RPC_URL for other gateway-enabled envs.
 GW_RPC_URL="${GW_RPC_URL:-https://zksync-os-stage-gateway.zksync.dev}"
 echo "GW RPC:       $GW_RPC_URL"
 # zk-governance commit whose AllContractsHashes.json PUVT uses to verify
@@ -276,7 +276,7 @@ echo "$TARGETS" | sed 's/^/  /'
 for TARGET in $TARGETS; do
   cast rpc anvil_setBalance "$TARGET" 0x21e19e0c9bab2400000 --rpc-url "$RPC" >/dev/null
   if [[ "$HAS_GATEWAY" == "1" ]]; then
-    # Gateway-ful env: ZK is the NTV-mintable new-GW base token and bundle 5's
+    # Gateway-enabled env: ZK is the NTV-mintable new-GW base token and bundle 5's
     # GW priority tx burns it — funding must succeed.
     echo "  bridgeMint($TARGET, $FUND_AMOUNT)"
     cast send --from "$NTV" --unlocked "$ZK_TOKEN" \
