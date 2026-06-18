@@ -31,6 +31,10 @@ if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
   forge build
 fi
 
+echo ">>> Regenerating the ZKsync OS genesis (the #2224 genesis-only contracts move the root)"
+( cd ../tools/zksync-os-genesis-gen && cargo run --release )
+rm -f ../zksync-os-genesis.json   # drop the tool's duplicate dump; latest.json is the artifact
+
 echo ">>> Running forge patch script (reconstruct from bytecode + generate calls)"
 forge script deploy-scripts/upgrade/v31/PatchZkosCtmAssetTracker.s.sol --ffi --sig "run()"
 

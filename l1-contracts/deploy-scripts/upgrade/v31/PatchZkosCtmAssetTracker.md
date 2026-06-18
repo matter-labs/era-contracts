@@ -165,11 +165,30 @@ plus the permissionless `publish_bytecodes_calldata`
 > correct primitive for patching an already-applied upgrade.
 
 In the forge script, `ChainCreationParams` reuses the prepared diamond cut
-verbatim (facets unchanged) and the ZKsyncOS genesis fields from
-`configs/genesis/zksync-os/latest.json` (`genesisRoot`, unit batch commitment,
-zero repeated-storage index — matching `ChainCreationParamsLib`), swapping in only
-the regenerated `forceDeploymentsData`. The TypeScript verifier independently
-confirms those same fields against the on-chain `NewChainCreationParams` event.
+verbatim (facets unchanged), a unit batch commitment and a zero repeated-storage
+index (matching `ChainCreationParamsLib` for ZKsyncOS), swaps in the regenerated
+`forceDeploymentsData`, and takes `genesisBatchHash` from
+`configs/genesis/zksync-os/latest.json`. The TypeScript verifier confirms the
+unchanged fields against the on-chain `NewChainCreationParams` event, and confirms
+`genesisBatchHash` equals the regenerated genesis root (and differs from on-chain).
+
+### The genesis root moves
+
+The genesis-only contracts changed by #2224 — `L2ComplexUpgrader` and
+`L2GenesisUpgrade` (transitively, via the `L2AssetTracker` dependency, with no
+source edit of their own) — are part of the genesis state, so the genesis root
+changes. This PR therefore **regenerates the whole ZKsync OS genesis** with
+`tools/zksync-os-genesis-gen` (built against the same foundry-zksync v0.1.5
+artifacts as `AllContractsHashes.json`) and commits the updated
+`configs/genesis/zksync-os/latest.json`. Note this also re-canonicalizes the
+metadata of every genesis contract: the previously-committed genesis root was
+produced by a different build, so the regenerated file differs from it on every
+contract, not only the #2224 ones.
+
+```bash
+# from repo root, after building l1-contracts with foundry-zksync v0.1.5:
+cd tools/zksync-os-genesis-gen && cargo run --release   # rewrites configs/genesis/zksync-os/latest.json
+```
 
 ## How the two scripts corroborate each other
 

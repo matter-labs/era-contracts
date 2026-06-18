@@ -431,6 +431,10 @@ contract PatchZkosCtmAssetTracker is Script {
     ///      for ZKsyncOS: `genesisRoot` from the ZKsyncOS genesis config, a unit
     ///      batch commitment and a zero repeated-storage index. The diamond cut is
     ///      reused verbatim from the prepared output (facets unchanged).
+    /// @dev The genesis root MOVES with this patch: the genesis-only contracts changed
+    ///      by #2224 (L2ComplexUpgrader / L2GenesisUpgrade — transitively via
+    ///      L2AssetTracker) feed the genesis state, so `configs/genesis/zksync-os/latest.json`
+    ///      is regenerated (via `tools/zksync-os-genesis-gen`) and this picks up the new root.
     function _buildChainCreationParams(Ctx memory _ctx) internal returns (ChainCreationParams memory params) {
         params = ChainCreationParams({
             genesisUpgrade: _ctx.genesisUpgrade,

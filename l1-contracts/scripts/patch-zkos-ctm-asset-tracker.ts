@@ -63,6 +63,11 @@ const DEFAULT_PATCH = path.join(
   REPO_ROOT,
   "l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/zkos-asset-tracker-patch.toml"
 );
+// Canonical ZKsync OS genesis (regenerated in this PR). Its `genesis_root` is the
+// new chain-creation genesis batch hash — the genesis-only contracts changed by
+// #2224 (L2ComplexUpgrader / L2GenesisUpgrade, transitively via L2AssetTracker)
+// shift it. We can only read it (a state root, not bytecode), not recompute it.
+const DEFAULT_GENESIS = path.join(REPO_ROOT, "configs/genesis/zksync-os/latest.json");
 
 // ---------------------------------------------------------------------------
 // ABI type descriptors (encoding-only, no contract ABIs are declared)
@@ -382,12 +387,14 @@ async function main() {
   const hashesPath = process.env.HASHES_JSON || DEFAULT_HASHES;
   const ecosystemPath = process.env.ECOSYSTEM_TOML || DEFAULT_ECOSYSTEM;
   const patchPath = process.env.PATCH_TOML || DEFAULT_PATCH;
+  const genesisPath = process.env.GENESIS_JSON || DEFAULT_GENESIS;
   const rpcUrl = process.env.L1_RPC || process.env.TENDERLY_SEPOLIA;
   if (!rpcUrl) throw new Error("Set L1_RPC (or TENDERLY_SEPOLIA) to the L1 RPC of the CTM's chain");
 
   console.log("Verifying ZKsync OS CTM patch proposal (hashes-only, on-chain-sourced)");
   console.log(`  hashes:     ${hashesPath}`);
   console.log(`  ecosystem:  ${ecosystemPath} (CTM address only)`);
+  console.log(`  genesis:    ${genesisPath} (genesis root only)`);
   console.log(`  patch:      ${patchPath}`);
 
   const hashes = loadHashes(hashesPath);
@@ -435,7 +442,9 @@ async function main() {
   }
 
   // --- (2) the ChainTypeManager calls were constructed correctly ---
-  // setChainCreationParams: original params with ONLY forceDeploymentsData swapped.
+  // setChainCreationParams: original params with `forceDeploymentsData` swapped to
+  // the patched value and `genesisBatchHash` bumped to the regenerated genesis root
+  // (the genesis-only contracts changed by #2224 shift it).
   assert(
     strip0x(patch.set_chain_creation_params_calldata).startsWith(strip0x(selector(SIG_SET_CHAIN_CREATION_PARAMS))),
     "set_chain_creation_params_calldata has the wrong selector"
@@ -448,7 +457,12 @@ async function main() {
     ethers.utils.getAddress(ccpArg.genesisUpgrade) === ethers.utils.getAddress(orig.genesisUpgrade),
     "genesisUpgrade changed"
   );
-  assert(eqHex(ccpArg.genesisBatchHash, orig.genesisBatchHash), "genesisBatchHash changed");
+  // genesisBatchHash MUST move from the on-chain value to the regenerated genesis
+  // root (a state root, not bytecode, so we read it from the canonical genesis file
+  // rather than recompute it).
+  const newGenesisRoot: string = JSON.parse(fs.readFileSync(genesisPath, "utf8")).genesis_root;
+  assert(eqHex(ccpArg.genesisBatchHash, newGenesisRoot), "genesisBatchHash != regenerated genesis root");
+  assert(!eqHex(newGenesisRoot, orig.genesisBatchHash), "genesis root unchanged vs on-chain — expected it to move");
   assert(
     ethers.BigNumber.from(ccpArg.genesisIndexRepeatedStorageChanges).eq(orig.genesisIndexRepeatedStorageChanges),
     "genesisIndex changed"
@@ -492,6 +506,9 @@ async function main() {
   console.log("\nAll checks passed:");
   console.log("  - chain-creation params / upgrade data differ from the on-chain originals");
   console.log("    only in the bytecode descriptors that AllContractsHashes.json says changed;");
+  console.log(
+    `  - genesisBatchHash bumped on-chain ${orig.genesisBatchHash} -> ${newGenesisRoot} (regenerated genesis root);`
+  );
   console.log("  - setChainCreationParams + setUpgradeDiamondCut calls are correctly constructed.");
 }
 
