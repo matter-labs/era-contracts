@@ -513,13 +513,7 @@ contract PatchZkosCtmAssetTracker is Script {
         vm.serializeAddress(zk, "chain_type_manager", _ctx.chainTypeManager);
         vm.serializeAddress(zk, "bytecodes_supplier", _ctx.bytecodesSupplier);
         vm.serializeUint(zk, "old_protocol_version", _ctx.oldProtocolVersion);
-        vm.serializeUint(zk, "new_protocol_version", _ctx.newProtocolVersion);
-        vm.serializeBytes32(zk, "asset_tracker_old_keccak", _ctx.assetTrackerOld.keccak);
-        vm.serializeBytes32(zk, "asset_tracker_new_keccak", _ctx.assetTrackerNew.keccak);
-        vm.serializeBytes32(zk, "v31_old_keccak", _ctx.v31Old.keccak);
-        vm.serializeBytes32(zk, "v31_new_keccak", _ctx.v31New.keccak);
-        vm.serializeAddress(zk, "v31_delegate_old", _ctx.delegateOld);
-        string memory zkJson = vm.serializeAddress(zk, "v31_delegate_new", _ctx.delegateNew);
+        string memory zkJson = vm.serializeUint(zk, "new_protocol_version", _ctx.newProtocolVersion);
 
         string memory root = "patch";
         vm.serializeString(root, "ctm", "zksync_os");
@@ -545,6 +539,9 @@ contract PatchZkosCtmAssetTracker is Script {
     ///      merge is done by the cheatcode host, so EVM memory only ever holds one
     ///      value at a time (unlike `vm.serialize*`, which grows in EVM memory).
     function _writeTomlBytes(string memory _path, string memory _key, bytes memory _val) internal {
-        vm.writeToml(string.concat('"', vm.toString(_val), '"'), _path, _key);
+        // `bytes1(0x22)` is a double quote; building it this way (rather than a
+        // string literal) keeps both prettier and solhint happy on the quote char.
+        string memory quote = string(abi.encodePacked(bytes1(0x22)));
+        vm.writeToml(string.concat(quote, vm.toString(_val), quote), _path, _key);
     }
 }
