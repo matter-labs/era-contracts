@@ -56,6 +56,7 @@ import {
   BundleStatus,
   L2_ASSET_ROUTER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
+  ATOMIC_SEND_BUNDLE_GAS_LIMIT,
   DEFAULT_TX_GAS_LIMIT,
   INTEROP_SEND_BUNDLE_GAS_LIMIT,
 } from "../../src/core/const";
@@ -256,6 +257,9 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       callStarters: [bridgeCallStarter(source, amount, recipient)],
       bundleAttributes: [atomicBundleAttr(flowId, deadline, lowNull)],
       value: fee,
+      // Atomic sends append to the IMT (~1.1M gas insert) on top of the burn; the plain-send default
+      // (INTEROP_SEND_BUNDLE_GAS_LIMIT) is too small.
+      gasLimit: ATOMIC_SEND_BUNDLE_GAS_LIMIT,
     });
 
     // Cross-check the predicted bundleHash against the actual one the InteropCenter emitted.
