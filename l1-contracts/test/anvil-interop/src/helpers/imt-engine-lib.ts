@@ -1,11 +1,25 @@
 /**
- * IMT engine library — the off-chain counterpart of the L1-free atomic-interop proof system.
+ * IMT engine library — the off-chain counterpart of the L1-free atomic-interop proof system
+ * (bundle model: InteropCenter / InteropHandler / AtomicFlowManager).
  *
  * It implements **IMT engine B** ({IndexedMerkleTreeLib}) exactly, so the harness can:
  *   - reproduce, byte-for-byte, the per-chain {L2InteropCommitmentTree} root and Merkle paths from
  *     the tree's live leaf set (verified against `tree.root()` / `tree.merklePath(i)` over RPC),
- *   - compute the low-nullifier index needed to `commitSend` (insert) a value,
- *   - build the {ImtInclusionProof} / {ImtNonInclusionProof} structs {AtomicFlowEscrow} verifies.
+ *   - compute the low-nullifier index needed to insert a value (the `lowNullifierIndex` carried by the
+ *     `atomicBundle` attribute, which the InteropCenter forwards to `AtomicFlowManager.append`),
+ *   - build the {ImtInclusionProof} / {ImtNonInclusionProof} structs the {AtomicFlowManager} verifies
+ *     (packed into the {AtomicFinalityProof} the {InteropHandler.executeAtomicBundle} consumes).
+ *
+ * The flow ids:
+ *   - `bundleHash = keccak256(abi.encode(sourceChainId, abi.encode(InteropBundle)))`, where the
+ *     InteropBundle is the one the InteropCenter emits in `InteropBundleSent`. The atomic send params
+ *     (flowId, deadline, lowNullifierIndex) travel via the `atomicBundle` ERC-7786 attribute and are
+ *     parsed by the InteropCenter into an internal `AtomicSend` struct — they are NOT part of the
+ *     InteropBundle, so `bundleHash` does NOT depend on `flowId`.
+ *   - `flowId = keccak256(abi.encode(sortedBundleHashes, sortedChainIds, deadline))` (both arrays
+ *     strictly ascending). Because `bundleHash` is independent of `flowId`, `flowId` is computable
+ *     off-chain BEFORE the send — which breaks the old circular dependency.
+ *   - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
  *
  * Engine B specifics (must match contracts/common/libraries/IndexedMerkleTree.sol):
  *   - fixed depth 32 (`IMT_DEPTH`); 2^32 leaf slots,
@@ -17,12 +31,14 @@
  *   - the commitment tree seeds the {0,0,0} head at index 0 (`setup`), then appends each inserted
  *     leaf and repoints its low-nullifier (`insert`).
  *
- * The cross-chain `(root, timestamp)` message that authenticates a chain's IMT root is verified
- * on-chain via {L2_MESSAGE_VERIFICATION}.proveL2MessageInclusionShared. On the anvil harness that
- * address hosts {MockL2MessageVerification}, which always returns true — so the message-proof fields
- * of a proof are well-formed placeholders (the IMT membership / low-nullifier layer and the
- * `rootTimestamp` deadline check are the parts actually exercised). This mirrors the Foundry
- * AtomicFlowEscrow tests, which mock the same call and build proofs from real tree state.
+ * The cross-chain `(root)` message that authenticates a chain's IMT root is verified on-chain via
+ * {L2_MESSAGE_VERIFICATION}.proveL2MessageInclusionShared. On the anvil harness that address hosts
+ * {MockL2MessageVerification}, which always returns true — so the real root check is out of harness
+ * scope. The deadline is a **settlement-layer (SL) block number**: {AtomicInteropProof} re-parses the
+ * SAME `messageProof` bytes with the real {MessageHashing._getProofData} (NOT mocked) to derive the SL
+ * block, so the harness builds format-valid multi-hop proof bytes carrying a CHOSEN `slBlock`
+ * ({buildSlProofBytes}). The IMT membership / low-nullifier layer and the SL-block deadline check are
+ * the parts actually exercised. This mirrors the Foundry AtomicFlowManager tests.
  */
 
 import type { providers, Wallet } from "ethers";
@@ -37,16 +53,6 @@ export const ATOMIC_COMMIT_LEAF_TAG: string = utils
   .keccak256(utils.toUtf8Bytes("AtomicInterop.commit.v1"))
   .slice(0, 10);
 
-export interface SendSpec {
-  destChainId: BigNumber | number | string;
-  recipient: string;
-  originChainId: BigNumber | number | string;
-  originToken: string;
-  amount: BigNumber | number | string;
-  erc20Data: string;
-  depositor: string;
-}
-
 /** Indexed-tree leaf, fields as uint256 decimal strings, in the on-chain field order. */
 export interface IMTLeaf {
   value: string;
@@ -57,13 +63,14 @@ export interface IMTLeaf {
 /**
  * Mirror of `ImtInclusionProof` in IAtomicInterop.sol. The IMT part (chainImtRoot/leaf/imtLeafIndex/
  * imtProof) is built from the engine; the message-inclusion part (batchNumber/messageIndex/
- * messageProof/messageTxNumberInBatch) authenticates the `(root, timestamp)` L2->L1 message.
+ * messageProof/messageTxNumberInBatch) authenticates the `(root)` L2->L1 message AND, via the real
+ * {MessageHashing._getProofData} parse, carries the settlement-layer block number used for the
+ * deadline check (`messageProof` is a format-valid multi-hop proof — see {buildSlProofBytes}).
  */
 export interface ImtInclusionProof {
   sourceChainId: string;
   batchNumber: string;
   chainImtRoot: string;
-  rootTimestamp: string;
   messageTxNumberInBatch: number;
   messageIndex: string;
   messageProof: string[];
@@ -77,7 +84,6 @@ export interface ImtNonInclusionProof {
   sourceChainId: string;
   batchNumber: string;
   chainImtRoot: string;
-  rootTimestamp: string;
   messageTxNumberInBatch: number;
   messageIndex: string;
   messageProof: string[];
@@ -86,12 +92,12 @@ export interface ImtNonInclusionProof {
   imtProof: string[];
 }
 
-// ── Leaf / id derivations (must match AtomicInteropProof / AtomicFlowEscrow) ──────────────
+// ── Leaf / id derivations (must match AtomicInteropProof / AtomicFlowManager) ──────────────
 
 /** The value inserted into a chain's IMT for a leg, as a 0x bytes32 (also a valid uint256). */
-export function commitValue(flowId: string, specHash: string): string {
+export function commitValue(flowId: string, bundleHash: string): string {
   return utils.keccak256(
-    utils.defaultAbiCoder.encode(["bytes4", "bytes32", "bytes32"], [ATOMIC_COMMIT_LEAF_TAG, flowId, specHash])
+    utils.defaultAbiCoder.encode(["bytes4", "bytes32", "bytes32"], [ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash])
   );
 }
 
@@ -102,36 +108,19 @@ export function indexedLeafHash(leaf: IMTLeaf): string {
   );
 }
 
-/** specHash = keccak256(abi.encode(SendSpec)) — must match AtomicFlowEscrow / the SendSpec layout. */
-export function specHashOf(spec: SendSpec): string {
-  return utils.keccak256(
-    utils.defaultAbiCoder.encode(
-      ["tuple(uint256,address,uint256,address,uint256,bytes,address)"],
-      [
-        [
-          BigNumber.from(spec.destChainId),
-          spec.recipient,
-          BigNumber.from(spec.originChainId),
-          spec.originToken,
-          BigNumber.from(spec.amount),
-          spec.erc20Data,
-          spec.depositor,
-        ],
-      ]
-    )
-  );
-}
-
-/** flowId = keccak256(abi.encode(sortedSpecHashes, sortedChainIds, deadline)). */
+/**
+ * flowId = keccak256(abi.encode(sortedBundleHashes, sortedChainIds, deadline)) — must match
+ * {AtomicFlowManager._checkFlowId}. Both arrays must already be strictly ascending.
+ */
 export function computeFlowId(
-  specHashes: string[],
+  bundleHashes: string[],
   chainIds: (BigNumber | number | string)[],
   deadline: number
 ): string {
   return utils.keccak256(
     utils.defaultAbiCoder.encode(
       ["bytes32[]", "uint256[]", "uint64"],
-      [specHashes, chainIds.map((c) => BigNumber.from(c)), deadline]
+      [bundleHashes, chainIds.map((c) => BigNumber.from(c)), deadline]
     )
   );
 }
@@ -272,7 +261,7 @@ export function findValueIndex(leaves: IMTLeaf[], value: string): number {
   return leaves.findIndex((l) => BigNumber.from(l.value).eq(v));
 }
 
-/** Convenience: low-nullifier index for inserting `value` into the current tree (for commitSend). */
+/** Convenience: low-nullifier index for inserting `value` into the current tree. */
 export async function lowNullifierIndexFor(tree: Contract, value: string, blockTag?: number): Promise<number> {
   const imt = await reconstructChainImt(tree, blockTag);
   return findLowNullifierIndex(imt.leaves, value);
@@ -280,32 +269,58 @@ export async function lowNullifierIndexFor(tree: Contract, value: string, blockT
 
 // ── Proof builders ────────────────────────────────────────────────────────────────────────
 
+/** Default settlement-layer chain id encoded into proof bytes (single-SL assumption). Arbitrary on
+ * the harness, since {MockL2MessageVerification} accepts any message; only the SL block is consumed. */
+export const DEFAULT_SL_CHAIN_ID = 506;
+
 /**
- * Well-formed placeholder for the `(root, timestamp)` L2->L1 message-inclusion proof. On the anvil
- * harness {MockL2MessageVerification} accepts any such message, so the batch / index / proof fields
- * are not inspected; the IMT layer and the `rootTimestamp` deadline check are what's verified.
+ * Builds the minimal **format-valid multi-hop** L2-message inclusion proof bytes that the real
+ * {MessageHashing._getProofData} parses to a chosen settlement-layer block number `slBlock` (with
+ * `finalProofNode == false`). Mirrors `AtomicInteropTestUtils.slProofBytes` in the Foundry suite.
+ *
+ * Byte layout (logLeafProofLen=0, batchLeafProofLen=0 -> no path nodes, so the mask words are 0):
+ *   [0] metadata header = version(0x01) << 248 | logLeafProofLen(0) | batchLeafProofLen(0) |
+ *       finalProofNode(0); the low 28 bytes MUST be zero (new versioned format).
+ *   [1] batchLeafProofMask = 0.
+ *   [2] settlementLayerPackedBatchInfo = (slBlock << 128) | mask(0).
+ *   [3] settlementLayerChainId.
+ * `messageIndex` (the leaf-proof mask) must be 0, since logLeafProofLen==0 requires index < 1.
  */
-function messageProofPlaceholder(): {
+export function buildSlProofBytes(slBlock: number, slChainId: number = DEFAULT_SL_CHAIN_ID): string[] {
+  const metadata = utils.hexZeroPad(BigNumber.from(0x01).shl(248).toHexString(), 32);
+  const batchLeafProofMask = utils.hexZeroPad("0x00", 32);
+  const packedBatchInfo = utils.hexZeroPad(BigNumber.from(slBlock).shl(128).toHexString(), 32);
+  const settlementLayerChainId = utils.hexZeroPad(BigNumber.from(slChainId).toHexString(), 32);
+  return [metadata, batchLeafProofMask, packedBatchInfo, settlementLayerChainId];
+}
+
+/**
+ * Well-formed message-inclusion proof carrying a chosen settlement-layer block number `slBlock`. On the
+ * anvil harness {MockL2MessageVerification} accepts any message (the real root check is out of scope),
+ * but {MessageHashing._getProofData} really parses these bytes to derive `slBlock` for the deadline check.
+ */
+function messageProofForSlBlock(slBlock: number): {
   batchNumber: string;
   messageIndex: string;
   messageTxNumberInBatch: number;
   messageProof: string[];
 } {
-  return { batchNumber: "1", messageIndex: "0", messageTxNumberInBatch: 0, messageProof: [] };
+  return { batchNumber: "1", messageIndex: "0", messageTxNumberInBatch: 0, messageProof: buildSlProofBytes(slBlock) };
 }
 
 /**
- * Build an {ImtInclusionProof} for `value` against `chainId`'s live IMT, carrying a root snapshot
- * timestamp of `rootTimestamp` (must be <= the flow deadline for `authorize` to accept it).
+ * Build an {ImtInclusionProof} for `value` against `chainId`'s live IMT, carrying a proof whose
+ * settlement-layer block number is `slBlock` (must be <= the flow deadline for `requireFlowFinalized`
+ * to accept).
  */
 export async function buildInclusionProof(params: {
   l2Tree: Contract;
   chainId: BigNumber | number | string;
   value: string;
-  rootTimestamp: number;
+  slBlock: number;
   l2BlockTag?: number;
 }): Promise<ImtInclusionProof> {
-  const { l2Tree, chainId, value, rootTimestamp, l2BlockTag } = params;
+  const { l2Tree, chainId, value, slBlock, l2BlockTag } = params;
   const imt = await reconstructChainImt(l2Tree, l2BlockTag);
   const idx = findValueIndex(imt.leaves, value);
   if (idx < 0) throw new Error(`value ${value} not found in chain ${chainId.toString()} IMT`);
@@ -319,27 +334,26 @@ export async function buildInclusionProof(params: {
   return {
     sourceChainId: BigNumber.from(chainId).toString(),
     chainImtRoot: imt.root,
-    rootTimestamp: rootTimestamp.toString(),
     leaf: imt.leaves[idx],
     imtLeafIndex: idx,
     imtProof: imt.engine.merklePath(idx),
-    ...messageProofPlaceholder(),
+    ...messageProofForSlBlock(slBlock),
   };
 }
 
 /**
- * Build an {ImtNonInclusionProof} proving `value` is absent from `chainId`'s live IMT, carrying a
- * post-deadline root snapshot timestamp `rootTimestamp` (must be > the flow deadline for
- * `authorizeRefund` to accept it). O(log n) via the low-nullifier bracket.
+ * Build an {ImtNonInclusionProof} proving `value` is absent from `chainId`'s live IMT, carrying a proof
+ * whose settlement-layer block number is `slBlock` (must be > the flow deadline for `authorizeRefund`
+ * to accept). O(log n) via the low-nullifier bracket.
  */
 export async function buildNonInclusionProof(params: {
   l2Tree: Contract;
   chainId: BigNumber | number | string;
   value: string;
-  rootTimestamp: number;
+  slBlock: number;
   l2BlockTag?: number;
 }): Promise<ImtNonInclusionProof> {
-  const { l2Tree, chainId, value, rootTimestamp, l2BlockTag } = params;
+  const { l2Tree, chainId, value, slBlock, l2BlockTag } = params;
   const imt = await reconstructChainImt(l2Tree, l2BlockTag);
   const lowIndex = findLowNullifierIndex(imt.leaves, value); // throws if value present
 
@@ -351,20 +365,14 @@ export async function buildNonInclusionProof(params: {
   return {
     sourceChainId: BigNumber.from(chainId).toString(),
     chainImtRoot: imt.root,
-    rootTimestamp: rootTimestamp.toString(),
     lowLeaf: imt.leaves[lowIndex],
     lowLeafIndex: lowIndex,
     imtProof: imt.engine.merklePath(lowIndex),
-    ...messageProofPlaceholder(),
+    ...messageProofForSlBlock(slBlock),
   };
 }
 
 // ── Tuple encoders (ordered for ethers contract calls) ────────────────────────────────────
-
-/** SendSpec tuple in struct field order (destChainId, recipient, originChainId, originToken, amount, erc20Data, depositor). */
-export function specTuple(s: SendSpec): unknown[] {
-  return [s.destChainId, s.recipient, s.originChainId, s.originToken, s.amount, s.erc20Data, s.depositor];
-}
 
 /** IMTLeaf tuple in struct field order (value, nextIndex, nextValue). */
 export function leafTuple(l: IMTLeaf): unknown[] {
@@ -377,7 +385,6 @@ export function inclusionProofTuple(p: ImtInclusionProof): unknown[] {
     p.sourceChainId,
     p.batchNumber,
     p.chainImtRoot,
-    p.rootTimestamp,
     p.messageTxNumberInBatch,
     p.messageIndex,
     p.messageProof,
@@ -393,12 +400,33 @@ export function nonInclusionProofTuple(p: ImtNonInclusionProof): unknown[] {
     p.sourceChainId,
     p.batchNumber,
     p.chainImtRoot,
-    p.rootTimestamp,
     p.messageTxNumberInBatch,
     p.messageIndex,
     p.messageProof,
     leafTuple(p.lowLeaf),
     p.lowLeafIndex,
     p.imtProof,
+  ];
+}
+
+/**
+ * Build the `AtomicFinalityProof` tuple {InteropHandler.executeAtomicBundle} consumes: the flow
+ * definition (flowId, deadline, ascending legBundleHashes + chainIds) plus one inclusion proof per
+ * leg, in `legBundleHashes` order. Tuple field order:
+ *   (flowId, deadline, legBundleHashes, chainIds, proofs).
+ */
+export function atomicFinalityProofTuple(params: {
+  flowId: string;
+  deadline: number;
+  legBundleHashes: string[];
+  chainIds: (BigNumber | number | string)[];
+  proofs: ImtInclusionProof[];
+}): unknown[] {
+  return [
+    params.flowId,
+    params.deadline,
+    params.legBundleHashes,
+    params.chainIds.map((c) => BigNumber.from(c)),
+    params.proofs.map(inclusionProofTuple),
   ];
 }

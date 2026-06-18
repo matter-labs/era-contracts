@@ -1,27 +1,30 @@
 /**
- * IMT engine CLI (L1-free atomic interop, IMT engine B).
+ * IMT engine CLI (L1-free atomic interop, bundle model).
  *
- * Given an RPC URL and an item, produces the proofs the {AtomicFlowEscrow} needs against a chain's
+ * Given an RPC URL and an item, produces the proofs the {AtomicFlowManager} needs against a chain's
  * per-chain {L2InteropCommitmentTree}. The global IMT + L1 registry are gone: a chain's IMT root is
- * carried by the standard interop-root channel and authenticated via the `(root, timestamp)` L2->L1
- * message, so a proof only references the source chain's tree plus a snapshot timestamp.
+ * carried by the standard interop-root channel and authenticated via the `(root)` L2->L1 message, so a
+ * proof only references the source chain's tree plus a settlement-layer block number derived in-module
+ * from the same message proof.
  *
  * Subcommands:
- *   value          --flow-id <0x> --spec-hash <0x>
- *                  Compute the commit value for a (flowId, specHash).
+ *   value          --flow-id <0x> --bundle-hash <0x>
+ *                  Compute the commit value for a (flowId, bundleHash).
  *
  *   low-nullifier  --l2-rpc <url> --tree <addr> --value <0x|dec> [--l2-block <n>]
- *                  Low-nullifier index to pass to commitSend when inserting `value`.
+ *                  Low-nullifier index to forward to AtomicFlowManager.append (via the InteropCenter's
+ *                  `atomicBundle` attribute) when inserting `value`.
  *
  *   full-proof     --l2-rpc <url> --tree <addr> --chain-id <n> --value <0x|dec>
- *                  --root-timestamp <unix> [--l2-block <n>]
- *                  Inclusion proof (ImtInclusionProof JSON) for AtomicFlowEscrow.authorize.
- *                  `root-timestamp` must be <= the flow deadline.
+ *                  --sl-block <n> [--l2-block <n>]
+ *                  Inclusion proof (ImtInclusionProof JSON) for AtomicFlowManager.requireFlowFinalized
+ *                  (consumed via the InteropHandler's AtomicFinalityProof). `sl-block` must be <= the
+ *                  flow deadline.
  *
  *   non-inclusion  --l2-rpc <url> --tree <addr> --chain-id <n> --value <0x|dec>
- *                  --root-timestamp <unix> [--l2-block <n>]
+ *                  --sl-block <n> [--l2-block <n>]
  *                  O(log n) non-inclusion proof (ImtNonInclusionProof JSON) for
- *                  AtomicFlowEscrow.authorizeRefund. `root-timestamp` must be > the flow deadline.
+ *                  AtomicFlowManager.authorizeRefund. `sl-block` must be > the flow deadline.
  */
 
 import { providers } from "ethers";
@@ -61,7 +64,7 @@ async function main(): Promise<void> {
 
   switch (command) {
     case "value": {
-      print({ value: commitValue(require_(flags, "flow-id"), require_(flags, "spec-hash")) });
+      print({ value: commitValue(require_(flags, "flow-id"), require_(flags, "bundle-hash")) });
       break;
     }
 
@@ -83,7 +86,7 @@ async function main(): Promise<void> {
         l2Tree: commitmentTree(require_(flags, "tree"), l2Provider),
         chainId: require_(flags, "chain-id"),
         value: require_(flags, "value"),
-        rootTimestamp: Number(require_(flags, "root-timestamp")),
+        slBlock: Number(require_(flags, "sl-block")),
         l2BlockTag: flags["l2-block"] ? Number(flags["l2-block"]) : undefined,
       });
       print(proof);
@@ -96,7 +99,7 @@ async function main(): Promise<void> {
         l2Tree: commitmentTree(require_(flags, "tree"), l2Provider),
         chainId: require_(flags, "chain-id"),
         value: require_(flags, "value"),
-        rootTimestamp: Number(require_(flags, "root-timestamp")),
+        slBlock: Number(require_(flags, "sl-block")),
         l2BlockTag: flags["l2-block"] ? Number(flags["l2-block"]) : undefined,
       });
       print(proof);

@@ -1,13 +1,19 @@
 /**
- * Deployment helper for the L1-free atomic-interop stack (IMT engine B).
+ * Deployment helper for the L1-free atomic-interop stack (bundle model).
  *
  * Installs, on each participating L2 anvil chain, the canonical built-in contract set:
  *   - {L2InteropCommitmentTree} at L2_INTEROP_COMMITMENT_TREE_ADDR (0x10012),
- *   - {AtomicFlowEscrow}        at L2_ATOMIC_FLOW_ESCROW_ADDR      (0x10014),
+ *   - {AtomicFlowManager}       at L2_ATOMIC_FLOW_MANAGER_ADDR      (0x10014),
  * then wires them exactly as the on-chain genesis force-deployment would:
- *   - tree.initialize(escrow),
- *   - escrow.initialize(tree, assetRouter, nativeTokenVault),
- *   - L2AssetRouter.setAtomicFlowEscrow(escrow)  (so the AR's atomic-burn / recover auth recognises it).
+ *   - tree.initialize(manager),
+ *   - manager.initialize(tree, assetRouter, interopCenter, interopHandler),
+ *   - L2AssetRouter.setAtomicFlowManager(manager)  (so the AR's recoverAtomicBurn auth recognises it).
+ *
+ * Unlike the removed escrow-direct flow, the manager is fund-touchless: the source-side burn happens
+ * through the normal interop path ({InteropCenter.sendBundle} -> {L2AssetRouter.initiateIndirectCall}),
+ * and the destination mint is driven by {InteropHandler.executeAtomicBundle}. The manager only appends
+ * commit values to the IMT (`append`, called by the InteropCenter) and drives `recoverAtomicBurn` on
+ * the timeout path.
  *
  * Contracts are installed at their canonical addresses via `anvil_setCode` (the established harness
  * pattern for built-ins; storage is NOT poked — all state comes from real `initialize` calls). The
@@ -23,9 +29,11 @@ import { getAbi, getBytecode } from "../core/contracts";
 import { impersonateAndRun } from "../core/utils";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
+  INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
-  L2_ATOMIC_FLOW_ESCROW_ADDR,
+  L2_ATOMIC_FLOW_MANAGER_ADDR,
   L2_INTEROP_COMMITMENT_TREE_ADDR,
+  L2_INTEROP_HANDLER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../core/const";
 
@@ -34,14 +42,18 @@ export interface AtomicStack {
   provider: providers.JsonRpcProvider;
   /** {L2InteropCommitmentTree} at the canonical 0x10012. */
   tree: Contract;
-  /** {AtomicFlowEscrow} at the canonical 0x10014. */
-  escrow: Contract;
+  /** {AtomicFlowManager} at the canonical 0x10014. */
+  manager: Contract;
+  /** {InteropCenter} at the canonical 0x1000d (the atomic SEND entry point). */
+  interopCenter: Contract;
+  /** {InteropHandler} at the canonical 0x1000e (the atomic RECEIVE entry point). */
+  interopHandler: Contract;
 }
 
 /**
  * Install + wire the atomic stack on one L2 chain.
  *
- * Idempotent: if the escrow is already initialized (re-run against the same loaded chain state) the
+ * Idempotent: if the manager is already initialized (re-run against the same loaded chain state) the
  * wiring steps are skipped. `assetRouter` / `nativeTokenVault` default to the system predeploys, which
  * is what the anvil harness uses.
  */
@@ -58,40 +70,71 @@ export async function deployAtomicStack(args: {
 
   // 1. Install runtime bytecode at the canonical addresses.
   await provider.send("anvil_setCode", [L2_INTEROP_COMMITMENT_TREE_ADDR, getBytecode("L2InteropCommitmentTree")]);
-  await provider.send("anvil_setCode", [L2_ATOMIC_FLOW_ESCROW_ADDR, getBytecode("AtomicFlowEscrow")]);
+  await provider.send("anvil_setCode", [L2_ATOMIC_FLOW_MANAGER_ADDR, getBytecode("AtomicFlowManager")]);
+
+  // 1b. Refresh the InteropCenter / InteropHandler runtime code if the pre-generated chain states
+  // predate the atomic-interop additions (the `atomicBundle` ERC-7786 attribute + `_dispatchBundle`
+  // append path on the center, `executeAtomicBundle` on the handler). Code-only upgrade: the atomic
+  // logic reuses the existing storage layout (no slot is added/reordered; the manager address is a
+  // hardcoded constant), so `anvil_setCode` preserves L1_CHAIN_ID / nonces / fees / bundleStatus. This
+  // is the same built-in-install pattern used for the AR / NTV below.
+  //   InteropCenter probe: the `atomicBundle` attribute selector (0xfc53bac1) embedded in
+  //     `parseAttributes`. InteropHandler probe: the `executeAtomicBundle` selector (0xf6b6a4e9).
+  if (!(await hasSelector(provider, INTEROP_CENTER_ADDR, "0xfc53bac1"))) {
+    await provider.send("anvil_setCode", [INTEROP_CENTER_ADDR, getBytecode("InteropCenter")]);
+  }
+  if (
+    !(await hasSelector(
+      provider,
+      L2_INTEROP_HANDLER_ADDR,
+      selectorOf(
+        "executeAtomicBundle(bytes,(bytes32,uint64,bytes32[],uint256[],(uint256,uint256,bytes32,uint16,uint256,bytes32[],(uint256,uint256,uint256),uint256,bytes32[])[]))"
+      )
+    ))
+  ) {
+    await provider.send("anvil_setCode", [L2_INTEROP_HANDLER_ADDR, getBytecode("InteropHandler")]);
+  }
 
   const tree = new Contract(L2_INTEROP_COMMITMENT_TREE_ADDR, getAbi("L2InteropCommitmentTree"), wallet);
-  const escrow = new Contract(L2_ATOMIC_FLOW_ESCROW_ADDR, getAbi("AtomicFlowEscrow"), wallet);
+  const manager = new Contract(L2_ATOMIC_FLOW_MANAGER_ADDR, getAbi("AtomicFlowManager"), wallet);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
 
   // 2. Wire (skip if already initialized — supports re-runs over loaded chain state).
   const existingTreeAppender: string = await tree.appender();
   if (existingTreeAppender === ethers.constants.AddressZero) {
-    await (await tree.initialize(L2_ATOMIC_FLOW_ESCROW_ADDR)).wait();
+    await (await tree.initialize(L2_ATOMIC_FLOW_MANAGER_ADDR)).wait();
   }
 
-  const existingEscrowTree: string = await escrow.commitmentTree();
-  if (existingEscrowTree === ethers.constants.AddressZero) {
-    await (await escrow.initialize(L2_INTEROP_COMMITMENT_TREE_ADDR, assetRouter, nativeTokenVault)).wait();
+  const existingManagerTree: string = await manager.commitmentTree();
+  if (existingManagerTree === ethers.constants.AddressZero) {
+    await (
+      await manager.initialize(
+        L2_INTEROP_COMMITMENT_TREE_ADDR,
+        assetRouter,
+        INTEROP_CENTER_ADDR,
+        L2_INTEROP_HANDLER_ADDR
+      )
+    ).wait();
   }
 
-  // 3. Register the escrow on the L2AssetRouter (owner-gated, mirrors 12-dummy-flow's wiring).
+  // 3. Register the manager on the L2AssetRouter (owner-gated, mirrors 12-dummy-flow's wiring).
   //
   // The pre-generated chain states were dumped before the AR's atomic-flow additions
-  // (`atomicFlowEscrow` / `setAtomicFlowEscrow` / `atomicBridgeBurn` / `recoverAtomicBurn`), so refresh
-  // the AR's runtime code in place to the freshly-built bytecode. This is a CODE upgrade only — the
-  // AR's storage is preserved: `atomicFlowEscrow` is a freshly-appended slot (258, after the existing
-  // layout) that reads as 0 in the old state, which is exactly what `setAtomicFlowEscrow` requires.
-  // No storage slot is overwritten; this is the same `anvil_setCode` built-in-install pattern the
-  // harness uses elsewhere.
+  // (`atomicFlowManager` / `setAtomicFlowManager` / `recoverAtomicBurn`), so refresh the AR's runtime
+  // code in place to the freshly-built bytecode. This is a CODE upgrade only — the AR's storage is
+  // preserved: `atomicFlowManager` is a freshly-appended slot that reads as 0 in the old state, which
+  // is exactly what `setAtomicFlowManager` requires. No storage slot is overwritten; this is the same
+  // `anvil_setCode` built-in-install pattern the harness uses elsewhere.
   // Selectors are computed from the literal signatures (not via a loaded ABI): the committed
   // zkstack-out ABIs can lag the freshly-rebuilt contracts, so signature-derived selectors are the
   // reliable probe.
-  if (!(await hasSelector(provider, assetRouter, selectorOf("atomicFlowEscrow()")))) {
+  if (!(await hasSelector(provider, assetRouter, selectorOf("atomicFlowManager()")))) {
     await provider.send("anvil_setCode", [assetRouter, getBytecode("L2AssetRouter")]);
   }
 
   // Likewise, refresh the L2NativeTokenVault if it predates `bridgeRecoverFailedTransfer` (the refund
-  // path the escrow drives via `recoverAtomicBurn`). Code-only upgrade: the recover path reuses the
+  // path the manager drives via `recoverAtomicBurn`). Code-only upgrade: the recover path reuses the
   // existing NTV storage (bridgedTokenBeacon / originChainId / tokenAddress / chainBalance), which is
   // identical between the standard and dev variants, so no slot is overwritten. We install the
   // `L2NativeTokenVaultDev` runtime — the variant the anvil harness deploys — because its
@@ -104,16 +147,16 @@ export async function deployAtomicStack(args: {
   }
 
   const arReader = new Contract(assetRouter, getAbi("L2AssetRouter"), provider);
-  const currentEscrow: string = await arReader.atomicFlowEscrow();
-  if (currentEscrow === ethers.constants.AddressZero) {
+  const currentManager: string = await arReader.atomicFlowManager();
+  if (currentManager === ethers.constants.AddressZero) {
     const arOwner: string = await arReader.owner();
     await impersonateAndRun(provider, arOwner, async (signer) => {
       const ar = new Contract(assetRouter, getAbi("L2AssetRouter"), signer);
-      await (await ar.setAtomicFlowEscrow(L2_ATOMIC_FLOW_ESCROW_ADDR)).wait();
+      await (await ar.setAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR)).wait();
     });
   }
 
-  return { chainId, provider, tree, escrow };
+  return { chainId, provider, tree, manager, interopCenter, interopHandler };
 }
 
 /**
@@ -127,7 +170,7 @@ async function hasSelector(provider: providers.JsonRpcProvider, address: string,
   return code.includes(selector.slice(2).toLowerCase());
 }
 
-/** 4-byte function selector for a canonical signature string, e.g. `selectorOf("atomicFlowEscrow()")`. */
+/** 4-byte function selector for a canonical signature string, e.g. `selectorOf("atomicFlowManager()")`. */
 function selectorOf(signature: string): string {
   return ethers.utils.id(signature).slice(0, 10);
 }

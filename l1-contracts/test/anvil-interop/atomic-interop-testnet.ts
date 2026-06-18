@@ -240,7 +240,9 @@ async function preflight(): Promise<void> {
     const balance = await p.getBalance(wallet.address);
     const nonce = await p.getTransactionCount(wallet.address);
     const block = await p.getBlockNumber();
-    console.log(`${c.name} (chainId ${c.chainId}): nonce=${nonce} balance=${ethers.utils.formatEther(balance)} block=${block}`);
+    console.log(
+      `${c.name} (chainId ${c.chainId}): nonce=${nonce} balance=${ethers.utils.formatEther(balance)} block=${block}`
+    );
   }
 
   const state = loadState();
@@ -280,7 +282,9 @@ async function bridgeEth(): Promise<void> {
     // current balance — the caller knows what they need.
     const forceDeposit = targetChainId !== undefined;
     if (!forceDeposit && balance.gte(ETH_PER_L2_DEPOSIT)) {
-      console.log(`[${c.name}] balance ${ethers.utils.formatEther(balance)} ETH already ≥ ${ethers.utils.formatEther(ETH_PER_L2_DEPOSIT)}, skipping deposit.`);
+      console.log(
+        `[${c.name}] balance ${ethers.utils.formatEther(balance)} ETH already ≥ ${ethers.utils.formatEther(ETH_PER_L2_DEPOSIT)}, skipping deposit.`
+      );
       continue;
     }
 
@@ -292,7 +296,9 @@ async function bridgeEth(): Promise<void> {
     );
     const mintValue = baseCost.add(depositAmount);
 
-    console.log(`[${c.name}] depositing ${ethers.utils.formatEther(depositAmount)} ETH (mintValue=${ethers.utils.formatEther(mintValue)})...`);
+    console.log(
+      `[${c.name}] depositing ${ethers.utils.formatEther(depositAmount)} ETH (mintValue=${ethers.utils.formatEther(mintValue)})...`
+    );
     const tx = await bridgehub.requestL2TransactionDirect(
       {
         chainId: c.chainId,
@@ -315,7 +321,9 @@ async function bridgeEth(): Promise<void> {
       saveState(state);
     }
     const targetBalance = balance.add(depositAmount);
-    console.log(`  L1 tx ${tx.hash}; waiting for L2 balance to reach ${ethers.utils.formatEther(targetBalance)} ETH...`);
+    console.log(
+      `  L1 tx ${tx.hash}; waiting for L2 balance to reach ${ethers.utils.formatEther(targetBalance)} ETH...`
+    );
     await waitForBalance(l2Provider, l1Wallet.address, targetBalance);
   }
   console.log("Bridge-eth done.");
@@ -327,7 +335,9 @@ async function waitForBalance(_p: providers.JsonRpcProvider, _addr: string, _tar
   while (true) {
     const b = await _p.getBalance(_addr);
     if (b.gte(_target)) {
-      console.log(`  L2 balance ${ethers.utils.formatEther(b)} ETH (after ${Math.floor((Date.now() - start) / 1000)}s)`);
+      console.log(
+        `  L2 balance ${ethers.utils.formatEther(b)} ETH (after ${Math.floor((Date.now() - start) / 1000)}s)`
+      );
       return;
     }
     await sleep(15_000);
@@ -432,7 +442,7 @@ async function wireL2(): Promise<void> {
     });
   }
 
-  // For each chain: initialize escrow + setAtomicFlowEscrow on the private AR.
+  // For each chain: initialize escrow + setAtomicFlowManager on the private AR.
   for (const c of CHAINS) {
     const cs = chainState(state, c);
     if (!cs.escrowAddress || !cs.privateStack) {
@@ -454,9 +464,9 @@ async function wireL2(): Promise<void> {
     const escrow = new Contract(cs.escrowAddress, getAbi("L2FlowEscrow"), wallet);
     await (await escrow.initialize(state.l1.linker, cs.privateStack.assetRouter, cs.privateStack.ntv, gas)).wait();
 
-    console.log(`[${c.name}] setting atomicFlowEscrow on private AR...`);
+    console.log(`[${c.name}] setting atomicFlowManager on private AR...`);
     const ar = new Contract(cs.privateStack.assetRouter, getAbi("PrivateL2AssetRouter"), wallet);
-    await (await ar.setAtomicFlowEscrow(cs.escrowAddress, gas)).wait();
+    await (await ar.setAtomicFlowManager(cs.escrowAddress, gas)).wait();
 
     cs.wired = true;
     saveState(state);
@@ -529,13 +539,19 @@ async function deployTokens(): Promise<void> {
 
     if (!cs.testTokenAddress) {
       console.log(`[${c.name}] deploying TestnetERC20Token...`);
-      const factory = new ContractFactory(getAbi("TestnetERC20Token"), getCreationBytecode("TestnetERC20Token"), wallet);
+      const factory = new ContractFactory(
+        getAbi("TestnetERC20Token"),
+        getCreationBytecode("TestnetERC20Token"),
+        wallet
+      );
       const token = await factory.deploy(`AtomicTest-${c.chainId}`, `ATM${c.chainId}`, 18, gas);
       await token.deployed();
       cs.testTokenAddress = token.address;
       saveState(state);
       await (await token.mint(wallet.address, TEST_TOKEN_AMOUNT, gas)).wait();
-      console.log(`  token=${token.address}, minted ${ethers.utils.formatUnits(TEST_TOKEN_AMOUNT, 18)} ATM${c.chainId} to ${wallet.address}`);
+      console.log(
+        `  token=${token.address}, minted ${ethers.utils.formatUnits(TEST_TOKEN_AMOUNT, 18)} ATM${c.chainId} to ${wallet.address}`
+      );
     }
 
     // Register with the private NTV so the assetId is known.
@@ -547,7 +563,8 @@ async function deployTokens(): Promise<void> {
       await (await ntv.registerToken(cs.testTokenAddress!, gas)).wait();
     }
     const assetId: string = await ntv.assetId(cs.testTokenAddress!);
-    if (assetId === ethers.constants.HashZero) throw new Error(`[${c.name}] NTV failed to assign assetId after registerToken`);
+    if (assetId === ethers.constants.HashZero)
+      throw new Error(`[${c.name}] NTV failed to assign assetId after registerToken`);
     // Sanity check that the assetId matches the off-chain derivation.
     const expectedAssetId = encodeNtvAssetId(c.chainId, cs.testTokenAddress!);
     if (assetId.toLowerCase() !== expectedAssetId.toLowerCase()) {
@@ -579,7 +596,9 @@ async function commit(): Promise<void> {
 
   // Build a symmetric A→B / B→A swap: each chain sends SWAP_AMOUNT of its native test
   // token to the wallet's address on the other chain.
-  const sortedChainIds = CHAINS.map((c) => c.chainId).slice().sort((a, b) => a - b);
+  const sortedChainIds = CHAINS.map((c) => c.chainId)
+    .slice()
+    .sort((a, b) => a - b);
   const specs: SendSpec[] = [];
   const specsBySender: Record<string, SendSpecJSON> = {};
   for (let i = 0; i < CHAINS.length; i++) {
@@ -651,7 +670,8 @@ async function commit(): Promise<void> {
     const tx = await escrow.commitSend(flowId, specs[i], gas);
     const receipt = await tx.wait();
     cs.commitTxHash = tx.hash;
-    cs.commitL2BatchNumber = (receipt as ethers.providers.TransactionReceipt & { l1BatchNumber?: number }).l1BatchNumber ?? undefined;
+    cs.commitL2BatchNumber =
+      (receipt as ethers.providers.TransactionReceipt & { l1BatchNumber?: number }).l1BatchNumber ?? undefined;
     saveState(state);
     console.log(`  commitSend tx: ${tx.hash}, l1BatchNumber=${cs.commitL2BatchNumber ?? "(not yet sealed)"}`);
   }
@@ -727,9 +747,7 @@ async function pollLogProof(_p: providers.JsonRpcProvider, _txHash: string): Pro
       };
       const txNumberInBatch = r.l1BatchTxIndex ?? l1Receipt.l2ToL1Logs?.[0]?.txIndexInL1Batch ?? 0;
       // Pull the message body from the receipt's L1MessageSent event.
-      const msgLog = receipt.logs.find((l) =>
-        l.topics[0] === ethers.utils.id("L1MessageSent(address,bytes32,bytes)")
-      );
+      const msgLog = receipt.logs.find((l) => l.topics[0] === ethers.utils.id("L1MessageSent(address,bytes32,bytes)"));
       if (!msgLog) throw new Error(`No L1MessageSent log in tx ${_txHash}`);
       const decoded = ethers.utils.defaultAbiCoder.decode(["bytes"], msgLog.data);
       return {
@@ -761,7 +779,12 @@ async function finalize(): Promise<void> {
   }
   for (const c of CHAINS) {
     const cs = chainState(state, c);
-    if (!cs.commitMerkleProof || !cs.commitLogMessage || cs.commitL2BatchNumber === undefined || cs.commitL2MessageIndex === undefined) {
+    if (
+      !cs.commitMerkleProof ||
+      !cs.commitLogMessage ||
+      cs.commitL2BatchNumber === undefined ||
+      cs.commitL2MessageIndex === undefined
+    ) {
       throw new Error(`[${c.name}] proof not collected; run wait-verify first.`);
     }
   }
@@ -803,9 +826,16 @@ async function executeFlow(): Promise<void> {
   const linker = new Contract(state.l1.linker!, getAbi("L1FlowLinker"), l1Wallet);
   const bridgehub = new Contract(L1_BRIDGEHUB, getAbi("L1Bridgehub"), l1Wallet);
 
-  const chainsAsc = CHAINS.map((c) => c.chainId).slice().sort((a, b) => a - b);
+  const chainsAsc = CHAINS.map((c) => c.chainId)
+    .slice()
+    .sort((a, b) => a - b);
   // Compute mintValue per chain.
-  const execParams: { mintValue: BigNumber; l2GasLimit: number; l2GasPerPubdataByteLimit: number; refundRecipient: string }[] = [];
+  const execParams: {
+    mintValue: BigNumber;
+    l2GasLimit: number;
+    l2GasPerPubdataByteLimit: number;
+    refundRecipient: string;
+  }[] = [];
   let total = BigNumber.from(0);
   for (const chainId of chainsAsc) {
     const baseCost: BigNumber = await bridgehub.l2TransactionBaseCost(

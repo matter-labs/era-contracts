@@ -66,6 +66,17 @@ export function useFixedFeeAttr(useFixedFee: boolean): string {
   return erc7786Iface.encodeFunctionData("useFixedFee", [useFixedFee]);
 }
 
+/**
+ * Encode the ERC-7786 `atomicBundle(bytes32 flowId, uint64 deadline, uint256 lowNullifierIndex)`
+ * bundle attribute. When present, the InteropCenter appends the bundle's commit value to the interop
+ * IMT via the AtomicFlowManager (in place of publishing the bundle to L1), and the destination
+ * executes it via InteropHandler.executeAtomicBundle once the whole flow is proven committed before
+ * the deadline. `_deadline` is a settlement-layer block number.
+ */
+export function atomicBundleAttr(flowId: string, deadline: number, lowNullifierIndex: number): string {
+  return erc7786Iface.encodeFunctionData("atomicBundle", [flowId, deadline, lowNullifierIndex]);
+}
+
 // ── Token transfer data encoding ───────────────────────────────
 
 /**

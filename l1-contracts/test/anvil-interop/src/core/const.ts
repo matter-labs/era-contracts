@@ -29,12 +29,12 @@ export const L2_ASSET_TRACKER_ADDR = "0x000000000000000000000000000000000001000f
 export const GW_ASSET_TRACKER_ADDR = "0x0000000000000000000000000000000000010010";
 export const L2_BASE_TOKEN_HOLDER_ADDR = "0x0000000000000000000000000000000000010011";
 
-// L1-free atomic interop (IMT engine B) canonical built-in addresses. Mirrors
-// L2_INTEROP_COMMITMENT_TREE_ADDR / L2_ATOMIC_FLOW_ESCROW_ADDR in
+// L1-free atomic interop (bundle model) canonical built-in addresses. Mirrors
+// L2_INTEROP_COMMITMENT_TREE_ADDR / L2_ATOMIC_FLOW_MANAGER_ADDR in
 // contracts/common/l2-helpers/L2ContractAddresses.sol. Slot 0x10013 is intentionally
 // skipped: it previously hosted the removed L2GlobalInteropRootImporter.
 export const L2_INTEROP_COMMITMENT_TREE_ADDR = "0x0000000000000000000000000000000000010012";
-export const L2_ATOMIC_FLOW_ESCROW_ADDR = "0x0000000000000000000000000000000000010014";
+export const L2_ATOMIC_FLOW_MANAGER_ADDR = "0x0000000000000000000000000000000000010014";
 
 // ZK-VM system hook addresses: SYSTEM_HOOKS_OFFSET (0x7000) + offset
 export const L1_MESSENGER_HOOK_ADDR = "0x0000000000000000000000000000000000007001";
@@ -74,8 +74,15 @@ export const ANVIL_INTEROP_TWO_BRIDGES_PRIORITY_REQUEST_COUNT = 2;
 export const TEST_TOKEN_DECIMALS = 18;
 export const TEST_TOKEN_MINT_AMOUNT_UNITS = "1000";
 
+// Mirrors the InteropBundle struct in contracts/common/Messaging.sol. The trailing BundleAttributes
+// tuple is the original 3 fields (executionAddress, unbundlerAddress, useFixedFee). Atomic-send params
+// (flowId, deadline, lowNullifierIndex) do NOT live in the bundle — they travel via the `atomicBundle`
+// ERC-7786 attribute and are parsed by the InteropCenter into an internal AtomicSend struct, so they
+// never affect the bundle bytes / bundleHash.
 export const INTEROP_BUNDLE_TUPLE_TYPE =
   "tuple(bytes1,uint256,uint256,bytes32,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes,bool))";
+// keccak256 of the InteropBundleSent(bytes32,bytes32,InteropBundle) signature (with the 3-field
+// BundleAttributes above).
 export const INTEROP_BUNDLE_SENT_TOPIC = "0x593b2515b718ee761cd2a586d8613d22833a452122cfb7692ebabd538d57d3ff";
 
 // AddressAliasHelper offset: uint160(0x1111000000000000000000000000000000001111)

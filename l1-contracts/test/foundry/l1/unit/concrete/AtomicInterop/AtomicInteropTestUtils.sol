@@ -64,11 +64,11 @@ library AtomicInteropTestUtils {
     }
 
     /// @notice Computes flowId exactly as {AtomicFlowManager}. Both arrays must be strictly ascending.
-    function computeFlowId(bytes32[] memory _bundleHashes, uint256[] memory _chainIds, uint64 _deadline)
-        internal
-        pure
-        returns (bytes32)
-    {
+    function computeFlowId(
+        bytes32[] memory _bundleHashes,
+        uint256[] memory _chainIds,
+        uint64 _deadline
+    ) internal pure returns (bytes32) {
         return keccak256(abi.encode(_bundleHashes, _chainIds, _deadline));
     }
 

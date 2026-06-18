@@ -118,18 +118,18 @@ describe("12 - Dummy Flow atomic A → B → C", function () {
     const initEscrows = initChainIds.map((id) => escrows[id].address);
     await (await linker.initialize(initChainIds, initEscrows)).wait();
 
-    // Whitelist each chain's escrow on its L2AssetRouter via the AR's owner.
-    // Required so the escrow can call AR.initiateIndirectCall (source-side burn) and
-    // AR.finalizeDeposit (destination-side mint). `setAtomicFlowEscrow` is gated
-    // `onlyOwner` (lifted off `onlyUpgrader` so a userspace AR can wire its own escrow
-    // without going through the system complex upgrader).
+    // Whitelist each chain's escrow on its L2AssetRouter via the AR's owner, by registering it in the
+    // atomic-flow-manager slot. Required so the escrow can call AR.initiateIndirectCall (source-side
+    // burn) and AR.finalizeDeposit (destination-side mint). `setAtomicFlowManager` is gated on the AR
+    // owner (or the complex upgrader) so a userspace AR can wire its own escrow without going through
+    // the system complex upgrader.
     await Promise.all(
       l2Triples.map(async ({ chainId, provider }) => {
         const arReader = new Contract(L2_ASSET_ROUTER_ADDR, getAbi("L2AssetRouter"), provider);
         const arOwner: string = await arReader.owner();
         await impersonateAndRun(provider, arOwner, async (signer) => {
           const ar = new Contract(L2_ASSET_ROUTER_ADDR, getAbi("L2AssetRouter"), signer);
-          await (await ar.setAtomicFlowEscrow(escrows[chainId].address)).wait();
+          await (await ar.setAtomicFlowManager(escrows[chainId].address)).wait();
         });
       })
     );

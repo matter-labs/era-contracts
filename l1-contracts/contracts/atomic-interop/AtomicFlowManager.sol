@@ -238,7 +238,9 @@ contract AtomicFlowManager is IAtomicFlowManager {
 
     /// @dev Strips the 4-byte selector from a `finalizeDeposit(uint256,bytes32,bytes)` calldata blob and
     /// returns `(assetId, bridgeMintData)`. The source chain id (first arg) is not needed for recovery.
-    function _decodeFinalizeDeposit(bytes memory _callData) private pure returns (bytes32 assetId, bytes memory mintData) {
+    function _decodeFinalizeDeposit(
+        bytes memory _callData
+    ) private pure returns (bytes32 assetId, bytes memory mintData) {
         uint256 argsLen = _callData.length - 4;
         bytes memory args = new bytes(argsLen);
         for (uint256 i = 0; i < argsLen; ++i) {
