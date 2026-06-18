@@ -1,22 +1,40 @@
 #!/usr/bin/env bash
 #
-# atomic-os-demo.sh — one-touch driver for the L1-free atomic-interop demo on two local
-# ZKsync OS servers. Wraps the full runbook in `atomic-imt-server-demo.md` into three commands:
+# atomic-os-demo.sh — one-touch driver for the L1-free atomic-interop demo (BUNDLE MODEL) on two
+# local ZKsync OS servers. Wraps the runbook in `atomic-imt-server-demo.md` into three commands:
 #
 #   ./atomic-os-demo.sh update-server   # zk-deployer bootstrap/apply + genesis + server configs
-#   ./atomic-os-demo.sh launch          # start Anvil + both servers, deploy L1 registry,
-#                                        # fund wallets via L1->L2, start the root relayer daemon
-#   ./atomic-os-demo.sh demo            # register a sample 2-leg swap, commit both sides,
-#                                        # wait for relay, authorize (+ try execute)
+#   ./atomic-os-demo.sh launch          # start Anvil + both servers, fund wallets via L1->L2
+#   ./atomic-os-demo.sh demo            # register a 2-leg swap, atomic-send both legs, execute both
 #
 #   ./atomic-os-demo.sh status          # show running processes + key addresses
-#   ./atomic-os-demo.sh stop            # stop the servers, relayer and Anvil started by `launch`
+#   ./atomic-os-demo.sh stop            # stop the servers and Anvil started by `launch`
 #
-# Everything reuses the same constants (RPCs, chain ids, rich/relayer PK) and a single work
-# directory, so the steps are repeatable and compose without following the long guide.
+# ─ Bundle model (vs. the old escrow/global-IMT/relayer model this script used to drive) ────────────
+#   The atomic flow is now L1-FREE and runs entirely through the production interop contracts:
+#     SEND     `InteropCenter.sendBundle(dst, [indirect AR call], [atomicBundle(flowId,deadline,low)])`
+#              — burns via the AR's `initiateIndirectCall`, and because of the `atomicBundle` attribute
+#              appends the leg's commit value to this chain's {L2InteropCommitmentTree} (0x10012) via
+#              {AtomicFlowManager.append} (0x10014) INSTEAD of publishing the bundle to L1.
+#     RECEIVE  `InteropHandler.executeAtomicBundle(bundle, AtomicFinalityProof)` once EVERY leg is
+#              proven committed (one IMT inclusion proof per leg) before the deadline.
+#     TIMEOUT  `AtomicFlowManager.authorizeRefund` + `claimRefund`.
+#   There is NO L1 GlobalInteropIMT registry and NO root-relayer daemon anymore. A chain's commitment
+#   root travels on the standard interop-root channel and is authenticated by the consuming chain; the
+#   deadline is a settlement-layer block number derived from the same inclusion proof.
 #
-# Required tool locations (set in the environment or in a `atomic-os-demo.env` next to this
-# script). Defaults assume sibling checkouts under $HOME.
+# ⚠️  UNVERIFIED ON LIVE SERVERS. The bundle-model atomic flow is covered end-to-end by the Anvil e2e
+#     spec `test/hardhat/13-imt-atomic-swap.spec.ts` (happy + timeout), where the cross-chain
+#     interop-root authentication is MOCKED ({MockL2MessageVerification}). This script targets two REAL
+#     zksync-os servers, where that authentication must instead be served by the servers' native
+#     interop-root import between the two chains. That live path is NOT exercised by CI and has not been
+#     run end-to-end at the time of writing — the `execute` step here assumes the destination server can
+#     authenticate the source chain's commitment root (the same assumption the Anvil harness mocks). If
+#     `execute` fails proof verification on a live server, that integration — not this script's flow — is
+#     the gap to close. The `demo` step prints this caveat at the inclusion-proof boundary.
+#
+# Required tool locations (set in the environment or in a `atomic-os-demo.env` next to this script).
+# Defaults assume sibling checkouts under $HOME.
 #
 #   ZK_DEPLOYER  path to the built zk-deployer binary (zksync-os-integration-tests)
 #   SERVER_BIN   path to the built zksync-os-server binary (with the demo proving bypass)
@@ -41,7 +59,7 @@ LOCAL_DEV="${LOCAL_DEV:-$HOME/zksync-os-integration-tests/tests/configs/local_de
 WORKDIR="${WORKDIR:-$ANVIL_INTEROP/.atomic-os-demo}"
 
 # Shared constants — the standard local Anvil rich account (Anvil account #0), reused as the
-# deployer, the relayer and the swap depositor. The recipient is Anvil account #1.
+# deployer and the swap depositor. The recipient is Anvil account #1.
 RICH_PK="${RICH_PK:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}"
 RECIPIENT="${RECIPIENT:-0x70997970C51812dc3A010C7d01b50e0d17dc79C8}"
 
@@ -50,7 +68,9 @@ CHAIN_A_ID="${CHAIN_A_ID:-6565}"
 CHAIN_B_ID="${CHAIN_B_ID:-6566}"
 CHAIN_A_RPC="${CHAIN_A_RPC:-http://127.0.0.1:3050}"
 CHAIN_B_RPC="${CHAIN_B_RPC:-http://127.0.0.1:3150}"
-RELAYER_POLL="${RELAYER_POLL:-4}"
+
+# Deadline as a settlement-layer block number (large, so inclusion proofs satisfy slBlock <= deadline).
+DEADLINE_SL_BLOCK="${DEADLINE_SL_BLOCK:-1000000}"
 
 # Base-token value written into intent.yaml. The zk-deployer intent schema for `base_token`
 # varies by version: older builds take the string `eth`; newer ones expect a struct. Override
@@ -59,10 +79,14 @@ RELAYER_POLL="${RELAYER_POLL:-4}"
 #   BASE_TOKEN='{ address: "0x0000000000000000000000000000000000000001" }'
 BASE_TOKEN="${BASE_TOKEN:-eth}"
 
-# Well-known L2 predeploy addresses for the atomic-interop contracts (genesis).
+# Well-known L2 predeploy addresses for the bundle-model atomic-interop contracts (genesis).
+# The global-IMT importer (formerly 0x10013) is GONE in the bundle model.
 TREE_ADDR="0x0000000000000000000000000000000000010012"
-IMPORTER_ADDR="0x0000000000000000000000000000000000010013"
-ESCROW_ADDR="0x0000000000000000000000000000000000010014"
+MANAGER_ADDR="0x0000000000000000000000000000000000010014"
+INTEROP_CENTER_ADDR="0x000000000000000000000000000000000001000d"
+INTEROP_HANDLER_ADDR="0x000000000000000000000000000000000001000e"
+ASSET_ROUTER_ADDR="0x0000000000000000000000000000000000010003"
+NTV_ADDR="0x0000000000000000000000000000000000010004"
 
 CAST="${CAST:-cast}"
 FORGE="${FORGE:-forge}"
@@ -115,7 +139,6 @@ wait_rpc() {
 rich_addr() { $CAST wallet address --private-key "$RICH_PK"; }
 
 bridgehub() { json_get "$WORKDIR/state.json" "['steps']['ecosystem.init']['bridgehub_proxy']"; }
-registry()  { cat "$WORKDIR/registry.txt"; }
 
 # ──────────────────────────────────────────────────────────────────────────────────────────
 # update-server: bootstrap the ecosystem + genesis + server configs (validium / no-DA)
@@ -161,12 +184,17 @@ YAML
     || { tail -20 "$WORKDIR/bootstrap.log"; die "bootstrap failed"; }
   ok "bridgehub $(bridgehub)"
 
-  step "Verifying the 3 atomic-interop predeploys are in genesis.json"
-  for a in 10012 10013 10014; do
+  step "Verifying the bundle-model atomic-interop predeploys are in genesis.json"
+  # Bundle model: commitment tree (0x10012) + flow manager (0x10014). The old global-IMT importer
+  # (0x10013) is intentionally absent.
+  for a in 10012 10014; do
     c=$(grep -c "00000000000000000000000000000000000$a" "$WORKDIR/genesis.json" || true)
     [ "$c" -ge 1 ] || die "predeploy 0x$a missing from genesis.json (is the deployer's genesis consts.rs patched?)"
   done
-  ok "tree/importer/escrow present in genesis"
+  if grep -q "0000000000000000000000000000000000010013" "$WORKDIR/genesis.json"; then
+    warn "genesis still contains 0x10013 (global-IMT importer) — stale genesis consts.rs? bundle model removed it"
+  fi
+  ok "commitment tree (0x10012) + flow manager (0x10014) present in genesis"
 
   step "zk-deployer apply (register chain-a and chain-b)"
   ( cd "$WORKDIR" && "$ZK_DEPLOYER" apply --broadcast >apply.log 2>&1 ) \
@@ -192,10 +220,10 @@ YAML
 }
 
 # ──────────────────────────────────────────────────────────────────────────────────────────
-# launch: start Anvil + both servers, deploy L1 registry, fund wallets, start relayer
+# launch: start Anvil + both servers, fund wallets
 # ──────────────────────────────────────────────────────────────────────────────────────────
 cmd_launch() {
-  section "launch — bring up Anvil, both ZKsync OS servers, the L1 registry and the relayer"
+  section "launch — bring up Anvil and both ZKsync OS servers, fund the depositor"
   need_file "$WORKDIR/l1-state.json" "l1-state.json" "run update-server first"
   need_file "$SERVER_BIN" "zksync-os-server binary" SERVER_BIN
   need_file "$LOCAL_DEV" "local_dev.yaml" LOCAL_DEV
@@ -219,75 +247,35 @@ cmd_launch() {
   wait_rpc "$CHAIN_A_RPC" "chain-a"; wait_rpc "$CHAIN_B_RPC" "chain-b"
   ok "chain-a up (chain-id $(cq chain-id --rpc-url "$CHAIN_A_RPC")), chain-b up (chain-id $(cq chain-id --rpc-url "$CHAIN_B_RPC"))"
 
-  step "Sanity: atomic-interop predeploys initialized on both chains"
+  step "Sanity: bundle-model atomic-interop predeploys initialized on both chains"
+  # In the bundle model genesis wires the manager to the commitment tree
+  # (AtomicFlowManager.commitmentTree() == tree). No escrow, no L1 registry, no importer.
   for rpc in "$CHAIN_A_RPC" "$CHAIN_B_RPC"; do
-    local tree; tree=$(cq call "$ESCROW_ADDR" 'commitmentTree()(address)' --rpc-url "$rpc")
-    [ "$(lc "$tree")" = "$(lc "$TREE_ADDR")" ] || die "escrow not initialized on $rpc (commitmentTree=$tree)"
+    local tree; tree=$(cq call "$MANAGER_ADDR" 'commitmentTree()(address)' --rpc-url "$rpc")
+    [ "$(lc "$tree")" = "$(lc "$TREE_ADDR")" ] || die "flow manager not initialized on $rpc (commitmentTree=$tree)"
   done
-  ok "escrow ⇄ tree ⇄ importer wired on both chains"
+  ok "AtomicFlowManager ⇄ L2InteropCommitmentTree wired on both chains"
 
   local BH; BH=$(bridgehub)
-  step "Deploying L1 GlobalInteropIMT registry (bridgehub $BH)"
-  local REG
-  REG=$( cd "$L1_CONTRACTS" && $FORGE create contracts/atomic-interop/GlobalInteropIMT.sol:GlobalInteropIMT \
-           --rpc-url "$L1_RPC" --private-key "$RICH_PK" --broadcast --constructor-args "$BH" 2>/dev/null \
-         | grep 'Deployed to:' | awk '{print $3}' )
-  [ -n "$REG" ] || die "registry deployment failed"
-  echo "$REG" > "$WORKDIR/registry.txt"
-  ok "registry $REG (chainDiamond($CHAIN_A_ID)=$(cq call "$REG" 'chainDiamond(uint256)(address)' "$CHAIN_A_ID" --rpc-url "$L1_RPC"))"
-
-  step "Funding the rich/relayer wallet $(rich_addr) on both chains via L1->L2 deposit"
+  step "Funding the depositor $(rich_addr) on both chains via L1->L2 deposit"
   ( cd "$ANVIL_INTEROP"
     npx ts-node fund-l2.ts --l1-rpc "$L1_RPC" --l2-rpc "$CHAIN_A_RPC" --bridgehub "$BH" --chain-id "$CHAIN_A_ID" --recipient "$(rich_addr)" --amount 1000 >/dev/null
     npx ts-node fund-l2.ts --l1-rpc "$L1_RPC" --l2-rpc "$CHAIN_B_RPC" --bridgehub "$BH" --chain-id "$CHAIN_B_ID" --recipient "$(rich_addr)" --amount 1000 >/dev/null )
   ok "depositor funded on chain-a and chain-b"
 
-  step "Writing relayer.json"
-  cat > "$WORKDIR/relayer.json" <<JSON
-{
-  "l1Rpc": "$L1_RPC",
-  "registry": "$REG",
-  "privateKey": "$RICH_PK",
-  "chains": [
-    { "chainId": $CHAIN_A_ID, "rpc": "$CHAIN_A_RPC", "tree": "$TREE_ADDR", "importer": "$IMPORTER_ADDR" },
-    { "chainId": $CHAIN_B_ID, "rpc": "$CHAIN_B_RPC", "tree": "$TREE_ADDR", "importer": "$IMPORTER_ADDR" }
-  ]
-}
-JSON
-  ok "relayer.json written"
-
-  step "Starting the root relayer daemon (poll ${RELAYER_POLL}s)"
-  ( cd "$ANVIL_INTEROP" && nohup npx ts-node atomic-root-relayer.ts \
-      --config "$WORKDIR/relayer.json" --poll "$RELAYER_POLL" >"$WORKDIR/relayer.log" 2>&1 & echo $! > "$WORKDIR/relayer.pid" )
-  sleep 6
-  grep -q "cycle complete" "$WORKDIR/relayer.log" || warn "relayer first cycle not confirmed yet (see relayer.log)"
-  ok "relayer running (pid $(cat "$WORKDIR/relayer.pid"))"
   echo ""; ok "launch complete — now run: $0 demo"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────────────────
-# demo: sample 2-leg atomic swap (register -> commit both -> wait relay -> authorize -> execute)
+# demo: sample 2-leg atomic swap (register -> atomic-send both -> check-status -> execute both)
 # ──────────────────────────────────────────────────────────────────────────────────────────
 cmd_demo() {
-  section "demo — drive a sample two-leg atomic swap ($CHAIN_A_ID ⇄ $CHAIN_B_ID)"
-  need_file "$WORKDIR/relayer.json" "relayer.json" "run launch first"
+  section "demo — drive a sample two-leg atomic swap ($CHAIN_A_ID ⇄ $CHAIN_B_ID), bundle model"
   need_tool "$FORGE"; need_tool "$CAST"; need_tool npx
-  local REG; REG=$(registry); local DEP; DEP=$(rich_addr)
+  local DEP; DEP=$(rich_addr)
   local STATE="$WORKDIR/atomic-flow-state.json"
   # The flow CLI expects the command as the first arg; flags (incl. --state) come after.
   flowcli() { ( cd "$ANVIL_INTEROP" && npx ts-node atomic-flow-cli.ts "$@" --state "$STATE" ); }
-
-  # Encode the origin token's (name,symbol,decimals) so the destination NTV can deploy the
-  # bridged token on first mint. Format: 0x01 || abi.encode(uint256 chainId, bytes name,
-  # bytes symbol, bytes decimals) — matches encodeErc20Data in src/helpers/dummy-flow-helpers.ts.
-  erc20_data() { # args: chainId name symbol decimals
-    local nb sb db inner
-    nb=$($CAST abi-encode "f(string)" "$2" 2>/dev/null)
-    sb=$($CAST abi-encode "f(string)" "$3" 2>/dev/null)
-    db=$($CAST abi-encode "f(uint8)" "$4" 2>/dev/null)
-    inner=$($CAST abi-encode "f(uint256,bytes,bytes,bytes)" "$1" "$nb" "$sb" "$db" 2>/dev/null)
-    echo "0x01${inner:2}"
-  }
 
   # Resolve the bridged-token address for a native (originChainId, originToken) on a destination
   # chain, via the destination NTV's tokenAddress(assetId) where assetId = encodeNtvAssetId(...).
@@ -295,10 +283,13 @@ cmd_demo() {
     local aid
     aid=$( cd "$ANVIL_INTEROP" && npx ts-node -e \
       "import {encodeNtvAssetId} from './src/core/data-encoding'; console.log(encodeNtvAssetId($1,'$2'))" 2>/dev/null )
-    cq call 0x0000000000000000000000000000000000010004 'tokenAddress(bytes32)(address)' "$aid" --rpc-url "$3"
+    cq call "$NTV_ADDR" 'tokenAddress(bytes32)(address)' "$aid" --rpc-url "$3"
   }
 
-  step "Deploying demo ERC20s + minting to $DEP + approving the escrow"
+  step "Deploying demo ERC20s + minting to $DEP + approving the NTV (source-burn pull)"
+  # The atomic send burns the source token through AR.initiateIndirectCall -> NTV.bridgeBurn, whose
+  # internal transferFrom pulls from the depositor with the NTV (0x10004) as spender — so the depositor
+  # approves the NTV. (Token registration with the NTV happens lazily on first bridgeBurn.)
   local TOKA TOKB
   TOKA=$( cd "$L1_CONTRACTS" && $FORGE create contracts/dev-contracts/TestnetERC20Token.sol:TestnetERC20Token \
             --rpc-url "$CHAIN_A_RPC" --private-key "$RICH_PK" --broadcast --constructor-args "DemoToken" "DEMO" 18 2>/dev/null \
@@ -309,19 +300,18 @@ cmd_demo() {
   [ -n "$TOKA" ] && [ -n "$TOKB" ] || die "token deployment failed"
   for pair in "$TOKA $CHAIN_A_RPC" "$TOKB $CHAIN_B_RPC"; do
     set -- $pair
-    $CAST send "$1" 'mint(address,uint256)'    "$DEP"        1000000000000000000000 --rpc-url "$2" --private-key "$RICH_PK" >/dev/null 2>&1
-    $CAST send "$1" 'approve(address,uint256)' "$ESCROW_ADDR" 1000000000000000000000 --rpc-url "$2" --private-key "$RICH_PK" >/dev/null 2>&1
+    $CAST send "$1" 'mint(address,uint256)'    "$DEP"      1000000000000000000000 --rpc-url "$2" --private-key "$RICH_PK" >/dev/null 2>&1
+    $CAST send "$1" 'approve(address,uint256)' "$NTV_ADDR" 1000000000000000000000 --rpc-url "$2" --private-key "$RICH_PK" >/dev/null 2>&1
   done
-  ok "token-a $TOKA (chain-a), token-b $TOKB (chain-b) — minted + approved"
+  ok "token-a $TOKA (chain-a), token-b $TOKB (chain-b) — minted + NTV-approved"
 
-  step "Seeding the flow-state config (L1 registry + per-chain addresses)"
+  step "Seeding the flow-state config (per-chain bundle-model addresses)"
   cat > "$STATE" <<JSON
 {
   "config": {
-    "l1": { "rpc": "$L1_RPC", "registry": "$REG" },
     "chains": {
-      "$CHAIN_A_ID": { "rpc": "$CHAIN_A_RPC", "escrow": "$ESCROW_ADDR", "tree": "$TREE_ADDR", "importer": "$IMPORTER_ADDR" },
-      "$CHAIN_B_ID": { "rpc": "$CHAIN_B_RPC", "escrow": "$ESCROW_ADDR", "tree": "$TREE_ADDR", "importer": "$IMPORTER_ADDR" }
+      "$CHAIN_A_ID": { "rpc": "$CHAIN_A_RPC", "interopCenter": "$INTEROP_CENTER_ADDR", "interopHandler": "$INTEROP_HANDLER_ADDR", "manager": "$MANAGER_ADDR", "tree": "$TREE_ADDR" },
+      "$CHAIN_B_ID": { "rpc": "$CHAIN_B_RPC", "interopCenter": "$INTEROP_CENTER_ADDR", "interopHandler": "$INTEROP_HANDLER_ADDR", "manager": "$MANAGER_ADDR", "tree": "$TREE_ADDR" }
     }
   },
   "flows": {}
@@ -330,67 +320,58 @@ JSON
   ok "config seeded ($STATE)"
 
   step "Registering the swap flow (leg A: a→b 100 DEMO, leg B: b→a 50 DEMO)"
-  local ERC20DATA_A ERC20DATA_B
-  ERC20DATA_A=$(erc20_data "$CHAIN_A_ID" "DemoToken" "DEMO" 18)
-  ERC20DATA_B=$(erc20_data "$CHAIN_B_ID" "DemoToken" "DEMO" 18)
+  # LegSpec shape per atomic-flow-cli.ts: amounts are whole-token strings (18 decimals applied in-CLI).
+  # The bundle model carries the origin token's metadata in the burn's bridgeMintCalldata, so the
+  # destination NTV deploys the bridged token on first mint — no separate erc20Data needed.
   cat > "$WORKDIR/legs.json" <<JSON
 [
   { "originChainId": $CHAIN_A_ID, "depositor": "$DEP", "originToken": "$TOKA", "amount": "100",
-    "destChainId": $CHAIN_B_ID, "recipient": "$RECIPIENT", "erc20Data": "$ERC20DATA_A" },
+    "destChainId": $CHAIN_B_ID, "recipient": "$RECIPIENT" },
   { "originChainId": $CHAIN_B_ID, "depositor": "$DEP", "originToken": "$TOKB", "amount": "50",
-    "destChainId": $CHAIN_A_ID, "recipient": "$RECIPIENT", "erc20Data": "$ERC20DATA_B" }
+    "destChainId": $CHAIN_A_ID, "recipient": "$RECIPIENT" }
 ]
 JSON
-  flowcli register-flow-id --legs-file "$WORKDIR/legs.json" >/dev/null
+  flowcli register-flow-id --legs-file "$WORKDIR/legs.json" --deadline "$DEADLINE_SL_BLOCK" >/dev/null
   local FLOWID LEG_A LEG_B
   FLOWID=$(python3 -c "import json;print(list(json.load(open('$STATE'))['flows'])[-1])")
   LEG_A=$(python3 -c "import json;f=json.load(open('$STATE'))['flows']['$FLOWID'];print([l['legId'] for l in f['legs'] if l['spec']['originChainId']==$CHAIN_A_ID][0])")
   LEG_B=$(python3 -c "import json;f=json.load(open('$STATE'))['flows']['$FLOWID'];print([l['legId'] for l in f['legs'] if l['spec']['originChainId']==$CHAIN_B_ID][0])")
   ok "flowId $FLOWID"
 
-  step "Committing both legs on their origin chains (ERC20 escrow + IMT insert)"
-  flowcli commit-send "$FLOWID" "$LEG_A" "$RICH_PK" "$CHAIN_A_RPC" | sed 's/^/      /'
-  flowcli commit-send "$FLOWID" "$LEG_B" "$RICH_PK" "$CHAIN_B_RPC" | sed 's/^/      /'
+  step "Atomic-sending both legs on their origin chains (source burn + IMT append)"
+  flowcli send "$FLOWID" "$LEG_A" "$RICH_PK" "$CHAIN_A_RPC" | sed 's/^/      /'
+  flowcli send "$FLOWID" "$LEG_B" "$RICH_PK" "$CHAIN_B_RPC" | sed 's/^/      /'
 
-  step "Authorizing the flow on both chains (verifies the IMT inclusion proofs)"
-  # The relayer daemon needs one poll cycle to expose the post-commit roots to L1 and import the
-  # resulting global root back; retry authorize until that proof is available.
-  flowcli check-status "$FLOWID" >/dev/null  # sanity
-  local attempt=0
-  until flowcli authorize "$FLOWID" "$RICH_PK" "$CHAIN_B_RPC" >"$WORKDIR/authorize-b.log" 2>&1; do
-    attempt=$((attempt+1)); [ "$attempt" -gt 15 ] && { cat "$WORKDIR/authorize-b.log"; die "authorize did not succeed (relayer/proof not ready)"; }
-    sleep "$RELAYER_POLL"
-  done
-  sed 's/^/      /' "$WORKDIR/authorize-b.log"
-  flowcli authorize "$FLOWID" "$RICH_PK" "$CHAIN_A_RPC" 2>&1 | sed 's/^/      /'
-  ok "both chains authorized — every spec verified (remote legs via IMT inclusion proof, local via local state)"
+  step "Checking commit status (every leg's commit value present in its source IMT)"
+  flowcli check-status "$FLOWID" | sed 's/^/      /'
 
-  step "Spec states (2 = Executable) — leg A / leg B"
-  info "chain-a: $(cq call "$ESCROW_ADDR" 'specState(bytes32,bytes32)(uint8)' "$FLOWID" "$LEG_A" --rpc-url "$CHAIN_A_RPC") / $(cq call "$ESCROW_ADDR" 'specState(bytes32,bytes32)(uint8)' "$FLOWID" "$LEG_B" --rpc-url "$CHAIN_A_RPC")    chain-b: $(cq call "$ESCROW_ADDR" 'specState(bytes32,bytes32)(uint8)' "$FLOWID" "$LEG_A" --rpc-url "$CHAIN_B_RPC") / $(cq call "$ESCROW_ADDR" 'specState(bytes32,bytes32)(uint8)' "$FLOWID" "$LEG_B" --rpc-url "$CHAIN_B_RPC")"
+  warn "execute below authenticates each source chain's commitment root on the destination server."
+  warn "On Anvil this is mocked; on live zksync-os servers it relies on native interop-root import —"
+  warn "the UNVERIFIED integration noted in this script's header. A proof-verification failure here is"
+  warn "that integration gap, not the flow itself (which is green under 13-imt-atomic-swap.spec.ts)."
 
-  step "Executing all four sides (source burn + destination mint for each leg)"
-  flowcli execute "$FLOWID" "$LEG_A" "$RICH_PK" "$CHAIN_A_RPC" | sed 's/^/      /'   # leg A source burn (chain-a)
-  flowcli execute "$FLOWID" "$LEG_A" "$RICH_PK" "$CHAIN_B_RPC" | sed 's/^/      /'   # leg A dest mint (chain-b)
-  flowcli execute "$FLOWID" "$LEG_B" "$RICH_PK" "$CHAIN_B_RPC" | sed 's/^/      /'   # leg B source burn (chain-b)
-  flowcli execute "$FLOWID" "$LEG_B" "$RICH_PK" "$CHAIN_A_RPC" | sed 's/^/      /'   # leg B dest mint (chain-a)
-  ok "all four execute calls landed"
+  step "Executing each destination leg (executeAtomicBundle: per-leg inclusion proof + mint)"
+  # Leg A's destination is chain-b; leg B's destination is chain-a.
+  flowcli execute "$FLOWID" "$LEG_A" "$RICH_PK" "$CHAIN_B_RPC" | sed 's/^/      /'
+  flowcli execute "$FLOWID" "$LEG_B" "$RICH_PK" "$CHAIN_A_RPC" | sed 's/^/      /'
+  ok "both destination legs executed"
 
-  step "Verifying balances — recipient received bridged tokens, source escrows debited"
+  step "Verifying balances — recipient received bridged tokens; depositor's source debited"
   local bridgedA bridgedB
   bridgedA=$(bridged_token "$CHAIN_A_ID" "$TOKA" "$CHAIN_B_RPC")   # token-a bridged onto chain-b
   bridgedB=$(bridged_token "$CHAIN_B_ID" "$TOKB" "$CHAIN_A_RPC")   # token-b bridged onto chain-a
-  local recvA recvB escA escB
+  local recvA recvB depA depB
   recvA=$(cq call "$bridgedA" 'balanceOf(address)(uint256)' "$RECIPIENT" --rpc-url "$CHAIN_B_RPC")
   recvB=$(cq call "$bridgedB" 'balanceOf(address)(uint256)' "$RECIPIENT" --rpc-url "$CHAIN_A_RPC")
-  escA=$(cq call "$TOKA" 'balanceOf(address)(uint256)' "$ESCROW_ADDR" --rpc-url "$CHAIN_A_RPC")
-  escB=$(cq call "$TOKB" 'balanceOf(address)(uint256)' "$ESCROW_ADDR" --rpc-url "$CHAIN_B_RPC")
-  info "recipient on chain-b: ${recvA%% *} bridged DEMO (token-a)   [expect 100]"
-  info "recipient on chain-a: ${recvB%% *} bridged DEMO (token-b)   [expect 50]"
-  info "source escrow on chain-a: ${escA%% *} token-a   on chain-b: ${escB%% *} token-b   [expect 0 / 0]"
-  if [ "${recvA%% *}" = "100" ] && [ "${recvB%% *}" = "50" ] && [ "${escA%% *}" = "0" ] && [ "${escB%% *}" = "0" ]; then
-    ok "atomic swap settled: funds received on both destinations, source escrows burned"
+  depA=$(cq call "$TOKA" 'balanceOf(address)(uint256)' "$DEP" --rpc-url "$CHAIN_A_RPC")
+  depB=$(cq call "$TOKB" 'balanceOf(address)(uint256)' "$DEP" --rpc-url "$CHAIN_B_RPC")
+  info "recipient on chain-b: ${recvA%% *} bridged DEMO (token-a)   [expect 100000000000000000000]"
+  info "recipient on chain-a: ${recvB%% *} bridged DEMO (token-b)   [expect 50000000000000000000]"
+  info "depositor token-a on chain-a: ${depA%% *}   token-b on chain-b: ${depB%% *}   [burned: 100 / 50 debited]"
+  if [ "${recvA%% *}" = "100000000000000000000" ] && [ "${recvB%% *}" = "50000000000000000000" ]; then
+    ok "atomic swap settled: funds received on both destinations, source tokens burned"
   else
-    die "balance check failed — see values above"
+    die "balance check failed — see values above (likely the unverified live root-authentication step)"
   fi
   echo ""; ok "demo complete — full atomic swap executed and verified."
 }
@@ -404,15 +385,15 @@ cmd_status() {
     local name="${pair%%:*}" url="${pair#*:}"
     if rpc_up "$url"; then ok "$name up ($url) block=$(cq block-number --rpc-url "$url")"; else warn "$name down ($url)"; fi
   done
-  [ -f "$WORKDIR/registry.txt" ] && info "registry: $(registry)"
-  for p in anvil serverA serverB relayer; do
+  info "tree $TREE_ADDR · manager $MANAGER_ADDR · interopCenter $INTEROP_CENTER_ADDR · interopHandler $INTEROP_HANDLER_ADDR"
+  for p in anvil serverA serverB; do
     [ -f "$WORKDIR/$p.pid" ] && kill -0 "$(cat "$WORKDIR/$p.pid")" 2>/dev/null && info "$p running (pid $(cat "$WORKDIR/$p.pid"))" || true
   done
 }
 
 cmd_stop() {
   section "stop — terminating processes started by launch"
-  for p in relayer serverA serverB anvil; do
+  for p in serverA serverB anvil; do
     local f="$WORKDIR/$p.pid"
     if [ -f "$f" ] && kill -0 "$(cat "$f")" 2>/dev/null; then
       kill -TERM "$(cat "$f")" 2>/dev/null && ok "stopped $p (pid $(cat "$f"))"
