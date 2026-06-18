@@ -40,6 +40,8 @@ contract EmergencyStageUpgradeCalldata is Script {
 
     IProtocolUpgradeHandler constant PUH = IProtocolUpgradeHandler(0x8f08627524aeD610192132A425D6b9C32a1727EF);
     string constant TOML = "upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml";
+    // Dedicated ZKsync OS CTM asset-tracker patch proposal (see PatchZkosCtmAssetTracker.md).
+    string constant PATCH_TOML = "upgrade-envs/v0.31.0-interopB/output/stage/zkos-asset-tracker-patch.toml";
     bytes32 constant SALT = bytes32(0);
 
     function runStage0() external view {
@@ -52,6 +54,15 @@ contract EmergencyStageUpgradeCalldata is Script {
 
     function runStage2() external view {
         _emit(2);
+    }
+
+    /// @notice Emits the approveHash + execute calldata for the ZKsync OS CTM asset-tracker patch
+    /// (`setChainCreationParams` + `setUpgradeDiamondCut`), routed through the EmergencyUpgradeBoard.
+    /// The two CTM calls are the `governance_calls` blob from the dedicated patch proposal.
+    function runAssetTrackerPatch() external view {
+        bytes memory encodedCalls = vm.readFile(PATCH_TOML).readBytes(".zksync_os.governance_calls");
+        IProtocolUpgradeHandler.Call[] memory calls = abi.decode(encodedCalls, (IProtocolUpgradeHandler.Call[]));
+        _emitForCalls(calls, "ZKSYNC OS ASSET-TRACKER PATCH");
     }
 
     function _emit(uint256 _stage) internal view {
