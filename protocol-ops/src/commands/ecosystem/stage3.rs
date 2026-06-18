@@ -19,20 +19,18 @@
 //! env's `owner_address` because on stage / mainnet that's the
 //! ProtocolUpgradeHandler contract (governance), not a signable EOA.
 
+use alloy::primitives::Address;
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::Address;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 
-use crate::commands::output::write_output_if_requested;
+use crate::common::abi::ICoreUpgradeV31Abi;
 use crate::common::env_config::default_protocol_ops_out_dir;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
+use crate::common::output::write_output_if_requested;
 use crate::common::paths::resolve_l1_contracts_path;
 use crate::common::SharedRunArgs;
-
-const STAGE3_SCRIPT: &str = "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol:CoreUpgrade_v31";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct Stage3Args {
@@ -81,9 +79,9 @@ pub async fn run(mut args: Stage3Args) -> anyhow::Result<()> {
     // `scripts/discover-legacy-bridged-tokens.ts`), point the forge script at
     // it via `UPGRADE_BRIDGED_TOKENS_INPUT_OVERRIDE`. That way the discovered
     // list flows into `registerBridgedTokensInNTV` without anyone hand-editing
-    // `script-config/v31-bridged-tokens.toml`. We only set the override when
-    // the file actually exists so local fixtures (which don't have a per-env
-    // tokens file) still fall back to the committed `script-config/` default.
+    // the committed default. We only set the override when the file actually
+    // exists so local fixtures still fall back to the committed
+    // `upgrade-envs/v0.31.0-interopB/local-bridged-tokens.toml` default.
     let bridged_tokens_override = env_cfg.as_ref().and_then(|cfg| {
         let rel = format!(
             "/upgrade-envs/v0.31.0-interopB/{}-bridged-tokens.toml",
@@ -104,20 +102,13 @@ pub async fn run(mut args: Stage3Args) -> anyhow::Result<()> {
         logger::info(format!("Bridged tokens input (per-env override): {rel}"));
     } else {
         logger::info(
-            "Bridged tokens input: script-config/v31-bridged-tokens.toml (committed default)",
+            "Bridged tokens input: upgrade-envs/v0.31.0-interopB/local-bridged-tokens.toml (committed default)",
         );
     }
-    let script_rel = Path::new(STAGE3_SCRIPT);
     let mut script = runner
-        .script_path_from_root(&l1_contracts_path, script_rel)
-        .with_contract_call(
-            &crate::abi_contracts::CORE_UPGRADE_V31_CONTRACT,
-            "stage3",
-            (bridgehub,),
-        )?
-        .with_broadcast()
-        .with_ffi()
-        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
+        .script_call(ICoreUpgradeV31Abi::stage3Call {
+            bridgehubProxy: bridgehub,
+        })
         .with_wallet(&sender);
     if let Some(rel) = bridged_tokens_override {
         script = script.with_env("UPGRADE_BRIDGED_TOKENS_INPUT_OVERRIDE", rel);

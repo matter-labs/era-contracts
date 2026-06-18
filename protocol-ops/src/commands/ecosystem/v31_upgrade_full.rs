@@ -9,16 +9,16 @@
 
 use std::{fs, path::Path};
 
+use alloy::hex;
+use alloy::primitives::Bytes;
 use anyhow::Context;
-use ethers::types::{Address, Bytes};
-use ethers::utils::hex;
 use serde::Deserialize;
 
+use crate::common::abi::AdminFunctionsAbi;
 use crate::common::env_config::{NewGatewayConfig, OwnableProxyEntry};
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::wallets::Wallet;
-use crate::config::forge_interface::script_params::ADMIN_FUNCTIONS_INVOCATION;
 
 use super::new_gateway_prepare::prepare_new_gateway;
 use super::v31_upgrade_inner::{
@@ -146,11 +146,13 @@ impl<'a> V31UpgradeFull<'a> {
         let wraps = encode_owner_wraps(&self.ownable_proxies);
         runner.run(
             runner
-                .with_script_call(
-                    &ADMIN_FUNCTIONS_INVOCATION,
-                    "ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps",
-                    (self.inner.bridgehub(), governance, wraps),
-                )?
+                .script_call(
+                    AdminFunctionsAbi::ensureCtmsAndProxyAdminsOwnedByGovernanceWithWrapsCall {
+                        _bridgehub: self.inner.bridgehub(),
+                        _governance: governance,
+                        _wraps: wraps,
+                    },
+                )
                 .with_wallet(deployer),
         )?;
         Ok(())
@@ -170,22 +172,20 @@ impl<'a> V31UpgradeFull<'a> {
         let wraps = encode_owner_wraps(&self.ownable_proxies);
         for entry in ctm_entries {
             let encoded_calls_hex = read_server_notifier_upgrade_calls(&entry.toml)?;
-            let encoded_calls = Bytes::from(
-                hex::decode(encoded_calls_hex.trim_start_matches("0x")).with_context(|| {
+            let encoded_calls = hex::decode(encoded_calls_hex.trim_start_matches("0x"))
+                .with_context(|| {
                     format!("invalid CTM admin calls hex in {}", entry.toml.display())
-                })?,
-            );
+                })?;
             logger::step(format!(
                 "Running v31 CTM admin calls for {:#x}",
                 entry.proxy
             ));
             runner.run(
                 runner
-                    .with_script_call(
-                        &ADMIN_FUNCTIONS_INVOCATION,
-                        "executeOwnableCallsWithWraps",
-                        (encoded_calls, wraps.clone()),
-                    )?
+                    .script_call(AdminFunctionsAbi::executeOwnableCallsWithWrapsCall {
+                        _callsToExecute: Bytes::from(encoded_calls),
+                        _wraps: wraps.clone(),
+                    })
                     .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
                     .with_wallet(deployer),
             )?;
@@ -194,12 +194,13 @@ impl<'a> V31UpgradeFull<'a> {
     }
 }
 
-/// Marshal the registry into the `Vec<(Address, u8)>` shape that ethers
-/// tokenizes as `tuple[]` matching Solidity's `OwnerWrap[]` argument.
-fn encode_owner_wraps(entries: &[OwnableProxyEntry]) -> Vec<(Address, u8)> {
+fn encode_owner_wraps(entries: &[OwnableProxyEntry]) -> Vec<AdminFunctionsAbi::OwnerWrap> {
     entries
         .iter()
-        .map(|e| (e.addr, e.kind.to_solidity_u8()))
+        .map(|e| AdminFunctionsAbi::OwnerWrap {
+            ownableContract: e.addr,
+            kind: e.kind.to_solidity_u8(),
+        })
         .collect()
 }
 

@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
+use alloy::primitives::Address;
 use anyhow::Context;
-use ethers::types::Address;
 
 use crate::upgrade_verification::{
     artifacts::{CtmArtifact, EcosystemUpgradeArtifact, GovernanceCalls},

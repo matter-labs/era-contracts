@@ -127,14 +127,12 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.permanent_values_path.display()
         )
     })?;
-    let zk_token_asset_id = FixedBytes::<32>::from_slice(zk_token_asset_id.as_bytes());
-    let create2_factory_eth = env_cfg.create2_factory().ok_or_else(|| {
+    let create2_factory = env_cfg.create2_factory().ok_or_else(|| {
         anyhow::anyhow!(
             "{} is missing `[permanent_contracts] create2_factory_addr`",
             env_cfg.permanent_values_path.display()
         )
     })?;
-    let create2_factory = Address::from_slice(create2_factory_eth.as_bytes());
     // `[new_gateway]` is optional: gateway-less envs omit it (no GW CTM deploy /
     // whitelist). When absent we pass sentinels; the v31 verifier gates every
     // new-Gateway check on the artifact's `[new_gateway]` block, which is
@@ -144,7 +142,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             Some(ng) => (
                 ng.chain_id,
                 ng.ctm_representative_chain_id,
-                ethers_u256_to_alloy(ng.settlement_fee),
+                ng.settlement_fee,
             ),
             None => (0u64, 0u64, U256::ZERO),
         };
@@ -155,10 +153,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     // in this set.
     let mut expected_salts: Vec<FixedBytes<32>> = Vec::new();
     if let Some(core_salt) = env_cfg.v31_create2_factory_salt()? {
-        expected_salts.push(FixedBytes::<32>::from_slice(core_salt.as_bytes()));
+        expected_salts.push(core_salt);
     }
     for salt in env_cfg.v31_create2_factory_salt_per_ctm()?.values() {
-        expected_salts.push(FixedBytes::<32>::from_slice(salt.as_bytes()));
+        expected_salts.push(*salt);
     }
     if env_cfg.governance_kind() == GovernanceKind::Puh {
         // The PUH/Guardians/SecurityCouncil/EmergencyUpgradeBoard redeploy uses
@@ -269,12 +267,6 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     logger::outro(format!("{}", result));
     verification_result?;
     result.ensure_success()
-}
-
-fn ethers_u256_to_alloy(value: ethers::types::U256) -> U256 {
-    let mut bytes = [0u8; 32];
-    value.to_big_endian(&mut bytes);
-    U256::from_be_bytes(bytes)
 }
 
 fn print_encoded_upgrade_data(label: &str, stage_calls_hex: &str) {

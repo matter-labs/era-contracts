@@ -171,10 +171,7 @@ fn step_vec(s: &str) -> Vec<String> {
 /// Build cast-ready transaction list from a forge run payload (broadcast JSON).
 /// Each item has "step", "from", "to", "data", "value" (normalized for cast
 /// replay). `from` is required — replay uses it as the per-tx sender.
-pub(crate) fn run_payload_to_cast_transactions(
-    payload: &Value,
-    step: &str,
-) -> anyhow::Result<Vec<Value>> {
+pub fn run_payload_to_cast_transactions(payload: &Value, step: &str) -> anyhow::Result<Vec<Value>> {
     let txs = match payload.get("transactions").and_then(|t| t.as_array()) {
         Some(a) => a,
         None => return Ok(vec![]),

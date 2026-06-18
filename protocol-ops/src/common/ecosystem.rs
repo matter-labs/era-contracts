@@ -8,8 +8,8 @@
 //! era chain id, output dir, …) is auto-filled from the env's permanent-values
 //! TOML + the v31 upgrade input TOML, unless an explicit CLI flag overrides.
 
+use alloy::primitives::Address;
 use clap::Args;
-use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 
 use crate::common::env_config::EnvConfig;

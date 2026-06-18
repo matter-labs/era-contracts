@@ -1,19 +1,19 @@
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
+use alloy::network::{EthereumWallet, TransactionBuilder};
+use alloy::primitives::{keccak256, Address, Bytes, B256, U256};
+use alloy::providers::{Provider, ProviderBuilder};
+use alloy::rpc::types::TransactionRequest;
+use alloy::signers::local::PrivateKeySigner;
 use anyhow::Context;
 use clap::Parser;
-use ethers::middleware::Middleware;
-use ethers::types::{Address, BlockNumber, Bytes, TransactionRequest, H256, U256};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use ethers::providers::{Http, Provider};
-use ethers::signers::{LocalWallet, Signer};
-
-use crate::common::logger;
+use crate::common::ethereum::get_provider;
+use crate::common::{logger, PrivateKey};
 
 /// One replayed Safe tx as it lands on L1, persisted to `--out` so the
 /// PUVT (`ecosystem verify-upgrade`) can later reconstruct CREATE2 / TUPP
@@ -46,28 +46,36 @@ const GAS_ESTIMATE_BUFFER_BPS: u64 = 12_500;
 const PER_TX_GAS_LIMIT_CAP: u64 = 20_000_000;
 /// Floor gas price (1 gwei). Used when the node returns `eth_gasPrice` below
 /// it (anvil/reth on a quiet local chain reports near-zero).
-const GAS_PRICE_FLOOR_WEI: u64 = 1_000_000_000;
+const GAS_PRICE_FLOOR_WEI: u128 = 1_000_000_000;
 /// Multiplier (in basis points) applied to live `eth_gasPrice` so our txs
 /// outbid the base-fee floor on a busy public chain (Sepolia / mainnet). 300%
 /// gives us ~3x headroom over chain median which is what gets txs included
 /// within 1-2 blocks instead of hanging in the mempool for 30+ minutes.
-const GAS_PRICE_MULTIPLIER_BPS: u64 = 30_000;
+const GAS_PRICE_MULTIPLIER_BPS: u128 = 30_000;
+
+/// Receipt polling interval. Alloy's default is tuned for public chains;
+/// tighten it so per-tx receipt polling doesn't dominate bundle latency on
+/// anvil's instamine or reth's sub-second block time.
+const RECEIPT_POLL_INTERVAL_MS: u64 = 50;
 
 /// Returns a legacy `gasPrice` that's high enough to land within ~1-2 blocks
 /// on busy public chains, but never below `GAS_PRICE_FLOOR_WEI` so local
 /// chains (anvil/reth at 0 base fee) still get a non-zero price. We use
 /// legacy (type-0) txs throughout this binary so an EIP-1559 split isn't
 /// needed.
-async fn resolve_gas_price<M: Middleware>(client: &M) -> anyhow::Result<U256>
-where
-    M::Error: std::error::Error + Send + Sync + 'static,
-{
-    let live = client
+async fn resolve_gas_price<P: Provider>(provider: &P) -> anyhow::Result<u128> {
+    let live = provider
         .get_gas_price()
         .await
-        .map_err(|e| anyhow::anyhow!("eth_gasPrice failed: {e}"))?;
-    let bumped = live.saturating_mul(U256::from(GAS_PRICE_MULTIPLIER_BPS)) / U256::from(10_000);
-    Ok(std::cmp::max(bumped, U256::from(GAS_PRICE_FLOOR_WEI)))
+        .context("eth_gasPrice failed")?;
+    let bumped = live.saturating_mul(GAS_PRICE_MULTIPLIER_BPS) / 10_000;
+    Ok(std::cmp::max(bumped, GAS_PRICE_FLOOR_WEI))
+}
+
+/// Render a wei gas price as gwei for logging.
+fn format_gwei(gas_price: u128) -> String {
+    alloy::primitives::utils::format_units(gas_price, "gwei")
+        .unwrap_or_else(|_| gas_price.to_string())
 }
 
 /// Execute a Gnosis Safe Transaction Builder JSON bundle: parse the
@@ -79,7 +87,7 @@ where
 /// our replay tooling, the broadcaster is derived from the supplied private
 /// key (every tx in the batch is sent under that key's address).
 ///
-/// Implementation note: we replay each tx natively via ethers (sign locally,
+/// Implementation note: we replay each tx natively via alloy (sign locally,
 /// send via `eth_sendRawTransaction`, await a receipt) instead of shelling
 /// out to forge. Forge involvement here was pure overhead — every bundle
 /// paid ~1-2s of forge startup before the first tx hit the wire. Bundles
@@ -104,7 +112,7 @@ pub struct DevExecuteSafeArgs {
     /// Private key whose address is used as the broadcaster for every tx in
     /// the bundle.
     #[clap(long)]
-    pub private_key: String,
+    pub private_key: PrivateKey,
 
     /// Optional path to append the replayed transactions to as JSON. Use the
     /// same path across multiple bundles (the file is read on entry and
@@ -120,7 +128,7 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
     execute_one_bundle(
         &args.safe_file,
         &args.l1_rpc_url,
-        &args.private_key,
+        args.private_key.expose(),
         args.out.as_deref(),
     )
     .await
@@ -132,7 +140,7 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
 /// case), and we sign + submit each tx directly via `eth_sendRawTransaction`.
 /// Used both by `dev execute-safe` (single bundle) and the multi-bundle
 /// dispatcher in `ecosystem upgrade-broadcast`.
-pub(crate) async fn execute_one_bundle(
+pub async fn execute_one_bundle(
     safe_file: &Path,
     l1_rpc_url: &str,
     private_key: &str,
@@ -149,28 +157,23 @@ pub(crate) async fn execute_one_bundle(
         .and_then(|t| t.as_array())
         .ok_or_else(|| anyhow::anyhow!("Safe file missing or invalid `.transactions` array"))?;
 
-    let pk_h256 =
-        H256::from_str(private_key).context("invalid private key (expected 0x-prefixed hex)")?;
-    let wallet = LocalWallet::from_bytes(pk_h256.as_bytes())
+    let pk_hex = private_key.strip_prefix("0x").unwrap_or(private_key);
+    let pk_bytes = alloy::hex::decode(pk_hex).context("invalid private key (expected hex)")?;
+    let signer = PrivateKeySigner::from_slice(&pk_bytes)
         .context("invalid private key (failed to construct signer)")?;
-    let from = ethers::signers::Signer::address(&wallet);
+    let from = signer.address();
+    let wallet = EthereumWallet::from(signer);
 
-    // Resolve chain id once so the signer can include it in the EIP-155
-    // signature (anvil rejects legacy txs without chain id).
-    //
-    // Override Provider's polling interval (default 7s, tuned for mainnet)
-    // so per-tx receipt polling doesn't dominate bundle latency on anvil's
-    // instamine or reth's sub-second block time.
-    let provider = Provider::<Http>::try_from(l1_rpc_url)
-        .context("connect L1 provider")?
-        .interval(std::time::Duration::from_millis(50));
-    let chain_id = provider
-        .get_chainid()
-        .await
-        .context("eth_chainId")?
-        .as_u64();
-    let client =
-        ethers::middleware::SignerMiddleware::new(provider, wallet.with_chain_id(chain_id));
+    // Build provider with signer. ProviderBuilder::new() includes
+    // recommended fillers (chain_id, gas, nonce); we override nonce and gas
+    // manually per-tx below so those fillers are effectively a no-op for
+    // the fields we set.
+    let provider = ProviderBuilder::new()
+        .wallet(wallet)
+        .connect_http(l1_rpc_url.parse().context("invalid L1 RPC URL")?);
+    provider
+        .client()
+        .set_poll_interval(std::time::Duration::from_millis(RECEIPT_POLL_INTERVAL_MS));
 
     logger::info(format!(
         "Replaying {} tx(s) under broadcaster {:#x}",
@@ -180,8 +183,11 @@ pub(crate) async fn execute_one_bundle(
 
     // Fetch starting nonce once and assign nonces locally — avoids a
     // serialised `eth_getTransactionCount(pending)` round-trip per tx.
-    let base_nonce = client
-        .get_transaction_count(from, Some(BlockNumber::Pending.into()))
+    // Must use Pending (not Latest) so in-flight txs from this address
+    // don't cause nonce reuse if the signer already has pending mempool txs.
+    let base_nonce = provider
+        .get_transaction_count(from)
+        .block_id(alloy::eips::BlockNumberOrTag::Pending.into())
         .await
         .context("eth_getTransactionCount(pending)")?;
 
@@ -189,13 +195,10 @@ pub(crate) async fn execute_one_bundle(
     // so a single snapshot is fine; if Sepolia gas spikes mid-bundle we'll
     // see slow blocks rather than dropped txs (still better than the old
     // hardcoded 1-gwei sub-base-fee behaviour).
-    let gas_price = resolve_gas_price(&client)
+    let gas_price = resolve_gas_price(&provider)
         .await
         .context("resolve gas price")?;
-    logger::info(format!(
-        "Using gas price {} gwei",
-        ethers::utils::format_units(gas_price, "gwei").unwrap_or_else(|_| gas_price.to_string()),
-    ));
+    logger::info(format!("Using gas price {} gwei", format_gwei(gas_price)));
 
     // Per-bundle tx log loaded from `--out`; we only flush additions after
     // the entire bundle succeeds so failed bundles do not pollute outputs.
@@ -217,7 +220,7 @@ pub(crate) async fn execute_one_bundle(
         _ => ExecutedBundle::default(),
     };
     let mut bundle_executed: Vec<ExecutedTx> = Vec::new();
-    let mut bundle_hashes: Vec<H256> = Vec::new();
+    let mut bundle_hashes: Vec<B256> = Vec::new();
 
     // Parse + sign + submit each tx sequentially, awaiting its receipt
     // before the next. Some bundle txs depend on contracts deployed by
@@ -240,7 +243,7 @@ pub(crate) async fn execute_one_bundle(
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `data`"))?;
         let data = Bytes::from(
-            ethers::utils::hex::decode(data_hex.trim_start_matches("0x"))
+            alloy::hex::decode(data_hex.trim_start_matches("0x"))
                 .with_context(|| format!("Safe tx #{idx} `data` is not valid hex"))?,
         );
         let value_str = tx
@@ -255,25 +258,22 @@ pub(crate) async fn execute_one_bundle(
         // gas limit, ~30M on a quiet local chain). Apply
         // `GAS_ESTIMATE_BUFFER_BPS` headroom, clamped to
         // `PER_TX_GAS_LIMIT_CAP` to stay below the block gas limit.
-        let estimate_req: ethers::types::transaction::eip2718::TypedTransaction =
-            TransactionRequest::new()
-                .from(from)
-                .to(to)
-                .data(data.clone())
-                .value(value)
-                .into();
-        let gas_limit = match client.estimate_gas(&estimate_req, None).await {
+        let estimate_req = TransactionRequest::default()
+            .with_from(from)
+            .with_to(to)
+            .with_input(data.clone())
+            .with_value(value);
+        let gas_limit: u64 = match provider.estimate_gas(estimate_req).await {
             Ok(est) => {
-                let buffered =
-                    est.saturating_mul(U256::from(GAS_ESTIMATE_BUFFER_BPS)) / U256::from(10_000);
-                std::cmp::min(buffered, U256::from(PER_TX_GAS_LIMIT_CAP))
+                let buffered = est.saturating_mul(GAS_ESTIMATE_BUFFER_BPS) / 10_000;
+                std::cmp::min(buffered, PER_TX_GAS_LIMIT_CAP)
             }
             Err(e) => {
                 // Idempotent skip: if estimation fails and the tx targets the
                 // CREATE2 factory, check whether the output address already has
                 // code (= already deployed in a prior partial broadcast). If so,
                 // skip this tx instead of aborting the whole bundle.
-                if should_skip_idempotent(&client, to, &data).await {
+                if should_skip_idempotent(&provider, to, &data).await {
                     logger::info(format!(
                         "Skipping Safe tx #{idx} (to {to:#x}) — already deployed / idempotent"
                     ));
@@ -309,7 +309,7 @@ pub(crate) async fn execute_one_bundle(
                     logger::info(format!(
                         "eth_estimateGas failed for CREATE2 tx #{idx}, using fallback gas limit {CREATE2_FALLBACK_GAS}"
                     ));
-                    U256::from(CREATE2_FALLBACK_GAS)
+                    CREATE2_FALLBACK_GAS
                 } else {
                     return Err(e).with_context(|| {
                         format!("eth_estimateGas for Safe tx #{idx} (to {to:#x})")
@@ -318,28 +318,26 @@ pub(crate) async fn execute_one_bundle(
             }
         };
 
-        let req = TransactionRequest::new()
-            .from(from)
-            .to(to)
-            .data(data)
-            .value(value)
-            .chain_id(chain_id)
-            .gas(gas_limit)
-            .gas_price(gas_price)
-            .nonce(base_nonce + idx - skipped);
+        let req = TransactionRequest::default()
+            .with_from(from)
+            .with_to(to)
+            .with_input(data)
+            .with_value(value)
+            .with_nonce(base_nonce + (idx - skipped) as u64)
+            .with_gas_limit(gas_limit)
+            .with_gas_price(gas_price);
 
-        let pending = client
-            .send_transaction(req, None)
+        let pending = provider
+            .send_transaction(req)
             .await
             .with_context(|| format!("eth_sendTransaction for Safe tx #{idx} (to {to:#x})"))?;
-        let tx_hash = pending.tx_hash();
+        let tx_hash = *pending.tx_hash();
         let receipt = pending
+            .get_receipt()
             .await
-            .with_context(|| format!("await receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?
-            .ok_or_else(|| anyhow::anyhow!("no receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?;
-        let status = receipt.status.unwrap_or_default();
+            .with_context(|| format!("await receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?;
         anyhow::ensure!(
-            status == 1.into(),
+            receipt.status(),
             "Safe tx #{idx} (hash {tx_hash:#x}) reverted (status=0)",
         );
 
@@ -347,9 +345,9 @@ pub(crate) async fn execute_one_bundle(
             bundle_executed.push(ExecutedTx {
                 tx_hash: format!("{tx_hash:#x}"),
                 to: format!("{to:#x}"),
-                data: format!("0x{}", ethers::utils::hex::encode(receipt_input(tx)?)),
+                data: format!("0x{}", alloy::hex::encode(receipt_input(tx)?)),
                 value: format!("{value}"),
-                status: status.as_u64(),
+                status: u64::from(receipt.status()),
             });
             bundle_hashes.push(tx_hash);
         }
@@ -378,25 +376,15 @@ const CREATE2_FACTORY: &str = "4e59b44847b379578588920ca78fbf26c0b4956c";
 ///   (the contract was deployed in a prior partial broadcast).
 /// - Any other tx whose target already has code and the call reverts
 ///   (likely an already-executed governance operation).
-async fn should_skip_idempotent<M: Middleware>(client: &M, to: Address, data: &Bytes) -> bool
-where
-    M::Error: std::error::Error + Send + Sync + 'static,
-{
+async fn should_skip_idempotent<P: Provider>(provider: &P, to: Address, data: &Bytes) -> bool {
     let to_hex = format!("{to:#x}").to_lowercase();
     // CREATE2 factory: calldata = salt(32) + initcode.
     // Compute the would-be CREATE2 address and check if it already has code.
     if to_hex.contains(CREATE2_FACTORY) && data.len() >= 32 {
         let salt: [u8; 32] = data[..32].try_into().unwrap_or([0u8; 32]);
         let initcode = &data[32..];
-        let initcode_hash = ethers::utils::keccak256(initcode);
-        let mut buf = Vec::with_capacity(1 + 20 + 32 + 32);
-        buf.push(0xff);
-        buf.extend_from_slice(to.as_bytes());
-        buf.extend_from_slice(&salt);
-        buf.extend_from_slice(&initcode_hash);
-        let addr_hash = ethers::utils::keccak256(&buf);
-        let deployed_addr = Address::from_slice(&addr_hash[12..]);
-        if let Ok(code) = client.get_code(deployed_addr, None).await {
+        let deployed_addr = to.create2(salt, keccak256(initcode));
+        if let Ok(code) = provider.get_code_at(deployed_addr).await {
             if !code.is_empty() {
                 return true;
             }
@@ -410,7 +398,7 @@ fn receipt_input(tx: &Value) -> anyhow::Result<Vec<u8>> {
         .get("data")
         .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow::anyhow!("Safe tx missing `data` while building executed bundle"))?;
-    ethers::utils::hex::decode(data_hex.trim_start_matches("0x"))
+    alloy::hex::decode(data_hex.trim_start_matches("0x"))
         .context("Safe tx `data` is not valid hex while building executed bundle")
 }
 
@@ -432,7 +420,7 @@ fn persist_executed_bundle(path: &Path, bundle: &ExecutedBundle) -> anyhow::Resu
     Ok(())
 }
 
-fn append_transaction_hash(out_path: &Path, tx_hash: H256) -> anyhow::Result<()> {
+fn append_transaction_hash(out_path: &Path, tx_hash: B256) -> anyhow::Result<()> {
     let Some(parent) = out_path.parent() else {
         return Ok(());
     };
@@ -463,7 +451,7 @@ fn append_transaction_hash(out_path: &Path, tx_hash: H256) -> anyhow::Result<()>
 /// started with `--auto-impersonate` (or after `anvil_impersonateAccount`)
 /// accepts these without holding the EOA's key. Used for fork-rehearsal of
 /// stage / mainnet bundles whose real signer keys aren't available locally.
-pub(crate) async fn execute_one_bundle_unlocked(
+pub async fn execute_one_bundle_unlocked(
     safe_file: &Path,
     l1_rpc_url: &str,
     sender: Address,
@@ -483,14 +471,11 @@ pub(crate) async fn execute_one_bundle_unlocked(
         .and_then(|t| t.as_array())
         .ok_or_else(|| anyhow::anyhow!("Safe file missing or invalid `.transactions` array"))?;
 
-    let provider = Provider::<Http>::try_from(l1_rpc_url)
-        .context("connect L1 provider")?
-        .interval(std::time::Duration::from_millis(50));
-    let chain_id = provider
-        .get_chainid()
-        .await
-        .context("eth_chainId")?
-        .as_u64();
+    let provider = get_provider(l1_rpc_url).context("connect L1 provider")?;
+    provider
+        .client()
+        .set_poll_interval(std::time::Duration::from_millis(RECEIPT_POLL_INTERVAL_MS));
+    let chain_id = provider.get_chain_id().await.context("eth_chainId")?;
 
     logger::info(format!(
         "Replaying {} tx(s) under impersonated broadcaster {:#x}",
@@ -499,7 +484,8 @@ pub(crate) async fn execute_one_bundle_unlocked(
     ));
 
     let base_nonce = provider
-        .get_transaction_count(sender, Some(BlockNumber::Pending.into()))
+        .get_transaction_count(sender)
+        .block_id(alloy::eips::BlockNumberOrTag::Pending.into())
         .await
         .context("eth_getTransactionCount(pending)")?;
 
@@ -508,11 +494,8 @@ pub(crate) async fn execute_one_bundle_unlocked(
     // can push `eth_gasPrice` 200x+ above prepare-time levels, causing
     // MsgValueTooLow on priority deposit txs whose mintValue was baked
     // in during prepare with a much lower gas price.
-    let gas_price = U256::from(GAS_PRICE_FLOOR_WEI);
-    logger::info(format!(
-        "Using gas price {} gwei",
-        ethers::utils::format_units(gas_price, "gwei").unwrap_or_else(|_| gas_price.to_string()),
-    ));
+    let gas_price = GAS_PRICE_FLOOR_WEI;
+    logger::info(format!("Using gas price {} gwei", format_gwei(gas_price)));
 
     // Same accumulating-write shape as `execute_one_bundle`: load any
     // existing log so multiple bundles into the same `--out` path stack in
@@ -535,7 +518,7 @@ pub(crate) async fn execute_one_bundle_unlocked(
         _ => ExecutedBundle::default(),
     };
     let mut bundle_executed: Vec<ExecutedTx> = Vec::new();
-    let mut bundle_hashes: Vec<H256> = Vec::new();
+    let mut bundle_hashes: Vec<B256> = Vec::new();
 
     let mut skipped: usize = 0;
     for (idx, tx) in safe_txs.iter().enumerate() {
@@ -550,7 +533,7 @@ pub(crate) async fn execute_one_bundle_unlocked(
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `data`"))?;
         let data = Bytes::from(
-            ethers::utils::hex::decode(data_hex.trim_start_matches("0x"))
+            alloy::hex::decode(data_hex.trim_start_matches("0x"))
                 .with_context(|| format!("Safe tx #{idx} `data` is not valid hex"))?,
         );
         let value_str = tx
@@ -560,18 +543,15 @@ pub(crate) async fn execute_one_bundle_unlocked(
         let value = parse_decimal_or_hex_u256(value_str)
             .with_context(|| format!("Safe tx #{idx} `value` is not a valid number"))?;
 
-        let estimate_req: ethers::types::transaction::eip2718::TypedTransaction =
-            TransactionRequest::new()
-                .from(sender)
-                .to(to)
-                .data(data.clone())
-                .value(value)
-                .into();
-        let gas_limit = match provider.estimate_gas(&estimate_req, None).await {
+        let estimate_req = TransactionRequest::default()
+            .with_from(sender)
+            .with_to(to)
+            .with_input(data.clone())
+            .with_value(value);
+        let gas_limit: u64 = match provider.estimate_gas(estimate_req).await {
             Ok(estimated) => {
-                let buffered = estimated.saturating_mul(U256::from(GAS_ESTIMATE_BUFFER_BPS))
-                    / U256::from(10_000);
-                std::cmp::min(buffered, U256::from(PER_TX_GAS_LIMIT_CAP))
+                let buffered = estimated.saturating_mul(GAS_ESTIMATE_BUFFER_BPS) / 10_000;
+                std::cmp::min(buffered, PER_TX_GAS_LIMIT_CAP)
             }
             Err(e) => {
                 // Keep unlocked replay idempotent like the signed path:
@@ -605,7 +585,7 @@ pub(crate) async fn execute_one_bundle_unlocked(
                     logger::info(format!(
                         "eth_estimateGas failed for CREATE2 tx #{idx}, using fallback gas limit {CREATE2_FALLBACK_GAS}"
                     ));
-                    U256::from(CREATE2_FALLBACK_GAS)
+                    CREATE2_FALLBACK_GAS
                 } else {
                     return Err(e).with_context(|| {
                         format!("eth_estimateGas for Safe tx #{idx} (to {to:#x})")
@@ -614,28 +594,27 @@ pub(crate) async fn execute_one_bundle_unlocked(
             }
         };
 
-        let req = TransactionRequest::new()
-            .from(sender)
-            .to(to)
-            .data(data)
-            .value(value)
-            .chain_id(chain_id)
-            .gas(gas_limit)
-            .gas_price(gas_price)
-            .nonce(base_nonce + idx - skipped);
+        let req = TransactionRequest::default()
+            .with_from(sender)
+            .with_to(to)
+            .with_input(data)
+            .with_value(value)
+            .with_chain_id(chain_id)
+            .with_nonce(base_nonce + (idx - skipped) as u64)
+            .with_gas_limit(gas_limit)
+            .with_gas_price(gas_price);
 
         let pending = provider
-            .send_transaction(req, None)
+            .send_transaction(req)
             .await
             .with_context(|| format!("eth_sendTransaction for Safe tx #{idx} (to {to:#x})"))?;
-        let tx_hash = pending.tx_hash();
+        let tx_hash = *pending.tx_hash();
         let receipt = pending
+            .get_receipt()
             .await
-            .with_context(|| format!("await receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?
-            .ok_or_else(|| anyhow::anyhow!("no receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?;
-        let status = receipt.status.unwrap_or_default();
+            .with_context(|| format!("await receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?;
         anyhow::ensure!(
-            status == 1.into(),
+            receipt.status(),
             "Safe tx #{idx} (hash {tx_hash:#x}) reverted (status=0)",
         );
 
@@ -643,9 +622,9 @@ pub(crate) async fn execute_one_bundle_unlocked(
             bundle_executed.push(ExecutedTx {
                 tx_hash: format!("{tx_hash:#x}"),
                 to: format!("{to:#x}"),
-                data: format!("0x{}", ethers::utils::hex::encode(receipt_input(tx)?)),
+                data: format!("0x{}", alloy::hex::encode(receipt_input(tx)?)),
                 value: format!("{value}"),
-                status: status.as_u64(),
+                status: u64::from(receipt.status()),
             });
             bundle_hashes.push(tx_hash);
         }
@@ -669,12 +648,14 @@ pub(crate) async fn execute_one_bundle_unlocked(
 /// (`"0"`, `"1000"`) or a hex string (`"0x0"`, `"0x10"`). Accept both.
 fn parse_decimal_or_hex_u256(raw: &str) -> anyhow::Result<U256> {
     let trimmed = raw.trim();
-    if let Some(hex) = trimmed.strip_prefix("0x") {
-        if hex.is_empty() {
-            return Ok(U256::zero());
+    if let Some(hex_str) = trimmed.strip_prefix("0x") {
+        if hex_str.is_empty() {
+            return Ok(U256::ZERO);
         }
-        U256::from_str_radix(hex, 16).with_context(|| format!("invalid hex u256 {trimmed:?}"))
+        U256::from_str_radix(hex_str, 16).with_context(|| format!("invalid hex u256 {trimmed:?}"))
     } else {
-        U256::from_dec_str(trimmed).with_context(|| format!("invalid decimal u256 {trimmed:?}"))
+        trimmed
+            .parse::<U256>()
+            .with_context(|| format!("invalid decimal u256 {trimmed:?}"))
     }
 }

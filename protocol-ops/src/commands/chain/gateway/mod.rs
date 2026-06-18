@@ -1,9 +1,9 @@
 use clap::Subcommand;
 
-pub(crate) mod convert;
-pub(crate) mod migrate_from;
-pub(crate) mod migrate_to;
-pub(crate) mod setup_fee_payer;
+pub mod convert;
+pub mod migrate_from;
+pub mod migrate_to;
+pub mod setup_fee_payer;
 
 /// Gateway operations: converting a chain into a gateway or migrating a chain to/from one.
 #[derive(Subcommand, Debug)]
@@ -29,7 +29,7 @@ pub use migrate_from::MigrateFromCommands;
 pub use migrate_to::MigrateToCommands;
 pub use setup_fee_payer::SetupFeePayerArgs;
 
-pub(crate) async fn run(args: GatewayCommands) -> anyhow::Result<()> {
+pub async fn run(args: GatewayCommands) -> anyhow::Result<()> {
     match args {
         GatewayCommands::Convert(cmd) => convert::run_convert(cmd).await,
         GatewayCommands::MigrateTo(cmd) => migrate_to::run_migrate_to(cmd).await,

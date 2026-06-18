@@ -14,6 +14,17 @@ interface IDeployCTM {
     /// @param reuseGovAndAdmin Whether to reuse existing governance and admin contracts
     function runWithBridgehub(address bridgehub, bool reuseGovAndAdmin) external;
 
+    /// @notice Same as `runWithBridgehub`, with the input/output TOML paths
+    /// (project-root relative) supplied by the caller instead of the
+    /// conventional defaults.
+    function runInner(
+        string calldata inputPath,
+        string calldata outputPath,
+        address bridgehub,
+        bool reuseGovAndAdmin,
+        bool skipL1Deployments
+    ) external;
+
     /// @notice Runs the deployment for testing purposes
     /// @param bridgehub The address of the bridgehub contract
     /// @param skipL1Deployments Whether to skip L1 contract deployments

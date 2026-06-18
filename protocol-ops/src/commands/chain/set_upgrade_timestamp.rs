@@ -1,14 +1,23 @@
+use alloy::primitives::{Address, U256};
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::{Address, U256};
 use serde::{Deserialize, Serialize};
 
-use crate::commands::output::write_output_if_requested;
+use crate::common::abi::AdminFunctionsAbi;
 use crate::common::addresses::ZERO_ADDRESS;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::SharedRunArgs;
-use crate::config::forge_interface::script_params::ADMIN_FUNCTIONS_INVOCATION;
+
+#[derive(Serialize)]
+struct SetUpgradeTimestampOutput {
+    admin_address: Address,
+    access_control_restriction: Address,
+    bridgehub: Address,
+    chain_id: u64,
+    new_protocol_version: String,
+    upgrade_timestamp: String,
+}
 
 /// Set chain-upgrade timestamp, prepare-only.
 ///
@@ -42,8 +51,14 @@ pub struct ChainSetUpgradeTimestampArgs {
 pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
-    let new_protocol_version = parse_u256_arg(&args.new_protocol_version)?;
-    let upgrade_timestamp = parse_u256_arg(&args.upgrade_timestamp)?;
+    let new_protocol_version = args
+        .new_protocol_version
+        .parse::<U256>()
+        .context("invalid new_protocol_version: expected decimal or hex uint256")?;
+    let upgrade_timestamp = args
+        .upgrade_timestamp
+        .parse::<U256>()
+        .context("invalid upgrade_timestamp: expected decimal or hex uint256")?;
 
     let admin_address =
         crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
@@ -56,18 +71,14 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         .await?;
 
     let forge = runner
-        .with_script_call(
-            &ADMIN_FUNCTIONS_INVOCATION,
-            "adminScheduleUpgrade",
-            (
-                admin_address,
-                args.access_control_restriction,
-                bridgehub,
-                chain_id,
-                new_protocol_version,
-                upgrade_timestamp,
-            ),
-        )?
+        .script_call(AdminFunctionsAbi::adminScheduleUpgradeCall {
+            _adminAddr: admin_address,
+            _accessControlRestriction: args.access_control_restriction,
+            _bridgehub: bridgehub,
+            _chainId: U256::from(chain_id),
+            _newProtocolVersion: new_protocol_version,
+            _timestamp: upgrade_timestamp,
+        })
         // `--broadcast` against the anvil fork. In this mode the
         // target RPC is the anvil fork, so "broadcast" produces no real-chain
         // effect — it just records the tx in forge's run file so protocol-ops can
@@ -95,32 +106,22 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         .run(forge)
         .context("Failed to prepare set-upgrade-timestamp")?;
 
-    write_output_if_requested(
+    crate::common::output::write_output_if_requested(
         "chain.set-upgrade-timestamp",
         &args.shared,
         &runner,
         &serde_json::json!({}),
-        &serde_json::json!({
-            "admin_address": format!("{:#x}", admin_address),
-            "access_control_restriction": format!("{:#x}", args.access_control_restriction),
-            "bridgehub": format!("{:#x}", bridgehub),
-            "chain_id": chain_id,
-            "new_protocol_version": &args.new_protocol_version,
-            "upgrade_timestamp": &args.upgrade_timestamp,
-        }),
+        &SetUpgradeTimestampOutput {
+            admin_address,
+            access_control_restriction: args.access_control_restriction,
+            bridgehub,
+            chain_id,
+            new_protocol_version: args.new_protocol_version.clone(),
+            upgrade_timestamp: args.upgrade_timestamp.clone(),
+        },
     )
     .await?;
 
     logger::success("Set upgrade timestamp prepared");
     Ok(())
-}
-
-fn parse_u256_arg(value: &str) -> anyhow::Result<U256> {
-    if let Some(hex_value) = value.strip_prefix("0x") {
-        U256::from_str_radix(hex_value, 16)
-            .map_err(|error| anyhow::anyhow!("invalid hex uint256 '{}': {}", value, error))
-    } else {
-        U256::from_dec_str(value)
-            .map_err(|error| anyhow::anyhow!("invalid decimal uint256 '{}': {}", value, error))
-    }
 }

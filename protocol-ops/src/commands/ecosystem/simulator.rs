@@ -2,11 +2,11 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use alloy::dyn_abi::{DynSolType, DynSolValue};
+use alloy::hex;
+use alloy::primitives::Address;
 use anyhow::Context;
 use clap::Parser;
-use ethers::abi::{decode as abi_decode, ParamType};
-use ethers::types::Address;
-use ethers::utils::hex;
 use serde::{Deserialize, Serialize};
 
 use crate::common::governance_calls::decode_calls;
@@ -204,61 +204,78 @@ fn parse_first_inner_call(data_hex: &str) -> Option<(Address, String)> {
     let selector = u32::from_be_bytes(bytes[..4].try_into().ok()?);
     let body = &bytes[4..];
 
-    let call_type = ParamType::Tuple(vec![
-        ParamType::Address,
-        ParamType::Uint(256),
-        ParamType::Bytes,
+    let call_type = DynSolType::Tuple(vec![
+        DynSolType::Address,
+        DynSolType::Uint(256),
+        DynSolType::Bytes,
     ]);
-    let operation_type = ParamType::Tuple(vec![
-        ParamType::Array(Box::new(call_type.clone())),
-        ParamType::FixedBytes(32),
-        ParamType::FixedBytes(32),
+    let operation_type = DynSolType::Tuple(vec![
+        DynSolType::Array(Box::new(call_type.clone())),
+        DynSolType::FixedBytes(32),
+        DynSolType::FixedBytes(32),
     ]);
 
-    let calls_array = match selector {
+    let first_param = match selector {
         // multicall((address,uint256,bytes)[], bool)
         0x69340beb => {
-            let tokens = abi_decode(
-                &[ParamType::Array(Box::new(call_type)), ParamType::Bool],
-                body,
-            )
+            let params = DynSolType::Tuple(vec![
+                DynSolType::Array(Box::new(call_type)),
+                DynSolType::Bool,
+            ])
+            .abi_decode_params(body)
             .ok()?;
-            tokens.into_iter().next()?.into_array()?
+            into_tuple(params)?.into_iter().next()?
         }
         // scheduleTransparent((Call[], bytes32, bytes32), uint256)
         0x2c431917 => {
-            let tokens = abi_decode(&[operation_type, ParamType::Uint(256)], body).ok()?;
-            tokens
+            let params = DynSolType::Tuple(vec![operation_type, DynSolType::Uint(256)])
+                .abi_decode_params(body)
+                .ok()?;
+            // First param is the Operation tuple; its first field is `Call[]`.
+            into_tuple(into_tuple(params)?.into_iter().next()?)?
                 .into_iter()
                 .next()?
-                .into_tuple()?
-                .into_iter()
-                .next()?
-                .into_array()?
         }
         // executeInstant((Call[], bytes32, bytes32))
         0x95218ecd => {
-            let tokens = abi_decode(&[operation_type], body).ok()?;
-            tokens
+            let params = DynSolType::Tuple(vec![operation_type])
+                .abi_decode_params(body)
+                .ok()?;
+            into_tuple(into_tuple(params)?.into_iter().next()?)?
                 .into_iter()
                 .next()?
-                .into_tuple()?
-                .into_iter()
-                .next()?
-                .into_array()?
         }
         _ => return None,
     };
+    let calls_array = match first_param {
+        DynSolValue::Array(calls) => calls,
+        _ => return None,
+    };
 
-    let first = calls_array.into_iter().next()?.into_tuple()?;
+    let first = into_tuple(calls_array.into_iter().next()?)?;
     let mut it = first.into_iter();
-    let target = it.next()?.into_address()?;
+    let target = match it.next()? {
+        DynSolValue::Address(addr) => addr,
+        _ => return None,
+    };
     let _value = it.next()?;
-    let inner_data = it.next()?.into_bytes()?;
+    let inner_data = match it.next()? {
+        DynSolValue::Bytes(b) => b,
+        _ => return None,
+    };
     if inner_data.len() < 4 {
         return None;
     }
     Some((target, format!("0x{}", hex::encode(&inner_data[..4]))))
+}
+
+/// Consume a `DynSolValue::Tuple`, returning its fields (or `None` for any
+/// other variant).
+fn into_tuple(value: DynSolValue) -> Option<Vec<DynSolValue>> {
+    match value {
+        DynSolValue::Tuple(items) => Some(items),
+        _ => None,
+    }
 }
 
 fn load_descriptions(path: Option<&Path>) -> SimDescriptionRegistry {

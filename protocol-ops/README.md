@@ -38,20 +38,25 @@ See `chain init --help` for owners, bridgehub admin keys, and forge passthrough 
 
 Most subcommands flatten **`SharedRunArgs`** from `common/args.rs`:
 
-| Flag                             | Role                                                                |
-| -------------------------------- | ------------------------------------------------------------------- |
-| **`--sender`**                   | Optional sender address (with `--private-key`).                     |
-| **`--private-key`** / **`--pk`** | Sender private key.                                                 |
-| **`--l1-rpc-url`**               | L1 RPC (default `http://localhost:8545`).                           |
-| **`--simulate`**                 | Run against a temporary Anvil fork of that RPC.                     |
-| **`--out`**                      | Write the JSON envelope below to this path.                         |
-| _(forge passthrough)_            | Forwarded via **`ForgeScriptArgs`** (see `--help` on each command). |
+| Flag                  | Role                                                                |
+| --------------------- | ------------------------------------------------------------------- |
+| **`--l1-rpc-url`**    | L1 RPC (default `http://localhost:8545`).                           |
+| **`--out`**           | Output directory for Safe bundles + `manifest.json`.                |
+| _(forge passthrough)_ | Forwarded via **`ForgeScriptArgs`** (see `--help` on each command). |
 
-Extra signers (e.g. **`--owner`**, **`--owner-pk`**, bridgehub keys) stay on the specific command; they are not part of `SharedRunArgs`.
+> **`--deployer-address` / `--private-key`** are **not** part of `SharedRunArgs`.
+> Bootstrap and apply commands declare their own deployer key flags because they need
+> an EOA to simulate forge scripts against the Anvil fork. Extra signers (e.g.
+> **`--owner`**, bridgehub keys) stay on specific commands.
 
-## Simulate mode
+## Execution model
 
-Pass **`--simulate`** (where supported) to run against a temporary **Anvil fork** of **`--l1-rpc-url`**. The real L1 is not modified; the fork stops when the CLI exits.
+Every command that generates Safe bundles runs **exclusively against a temporary Anvil fork**
+of `--l1-rpc-url`. The real L1 is **never modified** by the CLI. The fork exists only for
+the duration of the command and stops when it exits.
+
+To apply the generated Safe bundles to a real chain, use `dev execute-manifest` (or any
+Safe-bundle-aware executor) with the keys from `wallets.yaml`.
 
 ## Output
 
@@ -65,8 +70,6 @@ Commands that support **`--out`** write a **`CommandEnvelope`** snapshot after a
 | **`transactions`** | Flat array in execution order: `{ "to", "data", "value" }` for replay (normalized like `cast send`). Built from every `run`. |
 | **`input`**        | Serialized command input (may be `{}` if the command passes an empty object).                                                |
 | **`output`**       | Command-specific result object (may be `{}`).                                                                                |
-
-**Exception:** `chain set-upgrade-timestamp --simulate --out` writes a minimal JSON (`command`, **`transactions`**) built from `cast calldata` — no **`runs`** array.
 
 ## Requirements
 
