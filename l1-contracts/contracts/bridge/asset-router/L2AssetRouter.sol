@@ -203,6 +203,19 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _;
     }
 
+    /// @notice Checks that the message sender is the interop center or — if the atomic-flow stack is
+    /// enabled on this chain — the canonical atomic-flow manager. A userspace flow escrow (e.g. the
+    /// dummy-interop `L2FlowEscrow`) registered in the manager slot drives source-side burns via
+    /// `initiateIndirectCall` through this gate; the burn pulls from the caller's own balance, so the
+    /// trusted slot holder gains no ability to move other accounts' funds.
+    modifier onlyL2InteropCenterOrAtomicFlowManager() {
+        bool isAtomicFlowManager = atomicFlowManager != address(0) && msg.sender == atomicFlowManager;
+        if (msg.sender != _interopCenterAddr() && !isAtomicFlowManager) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @notice Checks that the message sender is the canonical atomic-flow manager (only meaningful when
     /// the atomic-flow stack is enabled on this chain). The manager drives `recoverAtomicBurn` for the
     /// L1-free atomic interop flow's timeout path.
@@ -411,7 +424,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         address _originalCaller,
         uint256 _value,
         bytes calldata _data
-    ) external payable onlyL2InteropCenter returns (InteropCallStarter memory interopCallStarter) {
+    )
+        external
+        payable
+        onlyL2InteropCenterOrAtomicFlowManager
+        returns (InteropCallStarter memory interopCallStarter)
+    {
         // This function is called by the InteropCenter when processing indirect interop calls.
         // It prepares the bridge operation for cross-chain execution through these steps:
         // 1. Processing the bridge request through the standard bridgehub flow
