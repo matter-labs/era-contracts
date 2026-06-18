@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
-import {LegState, ImtInclusionProof, ImtNonInclusionProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
+import {LegState, ImtNonInclusionProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

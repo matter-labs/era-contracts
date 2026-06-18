@@ -537,11 +537,7 @@ contract AtomicFlowManagerTest is Test {
             destinationBaseTokenAssetId: bytes32(0),
             interopBundleSalt: bytes32(0),
             calls: _calls,
-            bundleAttributes: BundleAttributes({
-                executionAddress: "",
-                unbundlerAddress: "",
-                useFixedFee: false
-            })
+            bundleAttributes: BundleAttributes({executionAddress: "", unbundlerAddress: "", useFixedFee: false})
         });
         return abi.encode(bundle);
     }
