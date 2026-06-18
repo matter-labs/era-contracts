@@ -326,8 +326,9 @@ contract AtomicFlowManagerTest is Test {
         assertTrue(managerA.legState(flowId, sourceLegA) == LegState.Reverted, "source leg reverted on A");
 
         // The re-mint must target the depositor (alice) as both originalCaller and remoteReceiver.
-        (address recvCaller, address recvReceiver,, uint256 recvAmount,) =
-            DataEncoding.decodeBridgeMintData(arA.lastRecoverData());
+        (address recvCaller, address recvReceiver, , uint256 recvAmount, ) = DataEncoding.decodeBridgeMintData(
+            arA.lastRecoverData()
+        );
         assertEq(recvCaller, alice, "recover re-mints to depositor (caller)");
         assertEq(recvReceiver, alice, "recover re-mints to depositor (receiver)");
         assertEq(recvAmount, AMOUNT, "recover preserves amount");
@@ -361,7 +362,12 @@ contract AtomicFlowManagerTest is Test {
 
         ImtNonInclusionProof memory proof = _nonInclusion(treeB, CHAIN_B, flowId, hBA, 5000);
         managerA.authorizeRefund(
-            flowId, _legHashes(hAB, hBA), _chainIds(), DEADLINE, _missingIdx(hAB, hBA, CHAIN_B), proof
+            flowId,
+            _legHashes(hAB, hBA),
+            _chainIds(),
+            DEADLINE,
+            _missingIdx(hAB, hBA, CHAIN_B),
+            proof
         );
         assertTrue(managerA.legState(flowId, hAB) == LegState.Revertable, "empty bundle leg revertable");
 
@@ -383,7 +389,12 @@ contract AtomicFlowManagerTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(ProofDeadlineNotExceeded.selector, earlySlBlock, DEADLINE));
         managerA.authorizeRefund(
-            flowId, _legHashes(hAB, hBA), _chainIds(), DEADLINE, _missingIdx(hAB, hBA, CHAIN_B), proof
+            flowId,
+            _legHashes(hAB, hBA),
+            _chainIds(),
+            DEADLINE,
+            _missingIdx(hAB, hBA, CHAIN_B),
+            proof
         );
     }
 
@@ -412,7 +423,12 @@ contract AtomicFlowManagerTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(ProofNonInclusionFailed.selector, treeB.root(), legBValue));
         managerA.authorizeRefund(
-            flowId, _legHashes(hAB, hBA), _chainIds(), DEADLINE, _missingIdx(hAB, hBA, CHAIN_B), proof
+            flowId,
+            _legHashes(hAB, hBA),
+            _chainIds(),
+            DEADLINE,
+            _missingIdx(hAB, hBA, CHAIN_B),
+            proof
         );
     }
 
@@ -461,7 +477,12 @@ contract AtomicFlowManagerTest is Test {
         _appendLeg(managerA, treeA, flowId, sourceLegA);
         ImtNonInclusionProof memory proof = _nonInclusion(treeB, CHAIN_B, flowId, missingLeg, 5000);
         managerA.authorizeRefund(
-            flowId, _legHashes(hAB, hBA), _chainIds(), DEADLINE, _missingIdx(hAB, hBA, CHAIN_B), proof
+            flowId,
+            _legHashes(hAB, hBA),
+            _chainIds(),
+            DEADLINE,
+            _missingIdx(hAB, hBA, CHAIN_B),
+            proof
         );
         managerA.claimRefund(flowId, _abBundleBytes());
         assertTrue(managerA.legState(flowId, sourceLegA) == LegState.Reverted, "source leg reverted");
@@ -504,11 +525,11 @@ contract AtomicFlowManagerTest is Test {
     }
 
     /// @dev Build an InteropBundle's ABI bytes from source/destination chain ids and a calls array.
-    function _bundleBytes(uint256 _sourceChainId, uint256 _destinationChainId, InteropCall[] memory _calls)
-        internal
-        pure
-        returns (bytes memory)
-    {
+    function _bundleBytes(
+        uint256 _sourceChainId,
+        uint256 _destinationChainId,
+        InteropCall[] memory _calls
+    ) internal pure returns (bytes memory) {
         InteropBundle memory bundle = InteropBundle({
             version: bytes1(0x01),
             sourceChainId: _sourceChainId,
@@ -519,11 +540,7 @@ contract AtomicFlowManagerTest is Test {
             bundleAttributes: BundleAttributes({
                 executionAddress: "",
                 unbundlerAddress: "",
-                useFixedFee: false,
-                isAtomic: true,
-                atomicFlowId: bytes32(0),
-                atomicDeadline: DEADLINE,
-                atomicLowNullifierIndex: 0
+                useFixedFee: false
             })
         });
         return abi.encode(bundle);
@@ -532,11 +549,11 @@ contract AtomicFlowManagerTest is Test {
     /// @dev A single-element calls array carrying the asset-router `finalizeDeposit(srcChainId, assetId,
     /// bridgeMintData)` call the manager recognises and reverses. The mint data encodes the depositor as
     /// originalCaller and the recipient as remoteReceiver.
-    function _arFinalizeCall(uint256 _srcChainId, address _depositor, address _recipient)
-        internal
-        view
-        returns (InteropCall[] memory calls)
-    {
+    function _arFinalizeCall(
+        uint256 _srcChainId,
+        address _depositor,
+        address _recipient
+    ) internal view returns (InteropCall[] memory calls) {
         bytes memory bridgeMintData = DataEncoding.encodeBridgeMintData({
             _originalCaller: _depositor,
             _remoteReceiver: _recipient,
@@ -545,7 +562,10 @@ contract AtomicFlowManagerTest is Test {
             _erc20Metadata: ""
         });
         bytes memory data = abi.encodeWithSelector(
-            IAssetRouterFinalizeDeposit.finalizeDeposit.selector, _srcChainId, ASSET_ID, bridgeMintData
+            IAssetRouterFinalizeDeposit.finalizeDeposit.selector,
+            _srcChainId,
+            ASSET_ID,
+            bridgeMintData
         );
         calls = new InteropCall[](1);
         calls[0] = InteropCall({
@@ -563,7 +583,12 @@ contract AtomicFlowManagerTest is Test {
         address stranger = address(0xBEEF);
         calls = new InteropCall[](1);
         calls[0] = InteropCall({
-            version: bytes1(0x01), shadowAccount: false, to: stranger, from: stranger, value: 0, data: hex"deadbeef"
+            version: bytes1(0x01),
+            shadowAccount: false,
+            to: stranger,
+            from: stranger,
+            value: 0,
+            data: hex"deadbeef"
         });
     }
 
@@ -611,18 +636,23 @@ contract AtomicFlowManagerTest is Test {
 
     /// @dev A full {AtomicFinalityProof} for the 2-leg flow, one inclusion proof per leg (in sorted leg
     /// order), each carrying SL block `_slBlock`. Requires both legs already appended to their trees.
-    function _finality(bytes32 _flowIdLocal, bytes32 _hAB, bytes32 _hBA, uint256 _slBlock)
-        internal
-        view
-        returns (AtomicFinalityProof memory finality)
-    {
+    function _finality(
+        bytes32 _flowIdLocal,
+        bytes32 _hAB,
+        bytes32 _hBA,
+        uint256 _slBlock
+    ) internal view returns (AtomicFinalityProof memory finality) {
         bytes32[] memory hashes = _legHashes(_hAB, _hBA);
         ImtInclusionProof[] memory proofs = new ImtInclusionProof[](2);
         for (uint256 i = 0; i < 2; ++i) {
             proofs[i] = _inclusion(_flowIdLocal, hashes[i], _slBlock);
         }
         finality = AtomicFinalityProof({
-            flowId: _flowIdLocal, deadline: DEADLINE, legBundleHashes: hashes, chainIds: _chainIds(), proofs: proofs
+            flowId: _flowIdLocal,
+            deadline: DEADLINE,
+            legBundleHashes: hashes,
+            chainIds: _chainIds(),
+            proofs: proofs
         });
     }
 
@@ -631,11 +661,13 @@ contract AtomicFlowManagerTest is Test {
     /// against A's tree at `_slBlock` too. Used only to exercise the deadline check on the missing leg in
     /// the refunded-then-finalize mutual-exclusivity test: every proof carries `_slBlock`, so the first
     /// leg checked trips the deadline guard.
-    function _partialFinality(bytes32 _flowIdLocal, bytes32 _hAB, bytes32 _hBA, bytes32 _presentLeg, uint256 _slBlock)
-        internal
-        view
-        returns (AtomicFinalityProof memory finality)
-    {
+    function _partialFinality(
+        bytes32 _flowIdLocal,
+        bytes32 _hAB,
+        bytes32 _hBA,
+        bytes32 _presentLeg,
+        uint256 _slBlock
+    ) internal view returns (AtomicFinalityProof memory finality) {
         bytes32[] memory hashes = _legHashes(_hAB, _hBA);
         ImtInclusionProof[] memory proofs = new ImtInclusionProof[](2);
         for (uint256 i = 0; i < 2; ++i) {
@@ -645,34 +677,39 @@ contract AtomicFlowManagerTest is Test {
             proofs[i].sourceChainId = hashes[i] == _hAB ? CHAIN_A : CHAIN_B;
         }
         finality = AtomicFinalityProof({
-            flowId: _flowIdLocal, deadline: DEADLINE, legBundleHashes: hashes, chainIds: _chainIds(), proofs: proofs
+            flowId: _flowIdLocal,
+            deadline: DEADLINE,
+            legBundleHashes: hashes,
+            chainIds: _chainIds(),
+            proofs: proofs
         });
     }
 
     /// @dev An inclusion proof for `(flowId, bundleHash)` built from the appropriate chain's real tree
     /// state, carrying SL block `_slBlock` in its message-proof bytes.
-    function _inclusion(bytes32 _flowIdLocal, bytes32 _bundleHash, uint256 _slBlock)
-        internal
-        view
-        returns (ImtInclusionProof memory)
-    {
+    function _inclusion(
+        bytes32 _flowIdLocal,
+        bytes32 _bundleHash,
+        uint256 _slBlock
+    ) internal view returns (ImtInclusionProof memory) {
         // A leg's bundleHash bakes in its source chain; route the proof to that chain's tree.
         bool isA = _bundleHash == _bundleHashAB();
         L2InteropCommitmentTree tree = isA ? treeA : treeB;
         uint256 sourceChainId = isA ? CHAIN_A : CHAIN_B;
         uint256 value = AtomicInteropTestUtils.commitValue(_flowIdLocal, _bundleHash);
         uint256 idx = AtomicInteropTestUtils.indexOfValue(tree, value);
-        return ImtInclusionProof({
-            sourceChainId: sourceChainId,
-            batchNumber: DUMMY_BATCH,
-            chainImtRoot: tree.root(),
-            messageTxNumberInBatch: DUMMY_TX_IN_BATCH,
-            messageIndex: DUMMY_MSG_INDEX,
-            messageProof: AtomicInteropTestUtils.slProofBytes(_slBlock, SL_CHAIN_ID),
-            leaf: tree.leafAt(idx),
-            imtLeafIndex: idx,
-            imtProof: tree.merklePath(idx)
-        });
+        return
+            ImtInclusionProof({
+                sourceChainId: sourceChainId,
+                batchNumber: DUMMY_BATCH,
+                chainImtRoot: tree.root(),
+                messageTxNumberInBatch: DUMMY_TX_IN_BATCH,
+                messageIndex: DUMMY_MSG_INDEX,
+                messageProof: AtomicInteropTestUtils.slProofBytes(_slBlock, SL_CHAIN_ID),
+                leaf: tree.leafAt(idx),
+                imtLeafIndex: idx,
+                imtProof: tree.merklePath(idx)
+            });
     }
 
     /// @dev A non-inclusion proof for `(flowId, bundleHash)` against `_tree`, with SL block `_slBlock`.
@@ -685,16 +722,17 @@ contract AtomicFlowManagerTest is Test {
     ) internal view returns (ImtNonInclusionProof memory) {
         uint256 value = AtomicInteropTestUtils.commitValue(_flowIdLocal, _bundleHash);
         uint256 lowIdx = AtomicInteropTestUtils.lowNullifierIndex(_tree, value);
-        return ImtNonInclusionProof({
-            sourceChainId: _chainId,
-            batchNumber: DUMMY_BATCH,
-            chainImtRoot: _tree.root(),
-            messageTxNumberInBatch: DUMMY_TX_IN_BATCH,
-            messageIndex: DUMMY_MSG_INDEX,
-            messageProof: AtomicInteropTestUtils.slProofBytes(_slBlock, SL_CHAIN_ID),
-            lowLeaf: _tree.leafAt(lowIdx),
-            lowLeafIndex: lowIdx,
-            imtProof: _tree.merklePath(lowIdx)
-        });
+        return
+            ImtNonInclusionProof({
+                sourceChainId: _chainId,
+                batchNumber: DUMMY_BATCH,
+                chainImtRoot: _tree.root(),
+                messageTxNumberInBatch: DUMMY_TX_IN_BATCH,
+                messageIndex: DUMMY_MSG_INDEX,
+                messageProof: AtomicInteropTestUtils.slProofBytes(_slBlock, SL_CHAIN_ID),
+                lowLeaf: _tree.leafAt(lowIdx),
+                lowLeafIndex: lowIdx,
+                imtProof: _tree.merklePath(lowIdx)
+            });
     }
 }

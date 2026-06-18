@@ -374,11 +374,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             bundleAttributes: BundleAttributes({
                 executionAddress: InteroperableAddress.formatEvmV1(EXECUTION_ADDRESS),
                 unbundlerAddress: InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS),
-                useFixedFee: false,
-                isAtomic: false,
-                atomicFlowId: bytes32(0),
-                atomicDeadline: 0,
-                atomicLowNullifierIndex: 0
+                useFixedFee: false
             })
         });
         return interopBundle;
@@ -672,11 +668,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             bundleAttributes: BundleAttributes({
                 executionAddress: InteroperableAddress.formatEvmV1(EXECUTION_ADDRESS),
                 unbundlerAddress: InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS),
-                useFixedFee: false,
-                isAtomic: false,
-                atomicFlowId: bytes32(0),
-                atomicDeadline: 0,
-                atomicLowNullifierIndex: 0
+                useFixedFee: false
             })
         });
         return interopBundle;
