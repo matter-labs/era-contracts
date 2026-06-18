@@ -9,7 +9,7 @@
  */
 
 import { BigNumber, Contract, ContractFactory, Wallet, ethers, providers } from "ethers";
-import { getAbi, getCreationBytecode } from "../core/contracts";
+import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   L2_ASSET_ROUTER_ADDR,
@@ -120,6 +120,16 @@ export async function deployL1FlowStack(
 }
 
 /**
+ * Whether the contract at `address` exposes the function with 4-byte `selector` — detected by
+ * scanning its runtime code for the selector (no eth_call, so no error to swallow). Lets the escrow
+ * deployer detect whether a pre-generated chain state predates the AR's atomic-flow additions.
+ */
+async function hasSelector(provider: providers.JsonRpcProvider, address: string, selector: string): Promise<boolean> {
+  const code: string = (await provider.getCode(address)).toLowerCase();
+  return code.includes(selector.slice(2).toLowerCase());
+}
+
+/**
  * Deploy one `L2FlowEscrow` on each provided L2, wired to the same `_l1LinkerAddress`.
  * Each chain may override the AR/NTV the escrow drives — defaults are the system
  * predeploys at `L2_ASSET_ROUTER_ADDR` / `L2_NATIVE_TOKEN_VAULT_ADDR`, which is what
@@ -143,11 +153,24 @@ export async function deployL2EscrowsForChains(
   await Promise.all(
     l2Providers.map(async ({ chainId, provider, assetRouter, nativeTokenVault }) => {
       const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, provider);
+      const ar = assetRouter ?? L2_ASSET_ROUTER_ADDR;
+      const ntv = nativeTokenVault ?? L2_NATIVE_TOKEN_VAULT_ADDR;
+
+      // The pre-generated chain states were dumped before the AR's atomic-flow additions
+      // (`atomicFlowManager` / `setAtomicFlowManager` / the `isAtomicFlowManager` exception in
+      // `onlyAssetRouterCounterpartOrSelf`). The dummy flow registers its escrow in that slot so the
+      // escrow can drive `initiateIndirectCall` (source burn) and `finalizeDeposit` (destination mint),
+      // so refresh the AR runtime code in place to the freshly-built bytecode. Code-only upgrade: the
+      // atomic-flow additions only append the `atomicFlowManager` slot (reads as 0 in the old state,
+      // exactly what `setAtomicFlowManager` requires); no existing slot is reordered or overwritten.
+      // This is the same `anvil_setCode` built-in-refresh pattern the bundle-model deployer uses.
+      if (!(await hasSelector(provider, ar, ethers.utils.id("setAtomicFlowManager(address)").slice(0, 10)))) {
+        await provider.send("anvil_setCode", [ar, getBytecode("L2AssetRouter")]);
+      }
+
       const factory = new ContractFactory(getAbi("L2FlowEscrow"), getCreationBytecode("L2FlowEscrow"), wallet);
       const escrow = await factory.deploy();
       await escrow.deployed();
-      const ar = assetRouter ?? L2_ASSET_ROUTER_ADDR;
-      const ntv = nativeTokenVault ?? L2_NATIVE_TOKEN_VAULT_ADDR;
       await (await escrow.initialize(_l1LinkerAddress, ar, ntv)).wait();
       out[chainId] = escrow;
     })
