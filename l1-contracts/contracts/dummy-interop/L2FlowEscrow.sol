@@ -40,8 +40,7 @@ import {
 /// @notice See `IL2FlowEscrow`. All three addresses the escrow depends on (the L1 linker
 /// it trusts, plus the AR/NTV it calls into) are storage-set in `initialize` — none are
 /// baked into bytecode. This lets the escrow point at either the system AR/NTV (system
-/// predeploys) or a userspace `PrivateL2AssetRouter` / `PrivateL2NativeTokenVault`,
-/// chosen at deploy time. CREATE2 with a fixed salt across L2s still yields the same
+/// predeploys) or a userspace AR/NTV, chosen at deploy time. CREATE2 with a fixed salt across L2s still yields the same
 /// escrow address (since bytecode is identical), but each instance's wiring is set by
 /// its per-chain initializer.
 ///
@@ -58,9 +57,8 @@ contract L2FlowEscrow is IL2FlowEscrow {
     address private _l1Linker;
 
     /// @dev L2 asset router this escrow calls into for burns/mints. Set once via
-    /// `initialize`. Typically a `PrivateL2AssetRouter` deployed in userspace, but the
-    /// system `L2_ASSET_ROUTER_ADDR` is also a valid choice on chains that wire its
-    /// `atomicFlowEscrow` slot to point at this escrow.
+    /// `initialize`. Typically the system `L2_ASSET_ROUTER_ADDR` on chains that wire its
+    /// `atomicFlowEscrow` slot to point at this escrow, but a userspace AR is also valid.
     address private _assetRouter;
 
     /// @dev L2 native token vault used for source-side allowances. Set once via

@@ -8,7 +8,8 @@
  * always returns true.
  */
 
-import { BigNumber, Contract, ContractFactory, Wallet, ethers, providers } from "ethers";
+import type { Contract, providers } from "ethers";
+import { BigNumber, ContractFactory, Wallet, ethers } from "ethers";
 import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
@@ -133,8 +134,7 @@ async function hasSelector(provider: providers.JsonRpcProvider, address: string,
  * Deploy one `L2FlowEscrow` on each provided L2, wired to the same `_l1LinkerAddress`.
  * Each chain may override the AR/NTV the escrow drives — defaults are the system
  * predeploys at `L2_ASSET_ROUTER_ADDR` / `L2_NATIVE_TOKEN_VAULT_ADDR`, which is what
- * the anvil tests use. For real testnet deploys, pass the userspace
- * `PrivateL2AssetRouter` / `PrivateL2NativeTokenVault` addresses.
+ * the anvil tests use. For real testnet deploys, pass the userspace AR/NTV addresses.
  *
  * Returns a map from chainId → deployed escrow contract.
  */

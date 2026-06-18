@@ -25,6 +25,7 @@ import {
 } from "../../src/core/utils";
 import { getAbi } from "../../src/core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, L2_ASSET_ROUTER_ADDR } from "../../src/core/const";
+import type { ExecuteParams, SendSpec } from "../../src/helpers/dummy-flow-helpers";
 import {
   buildCommitProofFromReceipt,
   buildExecuteParams,
@@ -33,8 +34,6 @@ import {
   deployL1FlowStack,
   deployL2EscrowsForChains,
   encodeErc20Data,
-  ExecuteParams,
-  SendSpec,
 } from "../../src/helpers/dummy-flow-helpers";
 
 const TEST_TOKEN_DECIMALS = 18;

@@ -17,7 +17,7 @@ import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/br
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
-import {InteropCallStarter, InteropRoute} from "../../common/Messaging.sol";
+import {InteropCallStarter} from "../../common/Messaging.sol";
 import {
     L2_BRIDGEHUB_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
@@ -37,7 +37,6 @@ import {
     TokenNotLegacy,
     Unauthorized
 } from "../../common/L1ContractErrors.sol";
-import {InteropRouteMismatch} from "../../interop/InteropErrors.sol";
 import {IERC7786Recipient} from "../../interop/IERC7786Recipient.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
 import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
@@ -77,9 +76,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// the old version where it was an immutable.
     bytes32 public BASE_TOKEN_ASSET_ID;
 
-    /// @notice Tracks interop route (public vs private) per asset, preventing mixing.
-    mapping(bytes32 assetId => InteropRoute) public assetInteropRoute;
-
     /// @notice Canonical atomic-flow manager on this chain. Whitelisted to call the AR's
     /// `recoverAtomicBurn` entry (atomic timeout recovery) and, via `onlyAssetRouterCounterpartOrSelf`,
     /// `finalizeDeposit` (used by a userspace flow escrow registered in this slot, e.g. dummy-interop's
@@ -109,45 +105,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         return L2_INTEROP_HANDLER_ADDR;
     }
 
-    /// @notice Returns the expected interop route for this router (Public for base, Private for subclass).
-    function _expectedInteropRoute() internal pure virtual returns (InteropRoute) {
-        return InteropRoute.Public;
-    }
-
     /// @notice Validates that an interop message sender is an authorized AssetRouter counterpart.
     /// @dev By default, only accepts messages from the same address (all system AssetRouters share one address).
-    /// Override in PrivateL2AssetRouter to accept registered remote routers.
     function _validateAssetRouterCounterpart(uint256 _senderChainId, address _senderAddress) internal view virtual {
         require((_senderChainId != L1_CHAIN_ID && _senderAddress == address(this)), Unauthorized(_senderAddress));
-    }
-
-    /// @notice Enforces that an asset uses a consistent interop route.
-    function _enforceRoute(bytes32 _assetId) internal {
-        InteropRoute expected = _expectedInteropRoute();
-        InteropRoute current = assetInteropRoute[_assetId];
-        if (current == InteropRoute.Unset) {
-            assetInteropRoute[_assetId] = expected;
-        } else {
-            require(current == expected, InteropRouteMismatch(_assetId, uint8(current), uint8(expected)));
-        }
-    }
-
-    /// @notice Extracts assetId from deposit data and enforces route consistency.
-    /// @dev Deposit data format: version byte (1) + abi.encode(bytes32 assetId, bytes transferData)
-    function _enforceRouteFromDepositData(bytes calldata _data) internal {
-        if (_data.length >= 33) {
-            (bytes32 assetId, ) = abi.decode(_data[1:], (bytes32, bytes));
-            _enforceRoute(assetId);
-        }
-    }
-
-    /// @notice Extracts assetId from finalizeDeposit payload and enforces route consistency.
-    /// @dev finalizeDeposit(uint256, bytes32, bytes) — assetId is at offset 4+32=36, length 32
-    function _enforceRouteFromFinalizeDeposit(bytes calldata _payload) internal {
-        if (_payload.length >= 68) {
-            bytes32 assetId = abi.decode(_payload[36:68], (bytes32));
-            _enforceRoute(assetId);
-        }
     }
 
     /// @notice Checks that the message sender is the L1 Asset Router.
@@ -298,8 +259,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     ///   - the complex upgrader, so the genesis force-deployment wires the canonical
     ///     predeployed manager on ZKsync OS out of the box (the upgrader is the genesis caller);
     ///   - the owner, so a system AR's aliased L1 governance can opt in post-genesis, and a
-    ///     userspace AR (e.g. `PrivateL2AssetRouter` deployed by an EOA) can wire its own manager
-    ///     without needing the system upgrader.
+    ///     userspace AR deployed by an EOA can wire its own manager without needing the system upgrader.
     /// See `atomicFlowManager` for the broader design context.
     function setAtomicFlowManager(address _manager) external {
         if (msg.sender != owner() && msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -369,8 +329,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
             InvalidSelector(bytes4(payload[0:4]))
         );
 
-        _enforceRouteFromFinalizeDeposit(payload);
-
         (bool success, ) = address(this).call{value: msg.value}(payload);
         require(success, ExecuteMessageFailed());
         return IERC7786Recipient.receiveMessage.selector;
@@ -439,8 +397,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         //   (L2AssetRouter address is equal on all ZKsync chains)
 
         address ntvAddr = _nativeTokenVaultAddr();
-
-        _enforceRouteFromDepositData(_data);
 
         L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit({
             _chainId: _chainId,

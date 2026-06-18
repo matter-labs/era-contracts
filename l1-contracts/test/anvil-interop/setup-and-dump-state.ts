@@ -36,7 +36,6 @@ async function main(): Promise<void> {
 
     const stateAfterSetup = runner.loadState();
     const testTokens = stateAfterSetup.testTokens;
-    const privateInteropAddresses = stateAfterSetup.privateInteropAddresses;
     const customBaseTokens = stateAfterSetup.customBaseTokens;
     const tbmAccountingSnapshots = stateAfterSetup.tbmAccountingSnapshots;
     const zkToken = stateAfterSetup.zkToken;
@@ -50,7 +49,6 @@ async function main(): Promise<void> {
       ctmAddresses,
       chainAddresses,
       testTokens,
-      privateInteropAddresses,
       customBaseTokens,
       tbmAccountingSnapshots,
       zkToken,

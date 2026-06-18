@@ -123,14 +123,6 @@ export interface ChainInfo {
   config: AnvilChainConfig[];
 }
 
-export interface PrivateInteropAddresses {
-  assetTracker: string;
-  ntv: string;
-  assetRouter: string;
-  interopCenter: string;
-  interopHandler: string;
-}
-
 export interface DeploymentState {
   chains?: ChainInfo;
   l1Addresses?: CoreDeployedAddresses;
@@ -138,7 +130,6 @@ export interface DeploymentState {
   chainAddresses?: ChainAddresses[];
   /** Token addresses used by interop tests, keyed by chain ID. Asset IDs are resolved from L2NativeTokenVault. */
   testTokens?: Record<number, string>;
-  privateInteropAddresses?: Record<number, PrivateInteropAddresses>;
   /** L1 address of the custom ERC20 base token, keyed by chain ID. */
   customBaseTokens?: Record<number, string>;
   /** Pre/post accounting captured during setup TBM, keyed by `${chainId}:${assetId.toLowerCase()}`. */
