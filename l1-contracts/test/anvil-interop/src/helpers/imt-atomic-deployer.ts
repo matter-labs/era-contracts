@@ -118,7 +118,7 @@ export async function deployAtomicStack(args: {
     ).wait();
   }
 
-  // 3. Register the manager on the L2AssetRouter (owner-gated, mirrors 12-dummy-flow's wiring).
+  // 3. Register the manager on the L2AssetRouter (owner-gated).
   //
   // The pre-generated chain states were dumped before the AR's atomic-flow additions
   // (`atomicFlowManager` / `setAtomicFlowManager` / `recoverAtomicBurn`), so refresh the AR's runtime

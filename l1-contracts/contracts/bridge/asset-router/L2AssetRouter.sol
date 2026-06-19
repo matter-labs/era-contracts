@@ -77,12 +77,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     bytes32 public BASE_TOKEN_ASSET_ID;
 
     /// @notice Canonical atomic-flow manager on this chain. Whitelisted to call the AR's
-    /// `recoverAtomicBurn` entry (atomic timeout recovery) and, via `onlyAssetRouterCounterpartOrSelf`,
-    /// `finalizeDeposit` (used by a userspace flow escrow registered in this slot, e.g. dummy-interop's
-    /// `L2FlowEscrow`). For the IMT atomic flow the source burn goes through the normal
-    /// `initiateIndirectCall` path and destination mints through the interop handler, so the IMT manager
-    /// does not itself call `finalizeDeposit`. Set once via `setAtomicFlowManager`; remains `address(0)`
-    /// (disabled) on chains that do not opt in to the atomic-flow stack.
+    /// `recoverAtomicBurn` entry (the IMT atomic flow's timeout recovery path). The source burn goes
+    /// through the normal `initiateIndirectCall` path and destination mints through the interop handler,
+    /// so the manager itself only drives `recoverAtomicBurn`. Set once via `setAtomicFlowManager`;
+    /// remains `address(0)` (disabled) on chains that do not opt in to the atomic-flow stack.
     address public atomicFlowManager;
 
     /// @notice Returns the bridgehub contract.
@@ -125,22 +123,17 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _;
     }
 
-    /// @notice Checks that the message sender is the L1 Asset Router, this contract itself, or — if the
-    /// atomic-flow stack is enabled on this chain — the canonical atomic-flow manager. A userspace flow
-    /// escrow (e.g. the dummy-interop `L2FlowEscrow`) registered in the manager slot drives
-    /// destination-side mints via `finalizeDeposit` through this gate.
+    /// @notice Checks that the message sender is the L1 Asset Router or this contract itself.
     modifier onlyAssetRouterCounterpartOrSelf(uint256 _chainId) {
-        bool isAtomicFlowManager = atomicFlowManager != address(0) && msg.sender == atomicFlowManager;
         if (_chainId == L1_CHAIN_ID) {
             if (
                 (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != address(L1_ASSET_ROUTER)) &&
-                msg.sender != address(this) &&
-                !isAtomicFlowManager
+                msg.sender != address(this)
             ) {
                 revert Unauthorized(msg.sender);
             }
         } else {
-            if (msg.sender != address(this) && !isAtomicFlowManager) {
+            if (msg.sender != address(this)) {
                 revert Unauthorized(msg.sender);
             }
         }
@@ -161,19 +154,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// @notice Checks that the message sender is the interop center.
     modifier onlyL2InteropCenter() {
         require(msg.sender == _interopCenterAddr(), Unauthorized(msg.sender));
-        _;
-    }
-
-    /// @notice Checks that the message sender is the interop center or — if the atomic-flow stack is
-    /// enabled on this chain — the canonical atomic-flow manager. A userspace flow escrow (e.g. the
-    /// dummy-interop `L2FlowEscrow`) registered in the manager slot drives source-side burns via
-    /// `initiateIndirectCall` through this gate; the burn pulls from the caller's own balance, so the
-    /// trusted slot holder gains no ability to move other accounts' funds.
-    modifier onlyL2InteropCenterOrAtomicFlowManager() {
-        bool isAtomicFlowManager = atomicFlowManager != address(0) && msg.sender == atomicFlowManager;
-        if (msg.sender != _interopCenterAddr() && !isAtomicFlowManager) {
-            revert Unauthorized(msg.sender);
-        }
         _;
     }
 
@@ -382,7 +362,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         address _originalCaller,
         uint256 _value,
         bytes calldata _data
-    ) external payable onlyL2InteropCenterOrAtomicFlowManager returns (InteropCallStarter memory interopCallStarter) {
+    ) external payable onlyL2InteropCenter returns (InteropCallStarter memory interopCallStarter) {
         // This function is called by the InteropCenter when processing indirect interop calls.
         // It prepares the bridge operation for cross-chain execution through these steps:
         // 1. Processing the bridge request through the standard bridgehub flow

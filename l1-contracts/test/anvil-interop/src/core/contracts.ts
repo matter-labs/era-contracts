@@ -71,8 +71,6 @@ const ARTIFACTS = {
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
   TestnetERC20Token: "TestnetERC20Token.sol/TestnetERC20Token.json",
-  L1FlowLinker: "L1FlowLinker.sol/L1FlowLinker.json",
-  L2FlowEscrow: "L2FlowEscrow.sol/L2FlowEscrow.json",
   // L1-free atomic interop (bundle model). The global IMT + importer were removed on-chain; the
   // per-chain commitment-tree root is carried by the standard interop-root channel, and the
   // (formerly escrow-direct) flow now runs through InteropCenter / InteropHandler with the
