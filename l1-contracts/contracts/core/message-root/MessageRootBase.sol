@@ -62,19 +62,20 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     mapping(uint256 chainIndex => uint256 chainId) public chainIndexToId;
 
     /// @notice The shared full merkle tree storing the aggregate hash.
-    /// @dev Note, that on L1, the chainId leaves are empty.
+    /// @dev The chainId leaves are updated on every `addChainBatchRoot` on both settlement layers (L1
+    /// and Gateway).
     FullMerkle.FullTree public sharedTree;
 
     /// @dev The incremental merkle tree storing the chain message roots.
-    /// @dev On L1, these are empty leaves and are populated only during the addition of the chain
-    /// are not updated thereafter.
+    /// @dev A chain's leaves are seeded empty when the chain is added and then pushed to on every
+    /// `addChainBatchRoot`, on both settlement layers (L1 and Gateway).
     mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) internal chainTree;
 
     /// @notice The mapping from block number to the global message root.
     /// @dev Each block might have multiple txs that change the historical root. You can safely use the final root in the block,
     /// since each new root cumulatively aggregates all prior changes — so the last root always contains (at minimum) everything
     /// from the earlier ones.
-    /// @dev Populated only on L2.
+    /// @dev Populated on both settlement layers (L1 and Gateway) on every `addChainBatchRoot`.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
     /// @dev Chain ID of L1.
@@ -89,7 +90,6 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// @notice The mapping from chainId to batchNumber to chainBatchRoot.
     /// @dev These are the same values as the leaves of the chainTree.
     /// @dev We store these values for message verification on L1 and Gateway.
-    /// @dev We only updated the chainTree on deprecated Era GW as of V31.
     /// @dev An expected invariant is that for all batches starting from currentChainBatchNumber + 1, the `chainBatchRoots` is 0.
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
@@ -179,7 +179,12 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         return (_chainId == block.chainid || chainIndex[_chainId] != 0);
     }
 
-    /// @notice Adds a new chainBatchRoot to the chainTree.
+    /// @notice Adds a new chainBatchRoot to the chainTree and updates the aggregated shared tree.
+    /// @dev Runs on both settlement layers: on L1 the chain's DiamondProxy calls it directly during
+    /// batch execution, on Gateway the GW asset tracker calls it (see `addChainBatchRootRestriction`).
+    /// In both cases the chainBatchRoot is recorded, pushed to the chain tree, the shared tree leaf is
+    /// updated, and a new interop root is emitted — so chains settling on either layer participate in
+    /// interop.
     /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
     /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
     /// @param _chainBatchRoot The value of chainBatchRoot which is being added.
@@ -202,6 +207,22 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
 
         chainBatchRoots[_chainId][_batchNumber] = _chainBatchRoot;
         currentChainBatchNumber[_chainId] = expectedNewChainBatchNumber;
+
+        // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.
+        bytes32 chainRoot;
+        // slither-disable-next-line unused-return
+        (, chainRoot) = chainTree[_chainId].push(MessageHashing.batchLeafHash(_chainBatchRoot, _batchNumber));
+
+        emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
+
+        // Update leaf corresponding to the specified chainId with newly acquired value of the chainRoot.
+        bytes32 cachedChainIdLeafHash = MessageHashing.chainIdLeafHash(chainRoot, _chainId);
+        bytes32 sharedTreeRoot = sharedTree.updateLeaf(chainIndex[_chainId], cachedChainIdLeafHash);
+
+        emit NewChainRoot(_chainId, chainRoot, cachedChainIdLeafHash);
+
+        _emitRoot(sharedTreeRoot);
+        historicalRoot[block.number] = sharedTreeRoot;
     }
 
     /// @notice Emits a new interop root event when the shared tree root changes.

@@ -14,8 +14,6 @@ import {
 import {OnlyL1} from "../bridgehub/L1BridgehubErrors.sol";
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
 
-import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
-import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {InvalidCaller} from "../../common/L1ContractErrors.sol";
@@ -25,8 +23,6 @@ import {InvalidCaller} from "../../common/L1ContractErrors.sol";
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2MessageRoot is MessageRootBase {
-    using FullMerkle for FullMerkle.FullTree;
-    using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
     using FullMerkleMemory for FullMerkleMemory.FullTree;
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
@@ -85,30 +81,6 @@ contract L2MessageRoot is MessageRootBase {
     function updateL2(uint256 _l1ChainId, uint256 _eraGatewayChainId) public onlyUpgrader {
         ERA_GATEWAY_CHAIN_ID = _eraGatewayChainId;
         l1ChainId = _l1ChainId;
-    }
-
-    /// @notice Adds a new chainBatchRoot to the chainTree.
-    /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
-    /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
-    /// @param _chainBatchRoot The value of chainBatchRoot which is being added.
-    function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) public override {
-        super.addChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
-
-        // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.
-        bytes32 chainRoot;
-        // slither-disable-next-line unused-return
-        (, chainRoot) = chainTree[_chainId].push(MessageHashing.batchLeafHash(_chainBatchRoot, _batchNumber));
-
-        emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
-
-        // Update leaf corresponding to the specified chainId with newly acquired value of the chainRoot.
-        bytes32 cachedChainIdLeafHash = MessageHashing.chainIdLeafHash(chainRoot, _chainId);
-        bytes32 sharedTreeRoot = sharedTree.updateLeaf(chainIndex[_chainId], cachedChainIdLeafHash);
-
-        emit NewChainRoot(_chainId, chainRoot, cachedChainIdLeafHash);
-
-        _emitRoot(sharedTreeRoot);
-        historicalRoot[block.number] = sharedTreeRoot;
     }
 
     function getEmptyMultichainBatchRoot(uint256 _chainId) external pure returns (bytes32) {

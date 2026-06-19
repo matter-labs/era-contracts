@@ -270,6 +270,51 @@ contract MessageRootTest is Test {
         // The actual root value depends on the merkle tree implementation
     }
 
+    /// @notice On L1, `addChainBatchRoot` now also pushes to the chain tree, updates the shared tree,
+    /// and emits a new interop root (previously only the Gateway's L2MessageRoot did this) — so chains
+    /// settling on L1 produce interop roots and can participate in interop.
+    function test_addChainBatchRoot_L1_buildsTreeAndEmitsInteropRoot() public {
+        address alphaChainSender = makeAddr("alphaChainSenderL1");
+        uint256 alphaChainId = 272;
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, alphaChainId),
+            abi.encode(alphaChainSender)
+        );
+
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(alphaChainId, 0);
+
+        // Before the first batch root the chain tree is empty.
+        assertEq(messageRoot.getChainRoot(alphaChainId), bytes32(0), "chain root empty before first batch");
+
+        // Roll to a fresh block so the interop-root logId increments on the next emit.
+        uint256 logIdBefore = messageRoot.interopRootLogId();
+        vm.roll(block.number + 1);
+
+        bytes32 batchRoot = bytes32(uint256(0x1234));
+
+        // The full set of interop events must be emitted on L1 (only chainId topic checked).
+        vm.prank(alphaChainSender);
+        vm.expectEmit(true, false, false, false);
+        emit IMessageRootBase.AppendedChainBatchRoot(alphaChainId, 1, batchRoot);
+        vm.expectEmit(true, false, false, false);
+        emit IMessageRootBase.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
+        vm.expectEmit(true, false, false, false);
+        emit IMessageRootBase.NewInteropRoot(block.chainid, block.number, logIdBefore + 1, new bytes32[](1));
+        messageRoot.addChainBatchRoot(alphaChainId, 1, batchRoot);
+
+        // The chain tree is now non-empty, and the aggregated root is tracked in historicalRoot.
+        assertTrue(messageRoot.getChainRoot(alphaChainId) != bytes32(0), "chain root built after batch");
+        assertEq(messageRoot.currentChainBatchNumber(alphaChainId), 1, "batch number incremented");
+        assertEq(
+            messageRoot.historicalRoot(block.number),
+            messageRoot.getAggregatedRoot(),
+            "historicalRoot tracks aggregated root"
+        );
+        assertEq(messageRoot.interopRootLogId(), logIdBefore + 1, "interop root logId incremented per block");
+    }
+
     /// @notice Verify that multiple _emitRoot calls within the same block share the same logId.
     function test_logId_noIncrementWithinSameBlock() public {
         uint256 chainId1 = uint256(uint160(makeAddr("chain1")));
