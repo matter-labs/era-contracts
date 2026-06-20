@@ -13,10 +13,22 @@ describe("PubdataChunkPublisher tests", () => {
 
   let pubdataChunkPublisher: PubdataChunkPublisher;
 
-  const genRandHex = (size) => ethers.utils.hexlify(ethers.utils.randomBytes(size));
-
+  const genRandHex = (size: number) => ethers.utils.hexlify(ethers.utils.randomBytes(size));
   const blobSizeInBytes = 126_976;
   const maxNumberBlobs = 6;
+
+  const chunkData = (data: string) => {
+    const strippedHex = data.slice(2);
+    const chunks: string[] = [];
+
+    const hexChunkLen = blobSizeInBytes * 2; // two symbols per byte
+
+    for (let i = 0; i < strippedHex.length; i += hexChunkLen) {
+      chunks.push(strippedHex.slice(i, i + hexChunkLen).padEnd(hexChunkLen, "0"));
+    }
+
+    return chunks.map((x) => ethers.utils.keccak256("0x" + x));
+  };
 
   before(async () => {
     await prepareEnvironment();
@@ -35,29 +47,36 @@ describe("PubdataChunkPublisher tests", () => {
     });
   });
 
-  describe("chunkAndPublishPubdata", () => {
-    it("non-L1Messenger failed to call", async () => {
-      await expect(pubdataChunkPublisher.chunkAndPublishPubdata("0x1337")).to.be.revertedWithCustomError(
-        pubdataChunkPublisher,
-        "Unauthorized"
-      );
-    });
-
+  describe("chunkPubdataToBlobs", () => {
     it("Too Much Pubdata", async () => {
       const pubdata = genRandHex(blobSizeInBytes * maxNumberBlobs + 1);
       await expect(
-        pubdataChunkPublisher.connect(l1MessengerAccount).chunkAndPublishPubdata(pubdata)
+        pubdataChunkPublisher.connect(l1MessengerAccount).chunkPubdataToBlobs(pubdata)
       ).to.be.revertedWithCustomError(pubdataChunkPublisher, "TooMuchPubdata");
     });
 
     it("Publish 1 Blob", async () => {
       const pubdata = genRandHex(blobSizeInBytes);
-      await pubdataChunkPublisher.connect(l1MessengerAccount).chunkAndPublishPubdata(pubdata);
+      const result = await pubdataChunkPublisher.connect(l1MessengerAccount).chunkPubdataToBlobs(pubdata);
+      expect(result).to.be.deep.eq(chunkData(pubdata));
     });
 
-    it("Publish 2 Blobs", async () => {
+    it("Publish max Blobs", async () => {
       const pubdata = genRandHex(blobSizeInBytes * maxNumberBlobs);
-      await pubdataChunkPublisher.connect(l1MessengerAccount).chunkAndPublishPubdata(pubdata);
+      const result = await pubdataChunkPublisher.connect(l1MessengerAccount).chunkPubdataToBlobs(pubdata);
+      expect(result).to.be.deep.eq(chunkData(pubdata));
+    });
+
+    it("Publish 1 padded blob", async () => {
+      const pubdata = genRandHex(blobSizeInBytes / 2);
+      const result = await pubdataChunkPublisher.connect(l1MessengerAccount).chunkPubdataToBlobs(pubdata);
+      expect(result).to.be.deep.eq(chunkData(pubdata));
+    });
+
+    it("Publish 1 full and 1 padded blob", async () => {
+      const pubdata = genRandHex(blobSizeInBytes + blobSizeInBytes / 2);
+      const result = await pubdataChunkPublisher.connect(l1MessengerAccount).chunkPubdataToBlobs(pubdata);
+      expect(result).to.be.deep.eq(chunkData(pubdata));
     });
   });
 });

@@ -1,0 +1,7 @@
+{
+  "compilerOptions": {
+    "types": ["node", "mocha"],
+    "downlevelIteration": true,
+    "resolveJsonModule": true
+  }
+}

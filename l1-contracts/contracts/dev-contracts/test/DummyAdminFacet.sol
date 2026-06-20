@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
-import {ZkSyncHyperchainBase} from "../../state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
+import {ZKChainBase} from "../../state-transition/chain-deps/facets/ZKChainBase.sol";
 
-contract DummyAdminFacet is ZkSyncHyperchainBase {
+contract DummyAdminFacet is ZKChainBase {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 

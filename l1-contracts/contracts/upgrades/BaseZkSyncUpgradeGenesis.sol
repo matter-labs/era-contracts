@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
-import {ProtocolVersionTooSmall, ProtocolVersionDeltaTooLarge, PreviousUpgradeNotFinalized, PreviousUpgradeBatchNotCleared, ProtocolMajorVersionNotZero} from "./ZkSyncUpgradeErrors.sol";
+import {GenesisUpgradeExpectedOnSettlementLayer, PreviousUpgradeBatchNotCleared, PreviousUpgradeNotFinalized, ProtocolMajorVersionNotZero, ProtocolVersionDeltaTooLarge, ProtocolVersionTooSmall} from "./ZkSyncUpgradeErrors.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
@@ -16,7 +16,8 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
     /// @notice Changes the protocol version
     /// @param _newProtocolVersion The new protocol version
     function _setNewProtocolVersion(
-        uint256 _newProtocolVersion
+        uint256 _newProtocolVersion,
+        bool _isOnSettlementLayer
     ) internal override returns (uint32 newMinorVersion, bool patchOnly) {
         uint256 previousProtocolVersion = s.protocolVersion;
         if (
@@ -53,12 +54,16 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
             revert ProtocolVersionDeltaTooLarge(minorDelta, MAX_ALLOWED_MINOR_VERSION_DELTA);
         }
 
+        if (!_isOnSettlementLayer) {
+            revert GenesisUpgradeExpectedOnSettlementLayer();
+        }
+
         // If the minor version changes also, we need to ensure that the previous upgrade has been finalized.
         // In case the minor version does not change, we permit to keep the old upgrade transaction in the system, but it
         // must be ensured in the other parts of the upgrade that the upgrade transaction is not overridden.
         if (!patchOnly) {
             // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
-            // Note it is important to keep this check, as otherwise hyperchains might skip upgrades by overwriting
+            // Note it is important to keep this check, as otherwise ZK chains might skip upgrades by overwriting
             if (s.l2SystemContractsUpgradeTxHash != bytes32(0)) {
                 revert PreviousUpgradeNotFinalized(s.l2SystemContractsUpgradeTxHash);
             }

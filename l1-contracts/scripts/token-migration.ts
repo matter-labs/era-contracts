@@ -197,7 +197,7 @@ async function prepareGovernanceTokenMigrationCall(
   delay: number
 ) {
   const governanceAbi = new ethers.utils.Interface((await hardhat.artifacts.readArtifact("IGovernance")).abi);
-  const sharedBridgeAbi = new ethers.utils.Interface((await hardhat.artifacts.readArtifact("L1SharedBridge")).abi);
+  const sharedBridgeAbi = new ethers.utils.Interface((await hardhat.artifacts.readArtifact("L1AssetRouter")).abi);
   const calls = tokens.map((token) => {
     const target = token == utils.ETH_ADDRESS_IN_CONTRACTS ? eraChainAddress : l1LegacyBridgeAddr;
 
@@ -233,11 +233,15 @@ export async function transferTokensOnForkedNetwork(deployer: Deployer) {
     const erc20contract = IERC20Factory.connect(tokenAddress, provider);
     console.log(`Migrating token ${tokenAddress}`);
     console.log(
-      `Balance before: ${await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
+      `Balance before: ${await erc20contract.balanceOf(
+        deployer.addresses.Bridges.ERC20BridgeProxy
+      )}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
     );
     await transferTokens(deployer, tokenAddress);
     console.log(
-      `Balance after: ${await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
+      `Balance after: ${await erc20contract.balanceOf(
+        deployer.addresses.Bridges.ERC20BridgeProxy
+      )}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
     );
   }
   for (const tokenAddress of tokenList) {

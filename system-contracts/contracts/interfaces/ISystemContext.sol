@@ -58,4 +58,6 @@ interface ISystemContext {
     function gasPerPubdataByte() external view returns (uint256 gasPerPubdataByte);
 
     function getCurrentPubdataSpent() external view returns (uint256 currentPubdataSpent);
+
+    function setChainId(uint256 _newChainId) external;
 }

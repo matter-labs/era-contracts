@@ -2,10 +2,10 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-import {SystemContractHelper, ADDRESS_MASK} from "./SystemContractHelper.sol";
-import {SystemContractsCaller, CalldataForwardingMode, RAW_FAR_CALL_BY_REF_CALL_ADDRESS, SYSTEM_CALL_BY_REF_CALL_ADDRESS, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, MIMIC_CALL_BY_REF_CALL_ADDRESS} from "./SystemContractsCaller.sol";
+import {ADDRESS_MASK, SystemContractHelper} from "./SystemContractHelper.sol";
+import {CalldataForwardingMode, MIMIC_CALL_BY_REF_CALL_ADDRESS, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, RAW_FAR_CALL_BY_REF_CALL_ADDRESS, SYSTEM_CALL_BY_REF_CALL_ADDRESS, SystemContractsCaller} from "./SystemContractsCaller.sol";
 import {Utils} from "./Utils.sol";
-import {SHA256_SYSTEM_CONTRACT, KECCAK256_SYSTEM_CONTRACT, MSG_VALUE_SYSTEM_CONTRACT} from "../Constants.sol";
+import {KECCAK256_SYSTEM_CONTRACT, MSG_VALUE_SYSTEM_CONTRACT, SHA256_SYSTEM_CONTRACT} from "../Constants.sol";
 import {Keccak256InvalidReturnData, ShaInvalidReturnData} from "../SystemContractErrors.sol";
 
 /**

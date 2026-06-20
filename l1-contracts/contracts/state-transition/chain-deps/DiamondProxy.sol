@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
+// Note, that while we do try to make use of custom errors whenever possible,
+// we do not change it for `DiamondProxy`, since it is a contract that can not be
+// upgraded or changed, so we keep its code always consistent with the production version.
 // solhint-disable gas-custom-errors
 
 import {Diamond} from "../libraries/Diamond.sol";
