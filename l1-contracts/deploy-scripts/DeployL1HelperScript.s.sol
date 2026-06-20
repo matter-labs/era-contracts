@@ -211,7 +211,7 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return
                     abi.encodeCall(
                         L1NativeTokenVault.initialize,
-                        (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
+                        (addresses.governance, addresses.bridges.bridgedTokenBeacon)
                     );
             } else if (compareStrings(contractName, "ChainTypeManager")) {
                 return

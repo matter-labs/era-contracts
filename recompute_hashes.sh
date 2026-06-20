@@ -16,13 +16,18 @@ fi
 # Get installed Foundry version (first line only)
 FORGE_OUTPUT=$(forge --version | head -n 1)
 
-# Accept anything that begins with: "${EXPECTED_VERSION} (${EXPECTED_COMMIT}"
-EXPECTED_PREFIX="${EXPECTED_VERSION} (${EXPECTED_COMMIT}"
-if [[ "$FORGE_OUTPUT" != "$EXPECTED_PREFIX"* ]]; then
+# Forge 0.0.4 version output is broken on Linux returning VERGEN_IDEMPOTENT_OUTPUT instead of the commit hash.
+# So we accept both the expected commit and VERGEN_IDEMPOTENT_OUTPUT with regex:
+# - must start with "forge 0.0.4"
+# - must have "(...)" after it
+# - inside parentheses: either the expected commit OR VERGEN_IDEMPOTENT_OUTPUT
+if [[ ! "$FORGE_OUTPUT" =~ ^${EXPECTED_VERSION}\ \(((${EXPECTED_COMMIT})|VERGEN_IDEMPOTENT_OUTPUT).* ]]; then
   echo "Incorrect Foundry version."
-  echo "Expected something starting with: ${EXPECTED_PREFIX}"
-  echo "Found:    ${FORGE_OUTPUT}"
-  echo "Run: foundryup-zksync --commit ${EXPECTED_COMMIT}"
+  echo "Expected:"
+  echo "  ${EXPECTED_VERSION} (${EXPECTED_COMMIT})"
+  echo "  or ${EXPECTED_VERSION} (VERGEN_IDEMPOTENT_OUTPUT ...)"
+  echo "Found:"
+  echo "  ${FORGE_OUTPUT}"
   exit 1
 fi
 
