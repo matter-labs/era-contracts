@@ -5,6 +5,7 @@ import * as chalk from "chalk";
 import { ethers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
+import { spawn as _spawn } from "child_process";
 
 const warning = chalk.bold.yellow;
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
@@ -50,7 +51,7 @@ export function web3Provider() {
   }
 
   // Short polling interval for local network
-  if (network === "localhost" || network === "hardhat") {
+  if (isCurrentNetworkLocal()) {
     provider.pollingInterval = 100;
   }
 
@@ -103,4 +104,28 @@ export function packSemver(major: number, minor: number, patch: number) {
 export function addToProtocolVersion(packedProtocolVersion: number, minor: number, patch: number) {
   const [major, minorVersion, patchVersion] = unpackNumberSemVer(packedProtocolVersion);
   return packSemver(major, minorVersion + minor, patchVersion + patch);
+}
+
+const LOCAL_NETWORKS = ["localhost", "hardhat", "localhostL2"];
+
+export function isCurrentNetworkLocal(): boolean {
+  return LOCAL_NETWORKS.includes(process.env.CHAIN_ETH_NETWORK);
+}
+
+// Executes a command in a new shell and pipes data to the parent's stdout/stderr
+export function spawn(command: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = _spawn(command.replace(/\n/g, " "), [], {
+      stdio: "inherit",
+      shell: true,
+    });
+
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`Command failed with exit code ${code}`));
+      }
+    });
+  });
 }

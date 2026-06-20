@@ -16,7 +16,7 @@ jobs:
       - name: Install foundry-zksync
         run: |
           mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly/foundry_nightly_linux_amd64.tar.gz
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
           tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
@@ -25,20 +25,25 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 18.18.0
-          cache: yarn
+
+      - name: Install Yarn
+        run: npm install -g yarn
 
       - name: Build artifacts
         working-directory: system-contracts
         run: |
           yarn install
-          yarn preprocess:system-contracts
-          forge build --zksync --zk-enable-eravm-extensions
-          yarn preprocess:bootloader
-          forge build --zksync --zk-enable-eravm-extensions
           yarn build
+          yarn build:foundry
+
+      - name: Build artifacts
+        working-directory: l1-contracts
+        run: |
+          yarn install
+          yarn build:foundry
 
       - name: Create cache
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           key: artifacts-system-${{ github.sha }}
           path: |
@@ -49,6 +54,7 @@ jobs:
             system-contracts/cache-zk
             system-contracts/typechain
             system-contracts/contracts-preprocessed
+            l1-contracts/zkout
 
   lint:
     runs-on: ubuntu-latest
@@ -80,7 +86,7 @@ jobs:
       - name: Install rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2023-04-17
+          toolchain: nightly-2024-08-01
 
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3
@@ -95,6 +101,7 @@ jobs:
             system-contracts/cache-zk
             system-contracts/typechain
             system-contracts/contracts-preprocessed
+            l1-contracts/zkout
 
       - name: Run bootloader tests
         run: |
@@ -115,10 +122,14 @@ jobs:
           node-version: 18.18.0
           cache: yarn
 
-      - name: Use era-test-node for testing
-        uses: dutterbutter/era-test-node-action@v0.1.3
+      - name: Run anvil-zksync
+        uses: dutterbutter/anvil-zksync-action@v1.3.0
         with:
-          releaseTag: v0.0.1-vm1.5.0
+          mode: run
+          protocolVersion: 29
+          evmInterpreter: true
+          logFilePath: "anvil_zksync.log"
+          offline: true
 
       - name: Install dependencies
         run: yarn
@@ -140,6 +151,6 @@ jobs:
       - name: Run tests
         run: yarn sc test
 
-      - name: Print output logs of era_test_node
+      - name: Print output logs of anvil-zksync
         if: always()
-        run: cat era_test_node.log
+        run: cat anvil_zksync.log

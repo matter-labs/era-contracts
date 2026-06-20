@@ -2,15 +2,17 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
-import {PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
-import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
+import {PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
+import {IZKChainBase} from "./IZKChainBase.sol";
 
 /// @title The interface of the Getters Contract that implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IGetters is IZkSyncHyperchainBase {
+/// @dev Most of the methods simply return the values that correspond to the current diamond proxy and possibly
+/// not to the ZK Chain as a whole. For example, if the chain is migrated to another settlement layer, the values returned
+/// by this facet will correspond to the values stored on this chain and possilbly not the canonical state of the chain.
+interface IGetters is IZKChainBase {
     /*//////////////////////////////////////////////////////////////
                             CUSTOM GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -28,13 +30,16 @@ interface IGetters is IZkSyncHyperchainBase {
     function getBridgehub() external view returns (address);
 
     /// @return The address of the state transition
-    function getStateTransitionManager() external view returns (address);
+    function getChainTypeManager() external view returns (address);
+
+    /// @return The chain ID
+    function getChainId() external view returns (uint256);
 
     /// @return The address of the base token
     function getBaseToken() external view returns (address);
 
-    /// @return The address of the base token bridge
-    function getBaseTokenBridge() external view returns (address);
+    /// @return The address of the base token
+    function getBaseTokenAssetId() external view returns (bytes32);
 
     /// @return The total number of batches that were committed
     function getTotalBatchesCommitted() external view returns (uint256);
@@ -45,8 +50,23 @@ interface IGetters is IZkSyncHyperchainBase {
     /// @return The total number of batches that were committed & verified & executed
     function getTotalBatchesExecuted() external view returns (uint256);
 
+    // @return Address of transaction filterer
+    function getTransactionFilterer() external view returns (address);
+
     /// @return The total number of priority operations that were added to the priority queue, including all processed ones
     function getTotalPriorityTxs() external view returns (uint256);
+
+    /// @return The start index of the priority tree, i.e. the index of the first priority operation that
+    /// was included into the priority tree.
+    function getPriorityTreeStartIndex() external view returns (uint256);
+
+    /// @return The root hash of the priority tree
+    function getPriorityTreeRoot() external view returns (bytes32);
+
+    /// @return Whether the priority queue is active, i.e. whether new priority operations are appended to it.
+    /// Once the chain processes all the transactions that were present in the priority queue, all the L1->L2 related
+    /// operations will start to get done using the priority tree.
+    function isPriorityQueueActive() external view returns (bool);
 
     /// @notice The function that returns the first unprocessed priority transaction.
     /// @dev Returns zero if and only if no operations were processed from the queue.
@@ -57,9 +77,6 @@ interface IGetters is IZkSyncHyperchainBase {
 
     /// @return The number of priority operations currently in the queue
     function getPriorityQueueSize() external view returns (uint256);
-
-    /// @return The first unprocessed priority operation from the queue
-    function priorityQueueFrontOperation() external view returns (PriorityOperation memory);
 
     /// @return Whether the address has a validator access
     function isValidator(address _address) external view returns (bool);
@@ -77,6 +94,9 @@ interface IGetters is IZkSyncHyperchainBase {
 
     /// @return Bytecode hash of default account (bytecode for EOA).
     function getL2DefaultAccountBytecodeHash() external view returns (bytes32);
+
+    /// @return Bytecode hash of EVM emulator.
+    function getL2EvmEmulatorBytecodeHash() external view returns (bytes32);
 
     /// @return Verifier parameters.
     /// @dev This function is deprecated and will soon be removed.
@@ -147,4 +167,7 @@ interface IGetters is IZkSyncHyperchainBase {
 
     /// @return isFreezable Whether the facet can be frozen by the admin or always accessible
     function isFacetFreezable(address _facet) external view returns (bool isFreezable);
+
+    /// @return The address of the current settlement layer.
+    function getSettlementLayer() external view returns (address);
 }

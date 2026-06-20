@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 
 contract UncheckedMathTest {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     function uncheckedInc(uint256 _number) external pure returns (uint256) {
         return UncheckedMath.uncheckedInc(_number);
     }

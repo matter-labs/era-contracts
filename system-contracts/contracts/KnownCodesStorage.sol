@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {IKnownCodesStorage} from "./interfaces/IKnownCodesStorage.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {COMPRESSOR_CONTRACT, L1_MESSENGER_CONTRACT} from "./Constants.sol";
-import {Unauthorized, MalformedBytecode, BytecodeError} from "./SystemContractErrors.sol";
+import {COMPRESSOR_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, L1_MESSENGER_CONTRACT} from "./Constants.sol";
+import {BytecodeError, MalformedBytecode, Unauthorized} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -82,6 +82,32 @@ contract KnownCodesStorage is IKnownCodesStorage, SystemContractBase {
 
         if (Utils.bytecodeLenInWords(_bytecodeHash) % 2 == 0) {
             revert MalformedBytecode(BytecodeError.NumberOfWords);
+        }
+    }
+
+    /// @notice The method used by ContractDeployer to publish EVM bytecode
+    /// @dev Bytecode should be padded by EraVM rules
+    /// @param paddedBytecode The length of EVM bytecode in bytes
+    /// @param paddedBytecode The bytecode to be published
+    function publishEVMBytecode(
+        uint256 evmBytecodeLen,
+        bytes calldata paddedBytecode
+    ) external payable onlyCallFrom(address(DEPLOYER_SYSTEM_CONTRACT)) returns (bytes32) {
+        bytes32 versionedBytecodeHash = Utils.hashEVMBytecode(evmBytecodeLen, paddedBytecode);
+
+        if (getMarker(versionedBytecodeHash) == 0) {
+            L1_MESSENGER_CONTRACT.sendToL1(paddedBytecode);
+
+            assembly {
+                sstore(versionedBytecodeHash, 1)
+            }
+
+            emit MarkedAsKnown(versionedBytecodeHash, false);
+        }
+
+        assembly {
+            mstore(0x0, versionedBytecodeHash)
+            return(0x0, 0x20)
         }
     }
 }

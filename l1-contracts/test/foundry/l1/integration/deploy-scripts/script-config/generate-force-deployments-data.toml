@@ -1,0 +1,7 @@
+era_chain_id = 9
+chain_id = 270
+l1_shared_bridge = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+governance = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+l2_legacy_shared_bridge = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+l2_token_beacon = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+l2_contracts_deployed_already = false

@@ -1,6 +1,7 @@
 import "@matterlabs/hardhat-zksync-solc";
 import "@matterlabs/hardhat-zksync-verify";
 import "@nomicfoundation/hardhat-chai-matchers";
+import "@matterlabs/hardhat-zksync-node";
 import "@nomiclabs/hardhat-ethers";
 import "hardhat-typechain";
 
@@ -12,14 +13,14 @@ if (!process.env.CHAIN_ETH_NETWORK) {
 
 export default {
   zksolc: {
-    version: "1.5.0",
+    version: "1.5.11",
     compilerSource: "binary",
     settings: {
       isSystem: true,
     },
   },
   solidity: {
-    version: "0.8.24",
+    version: "0.8.28",
   },
   defaultNetwork: "localhost",
   networks: {

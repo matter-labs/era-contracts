@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IGovernance} from "./IGovernance.sol";
-import {ZeroAddress, Unauthorized, OperationMustBeReady, OperationMustBePending, OperationExists, InvalidDelay, PreviousOperationNotExecuted} from "../common/L1ContractErrors.sol";
+import {Call} from "./Common.sol";
+import {InvalidDelay, OperationExists, OperationMustBePending, OperationMustBeReady, PreviousOperationNotExecuted, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -12,7 +13,7 @@ import {ZeroAddress, Unauthorized, OperationMustBeReady, OperationMustBePending,
 /// @notice This contract manages operations (calls with preconditions) for governance tasks.
 /// The contract allows for operations to be scheduled, executed, and canceled with
 /// appropriate permissions and delays. It is used for managing and coordinating upgrades
-/// and changes in all ZKsync hyperchain governed contracts.
+/// and changes in all ZK chain governed contracts.
 ///
 /// Operations can be proposed as either fully transparent upgrades with on-chain data,
 /// or "shadow" upgrades where upgrade data is not published on-chain before execution. Proposed operations

@@ -1,14 +1,15 @@
 // hardhat import should be the first import in the file
-import * as hre from "hardhat";
 
-import type { YulContractDescription } from "./constants";
-import { SYSTEM_CONTRACTS } from "./constants";
-import { query } from "./utils";
+import type { SolidityContractDescription, YulContractDescription } from "./constants";
+import { SourceLocation, SYSTEM_CONTRACTS } from "./constants";
+import { query, spawn } from "./utils";
 import { Command } from "commander";
 import * as fs from "fs";
 import { sleep } from "zksync-ethers/build/utils";
 
-const VERIFICATION_URL = hre.network?.config?.verifyURL;
+const VERIFICATION_URL = process.env.VERIFICATION_URL!;
+const ZKSOLC_VERSION = "v1.5.7";
+const COMPILER_SOLC_VERSION = "zkVM-0.8.24-1.0.1";
 
 async function waitForVerificationResult(requestId: number) {
   let retries = 0;
@@ -32,6 +33,15 @@ async function waitForVerificationResult(requestId: number) {
   }
 }
 
+const CHAIN = "zksync";
+
+async function verifySolFoundry(contractInfo: SolidityContractDescription) {
+  const codeNameWithPath = `contracts-preprocessed/${contractInfo.codeName}.sol:${contractInfo.codeName}`;
+  await spawn(
+    `forge verify-contract --zksync --chain ${CHAIN} --watch --verifier zksync --verifier-url ${VERIFICATION_URL} --constructor-args 0x ${contractInfo.address} ${codeNameWithPath}`
+  );
+}
+
 async function verifyYul(contractInfo: YulContractDescription) {
   const sourceCodePath = `${__dirname}/../contracts-preprocessed/${contractInfo.path}/${contractInfo.codeName}.yul`;
   const sourceCode = (await fs.promises.readFile(sourceCodePath)).toString();
@@ -40,15 +50,20 @@ async function verifyYul(contractInfo: YulContractDescription) {
     contractName: contractInfo.codeName,
     sourceCode: sourceCode,
     codeFormat: "yul-single-file",
-    compilerZksolcVersion: hre.config.zksolc.version,
-    compilerSolcVersion: hre.config.solidity.compilers[0].version,
+    compilerZksolcVersion: ZKSOLC_VERSION,
+    compilerSolcVersion: COMPILER_SOLC_VERSION,
     optimizationUsed: true,
     constructorArguments: "0x",
     isSystem: true,
   };
 
-  const requestId = await query("POST", VERIFICATION_URL, undefined, requestBody);
-  await waitForVerificationResult(requestId);
+  try {
+    const requestId = await query("POST", VERIFICATION_URL, undefined, requestBody);
+    await waitForVerificationResult(requestId);
+    console.log("Verification was successful.");
+  } catch (e) {
+    console.log(`Failed to process verification request. Error ${JSON.stringify(e)}`);
+  }
 }
 
 async function main() {
@@ -61,13 +76,19 @@ async function main() {
 
   for (const contractName in SYSTEM_CONTRACTS) {
     const contractInfo = SYSTEM_CONTRACTS[contractName];
+
+    if (contractInfo.lang == "solidity" && contractInfo.location == SourceLocation.L1Contracts) {
+      console.log(`Skipped verification of ${contractInfo.codeName} since it is located in l1-contracts`);
+      continue;
+    }
+
     console.log(`Verifying ${contractInfo.codeName} on ${contractInfo.address} address..`);
     if (contractInfo.lang == "solidity") {
-      await hre.run("verify:verify", {
-        address: contractInfo.address,
-        contract: `contracts-preprocessed/${contractInfo.codeName}.sol:${contractInfo.codeName}`,
-        constructorArguments: [],
-      });
+      if (contractInfo.location == SourceLocation.L1Contracts) {
+        continue;
+      }
+
+      await verifySolFoundry(contractInfo);
     } else if (contractInfo.lang == "yul") {
       await verifyYul(contractInfo);
     } else {

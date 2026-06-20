@@ -43,4 +43,13 @@ library UnsafeBytes {
             result := mload(add(_bytes, offset))
         }
     }
+
+    function readRemainingBytes(bytes memory _bytes, uint256 _start) internal pure returns (bytes memory result) {
+        uint256 arrayLen = _bytes.length - _start;
+        result = new bytes(arrayLen);
+
+        assembly {
+            mcopy(add(result, 0x20), add(_bytes, add(0x20, _start)), arrayLen)
+        }
+    }
 }

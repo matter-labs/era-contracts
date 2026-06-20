@@ -2,6 +2,8 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IAccountCodeStorage {
     function storeAccountConstructingCodeHash(address _address, bytes32 _hash) external;
 
@@ -14,4 +16,6 @@ interface IAccountCodeStorage {
     function getCodeHash(uint256 _input) external view returns (bytes32 codeHash);
 
     function getCodeSize(uint256 _input) external view returns (uint256 codeSize);
+
+    function isAccountEVM(address _addr) external view returns (bool);
 }
