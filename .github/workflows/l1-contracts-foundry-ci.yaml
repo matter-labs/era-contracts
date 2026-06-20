@@ -16,8 +16,13 @@ jobs:
         with:
           submodules: true
 
-      - name: Use Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -28,38 +33,30 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Build hardhat artifacts
-        run: yarn l1 build
-
       - name: Build artifacts
-        working-directory: ./l1-contracts
-        run: forge build
+        run: yarn l1 build:foundry
 
       - name: Build system-contract artifacts
-        run: yarn sc build
+        run: yarn sc build:foundry
 
       - name: Build l2 artifacts
-        run: yarn l2 build
+        run: yarn l2 build:foundry
 
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
 
       - name: Create cache
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           key: artifacts-l1-contracts-foudry-${{ github.sha }}
           path: |
             da-contracts/out
-            l1-contracts/cache
+            l1-contracts/cache-forge
             l1-contracts/out
-            l1-contracts/artifacts-zk
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            system-contracts/artifacts-zk
-            system-contracts/bootloader/build
-            system-contracts/cache-zk
-            system-contracts/contracts-preprocessed
-            system-contracts/typechain
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
 
   scripts:
     runs-on: ubuntu-latest
@@ -77,16 +74,12 @@ jobs:
           key: artifacts-l1-contracts-foudry-${{ github.sha }}
           path: |
             da-contracts/out
-            l1-contracts/cache
+            l1-contracts/cache-forge
             l1-contracts/out
-            l1-contracts/artifacts-zk
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            system-contracts/artifacts-zk
-            system-contracts/bootloader/build
-            system-contracts/cache-zk
-            system-contracts/contracts-preprocessed
-            system-contracts/typechain
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
 
       - name: Use Foundry
         uses: foundry-rs/foundry-toolchain@v1
@@ -116,9 +109,40 @@ jobs:
             exit 1
           fi
 
-      - name: Run DeployL1 script
+      - name: Run DeployL1CoreContracts script
         working-directory: ./l1-contracts
-        run: forge script ./deploy-scripts/DeployL1.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+        # First we need to deploy the ecosystem contracts
+        run: forge script ./deploy-scripts/DeployL1CoreContracts.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY --skip '*/l1-contracts/contracts/*'
+
+      - name: Read bridgehub proxy address
+        id: read-bridgehub
+        working-directory: ./l1-contracts
+        run: |
+          # Extract bridgehub_proxy_addr allowing leading whitespace
+          BRIDGEHUB=$(
+            sed -nE 's/^[[:space:]]*bridgehub_proxy_addr[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' \
+              ./script-out/output-deploy-l1.toml | head -n1
+          )
+
+          echo "Parsed bridgehub_proxy_addr: $BRIDGEHUB"
+
+          if [[ -z "$BRIDGEHUB" || ! "$BRIDGEHUB" =~ ^0x[0-9a-fA-F]{40}$ ]]; then
+            echo "❌ Failed to parse a valid bridgehub address"
+            exit 1
+          fi
+
+          echo "BRIDGEHUB=$BRIDGEHUB" >> $GITHUB_ENV
+
+      - name: Run DeployCTM script with bridgehub
+        working-directory: ./l1-contracts
+        run: |
+          forge script ./deploy-scripts/DeployCTM.s.sol \
+            --ffi \
+            --rpc-url $ANVIL_RPC_URL \
+            --broadcast \
+            --private-key $ANVIL_PRIVATE_KEY \
+            --sig "runWithBridgehub(address,bool)" $BRIDGEHUB "false" \
+            --skip '*/l1-contracts/contracts/*'
 
       - name: Run DeployErc20 script
         working-directory: ./l1-contracts

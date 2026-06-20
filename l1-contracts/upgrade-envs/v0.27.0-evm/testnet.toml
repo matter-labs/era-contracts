@@ -1,0 +1,49 @@
+era_chain_id = 300
+testnet_verifier = true
+governance_upgrade_timer_initial_delay = 86400
+
+# Not used in this upgrade
+# TODO: should be clarified and refined in next upgrades
+owner_address = "0x0000000000000000000000000000000000000000"
+# This should always be false for non-loadtest environments.
+support_l2_legacy_shared_bridge_test = false
+
+old_protocol_version = 0x1a00000000
+
+[contracts]
+# Not used in this upgrade
+governance_min_delay = 0
+
+max_number_of_chains = 100
+create2_factory_salt = "0x4a5dffcf82ef60e07d32d8b110a75dd63ce589ebc3fb31ac8b2547feea073559"
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+validator_timelock_execution_delay = 0 # Unused for this upgrade
+genesis_root = "0xb192c5937e91363c0b880faf0568b0621a3b16010cb2df42b588972516c1d4fe"
+genesis_rollup_leaf_index = 76
+genesis_batch_commitment = "0xe23f2436b09ef15ba64ec3f30dc26833dda86d6dd6bef7ba6f8274e434801d05"
+recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+priority_tx_max_gas_limit = 72000000
+diamond_init_pubdata_pricing_mode = 0
+diamond_init_batch_overhead_l1_gas = 1000000
+diamond_init_max_pubdata_per_batch = 120000
+diamond_init_max_l2_gas_per_batch = 80000000
+diamond_init_priority_tx_max_pubdata = 99000
+diamond_init_minimal_l2_gas_price = 250000000
+bootloader_hash = "0x0100087fe7df1cf5616646f85bd5eebc8efe5d8deac4d85bea9b9aefd88803dd"
+default_aa_hash = "0x0100050bf9baf9d08e5d3c037f8d8b486076de7e6dceb3f3fc0989ea2c99cd67"
+evm_emulator_hash = "0x01000bbb8116fe7bdf690c19740ea350375426cec23f4f1f69a12fdc58adc9ba"
+bridgehub_proxy_address = "0x35A54c8C757806eB6820629bc82d90E056394C92"
+transparent_proxy_admin = "0x0358BACa94dcD7931B7BA7aAf8a5Ac6090E143a5"
+rollup_da_manager = "0xB168490e38E5E7e1B8eB256a701Ee8314Cbf0E15"
+
+governance_security_council_address = "0x25Ab0397DA109A50C8921A1d4a034e0973602469"
+latest_protocol_version = 0x1b00000000
+l1_bytecodes_supplier_addr = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
+
+protocol_upgrade_handler_proxy_address = "0xe3a615778aeEC76df1B368948a1D1614497Db858"
+protocol_upgrade_handler_impl_address = "0xc93b74dcb1c6b037ab093c68645ca504b836d91f"
+
+[tokens]
+token_weth_address = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"

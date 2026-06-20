@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
@@ -44,6 +44,7 @@ contract ExecuteUpgradeTest is AdminTest {
             l2ProtocolUpgradeTx: Utils.makeEmptyL2CanonicalTransaction(),
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
+            evmEmulatorHash: bytes32(0),
             verifier: address(0),
             verifierParams: verifierParams,
             l1ContractsUpgradeCalldata: hex"",

@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
+import "forge-std/console.sol";
 import {Test} from "forge-std/Test.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_DA_VALIDATOR_ADDRESS} from "../Utils/Utils.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
-import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManager.sol";
+import {DummyChainTypeManagerForValidatorTimelock as DummyCTM} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {FeeParams, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {TestExecutor} from "contracts/dev-contracts/test/TestExecutor.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -18,15 +22,15 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IL1DAValidator} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
-import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -39,7 +43,6 @@ contract ExecutorTest is Test {
     address internal owner;
     address internal validator;
     address internal randomSigner;
-    address internal blobVersionedHashRetriever;
     address internal l1DAValidator;
     AdminFacet internal admin;
     TestExecutor internal executor;
@@ -51,7 +54,8 @@ contract ExecutorTest is Test {
     IExecutor.CommitBatchInfo internal newCommitBatchInfo;
     IExecutor.StoredBatchInfo internal newStoredBatchInfo;
     DummyEraBaseTokenBridge internal sharedBridge;
-    RollupL1DAValidator internal rollupL1DAValidator;
+    ValidatorTimelock internal validatorTimelock;
+    address internal rollupL1DAValidator;
     MessageRoot internal messageRoot;
 
     uint256 eraChainId;
@@ -61,72 +65,83 @@ contract ExecutorTest is Test {
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](12);
-        selectors[0] = admin.setPendingAdmin.selector;
-        selectors[1] = admin.acceptAdmin.selector;
-        selectors[2] = admin.setValidator.selector;
-        selectors[3] = admin.setPorterAvailability.selector;
-        selectors[4] = admin.setPriorityTxMaxGasLimit.selector;
-        selectors[5] = admin.changeFeeParams.selector;
-        selectors[6] = admin.setTokenMultiplier.selector;
-        selectors[7] = admin.upgradeChainFromVersion.selector;
-        selectors[8] = admin.executeUpgrade.selector;
-        selectors[9] = admin.freezeDiamond.selector;
-        selectors[10] = admin.unfreezeDiamond.selector;
-        selectors[11] = admin.setDAValidatorPair.selector;
+        uint256 i = 0;
+        selectors[i++] = admin.setPendingAdmin.selector;
+        selectors[i++] = admin.acceptAdmin.selector;
+        selectors[i++] = admin.setValidator.selector;
+        selectors[i++] = admin.setPorterAvailability.selector;
+        selectors[i++] = admin.setPriorityTxMaxGasLimit.selector;
+        selectors[i++] = admin.changeFeeParams.selector;
+        selectors[i++] = admin.setTokenMultiplier.selector;
+        selectors[i++] = admin.upgradeChainFromVersion.selector;
+        selectors[i++] = admin.executeUpgrade.selector;
+        selectors[i++] = admin.freezeDiamond.selector;
+        selectors[i++] = admin.unfreezeDiamond.selector;
+        selectors[i++] = admin.setDAValidatorPair.selector;
         return selectors;
     }
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](5);
-        selectors[0] = executor.commitBatchesSharedBridge.selector;
-        selectors[1] = executor.proveBatchesSharedBridge.selector;
-        selectors[2] = executor.executeBatchesSharedBridge.selector;
-        selectors[3] = executor.revertBatchesSharedBridge.selector;
-        selectors[4] = executor.setPriorityTreeStartIndex.selector;
+        bytes4[] memory selectors = new bytes4[](8);
+        uint256 i = 0;
+        selectors[i++] = executor.commitBatchesSharedBridge.selector;
+        selectors[i++] = executor.proveBatchesSharedBridge.selector;
+        selectors[i++] = executor.executeBatchesSharedBridge.selector;
+        selectors[i++] = executor.revertBatchesSharedBridge.selector;
+        selectors[i++] = executor.setPriorityTreeStartIndex.selector;
+        selectors[i++] = executor.setPriorityTreeHistoricalRoot.selector;
+        selectors[i++] = executor.appendPriorityOp.selector;
+        selectors[i++] = executor.precommitSharedBridge.selector;
         return selectors;
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](28);
-        selectors[0] = getters.getVerifier.selector;
-        selectors[1] = getters.getAdmin.selector;
-        selectors[2] = getters.getPendingAdmin.selector;
-        selectors[3] = getters.getTotalBlocksCommitted.selector;
-        selectors[4] = getters.getTotalBlocksVerified.selector;
-        selectors[5] = getters.getTotalBlocksExecuted.selector;
-        selectors[6] = getters.getTotalPriorityTxs.selector;
-        selectors[7] = getters.getFirstUnprocessedPriorityTx.selector;
-        selectors[8] = getters.getPriorityQueueSize.selector;
-        selectors[9] = getters.getTotalBatchesExecuted.selector;
-        selectors[10] = getters.isValidator.selector;
-        selectors[11] = getters.l2LogsRootHash.selector;
-        selectors[12] = getters.storedBatchHash.selector;
-        selectors[13] = getters.getL2BootloaderBytecodeHash.selector;
-        selectors[14] = getters.getL2DefaultAccountBytecodeHash.selector;
-        selectors[15] = getters.getVerifierParams.selector;
-        selectors[16] = getters.isDiamondStorageFrozen.selector;
-        selectors[17] = getters.getPriorityTxMaxGasLimit.selector;
-        selectors[18] = getters.isEthWithdrawalFinalized.selector;
-        selectors[19] = getters.facets.selector;
-        selectors[20] = getters.facetFunctionSelectors.selector;
-        selectors[21] = getters.facetAddresses.selector;
-        selectors[22] = getters.facetAddress.selector;
-        selectors[23] = getters.isFunctionFreezable.selector;
-        selectors[24] = getters.isFacetFreezable.selector;
-        selectors[25] = getters.getTotalBatchesCommitted.selector;
-        selectors[26] = getters.getTotalBatchesVerified.selector;
-        selectors[27] = getters.storedBlockHash.selector;
+        bytes4[] memory selectors = new bytes4[](32);
+        uint256 i = 0;
+        selectors[i++] = getters.getVerifier.selector;
+        selectors[i++] = getters.getAdmin.selector;
+        selectors[i++] = getters.getPendingAdmin.selector;
+        selectors[i++] = getters.getTotalBlocksCommitted.selector;
+        selectors[i++] = getters.getTotalBlocksVerified.selector;
+        selectors[i++] = getters.getTotalBlocksExecuted.selector;
+        selectors[i++] = getters.getTotalPriorityTxs.selector;
+        selectors[i++] = getters.getFirstUnprocessedPriorityTx.selector;
+        selectors[i++] = getters.getPriorityQueueSize.selector;
+        selectors[i++] = getters.getTotalBatchesExecuted.selector;
+        selectors[i++] = getters.isValidator.selector;
+        selectors[i++] = getters.l2LogsRootHash.selector;
+        selectors[i++] = getters.storedBatchHash.selector;
+        selectors[i++] = getters.getL2BootloaderBytecodeHash.selector;
+        selectors[i++] = getters.getL2DefaultAccountBytecodeHash.selector;
+        selectors[i++] = getters.getL2EvmEmulatorBytecodeHash.selector;
+        selectors[i++] = getters.getVerifierParams.selector;
+        selectors[i++] = getters.isDiamondStorageFrozen.selector;
+        selectors[i++] = getters.getPriorityTxMaxGasLimit.selector;
+        selectors[i++] = getters.isEthWithdrawalFinalized.selector;
+        selectors[i++] = getters.facets.selector;
+        selectors[i++] = getters.facetFunctionSelectors.selector;
+        selectors[i++] = getters.facetAddresses.selector;
+        selectors[i++] = getters.facetAddress.selector;
+        selectors[i++] = getters.isFunctionFreezable.selector;
+        selectors[i++] = getters.isFacetFreezable.selector;
+        selectors[i++] = getters.getTotalBatchesCommitted.selector;
+        selectors[i++] = getters.getTotalBatchesVerified.selector;
+        selectors[i++] = getters.storedBlockHash.selector;
+        selectors[i++] = getters.isPriorityQueueActive.selector;
+        selectors[i++] = getters.getChainTypeManager.selector;
+        selectors[i++] = getters.getChainId.selector;
         return selectors;
     }
 
     function getMailboxSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](6);
-        selectors[0] = mailbox.proveL2MessageInclusion.selector;
-        selectors[1] = mailbox.proveL2LogInclusion.selector;
-        selectors[2] = mailbox.proveL1ToL2TransactionStatus.selector;
-        selectors[3] = mailbox.finalizeEthWithdrawal.selector;
-        selectors[4] = mailbox.requestL2Transaction.selector;
-        selectors[5] = mailbox.l2TransactionBaseCost.selector;
+        uint256 i = 0;
+        selectors[i++] = mailbox.proveL2MessageInclusion.selector;
+        selectors[i++] = mailbox.proveL2LogInclusion.selector;
+        selectors[i++] = mailbox.proveL1ToL2TransactionStatus.selector;
+        selectors[i++] = mailbox.finalizeEthWithdrawal.selector;
+        selectors[i++] = mailbox.requestL2Transaction.selector;
+        selectors[i++] = mailbox.l2TransactionBaseCost.selector;
         return selectors;
     }
 
@@ -141,13 +156,30 @@ contract ExecutorTest is Test {
         });
     }
 
+    function deployValidatorTimelock(
+        address bridgehubAddr,
+        address _initialOwner,
+        uint32 _initialExecutionDelay
+    ) private returns (address) {
+        ProxyAdmin proxyAdmin = new ProxyAdmin();
+        ValidatorTimelock timelockImplementation = new ValidatorTimelock(bridgehubAddr);
+        return
+            address(
+                new TransparentUpgradeableProxy(
+                    address(timelockImplementation),
+                    address(proxyAdmin),
+                    abi.encodeCall(ValidatorTimelock.initialize, (_initialOwner, _initialExecutionDelay))
+                )
+            );
+    }
+
     constructor() {
+        uint256 l1ChainID = 1;
         owner = makeAddr("owner");
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
-        blobVersionedHashRetriever = makeAddr("blobVersionedHashRetriever");
         DummyBridgehub dummyBridgehub = new DummyBridgehub();
-        messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)));
+        messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)), l1ChainID);
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
 
@@ -161,19 +193,22 @@ contract ExecutorTest is Test {
 
         eraChainId = 9;
 
-        rollupL1DAValidator = new RollupL1DAValidator();
+        rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
 
         admin = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         getters = new GettersFacet();
         executor = new TestExecutor();
         mailbox = new MailboxFacet(eraChainId, block.chainid);
 
-        DummyChainTypeManager chainTypeManager = new DummyChainTypeManager();
+        DummyCTM chainTypeManager = new DummyCTM(owner, address(0));
         vm.mockCall(
             address(chainTypeManager),
             abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector),
             abi.encode(bool(true))
         );
+
+        validatorTimelock = ValidatorTimelock(deployValidatorTimelock(address(dummyBridgehub), owner, 0));
+
         DiamondInit diamondInit = new DiamondInit();
 
         bytes8 dummyHash = 0x1234567890123456;
@@ -184,12 +219,12 @@ contract ExecutorTest is Test {
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
+            dependencyRootsRollingHash: bytes32(0),
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             timestamp: 0,
             commitment: bytes32("")
         });
-
-        TestnetVerifier testnetVerifier = new TestnetVerifier();
+        TestnetVerifier testnetVerifier = new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
 
         InitializeData memory params = InitializeData({
             // TODO REVIEW
@@ -198,7 +233,7 @@ contract ExecutorTest is Test {
             chainTypeManager: address(chainTypeManager),
             protocolVersion: 0,
             admin: owner,
-            validatorTimelock: validator,
+            validatorTimelock: address(validatorTimelock),
             baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
             verifier: IVerifier(testnetVerifier), // verifier
@@ -209,9 +244,9 @@ contract ExecutorTest is Test {
             }),
             l2BootloaderBytecodeHash: dummyHash,
             l2DefaultAccountBytecodeHash: dummyHash,
+            l2EvmEmulatorBytecodeHash: dummyHash,
             priorityTxMaxGasLimit: 1000000,
-            feeParams: defaultFeeParams(),
-            blobVersionedHashRetriever: blobVersionedHashRetriever
+            feeParams: defaultFeeParams()
         });
 
         bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
@@ -255,6 +290,7 @@ contract ExecutorTest is Test {
         getters = GettersFacet(address(diamondProxy));
         mailbox = MailboxFacet(address(diamondProxy));
         admin = AdminFacet(address(diamondProxy));
+        chainTypeManager.setZKChain(eraChainId, address(diamondProxy));
 
         // Initiate the token multiplier to enable L1 -> L2 transactions.
         vm.prank(address(chainTypeManager));
@@ -262,9 +298,13 @@ contract ExecutorTest is Test {
         vm.prank(address(owner));
         admin.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_VALIDATOR_ADDRESS);
 
+        // Allow to call executor directly, without going through ValidatorTimelock
+        vm.prank(address(chainTypeManager));
+        admin.setValidator(address(validator), true);
+
         // foundry's default value is 1 for the block's timestamp, it is expected
         // that block.timestamp > COMMIT_TIMESTAMP_NOT_OLDER + 1
-        vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
+        vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
         currentTimestamp = block.timestamp;
 
         bytes memory l2Logs = Utils.encodePacked(Utils.createSystemLogs(bytes32(0)));
@@ -280,6 +320,11 @@ contract ExecutorTest is Test {
             systemLogs: l2Logs,
             operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
+
+        dummyBridgehub.setZKChain(eraChainId, address(diamondProxy));
+
+        vm.prank(owner);
+        validatorTimelock.addValidatorForChainId(eraChainId, validator);
 
         vm.mockCall(
             address(sharedBridge),

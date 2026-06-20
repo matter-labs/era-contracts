@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
 import {MerkleTreeNoSort} from "./MerkleTreeNoSort.sol";
-import {MerklePathEmpty, MerkleIndexOutOfBounds, MerklePathOutOfBounds, MerklePathLengthMismatch, MerkleIndexOrHeightMismatch, MerkleNothingToProve} from "contracts/common/L1ContractErrors.sol";
+import {MerkleIndexOrHeightMismatch, MerkleIndexOutOfBounds, MerkleNothingToProve, MerklePathEmpty, MerklePathLengthMismatch, MerklePathOutOfBounds} from "contracts/common/L1ContractErrors.sol";
 
 contract MerkleTestTest is Test {
     MerkleTreeNoSort merkleTree;
@@ -57,12 +57,12 @@ contract MerkleTestTest is Test {
         testElements(elements.length - 1);
     }
 
-    function testEmptyProof_shouldRevert() public {
+    function testEmptyProof_shouldSucceed() public {
         bytes32 leaf = elements[0];
         bytes32[] memory proof;
 
-        vm.expectRevert(MerklePathEmpty.selector);
-        merkleTest.calculateRoot(proof, 0, leaf);
+        bytes32 root = merkleTest.calculateRoot(proof, 0, leaf);
+        assertEq(root, leaf);
     }
 
     function testLeafIndexTooBig_shouldRevert() public {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 // solhint-disable gas-custom-errors, reason-string
 
@@ -7,17 +7,17 @@ import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 library BytecodePublisher {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
     Vm internal constant vm = Vm(VM_ADDRESS);
 
-    // 100 kb
+    /// @notice Maximal size of bytecodes' batch to be published at once
     uint256 constant MAX_BATCH_SIZE = 126_000;
 
-    /// @notice Publishes bytecodes in batches, each not exceeding 100KB
+    /// @notice Publishes bytecodes in batches, each not exceeding `MAX_BATCH_SIZE`
     /// @param bytecodes The array of bytecodes to publish
     function publishBytecodesInBatches(BytecodesSupplier bytecodesSupplier, bytes[] memory bytecodes) internal {
         uint256 totalBytecodes = bytecodes.length;
@@ -25,6 +25,9 @@ library BytecodePublisher {
 
         uint256 currentBatchSize = 0;
         uint256 batchStartIndex = 0;
+
+        bytes[] memory toPublish = new bytes[](bytecodes.length);
+        uint256 toPublishPtr = 0;
 
         for (uint256 i = 0; i < totalBytecodes; i++) {
             bytes32 hash = L2ContractHelper.hashL2Bytecode(bytecodes[i]);
@@ -49,20 +52,22 @@ library BytecodePublisher {
             // Check if adding this bytecode exceeds the MAX_BATCH_SIZE
             if (currentBatchSize + bytecodeSize > MAX_BATCH_SIZE) {
                 // Publish the current batch
-                bytes[] memory currentBatch = slice(bytecodes, batchStartIndex, i);
+                bytes[] memory currentBatch = slice(toPublish, 0, toPublishPtr);
                 _publishBatch(bytecodesSupplier, currentBatch);
 
                 // Reset for the next batch
                 batchStartIndex = i;
-                currentBatchSize = bytecodeSize;
-            } else {
-                currentBatchSize += bytecodeSize;
+                toPublishPtr = 0;
+                currentBatchSize = 0;
             }
+
+            currentBatchSize += bytecodeSize;
+            toPublish[toPublishPtr++] = bytecodes[i];
         }
 
         // Publish the last batch if any
-        if (batchStartIndex < totalBytecodes) {
-            bytes[] memory lastBatch = slice(bytecodes, batchStartIndex, totalBytecodes);
+        if (toPublishPtr != 0) {
+            bytes[] memory lastBatch = slice(toPublish, 0, toPublishPtr);
             _publishBatch(bytecodesSupplier, lastBatch);
         }
     }

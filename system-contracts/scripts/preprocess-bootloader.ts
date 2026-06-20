@@ -13,7 +13,8 @@ const preprocess = require("preprocess");
 const SYSTEM_PARAMS = require("../../SystemConfig.json");
 /* eslint-enable@typescript-eslint/no-var-requires */
 
-const OUTPUT_DIR = "bootloader/build";
+const OUTPUT_DIR_1 = "contracts-preprocessed/bootloader";
+const OUTPUT_DIR_2 = "bootloader/build";
 
 const PREPROCCESING_MODES = ["proved_batch", "playground_batch"];
 
@@ -62,7 +63,7 @@ function getSystemContextCodeHash() {
 // Maybe in the future some of these params will be passed
 // in a JSON file. For now, a simple object is ok here.
 const params = {
-  MARK_BATCH_AS_REPUBLISHED_SELECTOR: getSelector("KnownCodesStorage", "markFactoryDeps"),
+  MARK_FACTORY_DEPS_SELECTOR: getSelector("KnownCodesStorage", "markFactoryDeps"),
   VALIDATE_TX_SELECTOR: getSelector("IAccount", "validateTransaction"),
   EXECUTE_TX_SELECTOR: getSelector("DefaultAccount", "executeTransaction"),
   RIGHT_PADDED_GET_ACCOUNT_VERSION_SELECTOR: getPaddedSelector("ContractDeployer", "extendedAccountVersion"),
@@ -85,10 +86,13 @@ const params = {
   // Error
   REVERT_ERROR_SELECTOR: padZeroRight(getRevertSelector(), PADDED_SELECTOR_LENGTH),
   RIGHT_PADDED_VALIDATE_NONCE_USAGE_SELECTOR: getPaddedSelector("INonceHolder", "validateNonceUsage"),
+  INCREMENT_MIN_NONCE_IF_EQUALS_SELECTOR: getSelector("INonceHolder", "incrementMinNonceIfEquals"),
   RIGHT_PADDED_MINT_ETHER_SELECTOR: getPaddedSelector("L2BaseToken", "mint"),
   GET_TX_HASHES_SELECTOR: getSelector("BootloaderUtilities", "getTransactionHashes"),
   CREATE_SELECTOR: getSelector("ContractDeployer", "create"),
   CREATE2_SELECTOR: getSelector("ContractDeployer", "create2"),
+  CREATE_EVM_SELECTOR: getSelector("ContractDeployer", "createEVM"),
+  CREATE2_EVM_SELECTOR: getSelector("ContractDeployer", "create2EVM"),
   CREATE_ACCOUNT_SELECTOR: getSelector("ContractDeployer", "createAccount"),
   CREATE2_ACCOUNT_SELECTOR: getSelector("ContractDeployer", "create2Account"),
   PADDED_TRANSFER_FROM_TO_SELECTOR: getPaddedSelector("L2BaseToken", "transferFromTo"),
@@ -102,6 +106,7 @@ const params = {
     "appendTransactionToCurrentL2Block"
   ),
   RIGHT_PADDED_PUBLISH_TIMESTAMP_DATA_TO_L1_SELECTOR: getPaddedSelector("SystemContext", "publishTimestampDataToL1"),
+  RIGHT_PADDED_SET_L2_INTEROP_ROOT_SELECTOR: getPaddedSelector("L2InteropRootStorage", "addInteropRoot"),
   COMPRESSED_BYTECODES_SLOTS: 196608,
   ENSURE_RETURNED_MAGIC: 1,
   FORBID_ZERO_GAS_PER_PUBDATA: 1,
@@ -109,7 +114,7 @@ const params = {
   PADDED_FORCE_DEPLOY_ON_ADDRESSES_SELECTOR: getPaddedSelector("ContractDeployer", "forceDeployOnAddresses"),
   // One of "worst case" scenarios for the number of state diffs in a batch is when 780kb of pubdata is spent
   // on repeated writes, that are all zeroed out. In this case, the number of diffs is 780kb / 5 = 156k. This means that they will have
-  // accoomdate 42432000 bytes of calldata for the uncompressed state diffs. Adding 780kb on top leaves us with
+  // accommodate 42432000 bytes of calldata for the uncompressed state diffs. Adding 780kb on top leaves us with
   // roughly 43212000 bytes needed for calldata.
   // 1350375 slots are needed to accommodate this amount of data. We round up to 1360000 slots just in case.
   //
@@ -224,15 +229,32 @@ async function main() {
   });
   const provedBootloaderWithTests = preprocess.preprocess(bootloaderWithTests, { BOOTLOADER_TYPE: "proved_batch" });
 
-  if (!existsSync(OUTPUT_DIR)) {
-    mkdirSync(OUTPUT_DIR);
+  if (!existsSync(OUTPUT_DIR_1)) {
+    mkdirSync(OUTPUT_DIR_1);
   }
 
-  writeFileSync(`${OUTPUT_DIR}/bootloader_test.yul`, provedBootloaderWithTests);
-  writeFileSync(`${OUTPUT_DIR}/proved_batch.yul`, provedBatchBootloader);
-  writeFileSync(`${OUTPUT_DIR}/playground_batch.yul`, playgroundBatchBootloader);
-  writeFileSync(`${OUTPUT_DIR}/gas_test.yul`, gasTestBootloader);
-  writeFileSync(`${OUTPUT_DIR}/fee_estimate.yul`, feeEstimationBootloader);
+  if (!existsSync(OUTPUT_DIR_2)) {
+    mkdirSync(OUTPUT_DIR_2);
+  }
+
+  const transferTest = readFileSync("bootloader/tests/transfer_test.yul").toString();
+  const dummy = readFileSync("bootloader/tests/dummy.yul").toString();
+
+  writeFileSync(`${OUTPUT_DIR_1}/bootloader_test.yul`, provedBootloaderWithTests);
+  writeFileSync(`${OUTPUT_DIR_1}/proved_batch.yul`, provedBatchBootloader);
+  writeFileSync(`${OUTPUT_DIR_1}/playground_batch.yul`, playgroundBatchBootloader);
+  writeFileSync(`${OUTPUT_DIR_1}/gas_test.yul`, gasTestBootloader);
+  writeFileSync(`${OUTPUT_DIR_1}/fee_estimate.yul`, feeEstimationBootloader);
+  writeFileSync(`${OUTPUT_DIR_1}/dummy.yul`, dummy);
+  writeFileSync(`${OUTPUT_DIR_1}/transfer_test.yul`, transferTest);
+
+  writeFileSync(`${OUTPUT_DIR_2}/bootloader_test.yul`, provedBootloaderWithTests);
+  writeFileSync(`${OUTPUT_DIR_2}/proved_batch.yul`, provedBatchBootloader);
+  writeFileSync(`${OUTPUT_DIR_2}/playground_batch.yul`, playgroundBatchBootloader);
+  writeFileSync(`${OUTPUT_DIR_2}/gas_test.yul`, gasTestBootloader);
+  writeFileSync(`${OUTPUT_DIR_2}/fee_estimate.yul`, feeEstimationBootloader);
+  writeFileSync(`${OUTPUT_DIR_2}/dummy.yul`, dummy);
+  writeFileSync(`${OUTPUT_DIR_2}/transfer_test.yul`, transferTest);
 
   console.log("Bootloader preprocessing done!");
 }

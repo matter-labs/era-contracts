@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 
@@ -13,5 +13,5 @@ interface IGatewayUpgrade {
     /// @notice The upgrade function called from within this same contract
     /// @dev This is needed for memory -> calldata conversion of the _upgrade arg.
     /// @param _upgrade The upgrade to be executed.
-    function upgradeExternal(ProposedUpgrade calldata _upgrade) external returns (bytes32);
+    function upgradeExternal(ProposedUpgrade calldata _upgrade) external;
 }

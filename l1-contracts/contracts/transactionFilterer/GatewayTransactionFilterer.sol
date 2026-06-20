@@ -1,21 +1,26 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {AlreadyWhitelisted, InvalidSelector, NotWhitelisted, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {L2_ASSET_ROUTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 
+/// @dev We want to ensure that only whitelisted contracts can ever be deployed,
+/// while allowing anyone to call any other method. Thus, we disallow calls that can deploy contracts
+/// (i.e. calls to the predeployed Create2Factory or ContractDeployer).
+address constant MIN_ALLOWED_ADDRESS = address(0x20000);
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Filters transactions received by the Mailbox
 /// @dev Only allows whitelisted senders to deposit to Gateway
-contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ownable2StepUpgradeable {
+contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgradeable {
     /// @notice Event emitted when sender is whitelisted
     event WhitelistGranted(address indexed sender);
 
@@ -33,7 +38,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgeHub, address _assetRouter) reentrancyGuardInitializer {
+    constructor(IBridgehub _bridgeHub, address _assetRouter) {
         BRIDGE_HUB = _bridgeHub;
         L1_ASSET_ROUTER = _assetRouter;
         _disableInitializers();
@@ -41,7 +46,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
 
     /// @notice Initializes a contract filterer for later use. Expected to be used in the proxy.
     /// @param _owner The address which can upgrade the implementation.
-    function initialize(address _owner) external reentrancyGuardInitializer initializer {
+    function initialize(address _owner) external initializer {
         if (_owner == address(0)) {
             revert ZeroAddress();
         }
@@ -74,7 +79,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
     /// @return Whether the transaction is allowed
     function isTransactionAllowed(
         address sender,
-        address,
+        address contractL2,
         uint256,
         uint256,
         bytes calldata l2Calldata,
@@ -96,6 +101,13 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
             return _checkCTMAssetId(decodedAssetId);
         }
 
+        // We always allow calls to the L2AssetRouter contract. We expect that it will not
+        // cause deploying of any unwhitelisted code, but it is needed to facilitate withdrawals of chains.
+        if (contractL2 > MIN_ALLOWED_ADDRESS || contractL2 == L2_ASSET_ROUTER_ADDR) {
+            return true;
+        }
+
+        // Only whitelisted senders are allowed to use any built-in contracts.
         return whitelistedSenders[sender];
     }
 

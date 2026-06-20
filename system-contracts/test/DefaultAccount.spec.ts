@@ -38,9 +38,10 @@ describe("DefaultAccount tests", function () {
     mockERC20 = (await deployContract("MockContract")) as MockContract;
 
     paymasterFlowIface = new ethers.utils.Interface((await loadArtifact("IPaymasterFlow")).abi);
-    ERC20Iface = new ethers.utils.Interface(
-      (await loadArtifact("@openzeppelin/contracts-v4/token/ERC20/IERC20.sol:IERC20")).abi
-    );
+    ERC20Iface = new ethers.utils.Interface([
+      "function approve(address to, uint256 amount) external view",
+      "function allowance(address from, address to) external view",
+    ]);
 
     bootloaderAccount = await ethers.getImpersonatedSigner(TEST_BOOTLOADER_FORMAL_ADDRESS);
   });

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 // solhint-disable gas-length-in-loops
 
-import {NoCallsProvided, OnlySelfAllowed, RestrictionWasNotPresent, RestrictionWasAlreadyPresent} from "../common/L1ContractErrors.sol";
+import {NoCallsProvided, OnlySelfAllowed, RestrictionWasAlreadyPresent, RestrictionWasNotPresent} from "../common/L1ContractErrors.sol";
 import {IChainAdmin} from "./IChainAdmin.sol";
 import {Restriction} from "./restriction/Restriction.sol";
 import {RestrictionValidator} from "./restriction/RestrictionValidator.sol";
@@ -19,6 +19,8 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 /// @dev Note, that it does not implement any form of access control by default, but instead utilizes
 /// so called "restrictions": contracts that implement the `IRestriction` interface and ensure that
 /// particular restrictions are ensured for the contract, including access control, security invariants, etc.
+/// @dev This is a new EXPERIMENTAL version of the `ChainAdmin` implementation. While chains may opt into using it,
+/// using the old `ChainAdminOwnable` is recommended.
 contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -107,8 +109,8 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @dev Contract might receive/hold ETH as part of the maintenance process.
     receive() external payable {}
 
-    /// @notice Function that returns the current admin can perform the call.
-    /// @dev By default it always returns true, but can be overridden in derived contracts.
+    /// @notice Function that ensures that the current admin can perform the call.
+    /// @dev Reverts in case the call can not be performed. Successfully executes otherwise
     function _validateCall(Call calldata _call) private view {
         address[] memory restrictions = getRestrictions();
 

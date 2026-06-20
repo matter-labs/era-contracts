@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {L1Erc20BridgeTest} from "./_L1Erc20Bridge_Shared.t.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {EmptyDeposit, ValueMismatch, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
+import {EmptyDeposit, TokensWithFeesNotSupported, ValueMismatch} from "contracts/common/L1ContractErrors.sol";
 
 contract DepositTest is L1Erc20BridgeTest {
     event DepositInitiated(
@@ -57,7 +57,8 @@ contract DepositTest is L1Erc20BridgeTest {
             _l1Token: makeAddr("EOA"),
             _amount: 1,
             _l2TxGasLimit: 0,
-            _l2TxGasPerPubdataByte: 0
+            _l2TxGasPerPubdataByte: 0,
+            _refundRecipient: address(0)
         });
     }
 
@@ -79,7 +80,8 @@ contract DepositTest is L1Erc20BridgeTest {
             _l1Token: address(token),
             _amount: 1,
             _l2TxGasLimit: 0,
-            _l2TxGasPerPubdataByte: 0
+            _l2TxGasPerPubdataByte: 0,
+            _refundRecipient: address(0)
         });
     }
 
@@ -119,28 +121,13 @@ contract DepositTest is L1Erc20BridgeTest {
             _l1Token: address(feeOnTransferToken),
             _amount: amount,
             _l2TxGasLimit: 0,
-            _l2TxGasPerPubdataByte: 0
+            _l2TxGasPerPubdataByte: 0,
+            _refundRecipient: address(0)
         });
     }
 
     function test_depositSuccessfully() public {
         uint256 amount = 8;
-        bytes32 l2TxHash = keccak256("txHash");
-
-        vm.mockCall(
-            sharedBridgeAddress,
-            abi.encodeWithSelector(
-                IL1AssetRouter.depositLegacyErc20Bridge.selector,
-                alice,
-                randomSigner,
-                address(token),
-                amount,
-                0,
-                0,
-                address(0)
-            ),
-            abi.encode(l2TxHash)
-        );
 
         vm.prank(alice);
         token.approve(address(bridge), amount);
@@ -148,7 +135,7 @@ contract DepositTest is L1Erc20BridgeTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(bridge));
         // solhint-disable-next-line func-named-parameters
-        emit DepositInitiated(l2TxHash, alice, randomSigner, address(token), amount);
+        emit DepositInitiated(dummyL2DepositTxHash, alice, randomSigner, address(token), amount);
         bytes32 txHash = bridge.deposit({
             _l2Receiver: randomSigner,
             _l1Token: address(token),
@@ -157,33 +144,17 @@ contract DepositTest is L1Erc20BridgeTest {
             _l2TxGasPerPubdataByte: 0,
             _refundRecipient: address(0)
         });
-        assertEq(txHash, l2TxHash);
+        assertEq(txHash, dummyL2DepositTxHash);
 
-        uint256 depositedAmount = bridge.depositAmount(alice, address(token), l2TxHash);
+        uint256 depositedAmount = bridge.depositAmount(alice, address(token), dummyL2DepositTxHash);
         assertEq(amount, depositedAmount);
     }
 
     function test_legacyDepositSuccessfully() public {
         uint256 amount = 8;
-        bytes32 l2TxHash = keccak256("txHash");
 
-        uint256 depositedAmountBefore = bridge.depositAmount(alice, address(token), l2TxHash);
+        uint256 depositedAmountBefore = bridge.depositAmount(alice, address(token), dummyL2DepositTxHash);
         assertEq(depositedAmountBefore, 0);
-
-        vm.mockCall(
-            sharedBridgeAddress,
-            abi.encodeWithSelector(
-                IL1AssetRouter.depositLegacyErc20Bridge.selector,
-                alice,
-                randomSigner,
-                address(token),
-                amount,
-                0,
-                0,
-                address(0)
-            ),
-            abi.encode(l2TxHash)
-        );
 
         vm.prank(alice);
         token.approve(address(bridge), amount);
@@ -191,7 +162,7 @@ contract DepositTest is L1Erc20BridgeTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(bridge));
         // solhint-disable-next-line func-named-parameters
-        emit DepositInitiated(l2TxHash, alice, randomSigner, address(token), amount);
+        emit DepositInitiated(dummyL2DepositTxHash, alice, randomSigner, address(token), amount);
         bytes32 txHash = bridge.deposit({
             _l2Receiver: randomSigner,
             _l1Token: address(token),
@@ -199,9 +170,9 @@ contract DepositTest is L1Erc20BridgeTest {
             _l2TxGasLimit: 0,
             _l2TxGasPerPubdataByte: 0
         });
-        assertEq(txHash, l2TxHash);
+        assertEq(txHash, dummyL2DepositTxHash);
 
-        uint256 depositedAmount = bridge.depositAmount(alice, address(token), l2TxHash);
+        uint256 depositedAmount = bridge.depositAmount(alice, address(token), dummyL2DepositTxHash);
         assertEq(amount, depositedAmount);
     }
 }

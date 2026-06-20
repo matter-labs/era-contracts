@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
-import {IL1Nullifier, FinalizeL1DepositParams} from "./interfaces/IL1Nullifier.sol";
+import {FinalizeL1DepositParams, IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
 import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 
-import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
-import {EmptyDeposit, WithdrawalAlreadyFinalized, TokensWithFeesNotSupported, ETHDepositNotSupported, ApprovalFailed} from "../common/L1ContractErrors.sol";
+import {AssetRouterAllowanceNotZero, ETHDepositNotSupported, EmptyDeposit, TokensWithFeesNotSupported, WithdrawalAlreadyFinalized} from "../common/L1ContractErrors.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 
 /// @author Matter Labs
@@ -134,7 +134,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         if (isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex]) {
             revert WithdrawalAlreadyFinalized();
         }
-        // We don't need to set finalizeWithdrawal here, as we set it in the shared bridge
+        // We don't need to set finalizeWithdrawal here, as we set it in the L1 Nullifier
 
         FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
             chainId: ERA_CHAIN_ID,
@@ -203,10 +203,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
             _refundRecipient: _refundRecipient
         });
-        // clearing approval
-        bool success = IERC20(_l1Token).approve(address(L1_ASSET_ROUTER), 0);
-        if (!success) {
-            revert ApprovalFailed();
+        // Ensuring that all the funds that were locked into this bridge were spent by the asset router / native token vault.
+        if (IERC20(_l1Token).allowance(address(this), address(L1_ASSET_ROUTER)) != 0) {
+            revert AssetRouterAllowanceNotZero();
         }
         depositAmount[msg.sender][_l1Token][l2TxHash] = _amount;
         emit DepositInitiated({
@@ -222,15 +221,13 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
                             ERA LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Transfers tokens from the depositor address to the native token vault address.
+    /// @dev Transfers tokens from the depositor address to this contract and force approves those
+    /// to the asset router address.
     /// @return The difference between the contract balance before and after the transferring of funds.
     function _approveFundsToAssetRouter(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
         uint256 balanceBefore = _token.balanceOf(address(this));
         _token.safeTransferFrom(_from, address(this), _amount);
-        bool success = _token.approve(address(L1_ASSET_ROUTER), _amount);
-        if (!success) {
-            revert ApprovalFailed();
-        }
+        _token.forceApprove(address(L1_ASSET_ROUTER), _amount);
         uint256 balanceAfter = _token.balanceOf(address(this));
 
         return balanceAfter - balanceBefore;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
@@ -11,19 +11,19 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {IL2GenesisUpgrade} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL1GenesisUpgrade} from "./IL1GenesisUpgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
-import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_GENESIS_UPGRADE_ADDR} from "../common/L2ContractAddresses.sol"; //, COMPLEX_UPGRADER_ADDR, GENESIS_UPGRADE_ADDR
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
+import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_GENESIS_UPGRADE_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {PRIORITY_TX_MAX_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
-import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
-import {L1GatewayHelper} from "./L1GatewayHelper.sol";
+import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
+import {L1FixedForceDeploymentsHelper} from "./L1FixedForceDeploymentsHelper.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
+contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1FixedForceDeploymentsHelper {
     /// @notice The main function that will be called by the Admin facet.
     /// @param _l1GenesisUpgrade the address of the l1 genesis upgrade
     /// @param _chainId the chain id
@@ -46,7 +46,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
         {
             bytes memory complexUpgraderCalldata;
             {
-                bytes memory additionalForceDeploymentsData = L1GatewayHelper.getZKChainSpecificForceDeploymentsData(
+                bytes memory additionalForceDeploymentsData = getZKChainSpecificForceDeploymentsData(
                     s,
                     address(0),
                     baseTokenAddress
@@ -87,6 +87,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
             l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
+            evmEmulatorHash: bytes32(0),
             verifier: address(0),
             verifierParams: VerifierParams({
                 recursionNodeLevelVkHash: bytes32(0),

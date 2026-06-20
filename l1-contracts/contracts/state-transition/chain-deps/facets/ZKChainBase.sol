@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {ZKChainStorage} from "../ZKChainStorage.sol";
 import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 import {PriorityQueue} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
-import {Unauthorized, NotSettlementLayer} from "../../../common/L1ContractErrors.sol";
+import {NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
+import {Unauthorized} from "../../../common/L1ContractErrors.sol";
+import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
@@ -48,6 +50,13 @@ contract ZKChainBase is ReentrancyGuard {
         _;
     }
 
+    modifier onlyChainAssetHandler() {
+        if (msg.sender != IBridgehub(s.bridgehub).chainAssetHandler()) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     modifier onlyAdminOrChainTypeManager() {
         if (msg.sender != s.admin && msg.sender != s.chainTypeManager) {
             revert Unauthorized(msg.sender);
@@ -69,11 +78,32 @@ contract ZKChainBase is ReentrancyGuard {
         _;
     }
 
-    function _getTotalPriorityTxs() internal view returns (uint256) {
-        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
-            return s.priorityTree.getTotalPriorityTxs();
-        } else {
-            return s.priorityQueue.getTotalPriorityTxs();
+    modifier onlySelf() {
+        if (msg.sender != address(this)) {
+            revert Unauthorized(msg.sender);
         }
+        _;
+    }
+
+    /// @notice Returns whether the priority queue is still active, i.e.
+    /// the chain has not processed all transactions from it
+    function _isPriorityQueueActive() internal view returns (bool) {
+        return s.__DEPRECATED_priorityQueue.getFirstUnprocessedPriorityTx() < s.priorityTree.startIndex;
+    }
+
+    /// @notice Ensures that the queue is deactivated. Should be invoked
+    /// whenever the chain migrates to another settlement layer.
+    function _forceDeactivateQueue() internal {
+        // We double check whether it is still active mainly to prevent
+        // overriding `tail`/`head` on L1 deployment.
+        if (_isPriorityQueueActive()) {
+            uint256 startIndex = s.priorityTree.startIndex;
+            s.__DEPRECATED_priorityQueue.head = startIndex;
+            s.__DEPRECATED_priorityQueue.tail = startIndex;
+        }
+    }
+
+    function _getTotalPriorityTxs() internal view returns (uint256) {
+        return s.priorityTree.getTotalPriorityTxs();
     }
 }

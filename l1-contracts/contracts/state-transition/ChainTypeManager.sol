@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
@@ -10,18 +10,19 @@ import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
 import {IAdmin} from "./chain-interfaces/IAdmin.sol";
 import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
-import {IChainTypeManager, ChainTypeManagerInitializeData, ChainCreationParams} from "./IChainTypeManager.sol";
+import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "./IChainTypeManager.sol";
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
-import {Unauthorized, ZeroAddress, HashMismatch, GenesisUpgradeZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisBatchCommitmentZero} from "../common/L1ContractErrors.sol";
-import {InitialForceDeploymentMismatch, AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
+import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE} from "../common/Config.sol";
+import {AdminZero, InitialForceDeploymentMismatch, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
+import {ChainAlreadyLive, GenesisBatchCommitmentZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisUpgradeZero, HashMismatch, MigrationsNotPaused, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
-/// @title State Transition Manager contract
+import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+
+/// @title Chain Type Manager contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
@@ -48,8 +49,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @dev The timestamp when protocolVersion can be last used
     mapping(uint256 _protocolVersion => uint256) public protocolVersionDeadline;
 
-    /// @dev The validatorTimelock contract address
-    address public validatorTimelock;
+    /// @dev The validatorTimelock contract address.
+    /// @dev Note, that address contains validator timelock for pre-v29 protocol versions. It is deprecated and will be removed in the future.
+    address internal __DEPRECATED_validatorTimelock;
 
     /// @dev The stored cutData for upgrade diamond cut. protocolVersion => cutHash
     mapping(uint256 protocolVersion => bytes32 cutHash) public upgradeCutHash;
@@ -63,14 +65,28 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @dev The initial force deployment hash
     bytes32 public initialForceDeploymentHash;
 
+    /// @dev The contract, that notifies server about l1 changes
+    address public serverNotifierAddress;
+
+    /// @dev The address of the post-V29 upgradeable validatorTimelock.
+    /// @dev Both validatorTimelock and validatorTimelockPostV29 getters are available for backward compatibility of nodes that rely on the validatorTimelock address being available.
+    address public validatorTimelockPostV29;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
+    /// @dev Note, that while the contract does not use `nonReentrant` modifier, we still keep the `reentrancyGuardInitializer`
+    /// here for two reasons:
+    /// - It prevents the function from being called twice (including in the proxy impl).
+    /// - It makes the local version consistent with the one in production, which already had the reentrancy guard
+    /// initialized.
     constructor(address _bridgehub) reentrancyGuardInitializer {
         BRIDGE_HUB = _bridgehub;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
         assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
+
+        _disableInitializers();
     }
 
     /// @notice only the bridgehub can call
@@ -84,6 +100,14 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @notice the admin can call, for non-critical updates
     modifier onlyOwnerOrAdmin() {
         if (msg.sender != admin && msg.sender != owner()) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    /// @notice only the chain asset handler can call
+    modifier onlyChainAssetHandler() {
+        if (msg.sender != IBridgehub(BRIDGE_HUB).chainAssetHandler()) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -115,6 +139,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     }
 
     /// @dev initialize
+    /// @dev Note, that while the contract does not use `nonReentrant` modifier, we still keep the `reentrancyGuardInitializer`
+    /// here for two reasons:
+    /// - It prevents the function from being called twice (including in the proxy impl).
+    /// - It makes the local version consistent with the one in production, which already had the reentrancy guard
+    /// initialized.
     function initialize(ChainTypeManagerInitializeData calldata _initializeData) external reentrancyGuardInitializer {
         if (_initializeData.owner == address(0)) {
             revert ZeroAddress();
@@ -123,7 +152,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
         protocolVersion = _initializeData.protocolVersion;
         _setProtocolVersionDeadline(_initializeData.protocolVersion, type(uint256).max);
-        validatorTimelock = _initializeData.validatorTimelock;
+        validatorTimelockPostV29 = _initializeData.validatorTimelock;
+        serverNotifierAddress = _initializeData.serverNotifier;
 
         _setChainCreationParams(_initializeData.chainCreationParams);
     }
@@ -154,6 +184,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             numberOfLayer1Txs: 0,
             priorityOperationsHash: EMPTY_STRING_KECCAK,
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+            dependencyRootsRollingHash: bytes32(0),
             timestamp: 0,
             commitment: _chainCreationParams.genesisBatchCommitment
         });
@@ -168,7 +199,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             genesisBatchHash: _chainCreationParams.genesisBatchHash,
             genesisIndexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
             genesisBatchCommitment: _chainCreationParams.genesisBatchCommitment,
+            newInitialCut: _chainCreationParams.diamondCut,
             newInitialCutHash: newInitialCutHash,
+            forceDeploymentsData: _chainCreationParams.forceDeploymentsData,
             forceDeploymentHash: forceDeploymentHash
         });
     }
@@ -208,12 +241,30 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         emit NewAdmin(previousAdmin, currentPendingAdmin);
     }
 
-    /// @dev set validatorTimelock. Cannot do it during initialization, as validatorTimelock is deployed after CTM
+    /// @dev Used to set legacy validatorTimelock.
+    /// @dev Note, that the validator timelock that this function sets is only used for pre-v29 protocol versions.
+    /// It is kept only for convenience.
     /// @param _validatorTimelock the new validatorTimelock address
-    function setValidatorTimelock(address _validatorTimelock) external onlyOwner {
-        address oldValidatorTimelock = validatorTimelock;
-        validatorTimelock = _validatorTimelock;
+    function setLegacyValidatorTimelock(address _validatorTimelock) external onlyOwner {
+        address oldValidatorTimelock = __DEPRECATED_validatorTimelock;
+        __DEPRECATED_validatorTimelock = _validatorTimelock;
         emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
+    }
+
+    /// @dev Used to set post-V29 validator timelock. Cannot do it during initialization, as validatorTimelockPostV29 is deployed after CTM.
+    /// @param _validatorTimelockPostV29 the new post-V29 upgradeable validatorTimelock address
+    function setValidatorTimelockPostV29(address _validatorTimelockPostV29) external onlyOwner {
+        address oldValidatorTimelockPostV29 = validatorTimelockPostV29;
+        validatorTimelockPostV29 = _validatorTimelockPostV29;
+        emit NewValidatorTimelockPostV29(oldValidatorTimelockPostV29, _validatorTimelockPostV29);
+    }
+
+    /// @dev set ServerNotifier.
+    /// @param _serverNotifier the new serverNotifier address
+    function setServerNotifier(address _serverNotifier) external onlyOwnerOrAdmin {
+        address oldServerNotifier = serverNotifierAddress;
+        serverNotifierAddress = _serverNotifier;
+        emit NewServerNotifier(oldServerNotifier, _serverNotifier);
     }
 
     /// @dev set New Version with upgrade from old version
@@ -227,6 +278,10 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion
     ) external onlyOwner {
+        if (!IBridgehub(BRIDGE_HUB).migrationPaused()) {
+            revert MigrationsNotPaused();
+        }
+
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
         uint256 previousProtocolVersion = protocolVersion;
         upgradeCutHash[_oldProtocolVersion] = newCutHash;
@@ -278,8 +333,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @dev reverts batches on the specified chain
     /// @param _chainId the chainId of the chain
     /// @param _newLastBatch the new last batch
-    function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwnerOrAdmin {
-        IZKChain(getZKChain(_chainId)).revertBatchesSharedBridge(_chainId, _newLastBatch);
+    function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwner {
+        address zkChainAddr = getZKChain(_chainId);
+        IZKChain(zkChainAddr).revertBatchesSharedBridge(zkChainAddr, _newLastBatch);
     }
 
     /// @dev execute predefined upgrade
@@ -353,7 +409,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ) internal returns (address zkChainAddress) {
         if (getZKChain(_chainId) != address(0)) {
             // ZKChain already registered
-            return getZKChain(_chainId);
+            revert ChainAlreadyLive();
         }
 
         Diamond.DiamondCutData memory diamondCut = abi.decode(_diamondCut, (Diamond.DiamondCutData));
@@ -377,7 +433,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             bytes32(uint256(uint160(address(this)))),
             bytes32(protocolVersion),
             bytes32(uint256(uint160(_admin))),
-            bytes32(uint256(uint160(validatorTimelock))),
+            bytes32(uint256(uint160(validatorTimelockPostV29))),
             _baseTokenAssetId,
             storedBatchZero,
             diamondCut.initCalldata
@@ -438,7 +494,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     function forwardedBridgeBurn(
         uint256 _chainId,
         bytes calldata _data
-    ) external view override onlyBridgehub returns (bytes memory ctmForwardedBridgeMintData) {
+    ) external view override onlyChainAssetHandler returns (bytes memory ctmForwardedBridgeMintData) {
         // Note that the `_diamondCut` here is not for the current chain, for the chain where the migration
         // happens. The correctness of it will be checked on the CTM on the new settlement layer.
         (address _newSettlementLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
@@ -450,7 +506,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         // related to different protocol version support.
         uint256 chainProtocolVersion = IZKChain(getZKChain(_chainId)).getProtocolVersion();
         if (chainProtocolVersion != protocolVersion) {
-            revert OutdatedProtocolVersion(chainProtocolVersion, protocolVersion);
+            revert OutdatedProtocolVersion(protocolVersion, chainProtocolVersion);
         }
 
         return
@@ -468,7 +524,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     function forwardedBridgeMint(
         uint256 _chainId,
         bytes calldata _ctmData
-    ) external override onlyBridgehub returns (address chainAddress) {
+    ) external override onlyChainAssetHandler returns (address chainAddress) {
         (bytes32 _baseTokenAssetId, address _admin, uint256 _protocolVersion, bytes memory _diamondCut) = abi.decode(
             _ctmData,
             (bytes32, address, uint256, bytes)
@@ -477,7 +533,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
         if (_protocolVersion != protocolVersion) {
-            revert OutdatedProtocolVersion(_protocolVersion, protocolVersion);
+            revert OutdatedProtocolVersion(protocolVersion, _protocolVersion);
         }
         chainAddress = _deployNewChain({
             _chainId: _chainId,
@@ -528,5 +584,12 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             return legacyAddress;
         }
         return getZKChain(_chainId);
+    }
+
+    /// @notice Returns the legacy validator timelock address.
+    /// @dev This function is used to return the validator timelock address for pre-v29 protocol versions.
+    /// @dev This function is deprecated and will be removed in the future.
+    function validatorTimelock() external view returns (address) {
+        return __DEPRECATED_validatorTimelock;
     }
 }

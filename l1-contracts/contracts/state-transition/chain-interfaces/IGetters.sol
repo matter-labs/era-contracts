@@ -63,6 +63,11 @@ interface IGetters is IZKChainBase {
     /// @return The root hash of the priority tree
     function getPriorityTreeRoot() external view returns (bytes32);
 
+    /// @return Whether the priority queue is active, i.e. whether new priority operations are appended to it.
+    /// Once the chain processes all the transactions that were present in the priority queue, all the L1->L2 related
+    /// operations will start to get done using the priority tree.
+    function isPriorityQueueActive() external view returns (bool);
+
     /// @notice The function that returns the first unprocessed priority transaction.
     /// @dev Returns zero if and only if no operations were processed from the queue.
     /// @dev If all the transactions were processed, it will return the last processed index, so
@@ -89,6 +94,9 @@ interface IGetters is IZKChainBase {
 
     /// @return Bytecode hash of default account (bytecode for EOA).
     function getL2DefaultAccountBytecodeHash() external view returns (bytes32);
+
+    /// @return Bytecode hash of EVM emulator.
+    function getL2EvmEmulatorBytecodeHash() external view returns (bytes32);
 
     /// @return Verifier parameters.
     /// @dev This function is deprecated and will soon be removed.

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 // solhint-disable no-console, gas-custom-errors, reason-string
 
@@ -14,19 +14,26 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
+import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {Utils} from "./Utils.sol";
-import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
+import {ADDRESS_ONE, Utils} from "./Utils.sol";
+import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-
+import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
+import {IGovernance} from "contracts/governance/IGovernance.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
+import {Call} from "contracts/governance/Common.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -52,12 +59,17 @@ struct Config {
     address governanceSecurityCouncilAddress;
     uint256 governanceMinDelay;
     address l1Nullifier;
+    address l1Erc20Bridge;
+    bool initializeLegacyBridge;
+    address governance;
+    address create2FactoryAddress;
+    bytes32 create2Salt;
+    bool allowEvmEmulator;
 }
 
 contract RegisterZKChainScript is Script {
     using stdToml for string;
 
-    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewZKChain(uint256,address)");
 
     struct Output {
@@ -86,22 +98,22 @@ contract RegisterZKChainScript is Script {
 
         initializeConfig();
         // TODO: some chains may not want to have a legacy shared bridge
-        runInner("/script-out/output-register-zk-chain.toml", false);
+        runInner("/script-out/output-register-zk-chain.toml");
     }
 
     function runForTest() public {
         console.log("Deploying ZKChain");
 
         initializeConfigTest();
-        // TODO: Yes, it is the same as for prod since it is never read from down the line
-        runInner(vm.envString("ZK_CHAIN_OUT"), false);
+        runInner(vm.envString("ZK_CHAIN_OUT"));
     }
 
-    function runInner(string memory outputPath, bool initializeL2LegacyBridge) internal {
+    function runInner(string memory outputPath) internal {
         string memory root = vm.projectRoot();
+
         outputPath = string.concat(root, outputPath);
 
-        if (initializeL2LegacyBridge) {
+        if (config.initializeLegacyBridge) {
             // This must be run before the chain is deployed
             setUpLegacySharedBridgeParams();
         }
@@ -117,7 +129,7 @@ contract RegisterZKChainScript is Script {
         configureZkSyncStateTransition();
         setPendingAdmin();
 
-        if (initializeL2LegacyBridge) {
+        if (config.initializeLegacyBridge) {
             deployLegacySharedBridge();
         }
 
@@ -145,6 +157,7 @@ contract RegisterZKChainScript is Script {
         config.nativeTokenVault = toml.readAddress("$.deployed_addresses.native_token_vault_addr");
         config.sharedBridgeProxy = toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr");
         config.l1Nullifier = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
+        config.l1Erc20Bridge = toml.readAddress("$.deployed_addresses.bridges.erc20_bridge_proxy_addr");
 
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
@@ -165,6 +178,12 @@ contract RegisterZKChainScript is Script {
         config.validiumMode = toml.readBool("$.chain.validium_mode");
         config.validatorSenderOperatorCommitEth = toml.readAddress("$.chain.validator_sender_operator_commit_eth");
         config.validatorSenderOperatorBlobsEth = toml.readAddress("$.chain.validator_sender_operator_blobs_eth");
+        config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
+
+        config.governance = toml.readAddress("$.governance");
+        config.create2FactoryAddress = toml.readAddress("$.create2_factory_address");
+        config.create2Salt = toml.readBytes32("$.create2_salt");
+        config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
     }
 
     function getConfig() public view returns (Config memory) {
@@ -197,6 +216,10 @@ contract RegisterZKChainScript is Script {
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
 
+        config.governance = toml.readAddress("$.deployed_addresses.governance_addr");
+        config.create2FactoryAddress = toml.readAddress("$.create2_factory_addr");
+        config.create2Salt = toml.readBytes32("$.create2_factory_salt");
+
         path = string.concat(root, vm.envString("ZK_CHAIN_CONFIG"));
         toml = vm.readFile(path);
 
@@ -216,6 +239,7 @@ contract RegisterZKChainScript is Script {
         );
         config.governanceMinDelay = uint256(toml.readUint("$.chain.governance_min_delay"));
         config.governanceSecurityCouncilAddress = toml.readAddress("$.chain.governance_security_council_address");
+        config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
     }
 
     function getOwnerAddress() public view returns (address) {
@@ -240,54 +264,20 @@ contract RegisterZKChainScript is Script {
     }
 
     function setUpLegacySharedBridgeParams() internal {
-        bytes memory implementationConstructorParams = hex"";
-
-        address legacyBridgeImplementationAddress = L2ContractHelper.computeCreate2Address(
-            msg.sender,
-            "",
-            L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode()),
-            keccak256(implementationConstructorParams)
+        // Ecosystem governance is the owner of the L1Nullifier
+        address ecosystemGovernance = L1NullifierDev(config.l1Nullifier).owner();
+        address bridgeAddress = L2LegacySharedBridgeTestHelper.calculateL2LegacySharedBridgeProxyAddr(
+            config.l1Erc20Bridge,
+            config.l1Nullifier,
+            ecosystemGovernance
         );
-
-        bytes memory proxyInitializationParams = abi.encodeCall(
-            L2SharedBridgeLegacy.initialize,
-            (
-                config.sharedBridgeProxy,
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBeaconProxyBytecode()),
-                // This is not exactly correct, this should be ecosystem governance and not chain governance
-                msg.sender
-            )
-        );
-
-        bytes memory proxyConstructorParams = abi.encode(
-            legacyBridgeImplementationAddress,
-            // In real production, this would be aliased ecosystem governance.
-            // But in real production we also do not initialize legacy shared bridge
-            msg.sender,
-            proxyInitializationParams
-        );
-
-        address proxyAddress = L2ContractHelper.computeCreate2Address(
-            msg.sender,
-            "",
-            L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecode()),
-            keccak256(proxyConstructorParams)
-        );
-
         vm.broadcast();
-        L1NullifierDev(config.l1Nullifier).setL2LegacySharedBridge(config.chainChainId, proxyAddress);
-
-        legacySharedBridgeParams = LegacySharedBridgeParams({
-            implementationConstructorParams: implementationConstructorParams,
-            implementationAddress: legacyBridgeImplementationAddress,
-            proxyConstructorParams: proxyConstructorParams,
-            proxyAddress: proxyAddress
-        });
+        L1NullifierDev(config.l1Nullifier).setL2LegacySharedBridge(config.chainChainId, bridgeAddress);
     }
 
     function registerAssetIdOnBridgehub() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
-        Ownable ownable = Ownable(config.bridgehub);
+        ChainAdminOwnable admin = ChainAdminOwnable(payable(bridgehub.admin()));
         INativeTokenVault ntv = INativeTokenVault(config.nativeTokenVault);
         bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
         uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
@@ -299,15 +289,15 @@ contract RegisterZKChainScript is Script {
         if (bridgehub.assetIdIsRegistered(baseTokenAssetId)) {
             console.log("Base token asset id already registered on Bridgehub");
         } else {
-            bytes memory data = abi.encodeCall(bridgehub.addTokenAssetId, (baseTokenAssetId));
-            Utils.executeUpgrade({
-                _governor: ownable.owner(),
-                _salt: bytes32(config.bridgehubCreateNewChainSalt),
-                _target: config.bridgehub,
-                _data: data,
-                _value: 0,
-                _delay: 0
+            IChainAdminOwnable.Call[] memory calls = new IChainAdminOwnable.Call[](1);
+            calls[0] = IChainAdminOwnable.Call({
+                target: config.bridgehub,
+                value: 0,
+                data: abi.encodeCall(bridgehub.addTokenAssetId, (baseTokenAssetId))
             });
+            vm.broadcast(admin.owner());
+            admin.multicall(calls, true);
+
             console.log("Base token asset id registered on Bridgehub");
         }
     }
@@ -332,66 +322,91 @@ contract RegisterZKChainScript is Script {
     }
 
     function deployGovernance() internal {
-        vm.broadcast();
-        Governance governance = new Governance(
+        bytes memory input = abi.encode(
             config.ownerAddress,
             config.governanceSecurityCouncilAddress,
             config.governanceMinDelay
         );
-        console.log("Governance deployed at:", address(governance));
-        output.governance = address(governance);
+        address governance = Utils.deployViaCreate2(
+            abi.encodePacked(type(Governance).creationCode, input),
+            config.create2Salt,
+            config.create2FactoryAddress
+        );
+        console.log("Governance deployed at:", governance);
+        output.governance = governance;
     }
 
     function deployChainAdmin() internal {
-        vm.broadcast();
-        AccessControlRestriction restriction = new AccessControlRestriction(0, config.ownerAddress);
-        output.accessControlRestrictionAddress = address(restriction);
+        // TODO(EVM-924): provide an option to deploy a non-single owner ChainAdmin.
+        (address chainAdmin, address accessControlRestriction) = deployChainAdminOwnable();
+
+        output.accessControlRestrictionAddress = accessControlRestriction;
+        output.chainAdmin = chainAdmin;
+    }
+
+    function deployChainAdminOwnable() internal returns (address chainAdmin, address accessControlRestriction) {
+        chainAdmin = Utils.deployViaCreate2(
+            abi.encodePacked(type(ChainAdminOwnable).creationCode, abi.encode(config.ownerAddress, address(0))),
+            config.create2Salt,
+            config.create2FactoryAddress
+        );
+        // The single owner chainAdmin does not have a separate control restriction contract.
+        // We set to it to zero explicitly so that it is clear to the reader.
+        accessControlRestriction = address(0);
+
+        console.log("ChainAdminOwnable deployed at:", accessControlRestriction);
+    }
+
+    // TODO(EVM-924): this function is unused
+    function deployChainAdminWithRestrictions()
+        internal
+        returns (address chainAdmin, address accessControlRestriction)
+    {
+        bytes memory input = abi.encode(0, config.ownerAddress);
+        accessControlRestriction = Utils.deployViaCreate2(
+            abi.encodePacked(type(AccessControlRestriction).creationCode, input),
+            config.create2Salt,
+            config.create2FactoryAddress
+        );
 
         address[] memory restrictions = new address[](1);
-        restrictions[0] = address(restriction);
+        restrictions[0] = accessControlRestriction;
 
-        vm.broadcast();
-        ChainAdmin chainAdmin = new ChainAdmin(restrictions);
-        output.chainAdmin = address(chainAdmin);
+        input = abi.encode(restrictions);
+        chainAdmin = Utils.deployViaCreate2(
+            abi.encodePacked(type(ChainAdmin).creationCode, input),
+            config.create2Salt,
+            config.create2FactoryAddress
+        );
     }
 
     function registerZKChain() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
-        Ownable ownable = Ownable(config.bridgehub);
+        ChainAdminOwnable admin = ChainAdminOwnable(payable(bridgehub.admin()));
 
-        vm.recordLogs();
-        bytes memory data = abi.encodeCall(
-            bridgehub.createNewChain,
-            (
-                config.chainChainId,
-                config.chainTypeManagerProxy,
-                config.baseTokenAssetId,
-                config.bridgehubCreateNewChainSalt,
-                msg.sender,
-                abi.encode(config.diamondCutData, config.forceDeployments),
-                getFactoryDeps()
+        IChainAdminOwnable.Call[] memory calls = new IChainAdminOwnable.Call[](1);
+        calls[0] = IChainAdminOwnable.Call({
+            target: config.bridgehub,
+            value: 0,
+            data: abi.encodeCall(
+                bridgehub.createNewChain,
+                (
+                    config.chainChainId,
+                    config.chainTypeManagerProxy,
+                    config.baseTokenAssetId,
+                    config.bridgehubCreateNewChainSalt,
+                    msg.sender,
+                    abi.encode(config.diamondCutData, config.forceDeployments),
+                    getFactoryDeps()
+                )
             )
-        );
-        Utils.executeUpgrade({
-            _governor: ownable.owner(),
-            _salt: bytes32(config.bridgehubCreateNewChainSalt),
-            _target: config.bridgehub,
-            _data: data,
-            _value: 0,
-            _delay: 0
         });
+        vm.broadcast(admin.owner());
+        admin.multicall(calls, true);
         console.log("ZK chain registered");
 
         // Get new diamond proxy address from emitted events
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        address diamondProxyAddress;
-        uint256 logsLength = logs.length;
-        for (uint256 i = 0; i < logsLength; ++i) {
-            if (logs[i].topics[0] == STATE_TRANSITION_NEW_CHAIN_HASH) {
-                diamondProxyAddress = address(uint160(uint256(logs[i].topics[2])));
-                break;
-            }
-        }
+        address diamondProxyAddress = bridgehub.getZKChain(config.chainChainId);
         if (diamondProxyAddress == address(0)) {
             revert("Diamond proxy address not found");
         }
@@ -403,8 +418,8 @@ contract RegisterZKChainScript is Script {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(config.validatorTimelock);
 
         vm.startBroadcast(msg.sender);
-        validatorTimelock.addValidator(config.chainChainId, config.validatorSenderOperatorCommitEth);
-        validatorTimelock.addValidator(config.chainChainId, config.validatorSenderOperatorBlobsEth);
+        validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorCommitEth);
+        validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorBlobsEth);
         vm.stopBroadcast();
 
         console.log("Validators added");
@@ -437,19 +452,21 @@ contract RegisterZKChainScript is Script {
     }
 
     function deployChainProxyAddress() internal {
-        vm.startBroadcast();
-        ProxyAdmin proxyAdmin = new ProxyAdmin();
-        proxyAdmin.transferOwnership(output.chainAdmin);
-        vm.stopBroadcast();
+        bytes memory input = abi.encode(type(ProxyAdmin).creationCode, config.create2Salt, output.chainAdmin);
+        bytes memory encoded = abi.encodePacked(type(Create2AndTransfer).creationCode, input);
+        address create2AndTransfer = Utils.deployViaCreate2(encoded, config.create2Salt, config.create2FactoryAddress);
+
+        address proxyAdmin = vm.computeCreate2Address(config.create2Salt, keccak256(encoded), create2AndTransfer);
+
         console.log("Transparent Proxy Admin deployed at:", address(proxyAdmin));
         output.chainProxyAdmin = address(proxyAdmin);
     }
 
     function deployLegacySharedBridge() internal {
         bytes[] memory emptyDeps = new bytes[](0);
-        address correctLegacyBridgeImplAddr = Utils.deployThroughL1({
-            bytecode: L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode(),
-            constructorargs: legacySharedBridgeParams.implementationConstructorParams,
+        address legacyBridgeImplAddr = Utils.deployThroughL1Deterministic({
+            bytecode: ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacyDev"),
+            constructorargs: hex"",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             factoryDeps: emptyDeps,
@@ -458,9 +475,15 @@ contract RegisterZKChainScript is Script {
             l1SharedBridgeProxy: config.sharedBridgeProxy
         });
 
-        address correctProxyAddress = Utils.deployThroughL1({
-            bytecode: L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecode(),
-            constructorargs: legacySharedBridgeParams.proxyConstructorParams,
+        output.l2LegacySharedBridge = Utils.deployThroughL1Deterministic({
+            bytecode: ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy"),
+            constructorargs: L2LegacySharedBridgeTestHelper.getLegacySharedBridgeProxyConstructorParams(
+                legacyBridgeImplAddr,
+                config.l1Erc20Bridge,
+                config.l1Nullifier,
+                // Ecosystem governance is the owner of the L1Nullifier
+                L1NullifierDev(config.l1Nullifier).owner()
+            ),
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             factoryDeps: emptyDeps,
@@ -468,28 +491,23 @@ contract RegisterZKChainScript is Script {
             bridgehubAddress: config.bridgehub,
             l1SharedBridgeProxy: config.sharedBridgeProxy
         });
-
-        require(
-            correctLegacyBridgeImplAddr == legacySharedBridgeParams.implementationAddress,
-            "Legacy bridge implementation address mismatch"
-        );
-        require(correctProxyAddress == legacySharedBridgeParams.proxyAddress, "Legacy bridge proxy address mismatch");
-
-        output.l2LegacySharedBridge = correctProxyAddress;
     }
 
     function getFactoryDeps() internal view returns (bytes[] memory) {
-        bytes[] memory factoryDeps = new bytes[](3);
-        factoryDeps[0] = L2ContractsBytecodesLib.readBeaconProxyBytecode();
-        factoryDeps[1] = L2ContractsBytecodesLib.readStandardERC20Bytecode();
-        factoryDeps[2] = L2ContractsBytecodesLib.readUpgradeableBeaconBytecode();
+        bytes[] memory factoryDeps = new bytes[](4);
+        factoryDeps[0] = ContractsBytecodesLib.getCreationCode("BeaconProxy");
+        factoryDeps[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
+        factoryDeps[2] = ContractsBytecodesLib.getCreationCode("UpgradeableBeacon");
+        factoryDeps[3] = ContractsBytecodesLib.getCreationCode("SystemTransparentUpgradeableProxy");
         return factoryDeps;
     }
 
     function saveOutput(string memory outputPath) internal {
         vm.serializeAddress("root", "diamond_proxy_addr", output.diamondProxy);
         vm.serializeAddress("root", "chain_admin_addr", output.chainAdmin);
-        vm.serializeAddress("root", "l2_legacy_shared_bridge_addr", output.l2LegacySharedBridge);
+        if (output.l2LegacySharedBridge != address(0)) {
+            vm.serializeAddress("root", "l2_legacy_shared_bridge_addr", output.l2LegacySharedBridge);
+        }
         vm.serializeAddress("root", "access_control_restriction_addr", output.accessControlRestrictionAddress);
         vm.serializeAddress("root", "chain_proxy_admin_addr", output.chainProxyAdmin);
 
@@ -497,5 +515,24 @@ contract RegisterZKChainScript is Script {
         string memory root = vm.projectRoot();
         vm.writeToml(toml, outputPath);
         console.log("Output saved at:", outputPath);
+    }
+
+    function governanceExecuteCalls(bytes memory callsToExecute, address governanceAddr) internal {
+        IGovernance governance = IGovernance(governanceAddr);
+        Ownable2Step ownable = Ownable2Step(governanceAddr);
+
+        Call[] memory calls = abi.decode(callsToExecute, (Call[]));
+
+        IGovernance.Operation memory operation = IGovernance.Operation({
+            calls: calls,
+            predecessor: bytes32(0),
+            salt: bytes32(0)
+        });
+
+        vm.startBroadcast(ownable.owner());
+        governance.scheduleTransparent(operation, 0);
+        // We assume that the total value is 0
+        governance.execute{value: 0}(operation);
+        vm.stopBroadcast();
     }
 }

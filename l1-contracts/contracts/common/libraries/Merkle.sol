@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
-import {MerklePathEmpty, MerklePathOutOfBounds, MerkleIndexOutOfBounds, MerklePathLengthMismatch, MerkleNothingToProve, MerkleIndexOrHeightMismatch} from "../../common/L1ContractErrors.sol";
+import {MerkleIndexOrHeightMismatch, MerkleIndexOutOfBounds, MerkleNothingToProve, MerklePathEmpty, MerklePathLengthMismatch, MerklePathOutOfBounds} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -37,9 +37,10 @@ library Merkle {
     }
 
     /// @dev Calculate Merkle root by the provided Merkle proof.
-    /// NOTE: When using this function, check that the _path length is equal to the tree height to prevent shorter/longer paths attack
+    /// @dev NOTE: When using this function, check that the _path length is appropriate to prevent shorter/longer paths attack
     /// @param _path Merkle path from the leaf to the root
-    /// @param _index Leaf index in the tree
+    /// @param _index Leaf index in the tree.
+    /// @dev NOTE the tree can be joined. In this case the second tree's leaves indexes increase by the number of leaves in the first tree.
     /// @param _itemHash Hash of leaf content
     /// @return The Merkle root
     function calculateRootMemory(
@@ -123,9 +124,6 @@ library Merkle {
     }
 
     function _validatePathLengthForSingleProof(uint256 _index, uint256 _pathLength) private pure {
-        if (_pathLength == 0) {
-            revert MerklePathEmpty();
-        }
         if (_pathLength >= 256) {
             revert MerklePathOutOfBounds();
         }

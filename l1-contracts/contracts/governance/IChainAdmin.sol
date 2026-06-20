@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {Call} from "./Common.sol";
 
@@ -19,6 +19,9 @@ interface IChainAdmin {
 
     /// @notice Emitted when a restriction is removed.
     event RestrictionRemoved(address indexed restriction);
+
+    /// @notice The EVM emulator has been enabled
+    event EnableEvmEmulator();
 
     /// @notice Returns the list of active restrictions.
     function getRestrictions() external view returns (address[] memory);

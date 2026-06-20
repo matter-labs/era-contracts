@@ -1,23 +1,27 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
-import {CallNotAllowed, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation, AlreadyWhitelisted, NotAllowed} from "../common/L1ContractErrors.sol";
+import {AlreadyWhitelisted, CallNotAllowed, NotAllowed, RemovingPermanentRestriction, TooHighDeploymentNonce, UnallowedImplementation, ZeroAddress} from "../common/L1ContractErrors.sol";
 
-import {L2TransactionRequestTwoBridgesOuter, BridgehubBurnCTMAssetData} from "../bridgehub/IBridgehub.sol";
+import {BridgehubBurnCTMAssetData, IBridgehub, L2TransactionRequestTwoBridgesOuter} from "../bridgehub/IBridgehub.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
-import {NEW_ENCODING_VERSION, IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
+import {IAssetRouterBase, NEW_ENCODING_VERSION} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 import {Call} from "./Common.sol";
 import {Restriction} from "./restriction/Restriction.sol";
 import {IChainAdmin} from "./IChainAdmin.sol";
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 
 import {IPermanentRestriction} from "./IPermanentRestriction.sol";
+
+/// @dev The value up to which the nonces of the L2AdminDeployer could be used. This is needed
+/// to limit the impact of the birthday paradox attack, where an attack could craft a malicious
+/// address on L1.
+uint256 constant MAX_ALLOWED_NONCE = (1 << 48);
 
 /// @title PermanentRestriction contract
 /// @author Matter Labs
@@ -93,18 +97,15 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     }
 
     /// @notice Whitelists a certain L2 admin.
-    /// @param deploymentSalt The salt for the deployment.
-    /// @param l2BytecodeHash The hash of the L2 bytecode.
-    /// @param constructorInputHash The hash of the constructor data for the deployment.
-    function allowL2Admin(bytes32 deploymentSalt, bytes32 l2BytecodeHash, bytes32 constructorInputHash) external {
+    /// @param deploymentNonce The deployment nonce of the `L2_ADMIN_FACTORY` used for the deployment.
+    function allowL2Admin(uint256 deploymentNonce) external {
+        if (deploymentNonce > MAX_ALLOWED_NONCE) {
+            revert TooHighDeploymentNonce();
+        }
+
         // We do not do any additional validations for constructor data or the bytecode,
         // we expect that only admins of the allowed format are to be deployed.
-        address expectedAddress = L2ContractHelper.computeCreate2Address(
-            L2_ADMIN_FACTORY,
-            deploymentSalt,
-            l2BytecodeHash,
-            constructorInputHash
-        );
+        address expectedAddress = L2ContractHelper.computeCreateAddress(L2_ADMIN_FACTORY, deploymentNonce);
 
         if (allowedL2Admins[expectedAddress]) {
             revert AlreadyWhitelisted(expectedAddress);
@@ -195,6 +196,10 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return;
         }
 
+        if (_call.data.length < 4) {
+            return;
+        }
+
         if (bytes4(_call.data[:4]) != IChainAdmin.removeRestriction.selector) {
             return;
         }
@@ -225,18 +230,16 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
         (uint256 chainId, bool chainIdQuerySuccess) = _getChainIdUnffallibleCall(_chain);
 
         if (!chainIdQuerySuccess) {
-            // It is not a hyperchain, so we can return `false` here.
+            // It is not a ZKChain, so we can return `false` here.
             return false;
         }
 
-        // Note, that here it is important to use the legacy `getHyperchain` function, so that the contract
-        // is compatible with the legacy ones.
-        if (BRIDGE_HUB.getHyperchain(chainId) != _chain) {
-            // It is not a hyperchain, so we can return `false` here.
+        if (BRIDGE_HUB.getZKChain(chainId) != _chain) {
+            // It is not a ZKChain, so we can return `false` here.
             return false;
         }
 
-        // Now, the chain is known to be a hyperchain, so it must implement the corresponding interface
+        // Now, the chain is known to be a ZKChain, so it must implement the corresponding interface
         address admin = IZKChain(_chain).getAdmin();
 
         return admin == msg.sender;
@@ -288,7 +291,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return (address(0), false);
         }
 
-        address sharedBridge = BRIDGE_HUB.sharedBridge();
+        address sharedBridge = BRIDGE_HUB.assetRouter();
 
         // Assuming that correctly encoded calldata is provided, the following line must never fail,
         // since the correct selector was checked before.

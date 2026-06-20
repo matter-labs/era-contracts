@@ -2,12 +2,12 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-import {MAX_SYSTEM_CONTRACT_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, FORCE_DEPLOYER, KNOWN_CODE_STORAGE_CONTRACT, SLOAD_CONTRACT_ADDRESS} from "../Constants.sol";
+import {ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, FORCE_DEPLOYER, KNOWN_CODE_STORAGE_CONTRACT, MAX_SYSTEM_CONTRACT_ADDRESS, SLOAD_CONTRACT_ADDRESS} from "../Constants.sol";
 import {ForceDeployment, IContractDeployer} from "../interfaces/IContractDeployer.sol";
 import {SloadContract} from "../SloadContract.sol";
 
-import {CalldataForwardingMode, SystemContractsCaller, MIMIC_CALL_CALL_ADDRESS, CALLFLAGS_CALL_ADDRESS, CODE_ADDRESS_CALL_ADDRESS, EVENT_WRITE_ADDRESS, EVENT_INITIALIZE_ADDRESS, GET_EXTRA_ABI_DATA_ADDRESS, LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, META_CODE_SHARD_ID_OFFSET, META_CALLER_SHARD_ID_OFFSET, META_SHARD_ID_OFFSET, META_AUX_HEAP_SIZE_OFFSET, META_HEAP_SIZE_OFFSET, META_PUBDATA_PUBLISHED_OFFSET, META_CALL_ADDRESS, PTR_CALLDATA_CALL_ADDRESS, PTR_ADD_INTO_ACTIVE_CALL_ADDRESS, PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, PRECOMPILE_CALL_ADDRESS, SET_CONTEXT_VALUE_CALL_ADDRESS, TO_L1_CALL_ADDRESS} from "./SystemContractsCaller.sol";
-import {IndexOutOfBounds, FailedToChargeGas, SloadContractBytecodeUnknown, PreviousBytecodeUnknown} from "../SystemContractErrors.sol";
+import {CALLFLAGS_CALL_ADDRESS, CODE_ADDRESS_CALL_ADDRESS, CalldataForwardingMode, EVENT_INITIALIZE_ADDRESS, EVENT_WRITE_ADDRESS, GET_EXTRA_ABI_DATA_ADDRESS, LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, META_AUX_HEAP_SIZE_OFFSET, META_CALLER_SHARD_ID_OFFSET, META_CALL_ADDRESS, META_CODE_SHARD_ID_OFFSET, META_HEAP_SIZE_OFFSET, META_PUBDATA_PUBLISHED_OFFSET, META_SHARD_ID_OFFSET, MIMIC_CALL_CALL_ADDRESS, PRECOMPILE_CALL_ADDRESS, PTR_ADD_INTO_ACTIVE_CALL_ADDRESS, PTR_CALLDATA_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS, SET_CONTEXT_VALUE_CALL_ADDRESS, SystemContractsCaller, TO_L1_CALL_ADDRESS} from "./SystemContractsCaller.sol";
+import {FailedToChargeGas, IndexOutOfBounds, PreviousBytecodeUnknown, SloadContractBytecodeUnknown} from "../SystemContractErrors.sol";
 
 uint256 constant UINT32_MASK = type(uint32).max;
 uint256 constant UINT64_MASK = type(uint64).max;
@@ -347,6 +347,13 @@ library SystemContractHelper {
         return uint160(_address) <= uint160(MAX_SYSTEM_CONTRACT_ADDRESS);
     }
 
+    /// @notice Returns whether the current call is a system call from EVM emulator.
+    /// @return `true` or `false` based on whether the current call is a system call from EVM emulator.
+    function isSystemCallFromEvmEmulator() internal view returns (bool) {
+        if (!isSystemCall()) return false;
+        return ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender);
+    }
+
     /// @notice Method used for burning a certain amount of gas.
     /// @param _gasToPay The number of gas to burn.
     /// @param _pubdataToSpend The number of pubdata bytes to burn during the call.
@@ -436,6 +443,8 @@ library SystemContractHelper {
     /// 1. Force-deploy `SloadContract` to the address.
     /// 2. Read the required slot.
     /// 3. Force-deploy the previous bytecode back.
+    /// @dev Note, that the function will overwrite the account states of the `_addr`, i.e.
+    /// this function should NEVER be used against custom accounts.
     function forcedSload(address _addr, bytes32 _key) internal returns (bytes32 result) {
         bytes32 sloadContractBytecodeHash;
         address sloadContractAddress = SLOAD_CONTRACT_ADDRESS;
@@ -443,19 +452,14 @@ library SystemContractHelper {
             sloadContractBytecodeHash := extcodehash(sloadContractAddress)
         }
 
-        // Just in case, that the `sloadContractBytecodeHash` is known
+        // Just in case, checking that the `sloadContractBytecodeHash` is known.
         if (KNOWN_CODE_STORAGE_CONTRACT.getMarker(sloadContractBytecodeHash) == 0) {
             revert SloadContractBytecodeUnknown();
         }
 
-        bytes32 previoushHash;
-        assembly {
-            previoushHash := extcodehash(_addr)
-        }
+        bytes32 previoushHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_addr);
 
         // Just in case, double checking that the previous bytecode is known.
-        // It may be needed since `previoushHash` could be non-zero and unknown if it is
-        // equal to keccak(""). It is the case for used default accounts.
         if (KNOWN_CODE_STORAGE_CONTRACT.getMarker(previoushHash) == 0) {
             revert PreviousBytecodeUnknown();
         }

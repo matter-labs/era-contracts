@@ -1,25 +1,22 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
+import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
-import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {L2Message} from "contracts/common/Messaging.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
@@ -258,14 +255,14 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         vm.deal(currentUser, mintValue);
 
         currentToken.mint(currentUser, l2Value);
-        currentToken.approve(address(sharedBridge), l2Value);
+        currentToken.approve(address(addresses.sharedBridge), l2Value);
 
         bytes memory secondBridgeCallData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
         L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
             _chainId: currentChainId,
             _mintValue: mintValue,
             _secondBridgeValue: 0,
-            _secondBridgeAddress: address(sharedBridge),
+            _secondBridgeAddress: address(addresses.sharedBridge),
             _l2Value: 0,
             _l2GasLimit: l2GasLimit,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
@@ -273,7 +270,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = bridgehub.requestL2TransactionTwoBridges{value: mintValue}(requestTx);
+        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: mintValue}(requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -308,14 +305,14 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         vm.deal(currentUser, l2Value);
         uint256 mintValue = minRequiredGas;
         currentToken.mint(currentUser, mintValue);
-        currentToken.approve(address(sharedBridge), mintValue);
+        currentToken.approve(address(addresses.sharedBridge), mintValue);
 
         bytes memory secondBridgeCallData = abi.encode(ETH_TOKEN_ADDRESS, uint256(0), chainContracts[currentChainId]);
         L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
             _chainId: currentChainId,
             _mintValue: mintValue,
             _secondBridgeValue: l2Value,
-            _secondBridgeAddress: address(sharedBridge),
+            _secondBridgeAddress: address(addresses.sharedBridge),
             _l2Value: 0,
             _l2GasLimit: l2GasLimit,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
@@ -323,7 +320,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = bridgehub.requestL2TransactionTwoBridges{value: l2Value}(requestTx);
+        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: l2Value}(requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -360,17 +357,17 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         TestnetERC20Token baseToken = TestnetERC20Token(baseTokenAddress);
         baseToken.mint(currentUser, mintValue);
-        baseToken.approve(address(sharedBridge), mintValue);
+        baseToken.approve(address(addresses.sharedBridge), mintValue);
 
         currentToken.mint(currentUser, l2Value);
-        currentToken.approve(address(sharedBridge), l2Value);
+        currentToken.approve(address(addresses.sharedBridge), l2Value);
 
         bytes memory secondBridgeCallData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
         L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
             _chainId: currentChainId,
             _mintValue: mintValue,
             _secondBridgeValue: 0,
-            _secondBridgeAddress: address(sharedBridge),
+            _secondBridgeAddress: address(addresses.sharedBridge),
             _l2Value: 0,
             _l2GasLimit: l2GasLimit,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
@@ -378,7 +375,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = bridgehub.requestL2TransactionTwoBridges(requestTx);
+        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges(requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -423,7 +420,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = bridgehub.requestL2TransactionDirect{value: mintValue}(txRequest);
+        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionDirect{value: mintValue}(txRequest);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
@@ -454,7 +451,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         uint256 mintValue = l2Value + minRequiredGas;
         currentToken.mint(currentUser, mintValue);
-        currentToken.approve(address(sharedBridge), mintValue);
+        currentToken.approve(address(addresses.sharedBridge), mintValue);
 
         bytes memory callData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
         L2TransactionRequestDirect memory txRequest = _createL2TransactionRequestDirect({
@@ -467,7 +464,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = bridgehub.requestL2TransactionDirect(txRequest);
+        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionDirect(txRequest);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
@@ -489,8 +486,8 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         bytes32[] memory merkleProof = new bytes32[](1);
 
         _setSharedBridgeIsWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex, false);
-        uint256 beforeChainBalance = l1Nullifier.chainBalance(currentChainId, currentTokenAddress);
-        uint256 beforeBalance = currentToken.balanceOf(address(sharedBridge));
+        uint256 beforeChainBalance = addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress);
+        uint256 beforeBalance = currentToken.balanceOf(address(addresses.sharedBridge));
 
         if (beforeChainBalance < amountToWithdraw) {
             vm.expectRevert("L1AR: not enough funds 2");
@@ -512,7 +509,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.mockCall(
-            bridgehubProxyAddress,
+            addresses.bridgehubProxyAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 IBridgehub.proveL2MessageInclusion.selector,
@@ -525,7 +522,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             abi.encode(true)
         );
 
-        sharedBridge.finalizeWithdrawal({
+        addresses.sharedBridge.finalizeWithdrawal({
             _chainId: currentChainId,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -537,10 +534,10 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         // check if the balance was updated correctly
         if (beforeChainBalance > amountToWithdraw) {
             assertEq(
-                beforeChainBalance - l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
+                beforeChainBalance - addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
                 amountToWithdraw
             );
-            assertEq(beforeBalance - currentToken.balanceOf(address(sharedBridge)), amountToWithdraw);
+            assertEq(beforeBalance - currentToken.balanceOf(address(addresses.sharedBridge)), amountToWithdraw);
         }
     }
 
@@ -551,8 +548,8 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         bytes32[] memory merkleProof = new bytes32[](1);
 
         _setSharedBridgeIsWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex, false);
-        uint256 beforeChainBalance = l1Nullifier.chainBalance(currentChainId, currentTokenAddress);
-        uint256 beforeBalance = address(sharedBridge).balance;
+        uint256 beforeChainBalance = addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress);
+        uint256 beforeBalance = address(addresses.sharedBridge).balance;
 
         if (beforeChainBalance < amountToWithdraw) {
             vm.expectRevert("L1AR: not enough funds 2");
@@ -560,7 +557,11 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             tokenSumWithdrawal[currentTokenAddress] += amountToWithdraw;
         }
 
-        bytes memory message = abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, currentUser, amountToWithdraw);
+        bytes memory message = abi.encodePacked(
+            IMailboxImpl.finalizeEthWithdrawal.selector,
+            currentUser,
+            amountToWithdraw
+        );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -568,7 +569,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         });
 
         vm.mockCall(
-            bridgehubProxyAddress,
+            addresses.bridgehubProxyAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 IBridgehub.proveL2MessageInclusion.selector,
@@ -581,7 +582,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             abi.encode(true)
         );
 
-        sharedBridge.finalizeWithdrawal({
+        addresses.sharedBridge.finalizeWithdrawal({
             _chainId: currentChainId,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -593,10 +594,10 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         // check if the balance was updated correctly
         if (beforeChainBalance > amountToWithdraw) {
             assertEq(
-                beforeChainBalance - l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
+                beforeChainBalance - addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
                 amountToWithdraw
             );
-            assertEq(beforeBalance - address(sharedBridge).balance, amountToWithdraw);
+            assertEq(beforeBalance - address(addresses.sharedBridge).balance, amountToWithdraw);
         }
     }
 
@@ -646,8 +647,8 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
     }
 
     function getAddressesToExclude() public returns (address[] memory) {
-        addressesToExclude.push(bridgehubProxyAddress);
-        addressesToExclude.push(address(sharedBridge));
+        addressesToExclude.push(addresses.bridgehubProxyAddress);
+        addressesToExclude.push(address(addresses.sharedBridge));
 
         for (uint256 i = 0; i < users.length; i++) {
             addressesToExclude.push(users[i]);

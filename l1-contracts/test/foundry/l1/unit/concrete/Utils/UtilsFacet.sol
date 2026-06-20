@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {FeeParams, IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
@@ -70,6 +69,14 @@ contract UtilsFacet is ZKChainBase {
 
     function util_getL2DefaultAccountBytecodeHash() external view returns (bytes32) {
         return s.l2DefaultAccountBytecodeHash;
+    }
+
+    function util_setL2EvmEmulatorBytecodeHash(bytes32 _l2EvmEmulatorBytecodeHash) external {
+        s.l2EvmEmulatorBytecodeHash = _l2EvmEmulatorBytecodeHash;
+    }
+
+    function util_getL2EvmEmulatorBytecodeHash() external view returns (bytes32) {
+        return s.l2EvmEmulatorBytecodeHash;
     }
 
     function util_setPendingAdmin(address _pendingAdmin) external {
@@ -164,6 +171,18 @@ contract UtilsFacet is ZKChainBase {
 
     function util_setBaseTokenGasPriceMultiplierNominator(uint128 _nominator) external {
         s.baseTokenGasPriceMultiplierNominator = _nominator;
+    }
+
+    function util_setTotalBatchesCommitted(uint256 _totalBatchesCommitted) external {
+        s.totalBatchesCommitted = _totalBatchesCommitted;
+    }
+
+    function util_getBaseTokenGasPriceMultiplierDenominator() external view returns (uint128) {
+        return s.baseTokenGasPriceMultiplierDenominator;
+    }
+
+    function util_getBaseTokenGasPriceMultiplierNominator() external view returns (uint128) {
+        return s.baseTokenGasPriceMultiplierNominator;
     }
 
     // add this to be excluded from coverage report

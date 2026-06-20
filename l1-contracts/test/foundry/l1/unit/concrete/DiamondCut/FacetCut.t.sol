@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {Utils} from "../Utils/Utils.sol";
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
@@ -9,7 +9,7 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {ReplaceFunctionFacetAddressZero, RemoveFunctionFacetAddressNotZero, FacetExists, SelectorsMustAllHaveSameFreezability, AddressHasNoCode, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {AddressHasNoCode, FacetExists, NoFunctionsForDiamondCut, RemoveFunctionFacetAddressNotZero, RemoveFunctionFacetAddressZero, ReplaceFunctionFacetAddressZero, SelectorsMustAllHaveSameFreezability, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract FacetCutTest is DiamondCutTest {
     MailboxFacet private mailboxFacet;
@@ -20,10 +20,11 @@ contract FacetCutTest is DiamondCutTest {
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](4);
-        selectors[0] = executorFacet1.commitBatchesSharedBridge.selector;
-        selectors[1] = executorFacet1.proveBatchesSharedBridge.selector;
-        selectors[2] = executorFacet1.executeBatchesSharedBridge.selector;
-        selectors[3] = executorFacet1.revertBatchesSharedBridge.selector;
+        uint256 i = 0;
+        selectors[i++] = executorFacet1.commitBatchesSharedBridge.selector;
+        selectors[i++] = executorFacet1.proveBatchesSharedBridge.selector;
+        selectors[i++] = executorFacet1.executeBatchesSharedBridge.selector;
+        selectors[i++] = executorFacet1.revertBatchesSharedBridge.selector;
         return selectors;
     }
 
@@ -70,6 +71,25 @@ contract FacetCutTest is DiamondCutTest {
         uint256 numOfFacetsAfter = diamondCutTestContract.facetAddresses().length;
 
         assertEq(numOfFacetsBefore + facetCuts.length, numOfFacetsAfter, "wrong number of facets added");
+    }
+
+    function test_revertWhen_NoFunctionsForDiamondCut() public {
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: address(0),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: new bytes4[](0)
+        });
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(0),
+            initCalldata: bytes("")
+        });
+
+        vm.expectRevert(NoFunctionsForDiamondCut.selector);
+        diamondCutTestContract.diamondCut(diamondCutData);
     }
 
     function test_RevertWhen_AddingFacetToOccupiedSelector() public {
@@ -149,6 +169,25 @@ contract FacetCutTest is DiamondCutTest {
         });
 
         vm.expectRevert(abi.encodeWithSelector(RemoveFunctionFacetAddressNotZero.selector, address(mailboxFacet)));
+        diamondCutTestContract.diamondCut(diamondCutData);
+    }
+
+    function test_RevertWhen_RemovingFacetWithOldFacetAddressAsZero() public {
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: address(0),
+            action: Diamond.Action.Remove,
+            isFreezable: false,
+            selectors: Utils.getMailboxSelectors()
+        });
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(0),
+            initCalldata: bytes("")
+        });
+
+        vm.expectRevert(RemoveFunctionFacetAddressZero.selector);
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
@@ -15,14 +15,15 @@ import {NativeTokenVault} from "./NativeTokenVault.sol";
 
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
+import {IL2AssetRouter} from "../asset-router/IL2AssetRouter.sol";
 
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
-import {L2ContractHelper, IContractDeployer} from "../../common/libraries/L2ContractHelper.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {IContractDeployer, L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 
-import {SystemContractsCaller} from "../../common/libraries/SystemContractsCaller.sol";
+import {SystemContractsCaller} from "../../common/l2-helpers/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {AddressMismatch, AssetIdAlreadyRegistered, AssetIdNotSupported, DeployFailed, EmptyAddress, EmptyBytes32, NoLegacySharedBridge, TokenIsLegacy, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -34,7 +35,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     IL2SharedBridgeLegacy public immutable L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
-    bytes32 internal immutable L2_TOKEN_PROXY_BYTECODE_HASH;
+    bytes32 public immutable L2_TOKEN_PROXY_BYTECODE_HASH;
 
     /// @notice Initializes the bridge contract for later use.
     /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy.
@@ -83,13 +84,48 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
     }
 
+    function _registerTokenIfBridgedLegacy(address _tokenAddress) internal override returns (bytes32) {
+        // In zkEVM immutables are stored in a storage of a system contract,
+        // so it makes sense to cache them for efficiency.
+        IL2SharedBridgeLegacy legacyBridge = L2_LEGACY_SHARED_BRIDGE;
+        if (address(legacyBridge) == address(0)) {
+            // No legacy bridge, the token must be native
+            return bytes32(0);
+        }
+
+        address l1TokenAddress = legacyBridge.l1TokenAddress(_tokenAddress);
+        if (l1TokenAddress == address(0)) {
+            // The token is not legacy
+            return bytes32(0);
+        }
+
+        return _registerLegacyTokenAssetId(_tokenAddress, l1TokenAddress);
+    }
+
     /// @notice Sets the legacy token asset ID for the given L2 token address.
-    function setLegacyTokenAssetId(address _l2TokenAddress) public {
+    function setLegacyTokenAssetId(address _l2TokenAddress) public override {
+        // some legacy tokens were bridged without setting the originChainId on testnets
+        bytes32 assetId = assetId[_l2TokenAddress];
+        if (assetId != bytes32(0) && originChainId[assetId] != 0) {
+            revert AssetIdAlreadyRegistered();
+        }
+        if (address(L2_LEGACY_SHARED_BRIDGE) == address(0)) {
+            revert NoLegacySharedBridge();
+        }
         address l1TokenAddress = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_l2TokenAddress);
         if (l1TokenAddress == address(0)) {
-            revert ZeroAddress();
+            revert TokenNotLegacy();
         }
-        bytes32 newAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress);
+
+        _registerLegacyTokenAssetId(_l2TokenAddress, l1TokenAddress);
+    }
+
+    function _registerLegacyTokenAssetId(
+        address _l2TokenAddress,
+        address _l1TokenAddress
+    ) internal returns (bytes32 newAssetId) {
+        newAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1TokenAddress);
+        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).setLegacyTokenAssetHandler(newAssetId);
         tokenAddress[newAssetId] = _l2TokenAddress;
         assetId[_l2TokenAddress] = newAssetId;
         originChainId[newAssetId] = L1_CHAIN_ID;
@@ -146,6 +182,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
 
         tokenAddress[_assetId] = _expectedToken;
         assetId[_expectedToken] = _assetId;
+        originChainId[_assetId] = L1_CHAIN_ID;
     }
 
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
@@ -197,18 +234,18 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Calculates L2 wrapped token address given the currently stored beacon proxy bytecode hash and beacon address.
-    /// @param _originChainId The chain id of the origin token.
-    /// @param _nonNativeToken The address of token on its origin chain..
+    /// @param _tokenOriginChainId The chain id of the origin token.
+    /// @param _nonNativeToken The address of token on its origin chain.
     /// @return Address of an L2 token counterpart.
     function calculateCreate2TokenAddress(
-        uint256 _originChainId,
+        uint256 _tokenOriginChainId,
         address _nonNativeToken
     ) public view virtual override(INativeTokenVault, NativeTokenVault) returns (address) {
-        if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
+        if (address(L2_LEGACY_SHARED_BRIDGE) != address(0) && _tokenOriginChainId == L1_CHAIN_ID) {
             return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_nonNativeToken);
         } else {
             bytes32 constructorInputHash = keccak256(abi.encode(address(bridgedTokenBeacon), ""));
-            bytes32 salt = _getCreate2Salt(_originChainId, _nonNativeToken);
+            bytes32 salt = _getCreate2Salt(_tokenOriginChainId, _nonNativeToken);
             return
                 L2ContractHelper.computeCreate2Address(
                     address(this),
@@ -245,6 +282,17 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         bool _isNative
     ) internal override {
         // on L2s we don't track the balance
+    }
+
+    function _registerToken(address _nativeToken) internal override returns (bytes32) {
+        if (
+            address(L2_LEGACY_SHARED_BRIDGE) != address(0) &&
+            L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_nativeToken) != address(0)
+        ) {
+            // Legacy tokens should be registered via `setLegacyTokenAssetId`.
+            revert TokenIsLegacy();
+        }
+        return super._registerToken(_nativeToken);
     }
 
     /*//////////////////////////////////////////////////////////////

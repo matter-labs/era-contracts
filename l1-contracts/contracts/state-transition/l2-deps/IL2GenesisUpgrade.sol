@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 /// @notice A struct that describes a forced deployment on an address
 struct ForceDeployment {
@@ -25,6 +25,30 @@ struct ZKChainSpecificForceDeploymentsData {
     /// needed to deploy weth token in case it is not present
     string baseTokenName;
     string baseTokenSymbol;
+}
+
+/// @notice The structure that describes force deployments that are the same for each chain.
+/// @dev Note, that for simplicity, the same struct is used both for upgrading to the
+/// Gateway version and for the Genesis. Some fields may not be used in either of those.
+// solhint-disable-next-line gas-struct-packing
+struct FixedForceDeploymentsData {
+    uint256 l1ChainId;
+    uint256 eraChainId;
+    address l1AssetRouter;
+    bytes32 l2TokenProxyBytecodeHash;
+    address aliasedL1Governance;
+    uint256 maxNumberOfZKChains;
+    bytes32 bridgehubBytecodeHash;
+    bytes32 l2AssetRouterBytecodeHash;
+    bytes32 l2NtvBytecodeHash;
+    bytes32 messageRootBytecodeHash;
+    bytes32 chainAssetHandlerBytecodeHash;
+    address l2SharedBridgeLegacyImpl;
+    address l2BridgedStandardERC20Impl;
+    // The forced beacon address. It is needed only for internal testing.
+    // MUST be equal to 0 in production.
+    // It will be the job of the governance to ensure that this value is set correctly.
+    address dangerousTestOnlyForcedBeacon;
 }
 
 /// @author Matter Labs

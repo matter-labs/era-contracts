@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 
-import {ZeroAddress, TimerAlreadyStarted, CallerNotTimerAdmin, DeadlineNotYetPassed, NewDeadlineNotGreaterThanCurrent, NewDeadlineExceedsMaxDeadline} from "contracts/common/L1ContractErrors.sol";
+import {CallerNotTimerAdmin, DeadlineNotYetPassed, NewDeadlineExceedsMaxDeadline, NewDeadlineNotGreaterThanCurrent, TimerAlreadyStarted, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract GovernanceUpgradeTimerTest is Test {
     // Instance of the contract under test

@@ -29,6 +29,7 @@ import {
   packSemver,
   readBatchBootloaderBytecode,
   readSystemContractsBytecode,
+  readEvmEmulatorbytecode,
   unpackStringSemVer,
   SYSTEM_CONFIG,
   // web3Provider,
@@ -81,6 +82,7 @@ import { RollupL1DAValidatorFactory } from "../../da-contracts/typechain/RollupL
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
+let L2_EVM_EMULATOR_BYTECODE_HASH: string;
 
 export interface DeployerConfig {
   deployWallet: Wallet | ZkWallet;
@@ -92,6 +94,7 @@ export interface DeployerConfig {
   deployedLogPrefix?: string;
   l1Deployer?: Deployer;
   l1ChainId?: string;
+  evmEmulatorBytecodeHash?: string;
 }
 
 export interface Operation {
@@ -125,6 +128,9 @@ export class Deployer {
     L2_DEFAULT_ACCOUNT_BYTECODE_HASH = config.defaultAccountBytecodeHash
       ? config.defaultAccountBytecodeHash
       : hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
+    L2_EVM_EMULATOR_BYTECODE_HASH = config.evmEmulatorBytecodeHash
+      ? config.evmEmulatorBytecodeHash
+      : hexlify(hashL2Bytecode(readEvmEmulatorbytecode()));
     this.ownerAddress = config.ownerAddress != null ? config.ownerAddress : this.deployWallet.address;
     this.chainId = parseInt(process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID!);
     this.l1ChainId = parseInt(config.l1ChainId || getNumberFromEnv("ETH_CLIENT_CHAIN_ID"));
@@ -154,8 +160,8 @@ export class Deployer {
       verifierParams,
       L2_BOOTLOADER_BYTECODE_HASH,
       L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+      L2_EVM_EMULATOR_BYTECODE_HASH,
       this.addresses.StateTransition.Verifier,
-      this.addresses.BlobVersionedHashRetriever,
       +priorityTxMaxGasLimit,
       this.addresses.StateTransition.DiamondInit,
       false
@@ -1122,7 +1128,7 @@ export class Deployer {
       console.log(`CONTRACTS_DEFAULT_UPGRADE_ADDR=${contractAddress}`);
     }
 
-    this.addresses.StateTransition.DefaultUpgrade = contractAddress;
+    this.addresses.stateTransition.defaultUpgrade = contractAddress;
   }
 
   public async deployZKChainsUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -1132,7 +1138,7 @@ export class Deployer {
       console.log(`CONTRACTS_ZK_CHAIN_UPGRADE_ADDR=${contractAddress}`);
     }
 
-    this.addresses.StateTransition.DefaultUpgrade = contractAddress;
+    this.addresses.stateTransition.defaultUpgrade = contractAddress;
   }
 
   public async deployGenesisUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -1667,6 +1673,17 @@ export class Deployer {
     }
   }
 
+  public async enableEvmEmulation() {
+    const stm = this.chainTypeManagerContract(this.deployWallet);
+    const diamondProxyAddress = await stm.getHyperchain(this.chainId);
+    const hyperchain = IZKChainFactory.connect(diamondProxyAddress, this.deployWallet);
+
+    const receipt = await (await hyperchain.allowEvmEmulation()).wait();
+    if (this.verbose) {
+      console.log(`EVM emulation allowed, gas used: ${receipt.gasUsed.toString()}`);
+    }
+  }
+
   public async transferAdminFromDeployerToChainAdmin() {
     const ctm = this.chainTypeManagerContract(this.deployWallet);
     const diamondProxyAddress = await ctm.getZKChain(this.chainId);
@@ -1780,39 +1797,6 @@ export class Deployer {
     this.addresses.RollupL1DAValidator = rollupDAValidatorAddress;
     this.addresses.ValidiumL1DAValidator = validiumDAValidatorAddress;
     this.addresses.RelayedSLDAValidator = relayedSLDAValidator;
-  }
-
-  public async updateBlobVersionedHashRetrieverZkMode() {
-    if (!this.isZkMode()) {
-      throw new Error("`updateBlobVersionedHashRetrieverZk` should be only called when deploying on zkSync network");
-    }
-
-    console.log("BlobVersionedHashRetriever is not needed within zkSync network and won't be deployed");
-
-    // 0 is not allowed, we need to some random non-zero value. Let it be 0x1000000000000000000000000000000000000001
-    console.log("CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR=0x1000000000000000000000000000000000000001");
-    this.addresses.BlobVersionedHashRetriever = "0x1000000000000000000000000000000000000001";
-  }
-
-  public async deployBlobVersionedHashRetriever(
-    create2Salt: string,
-    ethTxOptions: ethers.providers.TransactionRequest
-  ) {
-    // solc contracts/zksync/utils/blobVersionedHashRetriever.yul --strict-assembly --bin
-    const bytecode = "0x600b600b5f39600b5ff3fe5f358049805f5260205ff3";
-
-    const contractAddress = await this.deployBytecodeViaCreate2(
-      "BlobVersionedHashRetriever",
-      bytecode,
-      create2Salt,
-      ethTxOptions
-    );
-
-    if (this.verbose) {
-      console.log(`CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR=${contractAddress}`);
-    }
-
-    this.addresses.BlobVersionedHashRetriever = contractAddress;
   }
 
   public transparentUpgradableProxyContract(address, signerOrProvider: Signer | providers.Provider) {

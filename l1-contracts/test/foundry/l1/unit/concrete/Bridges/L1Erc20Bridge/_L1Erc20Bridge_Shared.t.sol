@@ -2,8 +2,7 @@
 
 pragma solidity ^0.8.21;
 
-import {StdStorage, stdStorage} from "forge-std/Test.sol";
-import {Test} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
@@ -35,7 +34,7 @@ contract L1Erc20BridgeTest is Test {
     constructor() {
         randomSigner = makeAddr("randomSigner");
         dummyL2DepositTxHash = Utils.randomBytes32("dummyL2DepositTxHash");
-        sharedBridgeAddress = makeAddr("sharedBridgeAddress");
+        sharedBridgeAddress = address(new DummySharedBridge(dummyL2DepositTxHash));
         alice = makeAddr("alice");
         l1NullifierAddress = makeAddr("l1NullifierAddress");
 

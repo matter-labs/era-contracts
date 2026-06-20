@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {Utils} from "../Utils/Utils.sol";
@@ -7,9 +7,9 @@ import {Utils} from "../Utils/Utils.sol";
 import {GovernanceTest} from "./_Governance_Shared.t.sol";
 
 import {IGovernance} from "contracts/governance/IGovernance.sol";
-import {OperationMustBeReady, OperationMustBePending, OperationExists, PreviousOperationNotExecuted, InvalidDelay} from "contracts/common/L1ContractErrors.sol";
+import {InvalidDelay, OperationExists, OperationMustBePending, OperationMustBeReady, PreviousOperationNotExecuted} from "contracts/common/L1ContractErrors.sol";
 
-contract ExecutingTest is GovernanceTest {
+contract ExecutingGovernanceTest is GovernanceTest {
     using stdStorage for StdStorage;
 
     function test_ScheduleTransparentAndExecute() public {

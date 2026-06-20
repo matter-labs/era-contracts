@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -11,6 +11,7 @@ contract setNewVersionUpgradeTest is ChainTypeManagerTest {
 
     function test_SettingNewVersionUpgrade() public {
         assertEq(chainContractAddress.protocolVersion(), 0, "Initial protocol version is not correct");
+        vm.mockCall(address(bridgehub), abi.encodeWithSelector(bridgehub.migrationPaused.selector), abi.encode(true));
 
         address randomDiamondInit = address(0x303030303030303030303);
         Diamond.DiamondCutData memory newDiamondCutData = getDiamondCutData(address(randomDiamondInit));

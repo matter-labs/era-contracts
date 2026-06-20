@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
-import {RegisterZKChainScript} from "deploy-scripts/RegisterZKChain.s.sol";
+import {Config as ChainConfig, RegisterZKChainScript} from "deploy-scripts/RegisterZKChain.s.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
@@ -12,8 +12,6 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-
-import {Config as ChainConfig} from "deploy-scripts/RegisterZKChain.s.sol";
 
 contract ZKChainDeployer is L1ContractDeployer {
     using stdStorage for StdStorage;
@@ -29,6 +27,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         address validatorSenderOperatorBlobsEth;
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
+        bool allowEvmEmulator;
     }
 
     ChainConfig internal eraConfig;
@@ -90,7 +89,8 @@ contract ZKChainDeployer is L1ContractDeployer {
             validatorSenderOperatorCommitEth: address(0),
             validatorSenderOperatorBlobsEth: address(1),
             baseTokenGasPriceMultiplierNominator: uint128(1),
-            baseTokenGasPriceMultiplierDenominator: uint128(1)
+            baseTokenGasPriceMultiplierDenominator: uint128(1),
+            allowEvmEmulator: false
         });
     }
 
@@ -127,6 +127,8 @@ contract ZKChainDeployer is L1ContractDeployer {
         vm.serializeUint("chain", "governance_min_delay", 0);
         vm.serializeAddress("chain", "governance_security_council_address", address(0));
 
+        vm.serializeBool("chain", "allow_evm_emulator", description.allowEvmEmulator);
+
         string memory single_serialized = vm.serializeUint(
             "chain",
             "base_token_gas_price_multiplier_denominator",
@@ -139,15 +141,15 @@ contract ZKChainDeployer is L1ContractDeployer {
     }
 
     function getZKChainAddress(uint256 _chainId) public view returns (address) {
-        return bridgehub.getZKChain(_chainId);
+        return addresses.bridgehub.getZKChain(_chainId);
     }
 
     function getZKChainBaseToken(uint256 _chainId) public view returns (address) {
-        return bridgehub.baseToken(_chainId);
+        return addresses.bridgehub.baseToken(_chainId);
     }
 
     function acceptPendingAdmin() public {
-        IZKChain chain = IZKChain(bridgehub.getZKChain(currentZKChainId - 1));
+        IZKChain chain = IZKChain(addresses.bridgehub.getZKChain(currentZKChainId - 1));
         address admin = chain.getPendingAdmin();
         vm.startBroadcast(admin);
         chain.acceptAdmin();

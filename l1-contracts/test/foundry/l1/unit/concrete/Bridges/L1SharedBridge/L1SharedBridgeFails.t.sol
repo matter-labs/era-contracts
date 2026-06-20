@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import "forge-std/console.sol";
 
@@ -14,17 +14,16 @@ import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
-import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
+import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {AddressAlreadyUsed, WithdrawFailed, Unauthorized, AssetIdNotSupported, SharedBridgeKey, SharedBridgeValueNotSet, L2WithdrawalMessageWrongLength, InsufficientChainBalance, ZeroAddress, ValueMismatch, NonEmptyMsgValue, DepositExists, ValueMismatch, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, InvalidProof, NoFundsTransferred, DepositDoesNotExist, WithdrawalAlreadyFinalized, InvalidSelector, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
+import {AddressAlreadySet, AssetIdNotSupported, BurningNativeWETHNotSupported, DepositDoesNotExist, DepositExists, EmptyDeposit, InsufficientChainBalance, InvalidProof, InvalidSelector, L2WithdrawalMessageWrongLength, NoFundsTransferred, NonEmptyMsgValue, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, WithdrawFailed, WithdrawalAlreadyFinalized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
-import {WrongCounterpart, EthTransferFailed, EmptyToken, NativeTokenVaultAlreadySet, ZeroAmountToTransfer, WrongAmountTransferred, ClaimFailedDepositFailed} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {ClaimFailedDepositFailed, EmptyToken, EthTransferFailed, NativeTokenVaultAlreadySet, WrongAmountTransferred, WrongCounterpart, ZeroAmountToTransfer} from "contracts/bridge/L1BridgeContractErrors.sol";
 
 /// We are testing all the specified revert and require cases.
 contract L1AssetRouterFailTest is L1AssetRouterTest {
@@ -75,7 +74,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     function test_setL1Erc20Bridge_alreadySet() public {
         address currentBridge = address(sharedBridge.legacyBridge());
         vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(AddressAlreadyUsed.selector, currentBridge));
+        vm.expectRevert(abi.encodeWithSelector(AddressAlreadySet.selector, currentBridge));
         sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(address(0)));
     }
 
@@ -111,7 +110,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_transferFundsToSharedBridge_Eth_CallFailed() public {
-        vm.mockCallRevert(address(nativeTokenVault), "", "eth transfer failed");
+        vm.mockCallRevert(address(nativeTokenVault), abi.encode(), "eth transfer failed");
         vm.prank(address(nativeTokenVault));
         vm.expectRevert(abi.encodeWithSelector(EthTransferFailed.selector));
         l1Nullifier.transferTokenToNTV(ETH_TOKEN_ADDRESS);
@@ -171,7 +170,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_bridgehubDeposit_Erc_weth() public {
         vm.prank(bridgehubAddress);
-        vm.expectRevert(abi.encodeWithSelector(TokenNotSupported.selector, l1WethAddress));
+        vm.expectRevert(BurningNativeWETHNotSupported.selector);
         // solhint-disable-next-line func-named-parameters
         sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(l1WethAddress, amount, bob));
     }
@@ -244,7 +243,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_finalizeWithdrawal_EthOnEth_withdrawalFailed() public {
         vm.deal(address(nativeTokenVault), 0);
-        bytes memory message = abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -278,7 +277,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_bridgeRecoverFailedTransfer_Eth_claimFailedDepositFailed() public {
         vm.deal(address(nativeTokenVault), 0);
-        bytes memory transferData = abi.encode(amount, alice);
+        bytes memory transferData = abi.encode(amount, alice, ETH_TOKEN_ADDRESS);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
@@ -357,7 +356,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.store(address(l1Nullifier), bytes32(isWithdrawalFinalizedStorageLocation - 5), bytes32(uint256(2)));
 
         uint256 l2BatchNumber = 0;
-        bytes memory transferData = abi.encode(amount, alice);
+        bytes memory transferData = abi.encode(amount, alice, ETH_TOKEN_ADDRESS);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(eraChainId, txHash, txDataHash);
         require(l1Nullifier.depositHappened(eraChainId, txHash) == txDataHash, "Deposit not set");
@@ -639,7 +638,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_finalizeWithdrawal_chainBalance() public {
-        bytes memory message = abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -673,7 +672,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_checkWithdrawal_wrongProof() public {
-        bytes memory message = abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -706,7 +705,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_parseL2WithdrawalMessage_wrongMsgLength() public {
-        bytes memory message = abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector);
+        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector);
 
         vm.expectRevert(abi.encodeWithSelector(L2WithdrawalMessageWrongLength.selector, message.length));
         sharedBridge.finalizeWithdrawal({
@@ -744,9 +743,9 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_parseL2WithdrawalMessage_wrongSelector() public {
         // notice that the selector is wrong
-        bytes memory message = abi.encodePacked(IMailbox.proveL2LogInclusion.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IMailboxImpl.proveL2LogInclusion.selector, alice, amount);
 
-        vm.expectRevert(abi.encodeWithSelector(InvalidSelector.selector, IMailbox.proveL2LogInclusion.selector));
+        vm.expectRevert(abi.encodeWithSelector(InvalidSelector.selector, IMailboxImpl.proveL2LogInclusion.selector));
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
             _l2BatchNumber: l2BatchNumber,

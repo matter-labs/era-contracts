@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
@@ -32,18 +32,26 @@ interface IAssetRouterBase {
         bytes bridgeMintCalldata
     );
 
-    event AssetHandlerRegisteredInitial(
+    event BridgehubWithdrawalInitiated(
+        uint256 chainId,
+        address indexed sender,
         bytes32 indexed assetId,
-        address indexed assetHandlerAddress,
+        bytes32 assetDataHash // Todo: What's the point of emitting hash?
+    );
+
+    event AssetDeploymentTrackerRegistered(
+        bytes32 indexed assetId,
         bytes32 indexed additionalData,
         address assetDeploymentTracker
     );
 
-    event AssetHandlerRegistered(bytes32 indexed assetId, address indexed _assetAddress);
+    event AssetHandlerRegistered(bytes32 indexed assetId, address indexed _assetHandlerAddress);
 
     event DepositFinalizedAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
     function BRIDGE_HUB() external view returns (IBridgehub);
+
+    function L1_CHAIN_ID() external view returns (uint256);
 
     /// @notice Sets the asset handler address for a specified asset ID on the chain of the asset deployment tracker.
     /// @dev The caller of this function is encoded within the `assetId`, therefore, it should be invoked by the asset deployment tracker contract.
@@ -62,5 +70,5 @@ interface IAssetRouterBase {
     /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
     /// @dev We have both the legacy finalizeWithdrawal and the new finalizeDeposit functions,
     /// finalizeDeposit uses the new format. On the L2 we have finalizeDeposit with new and old formats both.
-    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes memory _transferData) external;
+    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes memory _transferData) external payable;
 }

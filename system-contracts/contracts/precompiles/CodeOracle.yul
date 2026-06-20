@@ -29,7 +29,7 @@ object "CodeOracle" {
             ////////////////////////////////////////////////////////////////
             //                      HELPER FUNCTIONS
             ////////////////////////////////////////////////////////////////
-            
+
             /// @notice The function that returns whether a certain versioned hash is marked as `known`
             /// @param versionedHash The versioned hash to check
             /// @return Whether the versioned hash is known
@@ -90,7 +90,7 @@ object "CodeOracle" {
                     // Decommitment failed
                     revert(0,0)
                 }
-                
+
                 // The "real" result of the `decommit` operation is a pointer to the memory page where the data was unpacked.
                 // We do not know whether the data was unpacked into the memory of this contract or not.
                 //  
@@ -98,17 +98,41 @@ object "CodeOracle" {
                 // decommit operation into the `active` pointer. 
                 verbatim_0i_0o("decommit_ptr_to_active")
 
+                // To avoid the complexity of calculating the length of the preimage in circuits, the length of the pointer is always fixed to 2^21 bytes.
+                // So we need to shrink `active` pointer
+
                 // This operation is never expected to overflow since the `lenInWords` is at most 2 bytes long.
                 let lenInBytes := mul(lenInWords, 32) 
 
-                // To avoid the complexity of calculating the length of the preimage in circuits, the length of the pointer is always fixed to 2^21 bytes.
-                // So the amount of data actually copied is determined here.
-                // Note, that here we overwrite the first `lenInBytes` bytes of the memory, but it is fine since the written values are equivalent
-                // to the bytes previously written there by the `decommit` operation (in case this is the first page where the decommit happened).
-                // In the future we won't do this and simply return the pointer returned by the `decommit` operation, shrunk to the `lenInBytes` length.
-                verbatim_3i_0o("active_ptr_data_copy", 0, 0, lenInBytes)
+                // Get the actual size of active pointer
+                let activePtrSize := verbatim_0i_1o("active_ptr_data_size")
+                
+                if gt(lenInBytes, activePtrSize) {
+                    // Should never happen, means that we have invalid versioned bytecode hash
+                    revert(0,0)            
+                }
 
-                return(0, lenInBytes)
+                // Truncate length of preimage pointer
+                if gt(activePtrSize, lenInBytes) {
+                    // Transforms `ACTIVE_PTR.length` into `ACTIVE_PTR.length - u32(_shrink)`. If underflow happens then it panics.
+                    verbatim_1i_0o("active_ptr_shrink_assign", sub(activePtrSize, lenInBytes))
+                }
+
+                // Return from the contract forwarding `active` pointer
+                verbatim_0i_0o("active_ptr_return_forward")
+            }
+
+            function paddedBytecodeLen(len) -> blobLen {
+                blobLen := len
+    
+                if mod(blobLen, 32) {
+                    blobLen := add(blobLen, sub(32, mod(blobLen, 32)))
+                }
+    
+                // Now it is divisible by 32, but we must make sure that the number of 32 byte words is odd
+                if iszero(mod(blobLen, 64)) {
+                    blobLen := add(blobLen, 32)
+                }
             }
 
             ////////////////////////////////////////////////////////////////
@@ -123,15 +147,21 @@ object "CodeOracle" {
             }
 
             let version := shr(248, versionedCodeHash)
-            // Currently, only a single version of the code hash is supported:
+            // Currently, two versions of the code hash is supported:
             // 1. The standard zkEVM bytecode. It has the following format:
             //   - hash[0] -- version (0x01)
             //   - hash[1] -- whether the contract is being constructed
             //   - hash[2..3] -- big endian length of the bytecode in 32-byte words. This number must be odd.
             //   - hash[4..31] -- the last 28 bytes of the sha256 hash.
+            // 2. EVM bytecode. It has the following format:
+            //   - hash[0] -- version (0x02)
+            //   - hash[1] -- whether the contract is being constructed
+            //   - hash[2..3] -- big endian length of the bytecode in bytes. This number can be arbitrary.
+            //   - hash[4..31] -- the last 28 bytes of the sha256 hash.
             // 
-            // Note, that in theory it can represent just some random blob of bytes, while 
-            // in practice it only represents only the corresponding bytecodes.
+            // Note, that in theory both values can represent just some random blob of bytes, while 
+            // in practice they only represent only the corresponding bytecodes.
+
 
             switch version 
             case 1 {
@@ -139,6 +169,12 @@ object "CodeOracle" {
                 // can pass the `isCodeHashKnown` check.
                 let lengthInWords := and(shr(224, versionedCodeHash), 0xffff)
                 decommit(versionedCodeHash, lengthInWords)
+            }
+            case 2 {
+                let lengthInBytes := and(shr(224, versionedCodeHash), 0xffff)
+                let paddedLengthInBytes := paddedBytecodeLen(lengthInBytes)
+
+                decommit(versionedCodeHash, shr(5, paddedLengthInBytes))
             }
             default {
                 // Unsupported

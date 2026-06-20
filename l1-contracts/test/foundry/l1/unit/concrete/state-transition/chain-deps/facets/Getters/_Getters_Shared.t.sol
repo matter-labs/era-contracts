@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
@@ -7,11 +7,10 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "contracts/state-transition/chain-interfaces/ILegacyGetters.sol";
-import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {PriorityOperation} from "contracts/state-transition/libraries/PriorityQueue.sol";
-import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
-contract GettersFacetWrapper is GettersFacet {
+contract GettersFacetWrapper is GettersFacet, Test {
     function util_setVerifier(address _verifier) external {
         s.verifier = IVerifier(_verifier);
     }
@@ -81,6 +80,10 @@ contract GettersFacetWrapper is GettersFacet {
 
     function util_setL2DefaultAccountBytecodeHash(bytes32 _l2DefaultAccountBytecodeHash) external {
         s.l2DefaultAccountBytecodeHash = _l2DefaultAccountBytecodeHash;
+    }
+
+    function utils_setL2EvmEmulatorBytecodeHash(bytes32 _l2EvmEmulatorBytecodeHash) external {
+        s.l2EvmEmulatorBytecodeHash = _l2EvmEmulatorBytecodeHash;
     }
 
     function util_setVerifierParams(VerifierParams memory _verifierParams) external {
@@ -163,6 +166,9 @@ contract GettersFacetWrapper is GettersFacet {
         Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
         ds.selectorToFacet[_selector].facetAddress = _facet;
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }
 
 contract GettersFacetTest is Test {

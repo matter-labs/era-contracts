@@ -47,13 +47,16 @@ interface IAdmin is IZKChainBase {
     /// @notice Set the transaction filterer
     function setTransactionFilterer(address _transactionFilterer) external;
 
+    /// @notice Allow EVM emulation on chain
+    function allowEvmEmulation() external returns (bytes32 canonicalTxHash);
+
     /// @notice Perform the upgrade from the current protocol version with the corresponding upgrade data
     /// @param _protocolVersion The current protocol version from which upgrade is executed
     /// @param _cutData The diamond cut parameters that is executed in the upgrade
     function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
 
     /// @notice Executes a proposed governor upgrade
-    /// @dev Only the current admin can execute the upgrade
+    /// @dev Only the ChainTypeManager contract can execute the upgrade
     /// @param _diamondCut The diamond cut parameters to be executed
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
 
@@ -62,7 +65,7 @@ interface IAdmin is IZKChainBase {
     function freezeDiamond() external;
 
     /// @notice Unpause the functionality of all freezable facets & their selectors
-    /// @dev Both the admin and the CTM can unfreeze Diamond Proxy
+    /// @dev Only the CTM can unfreeze Diamond Proxy
     function unfreezeDiamond() external;
 
     function genesisUpgrade(
@@ -71,6 +74,9 @@ interface IAdmin is IZKChainBase {
         bytes calldata _forceDeploymentData,
         bytes[] calldata _factoryDeps
     ) external;
+
+    /// @notice Returns address of the RollupDAManager of the ZK Chain.
+    function getRollupDAManager() external view returns (address);
 
     /// @notice Set the L1 DA validator address as well as the L2 DA validator address.
     /// @dev While in principle it is possible that updating only one of the addresses is needed,
@@ -107,7 +113,7 @@ interface IAdmin is IZKChainBase {
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
 
     /// @notice Validium mode status changed
-    event ValidiumModeStatusUpdate(PubdataPricingMode validiumMode);
+    event PubdataPricingModeUpdate(PubdataPricingMode validiumMode);
 
     /// @notice The transaction filterer has been updated
     event NewTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);
@@ -131,6 +137,9 @@ interface IAdmin is IZKChainBase {
 
     /// @notice Emitted when the contract is unfrozen.
     event Unfreeze();
+
+    /// @notice The EVM emulator has been enabled
+    event EnableEvmEmulator();
 
     /// @notice New pair of DA validators set
     event NewL2DAValidator(address indexed oldL2DAValidator, address indexed newL2DAValidator);

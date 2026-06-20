@@ -146,27 +146,6 @@ describe("L2BaseToken tests", () => {
     });
   });
 
-  describe("name", () => {
-    it("correct name", async () => {
-      const name = await L2BaseToken.name();
-      expect(name).to.equal("Ether");
-    });
-  });
-
-  describe("symbol", () => {
-    it("correct symbol", async () => {
-      const symbol = await L2BaseToken.symbol();
-      expect(symbol).to.equal("ETH");
-    });
-  });
-
-  describe("decimals", () => {
-    it("correct decimals", async () => {
-      const decimals = await L2BaseToken.decimals();
-      expect(decimals).to.equal(18);
-    });
-  });
-
   describe("withdraw", () => {
     it("event, balance, totalsupply", async () => {
       const amountToWithdraw: BigNumber = ethers.utils.parseEther("1.0");

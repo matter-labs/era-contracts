@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {TransactionValidatorSharedTest} from "./_TransactionValidator_Shared.t.sol";
 
@@ -42,6 +42,22 @@ contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
         // Value must be 0 - otherwise we revert.
         testTx.value = 1;
         vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Value));
+        TransactionValidator.validateUpgradeTransaction(testTx);
+    }
+
+    function test_RevertWhen_MaxFeePerGasIsNotZero() public {
+        L2CanonicalTransaction memory testTx = createUpgradeTransaction();
+        // MaxFeePerGas must be 0 - otherwise we revert.
+        testTx.maxFeePerGas = 1;
+        vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.MaxFeePerGas));
+        TransactionValidator.validateUpgradeTransaction(testTx);
+    }
+
+    function test_RevertWhen_MaxPriorityFeePerGasIsNotZero() public {
+        L2CanonicalTransaction memory testTx = createUpgradeTransaction();
+        // MaxPriorityFeePerGas must be 0 - otherwise we revert.
+        testTx.maxPriorityFeePerGas = 1;
+        vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.MaxPriorityFeePerGas));
         TransactionValidator.validateUpgradeTransaction(testTx);
     }
 

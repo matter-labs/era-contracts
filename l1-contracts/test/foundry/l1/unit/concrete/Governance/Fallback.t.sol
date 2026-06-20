@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {GovernanceTest} from "./_Governance_Shared.t.sol";
 
-contract ExecutingTest is GovernanceTest {
+contract ExecutingGovernanceUnitTest is GovernanceTest {
     function test_SendEtherToGovernance() public {
         startHoax(randomSigner);
         payable(address(governance)).transfer(100);

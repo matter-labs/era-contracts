@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
@@ -8,13 +8,11 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {PubdataPricingMode} from "../ZKChainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
-import {InvalidSelector} from "../../../common/L1ContractErrors.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -25,7 +23,6 @@ import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 /// @custom:security-contact security@matterlabs.dev
 contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     using UncheckedMath for uint256;
-    using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZKChainBase
@@ -117,11 +114,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getFirstUnprocessedPriorityTx() external view returns (uint256) {
-        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
-            return s.priorityTree.getFirstUnprocessedPriorityTx();
-        } else {
-            return s.priorityQueue.getFirstUnprocessedPriorityTx();
-        }
+        return s.priorityTree.getFirstUnprocessedPriorityTx();
     }
 
     /// @inheritdoc IGetters
@@ -131,11 +124,12 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getPriorityQueueSize() external view returns (uint256) {
-        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
-            return s.priorityTree.getSize();
-        } else {
-            return s.priorityQueue.getSize();
-        }
+        return s.priorityTree.getSize();
+    }
+
+    /// @inheritdoc IGetters
+    function isPriorityQueueActive() external view returns (bool) {
+        return _isPriorityQueueActive();
     }
 
     /// @inheritdoc IGetters
@@ -161,6 +155,11 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     /// @inheritdoc IGetters
     function getL2DefaultAccountBytecodeHash() external view returns (bytes32) {
         return s.l2DefaultAccountBytecodeHash;
+    }
+
+    /// @inheritdoc IGetters
+    function getL2EvmEmulatorBytecodeHash() external view returns (bytes32) {
+        return s.l2EvmEmulatorBytecodeHash;
     }
 
     /// @inheritdoc IGetters
@@ -217,7 +216,8 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     function isFunctionFreezable(bytes4 _selector) external view returns (bool) {
         Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
         if (ds.selectorToFacet[_selector].facetAddress == address(0)) {
-            revert InvalidSelector(_selector);
+            // The function does not exist
+            return false;
         }
         return ds.selectorToFacet[_selector].isFreezable;
     }

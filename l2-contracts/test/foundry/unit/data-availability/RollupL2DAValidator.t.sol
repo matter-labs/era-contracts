@@ -10,7 +10,7 @@ import {TestStateDiffComposer} from "./TestStateDiffComposer.sol";
 
 import {RollupL2DAValidator} from "contracts/data-availability/RollupL2DAValidator.sol";
 import {STATE_DIFF_ENTRY_SIZE} from "contracts/data-availability/StateDiffL2DAValidator.sol";
-import {ReconstructionMismatch, PubdataField} from "contracts/data-availability/DAErrors.sol";
+import {PubdataField, ReconstructionMismatch} from "contracts/data-availability/DAErrors.sol";
 
 import {COMPRESSOR_CONTRACT, PUBDATA_CHUNK_PUBLISHER} from "contracts/L2ContractHelper.sol";
 

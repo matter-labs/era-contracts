@@ -14,11 +14,14 @@ import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 /// @param validatorTimelock The address that serves as consensus, i.e. can submit blocks to be processed
 /// @param chainCreationParams The struct that contains the fields that define how a new chain should be created
 /// @param protocolVersion The initial protocol version on the newly deployed chain
+/// @param serverNotifier The address that serves as server notifier
+// solhint-disable-next-line gas-struct-packing
 struct ChainTypeManagerInitializeData {
     address owner;
     address validatorTimelock;
     ChainCreationParams chainCreationParams;
     uint256 protocolVersion;
+    address serverNotifier;
 }
 
 /// @notice The struct that contains the fields that define how a new chain should be created
@@ -59,13 +62,24 @@ interface IChainTypeManager {
     /// @notice ValidatorTimelock changed
     event NewValidatorTimelock(address indexed oldValidatorTimelock, address indexed newValidatorTimelock);
 
+    /// @notice ValidatorTimelockPostV29 changed
+    event NewValidatorTimelockPostV29(
+        address indexed oldValidatorTimelockPostV29,
+        address indexed newvalidatorTimelockPostV29
+    );
+
+    /// @notice ServerNotifier changed
+    event NewServerNotifier(address indexed oldServerNotifier, address indexed newServerNotifier);
+
     /// @notice chain creation parameters changed
     event NewChainCreationParams(
         address genesisUpgrade,
         bytes32 genesisBatchHash,
         uint64 genesisIndexRepeatedStorageChanges,
         bytes32 genesisBatchCommitment,
+        Diamond.DiamondCutData newInitialCut,
         bytes32 newInitialCutHash,
+        bytes forceDeploymentsData,
         bytes32 forceDeploymentHash
     );
 
@@ -111,7 +125,9 @@ interface IChainTypeManager {
 
     function initialize(ChainTypeManagerInitializeData calldata _initializeData) external;
 
-    function setValidatorTimelock(address _validatorTimelock) external;
+    function setLegacyValidatorTimelock(address _validatorTimelock) external;
+
+    function setValidatorTimelockPostV29(address _validatorTimelockPostV29) external;
 
     function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external;
 
