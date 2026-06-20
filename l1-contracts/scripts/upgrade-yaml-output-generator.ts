@@ -52,7 +52,6 @@ async function main() {
   // Convert the final object into YAML and output it.
   const yamlOutput = stringify(outputToml, { lineWidth: -1 });
   await fs.writeFile(YAML_OUTPUT_FILE, yamlOutput);
-  console.log(yamlOutput);
 }
 
 main().catch((err) => {

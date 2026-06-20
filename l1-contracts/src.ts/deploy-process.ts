@@ -90,11 +90,6 @@ export async function initialBridgehubDeployment(
     await deployer.setParametersSharedBridge();
   }
 
-  if (deployer.isZkMode()) {
-    await deployer.updateBlobVersionedHashRetrieverZkMode();
-  } else {
-    await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
-  }
   await deployer.deployChainTypeManagerContract(create2Salt, extraFacets, gasPrice);
   await deployer.setChainTypeManagerInValidatorTimelock({ gasPrice });
 }

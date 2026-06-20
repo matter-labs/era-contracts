@@ -4,6 +4,16 @@ This directory is used to create actual payloads for upgrades.
 
 It contains the $ECOSYSTEM_NAME.toml file with the input data, that is later fed into EcosystemUpgrade.s.sol, which publishes the necessary bytecodes, and creates the output data that ends out in outputs/ dir.
 
+## Naming Convention
+
+The YAML files under the `output/` directory contain critical upgrade information. New files should follow the naming convention `upgrade-envs/<UPGRADE_NAME>/output/<ENVIRONMENT>/<VERSION>-ecosystem.yaml`, where:
+
+- `UPGRADE_NAME` is the full name of the upgrade (e.g. `v0.28.0-precompiles`, or `v0.29.1-interopA-ff`)
+- `ENVIRONMENT` is the environment of the upgrade (e.g. `stage`, `testnet`, `mainnet`)
+- `VERSION` is the version of the upgrade (e.g. `v28`, or `v29.1`)
+
+For example, the YAML file for the v30.0 upgrade in the stage environment should be named something like `upgrade-envs/v0.30.0-interopB/output/stage/v30.0-ecosystem.yaml`.
+
 ## Generating inputs
 
 Inputs should be generated manually, and are usually a combination of things

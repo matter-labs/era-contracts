@@ -13,7 +13,7 @@ import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {Utils, ChainInfoFromBridgehub} from "./Utils.sol";
+import {ChainInfoFromBridgehub, Utils} from "./Utils.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -24,10 +24,11 @@ import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainS
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
+import {BridgehubBurnCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
@@ -60,6 +61,36 @@ contract AdminFunctions is Script {
             _value: 0,
             _delay: 0
         });
+    }
+
+    // This function should be called by governance to accept ownership of all core contracts
+    // Only accepts ownership for contracts that have pendingOwner set to governance
+    function governanceAcceptOwnerAggregated(address governor, address bridgehub) public {
+        // Query contract addresses from bridgehub
+        address assetRouter = IBridgehub(bridgehub).assetRouter();
+        address chainAssetHandler = IBridgehub(bridgehub).chainAssetHandler();
+        address ctmDeploymentTracker = address(IBridgehub(bridgehub).l1CtmDeployer());
+
+        // Query l1Nullifier from assetRouter
+        IL1AssetRouter assetRouterContract = IL1AssetRouter(assetRouter);
+        address l1Nullifier = address(assetRouterContract.L1_NULLIFIER());
+
+        // Accept ownership only for contracts with pending ownership
+        if (Ownable2Step(bridgehub).pendingOwner() == governor) {
+            governanceAcceptOwner(governor, bridgehub);
+        }
+        if (Ownable2Step(assetRouter).pendingOwner() == governor) {
+            governanceAcceptOwner(governor, assetRouter);
+        }
+        if (Ownable2Step(l1Nullifier).pendingOwner() == governor) {
+            governanceAcceptOwner(governor, l1Nullifier);
+        }
+        if (Ownable2Step(ctmDeploymentTracker).pendingOwner() == governor) {
+            governanceAcceptOwner(governor, ctmDeploymentTracker);
+        }
+        if (Ownable2Step(chainAssetHandler).pendingOwner() == governor) {
+            governanceAcceptOwner(governor, chainAssetHandler);
+        }
     }
 
     // This function should be called by the owner to accept the admin role
@@ -141,6 +172,11 @@ contract AdminFunctions is Script {
         Utils.executeCalls(governanceAddr, bytes32(0), 0, calls);
     }
 
+    function ecosystemAdminExecuteCalls(bytes memory callsToExecute, address ecosystemAdminAddr) public {
+        Call[] memory calls = abi.decode(callsToExecute, (Call[]));
+        saveAndSendAdminTx(ecosystemAdminAddr, calls, true);
+    }
+
     function adminEncodeMulticall(bytes memory callsToExecute) external {
         Call[] memory calls = abi.decode(callsToExecute, (Call[]));
 
@@ -182,26 +218,6 @@ contract AdminFunctions is Script {
         );
     }
 
-    function setDAValidatorPair(
-        ChainAdmin chainAdmin,
-        address target,
-        address l1DaValidator,
-        address l2DaValidator
-    ) public {
-        IZKChain adminContract = IZKChain(target);
-
-        Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: target,
-            value: 0,
-            data: abi.encodeCall(adminContract.setDAValidatorPair, (l1DaValidator, l2DaValidator))
-        });
-
-        vm.startBroadcast();
-        chainAdmin.multicall(calls, true);
-        vm.stopBroadcast();
-    }
-
     function makePermanentRollup(ChainAdmin chainAdmin, address target) public {
         IZKChain adminContract = IZKChain(target);
 
@@ -224,9 +240,9 @@ contract AdminFunctions is Script {
         bytes memory data;
         // The interface should be compatible with both the new and the old ValidatorTimelock
         if (addValidator) {
-            data = abi.encodeCall(ValidatorTimelock.addValidator, (chainId, validatorAddress));
+            data = abi.encodeCall(ValidatorTimelock.addValidatorForChainId, (chainId, validatorAddress));
         } else {
-            data = abi.encodeCall(ValidatorTimelock.removeValidator, (chainId, validatorAddress));
+            data = abi.encodeCall(ValidatorTimelock.removeValidatorForChainId, (chainId, validatorAddress));
         }
 
         Utils.adminExecute(adminAddr, accessControlRestriction, validatorTimelock, data, 0);
@@ -305,6 +321,67 @@ contract AdminFunctions is Script {
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
 
+    struct UpgradeZKChainOnGatewayParams {
+        uint256 l1GasPrice;
+        uint256 oldProtocolVersion;
+        bytes upgradeCutData;
+        address chainDiamondProxyOnGateway;
+        uint256 gatewayChainId;
+        uint256 chainId;
+        address bridgehub;
+        address l1AssetRouterProxy;
+        address refundRecipient;
+        bool shouldSend;
+    }
+
+    function _prepareUpgradeZKChainOnGatewayInner(UpgradeZKChainOnGatewayParams memory data) private {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(data.bridgehub, data.chainId);
+        Diamond.DiamondCutData memory upgradeCutData = abi.decode(data.upgradeCutData, (Diamond.DiamondCutData));
+
+        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
+            data.l1GasPrice,
+            abi.encodeCall(IAdmin.upgradeChainFromVersion, (data.oldProtocolVersion, upgradeCutData)),
+            Utils.MAX_PRIORITY_TX_GAS,
+            new bytes[](0),
+            data.chainDiamondProxyOnGateway,
+            0,
+            data.gatewayChainId,
+            data.bridgehub,
+            data.l1AssetRouterProxy,
+            data.refundRecipient
+        );
+
+        saveAndSendAdminTx(chainInfo.admin, calls, data.shouldSend);
+    }
+
+    function prepareUpgradeZKChainOnGateway(
+        uint256 l1GasPrice,
+        uint256 oldProtocolVersion,
+        bytes memory upgradeCutData,
+        address chainDiamondProxyOnGateway,
+        uint256 gatewayChainId,
+        uint256 chainId,
+        address bridgehub,
+        address l1AssetRouterProxy,
+        address refundRecipient,
+        bool shouldSend
+    ) public {
+        _prepareUpgradeZKChainOnGatewayInner(
+            UpgradeZKChainOnGatewayParams({
+                l1GasPrice: l1GasPrice,
+                oldProtocolVersion: oldProtocolVersion,
+                upgradeCutData: upgradeCutData,
+                chainDiamondProxyOnGateway: chainDiamondProxyOnGateway,
+                gatewayChainId: gatewayChainId,
+                chainId: chainId,
+                bridgehub: bridgehub,
+                l1AssetRouterProxy: l1AssetRouterProxy,
+                refundRecipient: refundRecipient,
+                shouldSend: shouldSend
+            })
+        );
+    }
+
     function grantGatewayWhitelist(
         address _bridgehub,
         uint256 _chainId,
@@ -313,16 +390,30 @@ contract AdminFunctions is Script {
     ) public {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
-        address transactionFilterer = IGetters(chainInfo.diamondProxy).getTransactionFilterer();
-        require(transactionFilterer != address(0), "Chain does not have a transaction filterer");
+        GatewayTransactionFilterer transactionFilterer = GatewayTransactionFilterer(
+            IGetters(chainInfo.diamondProxy).getTransactionFilterer()
+        );
+        require(address(transactionFilterer) != address(0), "Chain does not have a transaction filterer");
 
-        Call[] memory calls = new Call[](_grantees.length);
+        uint256 countWhitelistedSenders = 0;
         for (uint256 i = 0; i < _grantees.length; i++) {
-            calls[i] = Call({
-                target: transactionFilterer,
-                value: 0,
-                data: abi.encodeCall(GatewayTransactionFilterer.grantWhitelist, (_grantees[i]))
-            });
+            if (!transactionFilterer.whitelistedSenders(_grantees[i])) {
+                countWhitelistedSenders++;
+            }
+        }
+
+        Call[] memory calls = new Call[](countWhitelistedSenders);
+
+        uint256 j = 0;
+        for (uint256 i = 0; i < _grantees.length; i++) {
+            if (!transactionFilterer.whitelistedSenders(_grantees[i])) {
+                calls[j] = Call({
+                    target: address(transactionFilterer),
+                    value: 0,
+                    data: abi.encodeCall(GatewayTransactionFilterer.grantWhitelist, (_grantees[i]))
+                });
+                j++;
+            }
         }
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
@@ -363,6 +454,26 @@ contract AdminFunctions is Script {
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
+
+    function setDAValidatorPair(
+        address _bridgehub,
+        uint256 _chainId,
+        address _l1DaValidator,
+        address _l2DaValidator,
+        bool _shouldSend
+    ) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IAdmin.setDAValidatorPair, (_l1DaValidator, _l2DaValidator))
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
+    }
+
     struct MigrateChainToGatewayParams {
         address bridgehub;
         uint256 l1GasPrice;
@@ -532,7 +643,10 @@ contract AdminFunctions is Script {
             data.bridgehub,
             data.l2ChainId
         );
-        bytes memory callData = abi.encodeCall(ValidatorTimelock.addValidator, (data.l2ChainId, data.validatorAddress));
+        bytes memory callData = abi.encodeCall(
+            ValidatorTimelock.addValidatorForChainId,
+            (data.l2ChainId, data.validatorAddress)
+        );
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
             callData,
@@ -571,6 +685,22 @@ contract AdminFunctions is Script {
                 _shouldSend: _shouldSend
             })
         );
+    }
+
+    function enableValidator(
+        address bridgehub,
+        uint256 l2ChainId,
+        address validatorAddress,
+        address validatorTimelock,
+        bool _shouldSend
+    ) public {
+        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(bridgehub, l2ChainId);
+
+        bytes memory callData = abi.encodeCall(ValidatorTimelock.addValidatorForChainId, (l2ChainId, validatorAddress));
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: validatorTimelock, value: 0, data: callData});
+
+        saveAndSendAdminTx(l2ChainInfo.admin, calls, _shouldSend);
     }
 
     struct StartMigrateChainFromGatewayParams {
@@ -712,7 +842,7 @@ contract AdminFunctions is Script {
     function saveAndSendAdminTx(address _admin, Call[] memory _calls, bool _shouldSend) internal {
         bytes memory data = abi.encode(_calls);
 
-        if (_shouldSend) {
+        if (_shouldSend && _calls.length > 0) {
             Utils.adminExecuteCalls(_admin, address(0), _calls);
         }
 

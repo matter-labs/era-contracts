@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 
@@ -53,7 +53,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, L1FixedForceDeploymentsHelper, IGa
         bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, s.__DEPRECATED_baseToken);
 
         s.baseTokenAssetId = baseTokenAssetId;
-        s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
+        s.priorityTree.setup(s.__DEPRECATED_priorityQueue.getTotalPriorityTxs());
         s.validators[encodedInput.oldValidatorTimelock] = false;
         s.validators[encodedInput.newValidatorTimelock] = true;
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;

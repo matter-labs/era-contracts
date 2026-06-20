@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
 import {MerkleTreeNoSort} from "./MerkleTreeNoSort.sol";
-import {MerklePathEmpty, MerkleIndexOutOfBounds, MerklePathOutOfBounds, MerklePathLengthMismatch, MerkleIndexOrHeightMismatch, MerkleNothingToProve} from "contracts/common/L1ContractErrors.sol";
+import {MerkleIndexOrHeightMismatch, MerkleIndexOutOfBounds, MerkleNothingToProve, MerklePathEmpty, MerklePathLengthMismatch, MerklePathOutOfBounds} from "contracts/common/L1ContractErrors.sol";
 
 contract MerkleTestTest is Test {
     MerkleTreeNoSort merkleTree;

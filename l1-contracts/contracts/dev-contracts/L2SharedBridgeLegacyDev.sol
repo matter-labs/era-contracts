@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
 import {BridgedStandardERC20} from "../bridge/BridgedStandardERC20.sol";
 
 import {L2SharedBridgeLegacy} from "../bridge/L2SharedBridgeLegacy.sol";
-import {InvalidCaller, ZeroAddress, EmptyBytes32, Unauthorized, AmountMustBeGreaterThanZero, DeployFailed} from "../common/L1ContractErrors.sol";
+import {AmountMustBeGreaterThanZero, DeployFailed, EmptyBytes32, InvalidCaller, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 contract L2SharedBridgeLegacyDev is L2SharedBridgeLegacy {
     constructor() L2SharedBridgeLegacy() {}

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 import {L1FixedForceDeploymentsHelper} from "contracts/upgrades/L1FixedForceDeploymentsHelper.sol"; // Adjust the import path accordingly
@@ -83,7 +83,7 @@ contract L1FixedForceDeploymentsHelperTest is Test {
         // Set base token asset ID
         testGateway.setBaseTokenAssetId(baseTokenAssetId);
 
-        vm.mockCall(bridgehubMock, abi.encodeCall(IBridgehub.sharedBridge, ()), abi.encode(sharedBridgeMock));
+        vm.mockCall(bridgehubMock, abi.encodeCall(IBridgehub.assetRouter, ()), abi.encode(sharedBridgeMock));
         vm.mockCall(
             sharedBridgeMock,
             abi.encodeCall(IL1SharedBridgeLegacy.l2BridgeAddress, (chainId)),

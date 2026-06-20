@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 /// @title DummyChainTypeManagerForValidatorTimelock
-/// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing purposes.
+/// @notice A test smart contract simulating ChainTypeManager behavior for testing purposes.
 contract DummyChainTypeManagerForValidatorTimelock {
     // add this to be excluded from coverage report
     function test() internal virtual {}

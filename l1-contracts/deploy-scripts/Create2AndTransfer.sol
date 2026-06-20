@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-import {IOwnable} from "./interfaces/IOwnable.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 /// @title Create2AndTransfer
 /// @author Matter Labs

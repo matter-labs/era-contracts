@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
-import {PriorityQueue, PriorityOperation} from "../../state-transition/libraries/PriorityQueue.sol";
+import {PriorityOperation, PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 
 contract PriorityQueueTest {
     // add this to be excluded from coverage report

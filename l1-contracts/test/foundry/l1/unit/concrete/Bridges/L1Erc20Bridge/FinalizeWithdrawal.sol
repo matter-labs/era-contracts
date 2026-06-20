@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {L1Erc20BridgeTest} from "./_L1Erc20Bridge_Shared.t.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -8,7 +8,7 @@ import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {WithdrawalAlreadyFinalized} from "contracts/common/L1ContractErrors.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 contract FinalizeWithdrawalTest is L1Erc20BridgeTest {
     using stdStorage for StdStorage;

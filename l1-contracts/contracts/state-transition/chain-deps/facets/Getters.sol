@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
@@ -8,7 +8,6 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {PubdataPricingMode} from "../ZKChainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
@@ -24,7 +23,6 @@ import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 /// @custom:security-contact security@matterlabs.dev
 contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     using UncheckedMath for uint256;
-    using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZKChainBase
@@ -116,11 +114,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getFirstUnprocessedPriorityTx() external view returns (uint256) {
-        if (_isPriorityQueueActive()) {
-            return s.priorityQueue.getFirstUnprocessedPriorityTx();
-        } else {
-            return s.priorityTree.getFirstUnprocessedPriorityTx();
-        }
+        return s.priorityTree.getFirstUnprocessedPriorityTx();
     }
 
     /// @inheritdoc IGetters
@@ -130,11 +124,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getPriorityQueueSize() external view returns (uint256) {
-        if (_isPriorityQueueActive()) {
-            return s.priorityQueue.getSize();
-        } else {
-            return s.priorityTree.getSize();
-        }
+        return s.priorityTree.getSize();
     }
 
     /// @inheritdoc IGetters

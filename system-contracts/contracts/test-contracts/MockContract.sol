@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 contract MockContract {
     event Called(uint256 value, bytes data);
@@ -15,7 +15,9 @@ contract MockContract {
 
     constructor() {
         // Clean results if mock was redeployed.
-        delete results;
+        assembly {
+            sstore(results.slot, 0)
+        }
     }
 
     // This function call will not pass to fallback, but this is fine for the tests.

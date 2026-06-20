@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 // solhint-disable max-line-length
 
@@ -9,7 +9,7 @@ import {GovernanceTest} from "./_Governance_Shared.t.sol";
 
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {ReenterGovernance} from "contracts/dev-contracts/test/ReenterGovernance.sol";
-import {OperationMustBeReady, OperationMustBePending} from "contracts/common/L1ContractErrors.sol";
+import {OperationMustBePending, OperationMustBeReady} from "contracts/common/L1ContractErrors.sol";
 
 contract ReentrancyTest is GovernanceTest {
     using stdStorage for StdStorage;

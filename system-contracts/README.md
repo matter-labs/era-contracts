@@ -43,10 +43,22 @@ Update the system contracts hashes: `yarn sc calculate-hashes:fix`
 
 ### Run tests
 
-The tests of the system contracts utilize the ZKsync test node. In order to run the tests, execute the following commands in the root of the repository:
+The tests of the system contracts utilize the Anvil-ZKsync. In order to run the tests, execute the following commands in the root of the repository:
+
+```
+yarn install-anvil
+```
+
+If you want to run test-node with built-in contracts, run:
 
 ```
 yarn test-node
+```
+
+If you want to run test-node with local contracts for development, run:
+
+```
+yarn test-node-local-contracts
 ```
 
 It will run the test node, and you can see its logs in the output.
@@ -57,6 +69,12 @@ yarn test
 ```
 
 Please note that you need to rerun the test node every time you are running the tests because, in the current version, tests will be affected by the state after the previous run.
+
+To run the bootloader tests:
+
+```shell
+yarn sc test:bootloader
+```
 
 ### Testing infrastructure overview
 
@@ -83,8 +101,10 @@ Also, when testing these contracts, some of them should also be deployed on the 
 - [Ecrecover.yul](contracts%2Fprecompiles%2FEcrecover.yul): uses precompile call instruction, which is address-dependent
 - [Keccak256.yul](contracts%2Fprecompiles%2FKeccak256.yul): uses precompile call instruction, which is address-dependent
 - [SHA256.yul](contracts%2Fprecompiles%2FSHA256.yul): uses precompile call instruction, which is address-dependent
-
-However, this is not the case for [EcAdd.yul](contracts%2Fprecompiles%2FEcAdd.yul) and [EcMul.yul](contracts%2Fprecompiles%2FEcMul.yul), so they can be deployed on any addresses, even outside kernel space.
+- [Modexp.yul](contracts%2Fprecompiles%2FModexp.yul): uses precompile call instruction, which is address-dependent
+- [EcAdd.yul](contracts%2Fprecompiles%2FEcAdd.yul): uses precompile call instruction, which is address-dependent
+- [EcMul.yul](contracts%2Fprecompiles%2FEcMul.yul): uses precompile call instruction, which is address-dependent
+- [EcPairing.yul](contracts%2Fprecompiles%2FEcPairing.yul): uses precompile call instruction, which is address-dependent
 
 #### Test contracts/features
 
@@ -112,6 +132,17 @@ Typically, one test case corresponds to one main function call, possibly with ad
 
 Therefore, considering all the information above, we can say that it's almost unit tests over external functions.
 Many examples can be found in [test](test).
+
+#### Manual tests
+
+Manual tests are not part of the main test suite and are rather run manually against an anvil-zksync fork of the chain to be upgraded. Currently there is only one manual test for the [L2V29Upgrade](contracts/L2V29Upgrade.sol) that can be run by doing:
+
+```
+./bin/anvil-zksync fork --fork-url [chain-rpc-url] &> era_test_node.log.anvil &
+ALIASED_GOVERNANCE_ADDRESS=[governance-address] L1_CHAIN_ID=[l1-chain-id] yarn test-l2-v29-upgrade
+```
+
+and specifying the chain-rpc-url for the fork to test the upgrade against. Optionally, you can specify the governance-address and the L1 chain id, these will default to a random address and 1 respectively.
 
 ## Update Process
 

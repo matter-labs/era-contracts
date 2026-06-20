@@ -103,9 +103,16 @@ abstract contract Create2FactoryUtils is Script {
     function deployViaCreate2AndNotify(
         bytes memory creationCode,
         bytes memory constructorParams,
-        string memory contractName
+        string memory contractName,
+        bool isZKBytecode
     ) internal returns (address deployedAddress) {
-        deployedAddress = deployViaCreate2AndNotify(creationCode, constructorParams, contractName, contractName);
+        deployedAddress = deployViaCreate2AndNotify(
+            creationCode,
+            constructorParams,
+            contractName,
+            contractName,
+            isZKBytecode
+        );
     }
 
     /// @notice Deploys a contract via Create2 and notifies via console logs.
@@ -118,11 +125,12 @@ abstract contract Create2FactoryUtils is Script {
         bytes memory creationCode,
         bytes memory constructorParams,
         string memory contractName,
-        string memory displayName
+        string memory displayName,
+        bool isZKBytecode
     ) internal returns (address deployedAddress) {
         bytes memory bytecode = abi.encodePacked(creationCode, constructorParams);
         deployedAddress = deployViaCreate2(bytecode);
-        notifyAboutDeployment(deployedAddress, contractName, constructorParams, displayName);
+        notifyAboutDeployment(deployedAddress, contractName, constructorParams, displayName, isZKBytecode);
     }
 
     /// @notice Deploys a contract via Create2 with a deterministic owner.
@@ -150,10 +158,11 @@ abstract contract Create2FactoryUtils is Script {
         bytes memory constructorParams,
         address owner,
         string memory contractName,
-        string memory displayName
+        string memory displayName,
+        bool isZKBytecode
     ) internal returns (address contractAddress) {
         contractAddress = create2WithDeterministicOwner(abi.encodePacked(initCode, constructorParams), owner);
-        notifyAboutDeployment(contractAddress, contractName, constructorParams, displayName);
+        notifyAboutDeployment(contractAddress, contractName, constructorParams, displayName, isZKBytecode);
     }
 
     /// @notice Overload for notifyAboutDeployment that takes three arguments.
@@ -163,9 +172,10 @@ abstract contract Create2FactoryUtils is Script {
     function notifyAboutDeployment(
         address contractAddr,
         string memory contractName,
-        bytes memory constructorParams
+        bytes memory constructorParams,
+        bool isZKBytecode
     ) internal {
-        notifyAboutDeployment(contractAddr, contractName, constructorParams, contractName);
+        notifyAboutDeployment(contractAddr, contractName, constructorParams, contractName, isZKBytecode);
     }
 
     /// @notice Notifies about a deployment by printing messages to the console.
@@ -178,7 +188,8 @@ abstract contract Create2FactoryUtils is Script {
         address contractAddr,
         string memory contractName,
         bytes memory constructorParams,
-        string memory displayName
+        string memory displayName,
+        bool isZKBytecode
     ) internal {
         string memory basicMessage = string.concat(displayName, " has been deployed at ", vm.toString(contractAddr));
         console.log(basicMessage);
@@ -202,6 +213,10 @@ abstract contract Create2FactoryUtils is Script {
                 vm.toString(constructorParams)
             );
         }
+
+        if (isZKBytecode) {
+            forgeMessage = string.concat(forgeMessage, " --verifier zksync");
+        }
         console.log(forgeMessage);
     }
 
@@ -222,6 +237,6 @@ abstract contract Create2FactoryUtils is Script {
     /// @param b The second string.
     /// @return True if the strings are identical, false otherwise.
     function compareStrings(string memory a, string memory b) internal pure returns (bool) {
-        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
+        return Utils.compareStrings(a, b);
     }
 }

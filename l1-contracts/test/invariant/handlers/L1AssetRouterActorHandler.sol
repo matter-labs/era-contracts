@@ -3,13 +3,13 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 
-import {L1_TOKEN_ADDRESS, TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS, AMOUNT_UPPER_BOUND} from "../common/Constants.sol";
+import {AMOUNT_UPPER_BOUND, L1_TOKEN_ADDRESS, TOKEN_DEFAULT_DECIMALS, TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL} from "../common/Constants.sol";
 import {UserActorHandler} from "./UserActorHandler.sol";
 
 // no cheatcodes here because they won't work with `--zksync`
@@ -63,7 +63,7 @@ contract L1AssetRouterActorHandler is Test {
         ghost_totalDeposits += amount;
     }
 
-    // borrowed from https://github.com/matter-labs/era-contracts/blob/16dedf6d77695ce00f81fce35a3066381b97fca1/l1-contracts/test/foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol#L203-L217
+    // borrowed from https://github.com/matter-labs/era-contracts/blob/16dedf6d77695ce00f81fce35a3066381b97fca1/l1-contracts/test/foundry/l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol#L203-L217
     /// @notice Encodes the token data.
     /// @param name The name of the token.
     /// @param symbol The symbol of the token.

@@ -77,6 +77,8 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
 
     function L1_WETH_TOKEN() external view returns (address);
 
+    function ETH_TOKEN_ASSET_ID() external view returns (bytes32);
+
     function nativeTokenVault() external view returns (INativeTokenVault);
 
     function setAssetDeploymentTracker(bytes32 _assetRegistrationData, address _assetDeploymentTracker) external;
