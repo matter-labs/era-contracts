@@ -41,7 +41,10 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @notice Change the token multiplier for L1->L2 transactions
     function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external;
 
-    /// @notice Change the pubdata pricing mode before the first batch is processed
+    /// @notice Sets the pubdata pricing mode (Rollup vs Validium) used when deriving the L2 gas price.
+    /// @dev May be changed after genesis; it only affects subsequent fee derivation and does not alter
+    /// already-committed batches. Rollup chains are protected from switching their DA via `isPermanentRollup`,
+    /// not by this setter.
     /// @param _pricingMode The new pubdata pricing mode
     function setPubdataPricingMode(PubdataPricingMode _pricingMode) external;
 

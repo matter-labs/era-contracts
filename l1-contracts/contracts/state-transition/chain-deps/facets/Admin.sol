@@ -326,14 +326,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (s.priorityModeInfo.canBeActivated) {
             revert NotCompatibleWithPriorityMode();
         }
-        // The pubdata pricing mode (Rollup vs Validium) is a genesis-time chain property. Flipping it after
-        // batches have been committed would desync the data-availability accounting of already-committed
-        // batches, so it may only be set before the first batch is processed. This is the single path that
-        // can change the mode (`changeFeeParams` rejects any change to it), so enforce the precondition that
-        // until now lived only in the `IAdmin.setPubdataPricingMode` NatSpec.
-        if (s.totalBatchesCommitted != 0) {
-            revert InvalidPubdataPricingMode();
-        }
         s.feeParams.pubdataPricingMode = _pricingMode;
         emit PubdataPricingModeUpdate(_pricingMode);
     }
