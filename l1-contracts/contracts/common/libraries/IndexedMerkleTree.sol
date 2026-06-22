@@ -105,24 +105,26 @@ library IndexedMerkleTree {
         newRoot = self.tree.pushNewLeaf(hashLeaf(newLeaf));
     }
 
-    /// @dev Returns the current Merkle root.
+    /// @notice Returns the current Merkle root.
     function root(IMT storage self) internal view returns (bytes32) {
         return self.tree.root();
     }
 
-    /// @dev Returns a Merkle path for a leaf using the current {FullMerkle} height.
+    /// @notice Returns a Merkle path for a leaf using the current {FullMerkle} height.
     /// @param _leafIndex The index of the leaf to calculate proof for.
     function merklePath(IMT storage self, uint256 _leafIndex) internal view returns (bytes32[] memory path) {
         path = self.tree.merklePath(_leafIndex);
     }
 
-    /// @dev Hashes a leaf in the canonical indexed Merkle tree layout.
+    /// @notice Hashes a leaf in the canonical indexed Merkle tree layout.
+    /// @dev Note, that for security of the system, it is critical that the preimage for each leaf is not 64 bytes long
+    /// to avoid any possibility for maliciously crafted proofs that start from the intermediate node.
     /// @param _leaf The leaf preimage to hash.
     function hashLeaf(IMTLeaf memory _leaf) internal pure returns (bytes32) {
         return keccak256(abi.encode(_leaf.value, _leaf.nextIndex, _leaf.nextValue));
     }
 
-    /// @dev Verifies that `_value` is present in a tree with root `_root`.
+    /// @notice Verifies that `_value` is present in a tree with root `_root`.
     /// @param _root The root to verify against.
     /// @param _value The value expected to be present.
     /// @param _leaf The leaf preimage for `_value`.
@@ -142,7 +144,7 @@ library IndexedMerkleTree {
         return Merkle.calculateRootMemory(_proof, _leafIndex, hashLeaf(_leaf)) == _root;
     }
 
-    /// @dev Verifies that `_value` is absent from a tree with root `_root` by proving its low leaf.
+    /// @notice Verifies that `_value` is absent from a tree with root `_root` by proving its low leaf.
     /// @param _root The root to verify against.
     /// @param _value The value expected to be absent.
     /// @param _lowLeaf The leaf preimage that precedes `_value` in the sorted linked list.
