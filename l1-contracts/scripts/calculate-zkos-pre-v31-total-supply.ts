@@ -90,6 +90,10 @@ function formatAmount(value: ethers.BigNumber): string {
   return `${value.toString()} (${ethers.utils.formatEther(value)} assuming 18 decimals)`;
 }
 
+function formatUtcDate(timestamp: number): string {
+  return new Date(timestamp * 1000).toISOString().replace("T", " ").replace(".000Z", " UTC");
+}
+
 async function binarySearchFirstCodeBlock(
   provider: ethers.providers.JsonRpcProvider,
   address: string,
@@ -449,6 +453,10 @@ async function main(): Promise<void> {
   const toL1Block = await resolveToL1Block(l1Provider, opts.toL1Block, opts.upgradeL1Tx);
   const fromL1Block = opts.fromL1Block ?? (await binarySearchFirstCodeBlock(l1Provider, diamondProxy, 0, toL1Block));
   const { toL2Block, firstV31L2Block } = await resolveToL2Block(l2Provider, opts.toL2Block);
+  const cutoffL2Block = await l2Provider.getBlock(toL2Block);
+  if (!cutoffL2Block) {
+    throw new Error(`No L2 block found for cutoff block ${toL2Block}`);
+  }
 
   if (fromL1Block > toL1Block) {
     throw new Error(`Invalid L1 block range: ${fromL1Block} > ${toL1Block}`);
@@ -463,6 +471,7 @@ async function main(): Promise<void> {
     `  L2 pre-v31 range:         [0, ${toL2Block}]` +
       (firstV31L2Block === null ? "" : ` (first v31 block: ${firstV31L2Block})`)
   );
+  console.log(`  cutoff date:              ${formatUtcDate(cutoffL2Block.timestamp)} (L2 block ${toL2Block})`);
   console.log(`  getLogs block step:       ${opts.blockStep}`);
   console.log(`  receipt concurrency:      ${opts.receiptConcurrency}`);
 
@@ -509,6 +518,9 @@ async function main(): Promise<void> {
 
   const preV31TotalSupply = deposits.total.sub(withdrawals.total);
   console.log("\nResult:");
+  console.log(`  cutoff date:              ${formatUtcDate(cutoffL2Block.timestamp)} (L2 block ${toL2Block})`);
+  console.log(`  total deposited:          ${formatAmount(deposits.total)}`);
+  console.log(`  total withdrawn:          ${formatAmount(withdrawals.total)}`);
   console.log(`  preV31TotalSupply:        ${formatAmount(preV31TotalSupply)}`);
   console.log(`  raw uint256:              ${preV31TotalSupply.toString()}`);
 }
