@@ -9,7 +9,6 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {ERC20} from "@openzeppelin/contracts-v4/token/ERC20/ERC20.sol";
 
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
@@ -166,23 +165,16 @@ contract L1NativeTokenVaultExtendedTest is Test {
         freshNTV.setAssetTracker(address(0));
     }
 
-    /// @dev The tracker stays updatable, but every set/update must emit {AssetTrackerUpdated} with the old and
-    /// new values so a re-point is observable on-chain.
-    function test_SetAssetTracker_EmitsEventOnSetAndUpdate() public {
+    /// @dev The tracker is intentionally updatable (not set-once): a second call re-points it.
+    function test_SetAssetTracker_CanUpdate() public {
         L1NativeTokenVault freshNTV = _deployFreshNTV();
         address firstAssetTracker = makeAddr("firstAssetTracker");
         address secondAssetTracker = makeAddr("secondAssetTracker");
 
-        // Initial set: old value is the zero address.
-        vm.expectEmit(true, true, true, true, address(freshNTV));
-        emit IL1NativeTokenVault.AssetTrackerUpdated(address(0), firstAssetTracker);
         vm.prank(owner);
         freshNTV.setAssetTracker(firstAssetTracker);
         assertEq(address(freshNTV.l1AssetTracker()), firstAssetTracker);
 
-        // Update: old value is the previous tracker.
-        vm.expectEmit(true, true, true, true, address(freshNTV));
-        emit IL1NativeTokenVault.AssetTrackerUpdated(firstAssetTracker, secondAssetTracker);
         vm.prank(owner);
         freshNTV.setAssetTracker(secondAssetTracker);
         assertEq(address(freshNTV.l1AssetTracker()), secondAssetTracker);

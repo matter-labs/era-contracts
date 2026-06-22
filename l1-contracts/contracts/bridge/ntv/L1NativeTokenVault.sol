@@ -151,9 +151,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @param _l1AssetTracker The address of the AssetTracker component.
     function setAssetTracker(address _l1AssetTracker) external onlyOwner {
         require(_l1AssetTracker != address(0), ZeroAddress());
-        address oldAssetTracker = address(l1AssetTracker);
         l1AssetTracker = IL1AssetTracker(_l1AssetTracker);
-        emit AssetTrackerUpdated(oldAssetTracker, _l1AssetTracker);
     }
 
     /*//////////////////////////////////////////////////////////////
