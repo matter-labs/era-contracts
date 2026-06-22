@@ -4,8 +4,8 @@ pragma solidity 0.8.28;
 
 import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT, CURRENT_MAX_PRECOMPILE_ADDRESS, EVM_HASHES_STORAGE} from "./Constants.sol";
-import {Unauthorized, InvalidCodeHash, CodeHashReason} from "./SystemContractErrors.sol";
+import {CURRENT_MAX_PRECOMPILE_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, EVM_HASHES_STORAGE, NONCE_HOLDER_SYSTEM_CONTRACT} from "./Constants.sol";
+import {CodeHashReason, InvalidCodeHash, Unauthorized} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs

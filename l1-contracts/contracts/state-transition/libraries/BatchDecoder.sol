@@ -4,7 +4,8 @@ pragma solidity ^0.8.21;
 
 import {IExecutor} from "../chain-interfaces/IExecutor.sol";
 import {PriorityOpsBatchInfo} from "./PriorityTree.sol";
-import {IncorrectBatchBounds, EmptyData, UnsupportedCommitBatchEncoding, UnsupportedProofBatchEncoding, UnsupportedExecuteBatchEncoding} from "../../common/L1ContractErrors.sol";
+import {EmptyData, IncorrectBatchBounds, UnsupportedCommitBatchEncoding, UnsupportedExecuteBatchEncoding, UnsupportedProofBatchEncoding} from "../../common/L1ContractErrors.sol";
+import {InteropRoot} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -13,7 +14,10 @@ import {IncorrectBatchBounds, EmptyData, UnsupportedCommitBatchEncoding, Unsuppo
 ///      It reverts with custom errors when the data is invalid or unsupported encoding is used.
 library BatchDecoder {
     /// @notice The currently supported encoding version.
-    uint8 internal constant SUPPORTED_ENCODING_VERSION = 0;
+    uint8 internal constant SUPPORTED_ENCODING_VERSION = 1;
+    /// @notice The currently supported encoding version for ZKSync OS commit data.
+    /// We use different encoding only for commit, while prove/execute are common for Era VM and ZKsync OS chains.
+    uint8 internal constant SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS = 3;
 
     /// @notice Decodes commit data from a calldata bytes into the last committed batch data and an array of new batch data.
     /// @param _commitData The calldata byte array containing the data for committing batches.
@@ -44,6 +48,50 @@ library BatchDecoder {
         }
     }
 
+    // exactly the same as regular `_decodeCommitData`, except for 2 differences:
+    // - encoding version is different
+    // - uses different structure for the commit batch info
+    function _decodeCommitDataZKsyncOS(
+        bytes calldata _commitData
+    )
+        private
+        pure
+        returns (
+            IExecutor.StoredBatchInfo memory lastCommittedBatchData,
+            IExecutor.CommitBatchInfoZKsyncOS[] memory newBatchesData
+        )
+    {
+        if (_commitData.length == 0) {
+            revert EmptyData();
+        }
+
+        uint8 encodingVersion = uint8(_commitData[0]);
+        if (encodingVersion == SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS) {
+            (lastCommittedBatchData, newBatchesData) = abi.decode(
+                _commitData[1:],
+                (IExecutor.StoredBatchInfo, IExecutor.CommitBatchInfoZKsyncOS[])
+            );
+        } else {
+            revert UnsupportedCommitBatchEncoding(encodingVersion);
+        }
+    }
+
+    /// @notice Decodes and validates precommit data for a batch, ensuring the encoding version is supported.
+    /// @dev The first byte of `_precommitData` is interpreted as the encoding version and must equal `SUPPORTED_ENCODING_VERSION`.
+    ///      If it does, the remainder of the data is decoded into an `IExecutor.PrecommitInfo` struct. Otherwise, this call reverts.
+    /// @param _precommitData ABI-encoded bytes where the first byte is the encoding version, followed by the encoded `PrecommitInfo`.
+    /// @return precommitInfo The decoded `PrecommitInfo` containing transaction status commitments.
+    function decodeAndCheckPrecommitData(
+        bytes calldata _precommitData
+    ) internal pure returns (IExecutor.PrecommitInfo memory precommitInfo) {
+        uint8 encodingVersion = uint8(_precommitData[0]);
+        if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
+            (precommitInfo) = abi.decode(_precommitData[1:], (IExecutor.PrecommitInfo));
+        } else {
+            revert UnsupportedCommitBatchEncoding(encodingVersion);
+        }
+    }
+
     /// @notice Decodes the commit data and checks that the provided batch bounds are correct.
     /// @dev Note that it only checks that the last and the first batches in the array correspond to the provided bounds.
     /// The fact that the batches inside the array are provided in the correct order should be checked by the caller.
@@ -65,6 +113,39 @@ library BatchDecoder {
         )
     {
         (lastCommittedBatchData, newBatchesData) = _decodeCommitData(_commitData);
+
+        if (newBatchesData.length == 0) {
+            revert EmptyData();
+        }
+
+        if (
+            newBatchesData[0].batchNumber != _processBatchFrom ||
+            newBatchesData[newBatchesData.length - 1].batchNumber != _processBatchTo
+        ) {
+            revert IncorrectBatchBounds(
+                _processBatchFrom,
+                _processBatchTo,
+                newBatchesData[0].batchNumber,
+                newBatchesData[newBatchesData.length - 1].batchNumber
+            );
+        }
+    }
+
+    // exactly the same as regular `decodeAndCheckCommitData`, except for one difference:
+    // uses different structure for the commit batch info
+    function decodeAndCheckCommitDataZKsyncOS(
+        bytes calldata _commitData,
+        uint256 _processBatchFrom,
+        uint256 _processBatchTo
+    )
+        internal
+        pure
+        returns (
+            IExecutor.StoredBatchInfo memory lastCommittedBatchData,
+            IExecutor.CommitBatchInfoZKsyncOS[] memory newBatchesData
+        )
+    {
+        (lastCommittedBatchData, newBatchesData) = _decodeCommitDataZKsyncOS(_commitData);
 
         if (newBatchesData.length == 0) {
             revert EmptyData();
@@ -160,7 +241,11 @@ library BatchDecoder {
     )
         private
         pure
-        returns (IExecutor.StoredBatchInfo[] memory executeData, PriorityOpsBatchInfo[] memory priorityOpsData)
+        returns (
+            IExecutor.StoredBatchInfo[] memory executeData,
+            PriorityOpsBatchInfo[] memory priorityOpsData,
+            InteropRoot[][] memory dependencyRoots
+        )
     {
         if (_executeData.length == 0) {
             revert EmptyData();
@@ -168,9 +253,9 @@ library BatchDecoder {
 
         uint8 encodingVersion = uint8(_executeData[0]);
         if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
-            (executeData, priorityOpsData) = abi.decode(
+            (executeData, priorityOpsData, dependencyRoots) = abi.decode(
                 _executeData[1:],
-                (IExecutor.StoredBatchInfo[], PriorityOpsBatchInfo[])
+                (IExecutor.StoredBatchInfo[], PriorityOpsBatchInfo[], InteropRoot[][])
             );
         } else {
             revert UnsupportedExecuteBatchEncoding(encodingVersion);
@@ -192,9 +277,13 @@ library BatchDecoder {
     )
         internal
         pure
-        returns (IExecutor.StoredBatchInfo[] memory executeData, PriorityOpsBatchInfo[] memory priorityOpsData)
+        returns (
+            IExecutor.StoredBatchInfo[] memory executeData,
+            PriorityOpsBatchInfo[] memory priorityOpsData,
+            InteropRoot[][] memory dependencyRoots
+        )
     {
-        (executeData, priorityOpsData) = _decodeExecuteData(_executeData);
+        (executeData, priorityOpsData, dependencyRoots) = _decodeExecuteData(_executeData);
 
         if (executeData.length == 0) {
             revert EmptyData();

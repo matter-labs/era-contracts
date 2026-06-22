@@ -5,7 +5,7 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 
 import {DeployEvmPredeploys} from "deploy-scripts/evm-predeploys/DeployEvmPredeploys.s.sol";
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {AllowedBytecodeTypes, IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 
 contract EvmPredeploys is Test {

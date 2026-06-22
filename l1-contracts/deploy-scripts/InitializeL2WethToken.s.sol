@@ -8,8 +8,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Utils} from "./Utils.sol";
-import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {IL1Bridgehub, L2TransactionRequestDirect} from "contracts/bridgehub/IL1Bridgehub.sol";
 
 contract InitializeL2WethTokenScript is Script {
     using stdToml for string;
@@ -74,7 +73,7 @@ contract InitializeL2WethTokenScript is Script {
     }
 
     function initializeL2WethToken() internal {
-        Bridgehub bridgehub = Bridgehub(config.bridgehubProxyAddr);
+        IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehubProxyAddr);
 
         uint256 gasPrice = Utils.bytesToUint256(vm.rpc("eth_gasPrice", "[]")) * config.gasMultiplier;
         uint256 requiredValueToInitializeBridge = bridgehub.l2TransactionBaseCost(

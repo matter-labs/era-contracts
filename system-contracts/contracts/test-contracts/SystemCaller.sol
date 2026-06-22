@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {SYSTEM_CALL_CALL_ADDRESS, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, SystemContractsCaller, CalldataForwardingMode} from "../libraries/SystemContractsCaller.sol";
+import {CalldataForwardingMode, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, SYSTEM_CALL_CALL_ADDRESS, SystemContractsCaller} from "../libraries/SystemContractsCaller.sol";
 import {Utils} from "../libraries/Utils.sol";
 
 address constant REAL_MSG_VALUE_SYSTEM_CONTRACT = address(0x8009);

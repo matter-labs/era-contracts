@@ -5,7 +5,8 @@ libs = ['node_modules', 'lib']
 remappings = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
     "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
-    "l2-contracts/=../l2-contracts/contracts/"
+    "l2-contracts/=../l2-contracts/contracts/",
+    "forge-std/=lib/forge-std/src/",
 ]
 allow_paths = ["../l2-contracts/contracts"]
 fs_permissions = [

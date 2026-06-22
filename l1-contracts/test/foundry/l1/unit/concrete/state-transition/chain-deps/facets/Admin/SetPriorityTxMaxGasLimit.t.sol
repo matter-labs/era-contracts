@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {AdminTest} from "./_Admin_Shared.t.sol";
 
 import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
-import {Unauthorized, TooMuchGas} from "contracts/common/L1ContractErrors.sol";
+import {TooMuchGas, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract SetPriorityTxMaxGasLimitTest is AdminTest {
     event NewPriorityTxMaxGasLimit(uint256 oldPriorityTxMaxGasLimit, uint256 newPriorityTxMaxGasLimit);

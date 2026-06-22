@@ -6,9 +6,9 @@ import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/tok
 
 import {IL2WrappedBaseToken} from "./interfaces/IL2WrappedBaseToken.sol";
 import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
-import {ZeroAddress, Unauthorized, BridgeMintNotImplemented, WithdrawFailed} from "../common/L1ContractErrors.sol";
+import {BridgeMintNotImplemented, Unauthorized, WithdrawFailed, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

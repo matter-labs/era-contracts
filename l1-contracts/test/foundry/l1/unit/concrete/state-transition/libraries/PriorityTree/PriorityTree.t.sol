@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {PriorityTreeSharedTest, PriorityOpsBatchInfo} from "./_PriorityTree_Shared.t.sol";
+import {PriorityOpsBatchInfo, PriorityTreeSharedTest} from "./_PriorityTree_Shared.t.sol";
 import {PriorityTreeCommitment} from "contracts/common/Config.sol";
 import {NotHistoricalRoot} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
@@ -84,7 +84,12 @@ contract PriorityTreeTest is PriorityTreeSharedTest {
     function test_processBatch_shouldRevert() public {
         bytes32[] memory itemHashes = pushMockEntries(3);
 
-        vm.expectRevert(NotHistoricalRoot.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                NotHistoricalRoot.selector,
+                0x9916b82f0d1215e1cf93fdcf4c628eef02a88b920e9f8adf6abbd1a42cf9414c
+            )
+        );
         priorityTree.processBatch(
             PriorityOpsBatchInfo({leftPath: new bytes32[](2), rightPath: new bytes32[](2), itemHashes: itemHashes})
         );

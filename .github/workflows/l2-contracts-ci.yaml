@@ -16,7 +16,7 @@ jobs:
       - name: Install foundry-zksync
         run: |
           mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b/foundry_nightly_linux_amd64.tar.gz
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
           tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
@@ -30,6 +30,7 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      # In the future, we should simply take the artifacts that are built by l1-contracts.
       - name: Build l1 contracts
         working-directory: l1-contracts
         run: |
@@ -44,9 +45,9 @@ jobs:
         run: yarn sc build:foundry
 
       - name: Create cache
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
-          key: artifacts-l1-${{ github.sha }}
+          key: artifacts-l2-${{ github.sha }}
           path: |
             l1-contracts/cache-forge
             l1-contracts/out
@@ -73,46 +74,3 @@ jobs:
 
       - name: Lint
         run: yarn lint:check
-
-  test:
-    needs: [build, lint]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18.18.0
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn
-
-      - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
-        with:
-          fail-on-cache-miss: true
-          key: artifacts-l2-${{ github.sha }}
-          path: |
-            da-contracts/out
-            l1-contracts/cache-forge
-            l1-contracts/out
-            l1-contracts/zkout
-            l2-contracts/cache-forge
-            l2-contracts/zkout
-
-      - name: Install foundry-zksync
-        run: |
-          mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
-          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
-
-      - name: Run tests
-        run: yarn l2 test:foundry

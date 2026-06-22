@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
-import {PubdataPricingMode, FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";

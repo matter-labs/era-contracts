@@ -69,10 +69,12 @@
     "preprocess:emulator": "rm -f ./contracts/EvmEmulator.yul && yarn ts-node scripts/preprocess-emulator.ts",
     "preprocess:system-contracts": "rm -rf ./contracts-preprocessed && ts-node scripts/preprocess-system-contracts.ts",
     "verify-on-explorer": "yarn ts-node scripts/verify-on-explorer.ts",
-    "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode",
-    "test-no-build": "hardhat test --network zkSyncTestNode",
+    "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode test/*.spec.ts test/**/*.spec.ts",
+    "test-no-build": "hardhat test --network zkSyncTestNode test/*.spec.ts test/**/*.spec.ts",
+    "test-l2-v29-upgrade": "yarn build:system-contracts && hardhat test --network zkSyncTestNode test/manual-tests/L2V29Upgrade.manual.ts",
     "test-node": "./bin/anvil-zksync --protocol-version=28 --emulate-evm",
     "test-node-local-contracts": "yarn build:foundry && ./bin/anvil-zksync --protocol-version=28 --dev-system-contracts=local --system-contracts-path='.'",
+    "test:foundry": "FOUNDRY_PROFILE='test' forge test --zksync",
     "test:bootloader": "cd bootloader/test_infra && cargo run",
     "install-anvil": "ts-node ./scripts/install-anvil.ts"
   }

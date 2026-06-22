@@ -12,8 +12,6 @@ error InvalidInput();
 error Unauthorized(address);
 // 0xff15b069
 error UnsupportedPaymasterFlow();
-// 0xcea34703
-error MalformedBytecode(BytecodeError);
 
 enum BytecodeError {
     Version,

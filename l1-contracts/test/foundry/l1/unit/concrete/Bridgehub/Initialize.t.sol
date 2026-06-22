@@ -13,7 +13,7 @@ contract InitializeTest is BridgehubTest {
     uint256 internal priorityTxMaxGasLimit;
 
     function setUp() public {
-        bridgehubDiamondInit = new DiamondInit();
+        bridgehubDiamondInit = new DiamondInit(false);
 
         governor = GOVERNOR;
         chainImplementation = makeAddr("chainImplementation");

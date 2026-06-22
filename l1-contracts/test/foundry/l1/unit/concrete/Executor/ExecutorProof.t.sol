@@ -11,7 +11,7 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {IExecutor, LogProcessingOutput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 
 contract TestExecutorFacet is ExecutorFacet {
     constructor() ExecutorFacet(block.chainid) {}
@@ -47,7 +47,7 @@ contract TestExecutorFacet is ExecutorFacet {
 contract ExecutorProofTest is Test {
     UtilsFacet internal utilsFacet;
     TestExecutorFacet internal executor;
-    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
     function getTestExecutorFacetSelectors() private pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](3);
@@ -88,7 +88,7 @@ contract ExecutorProofTest is Test {
         utilsFacet.util_setL2BootloaderBytecodeHash(0x010008ddde4acc465cde1c420883701caadb41954567c0b4e3a0d1093a7afde7);
         utilsFacet.util_setZkPorterAvailability(false);
 
-        bytes[] memory mockSystemLogs = Utils.createSystemLogsWithEmptyDAValidator();
+        bytes[] memory mockSystemLogs = Utils.createSystemLogsWithNoneDAValidator();
 
         IExecutor.CommitBatchInfo memory nextBatch = IExecutor.CommitBatchInfo({
             // ignored
@@ -121,13 +121,13 @@ contract ExecutorProofTest is Test {
         );
         assertEq(
             nextCommitment,
-            0x6bf01db427f6af33a29a9505dfca9e1dd07b4e39ce7aee9be805c8f7115480f6,
+            0x9fae89899313dc524150960147a32da2521608231cb39e2741b2ca13435d3f12,
             "nextCommitment computation failed"
         );
 
         bytes32 prevCommitment = 0x8199d18dbc01ea80a635f515d6a12312daa1aa32b5404944477dcd41fd7b2bdf;
         uint256 result = executor.getBatchProofPublicInput(prevCommitment, nextCommitment);
-        assertEq(result, 0xb93b40845ee564c7458db1e46299f558a6bb7bab01e142ca5f19b6f4, "getBatchProofPublicInput");
+        assertEq(result, 0xC09291737B046C329198E1BEE081240EAFC26B675F0124BFB2A12FA6, "getBatchProofPublicInput");
     }
 
     // add this to be excluded from coverage report

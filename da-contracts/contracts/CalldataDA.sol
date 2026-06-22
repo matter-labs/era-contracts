@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {OperatorDAInputTooSmall, InvalidNumberOfBlobs, InvalidL2DAOutputHash, OnlyOneBlobWithCalldataAllowed, PubdataInputTooSmall, PubdataLengthTooBig, InvalidPubdataHash} from "./DAContractsErrors.sol";
+import {InvalidL2DAOutputHash, InvalidNumberOfBlobs, InvalidPubdataHash, OnlyOneBlobWithCalldataAllowed, OperatorDAInputTooSmall, PubdataInputTooSmall, PubdataLengthTooBig} from "./DAContractsErrors.sol";
 
 /// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
 /// @dev EIP-4844 defines it as 131_072 but we use 4096 * 31 within our circuits to always fit within a field element
@@ -16,7 +16,7 @@ uint256 constant BLOB_DATA_OFFSET = 65;
 uint256 constant BLOB_COMMITMENT_SIZE = 32;
 
 /// @notice Contract that contains the functionality for process the calldata DA.
-/// @dev The expected l2DAValidator that should be used with it `RollupL2DAValidator`.
+/// @dev The expected L2DACommitmentScheme that should be used with it is `BLOBS_AND_PUBDATA_KECCAK256`.
 abstract contract CalldataDA {
     /// @notice Parses the input that the L2 DA validator has provided to the contract.
     /// @param _l2DAValidatorOutputHash The hash of the output of the L2 DA validator.
