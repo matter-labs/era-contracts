@@ -236,6 +236,7 @@ script_calls! {
     AdminFunctionsAbi::governanceExecuteCallsCall                       => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::revokeGatewayWhitelistCall                       => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::adminScheduleUpgradeCall                         => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::setZKsyncOSPreV31TotalSupplyCall                 => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::governanceAcceptOwnerCall                        => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::chainAdminAcceptAdminCall                        => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::governanceAcceptOwnerAggregatedCall              => ADMIN_FUNCTIONS_INVOCATION,
