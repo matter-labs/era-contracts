@@ -77,6 +77,9 @@ tn_era_gov_upgrade_timer            = "0x7ACa96a96a0243A76c5F4a263A94CD8F0a32F73
 tn_atlas_gov_upgrade_timer          = "0x1EBcF35b6FDeA128248E0Fd825980171E2e635BA"  # Testnet Atlas (ZKsync OS) GovernanceUpgradeTimer
 tn_era_upgrade_stage_validator      = "0x235CD42116360C378e74E81F3D3356CE88aA496a"  # Testnet Era UpgradeStageValidator
 tn_atlas_upgrade_stage_validator    = "0xFF70697be4BfEB4aC27eb62AF83fC91294EFa35e"  # Testnet Atlas (ZKsync OS) UpgradeStageValidator
+tn_atlas_rollup_da_manager          = "0xC90E4E4897421E9380d734b72221f5485C3fd116"  # Testnet Atlas RollupDAManager
+tn_era_rollup_da_manager            = "0x82Ad20F138A46998265Ba75fdf1da4bB2E949934"  # Testnet Era RollupDAManager
+tn_atlas_verifier                   = "0xb32042d624cea1C401b854F6fc10aA3e0899d077"  # Testnet Atlas ZKsync OS verifier
 tn_chain_admin                      = "0x7cbdDA00285de05a1353803db38770043e359B6d"  # Testnet ChainAdmin (owner 0x5555…643c)
 tn_era_test_chain                   = "0xd3bc4353957bc0f138318384aa207c708a9455c4"  # Testnet Era chain 301 diamond (test_upgrade target)
 tn_zkos_test_chain                  = "0x02b1ac1cf0a592aefd3c2246b2431388365db272"  # Testnet ZKsync OS chain diamond (test_upgrade target)
@@ -463,11 +466,15 @@ desc = "Test (post-upgrade smoke): upgrade an existing ZKsync OS chain to v31 (u
 [[entries]]
 target = "tn_legacy_gov"
 selector = "0x2c431917"  # scheduleTransparent
+inner_target = "tn_atlas_ctm"
+inner_selector = "0xf2fde38b"  # transferOwnership(address)
 desc = "Testnet legacy Gov: scheduleTransparent — queues transferring Atlas (ZKsync OS) CTM ownership (Ownable2Step) to PUH. The Atlas CTM is owned by the legacy Governance pre-upgrade; this hands control to PUH for stage-1 impl/version work."
 
 [[entries]]
 target = "tn_legacy_gov"
 selector = "0x95218ecd"  # executeInstant
+inner_target = "tn_atlas_ctm"
+inner_selector = "0xf2fde38b"  # transferOwnership(address)
 desc = "Testnet legacy Gov: executeInstant — flushes the queued Atlas CTM ownership transfer to PUH now (legacy Gov minDelay = 0). PUH accepts in stage 0 (call 8)."
 
 # ─── Bundle: Atlas ValidatorTimelock ownership → PUH (signed by VT owner 0x5555…) ───
@@ -481,6 +488,35 @@ desc = "Testnet: Atlas ValidatorTimelock.transferOwnership(PUH) — queues VT ow
 target = "tn_chain_admin"
 selector = "0x69340beb"  # multicall
 desc = "Testnet ChainAdmin: multicall — administrative work on chain-owned proxies (e.g. ProxyAdmin / ServerNotifier in-place upgrade) signed by the ChainAdmin owner (0x5555…643c) during the v31 upgrade."
+
+# ─── Bundle: legacy Gov ceremony — Atlas auxiliary ownership → PUH ───
+[[entries]]
+target = "tn_legacy_gov"
+selector = "0x2c431917"  # scheduleTransparent
+inner_target = "tn_atlas_gov_upgrade_timer"
+inner_selector = "0xf2fde38b"  # transferOwnership(address)
+desc = "Testnet legacy Gov: scheduleTransparent — queues Atlas GovernanceUpgradeTimer.transferOwnership(PUH). This mirrors the stage cleanup for timer ownership."
+
+[[entries]]
+target = "tn_legacy_gov"
+selector = "0x95218ecd"  # executeInstant
+inner_target = "tn_atlas_gov_upgrade_timer"
+inner_selector = "0xf2fde38b"  # transferOwnership(address)
+desc = "Testnet legacy Gov: executeInstant — flushes Atlas GovernanceUpgradeTimer.transferOwnership(PUH). PUH accepts in stage 0."
+
+[[entries]]
+target = "tn_legacy_gov"
+selector = "0x2c431917"  # scheduleTransparent
+inner_target = "tn_atlas_rollup_da_manager"
+inner_selector = "0xf2fde38b"  # transferOwnership(address)
+desc = "Testnet legacy Gov: scheduleTransparent — queues Atlas RollupDAManager.transferOwnership(PUH). This fixes the same legacy-owner surface found on stage."
+
+[[entries]]
+target = "tn_legacy_gov"
+selector = "0x95218ecd"  # executeInstant
+inner_target = "tn_atlas_rollup_da_manager"
+inner_selector = "0xf2fde38b"  # transferOwnership(address)
+desc = "Testnet legacy Gov: executeInstant — flushes Atlas RollupDAManager.transferOwnership(PUH). PUH accepts in stage 0."
 
 # ─── Stage 0: PUH governance (pause, timers, PUH/Guardians redeploy, acceptOwnership) ───
 [[entries]]
@@ -528,6 +564,21 @@ desc = "Testnet PUH stage 0: Atlas CTM.acceptOwnership() — completes the Ownab
 target = "tn_atlas_validator_timelock"
 selector = "0x79ba5097"  # acceptOwnership()
 desc = "Testnet PUH stage 0: Atlas ValidatorTimelock.acceptOwnership() — completes the VT ownership transfer to PUH (queued in the transferOwnership bundle above)."
+
+[[entries]]
+target = "tn_atlas_gov_upgrade_timer"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Testnet PUH stage 0: Atlas GovernanceUpgradeTimer.acceptOwnership() — completes the legacy-Gov transfer to PUH."
+
+[[entries]]
+target = "tn_atlas_rollup_da_manager"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Testnet PUH stage 0: Atlas RollupDAManager.acceptOwnership() — completes the legacy-Gov transfer to PUH."
+
+[[entries]]
+target = "tn_atlas_verifier"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Testnet PUH stage 0: Atlas ZKsync OS verifier.acceptOwnership() — completes the deployer-issued verifier transfer to PUH."
 
 # ─── Stage 1: ecosystem TPA impl swaps (one PA for everything; disambiguated by arg0 proxy) ───
 [[entries]]
@@ -616,6 +667,16 @@ desc = "Testnet PUH stage 1: NTV.setAssetTracker(L1AssetTracker 0xeb298767…) �
 target = "tn_chain_asset_handler"
 selector = "0xbc3a429b"  # setAddresses
 desc = "Testnet PUH stage 1: ChainAssetHandler.setAddresses(...) — post-upgrade pointer fixups (bridgehub / AR / AT / etc.)."
+
+[[entries]]
+target = "tn_era_rollup_da_manager"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Testnet PUH stage 1: Era RollupDAManager.acceptOwnership() — completes the deployer-issued transfer to PUH before configuring the DA pair."
+
+[[entries]]
+target = "tn_era_rollup_da_manager"
+selector = "0x0e52323f"  # updateDAPair(address,uint8,bool)
+desc = "Testnet PUH stage 1: Era RollupDAManager.updateDAPair(0xcc46…, BLOBS_AND_PUBDATA_KECCAK256, true) — allows the permanent-rollup DA pair."
 
 [[entries]]
 target = "tn_atlas_gov_upgrade_timer"

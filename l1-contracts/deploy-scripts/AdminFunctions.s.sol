@@ -288,6 +288,45 @@ contract AdminFunctions is Script, IAdminFunctions {
         _ensureProxyAdminOwnedByGovernance(l1Nullifier, _governance, _wraps);
     }
 
+    /// Ensure non-proxy CTM-adjacent Ownable2Step contracts are owned by
+    /// governance. These addresses are emitted by the prepare scripts (for
+    /// example GovernanceUpgradeTimer, RollupDAManager, and the ZKsync OS
+    /// verifier), so the Rust orchestration passes them after prepare.
+    ///
+    /// Transfers are issued as the current owner, using the same owner-wrapper
+    /// registry as CTM/ProxyAdmin transfers. The deferred `acceptOwnership()`
+    /// calls are persisted separately and merged into stage 0 governance.
+    function ensureOwnable2StepTargetsOwnedByGovernanceWithWraps(
+        address[] memory _targets,
+        address _governance,
+        OwnerWrap[] memory _wraps
+    ) public {
+        Call[] memory acceptCalls = new Call[](_targets.length);
+        uint256 acceptCount = 0;
+
+        for (uint256 i = 0; i < _targets.length; i++) {
+            address target = _targets[i];
+            if (target == address(0)) {
+                continue;
+            }
+
+            Ownable2Step ownable = Ownable2Step(target);
+            address owner = ownable.owner();
+            if (owner != _governance && ownable.pendingOwner() != _governance) {
+                _issueAsOwner(owner, target, abi.encodeCall(Ownable2Step.transferOwnership, (_governance)), _wraps);
+            }
+            if (ownable.pendingOwner() == _governance) {
+                acceptCalls[acceptCount++] = Call({
+                    target: target,
+                    value: 0,
+                    data: abi.encodeCall(Ownable2Step.acceptOwnership, ())
+                });
+            }
+        }
+
+        _savePreGovernanceAuxAcceptOwnershipCalls(acceptCalls, acceptCount);
+    }
+
     /// Helper: read the EIP-1967 admin slot of `_proxy`, and if its single-step
     /// Ownable owner isn't already `_governance`, transfer ownership to it.
     function _ensureProxyAdminOwnedByGovernance(
@@ -337,12 +376,20 @@ contract AdminFunctions is Script, IAdminFunctions {
     /// of the merged governance_calls. Always written (even when empty) so
     /// the Rust side can `vm.readFile` unconditionally.
     function _savePreGovernanceAcceptOwnershipCalls(Call[] memory _calls, uint256 _count) private {
+        _saveCallList(_calls, _count, "pre-governance-accept-ownerships.toml");
+    }
+
+    function _savePreGovernanceAuxAcceptOwnershipCalls(Call[] memory _calls, uint256 _count) private {
+        _saveCallList(_calls, _count, "pre-governance-aux-accept-ownerships.toml");
+    }
+
+    function _saveCallList(Call[] memory _calls, uint256 _count, string memory _fileName) private {
         Call[] memory trimmed = new Call[](_count);
         for (uint256 i = 0; i < _count; i++) {
             trimmed[i] = _calls[i];
         }
         string memory toml = vm.serializeBytes("pre_governance_accept_ownerships", "calls", abi.encode(trimmed));
-        string memory path = string.concat(vm.projectRoot(), "/script-out/pre-governance-accept-ownerships.toml");
+        string memory path = string.concat(vm.projectRoot(), "/script-out/", _fileName);
         vm.writeToml(toml, path);
     }
 

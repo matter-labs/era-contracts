@@ -28,6 +28,7 @@ use anyhow::Context;
 use serde::Deserialize;
 
 use crate::common::paths::resolve_l1_contracts_path;
+use crate::types::L2DACommitmentScheme;
 
 const V31_UPGRADE_DIR: &str = "upgrade-envs/v0.31.0-interopB";
 const PERMANENT_VALUES_DIR: &str = "upgrade-envs/permanent-values";
@@ -205,6 +206,18 @@ pub struct CtmEntry {
     pub bytecodes_supplier: Option<Address>,
     #[serde(default)]
     pub rollup_da_manager: Option<Address>,
+    /// Optional DA pair that must be allowed on the CTM's RollupDAManager as
+    /// part of the v31 governance flow. Used when an env pins a fresh
+    /// v31-compatible manager instead of reusing the currently discoverable
+    /// pre-v31 one.
+    #[serde(default)]
+    pub rollup_da_pair: Option<RollupDAPairConfig>,
+}
+
+#[derive(Debug, Deserialize, Clone, Copy)]
+pub struct RollupDAPairConfig {
+    pub l1_da_validator: Address,
+    pub l2_da_commitment_scheme: L2DACommitmentScheme,
 }
 
 #[derive(Debug, Deserialize)]

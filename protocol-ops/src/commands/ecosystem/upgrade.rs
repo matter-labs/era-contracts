@@ -44,6 +44,16 @@ use crate::common::paths;
 use crate::common::wallets::Wallet;
 use crate::common::SharedRunArgs;
 
+alloy::sol! {
+    interface Ownable2StepAbi {
+        function acceptOwnership() external;
+    }
+
+    interface RollupDAManagerSetupAbi {
+        function updateDAPair(address l1DAValidator, uint8 l2DACommitmentScheme, bool status) external;
+    }
+}
+
 // ── upgrade-governance (stages 0 + 1 + 2 on one fork) ─────────────────────
 
 /// Run governance stages 0, 1, and 2 on the same anvil fork. Forge's
@@ -381,6 +391,7 @@ pub struct UpgradePrepareAllArgs {
     /// is_zk_sync_os = false                  # optional
     /// bytecodes_supplier = "0x..."           # optional
     /// rollup_da_manager  = "0x..."           # optional
+    /// rollup_da_pair = { l1_da_validator = "0x...", l2_da_commitment_scheme = "BlobsAndPubdataKeccak256" } # optional
     /// ```
     #[clap(long, conflicts_with_all = [
         "ctm_proxies",
@@ -430,6 +441,8 @@ struct CtmConfigEntry {
     bytecodes_supplier: Option<Address>,
     #[serde(default)]
     rollup_da_manager: Option<Address>,
+    #[serde(default)]
+    rollup_da_pair: Option<crate::common::env_config::RollupDAPairConfig>,
 }
 
 #[derive(Serialize)]
@@ -631,6 +644,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 is_zk_sync_os: args.is_zk_sync_os,
                 bytecodes_supplier: args.bytecodes_supplier_address,
                 rollup_da_manager: args.rollup_da_manager_address,
+                rollup_da_pair: None,
             })
             .collect::<Vec<_>>();
         (ctms, args.is_zk_sync_os)
@@ -660,6 +674,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 is_zk_sync_os: e.is_zk_sync_os,
                 bytecodes_supplier: e.bytecodes_supplier,
                 rollup_da_manager: e.rollup_da_manager,
+                rollup_da_pair: e.rollup_da_pair,
             })
             .collect::<Vec<_>>();
         (ctms, infer_core_is_zk_sync_os(entries))
@@ -724,10 +739,10 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         .with_new_gateway(new_gateway_cfg);
     let prepared = full.prepare(&mut runner, &deployer, &inputs).await?;
 
-    // `ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps` wrote one
-    // `acceptOwnership()` Call per Ownable2Step CTM whose pendingOwner is PUH.
-    // Those calls must execute as PUH via the governance ceremony — folded
-    // into stage 0 below, alongside the PUH/Guardians redeploy calls.
+    // The prepare pre-steps wrote `acceptOwnership()` calls for Ownable2Step
+    // contracts whose pendingOwner is PUH. Those calls must execute as PUH via
+    // the governance ceremony — folded into stage 0 below, alongside the
+    // PUH/Guardians redeploy calls.
     let pre_gov_accept_calls = read_pre_governance_accept_ownership_calls(&contracts_path)?;
 
     // Phase 1b on the same fork: redeploy ProtocolUpgradeHandler + Guardians
@@ -1035,6 +1050,14 @@ fn write_merged_ecosystem_toml(
         stage0.push(format!("0x{}", hex::encode(encode_calls(extra_stage0))));
     }
 
+    let rollup_da_manager_calls = rollup_da_manager_setup_calls(ctm_entries);
+    if !rollup_da_manager_calls.is_empty() {
+        stage1.push(format!(
+            "0x{}",
+            hex::encode(encode_calls(&rollup_da_manager_calls))
+        ));
+    }
+
     // `GatewayVotePreparation` writes a flat TOML whose `governance_calls_to_execute`
     // field is an abi-encoded `Call[]`. Pop that into the stage-2 chunks, keep
     // the rest (per-contract addresses + diamond cut data) under a top-level
@@ -1218,24 +1241,33 @@ fn write_merged_ecosystem_toml(
 }
 
 /// Walk every safe.json bundle under `prepare_dir` and rewrite each
-/// `transferOwnership(address)` tx whose `to` is in `targets` so the address
-/// argument points at `new_pending_owner` instead of whatever ChainAdmin
-/// Read the `acceptOwnership()` Call list written by
-/// `AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps`
-/// (in `<l1-contracts>/script-out/pre-governance-accept-ownerships.toml`).
-/// Returns an empty vector when the file doesn't exist (e.g. a prior regen
-/// without this step) — the merge step then has nothing to fold and the
+/// Read the `acceptOwnership()` Call lists written by the prepare ownership
+/// helpers. Returns an empty vector when files don't exist (e.g. a prior regen
+/// without these steps) — the merge step then has nothing to fold and the
 /// behavior matches the pre-refactor "no extra stage-0 calls" path.
 pub(super) fn read_pre_governance_accept_ownership_calls(
     contracts_path: &Path,
 ) -> anyhow::Result<Vec<crate::common::governance_calls::GovernanceCall>> {
-    let path = contracts_path
-        .join("script-out")
-        .join("pre-governance-accept-ownerships.toml");
+    let script_out = contracts_path.join("script-out");
+    let mut calls = Vec::new();
+    for file_name in [
+        "pre-governance-accept-ownerships.toml",
+        "pre-governance-aux-accept-ownerships.toml",
+    ] {
+        calls.extend(read_pre_governance_accept_ownership_call_file(
+            &script_out.join(file_name),
+        )?);
+    }
+    Ok(calls)
+}
+
+fn read_pre_governance_accept_ownership_call_file(
+    path: &Path,
+) -> anyhow::Result<Vec<crate::common::governance_calls::GovernanceCall>> {
     if !path.exists() {
         return Ok(Vec::new());
     }
-    let raw = fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+    let raw = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
     let parsed: toml::Table =
         toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
     // foundry's `vm.serializeBytes(objectKey, valueKey, value)` + `vm.writeToml(_, path)`
@@ -1281,6 +1313,36 @@ fn read_asset_tracker_proxy_from_core(core_toml: &Path) -> anyhow::Result<Addres
     })
 }
 
+fn rollup_da_manager_setup_calls(
+    ctm_entries: &[crate::commands::ecosystem::v31_upgrade_inner::CtmPrepareEntry],
+) -> Vec<crate::common::governance_calls::GovernanceCall> {
+    use alloy::primitives::U256;
+
+    let mut calls = Vec::new();
+    for entry in ctm_entries {
+        let Some(pair) = entry.rollup_da_pair else {
+            continue;
+        };
+
+        calls.push(crate::common::governance_calls::GovernanceCall {
+            target: entry.rollup_da_manager,
+            value: U256::ZERO,
+            data: Ownable2StepAbi::acceptOwnershipCall {}.abi_encode(),
+        });
+        calls.push(crate::common::governance_calls::GovernanceCall {
+            target: entry.rollup_da_manager,
+            value: U256::ZERO,
+            data: RollupDAManagerSetupAbi::updateDAPairCall {
+                l1DAValidator: pair.l1_da_validator,
+                l2DACommitmentScheme: pair.l2_da_commitment_scheme as u8,
+                status: true,
+            }
+            .abi_encode(),
+        });
+    }
+    calls
+}
+
 /// Read the multi-CTM config TOML and return per-CTM inputs + the
 /// `core_is_zk_sync_os` value to pass to the Core script. If the TOML doesn't
 /// set `core_is_zk_sync_os`, derive it from the CTM entries: prefer `false`
@@ -1319,6 +1381,7 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<(Vec<CtmInputs>, Option<bool>)
             is_zk_sync_os: e.is_zk_sync_os,
             bytecodes_supplier: e.bytecodes_supplier,
             rollup_da_manager: e.rollup_da_manager,
+            rollup_da_pair: e.rollup_da_pair,
         })
         .collect();
 

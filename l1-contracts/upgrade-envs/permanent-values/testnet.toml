@@ -71,12 +71,18 @@ rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 
 [[ctm_contracts.ctms]]
 # Era CTM (witness chain: 301, v29)
-# rollup_da_manager queried via `chain.getRollupDAManager()` on chain 301.
+# v31-compatible RollupDAManager deployed for the Era CTM. This intentionally
+# differs from the pre-v31 chain getter value because the old manager uses the
+# legacy `(address,address)` DA pair API, while the v31 AdminFacet requires the
+# `(address,L2DACommitmentScheme)` API.
+# The prepare flow accepts ownership of this manager as PUH and allows the
+# permanent-rollup DA pair before any chain admin tries to set it on-chain.
 # bytecodes_supplier from v0.29.1-interopA-ff/testnet.toml.
 proxy = "0x3Cc81628a14C824057a97C1B4Ab17758E5D18864"
 is_zk_sync_os = false
 bytecodes_supplier = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
-rollup_da_manager = "0x6b7D8FD12eF94485c8E928a055124F94C2B5d411"
+rollup_da_manager = "0x82Ad20F138A46998265Ba75fdf1da4bB2E949934"
+rollup_da_pair = { l1_da_validator = "0xcc46b186bd4515fa996adf3c40344ed7d546a65b", l2_da_commitment_scheme = "BlobsAndPubdataKeccak256" }
 
 # Contracts that own a CTM / ProxyAdmin and have no private key — ownership
 # transfers routed through them must be *wrapped* (called by their EOA owner via

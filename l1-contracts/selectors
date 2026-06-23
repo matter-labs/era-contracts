@@ -4902,6 +4902,8 @@ IAdminFunctions
 |----------+------------------------------------------------------------------------------------------------------------+------------|
 | Function | ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps(address,address,(address,uint8)[])                      | 0x31ca28a2 |
 |----------+------------------------------------------------------------------------------------------------------------+------------|
+| Function | ensureOwnable2StepTargetsOwnedByGovernanceWithWraps(address[],address,(address,uint8)[])                   | 0x4963d100 |
+|----------+------------------------------------------------------------------------------------------------------------+------------|
 | Function | executeOwnableCallsWithWraps(bytes,(address,uint8)[])                                                      | 0xaccce37f |
 |----------+------------------------------------------------------------------------------------------------------------+------------|
 | Function | governanceAcceptAdmin(address,address)                                                                     | 0xa0ed82fa |
