@@ -51,6 +51,36 @@ gw_l2_settlement_fee_setter         = "0x000000000000000000000000000000000001001
 gw_l2_server_notifier               = "0xBc7dD5BAC8b7afdDCAEB921699acDC54Fc5401F4"  # Gateway L2 ServerNotifier (v31 new GW)
 gw_l2_rollup_da_manager             = "0x1B756bD9aeB52435d3444004f7cdb6aD7931249a"  # Gateway L2 RollupDAManager (v31 new GW)
 
+# ─── Testnet (ZKsync-OS Sepolia) ecosystem — gateway-less, split-era (legacy 270 / registered 301).
+# Distinct address space from stage/mainnet, so these entries never collide
+# (matching is by `(target, selector)`). Two CTM flavors: Era (chain 301) +
+# Atlas (ZKsync OS). All proxies (incl. Atlas CTM/VT) sit under one PUH-owned
+# ecosystem TPA. ───
+tn_bridgehub                        = "0xc4FD2580C3487bba18D63f50301020132342fdbD"  # Testnet Bridgehub proxy
+tn_l1_asset_router                  = "0xB5d9C3F41E434b91295BD7962db5c873cEcCE2be"  # Testnet L1AssetRouter proxy
+tn_ntv                              = "0xF8d4A5195737043f45F998539D5C62Eee02E3426"  # Testnet NativeTokenVault proxy
+tn_l1_nullifier                     = "0x9e24E2c23933d30eF2DEB70A0D977Fb1Ca20AbEa"  # Testnet L1Nullifier proxy
+tn_ctm_deployment_tracker           = "0x6FCe8BB8480feBe1a8f3F5Ed083cF54703975477"  # Testnet CTMDeploymentTracker (L1CtmDeployer)
+tn_chain_asset_handler              = "0xDfA2193b161d7bd45FC81b4E80225eebDc3CF96C"  # Testnet ChainAssetHandler proxy
+tn_l1_asset_tracker                 = "0xeb2987671344263De1C03802CA31b7A00257E47A"  # Testnet L1AssetTracker proxy (v31)
+tn_message_root                     = "0xe7047cD9979D053ceb6dB637bc0383b87A3C7f58"  # Testnet L1MessageRoot proxy
+tn_chain_registration_sender        = "0xded97b2EBaA7FBfF213AD2c4a68bB0101AfBC0e8"  # Testnet ChainRegistrationSender proxy (v31)
+tn_ecosystem_tpa                    = "0xE00456791Da489418355B0a6b27965A54c7C01d2"  # Testnet ecosystem TransparentProxyAdmin (PUH-owned; also Atlas CTM/VT PA)
+tn_puh                              = "0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D"  # Testnet PUH (ProtocolUpgradeHandler proxy)
+tn_puh_proxy_admin                  = "0xd9dc52a30713c48e6e15696d258489f16c8d9ee0"  # Testnet PUH's ProxyAdmin
+tn_legacy_gov                       = "0xcf96aAb01347BA96050F39Ff6dcbC6138b462b58"  # Testnet legacy Governance (owns Atlas CTM pre-upgrade)
+tn_era_ctm                          = "0x3Cc81628a14C824057a97C1B4Ab17758E5D18864"  # Testnet Era CTM proxy (chain 301)
+tn_atlas_ctm                        = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"  # Testnet Atlas (ZKsync OS) CTM proxy
+tn_era_validator_timelock           = "0x2d259801aC24143b1F01EBF576833B8f685ACc14"  # Testnet Era ValidatorTimelock (postV29)
+tn_atlas_validator_timelock         = "0x73B668d8374DDB42c9e2f46fd5B754Ac215495bc"  # Testnet Atlas ValidatorTimelock (postV29)
+tn_era_gov_upgrade_timer            = "0x7ACa96a96a0243A76c5F4a263A94CD8F0a32F735"  # Testnet Era GovernanceUpgradeTimer
+tn_atlas_gov_upgrade_timer          = "0x1EBcF35b6FDeA128248E0Fd825980171E2e635BA"  # Testnet Atlas (ZKsync OS) GovernanceUpgradeTimer
+tn_era_upgrade_stage_validator      = "0x235CD42116360C378e74E81F3D3356CE88aA496a"  # Testnet Era UpgradeStageValidator
+tn_atlas_upgrade_stage_validator    = "0xFF70697be4BfEB4aC27eb62AF83fC91294EFa35e"  # Testnet Atlas (ZKsync OS) UpgradeStageValidator
+tn_chain_admin                      = "0x7cbdDA00285de05a1353803db38770043e359B6d"  # Testnet ChainAdmin (owner 0x5555…643c)
+tn_era_test_chain                   = "0xd3bc4353957bc0f138318384aa207c708a9455c4"  # Testnet Era chain 301 diamond (test_upgrade target)
+tn_zkos_test_chain                  = "0x02b1ac1cf0a592aefd3c2246b2431388365db272"  # Testnet ZKsync OS chain diamond (test_upgrade target)
+
 [[entries]]
 target = "upgrade_handler"
 selector = "0x2c431917"  # scheduleTransparent
@@ -419,3 +449,259 @@ desc = "Test (post-upgrade smoke): upgrade an existing Era chain to v31 (upgrade
 target = "0x98a0d85435a0e2834142bfd24a30e0c0b6866de2"  # ZKsync OS test chain (admin/diamond)
 selector = "0xfc57565f"  # upgradeChainFromVersion
 desc = "Test (post-upgrade smoke): upgrade an existing ZKsync OS chain to v31 (upgradeChainFromVersion) — verifies the upgrade path for an already-registered ZKsync OS chain."
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TESTNET (ZKsync-OS Sepolia) — gateway-less, split-era (legacy 270 / registered 301).
+# Mirrors the stage entries above with testnet addresses. Two CTM flavors:
+# Era (0x3cc8…, chain 301) and Atlas/ZKsync OS (0x54d5…). No new-Gateway calls
+# in stage 2 (testnet has no Gateway), and all proxies — including the Atlas
+# CTM and both ValidatorTimelocks — are upgraded via the single PUH-owned
+# ecosystem TPA (0xE0045679…), not a separate Atlas ProxyAdmin.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ─── Bundle: legacy Gov ceremony — Atlas CTM ownership → PUH ───
+[[entries]]
+target = "tn_legacy_gov"
+selector = "0x2c431917"  # scheduleTransparent
+desc = "Testnet legacy Gov: scheduleTransparent — queues transferring Atlas (ZKsync OS) CTM ownership (Ownable2Step) to PUH. The Atlas CTM is owned by the legacy Governance pre-upgrade; this hands control to PUH for stage-1 impl/version work."
+
+[[entries]]
+target = "tn_legacy_gov"
+selector = "0x95218ecd"  # executeInstant
+desc = "Testnet legacy Gov: executeInstant — flushes the queued Atlas CTM ownership transfer to PUH now (legacy Gov minDelay = 0). PUH accepts in stage 0 (call 8)."
+
+# ─── Bundle: Atlas ValidatorTimelock ownership → PUH (signed by VT owner 0x5555…) ───
+[[entries]]
+target = "tn_atlas_validator_timelock"
+selector = "0xf2fde38b"  # transferOwnership(address)
+desc = "Testnet: Atlas ValidatorTimelock.transferOwnership(PUH) — queues VT ownership to PUH (Ownable2Step). v31 moves the Atlas VT (still owned by 0x5555…643c) to governance; PUH accepts in stage 0 (call 9)."
+
+# ─── Bundle: ChainAdmin multicall — admin work on chain-owned proxies ───
+[[entries]]
+target = "tn_chain_admin"
+selector = "0x69340beb"  # multicall
+desc = "Testnet ChainAdmin: multicall — administrative work on chain-owned proxies (e.g. ProxyAdmin / ServerNotifier in-place upgrade) signed by the ChainAdmin owner (0x5555…643c) during the v31 upgrade."
+
+# ─── Stage 0: PUH governance (pause, timers, PUH/Guardians redeploy, acceptOwnership) ───
+[[entries]]
+target = "tn_chain_asset_handler"
+selector = "0xac700e63"  # pauseMigration()
+desc = "Testnet PUH stage 0/1: ChainAssetHandler.pauseMigration() — freezes cross-chain migrations during the upgrade window (re-asserted unconditionally at the head of stage 1)."
+
+[[entries]]
+target = "tn_atlas_gov_upgrade_timer"
+selector = "0xa39f7449"  # startTimer()
+desc = "Testnet PUH stage 0: Atlas (ZKsync OS) GovernanceUpgradeTimer.startTimer() — starts the Atlas-side deadline; stage 1 checkDeadline() asserts against it."
+
+[[entries]]
+target = "tn_era_gov_upgrade_timer"
+selector = "0xa39f7449"  # startTimer()
+desc = "Testnet PUH stage 0: Era GovernanceUpgradeTimer.startTimer() — starts the Era-side deadline."
+
+[[entries]]
+target = "tn_puh_proxy_admin"
+selector = "0x9623609d"  # upgradeAndCall(address,address,bytes)
+arg0_address = "tn_puh"
+desc = "Testnet PUH stage 0: PUH ProxyAdmin.upgradeAndCall(PUH proxy 0x803e5e7a…, new PUH impl 0x21aa63b9…, empty) — upgrades the ProtocolUpgradeHandler proxy itself (PUH/Guardians redeploy)."
+
+[[entries]]
+target = "tn_puh"
+selector = "0xdbfe3e96"  # updateSecurityCouncil(address)
+desc = "Testnet PUH stage 0: PUH.updateSecurityCouncil(0x98d22faa…) — point PUH at the freshly deployed SecurityCouncil."
+
+[[entries]]
+target = "tn_puh"
+selector = "0x691616c5"  # updateGuardians(address)
+desc = "Testnet PUH stage 0: PUH.updateGuardians(0x21f2372b…) — point PUH at the freshly deployed Guardians."
+
+[[entries]]
+target = "tn_puh"
+selector = "0x7aedf337"  # updateEmergencyUpgradeBoard(address)
+desc = "Testnet PUH stage 0: PUH.updateEmergencyUpgradeBoard(0x639b577e…) — point PUH at the freshly deployed EmergencyUpgradeBoard (embeds the new SecurityCouncil + Guardians)."
+
+[[entries]]
+target = "tn_atlas_ctm"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Testnet PUH stage 0: Atlas CTM.acceptOwnership() — completes the Ownable2Step transfer queued via the legacy-Gov ceremony; PUH now owns the Atlas CTM."
+
+[[entries]]
+target = "tn_atlas_validator_timelock"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Testnet PUH stage 0: Atlas ValidatorTimelock.acceptOwnership() — completes the VT ownership transfer to PUH (queued in the transferOwnership bundle above)."
+
+# ─── Stage 1: ecosystem TPA impl swaps (one PA for everything; disambiguated by arg0 proxy) ───
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"  # upgrade(address,address)
+arg0_address = "tn_bridgehub"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(Bridgehub 0xc4fd2580…, newImpl) — swaps Bridgehub impl to v31."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "tn_l1_nullifier"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(L1Nullifier 0x9e24e2c2…, newImpl) — swaps L1Nullifier impl to v31."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "tn_l1_asset_router"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(L1AssetRouter 0xb5d9c3f4…, newImpl) — swaps L1AssetRouter impl to v31."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "tn_ntv"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(NativeTokenVault 0xf8d4a519…, newImpl) — swaps NTV impl to v31."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x9623609d"  # upgradeAndCall(address,address,bytes)
+arg0_address = "tn_message_root"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgradeAndCall(MessageRoot 0xe7047cd9…, newImpl, initData) — swaps MessageRoot impl + runs the v31 reinitializer."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "tn_ctm_deployment_tracker"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(CTMDeploymentTracker 0x6fce8bb8…, newImpl) — swaps CTMDeploymentTracker impl to v31."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "tn_chain_asset_handler"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(ChainAssetHandler 0xdfa2193b…, newImpl) — swaps ChainAssetHandler impl to v31."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "tn_atlas_ctm"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(Atlas CTM 0x54d55e74…, newImpl) — swaps the Atlas (ZKsync OS) CTM impl to v31 (Atlas CTM is under the shared ecosystem TPA on testnet)."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "tn_atlas_validator_timelock"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(Atlas ValidatorTimelock 0x73b668d8…, newImpl) — swaps the Atlas ValidatorTimelock impl to v31."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "tn_era_ctm"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(Era CTM 0x3cc81628…, newImpl) — swaps the Era CTM impl to v31."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "tn_era_validator_timelock"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(Era ValidatorTimelock 0x2d259801…, newImpl) — swaps the Era ValidatorTimelock impl to v31."
+
+# ─── Stage 1: acceptOwnership / wiring / timer + validator checks / CTM version registration ───
+[[entries]]
+target = "tn_chain_registration_sender"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Testnet PUH stage 1: ChainRegistrationSender.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns ChainRegistrationSender."
+
+[[entries]]
+target = "tn_l1_asset_tracker"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Testnet PUH stage 1: L1AssetTracker.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns the L1AssetTracker."
+
+[[entries]]
+target = "tn_ntv"
+selector = "0xe26daa7e"  # setAssetTracker(address)
+desc = "Testnet PUH stage 1: NTV.setAssetTracker(L1AssetTracker 0xeb298767…) — wires NTV to push balance updates to the L1AT."
+
+[[entries]]
+target = "tn_chain_asset_handler"
+selector = "0xbc3a429b"  # setAddresses
+desc = "Testnet PUH stage 1: ChainAssetHandler.setAddresses(...) — post-upgrade pointer fixups (bridgehub / AR / AT / etc.)."
+
+[[entries]]
+target = "tn_atlas_gov_upgrade_timer"
+selector = "0x43bf9936"  # checkDeadline()
+desc = "Testnet PUH stage 1: Atlas GovernanceUpgradeTimer.checkDeadline() — asserts the stage-0 deadline window has elapsed (sim injects evm_increaseTime)."
+
+[[entries]]
+target = "tn_atlas_upgrade_stage_validator"
+selector = "0x386584cf"  # checkMigrationsPaused()
+desc = "Testnet PUH stage 1: Atlas UpgradeStageValidator.checkMigrationsPaused() — sanity: stage-0 pauseMigration took effect for Atlas chains."
+
+[[entries]]
+target = "tn_atlas_ctm"
+selector = "0x9b016b8b"  # setChainCreationParams
+desc = "Testnet PUH stage 1: Atlas CTM.setChainCreationParams(...) — sets v31 chain-creation params for Atlas (ZKsync OS) chains."
+
+[[entries]]
+target = "tn_atlas_ctm"
+selector = "0x8265f458"  # setNewVersionUpgrade
+desc = "Testnet PUH stage 1: Atlas CTM.setNewVersionUpgrade(...) — registers the v31 upgrade hash on the Atlas CTM."
+
+[[entries]]
+target = "tn_era_gov_upgrade_timer"
+selector = "0x43bf9936"  # checkDeadline()
+desc = "Testnet PUH stage 1: Era GovernanceUpgradeTimer.checkDeadline() — Era-side deadline check."
+
+[[entries]]
+target = "tn_era_upgrade_stage_validator"
+selector = "0x386584cf"  # checkMigrationsPaused()
+desc = "Testnet PUH stage 1: Era UpgradeStageValidator.checkMigrationsPaused() — sanity check for Era chains."
+
+[[entries]]
+target = "tn_era_ctm"
+selector = "0x9b016b8b"  # setChainCreationParams
+desc = "Testnet PUH stage 1: Era CTM.setChainCreationParams(...) — sets v31 chain-creation params for Era chains."
+
+[[entries]]
+target = "tn_era_ctm"
+selector = "0x8265f458"  # setNewVersionUpgrade
+desc = "Testnet PUH stage 1: Era CTM.setNewVersionUpgrade(...) — registers the v31 upgrade hash on the Era CTM."
+
+# ─── Stage 2: activation (gateway-less testnet → no new-Gateway bring-up calls) ───
+[[entries]]
+target = "tn_chain_asset_handler"
+selector = "0xf7c7eb92"  # unpauseMigration()
+desc = "Testnet PUH stage 2: ChainAssetHandler.unpauseMigration() — re-enables cross-chain migrations now that all impls are swapped."
+
+[[entries]]
+target = "tn_atlas_upgrade_stage_validator"
+selector = "0x37076ce3"  # checkProtocolUpgradePresence()
+desc = "Testnet PUH stage 2: Atlas UpgradeStageValidator.checkProtocolUpgradePresence() — sanity: v31 upgrade hash registered on every Atlas chain."
+
+[[entries]]
+target = "tn_atlas_upgrade_stage_validator"
+selector = "0x407a5a0b"  # checkMigrationsUnpaused()
+desc = "Testnet PUH stage 2: Atlas UpgradeStageValidator.checkMigrationsUnpaused() — sanity: migrations unpaused for Atlas chains."
+
+[[entries]]
+target = "tn_era_upgrade_stage_validator"
+selector = "0x37076ce3"  # checkProtocolUpgradePresence()
+desc = "Testnet PUH stage 2: Era UpgradeStageValidator.checkProtocolUpgradePresence() — sanity for Era chains."
+
+[[entries]]
+target = "tn_era_upgrade_stage_validator"
+selector = "0x407a5a0b"  # checkMigrationsUnpaused()
+desc = "Testnet PUH stage 2: Era UpgradeStageValidator.checkMigrationsUnpaused() — sanity for Era chains."
+
+# ─── Post-upgrade smoke tests (from [test_*]; not part of the governance ceremony) ───
+[[entries]]
+target = "tn_bridgehub"
+selector = "0xf113c88b"  # createNewChain
+arg0_address = "0x000000000000000000000000000000000000022b"  # chainId 555 (Era test chain)
+desc = "Testnet test (post-upgrade smoke): Bridgehub.createNewChain(chainId 555, Era CTM) — verifies a fresh Era chain can be created on v31."
+
+[[entries]]
+target = "tn_bridgehub"
+selector = "0xf113c88b"  # createNewChain
+arg0_address = "0x000000000000000000000000000000000000022c"  # chainId 556 (ZKsync OS test chain)
+desc = "Testnet test (post-upgrade smoke): Bridgehub.createNewChain(chainId 556, Atlas/ZKsync OS CTM) — verifies a fresh ZKsync OS chain can be created on v31."
+
+[[entries]]
+target = "tn_era_test_chain"
+selector = "0xfc57565f"  # upgradeChainFromVersion
+desc = "Testnet test (post-upgrade smoke): upgrade the registered Era chain 301 (upgradeChainFromVersion) — verifies the upgrade path for an existing Era chain."
+
+[[entries]]
+target = "tn_zkos_test_chain"
+selector = "0xfc57565f"  # upgradeChainFromVersion
+desc = "Testnet test (post-upgrade smoke): upgrade an existing ZKsync OS chain (upgradeChainFromVersion) — verifies the upgrade path for an existing ZKsync OS chain."
