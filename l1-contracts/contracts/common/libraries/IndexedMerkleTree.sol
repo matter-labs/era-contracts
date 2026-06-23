@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {MAX_LOW_INDEX_SEARCH_ATTEMPTS} from "../Config.sol";
 import {
     IMTAlreadyInitialized,
-    IMTCapacityExceeded,
     IMTLowLeafIndexOutOfBounds,
     IMTLowLeafNextTooSmall,
     IMTLowLeafValueTooLarge,
@@ -58,10 +57,11 @@ library IndexedMerkleTree {
     /// up to `MAX_LOW_INDEX_SEARCH_ATTEMPTS` times.
     /// @return newIndex The index of the inserted leaf.
     /// @return newRoot The root after insertion.
-    function insert(IMT storage self, uint256 _value, uint256 _lowLeafIndex)
-        internal
-        returns (uint256 newIndex, bytes32 newRoot)
-    {
+    function insert(
+        IMT storage self,
+        uint256 _value,
+        uint256 _lowLeafIndex
+    ) internal returns (uint256 newIndex, bytes32 newRoot) {
         uint256 leafNumber = self.tree._leafNumber;
         if (leafNumber == 0) {
             revert IMTNotInitialized();
@@ -91,7 +91,7 @@ library IndexedMerkleTree {
             lowLeaf = self.leaves[lowLeafIndex];
         }
 
-        newIndex = leafNumber;s
+        newIndex = leafNumber;
 
         uint256 oldNextIndex = lowLeaf.nextIndex;
         uint256 oldNextValue = lowLeaf.nextValue;

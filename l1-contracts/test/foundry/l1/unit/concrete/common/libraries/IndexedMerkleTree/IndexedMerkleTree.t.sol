@@ -148,17 +148,17 @@ contract IndexedMerkleTreeTest is Test {
     }
 
     function test_RevertWhen_LowLeafValueIsTooLarge() public {
-        (uint256 leafIndex,) = tree.insert(10, 0);
+        (uint256 leafIndex, ) = tree.insert(10, 0);
 
         vm.expectRevert(abi.encodeWithSelector(IMTLowLeafValueTooLarge.selector, 10, 5));
         tree.insert(5, leafIndex);
     }
 
     function test_InsertFindsUpdatedLowLeafWhenSuppliedLowLeafIsStale() public {
-        (uint256 firstIndex,) = tree.insert(10, 0);
-        (uint256 secondIndex,) = tree.insert(20, firstIndex);
+        (uint256 firstIndex, ) = tree.insert(10, 0);
+        (uint256 secondIndex, ) = tree.insert(20, firstIndex);
 
-        (uint256 thirdIndex,) = tree.insert(15, 0);
+        (uint256 thirdIndex, ) = tree.insert(15, 0);
 
         _assertLeaf(tree.leaf(0), 0, firstIndex, 10);
         _assertLeaf(tree.leaf(firstIndex), 10, thirdIndex, 15);
@@ -169,7 +169,7 @@ contract IndexedMerkleTreeTest is Test {
         uint256 lowLeafIndex = 0;
         for (uint256 i = 0; i <= MAX_LOW_INDEX_SEARCH_ATTEMPTS; ++i) {
             uint256 value = (i + 1) * 10;
-            (lowLeafIndex,) = tree.insert(value, lowLeafIndex);
+            (lowLeafIndex, ) = tree.insert(value, lowLeafIndex);
         }
 
         vm.expectRevert(abi.encodeWithSelector(IMTLowLeafNextTooSmall.selector, 60, 70));
@@ -189,7 +189,7 @@ contract IndexedMerkleTreeTest is Test {
     }
 
     function test_VerifyNonInclusionWithMiddleInterval() public {
-        (uint256 firstIndex,) = tree.insert(10, 0);
+        (uint256 firstIndex, ) = tree.insert(10, 0);
         tree.insert(20, firstIndex);
         bytes32 root = tree.root();
         IMTLeaf memory lowLeaf = tree.leaf(firstIndex);
@@ -222,11 +222,11 @@ contract IndexedMerkleTreeTest is Test {
     function test_MerklePathUsesCurrentFullMerkleHeight() public {
         assertEq(tree.merklePath(0).length, 0);
 
-        (uint256 firstIndex,) = tree.insert(10, 0);
+        (uint256 firstIndex, ) = tree.insert(10, 0);
         assertEq(tree.merklePath(0).length, 1);
         assertEq(tree.merklePath(firstIndex).length, 1);
 
-        (uint256 secondIndex,) = tree.insert(20, firstIndex);
+        (uint256 secondIndex, ) = tree.insert(20, firstIndex);
         assertEq(tree.merklePath(secondIndex).length, 2);
     }
 
