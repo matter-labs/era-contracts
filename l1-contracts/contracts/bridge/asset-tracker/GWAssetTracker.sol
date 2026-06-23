@@ -26,6 +26,7 @@ import {
     L2_COMPLEX_UPGRADER_ADDR,
     L2_COMPRESSOR_ADDR,
     L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_INTEROP_HANDLER_ADDR,
     L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR,
     L2_MESSAGE_ROOT,
@@ -346,6 +347,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                     // No further action is required in this case.
                 } else if (log.key == bytes32(uint256(uint160(address(L2_INTEROP_HANDLER_ADDR))))) {
                     _handleInteropHandlerMessage(_processLogsInputs.chainId, message);
+                } else if (log.key == bytes32(uint256(uint160(L2_INTEROP_COMMITMENT_TREE_ADDR)))) {
+                    // The atomic-interop commitment tree publishes `abi.encode(root)` on every insert
+                    // (and the genesis seed). The settlement layer needs no action: the message is
+                    // authenticated downstream by consuming chains against the interop root they import
+                    // for this chain. It is already folded into the reconstructed logs tree above.
                 } else if (uint256(log.key) <= MAX_BUILT_IN_CONTRACT_ADDR) {
                     // This Log is not supported
                     revert InvalidBuiltInContractMessage(logCount, msgCount - 1, log.key);
