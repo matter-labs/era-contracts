@@ -43,6 +43,7 @@ sol! {
         function l1CtmDeployer() external view returns (address);
         function messageRoot() external view returns (address);
         function chainAssetHandler() external view returns (address);
+        function chainRegistrationSender() external view returns (address);
         function getZKChain(uint256 _chainId) external view returns (address chainAddress);
         function baseToken(uint256 _chainId) external view returns (address);
         function requestL2TransactionDirect(
@@ -58,6 +59,11 @@ sol! {
         function ERA_CHAIN_ID() public view returns (uint256);
 
         function nativeTokenVault() public view returns (address);
+    }
+
+    #[sol(rpc)]
+    contract L1NativeTokenVault {
+        function bridgedTokenBeacon() external view returns (address);
     }
 
     #[sol(rpc)]

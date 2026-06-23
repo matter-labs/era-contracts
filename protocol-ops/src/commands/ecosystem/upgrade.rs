@@ -1013,7 +1013,7 @@ fn write_merged_ecosystem_toml(
     let mut zksync_os_test_calls: Option<TestUpgradeCalls> = None;
 
     for entry in ctm_entries {
-        let (body, gov, test_calls) = load_and_split(&entry.toml)?;
+        let (mut body, gov, test_calls) = load_and_split(&entry.toml)?;
         let label = if entry.is_zk_sync_os {
             "zksync_os"
         } else {
@@ -1023,6 +1023,18 @@ fn write_merged_ecosystem_toml(
             anyhow::bail!(
                 "duplicate CTM flavor `{label}`: two CTMs cannot share the same `is_zk_sync_os` value in one upgrade"
             );
+        }
+        if let Some(pair) = entry.rollup_da_pair {
+            let mut pair_table = Table::new();
+            pair_table.insert(
+                "l1_da_validator".to_string(),
+                Value::String(format!("{:#x}", pair.l1_da_validator)),
+            );
+            pair_table.insert(
+                "l2_da_commitment_scheme".to_string(),
+                Value::String(pair.l2_da_commitment_scheme.to_string()),
+            );
+            body.insert("rollup_da_pair".to_string(), Value::Table(pair_table));
         }
         ctms_table.insert(label.to_string(), Value::Table(body));
         stage0.push(gov.stage0_calls);

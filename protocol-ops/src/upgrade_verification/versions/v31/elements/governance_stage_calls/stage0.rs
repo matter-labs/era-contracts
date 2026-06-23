@@ -386,10 +386,11 @@ async fn collect_pre_governance_accept_ownership_targets(
     governance: Address,
     result: &mut VerificationResult,
 ) -> anyhow::Result<Vec<Address>> {
-    // Candidates: each CTM proxy plus its ValidatorTimelock. v31's
-    // `ensureCtmsAndProxyAdminsOwnedByGovernance` transfers both to governance
-    // (Ownable2Step) and defers the accept to stage 0; include any whose
-    // pendingOwner is governance at prepare time.
+    // Candidates: each CTM proxy plus its ValidatorTimelock and auxiliary
+    // ownership targets discovered from the generated artifact. v31's
+    // prepare flow transfers any still-stale Ownable2Step contracts to
+    // governance and defers the accept to stage 0; include only candidates
+    // whose live pendingOwner is governance at verify time.
     let mut candidates: Vec<Address> = Vec::new();
     for ctm in &artifact.ctms {
         if let Some(ctm_proxy) = required_ctm_address(
@@ -413,6 +414,33 @@ async fn collect_pre_governance_accept_ownership_targets(
         ) {
             if vt != Address::ZERO && !candidates.contains(&vt) {
                 candidates.push(vt);
+            }
+        }
+        if let Some(timer) = required_ctm_address(
+            ctm,
+            &["deployed_addresses", "l1_governance_upgrade_timer"],
+            result,
+        ) {
+            if timer != Address::ZERO && !candidates.contains(&timer) {
+                candidates.push(timer);
+            }
+        }
+        if ctm.value.get("rollup_da_pair").is_none() {
+            if let Some(rollup_da_manager) =
+                required_ctm_address(ctm, &["deployed_addresses", "l1_rollup_da_manager"], result)
+            {
+                if rollup_da_manager != Address::ZERO && !candidates.contains(&rollup_da_manager) {
+                    candidates.push(rollup_da_manager);
+                }
+            }
+        }
+        if ctm.flavor == CtmFlavor::ZksyncOs {
+            if let Some(verifier) =
+                required_ctm_address(ctm, &["state_transition", "verifier_addr"], result)
+            {
+                if verifier != Address::ZERO && !candidates.contains(&verifier) {
+                    candidates.push(verifier);
+                }
             }
         }
     }
@@ -522,12 +550,12 @@ fn verify_pre_governance_accept_ownership_tail(
             .collect::<Vec<_>>()
             .join(", ");
         result.report_error(&format!(
-            "Stage-0 deferred acceptOwnership tail is missing expected CTM target(s): {missing}"
+            "Stage-0 deferred acceptOwnership tail is missing expected target(s): {missing}"
         ));
         errors += 1;
     } else {
         result.report_ok(&format!(
-            "Stage-0 deferred acceptOwnership tail matches {} expected CTM target(s)",
+            "Stage-0 deferred acceptOwnership tail matches {} expected target(s)",
             expected_targets.len()
         ));
     }

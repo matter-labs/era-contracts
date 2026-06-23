@@ -11,8 +11,8 @@ use crate::upgrade_verification::{
             fee_param_verifier::{FeeParamVerifier, FeeParams},
             network_verifier::{
                 Bridgehub as BridgehubContract, ChainRegistrationSender, ChainTypeManager,
-                L1AssetRouter, L1AssetTracker, Ownable, Ownable2Step, ValidatorTimelock,
-                ZKChainFeeParams,
+                L1AssetRouter, L1AssetTracker, L1NativeTokenVault, Ownable, Ownable2Step,
+                ValidatorTimelock, ZKChainFeeParams,
             },
         },
         MAX_PRIORITY_TX_GAS_LIMIT, STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID,
@@ -45,6 +45,7 @@ const CORE_PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
     "ctm_deployment_tracker_proxy",
     "chain_asset_handler_proxy",
     "asset_tracker_proxy",
+    "chain_registration_sender_proxy",
 ];
 
 fn expect_address_eq(
@@ -162,6 +163,8 @@ pub(crate) async fn verify_v31_artifact_state(
     verify_v31_proxy_admins(artifact, verifiers, result).await?;
     verify_v31_core_wiring(artifact, verifiers, result).await?;
     verify_v31_validator_timelocks(artifact, verifiers, result).await?;
+    verify_v31_rollup_da_managers(artifact, verifiers, result).await?;
+    verify_v31_zksync_os_verifier_ownership(artifact, verifiers, result).await?;
     verify_v31_era_fee_params(verifiers, result).await;
     verify_v31_timer_admin_state(artifact, verifiers, result).await?;
     verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await?;
@@ -259,6 +262,11 @@ async fn verify_v31_proxy_admins(
         for (proxy_label, proxy_path) in [
             ("chain_type_manager_proxy", "chain_type_manager_proxy"),
             ("validator_timelock_addr", "validator_timelock_addr"),
+            ("bytecodes_supplier_addr", "bytecodes_supplier_addr"),
+            (
+                "permissionless_validator_addr",
+                "permissionless_validator_addr",
+            ),
         ] {
             let proxy_addr =
                 required_address(&ctm.value, &scope, &["state_transition", proxy_path])?;
@@ -322,6 +330,11 @@ async fn verify_v31_core_wiring(
         &artifact.core,
         "core",
         &["upgrade_addresses", "native_token_vault_addr"],
+    )?;
+    let expected_bridged_token_beacon = required_address(
+        &artifact.core,
+        "core",
+        &["upgrade_addresses", "bridges", "bridged_token_beacon"],
     )?;
     let expected_tracker = required_address(
         &artifact.core,
@@ -433,6 +446,37 @@ async fn verify_v31_core_wiring(
         )),
     }
 
+    let ntv = L1NativeTokenVault::new(expected_ntv, provider.clone());
+    match ntv.bridgedTokenBeacon().call().await {
+        Ok(actual_beacon) => {
+            expect_address_eq(
+                result,
+                "L1NativeTokenVault.bridgedTokenBeacon()",
+                actual_beacon,
+                expected_bridged_token_beacon,
+            );
+            if actual_beacon == Address::ZERO {
+                result.report_error("L1NativeTokenVault.bridgedTokenBeacon() is address(0)");
+            } else {
+                let beacon_owner = Ownable::new(actual_beacon, provider.clone());
+                match beacon_owner.owner().call().await {
+                    Ok(actual_owner) => expect_address_eq(
+                        result,
+                        "L1NativeTokenVault.bridgedTokenBeacon().owner()",
+                        actual_owner,
+                        bridgehub_owner,
+                    ),
+                    Err(err) => result.report_error(&format!(
+                        "Failed to call bridged token beacon owner() for core wiring checks: {err}"
+                    )),
+                }
+            }
+        }
+        Err(err) => result.report_error(&format!(
+            "Failed to call L1NativeTokenVault.bridgedTokenBeacon() for core wiring checks: {err}"
+        )),
+    }
+
     let asset_tracker = L1AssetTracker::new(expected_tracker, provider.clone());
     match asset_tracker.BRIDGE_HUB().call().await {
         Ok(actual) => expect_address_eq(
@@ -523,6 +567,18 @@ async fn verify_v31_core_wiring(
         ),
         Err(err) => result.report_error(&format!(
             "Failed to call Bridgehub.messageRoot() for core wiring checks: {err}"
+        )),
+    }
+
+    match bridgehub.chainRegistrationSender().call().await {
+        Ok(actual) => expect_address_eq(
+            result,
+            "Bridgehub.chainRegistrationSender()",
+            actual,
+            expected_chain_registration_sender,
+        ),
+        Err(err) => result.report_error(&format!(
+            "Failed to call Bridgehub.chainRegistrationSender() for core wiring checks: {err}"
         )),
     }
 
@@ -619,6 +675,87 @@ async fn verify_v31_validator_timelocks(
             )),
         }
     }
+    Ok(())
+}
+
+async fn verify_v31_rollup_da_managers(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> Result<()> {
+    let provider = verifiers.network_verifier.get_l1_provider();
+    for ctm in &artifact.ctms {
+        let label = ctm.flavor.label();
+        let scope = format!("ctms.{label}");
+        let rollup_da_manager = required_address(
+            &ctm.value,
+            &scope,
+            &["deployed_addresses", "l1_rollup_da_manager"],
+        )?;
+        let expected_owner =
+            required_address(&ctm.value, &scope, &["admin", "timer_governance_addr"])?;
+
+        let ownable = Ownable2Step::new(rollup_da_manager, provider.clone());
+        match (
+            ownable.owner().call().await,
+            ownable.pendingOwner().call().await,
+        ) {
+            (Ok(owner), _) if owner == expected_owner => result.report_ok(&format!(
+                "{label}.RollupDAManager.owner() matches expected ({expected_owner})"
+            )),
+            (Ok(_), Ok(pending)) if pending == expected_owner => result.report_ok(&format!(
+                "{label}.RollupDAManager ownership transfer to {expected_owner} is pending"
+            )),
+            (Ok(owner), _) => result.report_error(&format!(
+                "{label}.RollupDAManager.owner() mismatch: expected {expected_owner} (or pendingOwner), got {owner}"
+            )),
+            (Err(err), _) => result.report_error(&format!(
+                "Failed to call {label}.RollupDAManager.owner(): {err}"
+            )),
+        }
+    }
+
+    Ok(())
+}
+
+async fn verify_v31_zksync_os_verifier_ownership(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> Result<()> {
+    let provider = verifiers.network_verifier.get_l1_provider();
+    for ctm in &artifact.ctms {
+        if ctm.flavor != CtmFlavor::ZksyncOs {
+            continue;
+        }
+
+        let label = ctm.flavor.label();
+        let scope = format!("ctms.{label}");
+        let verifier =
+            required_address(&ctm.value, &scope, &["state_transition", "verifier_addr"])?;
+        let expected_owner =
+            required_address(&ctm.value, &scope, &["admin", "timer_governance_addr"])?;
+
+        let ownable = Ownable2Step::new(verifier, provider.clone());
+        match (
+            ownable.owner().call().await,
+            ownable.pendingOwner().call().await,
+        ) {
+            (Ok(owner), _) if owner == expected_owner => result.report_ok(&format!(
+                "{label}.verifier.owner() matches expected ({expected_owner})"
+            )),
+            (Ok(_), Ok(pending)) if pending == expected_owner => result.report_ok(&format!(
+                "{label}.verifier ownership transfer to {expected_owner} is pending"
+            )),
+            (Ok(owner), _) => result.report_error(&format!(
+                "{label}.verifier.owner() mismatch: expected {expected_owner} (or pendingOwner), got {owner}"
+            )),
+            (Err(err), _) => result.report_error(&format!(
+                "Failed to call {label}.verifier.owner(): {err}"
+            )),
+        }
+    }
+
     Ok(())
 }
 

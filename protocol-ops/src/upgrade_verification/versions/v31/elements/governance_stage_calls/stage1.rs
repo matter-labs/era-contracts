@@ -14,11 +14,13 @@
 
 use alloy::{
     hex,
-    primitives::U256,
+    primitives::{Address, U256},
     sol_types::{SolCall, SolValue},
 };
 use anyhow::Context;
+use serde::Deserialize;
 
+use crate::types::L2DACommitmentScheme;
 use crate::upgrade_verification::{
     artifacts::{CtmArtifact, CtmFlavor, EcosystemUpgradeArtifact},
     verifiers::{VerificationResult, Verifiers},
@@ -42,8 +44,9 @@ use super::helpers::{
     required_ctm_address, verify_call_by_address, verify_call_by_name,
 };
 use super::{
-    initializeL1V31UpgradeCall, setAssetTrackerCall, setChainCreationParamsCall,
-    upgradeAndCallCall, upgradeCall, CallList, GovernanceStage1Calls,
+    acceptOwnershipCall, initializeL1V31UpgradeCall, setAssetTrackerCall,
+    setChainCreationParamsCall, updateDAPairCall, upgradeAndCallCall, upgradeCall, CallList,
+    GovernanceStage1Calls,
 };
 
 /// Number of generated ecosystem-wide stage-1 calls before any per-CTM block.
@@ -60,6 +63,20 @@ const PER_CTM_OFFSET_UPGRADE_CTM: usize = 2;
 const PER_CTM_OFFSET_SET_CHAIN_CREATION_PARAMS: usize = 3;
 const PER_CTM_OFFSET_SET_NEW_VERSION_UPGRADE: usize = 4;
 const PER_CTM_OFFSET_UPGRADE_VALIDATOR_TIMELOCK: usize = 5;
+
+#[derive(Debug, Clone, Copy)]
+struct RollupDAManagerSetup {
+    flavor: CtmFlavor,
+    rollup_da_manager: Address,
+    l1_da_validator: Address,
+    l2_da_commitment_scheme: u8,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+struct RollupDAPairArtifact {
+    l1_da_validator: Address,
+    l2_da_commitment_scheme: L2DACommitmentScheme,
+}
 
 fn ctm_block_start(ctm_index: usize, call_offset: usize) -> usize {
     call_offset + STAGE1_GENERATED_PREFIX_LEN + ctm_index * STAGE1_PER_CTM_LEN
@@ -85,6 +102,211 @@ fn find_ctm_block_start(
     (0..num_ctms)
         .map(|k| ctm_block_start(k, call_offset))
         .find(|&block| calls.elems.get(block).is_some_and(|c| c.target == timer))
+}
+
+fn rollup_da_manager_setups(
+    ctms: &[CtmArtifact],
+    result: &mut VerificationResult,
+) -> (Vec<RollupDAManagerSetup>, usize) {
+    let mut setups = Vec::new();
+    let mut errors = 0usize;
+
+    for ctm in ctms {
+        let Some(pair_value) = ctm.value.get("rollup_da_pair") else {
+            continue;
+        };
+        let pair = match pair_value.clone().try_into::<RollupDAPairArtifact>() {
+            Ok(pair) => pair,
+            Err(err) => {
+                result.report_error(&format!(
+                    "[ctms.{}.rollup_da_pair] is invalid: {err}",
+                    ctm.flavor.label()
+                ));
+                errors += 1;
+                continue;
+            }
+        };
+
+        if pair.l1_da_validator == Address::ZERO {
+            result.report_error(&format!(
+                "[ctms.{}.rollup_da_pair.l1_da_validator] must not be zero",
+                ctm.flavor.label()
+            ));
+            errors += 1;
+            continue;
+        }
+        if pair.l2_da_commitment_scheme == L2DACommitmentScheme::None {
+            result.report_error(&format!(
+                "[ctms.{}.rollup_da_pair.l2_da_commitment_scheme] must not be None",
+                ctm.flavor.label()
+            ));
+            errors += 1;
+            continue;
+        }
+
+        let Some(rollup_da_manager) =
+            required_ctm_address(ctm, &["deployed_addresses", "l1_rollup_da_manager"], result)
+        else {
+            errors += 1;
+            continue;
+        };
+        if rollup_da_manager == Address::ZERO {
+            result.report_error(&format!(
+                "[ctms.{}.deployed_addresses.l1_rollup_da_manager] must not be zero when rollup_da_pair is configured",
+                ctm.flavor.label()
+            ));
+            errors += 1;
+            continue;
+        }
+
+        setups.push(RollupDAManagerSetup {
+            flavor: ctm.flavor,
+            rollup_da_manager,
+            l1_da_validator: pair.l1_da_validator,
+            l2_da_commitment_scheme: pair.l2_da_commitment_scheme as u8,
+        });
+    }
+
+    (setups, errors)
+}
+
+fn verify_rollup_da_manager_setup_calls(
+    calls: &CallList,
+    start_index: usize,
+    expected: &[RollupDAManagerSetup],
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> usize {
+    let mut errors = 0usize;
+    let mut seen = vec![false; expected.len()];
+
+    for pair_index in 0..expected.len() {
+        let accept_index = start_index + pair_index * 2;
+        let update_index = accept_index + 1;
+        let Some(accept_call) = calls.elems.get(accept_index) else {
+            result.report_error(&format!(
+                "Missing RollupDAManager acceptOwnership call at stage1 index {accept_index}"
+            ));
+            errors += 1;
+            continue;
+        };
+        let Some(update_call) = calls.elems.get(update_index) else {
+            result.report_error(&format!(
+                "Missing RollupDAManager updateDAPair call at stage1 index {update_index}"
+            ));
+            errors += 1;
+            continue;
+        };
+
+        if accept_call.value != U256::ZERO {
+            result.report_error(&format!(
+                "RollupDAManager acceptOwnership call #{accept_index} must have zero value, got {}",
+                accept_call.value
+            ));
+            errors += 1;
+        }
+        if update_call.value != U256::ZERO {
+            result.report_error(&format!(
+                "RollupDAManager updateDAPair call #{update_index} must have zero value, got {}",
+                update_call.value
+            ));
+            errors += 1;
+        }
+        if accept_call.data.as_ref() != acceptOwnershipCall::SELECTOR.as_slice() {
+            result.report_error(&format!(
+                "RollupDAManager setup call #{accept_index} must be acceptOwnership(), got selector 0x{}",
+                hex::encode(&accept_call.data[0..4.min(accept_call.data.len())])
+            ));
+            errors += 1;
+        }
+        if update_call.target != accept_call.target {
+            result.report_error(&format!(
+                "RollupDAManager setup calls #{accept_index}/#{update_index} target different contracts: {} vs {}",
+                accept_call.target, update_call.target
+            ));
+            errors += 1;
+        }
+
+        let Some(expected_index) = expected.iter().enumerate().position(|(index, setup)| {
+            !seen[index] && setup.rollup_da_manager == accept_call.target
+        }) else {
+            result.report_error(&format!(
+                "RollupDAManager setup call #{accept_index} targets unexpected manager {} ({})",
+                accept_call.target,
+                verifiers
+                    .address_verifier
+                    .name_or_unknown(&accept_call.target)
+            ));
+            errors += 1;
+            continue;
+        };
+        seen[expected_index] = true;
+        let setup = expected[expected_index];
+
+        let decoded = match updateDAPairCall::abi_decode(&update_call.data) {
+            Ok(decoded) => decoded,
+            Err(err) => {
+                result.report_error(&format!(
+                    "Failed to decode RollupDAManager updateDAPair call #{update_index}: {err}"
+                ));
+                errors += 1;
+                continue;
+            }
+        };
+        if decoded.l1DAValidator != setup.l1_da_validator {
+            result.report_error(&format!(
+                "{} RollupDAManager updateDAPair l1DAValidator mismatch: expected {}, got {}",
+                setup.flavor.label(),
+                setup.l1_da_validator,
+                decoded.l1DAValidator
+            ));
+            errors += 1;
+        }
+        if decoded.l2DACommitmentScheme != setup.l2_da_commitment_scheme {
+            result.report_error(&format!(
+                "{} RollupDAManager updateDAPair l2DACommitmentScheme mismatch: expected {}, got {}",
+                setup.flavor.label(),
+                setup.l2_da_commitment_scheme,
+                decoded.l2DACommitmentScheme
+            ));
+            errors += 1;
+        }
+        if !decoded.status {
+            result.report_error(&format!(
+                "{} RollupDAManager updateDAPair status must be true",
+                setup.flavor.label()
+            ));
+            errors += 1;
+        }
+        if decoded.l1DAValidator == setup.l1_da_validator
+            && decoded.l2DACommitmentScheme == setup.l2_da_commitment_scheme
+            && decoded.status
+            && update_call.target == accept_call.target
+        {
+            result.report_ok(&format!(
+                "{} RollupDAManager setup allows ({}, {}) on {}",
+                setup.flavor.label(),
+                setup.l1_da_validator,
+                setup.l2_da_commitment_scheme,
+                setup.rollup_da_manager
+            ));
+        }
+    }
+
+    for setup in expected
+        .iter()
+        .enumerate()
+        .filter_map(|(index, setup)| (!seen[index]).then_some(setup))
+    {
+        result.report_error(&format!(
+            "{} RollupDAManager setup for {} is missing from the stage1 tail",
+            setup.flavor.label(),
+            setup.rollup_da_manager
+        ));
+        errors += 1;
+    }
+
+    errors
 }
 
 /// v31's `DefaultCoreUpgrade.prepareStage1GovernanceCalls` prepends one leading
@@ -129,6 +351,8 @@ impl GovernanceStage1Calls {
 
         let call_offset = STAGE1_LEADING_PAUSE_OFFSET;
         let mut errors = 0;
+        let (rollup_da_setups, rollup_da_setup_errors) = rollup_da_manager_setups(ctms, result);
+        errors += rollup_da_setup_errors;
         // DefaultCoreUpgrade prepends a leading pauseMigration() re-assert to
         // stage-1 in every env (see STAGE1_LEADING_PAUSE_OFFSET), so verify it
         // unconditionally at index 0.
@@ -300,8 +524,9 @@ impl GovernanceStage1Calls {
             }
         }
 
-        let expected_call_count =
+        let canonical_call_count =
             call_offset + STAGE1_GENERATED_PREFIX_LEN + ctms.len() * STAGE1_PER_CTM_LEN;
+        let expected_call_count = canonical_call_count + rollup_da_setups.len() * 2;
         match self.calls.elems.len().cmp(&expected_call_count) {
             std::cmp::Ordering::Less => {
                 result.report_error(&format!(
@@ -321,6 +546,13 @@ impl GovernanceStage1Calls {
             }
             std::cmp::Ordering::Equal => {}
         }
+        errors += verify_rollup_da_manager_setup_calls(
+            &self.calls,
+            canonical_call_count,
+            &rollup_da_setups,
+            verifiers,
+            result,
+        );
 
         // The accepted AssetTracker proxy must be the one wired into NativeTokenVault.
         if let (Some(accept_call), Some(set_asset_tracker_call)) = (

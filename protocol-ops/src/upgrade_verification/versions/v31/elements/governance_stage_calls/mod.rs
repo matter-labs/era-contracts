@@ -61,6 +61,7 @@ sol! {
     function updateSecurityCouncil(address _newSecurityCouncil);
     function updateGuardians(address _newGuardians);
     function updateEmergencyUpgradeBoard(address _newEmergencyUpgradeBoard);
+    function updateDAPair(address l1DAValidator, uint8 l2DACommitmentScheme, bool status);
 
     // L2-side selectors carried as `l2Calldata` inside the new-Gateway
     // bring-up priority txs. Decoded by `verify_gateway_bring_up_calls` to
