@@ -486,7 +486,13 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         bool _isNativeToThisChain,
         address _tokenAddress
     ) internal view returns (bool) {
+        // We never force set the migration number for tokens native to the chain
         if (_isNativeToThisChain) {
+            return false;
+        }
+        // We never force set the migration number for the base token the total supply of which needs backfilling,
+        // since then the `totalSupply` would revert.
+        if (needBaseTokenTotalSupplyBackfill && _tokenAddress == address(L2_BASE_TOKEN_SYSTEM_CONTRACT)) {
             return false;
         }
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
