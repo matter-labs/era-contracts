@@ -664,6 +664,11 @@ selector = "0xe26daa7e"  # setAssetTracker(address)
 desc = "Testnet PUH stage 1: NTV.setAssetTracker(L1AssetTracker 0xeb298767…) — wires NTV to push balance updates to the L1AT."
 
 [[entries]]
+target = "tn_bridgehub"
+selector = "0xa17223b0"  # setAddressesV31(address)
+desc = "Testnet PUH stage 1: Bridgehub.setAddressesV31(ChainRegistrationSender 0xded97b2E…) — wires Bridgehub to the v31 ChainRegistrationSender."
+
+[[entries]]
 target = "tn_chain_asset_handler"
 selector = "0xbc3a429b"  # setAddresses
 desc = "Testnet PUH stage 1: ChainAssetHandler.setAddresses(...) — post-upgrade pointer fixups (bridgehub / AR / AT / etc.)."

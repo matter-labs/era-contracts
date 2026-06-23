@@ -1,16 +1,29 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use alloy::dyn_abi::{DynSolType, DynSolValue};
 use alloy::hex;
 use alloy::primitives::Address;
+use alloy::sol_types::SolCall;
 use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
 use crate::common::governance_calls::decode_calls;
 use crate::common::logger;
+
+alloy::sol! {
+    struct ChainAdminCall {
+        address target;
+        uint256 value;
+        bytes data;
+    }
+
+    interface ChainAdminAbi {
+        function multicall(ChainAdminCall[] _calls, bool _requireSuccess) external payable;
+    }
+}
 
 /// Optional human-description registry. Loaded from a TOML at
 /// `<env>/sim-descriptions.toml` (auto-discovered from `--env`) or via an
@@ -408,6 +421,7 @@ pub struct GovernanceTomlToSimulatorArgs {
 #[derive(Debug, Deserialize)]
 struct CtmAdminCallsSection {
     chain_admin: Address,
+    server_notifier_upgrade: String,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -421,7 +435,7 @@ struct GovernanceCallsToml {
     governance_calls: GovernanceCalls,
     #[serde(default)]
     test_upgrade_calls: BTreeMap<String, String>,
-    /// Per-CTM flavor sections — only `ctm_admin_calls.chain_admin` is consumed
+    /// Per-CTM flavor sections used to label ChainAdmin manifest bundles.
     #[serde(default)]
     ctms: BTreeMap<String, CtmFlavorSection>,
 }
@@ -432,20 +446,56 @@ const CTM_ADMIN_CALLS_FLAVOR_TAGS: &[(&str, &str)] = &[
     ("zksync_os", "ctm_admin_calls_zkos"),
 ];
 
-/// Builds a `chain_admin → simulator tag` map from the parsed TOML.
-/// Keyed by the ChainAdmin address (`tx.to` in the bundle) rather than the
-/// signer (`bundle.target`), because the same EOA signs many bundles but each
-/// ChainAdmin address is unique to one ctm_admin_calls entry.
-fn build_ctm_admin_calls_tag_map(parsed: &GovernanceCallsToml) -> HashMap<Address, String> {
-    let mut map = HashMap::new();
+type CtmAdminCallsTagKey = (Address, String);
+type CtmAdminCallsTags = Vec<(CtmAdminCallsTagKey, String)>;
+
+/// Builds `(chain_admin, multicall_calldata) → simulator tag` entries from the parsed TOML.
+/// Testnet uses the same ChainAdmin for multiple CTM flavors, so the address
+/// alone is not enough to distinguish Era and ZKsync OS admin-call bundles.
+fn build_ctm_admin_calls_tags(parsed: &GovernanceCallsToml) -> anyhow::Result<CtmAdminCallsTags> {
+    let mut tags = Vec::new();
     for (flavor, tag) in CTM_ADMIN_CALLS_FLAVOR_TAGS {
         if let Some(ctm) = parsed.ctms.get(*flavor) {
             if let Some(ref section) = ctm.ctm_admin_calls {
-                map.insert(section.chain_admin, tag.to_string());
+                tags.push((
+                    (
+                        section.chain_admin,
+                        encode_chain_admin_multicall(&section.server_notifier_upgrade)
+                            .with_context(|| {
+                                format!("encoding ctm_admin_calls for flavor {flavor}")
+                            })?,
+                    ),
+                    tag.to_string(),
+                ));
             }
         }
     }
-    map
+    Ok(tags)
+}
+
+fn encode_chain_admin_multicall(calls_hex: &str) -> anyhow::Result<String> {
+    let calls = decode_calls(calls_hex)?;
+    let calls = calls
+        .into_iter()
+        .map(|call| ChainAdminCall {
+            target: call.target,
+            value: call.value,
+            data: call.data.into(),
+        })
+        .collect();
+    let calldata = ChainAdminAbi::multicallCall {
+        _calls: calls,
+        _requireSuccess: true,
+    }
+    .abi_encode();
+
+    Ok(format!("0x{}", hex::encode(calldata)))
+}
+
+fn ctm_admin_calls_tag<'a>(tags: &'a CtmAdminCallsTags, tx: &SafeBundleTx) -> Option<&'a str> {
+    tags.iter()
+        .find(|((to, data), _)| *to == tx.to && data == &tx.data)
+        .map(|(_, tag)| tag.as_str())
 }
 
 #[derive(Debug, Deserialize)]
@@ -626,15 +676,15 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    // Parse the ecosystem TOML once up-front to build the ctm_admin_calls tag
-    // map — used below to give manifest bundles their proper flavor tag instead
-    // of the generic `bundle_<index>`.
-    let ctm_admin_calls_tags: HashMap<Address, String> = {
+    // Parse the ecosystem TOML once up-front to identify CTM admin calls by
+    // exact ChainAdmin calldata. This keeps shared-ChainAdmin environments
+    // distinguishable and lets us emit CTM calls in TOML flavor order.
+    let ctm_admin_calls_tags: CtmAdminCallsTags = {
         let content = fs::read_to_string(&governance_toml)
             .with_context(|| format!("failed to read {}", governance_toml.display()))?;
         let parsed: GovernanceCallsToml = toml::from_str(&content)
             .with_context(|| format!("failed to parse {}", governance_toml.display()))?;
-        build_ctm_admin_calls_tag_map(&parsed)
+        build_ctm_admin_calls_tags(&parsed)?
     };
 
     // Manifest bundles come FIRST (Camp-B setup the sim impersonates), then
@@ -797,7 +847,7 @@ fn manifest_to_simulator_transactions(
     network: &str,
     explicit_camp_a: &[Address],
     descriptions: &SimDescriptionRegistry,
-    ctm_admin_calls_tags: &HashMap<Address, String>,
+    ctm_admin_calls_tags: &CtmAdminCallsTags,
 ) -> anyhow::Result<Vec<SimulatorTransaction>> {
     let manifest_dir = manifest_path.parent().ok_or_else(|| {
         anyhow::anyhow!("manifest path has no parent: {}", manifest_path.display())
@@ -880,7 +930,21 @@ fn manifest_to_simulator_transactions(
         } else {
             bundle.steps.join(",")
         };
+        let ordered_ctm_admin_txs: Vec<&SafeBundleTx> = ctm_admin_calls_tags
+            .iter()
+            .filter_map(|((expected_to, expected_data), _)| {
+                kept.iter()
+                    .copied()
+                    .find(|tx| tx.to == *expected_to && tx.data == *expected_data)
+            })
+            .collect();
+        let mut ordered_ctm_admin_txs = ordered_ctm_admin_txs.into_iter();
         for (idx, tx) in kept.into_iter().enumerate() {
+            let tx = if ctm_admin_calls_tag(ctm_admin_calls_tags, tx).is_some() {
+                ordered_ctm_admin_txs.next().unwrap_or(tx)
+            } else {
+                tx
+            };
             let value_to_mint = if funded_signers.insert(bundle.target) {
                 Some("1".to_string())
             } else {
@@ -906,9 +970,8 @@ fn manifest_to_simulator_transactions(
                 value_to_mint,
                 time_increase: None,
                 emulate_all_batches_executed: None,
-                tag: ctm_admin_calls_tags
-                    .get(&tx.to)
-                    .cloned()
+                tag: ctm_admin_calls_tag(ctm_admin_calls_tags, tx)
+                    .map(str::to_string)
                     .unwrap_or_else(|| format!("bundle_{}", bundle.index)),
             });
         }

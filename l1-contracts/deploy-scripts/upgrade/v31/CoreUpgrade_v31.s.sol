@@ -9,7 +9,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {BridgehubBase} from "contracts/core/bridgehub/BridgehubBase.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -204,11 +204,12 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     /// @notice Override to add version-specific governance calls for stage 1
     /// @dev Stage 1 runs after proxy upgrades, so the new `L1ChainAssetHandler`
     ///      implementation is already in place when these calls execute.
-    /// @dev Four calls are emitted:
+    /// @dev Five calls are emitted:
     ///      1. ChainRegistrationSender.acceptOwnership (completes 2-step transfer started during deploy)
     ///      2. AssetTracker.acceptOwnership (completes 2-step transfer started during deploy)
     ///      3. NTV.setAssetTracker (wires AssetTracker into NTV)
-    ///      4. L1ChainAssetHandler.setAddresses (caches messageRoot/assetRouter from bridgehub)
+    ///      4. L1Bridgehub.setAddressesV31 (wires ChainRegistrationSender into Bridgehub)
+    ///      5. L1ChainAssetHandler.setAddresses (caches messageRoot/assetRouter from bridgehub)
     function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
         console.log("Preparing v31-specific stage1 governance calls...");
 
@@ -233,7 +234,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         // in updateContractConnections(), and ownership was transferred to governance.
         // Now governance needs to accept the ownership transfer.
 
-        calls = new Call[](4);
+        calls = new Call[](5);
 
         // First, accept ownership of ChainRegistrationSender (completes the two-step transfer)
         calls[0] = Call({
@@ -256,9 +257,16 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
             data: abi.encodeCall(L1NativeTokenVault.setAssetTracker, (assetTrackerProxy))
         });
 
+        // Wire ChainRegistrationSender into the freshly upgraded Bridgehub implementation.
+        calls[3] = Call({
+            target: coreAddresses.bridgehub.proxies.bridgehub,
+            value: 0,
+            data: abi.encodeCall(BridgehubBase.setAddressesV31, (chainRegistrationSenderProxy))
+        });
+
         // Cache messageRoot/assetRouter inside the new ChainAssetHandler implementation
         // so its facets don't re-query bridgehub on every call.
-        calls[3] = Call({
+        calls[4] = Call({
             target: chainAssetHandlerProxy,
             value: 0,
             data: abi.encodeCall(L1ChainAssetHandler.setAddresses, ())
