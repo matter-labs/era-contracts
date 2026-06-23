@@ -111,25 +111,6 @@
   },
   {
     "type": "function",
-    "name": "assetInteropRoute",
-    "inputs": [
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint8",
-        "internalType": "enum InteropRoute"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "atomicFlowManager",
     "inputs": [],
     "outputs": [
@@ -1032,27 +1013,6 @@
         "name": "tokenAddress",
         "type": "address",
         "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "InteropRouteMismatch",
-    "inputs": [
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "current",
-        "type": "uint8",
-        "internalType": "uint8"
-      },
-      {
-        "name": "expected",
-        "type": "uint8",
-        "internalType": "uint8"
       }
     ]
   },

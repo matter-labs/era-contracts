@@ -639,7 +639,7 @@ contract InteropCenter is
             (, address actualCallRecipient) = InteroperableAddress.parseEvmV1(actualCallStarter.to);
             interopCall = InteropCall({
                 version: INTEROP_CALL_VERSION,
-                shadowAccount: _callStarter.callAttributes.shadowAccount,
+                shadowAccount: false,
                 to: actualCallRecipient,
                 data: actualCallStarter.data,
                 value: _callStarter.callAttributes.interopCallValue,
@@ -648,7 +648,7 @@ contract InteropCenter is
         } else {
             interopCall = InteropCall({
                 version: INTEROP_CALL_VERSION,
-                shadowAccount: _callStarter.callAttributes.shadowAccount,
+                shadowAccount: false,
                 to: recipientAddress,
                 data: _callStarter.data,
                 value: _callStarter.callAttributes.interopCallValue,
@@ -758,23 +758,14 @@ contract InteropCenter is
                 // Decode the boolean parameter using AttributesDecoder
                 bool useFixed = AttributesDecoder.decodeBool(_attributes[i]);
                 bundleAttributes.useFixedFee = useFixed;
-            } else if (selector == IERC7786Attributes.shadowAccount.selector) {
-                require(!attributeUsed[5], AttributeAlreadySet(selector));
-                require(
-                    _restriction == AttributeParsingRestrictions.OnlyCallAttributes ||
-                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                attributeUsed[5] = true;
-                callAttributes.shadowAccount = true;
             } else if (selector == IERC7786Attributes.atomicBundle.selector) {
-                require(!attributeUsed[6], AttributeAlreadySet(selector));
+                require(!attributeUsed[5], AttributeAlreadySet(selector));
                 require(
                     _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
                         _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
                     AttributeViolatesRestriction(selector, uint256(_restriction))
                 );
-                attributeUsed[6] = true;
+                attributeUsed[5] = true;
                 // The atomic send metadata (flowId/deadline/lowNullifierIndex) is parsed separately via
                 // `_parseAtomicSend` and NOT stored in `BundleAttributes` — it must stay out of the
                 // cross-chain bundle so `bundleHash` does not depend on `flowId` (a circular dependency).
@@ -833,7 +824,6 @@ contract InteropCenter is
                 IERC7786Attributes.executionAddress.selector,
                 IERC7786Attributes.unbundlerAddress.selector,
                 IERC7786Attributes.useFixedFee.selector,
-                IERC7786Attributes.shadowAccount.selector,
                 IERC7786Attributes.atomicBundle.selector
             ];
     }

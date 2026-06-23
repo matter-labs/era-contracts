@@ -164,14 +164,6 @@ async function main() {
     console.log(`Status: ${execReceipt.status === 1 ? "SUCCESS" : "FAILED"}`);
     console.log(`Gas:    ${execReceipt.gasUsed.toString()}`);
     console.log(`Trace:  cast run ${execTx.hash} --rpc-url ${targetRpc}`);
-
-    // Check for ShadowAccountDeployed event
-    const shadowTopic = ethers.utils.id("ShadowAccountDeployed(address,uint256,address)");
-    for (const log of execReceipt.logs) {
-      if (log.topics[0] === shadowTopic) {
-        console.log(`\nShadowAccount deployed: ${ethers.utils.defaultAbiCoder.decode(["address"], log.topics[1])[0]}`);
-      }
-    }
   } catch (error: unknown) {
     const msg = (error as Error)?.message || String(error);
     const failedTx = (error as { transactionHash?: string })?.transactionHash;
