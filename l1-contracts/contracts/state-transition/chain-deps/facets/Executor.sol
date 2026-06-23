@@ -143,10 +143,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
-    /// @notice Appends the batch message root to the global message.
+    /// @notice Appends the batch's chain batch root to the L1 MessageRoot.
     /// @param _batchNumber The number of the batch
     /// @param _messageRoot The root of the merkle tree of the messages to L1.
-    /// @dev We only call this function on L1.
+    /// @dev We only call this function on L1. `addChainBatchRoot` records the root (used for L2->L1
+    /// message verification), pushes it to the chain's interop tree, and emits the interop root — so
+    /// chains settling on L1 participate in interop, the same as on Gateway.
     function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
         // Once the batch is executed, we include its message to the message root.
         IMessageRootBase messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
@@ -190,9 +192,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             );
         }
 
-        // Interop is only allowed on GW currently, so we go through the Asset Tracker when on Gateway.
-        // When on L1, we append directly to the Message Root, though interop is not allowed there, it is only used for
-        // message verification.
+        // On Gateway we route through the Asset Tracker, which appends the chain batch root AND
+        // processes the interop logs/messages (asset-tracking / settlement-fee accounting). On L1 we
+        // append the chain batch root directly to the MessageRoot: this builds the chain's interop tree
+        // and emits the interop root (so L1-settled chains participate in interop), and the stored
+        // chain batch roots are used for L2->L1 message verification. L1 does not run the asset-tracker
+        // message processing, hence no logs/messages are passed on L1 (enforced above).
         if (block.chainid != L1_CHAIN_ID) {
             uint256 messagesLength = messages.length;
             for (uint256 i = 0; i < messagesLength; ++i) {
