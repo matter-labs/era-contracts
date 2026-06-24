@@ -17,8 +17,7 @@ import {
     OnlyChain,
     OnlyGateway,
     OnlyOnSettlementLayer,
-    TotalBatchesExecutedZero,
-    V31UpgradeChainBatchNumberNotSet
+    TotalBatchesExecutedZero
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 import {
