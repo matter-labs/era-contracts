@@ -40,9 +40,8 @@ import {
   atomicFinalityProofTuple,
   commitValue,
   computeFlowId,
-  findValueIndex,
   lowNullifierIndexFor,
-  reconstructChainImt,
+  type IMTLeaf,
   type ImtInclusionProof,
 } from "./src/helpers/imt-engine-lib";
 
@@ -216,29 +215,44 @@ async function waitForMessageProof(
   }
 }
 
-/** Build an inclusion proof reusing the live IMT membership, but with the REAL messageProof. */
+type RpcImtProof = {
+  chainImtRoot: string;
+  leaf: IMTLeaf;
+  imtLeafIndex: number;
+  imtProof: string[];
+};
+
+/**
+ * Build an inclusion proof: the IMT half (root/leaf/index/path) comes from the server's
+ * `zks_getImtInclusionProof` (the Rust IMT engine), the message half from the REAL messageProof.
+ *
+ * The IMT proof is anchored to the atomic-send tx's block — the block whose commitment-tree root
+ * the messageProof authenticates.
+ */
 async function buildRealInclusionProof(params: {
   source: ChainCtx;
   value: string;
+  txHash: string;
   rawProof: RawLogProof;
   messageTxNumberInBatch: number;
 }): Promise<ImtInclusionProof> {
-  const { source, value, rawProof, messageTxNumberInBatch } = params;
-  const imt = await reconstructChainImt(source.tree);
-  const idx = findValueIndex(imt.leaves, value);
-  assert(idx >= 0, `commit value present in chain ${source.chainId} IMT`);
+  const { source, value, txHash, rawProof, messageTxNumberInBatch } = params;
+  const sendReceipt: any = await source.provider.send("eth_getTransactionReceipt", [txHash]);
+  const sendBlock = BigNumber.from(sendReceipt.blockNumber).toNumber();
+  const imt: RpcImtProof | null = await source.provider.send("zks_getImtInclusionProof", [value, sendBlock]);
+  assert(imt != null, `commit value present in chain ${source.chainId} IMT (server proof)`);
   const onChainRoot: string = await source.tree.root();
   assert(
-    imt.root.toLowerCase() === onChainRoot.toLowerCase(),
-    `reconstructed IMT root == on-chain root on ${source.chainId}`
+    imt.chainImtRoot.toLowerCase() === onChainRoot.toLowerCase(),
+    `server IMT root == on-chain root on ${source.chainId}`
   );
   const batchNumber = (rawProof.batchNumber ?? rawProof.batch_number ?? 0).toString();
   return {
     sourceChainId: BigNumber.from(source.chainId).toString(),
-    chainImtRoot: imt.root,
-    leaf: imt.leaves[idx],
-    imtLeafIndex: idx,
-    imtProof: imt.engine.merklePath(idx),
+    chainImtRoot: imt.chainImtRoot,
+    leaf: imt.leaf,
+    imtLeafIndex: imt.imtLeafIndex,
+    imtProof: imt.imtProof,
     batchNumber,
     messageIndex: rawProof.id.toString(),
     messageTxNumberInBatch,
@@ -407,8 +421,8 @@ async function main() {
 
   const abValue = commitValue(flowId, hAB);
   const baValue = commitValue(flowId, hBA);
-  const abProof = await buildRealInclusionProof({ source: chainA, value: abValue, rawProof: abRaw, messageTxNumberInBatch: 0 });
-  const baProof = await buildRealInclusionProof({ source: chainB, value: baValue, rawProof: baRaw, messageTxNumberInBatch: 0 });
+  const abProof = await buildRealInclusionProof({ source: chainA, value: abValue, txHash: ab.txHash, rawProof: abRaw, messageTxNumberInBatch: 0 });
+  const baProof = await buildRealInclusionProof({ source: chainB, value: baValue, txHash: ba.txHash, rawProof: baRaw, messageTxNumberInBatch: 0 });
   const proofsAsc = BigNumber.from(hAB).lt(BigNumber.from(hBA)) ? [abProof, baProof] : [baProof, abProof];
   const finality = atomicFinalityProofTuple({ flowId, deadline, legBundleHashes: legHashesAsc, chainIds: chainIdsAsc, proofs: proofsAsc });
 
