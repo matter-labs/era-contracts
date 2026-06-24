@@ -83,7 +83,7 @@ contract MessageRoot_Extended_Test is Test {
         );
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2MessageRoot.initL2(L1_CHAIN_ID, gatewayChainId);
+        l2MessageRoot.initL2(L1_CHAIN_ID);
     }
 
     function test_ChainRegistered_CurrentChain() public {
