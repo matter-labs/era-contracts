@@ -1079,6 +1079,15 @@ async fn verify_ctm_provenance(
         CtmFlavor::ZksyncOs => "l1-contracts/ZKsyncOSChainTypeManager",
     };
 
+    // Per-flavor validator implementation. Era keeps plain `ValidatorTimelock`;
+    // ZKsyncOS deploys `MultisigCommitter` (a superset with the same `(bridgehub)`
+    // constructor) so its upgrade does not downgrade proxies already running a
+    // MultisigCommitter. Both share the same constructor, only the bytecode differs.
+    let validator_timelock_file = match ctm.flavor {
+        CtmFlavor::Era => "l1-contracts/ValidatorTimelock",
+        CtmFlavor::ZksyncOs => "l1-contracts/MultisigCommitter",
+    };
+
     // Single dispatch table: (address, encoded ctor args, expected file).
     let checks: Vec<(Address, Vec<u8>, &str)> = vec![
         // CommitterFacet(_l1ChainId).
@@ -1149,14 +1158,15 @@ async fn verify_ctm_provenance(
         ),
         // Validator impl(bridgehub). Deployed once per CTM by `CTMUpgrade_v31`;
         // stage-1 governance swaps this behind the per-CTM ValidatorTimelock
-        // proxy. v31 deploys `MultisigCommitter` (a superset of ValidatorTimelock
-        // with the same `(bridgehub)` constructor) as the default validator impl,
-        // so the upgrade does not downgrade proxies already running a
+        // proxy. The impl is flavor-specific (see `validator_timelock_file`):
+        // Era uses plain `ValidatorTimelock`, ZKsyncOS uses `MultisigCommitter`
+        // (a superset of ValidatorTimelock with the same `(bridgehub)` constructor),
+        // so the ZKsyncOS upgrade does not downgrade proxies already running a
         // MultisigCommitter.
         (
             validator_timelock_impl,
             V31ValidatorTimelock::constructorCall::new((bridgehub_addr,)).abi_encode(),
-            "l1-contracts/MultisigCommitter",
+            validator_timelock_file,
         ),
     ];
     for (addr, args, file) in &checks {
