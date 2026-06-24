@@ -113,7 +113,7 @@ contract GWAssetTrackerTest is Test {
         // L2MessageRoot: real bytecode + init so getEmptyMultichainBatchRoot works.
         vm.etch(L2_MESSAGE_ROOT_ADDR, type(L2MessageRoot).runtimeCode);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(L1_CHAIN_ID, 0);
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(L1_CHAIN_ID);
 
         // Mock the WETH_TOKEN() call on NativeTokenVault
         address mockWrappedZKToken = makeAddr("mockWrappedZKToken");
@@ -283,7 +283,7 @@ contract GWAssetTrackerTest is Test {
         vm.chainId(CHAIN_ID);
         L2MessageRoot dummyL2MessageRoot = new L2MessageRoot();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        dummyL2MessageRoot.initL2(L1_CHAIN_ID, block.chainid);
+        dummyL2MessageRoot.initL2(L1_CHAIN_ID);
 
         assertEq(dummyL2MessageRoot.getAggregatedRoot(), emptyRoot);
     }
@@ -296,7 +296,7 @@ contract GWAssetTrackerTest is Test {
         vm.chainId(CHAIN_ID);
         L2MessageRoot l2MessageRoot = new L2MessageRoot();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2MessageRoot.initL2(L1_CHAIN_ID, block.chainid);
+        l2MessageRoot.initL2(L1_CHAIN_ID);
 
         // Get the aggregated root from L2MessageRoot (which uses MessageRootBase initialization)
         bytes32 l2AggregatedRoot = l2MessageRoot.getAggregatedRoot();
@@ -329,7 +329,7 @@ contract GWAssetTrackerTest is Test {
             vm.chainId(chainId);
             L2MessageRoot l2MessageRoot = new L2MessageRoot();
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            l2MessageRoot.initL2(L1_CHAIN_ID, block.chainid);
+            l2MessageRoot.initL2(L1_CHAIN_ID);
 
             // Get the aggregated root from L2MessageRoot
             bytes32 l2AggregatedRoot = l2MessageRoot.getAggregatedRoot();
