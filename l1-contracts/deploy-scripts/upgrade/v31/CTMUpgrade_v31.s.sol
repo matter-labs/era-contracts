@@ -93,11 +93,15 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
         // v31 adds `UPGRADER_ROLE` + `upgradeChainFromVersion()` (IChainUpgrader) to ValidatorTimelock;
         // existing chains' proxy still points at the v30 impl, so swap it under the same CREATE2 flow.
-        // Deploy `MultisigCommitter` (a superset of ValidatorTimelock) as the default validator impl so the
-        // upgrade does NOT downgrade proxies that already run a MultisigCommitter — the v31 stage-1 upgrade
-        // previously deployed plain `ValidatorTimelock` here, which silently dropped multisig-commit support.
+        // The validator implementation is chain-type specific:
+        //  - Era uses plain `ValidatorTimelock`.
+        //  - ZKsyncOS uses `MultisigCommitter` (a superset of ValidatorTimelock) so the upgrade does NOT
+        //    downgrade ZKsyncOS proxies that already run a MultisigCommitter — deploying plain
+        //    `ValidatorTimelock` there would silently drop multisig-commit support.
+        string memory validatorTimelockContractName = config.isZKsyncOS ? "MultisigCommitter" : "ValidatorTimelock";
+        console.log("Deploying validator timelock implementation:", validatorTimelockContractName);
         ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract(
-            "MultisigCommitter",
+            validatorTimelockContractName,
             false
         );
 
