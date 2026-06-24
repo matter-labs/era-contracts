@@ -18,7 +18,6 @@ import {
     MEMORY_OVERHEAD_GAS,
     TX_SLOT_OVERHEAD_L2_GAS,
     L1_TX_NATIVE_PER_GAS,
-    ZKSYNC_OS_L1_TX_NATIVE_PRICE,
     MAX_NATIVE_COMPUTATIONAL_ZKSYNC_OS
 } from "../../common/Config.sol";
 import {

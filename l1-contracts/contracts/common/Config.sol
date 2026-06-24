@@ -101,9 +101,6 @@ uint256 constant MAX_PRICE_CHANGE_DENOMINATOR = 10;
 /// @dev Reference L1 gas price used for price-change bound calculations.
 uint256 constant PRICE_REFERENCE_L1_GAS = 1 gwei;
 
-/// @dev The native price for L1->L2 transactions in ZKsync OS.
-uint256 constant ZKSYNC_OS_L1_TX_NATIVE_PRICE = 10;
-
 /// @dev The intrinsic cost of the L1->L2 transaction in computational L2 gas for ZKsync OS.
 uint256 constant L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS = 21000;
 
