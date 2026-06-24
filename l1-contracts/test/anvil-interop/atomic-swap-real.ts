@@ -25,6 +25,7 @@ import {
   L2_BRIDGEHUB_ADDR,
   L2_INTEROP_COMMITMENT_TREE_ADDR,
   L2_INTEROP_HANDLER_ADDR,
+  L2_INTEROP_ROOT_STORAGE_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "./src/core/const";
 import { encodeEvmAddress, encodeEvmChain } from "./src/core/data-encoding";
@@ -46,7 +47,8 @@ import {
 } from "./src/helpers/imt-engine-lib";
 
 const TEST_TOKEN_DECIMALS = 18;
-const BundleStatus = { Unset: 0, Sent: 1, PartiallyExecuted: 2, FullyExecuted: 3 } as const;
+// Mirror of `enum BundleStatus` in contracts/common/Messaging.sol.
+const BundleStatus = { Unreceived: 0, Verified: 1, FullyExecuted: 2, Unbundled: 3 } as const;
 const LegState = { Unset: 0, Committed: 1, Revertable: 2, Reverted: 3 } as const;
 
 type ChainCtx = {
@@ -295,6 +297,25 @@ async function registerChainsForInterop(
   }
 }
 
+/** Poll a chain's L2InteropRootStorage until it has imported the interop root for (l1ChainId, slBlock). */
+async function waitForInteropRoot(
+  ctx: ChainCtx,
+  l1ChainId: number,
+  slBlock: number,
+  timeoutMs = 180_000
+): Promise<void> {
+  const storage = new Contract(L2_INTEROP_ROOT_STORAGE_ADDR, getAbi("L2InteropRootStorage"), ctx.provider);
+  const start = Date.now();
+  for (;;) {
+    const root: string = await storage.interopRoots(l1ChainId, slBlock);
+    if (root && root !== ethers.constants.HashZero) return;
+    if (Date.now() - start > timeoutMs) {
+      throw new Error(`chain ${ctx.chainId} never imported interop root (L1 ${l1ChainId}, block ${slBlock})`);
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+}
+
 async function main() {
   const [rpcA, idAStr, rpcB, idBStr, pkArg, l1Rpc, bridgehubAddr] = process.argv.slice(2);
   if (!rpcA || !idAStr || !rpcB || !idBStr || !l1Rpc || !bridgehubAddr) {
@@ -390,6 +411,20 @@ async function main() {
   const baProof = await buildRealInclusionProof({ source: chainB, value: baValue, rawProof: baRaw, messageTxNumberInBatch: 0 });
   const proofsAsc = BigNumber.from(hAB).lt(BigNumber.from(hBA)) ? [abProof, baProof] : [baProof, abProof];
   const finality = atomicFinalityProofTuple({ flowId, deadline, legBundleHashes: legHashesAsc, chainIds: chainIdsAsc, proofs: proofsAsc });
+
+  // Both executeAtomicBundle calls verify EVERY leg, so each executing chain must have imported the
+  // L1 interop root at each leg's settlement block before we execute.
+  const l1ChainId = (await new providers.JsonRpcProvider(l1Rpc).getNetwork()).chainId;
+  const slBlocks = [abRaw.gatewayBlockNumber, baRaw.gatewayBlockNumber].filter(
+    (b): b is number => b != null
+  );
+  log(`waiting for interop roots (L1 ${l1ChainId}) at blocks [${slBlocks.join(", ")}] on both chains...`);
+  for (const ctx of [chainA, chainB]) {
+    for (const slBlock of slBlocks) {
+      await waitForInteropRoot(ctx, l1ChainId, slBlock);
+    }
+  }
+  log("interop roots imported on both chains");
 
   // ── PHASE 3: executeAtomicBundle on each destination ─────────────────────────────────────────
   log("executing AB on B and BA on A...");
