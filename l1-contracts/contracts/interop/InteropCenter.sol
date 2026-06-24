@@ -436,7 +436,13 @@ contract InteropCenter is
         bytes[][] memory _originalCallAttributes,
         AtomicSend memory _atomicSend
     ) internal returns (bytes32 bundleHash) {
-        _validateGatewayMode();
+        // Gateway mode is only required for normal bundles, which are published to L1 through the
+        // gateway. Atomic bundles are appended to this chain's interop IMT (and authenticated downstream
+        // via the interop-root channel, which is built on both L1 and the gateway), so they are valid
+        // regardless of settlement layer — including L1-settled chains.
+        if (!_atomicSend.isAtomic) {
+            _validateGatewayMode();
+        }
 
         // Form an InteropBundle.
         bytes32 destinationBaseTokenAssetId = _getDestinationBaseTokenAssetId(_destinationChainId);

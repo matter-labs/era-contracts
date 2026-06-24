@@ -17,7 +17,6 @@ import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 import {
     ChainAlreadyRegistered,
-    ChainsSettlingOnL1,
     ChainsSettlementLayerMismatch,
     NoEthAllowed,
     ZKChainNotRegistered
@@ -138,9 +137,10 @@ contract ChainRegistrationSender is
         if (chainToBeRegisteredSettlementLayer != chainRegisteredOnSettlementLayer) {
             revert ChainsSettlementLayerMismatch(chainToBeRegisteredSettlementLayer, chainRegisteredOnSettlementLayer);
         }
-        if (chainToBeRegisteredSettlementLayer == block.chainid) {
-            revert ChainsSettlingOnL1();
-        }
+        // Both chains settling directly on L1 is now permitted: L1 builds interop roots
+        // (MessageRootBase.addChainBatchRoot) and serves the corresponding inclusion proofs, so
+        // L1-settled chains can participate in interop without a gateway. The same-settlement-layer
+        // check above still applies (a flow's legs must share a settlement layer).
     }
 
     /// @inheritdoc IL1CrossChainSender

@@ -166,12 +166,10 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
 
     /// @inheritdoc IInteropHandler
     function executeAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public {
-        // Same settlement-layer requirement as executeBundle (the GWAssetTracker must be able to
-        // process the execution confirmation).
-        require(
-            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
-            CannotClaimInteropOnL1Settlement()
-        );
+        // No gateway-mode requirement here (unlike executeBundle): an atomic bundle's cross-chain
+        // binding comes from the per-leg IMT inclusion proofs authenticated against the interop root,
+        // which is built on both L1 and the gateway. Atomic execution is therefore valid regardless of
+        // settlement layer, including L1-settled chains.
 
         // Decode the bundle, compute its hash, read its status.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
