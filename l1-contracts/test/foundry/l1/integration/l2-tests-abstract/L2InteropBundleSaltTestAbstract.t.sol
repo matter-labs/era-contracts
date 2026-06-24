@@ -14,7 +14,7 @@ import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.
 import {
     AttributeAlreadySet,
     AttributeViolatesRestriction,
-    InteropBundleAlreadySent
+    InteropBundleSaltAlreadyUsed
 } from "contracts/interop/InteropErrors.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
@@ -131,23 +131,37 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
         assertTrue(hash1 != hash2, "different salts must yield different bundle hashes");
     }
 
-    /// @notice The contract records every sent bundle hash and rejects a reused one, guaranteeing unique bundle hashes.
+    /// @notice The contract records each (sender, salt) pair and rejects a reused salt, guaranteeing unique bundle hashes.
     /// @dev Unlike the removed auto-incrementing nonce, the sender must now provide a fresh salt to re-send an otherwise
-    ///      identical bundle. Re-sending with the same salt and content reverts with `InteropBundleAlreadySent`.
-    function test_sendBundle_revertsWhenBundleHashReused() public {
+    ///      identical bundle. Re-using the salt reverts with `InteropBundleSaltAlreadyUsed`.
+    function test_sendBundle_revertsWhenSaltReused() public {
         _setupGatewayMode();
         address sender = makeAddr("saltSender");
         bytes32 userSalt = keccak256("repeated-salt");
 
-        (, bytes32 hash1) = _sendAndDecodeBundle(sender, _buildBundleAttributesWithSalt(userSalt, true));
-        assertTrue(l2InteropCenter.isInteropBundleHashSent(hash1), "sent bundle hash should be recorded");
+        _sendAndDecodeBundle(sender, _buildBundleAttributesWithSalt(userSalt, true));
+        assertTrue(l2InteropCenter.isInteropBundleSaltUsed(sender, userSalt), "used salt should be recorded");
 
-        // Re-sending the identical bundle with the same salt must revert via the unique-hash guard.
+        // Re-using the same salt must revert via the unique-salt guard, even with completely different bundle content.
         InteropCallStarter[] memory calls = _buildSimpleCall();
         bytes[] memory attrs = _buildBundleAttributesWithSalt(userSalt, true);
         vm.prank(sender);
-        vm.expectRevert(abi.encodeWithSelector(InteropBundleAlreadySent.selector, hash1));
+        vm.expectRevert(abi.encodeWithSelector(InteropBundleSaltAlreadyUsed.selector, sender, userSalt));
         l2InteropCenter.sendBundle{value: 0}(InteroperableAddress.formatEvmV1(destinationChainId), calls, attrs);
+    }
+
+    /// @notice The same salt is tracked per-sender: two different senders may each use the same salt value once.
+    function test_sendBundle_saltIsTrackedPerSender() public {
+        _setupGatewayMode();
+        address senderA = makeAddr("senderA");
+        address senderB = makeAddr("senderB");
+        bytes32 userSalt = keccak256("shared-salt");
+
+        _sendAndDecodeBundle(senderA, _buildBundleAttributesWithSalt(userSalt, true));
+        _sendAndDecodeBundle(senderB, _buildBundleAttributesWithSalt(userSalt, true));
+
+        assertTrue(l2InteropCenter.isInteropBundleSaltUsed(senderA, userSalt));
+        assertTrue(l2InteropCenter.isInteropBundleSaltUsed(senderB, userSalt));
     }
 
     /// @notice The same sender can re-send an otherwise identical bundle as long as it provides a fresh salt.
@@ -159,8 +173,8 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
         (, bytes32 hash2) = _sendAndDecodeBundle(sender, _buildBundleAttributesWithSalt(keccak256("salt-2"), true));
 
         assertTrue(hash1 != hash2, "fresh salt should yield a new bundle hash");
-        assertTrue(l2InteropCenter.isInteropBundleHashSent(hash1));
-        assertTrue(l2InteropCenter.isInteropBundleHashSent(hash2));
+        assertTrue(l2InteropCenter.isInteropBundleSaltUsed(sender, keccak256("salt-1")));
+        assertTrue(l2InteropCenter.isInteropBundleSaltUsed(sender, keccak256("salt-2")));
     }
 
     /// @notice Different senders supplying the same user salt still produce distinct `interopBundleSalt` values.

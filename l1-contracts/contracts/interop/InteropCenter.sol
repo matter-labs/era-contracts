@@ -44,7 +44,7 @@ import {
     AttributeViolatesRestriction,
     DestinationChainNotRegistered,
     IndirectCallValueMismatch,
-    InteropBundleAlreadySent,
+    InteropBundleSaltAlreadyUsed,
     InteroperableAddressChainReferenceNotEmpty,
     InteroperableAddressNotEmpty,
     FeeWithdrawalFailed,
@@ -114,12 +114,13 @@ contract InteropCenter is
     /// @dev Coinbase addresses can claim their accumulated fees via claimZKFees().
     mapping(address coinbase => uint256 amount) public accumulatedZKFees;
 
-    /// @notice Tracks the hash of every `InteropBundle` that has been sent from this chain.
-    /// @dev Used to guarantee that each emitted bundle has a globally unique hash. Since the bundle hash commits to
-    ///      the `interopBundleSalt` (derived from `msg.sender` and the user-provided salt), a sender that wants to send
-    ///      two otherwise identical bundles must provide a fresh salt; otherwise `_sendBundle` reverts with
-    ///      `InteropBundleAlreadySent`.
-    mapping(bytes32 interopBundleHash => bool sent) public isInteropBundleHashSent;
+    /// @notice Tracks which salts a given sender has already used for an interop bundle.
+    /// @dev Used to guarantee that each bundle has a unique hash: the bundle hash commits to `interopBundleSalt`,
+    ///      which is derived from `msg.sender` and the user-provided salt. Enforcing that each (sender, salt) pair is
+    ///      used at most once therefore makes every emitted bundle hash unique. A sender that wants to send two
+    ///      otherwise identical bundles must provide a fresh salt; otherwise `_sendBundle` reverts with
+    ///      `InteropBundleSaltAlreadyUsed`.
+    mapping(address user => mapping(bytes32 salt => bool hasBeenUsed)) public isInteropBundleSaltUsed;
 
     modifier onlySettlementLayerRelayedSender() {
         require(msg.sender == SETTLEMENT_LAYER_RELAY_SENDER, Unauthorized(msg.sender));
@@ -417,6 +418,15 @@ contract InteropCenter is
     ) internal returns (bytes32 bundleHash) {
         require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
 
+        // Ensure the sender has not already used this salt. Since `interopBundleSalt` (and thus the bundle hash) is
+        // derived from `msg.sender` and the user-provided salt, enforcing a unique salt per sender guarantees that
+        // every emitted bundle has a unique hash.
+        require(
+            !isInteropBundleSaltUsed[msg.sender][_bundleAttributes.salt],
+            InteropBundleSaltAlreadyUsed(msg.sender, _bundleAttributes.salt)
+        );
+        isInteropBundleSaltUsed[msg.sender][_bundleAttributes.salt] = true;
+
         // Form an InteropBundle.
         bytes32 destinationBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
         require(destinationBaseTokenAssetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
@@ -474,15 +484,10 @@ contract InteropCenter is
         /// To avoid stack too deep error
         {
             bytes memory interopBundleBytes = abi.encode(bundle);
-            bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
-
-            // Ensure every sent bundle has a globally unique hash. As the hash commits to the user-provided salt,
-            // a duplicate here means the sender reused a salt for an otherwise identical bundle.
-            require(!isInteropBundleHashSent[bundleHash], InteropBundleAlreadySent(bundleHash));
-            isInteropBundleHashSent[bundleHash] = true;
 
             // Send the message corresponding to the relevant InteropBundle to L1.
             msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes));
+            bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
         }
 
         _emitMessageSent({

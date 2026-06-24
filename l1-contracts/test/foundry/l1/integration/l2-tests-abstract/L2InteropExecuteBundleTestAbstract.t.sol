@@ -46,6 +46,11 @@ abstract contract L2InteropExecuteBundleTestAbstract is L2InteropTestUtils {
 
         vm.recordLogs();
 
+        // Send the wrapper bundle from a distinct sender. Both sends in this test use the default salt (0), and
+        // InteropCenter enforces a unique salt per sender, so reusing `address(this)` here would revert with
+        // `InteropBundleSaltAlreadyUsed`. The wrapper is a permissionless `executeBundle` call, so its source sender
+        // does not affect execution.
+        vm.prank(makeAddr("wrapperSender"));
         InteropLibrary.sendDirectCall(
             destinationChainId,
             L2_INTEROP_HANDLER_ADDR,

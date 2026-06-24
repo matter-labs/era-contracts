@@ -225,17 +225,22 @@
   },
   {
     "type": "function",
-    "name": "isInteropBundleHashSent",
+    "name": "isInteropBundleSaltUsed",
     "inputs": [
       {
-        "name": "interopBundleHash",
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "salt",
         "type": "bytes32",
         "internalType": "bytes32"
       }
     ],
     "outputs": [
       {
-        "name": "sent",
+        "name": "hasBeenUsed",
         "type": "bool",
         "internalType": "bool"
       }
@@ -967,10 +972,15 @@
   },
   {
     "type": "error",
-    "name": "InteropBundleAlreadySent",
+    "name": "InteropBundleSaltAlreadyUsed",
     "inputs": [
       {
-        "name": "interopBundleHash",
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "salt",
         "type": "bytes32",
         "internalType": "bytes32"
       }

@@ -983,7 +983,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
             l2InteropCenter.sendBundle{value: fee1}(
                 InteroperableAddress.formatEvmV1(destinationChainId),
                 calls1,
-                bundleAttributes
+                InteropLibrary.withInteropBundleSalt(bundleAttributes, bytes32(uint256(1)))
             );
         }
 
@@ -1005,7 +1005,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
             l2InteropCenter.sendBundle{value: fee2}(
                 InteroperableAddress.formatEvmV1(destinationChainId),
                 calls2,
-                bundleAttributes
+                InteropLibrary.withInteropBundleSalt(bundleAttributes, bytes32(uint256(2)))
             );
         }
 
@@ -1027,7 +1027,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
             l2InteropCenter.sendBundle{value: fee3}(
                 InteroperableAddress.formatEvmV1(destinationChainId),
                 calls3,
-                bundleAttributes
+                InteropLibrary.withInteropBundleSalt(bundleAttributes, bytes32(uint256(3)))
             );
         }
 
@@ -1086,7 +1086,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
             l2InteropCenter.sendBundle{value: 0}(
                 InteroperableAddress.formatEvmV1(destinationChainId),
                 calls,
-                bundleAttributes
+                InteropLibrary.withInteropBundleSalt(bundleAttributes, bytes32(uint256(1)))
             );
         }
 
@@ -1106,7 +1106,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
             l2InteropCenter.sendBundle{value: 0}(
                 InteroperableAddress.formatEvmV1(destinationChainId),
                 calls,
-                bundleAttributes
+                InteropLibrary.withInteropBundleSalt(bundleAttributes, bytes32(uint256(2)))
             );
         }
 
