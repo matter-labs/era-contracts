@@ -1,7 +1,7 @@
 //! Stage 1 — the main upgrade ceremony.
 //!
-//! Non-stage call layout: 11 generated ecosystem-wide core calls
-//! (indices 0..=10), then a 6-call block per `[ctms.<flavor>]` entry,
+//! Non-stage call layout: 12 generated ecosystem-wide core calls
+//! (indices 0..=11), then a 6-call block per `[ctms.<flavor>]` entry,
 //! repeated in artifact order. Stage prepends one emergency-path
 //! `pauseMigration()` call, so all generated calls shift by one there.
 //!
@@ -44,7 +44,7 @@ use super::helpers::{
     required_ctm_address, verify_call_by_address, verify_call_by_name,
 };
 use super::{
-    acceptOwnershipCall, initializeL1V31UpgradeCall, setAssetTrackerCall,
+    acceptOwnershipCall, initializeL1V31UpgradeCall, setAddressesV31Call, setAssetTrackerCall,
     setChainCreationParamsCall, updateDAPairCall, upgradeAndCallCall, upgradeCall, CallList,
     GovernanceStage1Calls,
 };
@@ -52,7 +52,7 @@ use super::{
 /// Number of generated ecosystem-wide stage-1 calls before any per-CTM block.
 /// On stage, PUVT additionally requires one leading `pauseMigration()` call
 /// because stage1 is executed through the emergency-upgrade path.
-const STAGE1_GENERATED_PREFIX_LEN: usize = 11;
+const STAGE1_GENERATED_PREFIX_LEN: usize = 12;
 const STAGE1_PER_CTM_LEN: usize = 6;
 
 /// Index of the per-CTM `ChainTypeManager` proxy upgrade within the
@@ -346,8 +346,10 @@ impl GovernanceStage1Calls {
     ) -> anyhow::Result<()> {
         result.print_info("== Gov stage 1 calls ===");
 
+        const ACCEPT_CHAIN_REGISTRATION_SENDER_OWNERSHIP: usize = 7;
         const ACCEPT_ASSET_TRACKER_OWNERSHIP: usize = 8;
         const SET_ASSET_TRACKER: usize = 9;
+        const SET_BRIDGEHUB_ADDRESSES_V31: usize = 10;
 
         let call_offset = STAGE1_LEADING_PAUSE_OFFSET;
         let mut errors = 0;
@@ -389,8 +391,10 @@ impl GovernanceStage1Calls {
             (8, "asset_tracker_proxy", "acceptOwnership()"),
             // Wire AssetTracker into NativeTokenVault.
             (9, "native_token_vault", "setAssetTracker(address)"),
+            // Wire ChainRegistrationSender into the upgraded Bridgehub implementation.
+            (10, "bridgehub_proxy", "setAddressesV31(address)"),
             // Cache MessageRoot / AssetRouter inside L1ChainAssetHandler.
-            (10, "chain_asset_handler_proxy", "setAddresses()"),
+            (11, "chain_asset_handler_proxy", "setAddresses()"),
         ] {
             errors += verify_call_by_name(
                 &self.calls,
@@ -576,6 +580,36 @@ impl GovernanceStage1Calls {
                 }
                 Err(err) => {
                     result.report_error(&format!("Failed to decode setAssetTracker call: {err}"));
+                    errors += 1;
+                }
+            }
+        }
+
+        // The accepted ChainRegistrationSender proxy must be the one wired into
+        // Bridgehub once the v31 implementation is live.
+        if let (Some(accept_call), Some(set_addresses_v31_call)) = (
+            self.calls
+                .elems
+                .get(call_offset + ACCEPT_CHAIN_REGISTRATION_SENDER_OWNERSHIP),
+            self.calls
+                .elems
+                .get(call_offset + SET_BRIDGEHUB_ADDRESSES_V31),
+        ) {
+            match setAddressesV31Call::abi_decode(&set_addresses_v31_call.data) {
+                Ok(decoded) if decoded._chainRegistrationSender == accept_call.target => {
+                    result.report_ok(
+                        "ChainRegistrationSender ownership target matches setAddressesV31 argument",
+                    );
+                }
+                Ok(decoded) => {
+                    result.report_error(&format!(
+                        "ChainRegistrationSender target mismatch: acceptOwnership targets {}, but setAddressesV31 uses {}",
+                        accept_call.target, decoded._chainRegistrationSender
+                    ));
+                    errors += 1;
+                }
+                Err(err) => {
+                    result.report_error(&format!("Failed to decode setAddressesV31 call: {err}"));
                     errors += 1;
                 }
             }

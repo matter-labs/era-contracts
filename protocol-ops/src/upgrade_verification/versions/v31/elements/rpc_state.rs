@@ -570,18 +570,6 @@ async fn verify_v31_core_wiring(
         )),
     }
 
-    match bridgehub.chainRegistrationSender().call().await {
-        Ok(actual) => expect_address_eq(
-            result,
-            "Bridgehub.chainRegistrationSender()",
-            actual,
-            expected_chain_registration_sender,
-        ),
-        Err(err) => result.report_error(&format!(
-            "Failed to call Bridgehub.chainRegistrationSender() for core wiring checks: {err}"
-        )),
-    }
-
     // ChainAssetHandler must already be owned by governance (PUH on stage /
     // mainnet) before stage 0/1/2 run — `pauseMigration()`, `setAddresses()`,
     // and `unpauseMigration()` are all owner-gated. We expect governance to be

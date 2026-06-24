@@ -78,6 +78,10 @@ transparent_proxy_admin = "0xE00456791Da489418355B0a6b27965A54c7C01d2"
 upgrade_stage_validator = "0x235CD42116360C378e74E81F3D3356CE88aA496a"
 validium_l1_da_validator_addr = "0x0000000000000000000000000000000000000000"
 
+[ctms.era.rollup_da_pair]
+l1_da_validator = "0xcc46b186bd4515fa996adf3c40344ed7d546a65b"
+l2_da_commitment_scheme = "BlobsAndPubdataKeccak256"
+
 [ctms.era.state_transition]
 admin_facet_addr = "0x9c3ED7F3459B996749ab4aA166A019ff7AaC0F5d"
 bytecodes_supplier_addr = "0xD1ECf8B3A653A7580C5Ff0d7Fcef694Da89E854C"

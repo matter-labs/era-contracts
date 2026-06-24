@@ -58,6 +58,7 @@ sol! {
     function initializeL1V31Upgrade();
     function setAssetTracker(address _l1AssetTracker);
     function setAddresses();
+    function setAddressesV31(address _chainRegistrationSender);
     function updateSecurityCouncil(address _newSecurityCouncil);
     function updateGuardians(address _newGuardians);
     function updateEmergencyUpgradeBoard(address _newEmergencyUpgradeBoard);
