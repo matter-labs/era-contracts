@@ -240,7 +240,9 @@ async function buildRealInclusionProof(params: {
   const sendReceipt: any = await source.provider.send("eth_getTransactionReceipt", [txHash]);
   const sendBlock = BigNumber.from(sendReceipt.blockNumber).toNumber();
   const imt: RpcImtProof | null = await source.provider.send("zks_getImtInclusionProof", [value, sendBlock]);
-  assert(imt != null, `commit value present in chain ${source.chainId} IMT (server proof)`);
+  if (imt == null) {
+    throw new Error(`commit value not present in chain ${source.chainId} IMT (server proof returned null)`);
+  }
   const onChainRoot: string = await source.tree.root();
   assert(
     imt.chainImtRoot.toLowerCase() === onChainRoot.toLowerCase(),
