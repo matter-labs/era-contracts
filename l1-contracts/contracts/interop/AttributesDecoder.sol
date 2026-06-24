@@ -17,4 +17,8 @@ library AttributesDecoder {
     function decodeBool(bytes calldata _data) internal pure returns (bool) {
         return abi.decode(_data[4:], (bool));
     }
+
+    function decodeBytes32(bytes calldata _data) internal pure returns (bytes32) {
+        return abi.decode(_data[4:], (bytes32));
+    }
 }

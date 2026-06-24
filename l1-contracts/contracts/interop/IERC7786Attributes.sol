@@ -22,4 +22,11 @@ interface IERC7786Attributes {
     /// @dev This attribute is optional and defaults to `false` (base token fees) when not provided.
     /// @dev Contracts should be able to toggle this flag for Stage1/Stage2 compatibility, this is due to the fact that operator-set base token amount is dependent on operator of the chain, while fixed ZK option is not.
     function useFixedFee(bool _useFixed) external pure;
+
+    /// @notice Specifies a user-provided salt for the interop bundle.
+    /// @param _salt Arbitrary 32-byte salt chosen by the sender.
+    /// @dev This attribute is optional and defaults to `bytes32(0)` when not provided.
+    /// @dev The salt is mixed with `msg.sender` to derive the bundle's `interopBundleSalt`, which guarantees a unique
+    ///      bundle hash. A sender that wants to send two otherwise identical bundles MUST provide distinct salts.
+    function interopBundleSalt(bytes32 _salt) external pure;
 }

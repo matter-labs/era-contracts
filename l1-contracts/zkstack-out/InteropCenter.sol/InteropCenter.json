@@ -212,25 +212,6 @@
   },
   {
     "type": "function",
-    "name": "interopBundleNonce",
-    "inputs": [
-      {
-        "name": "sender",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "numberOfBundlesSent",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "interopProtocolFee",
     "inputs": [],
     "outputs": [
@@ -312,6 +293,11 @@
             "name": "useFixedFee",
             "type": "bool",
             "internalType": "bool"
+          },
+          {
+            "name": "salt",
+            "type": "bytes32",
+            "internalType": "bytes32"
           }
         ]
       }
@@ -639,6 +625,11 @@
                 "name": "useFixedFee",
                 "type": "bool",
                 "internalType": "bool"
+              },
+              {
+                "name": "salt",
+                "type": "bytes32",
+                "internalType": "bytes32"
               }
             ]
           }

@@ -82,10 +82,11 @@ contract InteropCenter is
     /// L1 that is at the most base layer.
     uint256 public L1_CHAIN_ID;
 
-    /// @notice This mapping stores a number of interop bundles sent by an individual sender.
-    ///         It's being used to derive interopBundleSalt in InteropBundle struct, whose role
-    ///         is to ensure that each bundle has a unique hash.
-    mapping(address sender => uint256 numberOfBundlesSent) public interopBundleNonce;
+    /// @notice DEPRECATED. This mapping used to store the number of interop bundles sent by an individual sender,
+    ///         which was used to derive the `interopBundleSalt` in the `InteropBundle` struct. The salt is now derived
+    ///         from a user-provided value supplied via the `interopBundleSalt` ERC-7786 bundle attribute, so this nonce
+    ///         is no longer read or written. The slot is retained to preserve the storage layout.
+    mapping(address sender => uint256 numberOfBundlesSent) internal __DEPRECATED_interopBundleNonce;
 
     /// @notice Operator-set fee in base token per interop call (when useFixedFee=false).
     uint256 public interopProtocolFee;
@@ -416,13 +417,13 @@ contract InteropCenter is
             sourceChainId: block.chainid,
             destinationChainId: _destinationChainId,
             destinationBaseTokenAssetId: destinationBaseTokenAssetId,
-            interopBundleSalt: keccak256(abi.encodePacked(msg.sender, interopBundleNonce[msg.sender])),
+            // The salt is derived from the sender and a user-provided salt (from the `interopBundleSalt` bundle attribute).
+            // Mixing in `msg.sender` ensures bundles from different senders can never collide, while the user-provided salt
+            // lets the sender control uniqueness of their own bundles.
+            interopBundleSalt: keccak256(abi.encodePacked(msg.sender, _bundleAttributes.salt)),
             calls: new InteropCall[](_callStarters.length),
             bundleAttributes: _bundleAttributes
         });
-
-        // Update interopBundleNonce for the msg.sender
-        ++interopBundleNonce[msg.sender];
 
         // This will calculate how much value does all of the calls use cumulatively.
         uint256 totalBurnedCallsValue;
@@ -658,6 +659,15 @@ contract InteropCenter is
                 // Decode the boolean parameter using AttributesDecoder
                 bool useFixed = AttributesDecoder.decodeBool(_attributes[i]);
                 bundleAttributes.useFixedFee = useFixed;
+            } else if (selector == IERC7786Attributes.interopBundleSalt.selector) {
+                require(!attributeUsed[5], AttributeAlreadySet(selector));
+                require(
+                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
+                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
+                    AttributeViolatesRestriction(selector, uint256(_restriction))
+                );
+                attributeUsed[5] = true;
+                bundleAttributes.salt = AttributesDecoder.decodeBytes32(_attributes[i]);
             } else {
                 revert IERC7786GatewaySource.UnsupportedAttribute(selector);
             }
@@ -696,7 +706,8 @@ contract InteropCenter is
                 IERC7786Attributes.indirectCall.selector,
                 IERC7786Attributes.executionAddress.selector,
                 IERC7786Attributes.unbundlerAddress.selector,
-                IERC7786Attributes.useFixedFee.selector
+                IERC7786Attributes.useFixedFee.selector,
+                IERC7786Attributes.interopBundleSalt.selector
             ];
     }
 
