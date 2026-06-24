@@ -21,6 +21,8 @@ import {
   DEFAULT_TX_GAS_LIMIT,
   INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
+  L2_ATOMIC_FLOW_MANAGER_ADDR,
+  L2_BRIDGEHUB_ADDR,
   L2_INTEROP_COMMITMENT_TREE_ADDR,
   L2_INTEROP_HANDLER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
@@ -242,14 +244,70 @@ async function buildRealInclusionProof(params: {
   };
 }
 
+/**
+ * Register the two chains with each other for interop, so each chain's L2 Bridgehub knows the other's
+ * base-token assetId (`InteropCenter.sendBundle` needs it). The default ecosystem does no interop
+ * registration for L1-settling chains, so we trigger it: query the L1 Bridgehub for its
+ * `chainRegistrationSender`, then call the permissionless `registerChain(toRegister, registeredOn)`
+ * for both directions. Each call sends an L2 service tx that sets `baseTokenAssetId[toRegister]` on
+ * `registeredOn`'s L2 Bridgehub; we poll until both are set.
+ */
+async function registerChainsForInterop(
+  l1Rpc: string,
+  bridgehubAddr: string,
+  chainA: ChainCtx,
+  chainB: ChainCtx
+): Promise<void> {
+  const l1Provider = new providers.JsonRpcProvider(l1Rpc);
+  // Standard anvil acct #0 is funded on the L1 anvil; registerChain is permissionless.
+  const l1Wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
+  const l1Bridgehub = new Contract(bridgehubAddr, getAbi("L1Bridgehub"), l1Wallet);
+  const senderAddr: string = await l1Bridgehub.chainRegistrationSender();
+  const sender = new Contract(senderAddr, getAbi("ChainRegistrationSender"), l1Wallet);
+  log(`chainRegistrationSender = ${senderAddr}`);
+
+  // registerChain(toRegister, registeredOn): A must learn B (-> registerChain(B, A)) and vice versa.
+  const directions = [
+    { toRegister: chainB, registeredOn: chainA },
+    { toRegister: chainA, registeredOn: chainB },
+  ];
+  for (const { toRegister, registeredOn } of directions) {
+    const l2bh = new Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), registeredOn.provider);
+    const existing: string = await l2bh.baseTokenAssetId(toRegister.chainId);
+    if (existing !== ethers.constants.HashZero) {
+      log(`chain ${registeredOn.chainId} already knows ${toRegister.chainId}`);
+      continue;
+    }
+    await (
+      await sender.registerChain(toRegister.chainId, registeredOn.chainId, { gasLimit: DEFAULT_TX_GAS_LIMIT })
+    ).wait();
+    log(`registerChain(${toRegister.chainId} on ${registeredOn.chainId}) submitted; waiting for L2 service tx...`);
+    const start = Date.now();
+    for (;;) {
+      const got: string = await l2bh.baseTokenAssetId(toRegister.chainId);
+      if (got !== ethers.constants.HashZero) break;
+      if (Date.now() - start > 120_000) {
+        throw new Error(`chain ${registeredOn.chainId} never learned ${toRegister.chainId}'s base token`);
+      }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    log(`chain ${registeredOn.chainId} now knows ${toRegister.chainId}`);
+  }
+}
+
 async function main() {
-  const [rpcA, idAStr, rpcB, idBStr, pkArg] = process.argv.slice(2);
-  if (!rpcA || !idAStr || !rpcB || !idBStr) {
-    throw new Error("usage: atomic-swap-real.ts <rpcA> <chainIdA> <rpcB> <chainIdB> [depositorPrivateKey]");
+  const [rpcA, idAStr, rpcB, idBStr, pkArg, l1Rpc, bridgehubAddr] = process.argv.slice(2);
+  if (!rpcA || !idAStr || !rpcB || !idBStr || !l1Rpc || !bridgehubAddr) {
+    throw new Error(
+      "usage: atomic-swap-real.ts <rpcA> <chainIdA> <rpcB> <chainIdB> <depositorPrivateKey> <l1Rpc> <bridgehubAddr>"
+    );
   }
   // The depositor/recipient key. Defaults to the standard anvil acct #0, but the integration-test
   // harness funds its own wallet set, so it passes a known-funded key explicitly.
   const userKey = pkArg || ANVIL_DEFAULT_PRIVATE_KEY;
+  // sendInteropBundle() signs with getInteropSourcePrivateKey(), which honors ANVIL_INTEROP_PRIVATE_KEY.
+  // Point it at our funded depositor so the atomic send is signed by the account that holds the tokens.
+  process.env.ANVIL_INTEROP_PRIVATE_KEY = userKey;
   const mkCtx = (rpc: string, chainId: number): ChainCtx => {
     const provider = new providers.JsonRpcProvider(rpc);
     const user = new Wallet(userKey, provider);
@@ -260,7 +318,7 @@ async function main() {
       testToken: undefined as unknown as Contract,
       interopCenter: new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), user),
       interopHandler: new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), user),
-      manager: new Contract(L2_INTEROP_COMMITMENT_TREE_ADDR, getAbi("AtomicFlowManager"), user),
+      manager: new Contract(L2_ATOMIC_FLOW_MANAGER_ADDR, getAbi("AtomicFlowManager"), user),
       tree: new Contract(L2_INTEROP_COMMITMENT_TREE_ADDR, getAbi("L2InteropCommitmentTree"), user),
     };
   };
@@ -289,6 +347,10 @@ async function main() {
   await setupToken(chainB, mint);
 
   const fee = await getInteropProtocolFee(chainA.provider);
+
+  // Register the chains with each other for interop (sets baseTokenAssetId cross-chain) before any send.
+  log("registering chains for interop...");
+  await registerChainsForInterop(l1Rpc, bridgehubAddr, chainA, chainB);
 
   // Deadline is an L1 (settlement-layer) block number; pick well above the current L1 head so the
   // legs' actual settlement blocks land before it. The harness L1 is a fast anvil.
