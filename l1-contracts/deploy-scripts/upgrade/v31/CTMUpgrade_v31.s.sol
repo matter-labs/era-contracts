@@ -109,13 +109,10 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     }
 
     /// @notice Append the ValidatorTimelock proxy-admin upgrade to the stage-1 governance bundle.
-    /// @dev Plain `ProxyAdmin.upgrade` (not `upgradeAndCall`): the new impl (Era: `ValidatorTimelock`,
-    ///      ZKsyncOS: `MultisigCommitter`) is deployed with no reinitializer call.
-    ///      - ZKsyncOS proxies already run a MultisigCommitter at `_initialized=2` with their multisig
-    ///        storage intact, so the swap just restores the multisig code; calling `reinitializeV2()`
-    ///        again would revert "already initialized".
-    ///      - `ValidatorTimelock` has no v2 reinitializer and adds no new storage (the v31 `UPGRADER_ROLE`
-    ///        is granted lazily when validators are (re)added), so the plain swap is storage-compatible.
+    /// @dev Plain `ProxyAdmin.upgrade` (not `upgradeAndCall`): the new `MultisigCommitter` impl is deployed
+    ///      with no reinitializer call. Proxies already running a MultisigCommitter are at `_initialized=2`
+    ///      with their multisig storage intact, so the swap just restores the multisig code; calling
+    ///      `reinitializeV2()` again would revert "already initialized".
     function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
         address validatorTimelockProxy = ctmAddresses.stateTransition.proxies.validatorTimelock;
         address newImpl = ctmAddresses.stateTransition.implementations.validatorTimelock;
