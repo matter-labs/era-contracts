@@ -243,13 +243,16 @@ async function buildRealInclusionProof(params: {
 }
 
 async function main() {
-  const [rpcA, idAStr, rpcB, idBStr] = process.argv.slice(2);
+  const [rpcA, idAStr, rpcB, idBStr, pkArg] = process.argv.slice(2);
   if (!rpcA || !idAStr || !rpcB || !idBStr) {
-    throw new Error("usage: atomic-swap-real.ts <rpcA> <chainIdA> <rpcB> <chainIdB>");
+    throw new Error("usage: atomic-swap-real.ts <rpcA> <chainIdA> <rpcB> <chainIdB> [depositorPrivateKey]");
   }
+  // The depositor/recipient key. Defaults to the standard anvil acct #0, but the integration-test
+  // harness funds its own wallet set, so it passes a known-funded key explicitly.
+  const userKey = pkArg || ANVIL_DEFAULT_PRIVATE_KEY;
   const mkCtx = (rpc: string, chainId: number): ChainCtx => {
     const provider = new providers.JsonRpcProvider(rpc);
-    const user = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, provider);
+    const user = new Wallet(userKey, provider);
     return {
       chainId,
       provider,
