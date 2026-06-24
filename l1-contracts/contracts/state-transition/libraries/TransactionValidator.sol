@@ -66,7 +66,6 @@ library TransactionValidator {
                 _transaction.data.length,
                 _transaction.factoryDeps.length,
                 _transaction.gasPerPubdataByteLimit,
-                _transaction.maxFeePerGas,
                 zksyncOS
             ) > l2GasForTxBody
         ) {
@@ -123,7 +122,6 @@ library TransactionValidator {
     /// @param _encodingLength The length of the priority transaction encoding in bytes.
     /// @param _numberOfFactoryDependencies The number of new factory dependencies that will be added.
     /// @param _l2GasPricePerPubdata The L2 gas price for publishing the priority transaction on L2.
-    /// @param _maxFeePerGas The maximal gas price for the transaction.
     /// @param zksyncOS ZKsync OS state transition flag
     /// @return The minimum gas limit required to execute the priority transaction.
     /// Note: The calculation includes the main cost of the priority transaction, however, in reality, the operator can spend a little more gas on overheads.
@@ -132,7 +130,6 @@ library TransactionValidator {
         uint256 _calldataLength,
         uint256 _numberOfFactoryDependencies,
         uint256 _l2GasPricePerPubdata,
-        uint256 _maxFeePerGas,
         bool zksyncOS
     ) internal pure returns (uint256) {
         if (zksyncOS) {

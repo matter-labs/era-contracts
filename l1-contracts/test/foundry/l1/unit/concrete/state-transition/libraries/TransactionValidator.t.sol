@@ -84,7 +84,6 @@ contract TransactionValidatorTest is Test {
             50, // calldataLength
             0, // numberOfFactoryDependencies
             800, // l2GasPricePerPubdata
-            1 gwei, // maxFeePerGas
             false // zksyncOS
         );
 
@@ -97,7 +96,6 @@ contract TransactionValidatorTest is Test {
             50, // calldataLength
             0, // numberOfFactoryDependencies
             800, // l2GasPricePerPubdata
-            1 gwei, // maxFeePerGas
             true // zksyncOS
         );
 
@@ -110,7 +108,6 @@ contract TransactionValidatorTest is Test {
             50,
             0,
             800,
-            1 gwei,
             false
         );
 
@@ -119,7 +116,6 @@ contract TransactionValidatorTest is Test {
             50,
             5,
             800,
-            1 gwei,
             false
         );
 
@@ -129,7 +125,7 @@ contract TransactionValidatorTest is Test {
 
     function test_getMinimalPriorityTransactionGasLimit_zeroMaxFeePerGas() public pure {
         // Zero max fee is possible for upgrade/service transactions
-        uint256 minGas = TransactionValidator.getMinimalPriorityTransactionGasLimit(100, 50, 0, 800, 0, true);
+        uint256 minGas = TransactionValidator.getMinimalPriorityTransactionGasLimit(100, 50, 0, 800, true);
 
         assertGt(minGas, 0);
     }
@@ -140,7 +136,6 @@ contract TransactionValidatorTest is Test {
             50,
             0,
             800,
-            1 gwei,
             false
         );
 
@@ -149,7 +144,6 @@ contract TransactionValidatorTest is Test {
             500,
             0,
             800,
-            1 gwei,
             false
         );
 
