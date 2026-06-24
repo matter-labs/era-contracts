@@ -13,6 +13,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {
     ChainExists,
     MessageRootNotRegistered,
+    NonConsecutiveBatchNumber,
     OnlyChainAssetHandler,
     OnlyChain,
     OnlyGateway,
@@ -347,6 +348,74 @@ contract MessageRoot_Extended_Test is Test {
         assertEq(messageRoot.chainBatchRoots(chainId, 1), batchRoot1);
         assertEq(messageRoot.chainBatchRoots(chainId, 2), batchRoot2);
         assertEq(messageRoot.currentChainBatchNumber(chainId), 2);
+    }
+
+    /// @notice From V31 the per-batch aggregation ceremony is unified into the base, so on L1 a batch-root
+    /// append emits an interop root and records the per-block historical root (previously L1 did neither).
+    /// This is the L1-side enabler for atomic interop: a leg's commitment-tree root, published as an L2->L1
+    /// message, becomes importable downstream via the emitted interop root.
+    function test_AddChainBatchRoot_L1AggregatesAndEmitsInteropRoot() public {
+        uint256 chainId = 271;
+        address chainSender = makeAddr("chainSender");
+
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
+            abi.encode(chainSender)
+        );
+        vm.mockCall(
+            chainSender,
+            abi.encodeWithSelector(IGetters.getSemverProtocolVersion.selector),
+            abi.encode(0, 29, 0)
+        );
+
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(chainId, 0);
+
+        bytes32 aggregatedBefore = messageRoot.getAggregatedRoot();
+
+        // Roll to a new block so the interop-root logId increments exactly once for this emission.
+        vm.roll(block.number + 1);
+        uint256 expectedLogId = messageRoot.interopRootLogId() + 1;
+
+        vm.expectEmit(true, true, true, false);
+        emit IMessageRootBase.NewInteropRoot(block.chainid, block.number, expectedLogId, new bytes32[](0));
+        vm.prank(chainSender);
+        messageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
+
+        assertTrue(
+            messageRoot.getAggregatedRoot() != aggregatedBefore,
+            "L1 aggregated root changes on batch-root append"
+        );
+        assertEq(
+            messageRoot.historicalRoot(block.number),
+            messageRoot.getAggregatedRoot(),
+            "L1 historicalRoot tracks the aggregated root"
+        );
+    }
+
+    function test_RevertWhen_AddChainBatchRoot_NonConsecutiveBatchNumber() public {
+        uint256 chainId = 271;
+        address chainSender = makeAddr("chainSender");
+
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
+            abi.encode(chainSender)
+        );
+        vm.mockCall(
+            chainSender,
+            abi.encodeWithSelector(IGetters.getSemverProtocolVersion.selector),
+            abi.encode(0, 29, 0)
+        );
+
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(chainId, 0);
+
+        // The first batch must be number 1; skipping ahead to 2 reverts.
+        vm.prank(chainSender);
+        vm.expectRevert(abi.encodeWithSelector(NonConsecutiveBatchNumber.selector, chainId, 2));
+        messageRoot.addChainBatchRoot(chainId, 2, keccak256("batchRoot"));
     }
 
     function test_HistoricalRoot() public {

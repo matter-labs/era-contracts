@@ -34,7 +34,10 @@ import {MessageVerification} from "../../common/MessageVerification.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
 /// @dev From V31 onwards it is also used for L2->L1 message verification, this allows bypassing the Mailbox of individual chains.
-/// This is especially useful for chains settling on Gateway.
+/// @dev Settlement topology: this base is shared by the L1 deployment (`L1MessageRoot`) and the Gateway
+/// deployment (`L2MessageRoot`). As of V32 all chains settle on L1. The per-batch aggregation ceremony in
+/// `addChainBatchRoot` (chainTree push, sharedTree update, interop-root emit, `historicalRoot` write) was
+/// unified into this base in V32, so the L1 deployment now performs it.
 abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initializable, MessageVerification {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
@@ -62,19 +65,18 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     mapping(uint256 chainIndex => uint256 chainId) public chainIndexToId;
 
     /// @notice The shared full merkle tree storing the aggregate hash.
-    /// @dev Note, that on L1, the chainId leaves are empty.
+    /// @dev The chainId leaves are updated on every batch-root append.
     FullMerkle.FullTree public sharedTree;
 
     /// @dev The incremental merkle tree storing the chain message roots.
-    /// @dev On L1, these are empty leaves and are populated only during the addition of the chain
-    /// are not updated thereafter.
+    /// @dev A batch leaf is pushed on every batch-root append.
     mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) internal chainTree;
 
     /// @notice The mapping from block number to the global message root.
     /// @dev Each block might have multiple txs that change the historical root. You can safely use the final root in the block,
     /// since each new root cumulatively aggregates all prior changes — so the last root always contains (at minimum) everything
     /// from the earlier ones.
-    /// @dev Populated only on L2.
+    /// @dev Populated on every shared-tree change: chain registration and batch-root append.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
     /// @dev Chain ID of L1.
@@ -88,8 +90,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
 
     /// @notice The mapping from chainId to batchNumber to chainBatchRoot.
     /// @dev These are the same values as the leaves of the chainTree.
-    /// @dev We store these values for message verification on L1 and Gateway.
-    /// @dev We only updated the chainTree on deprecated Era GW as of V31.
+    /// @dev We store these values for message verification on the settlement layer.
     /// @dev An expected invariant is that for all batches starting from currentChainBatchNumber + 1, the `chainBatchRoots` is 0.
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
@@ -202,6 +203,21 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
 
         chainBatchRoots[_chainId][_batchNumber] = _chainBatchRoot;
         currentChainBatchNumber[_chainId] = expectedNewChainBatchNumber;
+
+        // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.
+        bytes32 chainRoot;
+        // slither-disable-next-line unused-return
+        (, chainRoot) = chainTree[_chainId].push(MessageHashing.batchLeafHash(_chainBatchRoot, _batchNumber));
+
+        emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
+
+        // Update leaf corresponding to the specified chainId with newly acquired value of the chainRoot.
+        bytes32 cachedChainIdLeafHash = MessageHashing.chainIdLeafHash(chainRoot, _chainId);
+        bytes32 sharedTreeRoot = sharedTree.updateLeaf(chainIndex[_chainId], cachedChainIdLeafHash);
+
+        emit NewChainRoot(_chainId, chainRoot, cachedChainIdLeafHash);
+
+        _recordSharedRoot(sharedTreeRoot);
     }
 
     /// @notice Emits a new interop root event when the shared tree root changes.
@@ -260,8 +276,20 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
 
         emit AddedChain(_chainId, cachedChainCount);
 
-        _emitRoot(sharedTreeRoot);
-        historicalRoot[block.number] = sharedTreeRoot;
+        _recordSharedRoot(sharedTreeRoot);
+    }
+
+    /// @notice Records a new aggregated (shared-tree) root: emits the interop-root event and stores the
+    /// per-block historical root.
+    /// @dev Called on every shared-tree change: chain registration and batch-root append (the latter unified
+    /// into the base in V32; see the contract-level note on settlement topology). Atomic interop reuses this
+    /// same pipeline: a flow leg's commitment-tree root is published as an ordinary L2->L1 message, so it is
+    /// carried by the aggregated root here and authenticated downstream via the existing `MessageVerification`
+    /// path against an imported interop root.
+    /// @param _sharedTreeRoot The new aggregated root of the shared tree.
+    function _recordSharedRoot(bytes32 _sharedTreeRoot) internal {
+        _emitRoot(_sharedTreeRoot);
+        historicalRoot[block.number] = _sharedTreeRoot;
     }
 
     //////////////////////////////
