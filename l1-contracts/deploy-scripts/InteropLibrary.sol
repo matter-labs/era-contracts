@@ -158,6 +158,20 @@ library InteropLibrary {
         return attributes;
     }
 
+    /// @notice Appends an `interopBundleSalt` attribute to an existing bundle attributes array.
+    /// @dev Useful when sending several otherwise-identical bundles, which must carry distinct salts so that each
+    ///      produces a unique bundle hash (enforced by InteropCenter).
+    function withInteropBundleSalt(
+        bytes[] memory _attributes,
+        bytes32 _salt
+    ) internal pure returns (bytes[] memory attrs) {
+        attrs = new bytes[](_attributes.length + 1);
+        for (uint256 i = 0; i < _attributes.length; ++i) {
+            attrs[i] = _attributes[i];
+        }
+        attrs[_attributes.length] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (_salt));
+    }
+
     /// @notice Build a call-level 7786 attributes array.
     function buildCallAttributes(bool indirectCall) internal pure returns (bytes[] memory) {
         uint256 length;

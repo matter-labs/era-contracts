@@ -44,6 +44,7 @@ import {
     AttributeViolatesRestriction,
     DestinationChainNotRegistered,
     IndirectCallValueMismatch,
+    InteropBundleAlreadySent,
     InteroperableAddressChainReferenceNotEmpty,
     InteroperableAddressNotEmpty,
     FeeWithdrawalFailed,
@@ -112,6 +113,13 @@ contract InteropCenter is
     /// @notice Accumulated ZK fees per coinbase.
     /// @dev Coinbase addresses can claim their accumulated fees via claimZKFees().
     mapping(address coinbase => uint256 amount) public accumulatedZKFees;
+
+    /// @notice Tracks the hash of every `InteropBundle` that has been sent from this chain.
+    /// @dev Used to guarantee that each emitted bundle has a globally unique hash. Since the bundle hash commits to
+    ///      the `interopBundleSalt` (derived from `msg.sender` and the user-provided salt), a sender that wants to send
+    ///      two otherwise identical bundles must provide a fresh salt; otherwise `_sendBundle` reverts with
+    ///      `InteropBundleAlreadySent`.
+    mapping(bytes32 interopBundleHash => bool sent) public isInteropBundleHashSent;
 
     modifier onlySettlementLayerRelayedSender() {
         require(msg.sender == SETTLEMENT_LAYER_RELAY_SENDER, Unauthorized(msg.sender));
@@ -466,10 +474,15 @@ contract InteropCenter is
         /// To avoid stack too deep error
         {
             bytes memory interopBundleBytes = abi.encode(bundle);
+            bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
+
+            // Ensure every sent bundle has a globally unique hash. As the hash commits to the user-provided salt,
+            // a duplicate here means the sender reused a salt for an otherwise identical bundle.
+            require(!isInteropBundleHashSent[bundleHash], InteropBundleAlreadySent(bundleHash));
+            isInteropBundleHashSent[bundleHash] = true;
 
             // Send the message corresponding to the relevant InteropBundle to L1.
             msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes));
-            bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
         }
 
         _emitMessageSent({

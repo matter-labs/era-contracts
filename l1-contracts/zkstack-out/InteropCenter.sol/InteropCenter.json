@@ -225,6 +225,25 @@
   },
   {
     "type": "function",
+    "name": "isInteropBundleHashSent",
+    "inputs": [
+      {
+        "name": "interopBundleHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "sent",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "owner",
     "inputs": [],
     "outputs": [
@@ -943,6 +962,17 @@
         "name": "actual",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InteropBundleAlreadySent",
+    "inputs": [
+      {
+        "name": "interopBundleHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ]
   },

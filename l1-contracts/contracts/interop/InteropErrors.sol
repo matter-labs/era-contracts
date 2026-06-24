@@ -23,6 +23,8 @@ error ExecutingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes executi
 error FeeWithdrawalFailed();
 // 0x62d214aa
 error IndirectCallValueMismatch(uint256 expected, uint256 actual);
+// 0xedec69ff
+error InteropBundleAlreadySent(bytes32 interopBundleHash);
 // 0xfe8b1b16
 error InteroperableAddressChainReferenceNotEmpty(bytes interoperableAddress);
 // 0x884f49ba

@@ -11,7 +11,11 @@ import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {BundleAttributes, InteropBundle, InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
-import {AttributeAlreadySet, AttributeViolatesRestriction} from "contracts/interop/InteropErrors.sol";
+import {
+    AttributeAlreadySet,
+    AttributeViolatesRestriction,
+    InteropBundleAlreadySent
+} from "contracts/interop/InteropErrors.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
 /// @title L2InteropBundleSaltTestAbstract
@@ -127,18 +131,36 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
         assertTrue(hash1 != hash2, "different salts must yield different bundle hashes");
     }
 
-    /// @notice Edge case: the same sender re-sending an identical bundle with the same salt produces the same hash.
-    /// @dev This documents that, unlike the removed auto-incrementing nonce, the user is now responsible for choosing
-    ///      a fresh salt to make repeated bundles unique.
-    function test_sendBundle_sameSenderSameSaltSameContentCollides() public {
+    /// @notice The contract records every sent bundle hash and rejects a reused one, guaranteeing unique bundle hashes.
+    /// @dev Unlike the removed auto-incrementing nonce, the sender must now provide a fresh salt to re-send an otherwise
+    ///      identical bundle. Re-sending with the same salt and content reverts with `InteropBundleAlreadySent`.
+    function test_sendBundle_revertsWhenBundleHashReused() public {
         _setupGatewayMode();
         address sender = makeAddr("saltSender");
         bytes32 userSalt = keccak256("repeated-salt");
 
         (, bytes32 hash1) = _sendAndDecodeBundle(sender, _buildBundleAttributesWithSalt(userSalt, true));
-        (, bytes32 hash2) = _sendAndDecodeBundle(sender, _buildBundleAttributesWithSalt(userSalt, true));
+        assertTrue(l2InteropCenter.isInteropBundleHashSent(hash1), "sent bundle hash should be recorded");
 
-        assertEq(hash1, hash2, "identical bundle with identical salt must collide");
+        // Re-sending the identical bundle with the same salt must revert via the unique-hash guard.
+        InteropCallStarter[] memory calls = _buildSimpleCall();
+        bytes[] memory attrs = _buildBundleAttributesWithSalt(userSalt, true);
+        vm.prank(sender);
+        vm.expectRevert(abi.encodeWithSelector(InteropBundleAlreadySent.selector, hash1));
+        l2InteropCenter.sendBundle{value: 0}(InteroperableAddress.formatEvmV1(destinationChainId), calls, attrs);
+    }
+
+    /// @notice The same sender can re-send an otherwise identical bundle as long as it provides a fresh salt.
+    function test_sendBundle_freshSaltAllowsResend() public {
+        _setupGatewayMode();
+        address sender = makeAddr("saltSender");
+
+        (, bytes32 hash1) = _sendAndDecodeBundle(sender, _buildBundleAttributesWithSalt(keccak256("salt-1"), true));
+        (, bytes32 hash2) = _sendAndDecodeBundle(sender, _buildBundleAttributesWithSalt(keccak256("salt-2"), true));
+
+        assertTrue(hash1 != hash2, "fresh salt should yield a new bundle hash");
+        assertTrue(l2InteropCenter.isInteropBundleHashSent(hash1));
+        assertTrue(l2InteropCenter.isInteropBundleHashSent(hash2));
     }
 
     /// @notice Different senders supplying the same user salt still produce distinct `interopBundleSalt` values.

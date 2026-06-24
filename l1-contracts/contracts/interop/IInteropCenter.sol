@@ -72,6 +72,10 @@ interface IInteropCenter {
     /// @notice Returns the cached ZK token contract address.
     function zkToken() external view returns (IERC20);
 
+    /// @notice Returns whether a bundle with the given hash has already been sent from this chain.
+    /// @param interopBundleHash The hash of the interop bundle.
+    function isInteropBundleHashSent(bytes32 interopBundleHash) external view returns (bool);
+
     /// @notice Returns ZK token address if available, zero address otherwise.
     /// @dev View function to check ZK token availability without modifying state.
     /// @return The ZK token address or zero address if not available.

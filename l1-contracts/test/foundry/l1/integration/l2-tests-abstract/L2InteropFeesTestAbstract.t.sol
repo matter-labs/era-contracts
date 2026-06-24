@@ -1143,11 +1143,15 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         address sender = makeAddr("feeSender");
         vm.deal(sender, 10 ether);
 
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false);
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
-        // Send multiple bundles to accumulate fees
+        // Send multiple bundles to accumulate fees. Each bundle carries a distinct salt so that its hash is unique,
+        // as InteropCenter rejects re-sending a bundle with an already-used hash.
         for (uint256 i = 0; i < 3; i++) {
+            bytes[] memory bundleAttributes = InteropLibrary.withInteropBundleSalt(
+                InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false),
+                bytes32(i)
+            );
             vm.prank(sender);
             l2InteropCenter.sendBundle{value: protocolFee}(
                 InteroperableAddress.formatEvmV1(destinationChainId),
