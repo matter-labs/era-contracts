@@ -40,7 +40,6 @@ import {
   atomicFinalityProofTuple,
   commitValue,
   computeFlowId,
-  lowNullifierIndexFor,
   type IMTLeaf,
   type ImtInclusionProof,
 } from "./src/helpers/imt-engine-lib";
@@ -151,7 +150,13 @@ async function sendAtomicLeg(params: {
 }): Promise<{ bundleData: string; bundleHash: string; txHash: string }> {
   const { source, dest, amount, recipient, flowId, deadline, predictedBundleHash, fee } = params;
   const value = commitValue(flowId, predictedBundleHash);
-  const lowNull = await lowNullifierIndexFor(source.tree, value);
+  // Low-nullifier (predecessor) index for the about-to-be-inserted leaf, from the server's Rust IMT
+  // engine against the current (pre-insert) tree state.
+  const latestBlock = await source.provider.getBlockNumber();
+  const lowNull: number | null = await source.provider.send("zks_getImtLowNullifierIndex", [value, latestBlock]);
+  if (lowNull == null) {
+    throw new Error(`no low-nullifier leaf for value ${value} on chain ${source.chainId}`);
+  }
   const res = await sendInteropBundle({
     sourceProvider: source.provider,
     destinationChainId: dest.chainId,
