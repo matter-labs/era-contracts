@@ -81,6 +81,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
         _state[_flowId][_bundleHash] = LegState.Committed;
 
         uint256 value = AtomicInteropProof.commitValue(_flowId, _bundleHash);
+        // slither-disable-next-line unused-return
         (uint256 index, ) = IL2InteropCommitmentTree(commitmentTree()).insert(value, _lowNullifierIndex);
 
         emit FlowCommitted(_flowId, _bundleHash, _deadline, index);
