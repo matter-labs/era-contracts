@@ -41,11 +41,11 @@ Until merged to `main`, these won't appear in the Actions dropdown.
 is the **"Mode 2" real-network deployment** — the one job that uses the deployer
 private key to push the new-contract CREATE2 deploys on-chain.
 
-It is deliberately conservative:
+This is an operator-run helper, **not** the forced/authoritative production
+deployment gate. It is deliberately conservative:
 
-1. `workflow_dispatch` only, gated behind a protected `sepolia-deploy`
-   GitHub Environment (configure required reviewers in repo Settings → a human
-   must approve each run).
+1. `workflow_dispatch` only — never on push. (No GitHub Environment gate; the
+   dry-run default + confirm phrase below are the guards.)
 2. **Deploy-only-what's-verified:** it first runs the same fork regen + PUVT as
    above; if PUVT is not green it never reaches the broadcast. The bytecode it
    deploys is exactly what was just verified.

@@ -11,17 +11,19 @@ name: "Deploy Upgrade Contracts (real L1)"
 #
 # SAFETY MODEL (this job spends a real key and writes real on-chain state):
 #   1. workflow_dispatch only — never on push.
-#   2. `environment: sepolia-deploy` — configure it in repo Settings with
-#      required reviewers so a human must approve before the job runs.
-#   3. Deploy-only-what's-verified: the job first runs the SAME fork
-#      regen + PUVT as `regen-and-verify.yaml`. If PUVT is not green, it never
-#      reaches the broadcast. The bytecode deployed is exactly the bytecode
-#      just verified (identical build, identical CREATE2 addresses).
-#   4. Dry-run by default: `dry_run=true` prints the deployer txs that WOULD be
+#   2. Deploy-only-what's-verified: the job first runs the SAME fork
+#      regen + PUVT as `generate-ecosystem-upgrade-calldata.yaml`. If PUVT is not
+#      green, it never reaches the broadcast. The bytecode deployed is exactly
+#      the bytecode just verified (identical build, identical CREATE2 addresses).
+#   3. Dry-run by default: `dry_run=true` prints the deployer txs that WOULD be
 #      sent and stops. To actually broadcast you must set `dry_run=false` AND
-#      type the confirm phrase.
-#   5. Idempotent: `dev execute-safe` skips CREATE2 deploys whose address
+#      type the confirm phrase `DEPLOY-<environment>`.
+#   4. Idempotent: `dev execute-safe` skips CREATE2 deploys whose address
 #      already has code, so a re-run after a partial broadcast is safe.
+#
+# This is NOT the forced/authoritative production-deployment gate — it's an
+# operator-run helper. It deliberately does NOT use a GitHub Environment; the
+# dry-run default + confirm phrase are the guards.
 #
 # Required secrets: `L1_RPC_URL_SEPOLIA` / `L1_RPC_URL_MAINNET`,
 # `DEPLOYER_PRIVATE_KEY_SEPOLIA` / `DEPLOYER_PRIVATE_KEY_MAINNET`.
@@ -70,8 +72,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    # Gate behind a protected Environment so a reviewer must approve the run.
-    environment: sepolia-deploy
     env:
       # No FOUNDRY_PROFILE override — build under the default profile, matching
       # the canonical generate-ecosystem-upgrade-calldata.yaml. The default
