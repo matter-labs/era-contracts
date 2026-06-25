@@ -3,23 +3,18 @@
     {
       "file": "01_ecosystem.upgrade-prepare-all_0x5555555590930f501c88b73ea43b3eeb5a71643c.safe.json",
       "index": 1,
-      "steps": ["ecosystem.upgrade-prepare-all"],
-      "target": "0x5555555590930f501c88b73ea43b3eeb5a71643c",
-      "tx_count": 3
-    },
-    {
-      "file": "02_ecosystem.upgrade-prepare-all_0x343ee72ddd8ccd80cd43d6adbc6c463a2de433a7.safe.json",
-      "index": 2,
-      "steps": ["ecosystem.upgrade-prepare-all"],
-      "target": "0x343ee72ddd8ccd80cd43d6adbc6c463a2de433a7",
-      "tx_count": 3
+      "steps": [
+        "ecosystem.upgrade-prepare-all"
+      ],
+      "target": "0x5555555590930f501c88b73ea43b3eeb5a71643c"
     },
     {
       "file": "03_ecosystem.upgrade-prepare-all_0x5555555590930f501c88b73ea43b3eeb5a71643c.safe.json",
       "index": 3,
-      "steps": ["ecosystem.upgrade-prepare-all"],
-      "target": "0x5555555590930f501c88b73ea43b3eeb5a71643c",
-      "tx_count": 6
+      "steps": [
+        "ecosystem.upgrade-prepare-all"
+      ],
+      "target": "0x5555555590930f501c88b73ea43b3eeb5a71643c"
     }
   ]
 }
