@@ -2,6 +2,17 @@
 pragma solidity ^0.8.21;
 
 import {Merkle} from "./Merkle.sol";
+import {
+    IMTAlreadyInitialized,
+    IMTCapacityExceeded,
+    IMTLowLeafIndexOutOfBounds,
+    IMTLowLeafNextTooSmall,
+    IMTLowLeafValueTooLarge,
+    IMTNotInitialized,
+    IMTProofWrongLength,
+    IMTValueAlreadyExists,
+    IMTValueZero
+} from "../L1ContractErrors.sol";
 
 /// @dev Fixed depth of the Indexed Merkle Tree. 2^32 ≈ 4.29B leaves — practically unbounded for
 /// recording per-flow finality facts.
@@ -36,16 +47,6 @@ struct IMT {
     mapping(uint256 value => uint256 leafIndex) valueToIndex;
     uint256 leafCount;
 }
-
-error IMTAlreadyInitialized();
-error IMTNotInitialized();
-error IMTValueZero();
-error IMTValueAlreadyExists(uint256 value);
-error IMTLowLeafIndexOutOfBounds(uint256 lowLeafIndex, uint256 leafCount);
-error IMTLowLeafValueTooLarge(uint256 lowValue, uint256 newValue);
-error IMTLowLeafNextTooSmall(uint256 lowNextValue, uint256 newValue);
-error IMTCapacityExceeded();
-error IMTProofWrongLength(uint256 expected, uint256 actual);
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

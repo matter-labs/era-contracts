@@ -159,6 +159,24 @@ error GenesisUpgradeZero();
 error HashedLogIsDefault();
 // 0x0b08d5be
 error HashMismatch(bytes32 expected, bytes32 actual);
+// 0xf11438d9
+error IMTAlreadyInitialized();
+// 0x848374d5
+error IMTCapacityExceeded();
+// 0x037dc2ed
+error IMTLowLeafIndexOutOfBounds(uint256 lowLeafIndex, uint256 leafCount);
+// 0xd87e0e66
+error IMTLowLeafNextTooSmall(uint256 lowNextValue, uint256 newValue);
+// 0x74470b8f
+error IMTLowLeafValueTooLarge(uint256 lowValue, uint256 newValue);
+// 0xae48798a
+error IMTNotInitialized();
+// 0x1bb259f4
+error IMTProofWrongLength(uint256 expected, uint256 actual);
+// 0x68051076
+error IMTValueAlreadyExists(uint256 value);
+// 0xbd1de53d
+error IMTValueZero();
 // 0xd7d93e1f
 error IncorrectBatchBounds(
     uint256 processFromExpected,
