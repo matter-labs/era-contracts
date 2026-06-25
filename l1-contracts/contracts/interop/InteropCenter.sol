@@ -228,13 +228,13 @@ contract InteropCenter is
         originalCallAttributes[0] = attributes;
 
         // This single-call send path is never atomic; pass an empty AtomicSend (publishes to L1 as usual).
-        bytes32 bundleHash = _sendBundle(
-            recipientChainId,
-            callStartersInternal,
-            bundleAttributes,
-            originalCallAttributes,
-            AtomicSend(false, bytes32(0), 0, 0)
-        );
+        bytes32 bundleHash = _sendBundle({
+            _destinationChainId: recipientChainId,
+            _callStarters: callStartersInternal,
+            _bundleAttributes: bundleAttributes,
+            _originalCallAttributes: originalCallAttributes,
+            _atomicSend: AtomicSend({flowId: bytes32(0), lowNullifierIndex: 0, deadline: 0, isAtomic: false})
+        });
 
         // We return the sendId of the only message that was sent in the bundle above. We always send messages in bundles, even if there's only one message being sent.
         // Note, that bundleHash is unique for every bundle. Each sendId is determined as keccak256 of bundleHash where the message (call) is contained,

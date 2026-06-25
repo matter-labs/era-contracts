@@ -20,10 +20,10 @@ interface IInteropCenter {
     /// known before computing a `bundleHash` that itself embeds `flowId`). Consumed by `_dispatchBundle`
     /// to drive `AtomicFlowManager.append`.
     struct AtomicSend {
-        bool isAtomic;
         bytes32 flowId;
-        uint64 deadline;
         uint256 lowNullifierIndex;
+        uint64 deadline;
+        bool isAtomic;
     }
 
     event InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle interopBundle);
