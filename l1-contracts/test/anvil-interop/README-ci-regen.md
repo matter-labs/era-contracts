@@ -26,6 +26,13 @@ It is a thin CI wrapper around the canonical local driver
 The job is **green iff PUVT passes**. A PUVT failure makes the script exit
 non-zero → the job is red. That is the automated double-check.
 
+On success, if `open_pr` is set (default), the job commits the regenerated
+`ecosystem.toml` + `sim-inputs/` to a new branch and **opens a PR** against the
+branch it ran on (override with `pr_base`). The `sim-inputs/` are the
+transaction-simulator-compatible bundles, so reviewers see the exact calls in
+the PR diff before they go to the simulator. Needs `contents: write` +
+`pull-requests: write` (already set on the workflow).
+
 ## Running it
 
 Actions tab → "Regen & Verify Upgrade Calldata (PUVT)" → *Run workflow*. Inputs:
@@ -74,6 +81,15 @@ It is deliberately conservative:
    governance / multisig bundles (PUH, security council) — those go through the
    governance process. The broadcast is idempotent (already-deployed CREATE2
    addresses are skipped), so a re-run after a partial broadcast is safe.
+5. **Pre-flight mempool check:** before broadcasting it asserts the deployer's
+   `pending` nonce equals its `latest` nonce — i.e. no in-flight tx. A stuck tx
+   at a lower nonce would strand everything sent behind it, so the job fails
+   fast with guidance (cancel/replace that nonce, then re-run) instead of
+   queueing into a gap.
+6. **Gas bid is tunable** via the `gas_price_multiplier` input (default `1.5` =
+   150% of the live `eth_gasPrice`); higher lands faster on a busy chain, lower
+   risks hanging in the mempool. Threaded into `dev execute-safe
+   --gas-price-multiplier`.
 
 Extra secrets it needs: `DEPLOYER_PRIVATE_KEY_SEPOLIA` /
 `DEPLOYER_PRIVATE_KEY_MAINNET` (must control the `deployer_address` input).

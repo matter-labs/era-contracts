@@ -47,6 +47,11 @@ on:
         description: "To actually deploy, type: DEPLOY-<environment> (e.g. DEPLOY-testnet)"
         required: false
         type: string
+      gas_price_multiplier:
+        description: "How far above the live L1 eth_gasPrice to bid (e.g. 1.5 = 150%)"
+        required: true
+        type: string
+        default: "1.5"
       deployer_address:
         description: "Deployer EOA (must match the DEPLOYER_PRIVATE_KEY_<NET> secret)"
         required: true
@@ -210,10 +215,29 @@ jobs:
           done <<< "$DEPLOYER_BUNDLES"
           echo "Dry run complete — nothing was broadcast. Re-run with dry_run=false and the confirm phrase to deploy."
 
+      - name: Pre-flight — no in-flight txs for the deployer
+        if: ${{ !inputs.dry_run }}
+        env:
+          DEPLOYER: ${{ inputs.deployer_address }}
+        run: |
+          set -euo pipefail
+          # A stuck/pending tx at a lower nonce would strand everything we send
+          # (execute-safe assigns nonces from the pending count, which sits
+          # behind the gap). Refuse to start until the deployer's mempool is
+          # clear: pending nonce must equal latest nonce.
+          PENDING="$(cast nonce "$DEPLOYER" --rpc-url "$L1_RPC_URL" --block pending)"
+          LATEST="$(cast nonce "$DEPLOYER" --rpc-url "$L1_RPC_URL" --block latest)"
+          echo "Deployer $DEPLOYER nonce — latest=$LATEST pending=$PENDING"
+          if [ "$PENDING" != "$LATEST" ]; then
+            echo "::error::Deployer has in-flight tx(s) (pending=$PENDING > latest=$LATEST). Wait for them to mine, or cancel/replace nonce $LATEST, then re-run." >&2
+            exit 1
+          fi
+
       - name: Broadcast deployer bundle(s) to real L1
         if: ${{ !inputs.dry_run }}
         env:
           DEPLOYER: ${{ inputs.deployer_address }}
+          GAS_MULT: ${{ inputs.gas_price_multiplier }}
           DEPLOYER_PK_TESTNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
           DEPLOYER_PK_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
         run: |
@@ -239,11 +263,12 @@ jobs:
           EXECUTED="$OUT_DIR/executed.json"
           while IFS= read -r f; do
             [ -z "$f" ] && continue
-            echo "=== execute-safe: $f -> real ${{ inputs.environment }} ==="
+            echo "=== execute-safe: $f -> real ${{ inputs.environment }} (gas x${GAS_MULT}) ==="
             ./protocol-ops/target/debug/protocol_ops dev execute-safe \
               --safe-file "$PREPARE_DIR/$f" \
               --l1-rpc-url "$L1_RPC_URL" \
               --private-key "${PK}" \
+              --gas-price-multiplier "${GAS_MULT}" \
               --out "$EXECUTED"
           done <<< "$DEPLOYER_BUNDLES"
           echo "Broadcast complete. Receipts in $EXECUTED"
