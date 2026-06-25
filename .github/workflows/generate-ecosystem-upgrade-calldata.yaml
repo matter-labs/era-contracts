@@ -199,7 +199,7 @@ jobs:
       # random values so this run deploys to brand-new CREATE2 addresses (useful
       # when the current salt's addresses are already occupied on-chain). Runs
       # BEFORE prepare so the new salts flow into the generated calldata. The
-      # rotated salts land in the input TOML, so an open_pr run records them.
+      # rotated salts land in the input TOML, so a push_artifacts run records them.
       - name: Use new random deployment salt
         if: ${{ inputs.use_new_salt }}
         run: |
