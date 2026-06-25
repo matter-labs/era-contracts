@@ -118,7 +118,7 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
       // Verify total across all chains is positive
       let totalChainBalance = BigNumber.from(0);
       for (const chainConfig of state.chains!.config) {
-        if (!chainConfig.isL1) {
+        if (chainConfig.role !== "l1") {
           const balance = await tracker.getL1ChainBalance(chainConfig.chainId, assetId);
           totalChainBalance = totalChainBalance.add(balance);
         }

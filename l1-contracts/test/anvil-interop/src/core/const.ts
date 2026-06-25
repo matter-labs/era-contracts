@@ -2,6 +2,8 @@
 // probes the upstream chain). Read it via `runtimeConfig.l1ChainId` from
 // `./runtime-config` instead of importing a constant from here.
 
+import { utils } from "ethers";
+
 export const ETH_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000001";
 export const LEGACY_SHARED_BRIDGE_PLACEHOLDER = "0x0000000000000000000000000000000000000002";
 
@@ -86,9 +88,16 @@ export const TEST_TOKEN_MINT_AMOUNT_UNITS = "1000";
 // never affect the bundle bytes / bundleHash.
 export const INTEROP_BUNDLE_TUPLE_TYPE =
   "tuple(bytes1,uint256,uint256,bytes32,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes,bool))";
-// keccak256 of the InteropBundleSent(bytes32,bytes32,InteropBundle) signature (with the 3-field
-// BundleAttributes above).
-export const INTEROP_BUNDLE_SENT_TOPIC = "0x593b2515b718ee761cd2a586d8613d22833a452122cfb7692ebabd538d57d3ff";
+// Canonical signature of `InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle)`,
+// built from INTEROP_BUNDLE_TUPLE_TYPE so it stays in sync if the InteropBundle struct changes. Solidity
+// `tuple(...)` is spelled `(...)` in an event signature, hence the `tuple` -> `` strip.
+export const INTEROP_BUNDLE_SENT_SIGNATURE = `InteropBundleSent(bytes32,bytes32,${INTEROP_BUNDLE_TUPLE_TYPE.replace(
+  /tuple/g,
+  ""
+)})`;
+// keccak256 of the event signature == the log's topic0. Derived (not hardcoded) so it can't silently
+// drift from the struct above.
+export const INTEROP_BUNDLE_SENT_TOPIC = utils.id(INTEROP_BUNDLE_SENT_SIGNATURE);
 
 // AddressAliasHelper offset: uint160(0x1111000000000000000000000000000000001111)
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
