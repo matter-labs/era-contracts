@@ -33,10 +33,10 @@ max_expected_l1_gas_price = 50000000000
 governance_min_delay = 0
 
 max_number_of_chains = 100
-create2_factory_salt = "0x7ed3c791facb92a1f40d3bdd052d1c6a9c636f6ea373d2feec33496978171169"
+create2_factory_salt = "0x5dc245f87cfb442fd9708ef92ffc48fc6c4fd9c244c14fee977513a0efb67ab2"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 # Per-regen salt for legacy `Governance.sol` ceremonies (Atlas CTM owner wrap).
-legacy_gov_salt = "0x7cbcd5c8c398069ce792bfa10b2c411cec3c3afde45c1c70225e7f8d847d8ff2"
+legacy_gov_salt = "0xe70f186430cdbc7d2c79907aa541ace289eb107e336ae219b2100d2272fd76b0"
 validator_timelock_execution_delay = 0
 genesis_root = "0xedaadbbfe3202aabc4de8dfbf1728ea15a2f2d04fb994b9008f01dfaf5a9efa9"
 genesis_rollup_leaf_index = 102
@@ -73,6 +73,6 @@ token_weth_address = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"
 # second startTimer() would revert. Keyed by CTM proxy address.
 [create2_factory_salts]
 # Era CTM (witness chain 301)
-"0x3Cc81628a14C824057a97C1B4Ab17758E5D18864" = "0x7411a1be577892fc739c8d4d0704475f903a7273453d545b4b5a9bf9d830d5f0"
+"0x3Cc81628a14C824057a97C1B4Ab17758E5D18864" = "0x84d1fa17a6625e070e5cfbf7632e3d173a797ceaf6a9347d65329d6c225616f8"
 # ZKsync OS (Atlas) CTM (witness chain 8022833)
-"0x54D55e74De9c6003E7a68a1fE70E633f05761eb5" = "0xb03ca465c84967747da5e19ee70abeceef952fd1dc991f96e8118ab056699d38"
+"0x54D55e74De9c6003E7a68a1fE70E633f05761eb5" = "0x16dc8588072a5ec0ff019d32312d1f1036342ef4ed0117dfd20e572afdbed4e6"
