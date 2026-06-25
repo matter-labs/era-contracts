@@ -15,7 +15,7 @@ import {
     SystemLogKey,
     TOTAL_BLOBS_IN_COMMITMENT
 } from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {CommitBatchInfo, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 
 import {BLOB_DATA_OFFSET} from "../../../da-contracts-imports/CalldataDA.sol";
@@ -569,19 +569,46 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        // Two events are emitted per committed batch: BlockCommit, followed by the protocol-version report.
+        // BlockCommit is now followed by a ReportCommittedBatchProtocolVersion event for every committed batch
+        // (its values are asserted in test_emitsProtocolVersionEvent).
         assertEq(entries.length, 2 + EVENT_INDEX);
         assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
-        assertEq(
-            entries[EVENT_INDEX + 1].topics[0],
-            keccak256("ReportCommittedBatchProtocolVersion(uint64,uint256,bytes32)")
-        );
         assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
         assertEq(entries[EVENT_INDEX].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
         assertEq(entries[EVENT_INDEX].topics[3], expectedBatchCommitment); // commitment
 
         uint256 totalBatchesCommitted = getters.getTotalBatchesCommitted();
         assertEq(totalBatchesCommitted, 1);
+    }
+
+    /// @notice A committed Era batch emits ReportCommittedBatchProtocolVersion carrying the chain's protocol
+    /// version (0 in the harness) and a zero upgrade transaction hash when there is no pending protocol upgrade.
+    function test_emitsProtocolVersionEvent() public {
+        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
+        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+        );
+
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
+        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
+
+        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
+        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            genesisStoredBatchInfo,
+            correctCommitBatchInfoArray
+        );
+
+        vm.prank(validator);
+        vm.blobhashes(defaultBlobVersionedHashes);
+        vm.expectEmit(true, true, true, true, address(committer));
+        emit ICommitter.ReportCommittedBatchProtocolVersion(1, 0, bytes32(0));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_SuccessfullyCommitBatchWithOneBlob() public {
@@ -614,13 +641,10 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        // Two events are emitted per committed batch: BlockCommit, followed by the protocol-version report.
+        // BlockCommit is now followed by a ReportCommittedBatchProtocolVersion event for every committed batch
+        // (its values are asserted in test_emitsProtocolVersionEvent).
         assertEq(entries.length, 2 + EVENT_INDEX);
         assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
-        assertEq(
-            entries[EVENT_INDEX + 1].topics[0],
-            keccak256("ReportCommittedBatchProtocolVersion(uint64,uint256,bytes32)")
-        );
         assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
 
         uint256 totalBatchesCommitted = getters.getTotalBatchesCommitted();
@@ -688,13 +712,10 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        // Two events are emitted per committed batch: BlockCommit, followed by the protocol-version report.
+        // BlockCommit is now followed by a ReportCommittedBatchProtocolVersion event for every committed batch
+        // (its values are asserted in test_emitsProtocolVersionEvent).
         assertEq(entries.length, 2 + EVENT_INDEX);
         assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
-        assertEq(
-            entries[EVENT_INDEX + 1].topics[0],
-            keccak256("ReportCommittedBatchProtocolVersion(uint64,uint256,bytes32)")
-        );
         assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
 
         uint256 totalBatchesCommitted = getters.getTotalBatchesCommitted();

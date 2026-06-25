@@ -4,10 +4,12 @@ pragma solidity 0.8.28;
 import "forge-std/console.sol";
 
 import {Utils} from "../Utils/Utils.sol";
+import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
-import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {CommitBatchInfoZKsyncOS, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {MismatchL2DACommitmentScheme} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {
@@ -545,5 +547,133 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+}
+
+/// @notice Tests for the `ReportCommittedBatchProtocolVersion` event on the ZKsync OS commit path. Uses UtilsFacet
+/// (attached through a real upgrade, not storage-slot overrides) to drive a non-default protocol version and a
+/// pending protocol upgrade. ZKsync OS commits with validium (no-DA), so no pubdata machinery is needed.
+contract CommittingProtocolVersionTest is ExecutorTest {
+    UtilsFacet internal utilsFacet;
+
+    function isZKsyncOS() internal pure override returns (bool) {
+        return true;
+    }
+
+    function setUp() public {
+        // Attach UtilsFacet via a real diamond upgrade, mirroring ExecutorRevertBatchesTest.
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: address(new UtilsFacet()),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getUtilsFacetSelectors()
+        });
+        vm.prank(getters.getChainTypeManager());
+        admin.executeUpgrade(
+            Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: bytes("")})
+        );
+        utilsFacet = UtilsFacet(address(committer));
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(owner);
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+    }
+
+    /// @notice A non-upgrade batch reports the chain's protocol version (0 in the harness) and a zero upgrade hash.
+    function test_emitsProtocolVersionWithZeroUpgradeTxHash() public {
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = _encodeValidiumCommit(
+            _validiumBatch(1)
+        );
+
+        vm.prank(validator);
+        vm.expectEmit(true, true, true, true, address(committer));
+        emit ICommitter.ReportCommittedBatchProtocolVersion(1, 0, bytes32(0));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    /// @notice The emitted protocol version equals the chain's protocol version at commit time, so it stays
+    /// correct for a batch even after later upgrades change the chain's current protocol version.
+    function test_emittedProtocolVersionReflectsConfiguredVersion() public {
+        // A semver-like packed value (minor = 27, patch = 7); any non-zero value demonstrates the point.
+        uint256 protocolVersion = (uint256(27) << 32) | uint256(7);
+        utilsFacet.util_setProtocolVersion(protocolVersion);
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = _encodeValidiumCommit(
+            _validiumBatch(1)
+        );
+
+        vm.prank(validator);
+        vm.expectEmit(true, true, true, true, address(committer));
+        emit ICommitter.ReportCommittedBatchProtocolVersion(1, protocolVersion, bytes32(0));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    /// @notice For the first batch committed after a protocol upgrade, the event reports the upgrade transaction
+    /// hash, and that hash is exactly the one folded into the batch commitment (so an external observer can
+    /// independently recompute the commitment).
+    function test_emitsUpgradeTxHashFoldedIntoCommitment() public {
+        bytes32 upgradeTxHash = Utils.randomBytes32("upgradeTx");
+        utilsFacet.util_setL2SystemContractsUpgradeTxHash(upgradeTxHash);
+        assertEq(utilsFacet.util_getL2SystemContractsUpgradeBatchNumber(), 0, "no upgrade batch recorded yet");
+
+        CommitBatchInfoZKsyncOS memory batch = _validiumBatch(1);
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = _encodeValidiumCommit(batch);
+
+        vm.prank(validator);
+        // BlockCommit's commitment is the batch output hash computed WITH the upgrade tx hash, ...
+        vm.expectEmit(true, true, true, true, address(committer));
+        emit ICommitter.BlockCommit(1, batch.newStateCommitment, _batchOutputHash(batch, upgradeTxHash));
+        // ... and the new event reports that same upgrade tx hash.
+        vm.expectEmit(true, true, true, true, address(committer));
+        emit ICommitter.ReportCommittedBatchProtocolVersion(1, 0, upgradeTxHash);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+
+        // The commit records this batch as the upgrade batch, mirroring Committer._commitBatchesZKsyncOS.
+        assertEq(utilsFacet.util_getL2SystemContractsUpgradeBatchNumber(), 1, "upgrade batch number recorded");
+    }
+
+    /// @dev Builds a minimal validium ZKsync OS commit batch with the given number.
+    function _validiumBatch(uint64 _batchNumber) internal view returns (CommitBatchInfoZKsyncOS memory batch) {
+        batch = newCommitBatchInfoZKsyncOS;
+        batch.batchNumber = _batchNumber;
+        batch.operatorDAInput = abi.encodePacked(bytes32(0));
+        batch.daCommitment = bytes32(0);
+        batch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+    }
+
+    function _encodeValidiumCommit(
+        CommitBatchInfoZKsyncOS memory _batch
+    ) internal view returns (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) {
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = _batch;
+        (commitBatchFrom, commitBatchTo, commitData) = Utils.encodeCommitBatchesDataZKsyncOS(
+            genesisStoredBatchInfo,
+            batchArray
+        );
+    }
+
+    /// @dev Mirrors the `batchOutputHash` formula from Committer._commitOneBatchZKsyncOS.
+    function _batchOutputHash(
+        CommitBatchInfoZKsyncOS memory _batch,
+        bytes32 _upgradeTxHash
+    ) internal pure returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    _batch.chainId,
+                    _batch.firstBlockTimestamp,
+                    _batch.lastBlockTimestamp,
+                    uint256(_batch.daCommitmentScheme),
+                    _batch.daCommitment,
+                    _batch.numberOfLayer1Txs,
+                    _batch.numberOfLayer2Txs,
+                    _batch.priorityOperationsHash,
+                    _batch.l2LogsTreeRoot,
+                    _upgradeTxHash,
+                    _batch.dependencyRootsRollingHash,
+                    _batch.slChainId
+                )
+            );
     }
 }
