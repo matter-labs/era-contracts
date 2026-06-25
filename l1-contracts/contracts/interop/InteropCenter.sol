@@ -18,7 +18,6 @@ import {
     L2_BRIDGEHUB,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_NATIVE_TOKEN_VAULT,
-    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 
@@ -37,7 +36,6 @@ import {
     InteropCallStarterInternal
 } from "../common/Messaging.sol";
 import {AssetIdMismatch, MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
-import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
 import {
     AttributeAlreadySet,
@@ -417,18 +415,6 @@ contract InteropCenter is
     /// @param _bundleAttributes Attributes of the bundle.
     /// @param _originalCallAttributes Original ERC-7786 attributes for each call to emit in MessageSent events.
     /// @return bundleHash Hash of the sent bundle.
-    /// @notice Send-side metadata for an atomic bundle, parsed from the `atomicBundle` attribute. It is
-    /// deliberately NOT part of the cross-chain {InteropBundle}: keeping it out of `bundleHash` avoids a
-    /// circular dependency (`flowId = keccak256(sortedBundleHashes, ...)` would otherwise have to be
-    /// known before computing a `bundleHash` that itself embeds `flowId`). Consumed by `_dispatchBundle`
-    /// to drive `AtomicFlowManager.append`.
-    struct AtomicSend {
-        bool isAtomic;
-        bytes32 flowId;
-        uint64 deadline;
-        uint256 lowNullifierIndex;
-    }
-
     function _sendBundle(
         uint256 _destinationChainId,
         InteropCallStarterInternal[] memory _callStarters,
@@ -436,14 +422,6 @@ contract InteropCenter is
         bytes[][] memory _originalCallAttributes,
         AtomicSend memory _atomicSend
     ) internal returns (bytes32 bundleHash) {
-        // Gateway mode is only required for normal bundles, which are published to L1 through the
-        // gateway. Atomic bundles are appended to this chain's interop IMT (and authenticated downstream
-        // via the interop-root channel, which is built on both L1 and the gateway), so they are valid
-        // regardless of settlement layer — including L1-settled chains.
-        if (!_atomicSend.isAtomic) {
-            _validateGatewayMode();
-        }
-
         // Form an InteropBundle.
         bytes32 destinationBaseTokenAssetId = _getDestinationBaseTokenAssetId(_destinationChainId);
         InteropBundle memory bundle = InteropBundle({
@@ -515,11 +493,6 @@ contract InteropCenter is
         emit InteropBundleSent(msgHash, bundleHash, bundle);
     }
 
-    /// @notice Validates that we're in gateway mode. Override in private interop for pre-v31 chains.
-    function _validateGatewayMode() internal view virtual {
-        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
-    }
-
     /// @notice Returns the base token asset ID for the destination chain. Override for pre-v31 chains.
     function _getDestinationBaseTokenAssetId(uint256 _destinationChainId) internal view virtual returns (bytes32) {
         bytes32 assetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
@@ -527,12 +500,12 @@ contract InteropCenter is
         return assetId;
     }
 
-    /// @notice Validates a single call starter's interopCallValue. Override in private interop to reject value > 0.
-    function _validateCallStarterValue(uint256 /* _interopCallValue */) internal virtual {
-        // Public interop allows any value — no validation needed.
+    /// @notice Validates a single call starter's interopCallValue. Any value is allowed.
+    function _validateCallStarterValue(uint256 /* _interopCallValue */) internal pure {
+        // No validation needed.
     }
 
-    /// @notice Handles base-token value collection for the bundle. Override in private interop to skip.
+    /// @notice Handles base-token value collection for the bundle.
     function _handleValueCollection(
         uint256 _destinationChainId,
         bytes32 _destinationBaseTokenAssetId,
@@ -540,7 +513,7 @@ contract InteropCenter is
         uint256 _totalIndirectCallsValue,
         bool _useFixedFee,
         uint256 _callCount
-    ) internal virtual {
+    ) internal {
         // solhint-disable-next-line
         _ensureCorrectTotalValue(
             _destinationChainId,

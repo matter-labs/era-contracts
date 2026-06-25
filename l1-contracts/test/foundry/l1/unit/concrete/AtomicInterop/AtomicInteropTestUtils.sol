@@ -6,6 +6,8 @@ import {Vm} from "forge-std/Vm.sol";
 import {IMTLeaf} from "contracts/common/libraries/IndexedMerkleTree.sol";
 import {ATOMIC_COMMIT_LEAF_TAG} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {IL2InteropCommitmentTree} from "contracts/atomic-interop/IL2InteropCommitmentTree.sol";
+import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
+import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
@@ -43,6 +45,54 @@ contract MockAtomicAssetRouter {
         lastChainId = _destChainId;
         lastAssetId = _assetId;
         lastRecoverData = _recoverData;
+    }
+}
+
+/// @notice Test-only subclass that overrides the commitment tree's canonical `appender()` getter so a
+/// unit test can register an arbitrary appender (e.g. itself, or a test-deployed manager). Production
+/// returns the fixed {AtomicFlowManager} address; this lets tests inject without canonical deployment.
+contract TestL2InteropCommitmentTree is L2InteropCommitmentTree {
+    address private _appenderOverride;
+
+    function setAppender(address _a) external {
+        _appenderOverride = _a;
+    }
+
+    function appender() public view override returns (address) {
+        return _appenderOverride;
+    }
+}
+
+/// @notice Test-only subclass that overrides the manager's canonical collaborator getters so a unit
+/// test can wire its own tree / asset router and act as the interop center + handler. Production
+/// returns the fixed built-in addresses; these overrides let tests deploy multiple independent stacks.
+contract TestAtomicFlowManager is AtomicFlowManager {
+    address private _treeOverride;
+    address private _assetRouterOverride;
+    address private _interopCenterOverride;
+    address private _interopHandlerOverride;
+
+    function wire(address _tree, address _ar, address _ic, address _ih) external {
+        _treeOverride = _tree;
+        _assetRouterOverride = _ar;
+        _interopCenterOverride = _ic;
+        _interopHandlerOverride = _ih;
+    }
+
+    function commitmentTree() public view override returns (address) {
+        return _treeOverride;
+    }
+
+    function assetRouter() public view override returns (address) {
+        return _assetRouterOverride;
+    }
+
+    function interopCenter() public view override returns (address) {
+        return _interopCenterOverride;
+    }
+
+    function interopHandler() public view override returns (address) {
+        return _interopHandlerOverride;
     }
 }
 

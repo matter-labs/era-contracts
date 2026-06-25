@@ -33,7 +33,12 @@ import {InteropBundle, InteropCall, BundleAttributes} from "contracts/common/Mes
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {AtomicInteropTestUtils, MockAtomicAssetRouter} from "./AtomicInteropTestUtils.sol";
+import {
+    AtomicInteropTestUtils,
+    MockAtomicAssetRouter,
+    TestL2InteropCommitmentTree,
+    TestAtomicFlowManager
+} from "./AtomicInteropTestUtils.sol";
 
 /// @dev Local view of `AssetRouterBase.finalizeDeposit` so the test can build the destination mint call
 /// the manager recognises in a reverted bundle. Mirrors `AtomicFlowManager.IAssetRouterFinalizeDeposit`.
@@ -85,10 +90,10 @@ contract AtomicFlowManagerTest is Test {
     address internal originToken = makeAddr("originToken");
     uint256 internal constant AMOUNT = 100;
 
-    L2InteropCommitmentTree internal treeA;
-    L2InteropCommitmentTree internal treeB;
-    AtomicFlowManager internal managerA;
-    AtomicFlowManager internal managerB;
+    TestL2InteropCommitmentTree internal treeA;
+    TestL2InteropCommitmentTree internal treeB;
+    TestAtomicFlowManager internal managerA;
+    TestAtomicFlowManager internal managerB;
     MockAtomicAssetRouter internal arA;
     MockAtomicAssetRouter internal arB;
 
@@ -99,16 +104,19 @@ contract AtomicFlowManagerTest is Test {
     }
 
     /// @dev Deploy a real tree + manager + mock AR, wiring this test as both interop center and handler.
+    /// Uses the Test* subclasses (which override the canonical-address getters) so multiple independent
+    /// stacks can coexist and the test can inject itself as the interop center / handler.
     function _deployStack()
         internal
-        returns (L2InteropCommitmentTree tree, AtomicFlowManager manager, MockAtomicAssetRouter ar)
+        returns (TestL2InteropCommitmentTree tree, TestAtomicFlowManager manager, MockAtomicAssetRouter ar)
     {
-        tree = new L2InteropCommitmentTree();
-        manager = new AtomicFlowManager();
+        tree = new TestL2InteropCommitmentTree();
+        manager = new TestAtomicFlowManager();
         ar = new MockAtomicAssetRouter();
-        tree.initialize(address(manager));
+        tree.setAppender(address(manager));
+        tree.initialize();
         // ic == ih == this test, so it can drive append / requireFlowFinalized directly.
-        manager.initialize(address(tree), address(ar), address(this), address(this));
+        manager.wire(address(tree), address(ar), address(this), address(this));
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────────
@@ -150,10 +158,11 @@ contract AtomicFlowManagerTest is Test {
 
     function test_append_revertsForNonInteropCenter() public {
         // A manager wired to a different ic/ih: this test is neither, so `append` must be rejected.
-        AtomicFlowManager other = new AtomicFlowManager();
-        L2InteropCommitmentTree otherTree = new L2InteropCommitmentTree();
-        otherTree.initialize(address(other));
-        other.initialize(address(otherTree), address(arA), makeAddr("ic"), makeAddr("ih"));
+        TestAtomicFlowManager other = new TestAtomicFlowManager();
+        TestL2InteropCommitmentTree otherTree = new TestL2InteropCommitmentTree();
+        otherTree.setAppender(address(other));
+        otherTree.initialize();
+        other.wire(address(otherTree), address(arA), makeAddr("ic"), makeAddr("ih"));
 
         vm.expectRevert(abi.encodeWithSelector(ManagerNotInteropCenter.selector, address(this)));
         other.append(keccak256("f"), keccak256("b"), DEADLINE, 0);
@@ -270,10 +279,11 @@ contract AtomicFlowManagerTest is Test {
 
     function test_requireFlowFinalized_revertsForNonInteropHandler() public {
         // A manager wired to a different ic/ih: this test is neither, so `requireFlowFinalized` is rejected.
-        AtomicFlowManager other = new AtomicFlowManager();
-        L2InteropCommitmentTree otherTree = new L2InteropCommitmentTree();
-        otherTree.initialize(address(other));
-        other.initialize(address(otherTree), address(arA), makeAddr("ic"), makeAddr("ih"));
+        TestAtomicFlowManager other = new TestAtomicFlowManager();
+        TestL2InteropCommitmentTree otherTree = new TestL2InteropCommitmentTree();
+        otherTree.setAppender(address(other));
+        otherTree.initialize();
+        other.wire(address(otherTree), address(arA), makeAddr("ic"), makeAddr("ih"));
 
         // The ACL modifier runs before any flowId / proof checks, so an empty finality struct suffices
         // (no real tree state is needed to exercise the handler gate).

@@ -4,11 +4,8 @@ pragma solidity 0.8.28;
 import {IndexedMerkleTreeLib, IMT, IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
 import {IL2InteropCommitmentTree} from "./IL2InteropCommitmentTree.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
-import {
-    CommitmentTreeAlreadyInitialized,
-    CommitmentTreeNotAppender,
-    CommitmentTreeZeroAppender
-} from "./AtomicInteropErrors.sol";
+import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {CommitmentTreeNotAppender} from "./AtomicInteropErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -27,20 +24,13 @@ import {
 contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
     using IndexedMerkleTreeLib for IMT;
 
-    /// @dev The append-only indexed tree. `_appender` (below) doubles as the "initialized" flag.
+    /// @dev The append-only indexed tree. A non-zero `_imt.leafCount` doubles as the "initialized" flag.
     IMT internal _imt;
 
-    /// @dev The {AtomicFlowManager} allowed to insert commit values.
-    address internal _appender;
-
-    /// @notice One-shot initializer. Sets up the IMT (seeding the `{0,0,0}` head leaf at index 0) and
-    /// publishes the seed root.
-    /// @param _manager The {AtomicFlowManager} allowed to insert commit values.
-    function initialize(address _manager) external {
-        if (_appender != address(0)) revert CommitmentTreeAlreadyInitialized();
-        if (_manager == address(0)) revert CommitmentTreeZeroAppender();
-        _appender = _manager;
-
+    /// @notice One-shot initializer: seeds the IMT (the `{0,0,0}` head leaf at index 0) and publishes
+    /// the seed root. The appender is the canonical {AtomicFlowManager} (a fixed built-in address), so
+    /// there is no wiring parameter; `_imt.setup()` reverts if the tree was already seeded.
+    function initialize() external {
         _imt.setup();
         bytes32 seedRoot = _imt.root();
         _publishRoot(seedRoot);
@@ -49,7 +39,7 @@ contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
 
     /// @inheritdoc IL2InteropCommitmentTree
     function insert(uint256 _value, uint256 _lowNullifierIndex) external returns (uint256 newIndex, bytes32 newRoot) {
-        if (msg.sender != _appender) revert CommitmentTreeNotAppender(msg.sender);
+        if (msg.sender != appender()) revert CommitmentTreeNotAppender(msg.sender);
         // Value / low-nullifier validation (non-zero, no duplicates, correct bracket) is enforced by
         // the engine and surfaces its own `IMT*` errors.
         (newIndex, newRoot) = _imt.insert(_value, _lowNullifierIndex);
@@ -78,8 +68,8 @@ contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
     }
 
     /// @inheritdoc IL2InteropCommitmentTree
-    function appender() external view returns (address) {
-        return _appender;
+    function appender() public view virtual returns (address) {
+        return L2_ATOMIC_FLOW_MANAGER_ADDR;
     }
 
     /// @dev Publishes `abi.encode(root)` to L1. The encoding must match what {AtomicInteropProof}

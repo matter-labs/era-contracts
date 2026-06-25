@@ -9,9 +9,13 @@ import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
 import {InteropDataEncoding} from "../interop/InteropDataEncoding.sol";
-import {L2_ASSET_ROUTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {
-    ManagerAlreadyInitialized,
+    L2_ASSET_ROUTER_ADDR,
+    L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_COMMITMENT_TREE_ADDR,
+    L2_INTEROP_HANDLER_ADDR
+} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {
     ManagerNotInteropCenter,
     ManagerNotInteropHandler,
     ManagerLegAlreadyCommitted,
@@ -50,40 +54,19 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// `initiateIndirectCall` embeds in an interop bundle (see `AssetRouterBase.getDepositCalldata`).
     bytes4 internal constant FINALIZE_DEPOSIT_SELECTOR = IAssetRouterFinalizeDeposit.finalizeDeposit.selector;
 
-    /// @dev The append-only indexed interop IMT (commitment tree) for this chain. Also the
-    /// "initialized" flag.
-    address internal _commitmentTree;
-    /// @dev L2 asset router this manager drives for recovery.
-    address internal _assetRouter;
-    /// @dev The interop center allowed to call `append`.
-    address internal _interopCenter;
-    /// @dev The interop handler allowed to call `requireFlowFinalized`.
-    address internal _interopHandler;
-
-    /// @dev (flowId, bundleHash) => source-leg state on this chain.
+    /// @dev (flowId, bundleHash) => source-leg state on this chain. All collaborators
+    /// (commitment tree, asset router, interop center, interop handler) are genesis-deployed built-ins
+    /// at canonical fixed addresses, so they are referenced as constants rather than stored/initialized.
     mapping(bytes32 flowId => mapping(bytes32 bundleHash => LegState)) internal _state;
 
     modifier onlyInteropCenter() {
-        if (msg.sender != _interopCenter) revert ManagerNotInteropCenter(msg.sender);
+        if (msg.sender != interopCenter()) revert ManagerNotInteropCenter(msg.sender);
         _;
     }
 
     modifier onlyInteropHandler() {
-        if (msg.sender != _interopHandler) revert ManagerNotInteropHandler(msg.sender);
+        if (msg.sender != interopHandler()) revert ManagerNotInteropHandler(msg.sender);
         _;
-    }
-
-    /// @notice One-shot initializer.
-    /// @param _tree The {L2InteropCommitmentTree} this manager inserts commit values into.
-    /// @param _ar The L2 asset router this manager drives for recovery.
-    /// @param _ic The interop center allowed to call `append`.
-    /// @param _ih The interop handler allowed to call `requireFlowFinalized`.
-    function initialize(address _tree, address _ar, address _ic, address _ih) external {
-        if (_commitmentTree != address(0)) revert ManagerAlreadyInitialized();
-        _commitmentTree = _tree;
-        _assetRouter = _ar;
-        _interopCenter = _ic;
-        _interopHandler = _ih;
     }
 
     /// @inheritdoc IAtomicFlowManager
@@ -98,7 +81,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
         _state[_flowId][_bundleHash] = LegState.Committed;
 
         uint256 value = AtomicInteropProof.commitValue(_flowId, _bundleHash);
-        (uint256 index, ) = IL2InteropCommitmentTree(_commitmentTree).insert(value, _lowNullifierIndex);
+        (uint256 index, ) = IL2InteropCommitmentTree(commitmentTree()).insert(value, _lowNullifierIndex);
 
         emit FlowCommitted(_flowId, _bundleHash, _deadline, index);
     }
@@ -178,23 +161,23 @@ contract AtomicFlowManager is IAtomicFlowManager {
     }
 
     /// @inheritdoc IAtomicFlowManager
-    function commitmentTree() external view returns (address) {
-        return _commitmentTree;
+    function commitmentTree() public view virtual returns (address) {
+        return L2_INTEROP_COMMITMENT_TREE_ADDR;
     }
 
     /// @inheritdoc IAtomicFlowManager
-    function assetRouter() external view returns (address) {
-        return _assetRouter;
+    function assetRouter() public view virtual returns (address) {
+        return L2_ASSET_ROUTER_ADDR;
     }
 
     /// @inheritdoc IAtomicFlowManager
-    function interopCenter() external view returns (address) {
-        return _interopCenter;
+    function interopCenter() public view virtual returns (address) {
+        return L2_INTEROP_CENTER_ADDR;
     }
 
     /// @inheritdoc IAtomicFlowManager
-    function interopHandler() external view returns (address) {
-        return _interopHandler;
+    function interopHandler() public view virtual returns (address) {
+        return L2_INTEROP_HANDLER_ADDR;
     }
 
     /// @dev Reverses every asset-router burn embedded in `_bundle`, re-minting each asset to its
@@ -230,7 +213,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
                 _amount: amount,
                 _erc20Metadata: erc20Metadata
             });
-            IL2AssetRouter(_assetRouter).recoverAtomicBurn(destChainId, assetId, recoverData);
+            IL2AssetRouter(assetRouter()).recoverAtomicBurn(destChainId, assetId, recoverData);
             ++recovered;
         }
         if (recovered == 0) revert ManagerNoRecoverableCalls(_flowId, _bundleHash);

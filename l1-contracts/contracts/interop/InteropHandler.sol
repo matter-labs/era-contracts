@@ -107,27 +107,9 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
+        // For a non-atomic bundle the cross-chain binding is the L1 message; the proof carries its chainId.
         _validateBundleDestinationContext(bundleHash, interopBundle, _proof.chainId);
-
-        // If the execution address is not specified then the execution is permissionless.
-        if (interopBundle.bundleAttributes.executionAddress.length != 0) {
-            (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
-                interopBundle.bundleAttributes.executionAddress
-            );
-
-            // Verify that the caller has permission to execute the bundle.
-            // Note, that in case the executionAddress wasn't specified in the bundle then executing is permissionless, as documented in Messaging.sol
-            // It's also possible that the caller is InteropHandler itself, in case the execution was initiated through receiveMessage.
-            require(
-                (msg.sender == address(this) ||
-                    ((executionChainId == block.chainid || executionChainId == 0) && executionAddress == msg.sender)),
-                ExecutingNotAllowed(
-                    bundleHash,
-                    InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
-                    interopBundle.bundleAttributes.executionAddress
-                )
-            );
-        }
+        _requireExecutionAllowed(bundleHash, interopBundle);
 
         // We can only process bundles that are either unreceived (first time processing) or verified (already verified but not executed).
         // This whitelist approach ensures that if new bundle statuses are added in the future, they will be explicitly rejected
@@ -137,31 +119,10 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
             BundleAlreadyProcessed(bundleHash)
         );
 
-        // Verify the bundle inclusion, if not done yet.
+        // Proof gate: verify the bundle's L1-message inclusion, if not done yet.
         if (status != BundleStatus.Verified) _verifyBundle(_bundle, _proof, bundleHash);
 
-        // Mark the given bundle as fully executed, following CEI pattern.
-        bundleStatus[bundleHash] = BundleStatus.FullyExecuted;
-
-        // Update callStatus of the calls which are to be executed.
-        uint256 callsLength = interopBundle.calls.length;
-        for (uint256 i = 0; i < callsLength; ++i) {
-            callStatus[bundleHash][i] = CallStatus.Executed;
-        }
-
-        // Execute all of the calls.
-        // Since we provide the flag `_executeAllCalls` to be true, if either of the calls fail,
-        // the `_executeCalls` will fail as well, thus making the whole flow revert, no changes will be applied to the state.
-        _executeCalls({
-            _sourceChainId: interopBundle.sourceChainId,
-            _bundleHash: bundleHash,
-            _interopBundle: interopBundle,
-            _executeAllCalls: true,
-            _providedCallStatus: new CallStatus[](0)
-        });
-
-        // Emit event stating that the bundle was executed.
-        emit BundleExecuted(bundleHash);
+        _markFullyExecutedAndRun(bundleHash, interopBundle);
     }
 
     /// @inheritdoc IInteropHandler
@@ -175,24 +136,9 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
         // An atomic bundle is never published to L1, so its source chain id is the bundle's own field;
-        // the cross-chain binding comes from the IMT inclusion proof below, not an L1 message.
+        // the cross-chain binding comes from the IMT inclusion proof (the atomicity gate) below.
         _validateBundleDestinationContext(bundleHash, interopBundle, interopBundle.sourceChainId);
-
-        // Permissioned execution, identical to executeBundle.
-        if (interopBundle.bundleAttributes.executionAddress.length != 0) {
-            (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
-                interopBundle.bundleAttributes.executionAddress
-            );
-            require(
-                (msg.sender == address(this) ||
-                    ((executionChainId == block.chainid || executionChainId == 0) && executionAddress == msg.sender)),
-                ExecutingNotAllowed(
-                    bundleHash,
-                    InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
-                    interopBundle.bundleAttributes.executionAddress
-                )
-            );
-        }
+        _requireExecutionAllowed(bundleHash, interopBundle);
 
         // Atomic bundles have no verify path (they were never published to L1), so only a fresh bundle
         // may be executed; replay is then prevented by marking it FullyExecuted below. (A non-atomic
@@ -205,21 +151,51 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
         // of the flow's legs. Reverts otherwise.
         IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).requireFlowFinalized(bundleHash, _finality);
 
-        // Mark fully executed (CEI) and execute all calls — identical to executeBundle from here.
-        bundleStatus[bundleHash] = BundleStatus.FullyExecuted;
-        uint256 callsLength = interopBundle.calls.length;
-        for (uint256 i = 0; i < callsLength; ++i) {
-            callStatus[bundleHash][i] = CallStatus.Executed;
+        _markFullyExecutedAndRun(bundleHash, interopBundle);
+    }
+
+    /// @notice Execution-address permission gate shared by executeBundle / executeAtomicBundle.
+    /// @dev Permissionless when no `executionAddress` is set; otherwise only that address (on this
+    /// chain, or chain-agnostic via chainId 0) may execute — or this contract itself, when execution
+    /// was initiated through `receiveMessage`.
+    function _requireExecutionAllowed(bytes32 _bundleHash, InteropBundle memory _interopBundle) internal view {
+        if (_interopBundle.bundleAttributes.executionAddress.length == 0) {
+            return;
         }
+        (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
+            _interopBundle.bundleAttributes.executionAddress
+        );
+        require(
+            (msg.sender == address(this) ||
+                ((executionChainId == block.chainid || executionChainId == 0) && executionAddress == msg.sender)),
+            ExecutingNotAllowed(
+                _bundleHash,
+                InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
+                _interopBundle.bundleAttributes.executionAddress
+            )
+        );
+    }
+
+    /// @notice Marks the bundle `FullyExecuted` (CEI) and executes all of its calls — the shared tail of
+    /// executeBundle / executeAtomicBundle. `_executeAllCalls = true`, so any failing call reverts the
+    /// whole flow, leaving no state changes.
+    function _markFullyExecutedAndRun(bytes32 _bundleHash, InteropBundle memory _interopBundle) internal {
+        bundleStatus[_bundleHash] = BundleStatus.FullyExecuted;
+
+        uint256 callsLength = _interopBundle.calls.length;
+        for (uint256 i = 0; i < callsLength; ++i) {
+            callStatus[_bundleHash][i] = CallStatus.Executed;
+        }
+
         _executeCalls({
-            _sourceChainId: interopBundle.sourceChainId,
-            _bundleHash: bundleHash,
-            _interopBundle: interopBundle,
+            _sourceChainId: _interopBundle.sourceChainId,
+            _bundleHash: _bundleHash,
+            _interopBundle: _interopBundle,
             _executeAllCalls: true,
             _providedCallStatus: new CallStatus[](0)
         });
 
-        emit BundleExecuted(bundleHash);
+        emit BundleExecuted(_bundleHash);
     }
 
     /// @inheritdoc IInteropHandler

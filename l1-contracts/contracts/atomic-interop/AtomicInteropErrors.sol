@@ -5,13 +5,11 @@ import {LegState} from "./IAtomicInterop.sol";
 
 // ── L2InteropCommitmentTree errors ───────────────────────────────────────────────────
 // Value / low-nullifier validation now lives in {IndexedMerkleTreeLib} (the IMT engine) and surfaces
-// its own `IMT*` errors; only the shell's ACL / init errors remain here.
-error CommitmentTreeAlreadyInitialized();
+// its own `IMT*` errors; only the shell's appender ACL error remains here.
+/// @dev `insert` is restricted to the canonical {AtomicFlowManager}.
 error CommitmentTreeNotAppender(address sender);
-error CommitmentTreeZeroAppender();
 
 // ── AtomicFlowManager errors ─────────────────────────────────────────────────────────
-error ManagerAlreadyInitialized();
 /// @dev `append` is restricted to the canonical {InteropCenter}.
 error ManagerNotInteropCenter(address sender);
 /// @dev `requireFlowFinalized` is restricted to the canonical {InteropHandler}.

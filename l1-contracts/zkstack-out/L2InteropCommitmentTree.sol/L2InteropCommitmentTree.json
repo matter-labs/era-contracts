@@ -15,13 +15,7 @@
   {
     "type": "function",
     "name": "initialize",
-    "inputs": [
-      {
-        "name": "_manager",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
+    "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -156,11 +150,6 @@
   },
   {
     "type": "error",
-    "name": "CommitmentTreeAlreadyInitialized",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "CommitmentTreeNotAppender",
     "inputs": [
       {
@@ -169,11 +158,6 @@
         "internalType": "address"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "CommitmentTreeZeroAppender",
-    "inputs": []
   },
   {
     "type": "error",

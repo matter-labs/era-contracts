@@ -7,18 +7,15 @@ import {Vm} from "forge-std/Vm.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {IL2InteropCommitmentTree} from "contracts/atomic-interop/IL2InteropCommitmentTree.sol";
 import {IndexedMerkleTreeLib, IMTLeaf} from "contracts/common/libraries/IndexedMerkleTree.sol";
+import {CommitmentTreeNotAppender} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {
-    CommitmentTreeAlreadyInitialized,
-    CommitmentTreeNotAppender,
-    CommitmentTreeZeroAppender
-} from "contracts/atomic-interop/AtomicInteropErrors.sol";
-import {
+    IMTAlreadyInitialized,
     IMTValueZero,
     IMTValueAlreadyExists,
     IMTLowLeafValueTooLarge,
     IMTLowLeafNextTooSmall
 } from "contracts/common/libraries/IndexedMerkleTree.sol";
-import {AtomicInteropTestUtils} from "./AtomicInteropTestUtils.sol";
+import {AtomicInteropTestUtils, TestL2InteropCommitmentTree} from "./AtomicInteropTestUtils.sol";
 
 /// @notice Unit tests for the {L2InteropCommitmentTree} shell over the shared IMT engine. The shell
 /// owns the appender ACL, the `initialize` wiring, and the L2->L1 root publication; value / low-leaf
@@ -30,14 +27,16 @@ contract L2InteropCommitmentTreeTest is Test {
     /// @dev Mirror of the event so tests can `vm.expectEmit` against it.
     event RootPublished(uint256 indexed leafIndex, bytes32 root);
 
-    L2InteropCommitmentTree internal tree;
+    TestL2InteropCommitmentTree internal tree;
     address internal stranger = makeAddr("stranger");
 
     function setUp() public {
         AtomicInteropTestUtils.installSystemMocks();
-        tree = new L2InteropCommitmentTree();
-        // This test contract acts as the appender so it can call insert directly.
-        tree.initialize(address(this));
+        tree = new TestL2InteropCommitmentTree();
+        // This test contract acts as the appender so it can call insert directly (production reads the
+        // canonical AtomicFlowManager address; the Test* subclass lets us override it to this test).
+        tree.setAppender(address(this));
+        tree.initialize();
     }
 
     // ── initialize ───────────────────────────────────────────────────────────────────────────
@@ -50,23 +49,18 @@ contract L2InteropCommitmentTreeTest is Test {
         assertEq(head.nextIndex, 0);
         assertEq(head.nextValue, 0);
 
-        vm.expectRevert(CommitmentTreeAlreadyInitialized.selector);
-        tree.initialize(address(this));
-    }
-
-    function test_initialize_revertsOnZeroAppender() public {
-        L2InteropCommitmentTree fresh = new L2InteropCommitmentTree();
-        vm.expectRevert(CommitmentTreeZeroAppender.selector);
-        fresh.initialize(address(0));
+        // Re-initialization reverts: the IMT engine's setup() rejects a non-empty tree.
+        vm.expectRevert(IMTAlreadyInitialized.selector);
+        tree.initialize();
     }
 
     function test_initialize_publishesSeedRoot() public {
-        L2InteropCommitmentTree fresh = new L2InteropCommitmentTree();
+        TestL2InteropCommitmentTree fresh = new TestL2InteropCommitmentTree();
         // The seed root is published at leafIndex 0. We don't pin the exact root here (it is asserted in
         // the insert test); just that the head-seed event is emitted.
         vm.expectEmit(true, false, false, false);
         emit RootPublished(0, bytes32(0));
-        fresh.initialize(address(this));
+        fresh.initialize();
     }
 
     // ── insert / sorted linked list ─────────────────────────────────────────────────────────

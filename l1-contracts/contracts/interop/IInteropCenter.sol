@@ -14,6 +14,18 @@ import {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IInteropCenter {
+    /// @notice Send-side metadata for an atomic bundle, parsed from the `atomicBundle` attribute. It is
+    /// deliberately NOT part of the cross-chain {InteropBundle}: keeping it out of `bundleHash` avoids a
+    /// circular dependency (`flowId = keccak256(sortedBundleHashes, ...)` would otherwise have to be
+    /// known before computing a `bundleHash` that itself embeds `flowId`). Consumed by `_dispatchBundle`
+    /// to drive `AtomicFlowManager.append`.
+    struct AtomicSend {
+        bool isAtomic;
+        bytes32 flowId;
+        uint64 deadline;
+        uint256 lowNullifierIndex;
+    }
+
     event InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle interopBundle);
 
     event NewAssetRouter(address indexed oldAssetRouter, address indexed newAssetRouter);

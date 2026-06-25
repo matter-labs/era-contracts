@@ -4,11 +4,12 @@
  * Installs, on each participating L2 anvil chain, the canonical built-in contract set:
  *   - {L2InteropCommitmentTree} at L2_INTEROP_COMMITMENT_TREE_ADDR (0x10012),
  *   - {AtomicFlowManager}       at L2_ATOMIC_FLOW_MANAGER_ADDR      (0x10014),
- * then wires them exactly as the on-chain genesis force-deployment would:
- *   - tree.initialize(manager),
- *   - manager.initialize(tree, assetRouter, interopCenter, interopHandler).
- * The L2AssetRouter recognises the manager by its canonical address (`_atomicFlowManagerAddr()` ->
- * L2_ATOMIC_FLOW_MANAGER_ADDR), so `recoverAtomicBurn` auth needs no explicit registration step.
+ * then seeds the commitment tree exactly as the on-chain genesis force-deployment would:
+ *   - tree.initialize()  (one-time IMT seed; no wiring args).
+ * All cross-contract wiring is referenced by canonical fixed address in the contracts themselves — the
+ * tree's appender, the manager's tree / asset router / interop center / interop handler, and the
+ * L2AssetRouter's recognition of the manager (`_atomicFlowManagerAddr()` -> L2_ATOMIC_FLOW_MANAGER_ADDR)
+ * — so there is no manager initialization and no explicit registration step.
  *
  * Unlike the removed escrow-direct flow, the manager is fund-touchless: the source-side burn happens
  * through the normal interop path ({InteropCenter.sendBundle} -> {L2AssetRouter.initiateIndirectCall}),
@@ -100,22 +101,13 @@ export async function deployAtomicStack(args: {
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
   const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
 
-  // 2. Wire (skip if already initialized — supports re-runs over loaded chain state).
-  const existingTreeAppender: string = await tree.appender();
-  if (existingTreeAppender === ethers.constants.AddressZero) {
-    await (await tree.initialize(L2_ATOMIC_FLOW_MANAGER_ADDR)).wait();
-  }
-
-  const existingManagerTree: string = await manager.commitmentTree();
-  if (existingManagerTree === ethers.constants.AddressZero) {
-    await (
-      await manager.initialize(
-        L2_INTEROP_COMMITMENT_TREE_ADDR,
-        assetRouter,
-        INTEROP_CENTER_ADDR,
-        L2_INTEROP_HANDLER_ADDR
-      )
-    ).wait();
+  // 2. Seed the commitment tree's IMT if not already seeded (supports re-runs over loaded chain state).
+  //    All cross-contract wiring — the tree's appender and the manager's tree / asset router / interop
+  //    center / interop handler — is referenced by canonical fixed address in the contracts themselves,
+  //    so there is no manager initialization step and `tree.initialize()` takes no arguments.
+  const treeLeafCount = await tree.leafCount();
+  if (treeLeafCount.eq(0)) {
+    await (await tree.initialize()).wait();
   }
 
   // 3. Refresh the L2AssetRouter runtime code if it predates the atomic-flow additions.

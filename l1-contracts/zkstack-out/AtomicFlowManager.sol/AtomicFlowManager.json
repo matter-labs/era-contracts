@@ -175,34 +175,6 @@
   },
   {
     "type": "function",
-    "name": "initialize",
-    "inputs": [
-      {
-        "name": "_tree",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_ar",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_ic",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_ih",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "interopCenter",
     "inputs": [],
     "outputs": [
@@ -453,11 +425,6 @@
   {
     "type": "error",
     "name": "InvalidProofLengthForFinalNode",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ManagerAlreadyInitialized",
     "inputs": []
   },
   {
