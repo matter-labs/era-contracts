@@ -52,3 +52,28 @@ secret is required for the fork rehearsal.
 `workflow_dispatch` workflows can only be triggered once the file lives on the
 repo's **default branch**. Until this is merged to `main`, the workflow will not
 appear in the Actions dropdown on feature branches.
+
+## Companion: actual deployment
+
+[`.github/workflows/deploy-upgrade-contracts.yaml`](../../../.github/workflows/deploy-upgrade-contracts.yaml)
+is the **"Mode 2" real-network deployment** — the one job that uses the deployer
+private key to push the new-contract CREATE2 deploys on-chain.
+
+It is deliberately conservative:
+
+1. `workflow_dispatch` only, gated behind a protected `sepolia-deploy`
+   GitHub Environment (configure required reviewers in repo Settings → a human
+   must approve each run).
+2. **Deploy-only-what's-verified:** it first runs the same fork regen + PUVT as
+   above; if PUVT is not green it never reaches the broadcast. The bytecode it
+   deploys is exactly what was just verified.
+3. **Dry run by default** (`dry_run=true`): prints the deployer bundle(s) that
+   *would* be sent and stops. To actually deploy, set `dry_run=false` **and**
+   type the confirm phrase `DEPLOY-<environment>`.
+4. Broadcasts **only the deployer-EOA bundle(s)** (`dev execute-safe`), never the
+   governance / multisig bundles (PUH, security council) — those go through the
+   governance process. The broadcast is idempotent (already-deployed CREATE2
+   addresses are skipped), so a re-run after a partial broadcast is safe.
+
+Extra secrets it needs: `DEPLOYER_PRIVATE_KEY_SEPOLIA` /
+`DEPLOYER_PRIVATE_KEY_MAINNET` (must control the `deployer_address` input).

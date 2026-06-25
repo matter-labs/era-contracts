@@ -1,0 +1,266 @@
+name: "Deploy Upgrade Contracts (real L1)"
+
+# Broadcasts the v31 ecosystem upgrade's *deployer-EOA* bundle to a REAL L1
+# (default: Sepolia / testnet). This is the "Mode 2" real-network deployment —
+# it pushes the new-contract CREATE2 deploys on-chain and is the ONE job that
+# uses the deployer private key.
+#
+# Governance / multisig bundles (PUH, security council) are deliberately NOT
+# broadcast here — those go through the governance process, not CI. This job
+# only sends the bundle(s) whose `target` is the deployer EOA.
+#
+# SAFETY MODEL (this job spends a real key and writes real on-chain state):
+#   1. workflow_dispatch only — never on push.
+#   2. `environment: sepolia-deploy` — configure it in repo Settings with
+#      required reviewers so a human must approve before the job runs.
+#   3. Deploy-only-what's-verified: the job first runs the SAME fork
+#      regen + PUVT as `regen-and-verify.yaml`. If PUVT is not green, it never
+#      reaches the broadcast. The bytecode deployed is exactly the bytecode
+#      just verified (identical build, identical CREATE2 addresses).
+#   4. Dry-run by default: `dry_run=true` prints the deployer txs that WOULD be
+#      sent and stops. To actually broadcast you must set `dry_run=false` AND
+#      type the confirm phrase.
+#   5. Idempotent: `dev execute-safe` skips CREATE2 deploys whose address
+#      already has code, so a re-run after a partial broadcast is safe.
+#
+# Required secrets: `L1_RPC_URL_SEPOLIA` / `L1_RPC_URL_MAINNET`,
+# `DEPLOYER_PRIVATE_KEY_SEPOLIA` / `DEPLOYER_PRIVATE_KEY_MAINNET`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        default: testnet
+        options:
+          - testnet
+          - stage
+          - mainnet
+      dry_run:
+        description: "Dry run (print what would be broadcast and stop). Uncheck to actually deploy."
+        required: true
+        type: boolean
+        default: true
+      confirm:
+        description: "To actually deploy, type: DEPLOY-<environment> (e.g. DEPLOY-testnet)"
+        required: false
+        type: string
+      deployer_address:
+        description: "Deployer EOA (must match the DEPLOYER_PRIVATE_KEY_<NET> secret)"
+        required: true
+        type: string
+        default: "0x343Ee72DdD8CCD80cd43D6Adbc6c463a2DE433a7"
+      zk_governance_commit:
+        description: "zk-governance commit (PUH/Guardians bytecode verified by PUVT)"
+        required: true
+        type: string
+        default: "3e516c5"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    # Gate behind a protected Environment so a reviewer must approve the run.
+    environment: sepolia-deploy
+    env:
+      FOUNDRY_PROFILE: anvil-interop
+      PROTOCOL_CONTRACTS_ROOT: ${{ github.workspace }}
+    steps:
+      - name: Validate confirm phrase (unless dry run)
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          CONFIRM: ${{ inputs.confirm }}
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "DRY RUN — will verify on a fork and print the deployer bundle, but NOT broadcast."
+            exit 0
+          fi
+          EXPECTED="DEPLOY-${ENVIRONMENT}"
+          if [ "${CONFIRM}" != "${EXPECTED}" ]; then
+            echo "::error::dry_run is false but confirm phrase is wrong. Type exactly: ${EXPECTED}" >&2
+            exit 1
+          fi
+          echo "Confirm phrase OK — this run WILL broadcast to real ${ENVIRONMENT}."
+
+      - name: Checkout era-contracts
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Resolve & mask the L1 RPC URL
+        env:
+          SECRET_RPC_TESTNET: ${{ secrets.L1_RPC_URL_SEPOLIA }}
+          SECRET_RPC_MAINNET: ${{ secrets.L1_RPC_URL_MAINNET }}
+        run: |
+          set -euo pipefail
+          case "${{ inputs.environment }}" in
+            testnet|stage) RPC="${SECRET_RPC_TESTNET}" ;;
+            mainnet)       RPC="${SECRET_RPC_MAINNET}" ;;
+          esac
+          if [ -z "${RPC}" ]; then
+            echo "::error::No L1 RPC URL secret set for ${{ inputs.environment }}." >&2
+            exit 1
+          fi
+          echo "::add-mask::${RPC}"
+          # L1_FORK_URL drives the fork regen+verify; L1_RPC_URL drives the real broadcast.
+          echo "L1_FORK_URL=${RPC}" >> "$GITHUB_ENV"
+          echo "L1_RPC_URL=${RPC}" >> "$GITHUB_ENV"
+
+      - name: Install Foundry (anvil + cast)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Install foundry-zksync (forge --zksync)
+        uses: ./.github/actions/install-zksync-foundry
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install Rust toolchain
+        run: rustup show
+        working-directory: protocol-ops
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: protocol-ops
+
+      - name: Install JS dependencies
+        run: yarn
+
+      - name: Build da-contracts
+        run: yarn da build:foundry
+
+      - name: Build l1-contracts
+        run: yarn l1 build:foundry
+
+      - name: Build system-contracts
+        run: yarn sc build:foundry
+
+      - name: Build protocol_ops
+        run: cargo build
+        working-directory: protocol-ops
+
+      - name: Checkout zk-governance (sibling)
+        env:
+          ZK_GOV_COMMIT: ${{ inputs.zk_governance_commit }}
+        run: |
+          set -euo pipefail
+          ZK_GOV_DEST="$(cd "$GITHUB_WORKSPACE/../.." && pwd)/zk-governance"
+          rm -rf "$ZK_GOV_DEST"
+          git clone "https://github.com/zksync-association/zk-governance.git" "$ZK_GOV_DEST"
+          git -C "$ZK_GOV_DEST" checkout "${ZK_GOV_COMMIT}"
+          git -C "$ZK_GOV_DEST" submodule update --init --recursive
+
+      # Verify on a fork BEFORE touching the real chain. PUVT failure => the
+      # script exits non-zero => the job stops here and never broadcasts.
+      - name: Regenerate + verify on fork (PUVT gate)
+        env:
+          DEPLOYER_ADDR: ${{ inputs.deployer_address }}
+          ZK_GOVERNANCE_COMMIT: ${{ inputs.zk_governance_commit }}
+          GITHUB_TOKEN: ${{ github.token }}
+        working-directory: l1-contracts/test/anvil-interop
+        run: ./regen-and-verify.sh "${{ inputs.environment }}"
+
+      - name: Select deployer bundle(s) from the prepare manifest
+        env:
+          DEPLOYER: ${{ inputs.deployer_address }}
+        run: |
+          set -euo pipefail
+          OUT="$GITHUB_WORKSPACE/l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}"
+          MANIFEST="$OUT/prepare/manifest.json"
+          test -f "$MANIFEST" || { echo "::error::manifest not found at $MANIFEST"; exit 1; }
+          DEPLOYER_LC="$(echo "$DEPLOYER" | tr '[:upper:]' '[:lower:]')"
+          # Bundles whose target is the deployer EOA, in execution (index) order.
+          mapfile -t FILES < <(jq -r --arg d "$DEPLOYER_LC" \
+            '.bundles | sort_by(.index)[] | select((.target|ascii_downcase) == $d) | .file' "$MANIFEST")
+          if [ "${#FILES[@]}" -eq 0 ]; then
+            echo "::error::No deployer bundle for $DEPLOYER in $MANIFEST" >&2
+            exit 1
+          fi
+          echo "Deployer bundle file(s):"
+          printf '  %s\n' "${FILES[@]}"
+          # Persist for later steps (newline-joined, relative to prepare/).
+          { echo "DEPLOYER_BUNDLES<<EOF"; printf '%s\n' "${FILES[@]}"; echo "EOF"; } >> "$GITHUB_ENV"
+          echo "PREPARE_DIR=$OUT/prepare" >> "$GITHUB_ENV"
+
+      - name: Dry run — show what would be broadcast
+        if: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          echo "### Dry run — deployer bundle(s) that WOULD be broadcast to ${{ inputs.environment }}" >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            echo "#### $f" >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            jq '{target: (.meta // {} ), count: (.transactions|length), to: [.transactions[].to]}' \
+              "$PREPARE_DIR/$f" 2>/dev/null | head -200 >> "$GITHUB_STEP_SUMMARY" || cat "$PREPARE_DIR/$f" | head -100 >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          done <<< "$DEPLOYER_BUNDLES"
+          echo "Dry run complete — nothing was broadcast. Re-run with dry_run=false and the confirm phrase to deploy."
+
+      - name: Broadcast deployer bundle(s) to real L1
+        if: ${{ !inputs.dry_run }}
+        env:
+          DEPLOYER: ${{ inputs.deployer_address }}
+          DEPLOYER_PK_TESTNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
+          DEPLOYER_PK_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
+        run: |
+          set -euo pipefail
+          case "${{ inputs.environment }}" in
+            testnet|stage) PK="${DEPLOYER_PK_TESTNET}" ;;
+            mainnet)       PK="${DEPLOYER_PK_MAINNET}" ;;
+          esac
+          if [ -z "${PK}" ]; then
+            echo "::error::No DEPLOYER_PRIVATE_KEY_<NET> secret set for ${{ inputs.environment }}." >&2
+            exit 1
+          fi
+          echo "::add-mask::${PK}"
+          # Refuse to broadcast under the wrong sender: the key must control the
+          # declared deployer address (also enforced inside protocol_ops).
+          DERIVED="$(cast wallet address --private-key "${PK}")"
+          if [ "$(echo "$DERIVED" | tr '[:upper:]' '[:lower:]')" != "$(echo "$DEPLOYER" | tr '[:upper:]' '[:lower:]')" ]; then
+            echo "::error::DEPLOYER_PRIVATE_KEY signs as $DERIVED, not the declared deployer $DEPLOYER." >&2
+            exit 1
+          fi
+          OUT_DIR="$PREPARE_DIR/../real-broadcast"
+          mkdir -p "$OUT_DIR"
+          EXECUTED="$OUT_DIR/executed.json"
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            echo "=== execute-safe: $f -> real ${{ inputs.environment }} ==="
+            ./protocol-ops/target/debug/protocol_ops dev execute-safe \
+              --safe-file "$PREPARE_DIR/$f" \
+              --l1-rpc-url "$L1_RPC_URL" \
+              --private-key "${PK}" \
+              --out "$EXECUTED"
+          done <<< "$DEPLOYER_BUNDLES"
+          echo "Broadcast complete. Receipts in $EXECUTED"
+
+      - name: Upload deploy receipts
+        if: ${{ always() && !inputs.dry_run }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-receipts-${{ inputs.environment }}
+          path: l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/real-broadcast/executed.json
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Cleanup anvil (by port)
+        if: always()
+        run: |
+          for PORT in 29547 29545 29549; do
+            PID="$(lsof -t -i :$PORT 2>/dev/null || true)"
+            [ -n "$PID" ] && kill "$PID" 2>/dev/null || true
+          done
