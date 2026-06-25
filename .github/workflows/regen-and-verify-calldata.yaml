@@ -214,10 +214,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Stage only the reviewable artifacts (force, in case sim-inputs are
-          # under a broad output/ ignore rule on some branches).
-          git add -f "$OUT/ecosystem.toml" "$OUT/sim-inputs" || true
-          [ -f "$OUT/extra-verification-logs.txt" ] && git add -f "$OUT/extra-verification-logs.txt" || true
+          # Stage the whole output/<env>/ tree WITHOUT -f so .gitignore is
+          # honoured: that keeps the ephemeral/secret files out (anvil.log —
+          # which can echo the RPC — plus prepare/*.safe.json, prepare/
+          # manifest.json and fork-rehearsal/ are all git-ignored) while picking
+          # up the full committed artifact set: ecosystem.toml,
+          # extra-verification-logs.txt, gw-verification-logs.txt, sim-inputs/*
+          # and the preserved real-network transactions.txt.
+          git add "$OUT"
 
           if git diff --cached --quiet; then
             echo "No artifact changes vs $BASE — nothing to PR (calldata already up to date)."
@@ -269,6 +273,7 @@ jobs:
             l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/ecosystem.toml
             l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/sim-inputs/**
             l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/extra-verification-logs.txt
+            l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/gw-verification-logs.txt
           if-no-files-found: warn
           retention-days: 30
 
