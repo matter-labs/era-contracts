@@ -42,16 +42,11 @@ on:
         required: false
         default: "v0.1.5"
         type: string
-      open_pr:
-        description: "On a PUVT-green run, open a PR with the regenerated artifacts (ecosystem.toml + sim-inputs/)"
+      push_artifacts:
+        description: "On a PUVT-green run, commit the regenerated artifacts (ecosystem.toml + sim-inputs/) and push them to the branch this run was dispatched on (refreshing its PR). Requires the RELEASE_TOKEN secret."
         required: false
         default: false
         type: boolean
-      pr_base:
-        description: "Base branch for the artifacts PR (blank = the branch this workflow ran on)"
-        required: false
-        default: ""
-        type: string
       deploy:
         description: "Also broadcast the deployer-EOA bundle to the real L1 (uses DEPLOYER_PRIVATE_KEY_<net>)"
         required: false
