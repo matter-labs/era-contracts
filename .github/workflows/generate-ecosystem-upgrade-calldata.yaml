@@ -1,0 +1,78 @@
+name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
+
+# ============================================================================
+# STUB ON `main` — REGISTRATION ONLY. DO NOT ADD LOGIC HERE.
+#
+# This file exists on the default branch (`main`) ONLY so that GitHub shows the
+# "Run workflow" button for this `workflow_dispatch` workflow and renders its
+# inputs. `workflow_dispatch` workflows are only dispatchable if the file is on
+# the default branch.
+#
+# The REAL implementation (build → regen → PUVT → optional sim-inputs PR →
+# optional deploy) lives on the v31 line (`draft-v31` /
+# `kl/testnet-v31-calldata`). When you click "Run workflow", **select that
+# branch** in the branch dropdown: GitHub then executes the workflow file from
+# the selected ref and checks that ref out — which is where the v31 env configs,
+# `regen-and-verify.sh`, and `protocol_ops` actually are. `main` has none of
+# those, so running this stub from `main` intentionally just prints guidance and
+# exits.
+#
+# The inputs below are kept in sync with the real workflow so the dispatch
+# dialog is correct regardless of which branch's inputs the UI reads.
+# ============================================================================
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - stage
+          - testnet
+          - mainnet
+      l1_rpc_url:
+        description: "L1 RPC URL (optional override; BLANK = use repo secret. NOTE: a typed value is visible in the run summary — not secret-grade)"
+        required: false
+        default: ""
+        type: string
+      zksync_foundry_version:
+        description: "foundry-zksync version (forge --zksync)"
+        required: false
+        default: "v0.1.5"
+        type: string
+      open_pr:
+        description: "On a PUVT-green run, open a PR with the regenerated artifacts (ecosystem.toml + sim-inputs/)"
+        required: false
+        default: false
+        type: boolean
+      pr_base:
+        description: "Base branch for the artifacts PR (blank = the branch this workflow ran on)"
+        required: false
+        default: ""
+        type: string
+      deploy:
+        description: "Also broadcast the deployer-EOA bundle to the real L1 (uses DEPLOYER_PRIVATE_KEY_<net>)"
+        required: false
+        default: false
+        type: boolean
+      use_new_salt:
+        description: "Use a fresh random CREATE2/gov deployment salt for this run (new addresses)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  stub:
+    runs-on: ubuntu-latest
+    steps:
+      - name: This is the registration stub
+        run: |
+          echo "::warning::This is the main-branch STUB of the ecosystem-upgrade-calldata workflow."
+          echo "It only exists so the workflow is dispatchable. It does nothing on 'main'."
+          echo "Re-run 'Run workflow' and select a v31 branch (draft-v31 / kl/testnet-v31-calldata)"
+          echo "to execute the real regen/verify/deploy logic."
