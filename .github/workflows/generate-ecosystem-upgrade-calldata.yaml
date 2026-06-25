@@ -1,0 +1,211 @@
+name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
+
+# Regenerates the v31 ecosystem upgrade calldata for one environment and
+# verifies it with PUVT, on a Linux runner so the compiled bytecode — and
+# therefore the CREATE2 addresses baked into `ecosystem.toml` — is
+# bit-identical with CI (the whole reason this can't be trusted from a dev's
+# macOS checkout).
+#
+# It builds the CONTRACTS AND protocol_ops FROM THE CHECKED-OUT BRANCH (not a
+# pre-built Docker image), so the regenerated calldata reflects the current
+# source — including any contract changes merged in since the last image was
+# published.
+#
+# Flow (the canonical `l1-contracts/test/anvil-interop/regen-and-verify.sh`):
+#   anvil fork of the L1 RPC
+#     -> protocol_ops ecosystem upgrade-prepare-all   (writes ecosystem.toml)
+#     -> fund + fork-replay the prepare bundles
+#     -> protocol_ops ecosystem verify-upgrade (PUVT)
+#   then emit the git-portable `sim-inputs/` handoff set.
+# Artifacts uploaded: `ecosystem.toml` + `sim-inputs/`. NOT `anvil.log` — it
+# can contain the forked RPC URL.
+#
+# ─── SECRET HYGIENE (the L1 RPC URL carries an API key) ───
+# The RPC URL can come from EITHER a repo secret (default, fully hidden) OR an
+# optional dispatch-time input (per-run, see the caveat below). Whichever is
+# used, the workflow:
+#   * registers it with `::add-mask::`, so GitHub redacts that exact string
+#     everywhere in the LOGS — including subprocess output we don't control
+#     (anvil's `--fork-url`, the prepare's "[SIMULATION] Forking <rpc>" line);
+#   * passes it to the regen via $GITHUB_ENV (job-scoped), never
+#     $GITHUB_OUTPUT, and never writes it into an uploaded artifact.
+#
+# ⚠️ CAVEAT on the `l1_rpc_url` INPUT: GitHub has no masked/secret
+# workflow_dispatch input. A value typed into the "Run workflow" box is shown
+# in the run-summary inputs panel and is retrievable via `gh run view` / the
+# API — `::add-mask::` only redacts LOG text, not that UI panel. So the input
+# override gives you per-run URLs with LOG redaction, but the typed value is
+# visible to anyone with Actions read access. If the URL must never be exposed
+# at all, leave the input blank and use the repo secret. The deployer private
+# key is deliberately secret-only (never a dispatch input).
+#
+# Required repository secrets:
+#   L1_RPC_URL_SEPOLIA            — used by stage + testnet (both fork Sepolia)
+#   L1_RPC_URL_MAINNET            — used by mainnet
+#                                   (either may be omitted if you always pass
+#                                    the `l1_rpc_url` input instead)
+#   DEPLOYER_PRIVATE_KEY_SEPOLIA  — deployer EOA key for stage + testnet
+#   DEPLOYER_PRIVATE_KEY_MAINNET  — deployer EOA key for mainnet
+# Optional:
+#   GW_RPC_URL                    — Gateway RPC for PUVT GW-side checks
+#                                   (only exercised on gateway-enabled envs;
+#                                    defaults to the script's built-in).
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - stage
+          - testnet
+          - mainnet
+      l1_rpc_url:
+        description: "L1 RPC URL (optional override; BLANK = use repo secret. NOTE: a typed value is visible in the run summary — not secret-grade)"
+        required: false
+        default: ""
+        type: string
+      zksync_foundry_version:
+        description: "foundry-zksync version (forge --zksync)"
+        required: false
+        default: "v0.1.5"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  regen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Foundry (for Anvil)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Install foundry-zksync (for forge --zksync)
+        uses: ./.github/actions/install-zksync-foundry
+        with:
+          version: ${{ inputs.zksync_foundry_version }}
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.91.1
+
+      - name: Install dependencies
+        run: yarn
+
+      # `yarn l1 build:foundry` builds both EVM (out/) and EraVM (zkout/)
+      # artifacts; da + sc artifacts are referenced by the prepare/PUVT.
+      - name: Build da-contracts artifacts
+        run: yarn da build:foundry
+      - name: Build system-contracts artifacts
+        run: yarn sc build:foundry
+      - name: Build l1-contracts artifacts (EVM + zkout)
+        run: yarn l1 build:foundry
+
+      - name: Build protocol_ops
+        working-directory: protocol-ops
+        run: cargo build --release
+
+      - name: Install anvil-interop dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install
+
+      # Pick the per-network secrets, mask them, and stash them in the
+      # job-scoped environment. stage + testnet fork Sepolia; mainnet forks
+      # mainnet.
+      - name: Select + mask RPC and deployer-key secrets
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          # Referenced as shell vars (not `${{ }}`-interpolated into the script
+          # body) to avoid shell-injection and metacharacter issues.
+          INPUT_RPC: ${{ inputs.l1_rpc_url }}
+          RPC_SEPOLIA: ${{ secrets.L1_RPC_URL_SEPOLIA }}
+          RPC_MAINNET: ${{ secrets.L1_RPC_URL_MAINNET }}
+          PK_SEPOLIA: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
+          PK_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
+          GW_RPC_URL: ${{ secrets.GW_RPC_URL }}
+        run: |
+          set -euo pipefail
+          if [ "$ENVIRONMENT" = "mainnet" ]; then
+            rpc="$RPC_MAINNET"; pk="$PK_MAINNET"
+          else
+            rpc="$RPC_SEPOLIA"; pk="$PK_SEPOLIA"
+          fi
+          # Optional dispatch-time override wins over the secret (see the
+          # CAVEAT in the header: the typed value is visible in the run summary).
+          if [ -n "${INPUT_RPC:-}" ]; then
+            rpc="$INPUT_RPC"
+            echo "Using L1 RPC from the dispatch input (masked in logs; visible in run summary)."
+          fi
+          if [ -z "$rpc" ]; then
+            echo "::error::No L1 RPC: pass the l1_rpc_url input or set L1_RPC_URL_SEPOLIA / L1_RPC_URL_MAINNET"
+            exit 1
+          fi
+          if [ -z "$pk" ]; then
+            echo "::error::Missing deployer-key secret for '${{ inputs.environment }}' (set DEPLOYER_PRIVATE_KEY_SEPOLIA / DEPLOYER_PRIVATE_KEY_MAINNET)"
+            exit 1
+          fi
+          # Redact both everywhere in the logs, including subprocess echoes.
+          echo "::add-mask::$rpc"
+          echo "::add-mask::$pk"
+          # Job-scoped; not echoed back, never an output or artifact.
+          {
+            echo "L1_FORK_URL=$rpc"
+            echo "DEPLOYER_PK=$pk"
+          } >> "$GITHUB_ENV"
+          if [ -n "${GW_RPC_URL:-}" ]; then
+            echo "::add-mask::$GW_RPC_URL"
+            echo "GW_RPC_URL=$GW_RPC_URL" >> "$GITHUB_ENV"
+          fi
+
+      - name: Regenerate + verify calldata
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          # L1_FORK_URL + DEPLOYER_PK come from $GITHUB_ENV (masked). The script
+          # forks L1_FORK_URL into a local anvil and runs prepare/PUVT against
+          # localhost, so only anvil sees the real RPC.
+          ./regen-and-verify.sh "${{ inputs.environment }}"
+
+      - name: Emit git-portable sim-inputs handoff set
+        run: |
+          set -euo pipefail
+          OUT="l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}"
+          ./protocol-ops/target/release/protocol_ops ecosystem governance-toml-to-simulator \
+            --env "${{ inputs.environment }}" \
+            --emit-sim-inputs "$OUT/sim-inputs"
+
+      # Upload only the calldata deliverables. Deliberately NOT anvil.log /
+      # *-verification-logs.txt — anvil.log can echo the forked RPC URL.
+      - name: Upload calldata artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecosystem-upgrade-calldata-${{ inputs.environment }}
+          path: |
+            l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/ecosystem.toml
+            l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/sim-inputs/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Cleanup anvil
+        if: always()
+        working-directory: l1-contracts/test/anvil-interop
+        run: bash cleanup.sh
