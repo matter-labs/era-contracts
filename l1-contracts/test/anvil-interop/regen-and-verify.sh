@@ -143,9 +143,9 @@ GW_RPC_URL="${GW_RPC_URL:-https://zksync-os-stage-gateway.zksync.dev}"
 echo "GW RPC:       $GW_RPC_URL"
 # zk-governance commit whose AllContractsHashes.json PUVT uses to verify
 # PUH/Guardians bytecodes. Override via ZK_GOVERNANCE_COMMIT env var; the
-# default points to the latest kl/v31-puh-guardians-redeploy on upstream
-# (zksync-association/zk-governance) which carries the regenerated hashes.
-ZK_GOV_COMMIT="${ZK_GOVERNANCE_COMMIT:-3e516c5}"
+# default points to the v31 governance set on upstream
+# (zksync-association/zk-governance).
+ZK_GOV_COMMIT="${ZK_GOVERNANCE_COMMIT:-7c5e27b}"
 echo "zk-gov commit: $ZK_GOV_COMMIT"
 # 1e30 wei
 FUND_AMOUNT="1000000000000000000000000000000"

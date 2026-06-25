@@ -63,7 +63,7 @@ on:
         description: "zk-governance commit (PUH/Guardians bytecode verified by PUVT)"
         required: true
         type: string
-        default: "3e516c5"
+        default: "7c5e27b"
 
 permissions:
   contents: read
