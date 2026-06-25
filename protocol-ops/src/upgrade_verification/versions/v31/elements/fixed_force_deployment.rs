@@ -19,7 +19,6 @@ sol! {
     #[derive(Debug)]
     struct FixedForceDeploymentsData {
         uint256 l1ChainId;
-        uint256 eraGatewayChainId;
         uint256 eraChainId;
         address l1AssetRouter;
         bytes32 l2TokenProxyBytecodeHash;
@@ -142,19 +141,6 @@ impl FixedForceDeploymentsData {
             Err(err) => result.report_error(&format!(
                 "Could not verify FixedForceDeploymentsData l1ChainId: {err}"
             )),
-        }
-
-        let expected_era_gateway_chain_id = U256::from(verifiers.legacy_gateway_chain_id);
-        if self.eraGatewayChainId != expected_era_gateway_chain_id {
-            result.report_error(&format!(
-                "FixedForceDeploymentsData eraGatewayChainId mismatch: expected legacy gateway chain id {}, got {}",
-                verifiers.legacy_gateway_chain_id, self.eraGatewayChainId
-            ));
-        } else {
-            result.report_ok(&format!(
-                "FixedForceDeploymentsData eraGatewayChainId matches legacy gateway chain id ({})",
-                verifiers.legacy_gateway_chain_id
-            ));
         }
 
         // The force-deployment's eraChainId is the LEGACY Era (e.g. testnet 270),

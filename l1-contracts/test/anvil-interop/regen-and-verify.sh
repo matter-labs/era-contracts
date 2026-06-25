@@ -207,19 +207,18 @@ else
   # Optional FORK_BLOCK pin. Needed when the live chain is mid-upgrade: forking the tip would
   # inherit an already-applied stage (e.g. a started GovernanceUpgradeTimer), making the prepare's
   # gov-stage replay revert. Pin to a pre-upgrade block to fork a clean pre-stage state.
-  FORK_BLOCK_ARG=()
+  anvil_args=(
+    --port "$PORT"
+    --auto-impersonate
+    --disable-block-gas-limit
+    --gas-price 1000000000
+    --fork-url "$L1_FORK_URL"
+  )
   if [[ -n "${FORK_BLOCK:-}" ]]; then
     echo "    pinning fork to block $FORK_BLOCK"
-    FORK_BLOCK_ARG=(--fork-block-number "$FORK_BLOCK")
+    anvil_args+=(--fork-block-number "$FORK_BLOCK")
   fi
-  anvil \
-    --port $PORT \
-    --auto-impersonate \
-    --disable-block-gas-limit \
-    --gas-price 1000000000 \
-    --fork-url "$L1_FORK_URL" \
-    "${FORK_BLOCK_ARG[@]}" \
-    >"$OUT/anvil.log" 2>&1 &
+  anvil "${anvil_args[@]}" >"$OUT/anvil.log" 2>&1 &
   ANVIL_PID=$!
   for _ in $(seq 1 30); do
     if cast chain-id --rpc-url "$RPC" >/dev/null 2>&1; then
