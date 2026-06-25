@@ -35,36 +35,21 @@ address from it).
 `workflow_dispatch` workflows only register from the repo's **default branch**.
 Until merged to `main`, these won't appear in the Actions dropdown.
 
-## 2. Actual deployment
+## 2. Actual deployment (the `deploy` checkbox)
 
-[`.github/workflows/deploy-upgrade-contracts.yaml`](../../../.github/workflows/deploy-upgrade-contracts.yaml)
-is the **"Mode 2" real-network deployment** — the one job that uses the deployer
-private key to push the new-contract CREATE2 deploys on-chain.
+The real-network "Mode 2" deployment is folded into the same workflow as an
+opt-in `deploy` checkbox (default off). On a run with `deploy` checked, after
+regen+PUVT the job broadcasts **only the deployer-EOA bundle** to the real L1
+via idempotent `dev execute-safe` (already-deployed CREATE2 addresses are
+skipped). Governance / multisig bundles (PUH, security council) are **never**
+broadcast here — those go through the governance process.
 
-This is an operator-run helper, **not** the forced/authoritative production
-deployment gate. It is deliberately conservative:
+It is intentionally **ungated** — just the checkbox. It runs even if PUVT
+reported errors (`!cancelled()`), since prepare's bundles already exist, and it
+reuses the `DEPLOYER_PRIVATE_KEY_<net>` + real RPC already loaded into
+`$GITHUB_ENV`. The `use_new_salt` checkbox rotates the deployment salts first so
+the run lands at fresh CREATE2 addresses.
 
-1. `workflow_dispatch` only — never on push. (No GitHub Environment gate; the
-   dry-run default + confirm phrase below are the guards.)
-2. **Deploy-only-what's-verified:** it first runs the same fork regen + PUVT as
-   above; if PUVT is not green it never reaches the broadcast. The bytecode it
-   deploys is exactly what was just verified.
-3. **Dry run by default** (`dry_run=true`): prints the deployer bundle(s) that
-   *would* be sent and stops. To actually deploy, set `dry_run=false` **and**
-   type the confirm phrase `DEPLOY-<environment>`.
-4. Broadcasts **only the deployer-EOA bundle(s)** (`dev execute-safe`), never the
-   governance / multisig bundles (PUH, security council) — those go through the
-   governance process. The broadcast is idempotent (already-deployed CREATE2
-   addresses are skipped), so a re-run after a partial broadcast is safe.
-5. **Pre-flight mempool check:** before broadcasting it asserts the deployer's
-   `pending` nonce equals its `latest` nonce — i.e. no in-flight tx. A stuck tx
-   at a lower nonce would strand everything sent behind it, so the job fails
-   fast with guidance (cancel/replace that nonce, then re-run) instead of
-   queueing into a gap.
-6. **Gas bid is tunable** via the `gas_price_multiplier` input (default `1.5` =
-   150% of the live `eth_gasPrice`); higher lands faster on a busy chain, lower
-   risks hanging in the mempool. Threaded into `dev execute-safe
-   --gas-price-multiplier`.
-
-Extra secrets it needs: `DEPLOYER_PRIVATE_KEY_SEPOLIA` /
-`DEPLOYER_PRIVATE_KEY_MAINNET` (must control the `deployer_address` input).
+> Note: this does **not** merge the new real-network deploy hashes into the
+> committed `transactions.txt`, so an `open_pr` run still PRs the calldata as
+> "not-yet-deployed".
