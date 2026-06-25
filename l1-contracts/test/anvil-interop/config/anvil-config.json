@@ -33,7 +33,8 @@
       "chainId": 14,
       "port": 4054,
       "role": "gwSettled",
-      "settlement": "gateway"
+      "settlement": "gateway",
+      "baseToken": "custom"
     }
   ]
 }
