@@ -65,19 +65,6 @@ struct PriorityModeInformation {
     address transactionFilterer;
 }
 
-/// @notice Runtime chain-level execution rules for ZKsync OS chains.
-/// @dev Committed into each batch proof public input together with `ZKChainStorage.chainId`,
-/// so these values must match the configuration ZKsync OS executed the batch with.
-/// They can change between batches but must stay fixed within a batch.
-/// @param friProofVerificationEnabled Whether ZKsync OS FRI proof verification (the Gateway FRI precompile) is enabled.
-/// @param maxTxGasLimit EIP-7825 single-transaction gas limit. A chain may raise the cap above the Ethereum
-/// limit but must not set it below. `0` means the default (`ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`) for chains
-/// that existed before this field was introduced.
-struct ZKsyncOSChainConfig {
-    bool friProofVerificationEnabled;
-    uint64 maxTxGasLimit;
-}
-
 /// @dev storing all storage variables for ZK chain diamond facets
 /// NOTE: It is used in a proxy, so it is possible to add new variables to the end
 /// but NOT to modify already existing variables or change their order.
@@ -273,7 +260,10 @@ struct ZKChainStorage {
     /// except for ZKsync OS chains that have existed before the v31 upgrade.
     /// @dev STORAGE SLOT: 70
     bool baseTokenHasTotalSupply;
-    /// @dev Runtime chain config for ZKsync OS chains; committed into each batch proof public input.
+    /// @dev The ZKsync OS single-transaction gas limit (EIP-7825), committed into each batch proof
+    /// public input. A chain may raise the cap above the Ethereum limit but must not set it below.
+    /// `0` means the default (`ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`) for chains that existed before
+    /// this field was introduced.
     /// @dev STORAGE SLOT: 71
-    ZKsyncOSChainConfig zksyncOSChainConfig;
+    uint64 zksyncOSMaxTxGasLimit;
 }

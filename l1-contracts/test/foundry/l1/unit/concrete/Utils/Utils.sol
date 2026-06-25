@@ -518,8 +518,8 @@ library Utils {
         selectors[i++] = UtilsFacet.util_setPriorityTreeNextLeafIndex.selector;
         selectors[i++] = UtilsFacet.util_setPriorityOpsRequestTimestamp.selector;
         selectors[i++] = UtilsFacet.util_setZksyncOS.selector;
-        selectors[i++] = UtilsFacet.util_setZKsyncOSChainConfig.selector;
-        selectors[i++] = UtilsFacet.util_getZKsyncOSChainConfig.selector;
+        selectors[i++] = UtilsFacet.util_setZKsyncOSMaxTxGasLimit.selector;
+        selectors[i++] = UtilsFacet.util_getZKsyncOSMaxTxGasLimit.selector;
         selectors[i++] = UtilsFacet.util_setBaseTokenHasTotalSupply.selector;
 
         return selectors;

@@ -173,17 +173,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setFriProofVerificationEnabled(
-        bool _friProofVerificationEnabled
-    ) external onlyAdmin onlySettlementLayer onlyZKsyncOS {
-        _enforceNoUnverifiedBatchesForChainConfigUpdate();
-
-        bool oldFriProofVerificationEnabled = s.zksyncOSChainConfig.friProofVerificationEnabled;
-        s.zksyncOSChainConfig.friProofVerificationEnabled = _friProofVerificationEnabled;
-        emit NewFriProofVerificationEnabled(oldFriProofVerificationEnabled, _friProofVerificationEnabled);
-    }
-
-    /// @inheritdoc IAdmin
     function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external onlyAdmin onlySettlementLayer onlyZKsyncOS {
         // The cap may only be raised above Ethereum's EIP-7825 single-tx gas limit, never below.
         if (_newMaxTxGasLimit < ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT) {
@@ -192,7 +181,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         _enforceNoUnverifiedBatchesForChainConfigUpdate();
 
         uint64 oldMaxTxGasLimit = _getZKsyncOSMaxTxGasLimit();
-        s.zksyncOSChainConfig.maxTxGasLimit = _newMaxTxGasLimit;
+        s.zksyncOSMaxTxGasLimit = _newMaxTxGasLimit;
         emit NewZKsyncOSMaxTxGasLimit(oldMaxTxGasLimit, _newMaxTxGasLimit);
     }
 

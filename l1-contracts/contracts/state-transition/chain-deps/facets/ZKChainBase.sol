@@ -220,7 +220,7 @@ contract ZKChainBase is ReentrancyGuard {
     /// @dev `0` in storage means the value was never set explicitly (chains deployed before the
     /// field was introduced) and falls back to the default cap.
     function _getZKsyncOSMaxTxGasLimit() internal view returns (uint64) {
-        uint64 storedMaxTxGasLimit = s.zksyncOSChainConfig.maxTxGasLimit;
+        uint64 storedMaxTxGasLimit = s.zksyncOSMaxTxGasLimit;
         return storedMaxTxGasLimit == 0 ? ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT : storedMaxTxGasLimit;
     }
 

@@ -300,24 +300,29 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @dev Gets zk proof public input for ZKSync OS.
-    /// @dev Mirrors the ZKsync OS `BatchPublicInput` encoding: between the state commitments and the
-    /// batch output hash the chain config is committed as three 32-byte big-endian words, in order:
-    /// `chain_id`, `fri_proof_verification_enabled` (0/1) and `max_tx_gas_limit`. The values are read
-    /// from storage, so they must match the configuration ZKsync OS executed the batch with.
+    /// @dev Mirrors the ZKsync OS `BatchPublicInput::hash` encoding:
+    /// `keccak256(state_before, state_after, chain_config_hash, batch_output)`, where the chain config
+    /// is committed as a nested hash so that the public-input layout stays fixed as the config's field
+    /// set evolves. `chain_config_hash` mirrors ZKsync OS `ChainConfig::hash`, hashing three 32-byte
+    /// big-endian words in order: `chain_id`, `fri_proof_verification_enabled` (0/1) and `max_tx_gas_limit`.
+    /// FRI proof verification is always disabled from the settlement layer, so its word is always zero.
+    /// The values are read from storage, so they must match the configuration ZKsync OS executed the batch with.
     function _getBatchProofPublicInputZKsyncOS(
         bytes32 _prevBatchStateCommitment,
         bytes32 _currentBatchStateCommitment,
         bytes32 _currentBatchCommitment
     ) internal view returns (uint256) {
+        // `fri_proof_verification_enabled` is always disabled from the settlement layer, hence the `0` word.
+        bytes32 chainConfigHash = keccak256(
+            abi.encodePacked(s.chainId, uint256(0), uint256(_getZKsyncOSMaxTxGasLimit()))
+        );
         return
             uint256(
                 keccak256(
                     abi.encodePacked(
                         _prevBatchStateCommitment,
                         _currentBatchStateCommitment,
-                        s.chainId,
-                        uint256(s.zksyncOSChainConfig.friProofVerificationEnabled ? 1 : 0),
-                        uint256(_getZKsyncOSMaxTxGasLimit()),
+                        chainConfigHash,
                         _currentBatchCommitment
                     )
                 )

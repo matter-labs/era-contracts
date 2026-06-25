@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {PubdataPricingMode, ZKsyncOSChainConfig} from "../ZKChainStorage.sol";
+import {PubdataPricingMode} from "../ZKChainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
@@ -215,12 +215,8 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function getZKsyncOSChainConfig() external view returns (ZKsyncOSChainConfig memory) {
-        return
-            ZKsyncOSChainConfig({
-                friProofVerificationEnabled: s.zksyncOSChainConfig.friProofVerificationEnabled,
-                maxTxGasLimit: _getZKsyncOSMaxTxGasLimit()
-            });
+    function getZKsyncOSMaxTxGasLimit() external view returns (uint64) {
+        return _getZKsyncOSMaxTxGasLimit();
     }
 
     /// @inheritdoc IGetters
