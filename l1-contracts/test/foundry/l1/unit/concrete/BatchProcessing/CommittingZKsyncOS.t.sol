@@ -20,11 +20,28 @@ import {
 import {BlobsL1DAValidatorZKsyncOS} from "../../../da-contracts-imports/BlobsL1DAValidatorZKsyncOS.sol";
 
 contract CommittingTest is ExecutorTest {
+    UtilsFacet internal utilsFacet;
+
     function isZKsyncOS() internal pure override returns (bool) {
         return true;
     }
 
-    function setUp() public {}
+    function setUp() public {
+        // Attach UtilsFacet via a real diamond upgrade (not storage-slot overrides) so the protocol-version tests
+        // can configure the protocol version and a pending upgrade. Mirrors ExecutorRevertBatchesTest.
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: address(new UtilsFacet()),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getUtilsFacetSelectors()
+        });
+        vm.prank(getters.getChainTypeManager());
+        admin.executeUpgrade(
+            Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: bytes("")})
+        );
+        utilsFacet = UtilsFacet(address(committer));
+    }
 
     function test_SuccessfullyCommitBatchWithCalldata() public {
         // Calldata DA
@@ -548,33 +565,10 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
-}
 
-/// @notice Tests for the `ReportCommittedBatchProtocolVersion` event on the ZKsync OS commit path. Uses UtilsFacet
-/// (attached through a real upgrade, not storage-slot overrides) to drive a non-default protocol version and a
-/// pending protocol upgrade. ZKsync OS commits with validium (no-DA), so no pubdata machinery is needed.
-contract CommittingProtocolVersionTest is ExecutorTest {
-    UtilsFacet internal utilsFacet;
-
-    function isZKsyncOS() internal pure override returns (bool) {
-        return true;
-    }
-
-    function setUp() public {
-        // Attach UtilsFacet via a real diamond upgrade, mirroring ExecutorRevertBatchesTest.
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: address(new UtilsFacet()),
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getUtilsFacetSelectors()
-        });
-        vm.prank(getters.getChainTypeManager());
-        admin.executeUpgrade(
-            Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: bytes("")})
-        );
-        utilsFacet = UtilsFacet(address(committer));
-
+    /// @dev Switches the chain to the validium (no-DA) scheme so a protocol-version test can commit without pubdata.
+    function _enableValidiumDA() internal {
+        // Deploy on its own line: vm.prank applies to the next call, so it must land on setDAValidatorPair.
         address validiumL1DAValidator = address(new ValidiumL1DAValidator());
         vm.prank(owner);
         admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
@@ -582,6 +576,7 @@ contract CommittingProtocolVersionTest is ExecutorTest {
 
     /// @notice A non-upgrade batch reports the chain's protocol version (0 in the harness) and a zero upgrade hash.
     function test_emitsProtocolVersionWithZeroUpgradeTxHash() public {
+        _enableValidiumDA();
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = _encodeValidiumCommit(
             _validiumBatch(1)
         );
@@ -595,6 +590,7 @@ contract CommittingProtocolVersionTest is ExecutorTest {
     /// @notice The emitted protocol version equals the chain's protocol version at commit time, so it stays
     /// correct for a batch even after later upgrades change the chain's current protocol version.
     function test_emittedProtocolVersionReflectsConfiguredVersion() public {
+        _enableValidiumDA();
         // A semver-like packed value (minor = 27, patch = 7); any non-zero value demonstrates the point.
         uint256 protocolVersion = (uint256(27) << 32) | uint256(7);
         utilsFacet.util_setProtocolVersion(protocolVersion);
@@ -613,6 +609,7 @@ contract CommittingProtocolVersionTest is ExecutorTest {
     /// hash, and that hash is exactly the one folded into the batch commitment (so an external observer can
     /// independently recompute the commitment).
     function test_emitsUpgradeTxHashFoldedIntoCommitment() public {
+        _enableValidiumDA();
         bytes32 upgradeTxHash = Utils.randomBytes32("upgradeTx");
         utilsFacet.util_setL2SystemContractsUpgradeTxHash(upgradeTxHash);
         assertEq(utilsFacet.util_getL2SystemContractsUpgradeBatchNumber(), 0, "no upgrade batch recorded yet");
