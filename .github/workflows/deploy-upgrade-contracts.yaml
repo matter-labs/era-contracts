@@ -137,13 +137,9 @@ jobs:
           cache: yarn
 
       - name: Install Rust toolchain
-        run: rustup show
-        working-directory: protocol-ops
-
-      - name: Cache cargo build
-        uses: Swatinem/rust-cache@v2
+        uses: dtolnay/rust-toolchain@master
         with:
-          workspaces: protocol-ops
+          toolchain: 1.91.1
 
       - name: Install JS dependencies
         run: yarn
@@ -151,14 +147,14 @@ jobs:
       - name: Build da-contracts
         run: yarn da build:foundry
 
-      - name: Build l1-contracts
-        run: yarn l1 build:foundry
-
       - name: Build system-contracts
         run: yarn sc build:foundry
 
+      - name: Build l1-contracts
+        run: yarn l1 build:foundry
+
       - name: Build protocol_ops
-        run: cargo build
+        run: cargo build --release
         working-directory: protocol-ops
 
       - name: Checkout zk-governance (sibling)
@@ -268,7 +264,7 @@ jobs:
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             echo "=== execute-safe: $f -> real ${{ inputs.environment }} (gas x${GAS_MULT}) ==="
-            ./protocol-ops/target/debug/protocol_ops dev execute-safe \
+            ./protocol-ops/target/release/protocol_ops dev execute-safe \
               --safe-file "$PREPARE_DIR/$f" \
               --l1-rpc-url "$L1_RPC_URL" \
               --private-key "${PK}" \
