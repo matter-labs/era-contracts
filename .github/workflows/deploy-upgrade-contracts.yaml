@@ -73,7 +73,11 @@ jobs:
     # Gate behind a protected Environment so a reviewer must approve the run.
     environment: sepolia-deploy
     env:
-      FOUNDRY_PROFILE: anvil-interop
+      # No FOUNDRY_PROFILE override — build under the default profile, matching
+      # the canonical generate-ecosystem-upgrade-calldata.yaml. The default
+      # profile is what produced the committed AllContractsHashes.json; forcing
+      # `anvil-interop` here builds EraVM with the wrong zksolc and shifts every
+      # CREATE2 address, so PUVT (correctly) rejects the result.
       PROTOCOL_CONTRACTS_ROOT: ${{ github.workspace }}
     steps:
       - name: Validate confirm phrase (unless dry run)
