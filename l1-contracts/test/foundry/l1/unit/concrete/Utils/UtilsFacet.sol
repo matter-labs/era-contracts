@@ -2,12 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {
-    FeeParams,
-    IVerifier,
-    VerifierParams,
-    ZKsyncOSChainConfig
-} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {FeeParams, IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
@@ -304,12 +299,12 @@ contract UtilsFacet is ZKChainBase {
         s.zksyncOS = _zksyncOS;
     }
 
-    function util_setZKsyncOSChainConfig(ZKsyncOSChainConfig memory _config) external {
-        s.zksyncOSChainConfig = _config;
+    function util_setZKsyncOSMaxTxGasLimit(uint64 _maxTxGasLimit) external {
+        s.zksyncOSMaxTxGasLimit = _maxTxGasLimit;
     }
 
-    function util_getZKsyncOSChainConfig() external view returns (ZKsyncOSChainConfig memory) {
-        return s.zksyncOSChainConfig;
+    function util_getZKsyncOSMaxTxGasLimit() external view returns (uint64) {
+        return s.zksyncOSMaxTxGasLimit;
     }
 
     function util_setBaseTokenHasTotalSupply(bool _hasTotalSupply) external {
