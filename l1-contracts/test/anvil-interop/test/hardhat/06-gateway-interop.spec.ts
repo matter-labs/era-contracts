@@ -8,6 +8,7 @@ import {
   buildInteropCallExecutedLogs,
   callProcessLogsAndMessages,
   getGWChainBalance,
+  getGWPendingInteropBalance,
 } from "../../src/helpers/process-logs-helper";
 import { migrateTokenBalanceToGW } from "../../src/helpers/token-balance-migration-helper";
 import { getAbi } from "../../src/core/contracts";
@@ -126,12 +127,19 @@ describe("06 - Gateway Interop (GW-settled chains)", function () {
       });
     }
 
+    const amountWei = BigNumber.from(result.amountWei);
+
     const srcGwBalanceBefore = await getGWChainBalance(gwProvider, sourceChainId, assetId);
     const dstGwBalanceBefore = await getGWChainBalance(gwProvider, targetChainId, assetId);
+    const dstPendingInteropBefore = await getGWPendingInteropBalance(gwProvider, targetChainId, assetId);
 
     console.log(`   GWAssetTracker.chainBalance[${sourceChainId}][assetId] before: ${srcGwBalanceBefore}`);
     console.log(`   GWAssetTracker.chainBalance[${targetChainId}][assetId] before: ${dstGwBalanceBefore}`);
+    console.log(`   GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] before: ${dstPendingInteropBefore}`);
 
+    // ── Step 1: Process the source chain's interop bundle log on the GW ──
+    // This burns the source chain balance and parks the destination amount in
+    // pendingInteropBalance — it is NOT yet credited to the destination chainBalance.
     const processResult = await callProcessLogsAndMessages({
       gwProvider,
       gwRpcUrl: gwChain.rpcUrl,
@@ -143,9 +151,41 @@ describe("06 - Gateway Interop (GW-settled chains)", function () {
 
     expect(processResult.txHash).to.not.be.null;
 
-    // Process the destination chain's interopCallExecuted logs.
-    // The merged InteropHandler now sends L2→L1 messages via _sendCallExecutedMessage
-    // for each executed call. GWAssetTracker needs these to credit the destination chain balance.
+    const srcGwBalanceAfterSend = await getGWChainBalance(gwProvider, sourceChainId, assetId);
+    const dstGwBalanceAfterSend = await getGWChainBalance(gwProvider, targetChainId, assetId);
+    const dstPendingInteropAfterSend = await getGWPendingInteropBalance(gwProvider, targetChainId, assetId);
+
+    console.log(`   GWAssetTracker.chainBalance[${sourceChainId}][assetId] after send: ${srcGwBalanceAfterSend}`);
+    console.log(`   GWAssetTracker.chainBalance[${targetChainId}][assetId] after send: ${dstGwBalanceAfterSend}`);
+    console.log(
+      `   GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] after send: ${dstPendingInteropAfterSend}`
+    );
+
+    if (sourceChainId !== 1) {
+      const srcDelta = srcGwBalanceBefore.sub(srcGwBalanceAfterSend);
+      expect(
+        srcDelta.eq(amountWei),
+        `GWAssetTracker.chainBalance[${sourceChainId}][assetId] should decrease by ${amountWei}, got ${srcDelta}`
+      ).to.equal(true);
+    }
+
+    if (targetChainId !== 1) {
+      const dstChainBalanceDelta = dstGwBalanceAfterSend.sub(dstGwBalanceBefore);
+      const dstPendingInteropDelta = dstPendingInteropAfterSend.sub(dstPendingInteropBefore);
+      expect(
+        dstChainBalanceDelta.isZero(),
+        `GWAssetTracker.chainBalance[${targetChainId}][assetId] should not change before execution confirmation, got ${dstChainBalanceDelta}`
+      ).to.equal(true);
+      expect(
+        dstPendingInteropDelta.eq(amountWei),
+        `GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] should increase by ${amountWei}, got ${dstPendingInteropDelta}`
+      ).to.equal(true);
+    }
+
+    // ── Step 2: Process the destination chain's execution-confirmation logs ──
+    // When executeBundle ran on the destination chain, the merged InteropHandler sent L2→L1
+    // messages (one per call) via _sendCallExecutedMessage. Processing these on the GW
+    // converts pendingInteropBalance → chainBalance for the destination chain.
     const { logs: executedLogs, messages: executedMessages } = buildInteropCallExecutedLogs({
       startTxNumberInBatch: 0,
       interopBundle,
@@ -162,27 +202,26 @@ describe("06 - Gateway Interop (GW-settled chains)", function () {
 
     expect(destProcessResult.txHash).to.not.be.null;
 
-    const srcGwBalanceAfter = await getGWChainBalance(gwProvider, sourceChainId, assetId);
-    const dstGwBalanceAfter = await getGWChainBalance(gwProvider, targetChainId, assetId);
+    const dstGwBalanceAfterConfirm = await getGWChainBalance(gwProvider, targetChainId, assetId);
+    const dstPendingInteropAfterConfirm = await getGWPendingInteropBalance(gwProvider, targetChainId, assetId);
 
-    console.log(`   GWAssetTracker.chainBalance[${sourceChainId}][assetId] after: ${srcGwBalanceAfter}`);
-    console.log(`   GWAssetTracker.chainBalance[${targetChainId}][assetId] after: ${dstGwBalanceAfter}`);
-
-    const amountWei = BigNumber.from(result.amountWei);
-
-    if (sourceChainId !== 1) {
-      const srcDelta = srcGwBalanceBefore.sub(srcGwBalanceAfter);
-      expect(
-        srcDelta.eq(amountWei),
-        `GWAssetTracker.chainBalance[${sourceChainId}][assetId] should decrease by ${amountWei}, got ${srcDelta}`
-      ).to.equal(true);
-    }
+    console.log(
+      `   GWAssetTracker.chainBalance[${targetChainId}][assetId] after confirm: ${dstGwBalanceAfterConfirm}`
+    );
+    console.log(
+      `   GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] after confirm: ${dstPendingInteropAfterConfirm}`
+    );
 
     if (targetChainId !== 1) {
-      const dstDelta = dstGwBalanceAfter.sub(dstGwBalanceBefore);
+      const pendingDecrease = dstPendingInteropAfterSend.sub(dstPendingInteropAfterConfirm);
+      const chainBalIncrease = dstGwBalanceAfterConfirm.sub(dstGwBalanceAfterSend);
       expect(
-        dstDelta.eq(amountWei),
-        `GWAssetTracker.chainBalance[${targetChainId}][assetId] should increase by ${amountWei}, got ${dstDelta}`
+        pendingDecrease.eq(amountWei),
+        `GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] should decrease by ${amountWei} after confirm, got ${pendingDecrease}`
+      ).to.equal(true);
+      expect(
+        chainBalIncrease.eq(amountWei),
+        `GWAssetTracker.chainBalance[${targetChainId}][assetId] should increase by ${amountWei} after confirm, got ${chainBalIncrease}`
       ).to.equal(true);
     }
 
