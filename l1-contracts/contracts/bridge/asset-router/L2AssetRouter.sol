@@ -19,6 +19,7 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
 import {InteropCallStarter} from "../../common/Messaging.sol";
 import {
+    L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_CENTER_ADDR,
@@ -76,13 +77,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// the old version where it was an immutable.
     bytes32 public BASE_TOKEN_ASSET_ID;
 
-    /// @notice Canonical atomic-flow manager on this chain. Whitelisted to call the AR's
-    /// `recoverAtomicBurn` entry (the IMT atomic flow's timeout recovery path). The source burn goes
-    /// through the normal `initiateIndirectCall` path and destination mints through the interop handler,
-    /// so the manager itself only drives `recoverAtomicBurn`. Set once via `setAtomicFlowManager`;
-    /// remains `address(0)` (disabled) on chains that do not opt in to the atomic-flow stack.
-    address public atomicFlowManager;
-
     /// @notice Returns the bridgehub contract.
     function _bridgehub() internal view virtual override returns (IBridgehubBase) {
         return IBridgehubBase(L2_BRIDGEHUB_ADDR);
@@ -101,6 +95,15 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// @notice Returns the interop handler address. Virtual for private interop override.
     function _interopHandlerAddr() internal view virtual returns (address) {
         return L2_INTEROP_HANDLER_ADDR;
+    }
+
+    /// @notice Returns the canonical atomic-flow manager address — the contract whitelisted to call
+    /// `recoverAtomicBurn` (the IMT atomic flow's timeout recovery path). It is a genesis-deployed
+    /// built-in at a fixed address, like the interop center / handler above; chains without the
+    /// atomic-flow stack simply have nothing deployed there, so the auth gate never passes. Virtual
+    /// for private interop override.
+    function _atomicFlowManagerAddr() internal view virtual returns (address) {
+        return L2_ATOMIC_FLOW_MANAGER_ADDR;
     }
 
     /// @notice Validates that an interop message sender is an authorized AssetRouter counterpart.
@@ -157,11 +160,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _;
     }
 
-    /// @notice Checks that the message sender is the canonical atomic-flow manager (only meaningful when
-    /// the atomic-flow stack is enabled on this chain). The manager drives `recoverAtomicBurn` for the
-    /// L1-free atomic interop flow's timeout path.
+    /// @notice Checks that the message sender is the canonical atomic-flow manager, which drives
+    /// `recoverAtomicBurn` for the L1-free atomic interop flow's timeout path. On chains without the
+    /// atomic-flow stack nothing is deployed at that address, so this gate naturally never passes.
     modifier onlyAtomicFlowManager() {
-        require(atomicFlowManager != address(0) && msg.sender == atomicFlowManager, Unauthorized(msg.sender));
+        require(msg.sender == _atomicFlowManagerAddr(), Unauthorized(msg.sender));
         _;
     }
 
@@ -231,23 +234,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         if (owner() != _aliasedOwner) {
             _transferOwnership(_aliasedOwner);
         }
-    }
-
-    /// @notice Registers the canonical atomic-flow manager on this chain. One-shot: the
-    /// manager address is set exactly once, after which the AR's atomic-flow auth gates
-    /// recognise it. Callable by:
-    ///   - the complex upgrader, so the genesis force-deployment wires the canonical
-    ///     predeployed manager on ZKsync OS out of the box (the upgrader is the genesis caller);
-    ///   - the owner, so a system AR's aliased L1 governance can opt in post-genesis, and a
-    ///     userspace AR deployed by an EOA can wire its own manager without needing the system upgrader.
-    /// See `atomicFlowManager` for the broader design context.
-    function setAtomicFlowManager(address _manager) external {
-        if (msg.sender != owner() && msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
-        require(atomicFlowManager == address(0), Unauthorized(msg.sender));
-        require(_manager != address(0), EmptyAddress());
-        atomicFlowManager = _manager;
     }
 
     /// @inheritdoc IL2AssetRouter

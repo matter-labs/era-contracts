@@ -6,8 +6,9 @@
  *   - {AtomicFlowManager}       at L2_ATOMIC_FLOW_MANAGER_ADDR      (0x10014),
  * then wires them exactly as the on-chain genesis force-deployment would:
  *   - tree.initialize(manager),
- *   - manager.initialize(tree, assetRouter, interopCenter, interopHandler),
- *   - L2AssetRouter.setAtomicFlowManager(manager)  (so the AR's recoverAtomicBurn auth recognises it).
+ *   - manager.initialize(tree, assetRouter, interopCenter, interopHandler).
+ * The L2AssetRouter recognises the manager by its canonical address (`_atomicFlowManagerAddr()` ->
+ * L2_ATOMIC_FLOW_MANAGER_ADDR), so `recoverAtomicBurn` auth needs no explicit registration step.
  *
  * Unlike the removed escrow-direct flow, the manager is fund-touchless: the source-side burn happens
  * through the normal interop path ({InteropCenter.sendBundle} -> {L2AssetRouter.initiateIndirectCall}),
@@ -26,7 +27,6 @@
 import type { providers } from "ethers";
 import { Contract, Wallet, ethers } from "ethers";
 import { getAbi, getBytecode } from "../core/contracts";
-import { impersonateAndRun } from "../core/utils";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   INTEROP_CENTER_ADDR,
@@ -118,18 +118,17 @@ export async function deployAtomicStack(args: {
     ).wait();
   }
 
-  // 3. Register the manager on the L2AssetRouter (owner-gated).
+  // 3. Refresh the L2AssetRouter runtime code if it predates the atomic-flow additions.
   //
   // The pre-generated chain states were dumped before the AR's atomic-flow additions
-  // (`atomicFlowManager` / `setAtomicFlowManager` / `recoverAtomicBurn`), so refresh the AR's runtime
-  // code in place to the freshly-built bytecode. This is a CODE upgrade only — the AR's storage is
-  // preserved: `atomicFlowManager` is a freshly-appended slot that reads as 0 in the old state, which
-  // is exactly what `setAtomicFlowManager` requires. No storage slot is overwritten; this is the same
-  // `anvil_setCode` built-in-install pattern the harness uses elsewhere.
-  // Selectors are computed from the literal signatures (not via a loaded ABI): the committed
-  // zkstack-out ABIs can lag the freshly-rebuilt contracts, so signature-derived selectors are the
-  // reliable probe.
-  if (!(await hasSelector(provider, assetRouter, selectorOf("atomicFlowManager()")))) {
+  // (`recoverAtomicBurn`, plus auth that recognises the canonical AtomicFlowManager at
+  // `L2_ATOMIC_FLOW_MANAGER_ADDR`), so refresh the AR's runtime code in place to the freshly-built
+  // bytecode. This is a CODE upgrade only — the AR's storage is preserved, and the atomic-flow auth
+  // keys off a fixed address (`_atomicFlowManagerAddr()`) rather than storage, so nothing needs wiring.
+  // Same `anvil_setCode` built-in-install pattern the harness uses elsewhere. Selectors are computed
+  // from the literal signatures (not via a loaded ABI): the committed zkstack-out ABIs can lag the
+  // freshly-rebuilt contracts, so signature-derived selectors are the reliable probe.
+  if (!(await hasSelector(provider, assetRouter, selectorOf("recoverAtomicBurn(uint256,bytes32,bytes)")))) {
     await provider.send("anvil_setCode", [assetRouter, getBytecode("L2AssetRouter")]);
   }
 
@@ -146,15 +145,8 @@ export async function deployAtomicStack(args: {
     await provider.send("anvil_setCode", [nativeTokenVault, getBytecode("L2NativeTokenVaultDev")]);
   }
 
-  const arReader = new Contract(assetRouter, getAbi("L2AssetRouter"), provider);
-  const currentManager: string = await arReader.atomicFlowManager();
-  if (currentManager === ethers.constants.AddressZero) {
-    const arOwner: string = await arReader.owner();
-    await impersonateAndRun(provider, arOwner, async (signer) => {
-      const ar = new Contract(assetRouter, getAbi("L2AssetRouter"), signer);
-      await (await ar.setAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR)).wait();
-    });
-  }
+  // No manager registration step: the AR recognises the canonical AtomicFlowManager by its fixed
+  // address (`_atomicFlowManagerAddr()` -> L2_ATOMIC_FLOW_MANAGER_ADDR), installed at step 1 above.
 
   return { chainId, provider, tree, manager, interopCenter, interopHandler };
 }
@@ -170,7 +162,7 @@ async function hasSelector(provider: providers.JsonRpcProvider, address: string,
   return code.includes(selector.slice(2).toLowerCase());
 }
 
-/** 4-byte function selector for a canonical signature string, e.g. `selectorOf("atomicFlowManager()")`. */
+/** 4-byte function selector for a canonical signature string, e.g. `selectorOf("recoverAtomicBurn(uint256,bytes32,bytes)")`. */
 function selectorOf(signature: string): string {
   return ethers.utils.id(signature).slice(0, 10);
 }

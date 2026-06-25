@@ -463,11 +463,12 @@ library L2GenesisForceDeploymentsHelper {
         // For ZKOS: mints via MINT_BASE_TOKEN_HOOK and transfers to holder.
         IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
 
-        // Atomic interop (L1-free): wire the commitment tree's appender to the AtomicFlowManager, the
-        // manager to the tree / asset router / interop center / interop handler, and whitelist the
-        // manager on the asset router for the timeout recovery path. The manager never custodies funds:
-        // the source burn flows through the normal interop path and destination mints through the
-        // interop handler. Only ZKsync OS chains predeploy these (see the genesis gen tool).
+        // Atomic interop (L1-free): wire the commitment tree's appender to the AtomicFlowManager and the
+        // manager to the tree / asset router / interop center / interop handler. The asset router
+        // recognises the manager by its canonical address (`_atomicFlowManagerAddr()`), so no explicit
+        // whitelisting is needed. The manager never custodies funds: the source burn flows through the
+        // normal interop path and destination mints through the interop handler. Only ZKsync OS chains
+        // predeploy these (see the genesis gen tool).
         if (_isZKsyncOS) {
             L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initialize(L2_ATOMIC_FLOW_MANAGER_ADDR);
             AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initialize(
@@ -476,9 +477,6 @@ library L2GenesisForceDeploymentsHelper {
                 L2_INTEROP_CENTER_ADDR,
                 L2_INTEROP_HANDLER_ADDR
             );
-            // The genesis force-deployment runs as the complex upgrader, which `setAtomicFlowManager`
-            // authorises for this one-shot genesis wiring.
-            L2AssetRouter(L2_ASSET_ROUTER_ADDR).setAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
         }
     }
 
