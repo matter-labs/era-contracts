@@ -12,13 +12,15 @@ profile — the same toolchain that produced the committed `AllContractsHashes.j
 and runs the canonical [`regen-and-verify.sh`](./regen-and-verify.sh): `upgrade-prepare-all`
 → fund + fork-replay → PUVT → emit `sim-inputs/`. Green iff PUVT passes.
 
-**Open-PR option** (`open_pr` input, default off): on a PUVT-green run it commits
-the regenerated `ecosystem.toml` + `sim-inputs/` to a `ci/regen-<env>-<run_id>`
-branch and opens a PR against the branch it ran on (override with `pr_base`). The
-`sim-inputs/` are the transaction-simulator-compatible bundles, so reviewers see
-the exact calls in the PR diff before they go to the simulator. The PR step
+**Push-artifacts option** (`push_artifacts` input, default off): on a PUVT-green
+run it commits the regenerated `ecosystem.toml` + `sim-inputs/` and **pushes them
+to the branch this run was dispatched on** (refreshing that branch's open PR), so
+the transaction-simulator-compatible `sim-inputs/` are reviewable in the diff. It
 stages `output/<env>/` without `-f`, so `.gitignore` keeps `anvil.log` (which can
-echo the RPC) and the ephemeral `prepare/` + `fork-rehearsal/` dirs out.
+echo the RPC) and the ephemeral `prepare/` + `fork-rehearsal/` dirs out. Following
+`update-generated-artifacts.yaml`, the workflow's `GITHUB_TOKEN` stays **read-only**
+and the push is authenticated with the scoped **`RELEASE_TOKEN`** secret — no
+`contents: write` / `pull-requests: write` needed.
 
 Required secrets: `L1_RPC_URL_SEPOLIA` / `L1_RPC_URL_MAINNET` (RPC, masked) and
 `DEPLOYER_PRIVATE_KEY_SEPOLIA` / `DEPLOYER_PRIVATE_KEY_MAINNET` (deployer key,
@@ -51,5 +53,5 @@ reuses the `DEPLOYER_PRIVATE_KEY_<net>` + real RPC already loaded into
 the run lands at fresh CREATE2 addresses.
 
 > Note: this does **not** merge the new real-network deploy hashes into the
-> committed `transactions.txt`, so an `open_pr` run still PRs the calldata as
-> "not-yet-deployed".
+> committed `transactions.txt`, so a `push_artifacts` run still pushes the
+> calldata as "not-yet-deployed".
