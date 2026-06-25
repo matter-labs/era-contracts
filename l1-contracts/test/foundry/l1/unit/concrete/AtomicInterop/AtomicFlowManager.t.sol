@@ -41,8 +41,8 @@ interface IAssetRouterFinalizeDeposit {
     function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) external payable;
 }
 
-/// @notice Unit tests for the fund-touchless {AtomicFlowManager} (the bundle-based successor of the
-/// custodial AtomicFlowEscrow). The manager never custodies funds: the source burn happens through the
+/// @notice Unit tests for the fund-touchless {AtomicFlowManager}. The manager never custodies funds:
+/// the source burn happens through the
 /// normal interop path during `InteropCenter.sendBundle`; the manager only coordinates cross-chain
 /// atomicity (IMT commit + finality proofs) and the timeout recovery (`recoverAtomicBurn`).
 ///
