@@ -86,7 +86,6 @@ The two L2 contracts are predeployed in the ZKsync OS genesis (no `Executor` / c
 - `src/helpers/imt-atomic-deployer.ts` — installs the atomic built-ins (`anvil_setCode`) on the anvil
   harness chains and wires them as genesis would, for the hardhat spec.
 - `test/hardhat/13-imt-atomic-swap.spec.ts` — the anvil-interop atomic-swap spec.
-- `atomic-flow-cli.ts` — interactive demo CLI over the flow.
 
 In production, the IMT proofs are served by the zksync-os-server `zks_getImtInclusionProof` /
 `zks_getImtLowNullifierIndex` RPCs (a Rust port of the engine above), paired with `zks_getL2ToL1LogProof`

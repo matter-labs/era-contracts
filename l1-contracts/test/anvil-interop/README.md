@@ -201,8 +201,7 @@ test/anvil-interop/
 │   ├── 03-interop-transfer.spec.ts
 │   ├── 04-gateway-setup.spec.ts
 │   ├── 05-gateway-bridge.spec.ts
-│   ├── 06-gateway-interop.spec.ts
-│   └── token-transfer.spec.ts
+│   └── 06-gateway-interop.spec.ts
 └── outputs/                       # Deployment outputs (gitignored)
 ```
 
