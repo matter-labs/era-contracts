@@ -181,6 +181,11 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// was `finalizeDeposit(sourceChainId, assetId, bridgeMintData)`; we recover the same
     /// `(assetId, amount)` against the burn's destination chain via `recoverAtomicBurn`, swapping the
     /// receiver to the depositor. Reverts if the bundle carries no such call.
+    // TODO(atomic-interop): clean this up. It reaches into the asset-router's deposit wire format —
+    // sniffing the `finalizeDeposit` selector via inline assembly, hand-stripping the selector
+    // byte-by-byte (`_decodeFinalizeDeposit`), and re-decoding/re-encoding `bridgeMintData` just to swap
+    // the receiver to the depositor. This duplicates AR encoding knowledge and is fragile to layout
+    // changes. The recovery-data construction should live in (or be delegated to) the asset router.
     function _recoverBundle(bytes32 _flowId, bytes32 _bundleHash, InteropBundle memory _bundle) internal {
         uint256 destChainId = _bundle.destinationChainId;
         uint256 callsLen = _bundle.calls.length;
