@@ -15,3 +15,6 @@ atomic-os-demo.env
 
 # Fork-mode L2 RPC map (developer-local)
 config/fork-l2-rpcs.json
+
+# Per-port-offset temp chain-state dirs written during parallel test runs
+chain-states/**/.tmp-p*/
