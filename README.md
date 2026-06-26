@@ -1,4 +1,4 @@
-# ZKsync Era: Smart Contracts
+# ZKsync Era: Smart Contracts 
 
 [![Logo](eraLogo.svg)](https://zksync.io/)
 
