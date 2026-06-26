@@ -96,7 +96,7 @@
           {
             "name": "proofs",
             "type": "tuple[]",
-            "internalType": "struct ImtInclusionProof[]",
+            "internalType": "struct ImtProof[]",
             "components": [
               {
                 "name": "sourceChainId",

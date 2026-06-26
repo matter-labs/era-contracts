@@ -7,7 +7,7 @@
  *     the tree's live leaf set (verified against `tree.root()` / `tree.merklePath(i)` over RPC),
  *   - compute the low-nullifier index needed to insert a value (the `lowNullifierIndex` carried by the
  *     `atomicBundle` attribute, which the InteropCenter forwards to `AtomicFlowManager.append`),
- *   - build the {ImtInclusionProof} / {ImtNonInclusionProof} structs the {AtomicFlowManager} verifies
+ *   - build the {ImtProof} structs (inclusion + non-inclusion) the {AtomicFlowManager} verifies
  *     (packed into the {AtomicFinalityProof} the {InteropHandler.executeAtomicBundle} consumes).
  *
  * The flow ids:
@@ -61,13 +61,15 @@ export interface IMTLeaf {
 }
 
 /**
- * Mirror of `ImtInclusionProof` in IAtomicInterop.sol. The IMT part (chainImtRoot/leaf/imtLeafIndex/
- * imtProof) is built from the engine; the message-inclusion part (batchNumber/messageIndex/
- * messageProof/messageTxNumberInBatch) authenticates the `(root)` L2->L1 message AND, via the real
- * {MessageHashing._getProofData} parse, carries the settlement-layer block number used for the
- * deadline check (`messageProof` is a format-valid multi-hop proof — see {buildSlProofBytes}).
+ * Mirror of `ImtProof` in IAtomicInterop.sol — used for both inclusion and non-inclusion. The IMT part
+ * (chainImtRoot/leaf/imtLeafIndex/imtProof) is built from the engine; the message-inclusion part
+ * (batchNumber/messageIndex/messageProof/messageTxNumberInBatch) authenticates the `(root)` L2->L1
+ * message AND, via the real {MessageHashing._getProofData} parse, carries the settlement-layer block
+ * number used for the deadline check (`messageProof` is a format-valid multi-hop proof — see
+ * {buildSlProofBytes}). For inclusion `leaf` is the value's own leaf; for non-inclusion it is the
+ * low-nullifier (predecessor) leaf.
  */
-export interface ImtInclusionProof {
+export interface ImtProof {
   sourceChainId: string;
   batchNumber: string;
   chainImtRoot: string;
@@ -76,19 +78,6 @@ export interface ImtInclusionProof {
   messageProof: string[];
   leaf: IMTLeaf;
   imtLeafIndex: number;
-  imtProof: string[];
-}
-
-/** Mirror of `ImtNonInclusionProof` in IAtomicInterop.sol. */
-export interface ImtNonInclusionProof {
-  sourceChainId: string;
-  batchNumber: string;
-  chainImtRoot: string;
-  messageTxNumberInBatch: number;
-  messageIndex: string;
-  messageProof: string[];
-  lowLeaf: IMTLeaf;
-  lowLeafIndex: number;
   imtProof: string[];
 }
 
@@ -309,9 +298,9 @@ function messageProofForSlBlock(slBlock: number): {
 }
 
 /**
- * Build an {ImtInclusionProof} for `value` against `chainId`'s live IMT, carrying a proof whose
- * settlement-layer block number is `slBlock` (must be <= the flow deadline for `requireFlowFinalized`
- * to accept).
+ * Build an {ImtProof} for `value` against `chainId`'s live IMT for INCLUSION (`leaf` is the value's own
+ * leaf), carrying a proof whose settlement-layer block number is `slBlock` (must be <= the flow deadline
+ * for `requireFlowFinalized` to accept).
  */
 export async function buildInclusionProof(params: {
   l2Tree: Contract;
@@ -319,7 +308,7 @@ export async function buildInclusionProof(params: {
   value: string;
   slBlock: number;
   l2BlockTag?: number;
-}): Promise<ImtInclusionProof> {
+}): Promise<ImtProof> {
   const { l2Tree, chainId, value, slBlock, l2BlockTag } = params;
   const imt = await reconstructChainImt(l2Tree, l2BlockTag);
   const idx = findValueIndex(imt.leaves, value);
@@ -342,9 +331,10 @@ export async function buildInclusionProof(params: {
 }
 
 /**
- * Build an {ImtNonInclusionProof} proving `value` is absent from `chainId`'s live IMT, carrying a proof
- * whose settlement-layer block number is `slBlock` (must be > the flow deadline for `authorizeRefund`
- * to accept). O(log n) via the low-nullifier bracket.
+ * Build an {ImtProof} proving `value` is absent from `chainId`'s live IMT for NON-INCLUSION (`leaf` is
+ * the low-nullifier / predecessor leaf), carrying a proof whose settlement-layer block number is
+ * `slBlock` (must be > the flow deadline for `authorizeRefund` to accept). O(log n) via the low-nullifier
+ * bracket.
  */
 export async function buildNonInclusionProof(params: {
   l2Tree: Contract;
@@ -352,7 +342,7 @@ export async function buildNonInclusionProof(params: {
   value: string;
   slBlock: number;
   l2BlockTag?: number;
-}): Promise<ImtNonInclusionProof> {
+}): Promise<ImtProof> {
   const { l2Tree, chainId, value, slBlock, l2BlockTag } = params;
   const imt = await reconstructChainImt(l2Tree, l2BlockTag);
   const lowIndex = findLowNullifierIndex(imt.leaves, value); // throws if value present
@@ -365,8 +355,8 @@ export async function buildNonInclusionProof(params: {
   return {
     sourceChainId: BigNumber.from(chainId).toString(),
     chainImtRoot: imt.root,
-    lowLeaf: imt.leaves[lowIndex],
-    lowLeafIndex: lowIndex,
+    leaf: imt.leaves[lowIndex],
+    imtLeafIndex: lowIndex,
     imtProof: imt.engine.merklePath(lowIndex),
     ...messageProofForSlBlock(slBlock),
   };
@@ -379,8 +369,8 @@ export function leafTuple(l: IMTLeaf): unknown[] {
   return [l.value, l.nextIndex, l.nextValue];
 }
 
-/** ImtInclusionProof tuple in struct field order. */
-export function inclusionProofTuple(p: ImtInclusionProof): unknown[] {
+/** ImtProof tuple in struct field order (same for inclusion and non-inclusion). */
+export function proofTuple(p: ImtProof): unknown[] {
   return [
     p.sourceChainId,
     p.batchNumber,
@@ -390,21 +380,6 @@ export function inclusionProofTuple(p: ImtInclusionProof): unknown[] {
     p.messageProof,
     leafTuple(p.leaf),
     p.imtLeafIndex,
-    p.imtProof,
-  ];
-}
-
-/** ImtNonInclusionProof tuple in struct field order. */
-export function nonInclusionProofTuple(p: ImtNonInclusionProof): unknown[] {
-  return [
-    p.sourceChainId,
-    p.batchNumber,
-    p.chainImtRoot,
-    p.messageTxNumberInBatch,
-    p.messageIndex,
-    p.messageProof,
-    leafTuple(p.lowLeaf),
-    p.lowLeafIndex,
     p.imtProof,
   ];
 }
@@ -420,13 +395,13 @@ export function atomicFinalityProofTuple(params: {
   deadline: number;
   legBundleHashes: string[];
   chainIds: (BigNumber | number | string)[];
-  proofs: ImtInclusionProof[];
+  proofs: ImtProof[];
 }): unknown[] {
   return [
     params.flowId,
     params.deadline,
     params.legBundleHashes,
     params.chainIds.map((c) => BigNumber.from(c)),
-    params.proofs.map(inclusionProofTuple),
+    params.proofs.map(proofTuple),
   ];
 }

@@ -5,7 +5,7 @@ import {IAtomicFlowManager} from "./IAtomicFlowManager.sol";
 import {IL2InteropCommitmentTree} from "./IL2InteropCommitmentTree.sol";
 import {IAtomicRecoverable} from "./IAtomicRecoverable.sol";
 import {AtomicInteropProof} from "./libraries/AtomicInteropProof.sol";
-import {LegState, ImtNonInclusionProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
+import {LegState, ImtProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
 import {InteropDataEncoding} from "../interop/InteropDataEncoding.sol";
 import {
@@ -105,7 +105,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
         uint256[] calldata _chainIds,
         uint64 _deadline,
         uint256 _missingLegIndex,
-        ImtNonInclusionProof calldata _proof
+        ImtProof calldata _proof
     ) external {
         _checkFlowId(_flowId, _legBundleHashes, _chainIds, _deadline);
 

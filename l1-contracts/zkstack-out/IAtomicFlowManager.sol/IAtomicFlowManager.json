@@ -59,7 +59,7 @@
       {
         "name": "_proof",
         "type": "tuple",
-        "internalType": "struct ImtNonInclusionProof",
+        "internalType": "struct ImtProof",
         "components": [
           {
             "name": "sourceChainId",
@@ -92,7 +92,7 @@
             "internalType": "bytes32[]"
           },
           {
-            "name": "lowLeaf",
+            "name": "leaf",
             "type": "tuple",
             "internalType": "struct IMTLeaf",
             "components": [
@@ -114,7 +114,7 @@
             ]
           },
           {
-            "name": "lowLeafIndex",
+            "name": "imtLeafIndex",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -247,7 +247,7 @@
           {
             "name": "proofs",
             "type": "tuple[]",
-            "internalType": "struct ImtInclusionProof[]",
+            "internalType": "struct ImtProof[]",
             "components": [
               {
                 "name": "sourceChainId",

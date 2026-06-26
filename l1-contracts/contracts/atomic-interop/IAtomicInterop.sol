@@ -21,24 +21,32 @@ enum LegState {
     Reverted
 }
 
-/// @notice Inclusion proof that a leg's commit value is present in its source chain's interop IMT
-/// as of a root snapshot that settled no later than the flow deadline (a settlement-layer block
-/// number).
+/// @notice A single IMT proof against a source chain's interop commitment tree, used both ways:
+///   - inclusion ({AtomicInteropProof.verifyInclusion}): `leaf` is the leaf holding the leg's commit
+///     value (`leaf.value == commitValue`), proven present as of a root that settled no later than the
+///     flow deadline;
+///   - non-inclusion ({AtomicInteropProof.verifyNonInclusion}, timeout/refund path): `leaf` is the
+///     low-nullifier (predecessor) leaf that brackets the absent commit value, proven against a root
+///     that settled strictly after the deadline. Because the IMT is append-only, absence in a
+///     post-deadline snapshot implies absence at the deadline, so the leg can no longer finalize.
+///
+/// The two structs were identical in layout, so they are unified; the meaning of `leaf` (the value's
+/// own leaf vs. its predecessor) is fixed by which verify function consumes the proof.
 ///
 /// Authentication has two layers, both resolved against the interop root the verifying chain imported
 /// for `(sourceChainId, batchNumber)`:
 ///   1. The origin {L2InteropCommitmentTree}'s `abi.encode(chainImtRoot)` L2->L1 message (sender
 ///      pinned to the canonical commitment-tree address) is proven included; this authenticates the
 ///      root.
-///   2. `leaf` (with `leaf.value == commitValue`) at `imtLeafIndex` with `imtProof` hashes up to
-///      `chainImtRoot` (delegated to {IndexedMerkleTreeLib.verifyInclusion}).
+///   2. `leaf` at `imtLeafIndex` with `imtProof` hashes up to `chainImtRoot` (delegated to
+///      {IndexedMerkleTreeLib.verifyInclusion} / `verifyNonInclusion`).
 /// The settlement-layer (SL) block number the root settled at is NOT carried as a struct field — that
 /// would be spoofable. It is parsed in-module from `messageProof` (the same multi-hop proof the
 /// verifier checks) via {MessageHashing._getProofData}, so it is bound to the verified
-/// `interopRoots(SL, slBlock)`. The manager then requires `slBlock <= deadline`.
+/// `interopRoots(SL, slBlock)`. The manager then enforces the appropriate `slBlock` vs `deadline` bound.
 /// @dev `batchNumber` is the source chain's top-level batch number passed to the message verifier and
 /// to `_getProofData`.
-struct ImtInclusionProof {
+struct ImtProof {
     uint256 sourceChainId;
     uint256 batchNumber;
     bytes32 chainImtRoot;
@@ -47,27 +55,6 @@ struct ImtInclusionProof {
     bytes32[] messageProof;
     IMTLeaf leaf;
     uint256 imtLeafIndex;
-    bytes32[] imtProof;
-}
-
-/// @notice Non-inclusion proof used on the timeout/refund path. O(log n) thanks to the indexed tree.
-///
-/// Proves the target commit value was absent from its chain's interop IMT as of an authenticated root
-/// whose settlement-layer block number (parsed in-module from `messageProof`) is strictly after the
-/// deadline. Because the IMT is append-only, absence in a post-deadline snapshot implies absence at
-/// the deadline, so the leg can no longer be committed in time and the flow cannot finalize. Same
-/// two-layer authentication as {ImtInclusionProof} (the SL block is likewise derived from the proof,
-/// not a struct field); membership is replaced by the low-nullifier bracket
-/// ({IndexedMerkleTreeLib.verifyNonInclusion}).
-struct ImtNonInclusionProof {
-    uint256 sourceChainId;
-    uint256 batchNumber;
-    bytes32 chainImtRoot;
-    uint16 messageTxNumberInBatch;
-    uint256 messageIndex;
-    bytes32[] messageProof;
-    IMTLeaf lowLeaf;
-    uint256 lowLeafIndex;
     bytes32[] imtProof;
 }
 
@@ -85,7 +72,7 @@ struct AtomicFinalityProof {
     uint64 deadline;
     bytes32[] legBundleHashes;
     uint256[] chainIds;
-    ImtInclusionProof[] proofs;
+    ImtProof[] proofs;
 }
 
 /// @dev Domain tag prepended to the preimage of a commit value so values cannot be confused with

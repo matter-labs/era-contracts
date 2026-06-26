@@ -77,7 +77,7 @@ import {
   commitValue,
   computeFlowId,
   lowNullifierIndexFor,
-  nonInclusionProofTuple,
+  proofTuple,
   reconstructChainImt,
 } from "../../src/helpers/imt-engine-lib";
 
@@ -433,15 +433,9 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     // ── authorizeRefund on A (A is AB's source) -> AB becomes Revertable. ────────────────────
     const managerA = chainA.stack.manager.connect(chainA.user);
     const refundAuth = await (
-      await managerA.authorizeRefund(
-        flowId,
-        legHashesAsc,
-        chainIdsAsc,
-        deadline,
-        missingIdx,
-        nonInclusionProofTuple(nonIncl),
-        { gasLimit: DEFAULT_TX_GAS_LIMIT }
-      )
+      await managerA.authorizeRefund(flowId, legHashesAsc, chainIdsAsc, deadline, missingIdx, proofTuple(nonIncl), {
+        gasLimit: DEFAULT_TX_GAS_LIMIT,
+      })
     ).wait();
     expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Revertable, "AB revertable on A");
     expect(

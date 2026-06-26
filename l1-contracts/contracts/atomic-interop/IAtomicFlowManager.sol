@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
-import {LegState, ImtNonInclusionProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
+import {LegState, ImtProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -58,7 +58,7 @@ interface IAtomicFlowManager {
         uint256[] calldata _chainIds,
         uint64 _deadline,
         uint256 _missingLegIndex,
-        ImtNonInclusionProof calldata _proof
+        ImtProof calldata _proof
     ) external;
 
     /// @notice Recover the burned source funds for a `Revertable` leg by reversing the bundle's

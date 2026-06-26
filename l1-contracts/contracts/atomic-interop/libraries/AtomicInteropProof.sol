@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {IndexedMerkleTreeLib} from "../../common/libraries/IndexedMerkleTree.sol";
-import {ImtInclusionProof, ImtNonInclusionProof, ATOMIC_COMMIT_LEAF_TAG} from "../IAtomicInterop.sol";
+import {ImtProof, ATOMIC_COMMIT_LEAF_TAG} from "../IAtomicInterop.sol";
 import {L2Message, ProofData} from "../../common/Messaging.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
 import {L2_MESSAGE_VERIFICATION} from "../../common/l2-helpers/L2ContractInterfaces.sol";
@@ -51,7 +51,7 @@ library AtomicInteropProof {
     /// @dev The proof is bound to the correct chain by `_commitValue` itself: it bakes in the
     /// chain-specific `bundleHash`, so a leg's commit value can only ever be inserted into its own
     /// source chain's tree — the membership check below therefore can only pass against that chain.
-    function verifyInclusion(ImtInclusionProof calldata _proof, uint256 _commitValue, uint64 _deadline) internal view {
+    function verifyInclusion(ImtProof calldata _proof, uint256 _commitValue, uint64 _deadline) internal view {
         // solhint-disable-next-line func-named-parameters
         (uint256 slBlock, ) = _authenticateRoot(
             _proof.sourceChainId,
@@ -79,11 +79,7 @@ library AtomicInteropProof {
     /// longer be committed in time and the flow cannot finalize.
     /// @dev As in {verifyInclusion}, `_commitValue` is chain-specific (it bakes in the chain-specific
     /// `bundleHash`), so the non-inclusion check is meaningful only against the leg's own source chain.
-    function verifyNonInclusion(
-        ImtNonInclusionProof calldata _proof,
-        uint256 _commitValue,
-        uint64 _deadline
-    ) internal view {
+    function verifyNonInclusion(ImtProof calldata _proof, uint256 _commitValue, uint64 _deadline) internal view {
         // solhint-disable-next-line func-named-parameters
         (uint256 slBlock, ) = _authenticateRoot(
             _proof.sourceChainId,
@@ -99,8 +95,8 @@ library AtomicInteropProof {
         bool absent = IndexedMerkleTreeLib.verifyNonInclusion({
             _root: _proof.chainImtRoot,
             _value: _commitValue,
-            _lowLeaf: _proof.lowLeaf,
-            _lowLeafIndex: _proof.lowLeafIndex,
+            _lowLeaf: _proof.leaf,
+            _lowLeafIndex: _proof.imtLeafIndex,
             _lowLeafProof: _proof.imtProof
         });
         if (!absent) revert ProofNonInclusionFailed(_proof.chainImtRoot, _commitValue);

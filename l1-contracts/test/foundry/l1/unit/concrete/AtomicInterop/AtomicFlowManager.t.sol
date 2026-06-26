@@ -6,12 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {IL2InteropCommitmentTree} from "contracts/atomic-interop/IL2InteropCommitmentTree.sol";
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
-import {
-    LegState,
-    ImtInclusionProof,
-    ImtNonInclusionProof,
-    AtomicFinalityProof
-} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {LegState, ImtProof, AtomicFinalityProof} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 import {
     ManagerNotInteropCenter,
@@ -55,7 +50,7 @@ interface IAssetRouterFinalizeDeposit {
 /// call `requireFlowFinalized`) — those are wired to `address(this)` in `setUp`. The ACL itself is
 /// exercised by separate tests using a manager wired to a different ic/ih.
 ///
-/// Proofs are built from REAL tree state: `chainImtRoot = tree.root()`, `leaf/lowLeaf = tree.leafAt`,
+/// Proofs are built from REAL tree state: `chainImtRoot = tree.root()`, `leaf = tree.leafAt`,
 /// `imtProof = tree.merklePath`. The cross-chain authentication of the `(root)` message —
 /// `proveL2MessageInclusionShared` — is mocked to `true` here (the real root check is out of unit-test
 /// scope; it is exercised end-to-end in the separate anvil-interop suite). The deadline is a
@@ -216,7 +211,7 @@ contract AtomicFlowManagerTest is Test {
 
         AtomicFinalityProof memory finality = _finality(flowId, hAB, hBA, 1500);
         // Drop one proof so proofs.length != legBundleHashes.length.
-        ImtInclusionProof[] memory short = new ImtInclusionProof[](1);
+        ImtProof[] memory short = new ImtProof[](1);
         short[0] = finality.proofs[0];
         finality.proofs = short;
 
@@ -293,7 +288,7 @@ contract AtomicFlowManagerTest is Test {
             deadline: DEADLINE,
             legBundleHashes: new bytes32[](0),
             chainIds: new uint256[](0),
-            proofs: new ImtInclusionProof[](0)
+            proofs: new ImtProof[](0)
         });
 
         vm.expectRevert(abi.encodeWithSelector(ManagerNotInteropHandler.selector, address(this)));
@@ -316,7 +311,7 @@ contract AtomicFlowManagerTest is Test {
 
         // 1. Authorize the refund: non-inclusion of the missing leg against B's tree, with a root that
         //    settled at an SL block (5000) strictly past the deadline.
-        ImtNonInclusionProof memory proof = _nonInclusion(treeB, CHAIN_B, flowId, missingLeg, 5000);
+        ImtProof memory proof = _nonInclusion(treeB, CHAIN_B, flowId, missingLeg, 5000);
         uint256 missingIdx = _missingIdx(hAB, hBA, CHAIN_B);
 
         vm.expectEmit(true, true, false, false);
@@ -367,7 +362,7 @@ contract AtomicFlowManagerTest is Test {
         bytes32 flowId = _flowId(hAB, hBA);
         _appendLeg(managerA, treeA, flowId, hAB);
 
-        ImtNonInclusionProof memory proof = _nonInclusion(treeB, CHAIN_B, flowId, hBA, 5000);
+        ImtProof memory proof = _nonInclusion(treeB, CHAIN_B, flowId, hBA, 5000);
         managerA.authorizeRefund(
             flowId,
             _legHashes(hAB, hBA),
@@ -392,7 +387,7 @@ contract AtomicFlowManagerTest is Test {
         bytes32 missingLeg = _sourceLegOf(CHAIN_B, hAB, hBA);
 
         uint256 earlySlBlock = 1500;
-        ImtNonInclusionProof memory proof = _nonInclusion(treeB, CHAIN_B, flowId, missingLeg, earlySlBlock);
+        ImtProof memory proof = _nonInclusion(treeB, CHAIN_B, flowId, missingLeg, earlySlBlock);
 
         vm.expectRevert(abi.encodeWithSelector(ProofDeadlineNotExceeded.selector, earlySlBlock, DEADLINE));
         managerA.authorizeRefund(
@@ -416,15 +411,15 @@ contract AtomicFlowManagerTest is Test {
         _appendLeg(managerB, treeB, flowId, legB); // legB IS present on B
 
         uint256 legBValue = AtomicInteropTestUtils.commitValue(flowId, legB);
-        ImtNonInclusionProof memory proof = ImtNonInclusionProof({
+        ImtProof memory proof = ImtProof({
             sourceChainId: CHAIN_B,
             batchNumber: DUMMY_BATCH,
             chainImtRoot: treeB.root(),
             messageTxNumberInBatch: DUMMY_TX_IN_BATCH,
             messageIndex: DUMMY_MSG_INDEX,
             messageProof: AtomicInteropTestUtils.slProofBytes(5000, SL_CHAIN_ID), // SL block 5000 > deadline
-            lowLeaf: treeB.leafAt(0), // head leaf does not bracket a present value
-            lowLeafIndex: 0,
+            leaf: treeB.leafAt(0), // head leaf does not bracket a present value
+            imtLeafIndex: 0,
             imtProof: treeB.merklePath(0)
         });
 
@@ -482,7 +477,7 @@ contract AtomicFlowManagerTest is Test {
 
         // A commits; B never commits its leg. Refund A's source leg.
         _appendLeg(managerA, treeA, flowId, sourceLegA);
-        ImtNonInclusionProof memory proof = _nonInclusion(treeB, CHAIN_B, flowId, missingLeg, 5000);
+        ImtProof memory proof = _nonInclusion(treeB, CHAIN_B, flowId, missingLeg, 5000);
         managerA.authorizeRefund(
             flowId,
             _legHashes(hAB, hBA),
@@ -648,7 +643,7 @@ contract AtomicFlowManagerTest is Test {
         uint256 _slBlock
     ) internal view returns (AtomicFinalityProof memory finality) {
         bytes32[] memory hashes = _legHashes(_hAB, _hBA);
-        ImtInclusionProof[] memory proofs = new ImtInclusionProof[](2);
+        ImtProof[] memory proofs = new ImtProof[](2);
         for (uint256 i = 0; i < 2; ++i) {
             proofs[i] = _inclusion(_flowIdLocal, hashes[i], _slBlock);
         }
@@ -674,7 +669,7 @@ contract AtomicFlowManagerTest is Test {
         uint256 _slBlock
     ) internal view returns (AtomicFinalityProof memory finality) {
         bytes32[] memory hashes = _legHashes(_hAB, _hBA);
-        ImtInclusionProof[] memory proofs = new ImtInclusionProof[](2);
+        ImtProof[] memory proofs = new ImtProof[](2);
         for (uint256 i = 0; i < 2; ++i) {
             // Both proofs reference A's tree and the present leg's leaf; only the SL block (> deadline)
             // matters because the deadline guard runs before membership.
@@ -696,7 +691,7 @@ contract AtomicFlowManagerTest is Test {
         bytes32 _flowIdLocal,
         bytes32 _bundleHash,
         uint256 _slBlock
-    ) internal view returns (ImtInclusionProof memory) {
+    ) internal view returns (ImtProof memory) {
         // A leg's bundleHash bakes in its source chain; route the proof to that chain's tree.
         bool isA = _bundleHash == _bundleHashAB();
         L2InteropCommitmentTree tree = isA ? treeA : treeB;
@@ -704,7 +699,7 @@ contract AtomicFlowManagerTest is Test {
         uint256 value = AtomicInteropTestUtils.commitValue(_flowIdLocal, _bundleHash);
         uint256 idx = AtomicInteropTestUtils.indexOfValue(tree, value);
         return
-            ImtInclusionProof({
+            ImtProof({
                 sourceChainId: sourceChainId,
                 batchNumber: DUMMY_BATCH,
                 chainImtRoot: tree.root(),
@@ -724,19 +719,19 @@ contract AtomicFlowManagerTest is Test {
         bytes32 _flowIdLocal,
         bytes32 _bundleHash,
         uint256 _slBlock
-    ) internal view returns (ImtNonInclusionProof memory) {
+    ) internal view returns (ImtProof memory) {
         uint256 value = AtomicInteropTestUtils.commitValue(_flowIdLocal, _bundleHash);
         uint256 lowIdx = AtomicInteropTestUtils.lowNullifierIndex(_tree, value);
         return
-            ImtNonInclusionProof({
+            ImtProof({
                 sourceChainId: _chainId,
                 batchNumber: DUMMY_BATCH,
                 chainImtRoot: _tree.root(),
                 messageTxNumberInBatch: DUMMY_TX_IN_BATCH,
                 messageIndex: DUMMY_MSG_INDEX,
                 messageProof: AtomicInteropTestUtils.slProofBytes(_slBlock, SL_CHAIN_ID),
-                lowLeaf: _tree.leafAt(lowIdx),
-                lowLeafIndex: lowIdx,
+                leaf: _tree.leafAt(lowIdx),
+                imtLeafIndex: lowIdx,
                 imtProof: _tree.merklePath(lowIdx)
             });
     }
