@@ -8,7 +8,6 @@ import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
 import {L2_MESSAGE_VERIFICATION} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {L2_INTEROP_COMMITMENT_TREE_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {
-    ProofChainMismatch,
     ProofRootMessageInclusionFailed,
     ProofMissingSettlementLayerAnchor,
     ProofDeadlineExceeded,
@@ -49,15 +48,10 @@ library AtomicInteropProof {
 
     /// @notice Verifies `_commitValue` is present in `_proof.sourceChainId`'s IMT as of an
     /// authenticated root whose settlement-layer block number is `<= _deadline`.
-    function verifyInclusion(
-        ImtInclusionProof calldata _proof,
-        uint256 _expectedChainId,
-        uint256 _commitValue,
-        uint64 _deadline
-    ) internal view {
-        if (_proof.sourceChainId != _expectedChainId) {
-            revert ProofChainMismatch(_expectedChainId, _proof.sourceChainId);
-        }
+    /// @dev The proof is bound to the correct chain by `_commitValue` itself: it bakes in the
+    /// chain-specific `bundleHash`, so a leg's commit value can only ever be inserted into its own
+    /// source chain's tree — the membership check below therefore can only pass against that chain.
+    function verifyInclusion(ImtInclusionProof calldata _proof, uint256 _commitValue, uint64 _deadline) internal view {
         // solhint-disable-next-line func-named-parameters
         (uint256 slBlock, ) = _authenticateRoot(
             _proof.sourceChainId,
@@ -83,15 +77,13 @@ library AtomicInteropProof {
     /// @notice Verifies `_commitValue` is absent from `_proof.sourceChainId`'s IMT as of an
     /// authenticated root whose settlement-layer block number is `> _deadline` — so the leg can no
     /// longer be committed in time and the flow cannot finalize.
+    /// @dev As in {verifyInclusion}, `_commitValue` is chain-specific (it bakes in the chain-specific
+    /// `bundleHash`), so the non-inclusion check is meaningful only against the leg's own source chain.
     function verifyNonInclusion(
         ImtNonInclusionProof calldata _proof,
-        uint256 _expectedChainId,
         uint256 _commitValue,
         uint64 _deadline
     ) internal view {
-        if (_proof.sourceChainId != _expectedChainId) {
-            revert ProofChainMismatch(_expectedChainId, _proof.sourceChainId);
-        }
         // solhint-disable-next-line func-named-parameters
         (uint256 slBlock, ) = _authenticateRoot(
             _proof.sourceChainId,

@@ -456,7 +456,10 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Reverted, "AB reverted on A");
 
     const aAfterRefund: BigNumber = await chainA.testToken.balanceOf(user);
-    expect(aAfterRefund.toString()).to.equal(aBalanceBefore.toString(), "AB depositor fully recovered the burned tokens");
+    expect(aAfterRefund.toString()).to.equal(
+      aBalanceBefore.toString(),
+      "AB depositor fully recovered the burned tokens"
+    );
 
     expect(
       claim.logs

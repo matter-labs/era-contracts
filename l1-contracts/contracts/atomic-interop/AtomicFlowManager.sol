@@ -105,12 +105,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
         for (uint256 i = 0; i < n; ++i) {
             if (_finality.legBundleHashes[i] == _executingBundleHash) executingIsLeg = true;
             uint256 value = AtomicInteropProof.commitValue(_finality.flowId, _finality.legBundleHashes[i]);
-            AtomicInteropProof.verifyInclusion(
-                _finality.proofs[i],
-                _finality.proofs[i].sourceChainId,
-                value,
-                _finality.deadline
-            );
+            AtomicInteropProof.verifyInclusion(_finality.proofs[i], value, _finality.deadline);
         }
         if (!executingIsLeg) revert ManagerExecutingBundleNotInFlow(_finality.flowId, _executingBundleHash);
     }
@@ -128,7 +123,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
 
         // 1. Prove a leg is absent past the deadline -> the flow can no longer finalize.
         uint256 value = AtomicInteropProof.commitValue(_flowId, _legBundleHashes[_missingLegIndex]);
-        AtomicInteropProof.verifyNonInclusion(_proof, _proof.sourceChainId, value, _deadline);
+        AtomicInteropProof.verifyNonInclusion(_proof, value, _deadline);
 
         // 2. Mark this chain's committed source legs Revertable (legs committed on other chains are not
         //    in this manager's state, so they are skipped).

@@ -577,22 +577,6 @@
   },
   {
     "type": "error",
-    "name": "ProofChainMismatch",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "actual",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "ProofDeadlineExceeded",
     "inputs": [
       {

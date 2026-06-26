@@ -51,12 +51,12 @@ Leg state machine (`LegState`): `Unset -> Committed` (send) `-> Revertable -> Re
 
 ## Contracts
 
-| Contract                       | Layer | Role                                                                                                                                                       |
-| ------------------------------ | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `L2InteropCommitmentTree`      | L2    | Per-chain append-only **Indexed** Merkle Tree (`{value, nextIndex, nextValue}` leaves). `append` is appender-gated (the flow manager); publishes `abi.encode(root)` to L1 on every insert. Built-in at `0x10012`. |
-| `AtomicFlowManager`            | L2    | `append` (from `InteropCenter`), `requireFlowFinalized` (from `InteropHandler`), `authorizeRefund` / `claimRefund` (timeout). Holds per-leg `LegState`. Built-in at `0x10014`. |
-| `libraries/AtomicInteropProof` | L2    | `verifyInclusion` / `verifyNonInclusion`, `commitValue`, and `_authenticateRoot` — authenticates a `chainImtRoot` against the imported interop root and derives the settlement-layer block for the deadline check. |
-| `IL2InteropCommitmentTree`, `IAtomicFlowManager`, `IAtomicInterop`, `AtomicInteropErrors` | L2 | Interfaces, shared structs (`ImtInclusionProof`, `ImtNonInclusionProof`, `AtomicFinalityProof`, `LegState`), and errors. |
+| Contract                                                                                  | Layer | Role                                                                                                                                                                                                               |
+| ----------------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `L2InteropCommitmentTree`                                                                 | L2    | Per-chain append-only **Indexed** Merkle Tree (`{value, nextIndex, nextValue}` leaves). `append` is appender-gated (the flow manager); publishes `abi.encode(root)` to L1 on every insert. Built-in at `0x10012`.  |
+| `AtomicFlowManager`                                                                       | L2    | `append` (from `InteropCenter`), `requireFlowFinalized` (from `InteropHandler`), `authorizeRefund` / `claimRefund` (timeout). Holds per-leg `LegState`. Built-in at `0x10014`.                                     |
+| `libraries/AtomicInteropProof`                                                            | L2    | `verifyInclusion` / `verifyNonInclusion`, `commitValue`, and `_authenticateRoot` — authenticates a `chainImtRoot` against the imported interop root and derives the settlement-layer block for the deadline check. |
+| `IL2InteropCommitmentTree`, `IAtomicFlowManager`, `IAtomicInterop`, `AtomicInteropErrors` | L2    | Interfaces, shared structs (`ImtInclusionProof`, `ImtNonInclusionProof`, `AtomicFinalityProof`, `LegState`), and errors.                                                                                           |
 
 The flow's entry points live outside this directory: `InteropCenter` (`interop/`, `0x1000d`) drives the
 send + `append`; `InteropHandler` (`interop/`, `0x1000e`) drives `executeAtomicBundle`; `L2AssetRouter`
@@ -80,7 +80,7 @@ The two L2 contracts are predeployed in the ZKsync OS genesis (no `Executor` / c
 
 ## Off-chain tooling (`test/anvil-interop/`)
 
-- `src/helpers/imt-engine-lib.ts` / `imt-engine.ts` — the off-chain IMT engine: commit values, the
+- `src/helpers/imt-engine-lib.ts` — the off-chain IMT engine: commit values, the
   low-nullifier index for an insert, and the O(log n) inclusion / non-inclusion proofs (must match
   `IndexedMerkleTreeLib` bit-for-bit).
 - `src/helpers/imt-atomic-deployer.ts` — installs the atomic built-ins (`anvil_setCode`) on the anvil

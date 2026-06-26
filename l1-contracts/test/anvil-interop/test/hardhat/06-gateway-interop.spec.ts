@@ -135,7 +135,9 @@ describe("06 - Gateway Interop (GW-settled chains)", function () {
 
     console.log(`   GWAssetTracker.chainBalance[${sourceChainId}][assetId] before: ${srcGwBalanceBefore}`);
     console.log(`   GWAssetTracker.chainBalance[${targetChainId}][assetId] before: ${dstGwBalanceBefore}`);
-    console.log(`   GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] before: ${dstPendingInteropBefore}`);
+    console.log(
+      `   GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] before: ${dstPendingInteropBefore}`
+    );
 
     // ── Step 1: Process the source chain's interop bundle log on the GW ──
     // This burns the source chain balance and parks the destination amount in
@@ -205,9 +207,7 @@ describe("06 - Gateway Interop (GW-settled chains)", function () {
     const dstGwBalanceAfterConfirm = await getGWChainBalance(gwProvider, targetChainId, assetId);
     const dstPendingInteropAfterConfirm = await getGWPendingInteropBalance(gwProvider, targetChainId, assetId);
 
-    console.log(
-      `   GWAssetTracker.chainBalance[${targetChainId}][assetId] after confirm: ${dstGwBalanceAfterConfirm}`
-    );
+    console.log(`   GWAssetTracker.chainBalance[${targetChainId}][assetId] after confirm: ${dstGwBalanceAfterConfirm}`);
     console.log(
       `   GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] after confirm: ${dstPendingInteropAfterConfirm}`
     );

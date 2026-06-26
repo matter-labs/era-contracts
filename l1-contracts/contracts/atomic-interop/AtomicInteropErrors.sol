@@ -32,8 +32,6 @@ error ManagerExecutingBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
 error ManagerNoRecoverableCalls(bytes32 flowId, bytes32 bundleHash);
 
 // ── AtomicInteropProof library errors ────────────────────────────────────────────────
-/// @dev The proof's `sourceChainId` does not match the leg's source chain.
-error ProofChainMismatch(uint256 expected, uint256 actual);
 /// @dev The commitment tree's `(root)` message could not be proven against the imported interop root
 /// for `(chainId, batchNumber)`.
 error ProofRootMessageInclusionFailed(uint256 chainId, uint256 batchNumber);
