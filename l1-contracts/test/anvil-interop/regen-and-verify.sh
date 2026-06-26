@@ -145,7 +145,7 @@ echo "GW RPC:       $GW_RPC_URL"
 # PUH/Guardians bytecodes. Override via ZK_GOVERNANCE_COMMIT env var; the
 # default points to the v31 governance set on upstream
 # (zksync-association/zk-governance).
-ZK_GOV_COMMIT="${ZK_GOVERNANCE_COMMIT:-7c5e27b}"
+ZK_GOV_COMMIT="${ZK_GOVERNANCE_COMMIT:-cc7c76d}"
 echo "zk-gov commit: $ZK_GOV_COMMIT"
 # 1e30 wei
 FUND_AMOUNT="1000000000000000000000000000000"
