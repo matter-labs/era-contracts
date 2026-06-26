@@ -45,7 +45,8 @@ bundle, so `bundleHash` does not depend on `flowId` (which would be circular).
    `commitValue` is absent from an authenticated root whose settlement-layer block is `> deadline`.
    Since the IMT is append-only, absence after the deadline implies absence at the deadline, so the flow
    can no longer finalize. It marks this chain's `Committed` legs `Revertable`; `claimRefund` then
-   reverses each burn via `L2AssetRouter.recoverAtomicBurn`, re-minting to the original depositor.
+   reverses each burn by asking the call's target to recover itself via `IAtomicRecoverable.recoverAtomicCall`
+   (the `L2AssetRouter` implements it), re-minting to the original depositor.
 
 Leg state machine (`LegState`): `Unset -> Committed` (send) `-> Revertable -> Reverted` (timeout path).
 
@@ -60,8 +61,8 @@ Leg state machine (`LegState`): `Unset -> Committed` (send) `-> Revertable -> Re
 
 The flow's entry points live outside this directory: `InteropCenter` (`interop/`, `0x1000d`) drives the
 send + `append`; `InteropHandler` (`interop/`, `0x1000e`) drives `executeAtomicBundle`; `L2AssetRouter`
-(`bridge/asset-router/`, `0x10003`) does the burn / mint / `recoverAtomicBurn`, recognising the flow
-manager by its canonical address. The underlying IMT data structure is `common/libraries/IndexedMerkleTree.sol`.
+(`bridge/asset-router/`, `0x10003`) does the burn / mint and implements `IAtomicRecoverable.recoverAtomicCall`
+for the timeout recovery, recognising the flow manager by its canonical address. The underlying IMT data structure is `common/libraries/IndexedMerkleTree.sol`.
 
 > Address `0x10013` is intentionally reserved/empty — it formerly held a global-root importer that was
 > removed when atomic interop moved to the interop-root channel.
@@ -73,10 +74,12 @@ The two L2 contracts are predeployed in the ZKsync OS genesis (no `Executor` / c
 - registered in the genesis gen tool (`tools/zksync-os-genesis-gen`) at `0x10012`
   (`L2InteropCommitmentTree`) and `0x10014` (`AtomicFlowManager`) — constants in
   `common/l2-helpers/L2ContractAddresses.sol`;
-- wired during genesis in `L2GenesisForceDeploymentsHelper._initializeV31Contracts` (ZKsync OS only):
-  the commitment tree's appender is set to the flow manager, and the manager is initialized with the
-  tree, asset router, interop center, and interop handler. No asset-router registration step is needed —
-  the AR recognises the manager via its canonical address (`_atomicFlowManagerAddr()`).
+- seeded during genesis in `L2GenesisForceDeploymentsHelper._initializeV31Contracts` (ZKsync OS only):
+  the commitment tree's one-time `initialize()` seeds the IMT. No wiring or registration step is needed —
+  every collaborator is referenced by its canonical fixed address: the tree's appender and the manager's
+  tree / interop center / interop handler are constant getters, and the AR recognises the manager via
+  `_atomicFlowManagerAddr()`. The manager no longer holds an asset-router reference at all — it drives
+  recovery generically through `IAtomicRecoverable` on each bundle call's target.
 
 ## Off-chain tooling (`test/anvil-interop/`)
 

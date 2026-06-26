@@ -18,15 +18,6 @@ interface IL2AssetRouter is IAssetRouterBase, IL2CrossChainSender {
 
     function withdraw(bytes32 _assetId, bytes calldata _transferData) external returns (bytes32);
 
-    /// @notice Reverses an atomic-interop leg's source burn for an expired flow, returning the funds to
-    /// the depositor via the native token vault. Callable only by the canonical atomic-flow manager,
-    /// which gates it on a proven IMT non-inclusion (timeout). The original burn flowed through the
-    /// normal `initiateIndirectCall` path during `InteropCenter.sendBundle`.
-    /// @param _destChainId The destination chain id used at burn time (for chain-balance accounting).
-    /// @param _assetId The asset being recovered.
-    /// @param _recoverData Bridge-mint-formatted data whose receiver is the original depositor.
-    function recoverAtomicBurn(uint256 _destChainId, bytes32 _assetId, bytes calldata _recoverData) external;
-
     function L1_ASSET_ROUTER() external view returns (IL1AssetRouter);
 
     function BASE_TOKEN_ASSET_ID() external view returns (bytes32);

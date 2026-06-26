@@ -130,29 +130,6 @@
   },
   {
     "type": "function",
-    "name": "recoverAtomicBurn",
-    "inputs": [
-      {
-        "name": "_destChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "_recoverData",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "setAssetHandlerAddress",
     "inputs": [
       {

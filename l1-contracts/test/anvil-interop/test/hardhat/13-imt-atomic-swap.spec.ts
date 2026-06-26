@@ -17,7 +17,7 @@
  *           (the destination mint), owning the double-execute guard via `bundleStatus`.
  *   TIMEOUT `AtomicFlowManager.authorizeRefund(...)` (single-root non-inclusion proof for the missing
  *           leg, settled past the deadline) then `claimRefund(flowId, bundleBytes)` recovers the burned
- *           source funds to the depositor via `L2AssetRouter.recoverAtomicBurn`.
+ *           source funds to the depositor via `IAtomicRecoverable.recoverAtomicCall` (implemented by L2AssetRouter).
  *
  * Ids (see contracts/atomic-interop + contracts/interop):
  *   - `bundleHash = keccak256(abi.encode(sourceChainId, abi.encode(InteropBundle)))`. The atomic send

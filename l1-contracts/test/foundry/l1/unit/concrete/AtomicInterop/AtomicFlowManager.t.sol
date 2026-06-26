@@ -32,7 +32,6 @@ import {
 import {InteropBundle, InteropCall, BundleAttributes} from "contracts/common/Messaging.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {
     AtomicInteropTestUtils,
     MockAtomicAssetRouter,
@@ -49,7 +48,7 @@ interface IAssetRouterFinalizeDeposit {
 /// @notice Unit tests for the fund-touchless {AtomicFlowManager}. The manager never custodies funds:
 /// the source burn happens through the
 /// normal interop path during `InteropCenter.sendBundle`; the manager only coordinates cross-chain
-/// atomicity (IMT commit + finality proofs) and the timeout recovery (`recoverAtomicBurn`).
+/// atomicity (IMT commit + finality proofs) and the timeout recovery (`recoverAtomicCall`).
 ///
 /// Two chains (A, B) each run a real {L2InteropCommitmentTree} (IMT engine) and an {AtomicFlowManager}.
 /// The test acts as BOTH the interop center (so it can call `append`) and the interop handler (so it can
@@ -115,8 +114,10 @@ contract AtomicFlowManagerTest is Test {
         ar = new MockAtomicAssetRouter();
         tree.setAppender(address(manager));
         tree.initialize();
-        // ic == ih == this test, so it can drive append / requireFlowFinalized directly.
-        manager.wire(address(tree), address(ar), address(this), address(this));
+        // ic == ih == this test, so it can drive append / requireFlowFinalized directly. The mock AR is
+        // not wired into the manager (the manager drives recovery generically via IAtomicRecoverable on
+        // each bundle call's `to`); it is used as the call target the refund bundles point at.
+        manager.wire(address(tree), address(this), address(this));
     }
 
     // ─────────────────────────────────────────────────────────────────────────────────────
@@ -162,7 +163,7 @@ contract AtomicFlowManagerTest is Test {
         TestL2InteropCommitmentTree otherTree = new TestL2InteropCommitmentTree();
         otherTree.setAppender(address(other));
         otherTree.initialize();
-        other.wire(address(otherTree), address(arA), makeAddr("ic"), makeAddr("ih"));
+        other.wire(address(otherTree), makeAddr("ic"), makeAddr("ih"));
 
         vm.expectRevert(abi.encodeWithSelector(ManagerNotInteropCenter.selector, address(this)));
         other.append(keccak256("f"), keccak256("b"), DEADLINE, 0);
@@ -283,7 +284,7 @@ contract AtomicFlowManagerTest is Test {
         TestL2InteropCommitmentTree otherTree = new TestL2InteropCommitmentTree();
         otherTree.setAppender(address(other));
         otherTree.initialize();
-        other.wire(address(otherTree), address(arA), makeAddr("ic"), makeAddr("ih"));
+        other.wire(address(otherTree), makeAddr("ic"), makeAddr("ih"));
 
         // The ACL modifier runs before any flowId / proof checks, so an empty finality struct suffices
         // (no real tree state is needed to exercise the handler gate).
@@ -323,25 +324,21 @@ contract AtomicFlowManagerTest is Test {
         managerA.authorizeRefund(flowId, _legHashes(hAB, hBA), _chainIds(), DEADLINE, missingIdx, proof);
         assertTrue(managerA.legState(flowId, sourceLegA) == LegState.Revertable, "source leg revertable on A");
 
-        // 2. Claim the refund: decode the real AB bundle and recover the burn to the depositor.
+        // 2. Claim the refund: the manager forwards each bundle call to its target via recoverAtomicCall.
         bytes memory bundleBytes = _abBundleBytes();
 
         vm.expectEmit(true, true, false, false);
         emit IAtomicFlowManager.FlowRefunded(flowId, sourceLegA);
         managerA.claimRefund(flowId, bundleBytes);
 
-        assertEq(arA.recoverCount(), 1, "recoverAtomicBurn routed once");
-        assertEq(arA.lastChainId(), CHAIN_B, "recover references the AB bundle's destination chain B");
-        assertEq(arA.lastAssetId(), ASSET_ID, "recover references the burned asset id");
+        assertEq(arA.recoverCount(), 1, "recovery routed to the call's target once");
+        assertEq(arA.lastDestChainId(), CHAIN_B, "recover references the AB bundle's destination chain B");
         assertTrue(managerA.legState(flowId, sourceLegA) == LegState.Reverted, "source leg reverted on A");
 
-        // The re-mint must target the depositor (alice) as both originalCaller and remoteReceiver.
-        (address recvCaller, address recvReceiver, , uint256 recvAmount, ) = DataEncoding.decodeBridgeMintData(
-            arA.lastRecoverData()
-        );
-        assertEq(recvCaller, alice, "recover re-mints to depositor (caller)");
-        assertEq(recvReceiver, alice, "recover re-mints to depositor (receiver)");
-        assertEq(recvAmount, AMOUNT, "recover preserves amount");
+        // The manager forwards the bundle call's (destChainId, data) verbatim to its `to`; the AR owns
+        // the finalizeDeposit decode + depositor-swap, exercised end-to-end in the anvil-interop suite.
+        InteropCall[] memory expectedCalls = _arFinalizeCall(address(arA), CHAIN_A, alice, bob);
+        assertEq(arA.lastCallData(), expectedCalls[0].data, "manager forwards the bundle call's data to its target");
     }
 
     function test_claimRefund_revertsWhenNotRevertable() public {
@@ -360,10 +357,10 @@ contract AtomicFlowManagerTest is Test {
     }
 
     function test_claimRefund_revertsWhenNoRecoverableCalls() public {
-        // A Revertable leg whose bundle carries no asset-router finalizeDeposit call has nothing to
-        // recover -> ManagerNoRecoverableCalls.
+        // A Revertable leg whose bundle calls all report "nothing recovered" -> ManagerNoRecoverableCalls.
+        arA.setWillRecover(false);
         bytes32 hBA = _bundleHashBA();
-        bytes memory emptyBundleBytes = _bundleBytes(CHAIN_A, CHAIN_B, _noArCalls());
+        bytes memory emptyBundleBytes = _bundleBytes(CHAIN_A, CHAIN_B, _nonRecoverableCalls(address(arA)));
         bytes32 emptyHash = InteropDataEncoding.encodeInteropBundleHash(CHAIN_A, emptyBundleBytes);
         // Use the empty bundle's hash as the AB-leg hash so authorize marks exactly it Revertable.
         bytes32 hAB = emptyHash;
@@ -523,15 +520,15 @@ contract AtomicFlowManagerTest is Test {
         return InteropDataEncoding.encodeInteropBundleHash(CHAIN_B, _baBundleBytes());
     }
 
-    /// @dev The AB leg's ABI-encoded bundle: a single asset-router finalizeDeposit call (the destination
-    /// mint embedded by `initiateIndirectCall`), so claimRefund can reverse it via recoverAtomicBurn.
+    /// @dev The AB leg's ABI-encoded bundle: a single finalizeDeposit call (the destination mint embedded
+    /// by `initiateIndirectCall`) targeting arA, so claimRefund forwards it to arA via recoverAtomicCall.
     function _abBundleBytes() internal view returns (bytes memory) {
-        return _bundleBytes(CHAIN_A, CHAIN_B, _arFinalizeCall(CHAIN_A, alice, bob));
+        return _bundleBytes(CHAIN_A, CHAIN_B, _arFinalizeCall(address(arA), CHAIN_A, alice, bob));
     }
 
     /// @dev The BA leg's bundle (mirror of AB). Its contents only matter for hash distinctness here.
     function _baBundleBytes() internal view returns (bytes memory) {
-        return _bundleBytes(CHAIN_B, CHAIN_A, _arFinalizeCall(CHAIN_B, bob, alice));
+        return _bundleBytes(CHAIN_B, CHAIN_A, _arFinalizeCall(address(arB), CHAIN_B, bob, alice));
     }
 
     /// @dev Build an InteropBundle's ABI bytes from source/destination chain ids and a calls array.
@@ -552,10 +549,11 @@ contract AtomicFlowManagerTest is Test {
         return abi.encode(bundle);
     }
 
-    /// @dev A single-element calls array carrying the asset-router `finalizeDeposit(srcChainId, assetId,
-    /// bridgeMintData)` call the manager recognises and reverses. The mint data encodes the depositor as
+    /// @dev A single-element calls array carrying a `finalizeDeposit(srcChainId, assetId, bridgeMintData)`
+    /// call targeting `_to` (the recoverable target). The mint data encodes the depositor as
     /// originalCaller and the recipient as remoteReceiver.
     function _arFinalizeCall(
+        address _to,
         uint256 _srcChainId,
         address _depositor,
         address _recipient
@@ -577,22 +575,23 @@ contract AtomicFlowManagerTest is Test {
         calls[0] = InteropCall({
             version: bytes1(0x01),
             shadowAccount: false,
-            to: L2_ASSET_ROUTER_ADDR,
+            to: _to,
             from: _depositor,
             value: 0,
             data: data
         });
     }
 
-    /// @dev A calls array with a single non-asset-router call -> nothing recoverable.
-    function _noArCalls() internal pure returns (InteropCall[] memory calls) {
-        address stranger = address(0xBEEF);
+    /// @dev A single-element calls array whose target is `_to` (an IAtomicRecoverable) but whose data is
+    /// not a recoverable call — used (with the mock set to `willRecover = false`) to drive the
+    /// "nothing recovered" path.
+    function _nonRecoverableCalls(address _to) internal pure returns (InteropCall[] memory calls) {
         calls = new InteropCall[](1);
         calls[0] = InteropCall({
             version: bytes1(0x01),
             shadowAccount: false,
-            to: stranger,
-            from: stranger,
+            to: _to,
+            from: _to,
             value: 0,
             data: hex"deadbeef"
         });

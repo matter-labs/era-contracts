@@ -29,19 +29,6 @@
   },
   {
     "type": "function",
-    "name": "assetRouter",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "authorizeRefund",
     "inputs": [
       {

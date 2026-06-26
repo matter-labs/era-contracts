@@ -472,7 +472,7 @@
   },
   {
     "type": "function",
-    "name": "recoverAtomicBurn",
+    "name": "recoverAtomicCall",
     "inputs": [
       {
         "name": "_destChainId",
@@ -480,17 +480,18 @@
         "internalType": "uint256"
       },
       {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "_recoverData",
+        "name": "_callData",
         "type": "bytes",
         "internalType": "bytes"
       }
     ],
-    "outputs": [],
+    "outputs": [
+      {
+        "name": "recovered",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
     "stateMutability": "nonpayable"
   },
   {

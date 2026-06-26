@@ -20,7 +20,8 @@ import {LegState, ImtNonInclusionProof, AtomicFinalityProof} from "./IAtomicInte
 ///      the deadline. The handler then executes the bundle (and owns the double-execute guard).
 ///   3. `authorizeRefund` / `claimRefund` — the timeout path: prove (O(log n) non-inclusion) that a leg
 ///      can no longer be committed in time, then **recover** the burned source funds to the depositor
-///      by reversing the bundle's asset-router calls via `L2AssetRouter.recoverAtomicBurn`.
+///      by asking each of the bundle's call targets to reverse itself via
+///      {IAtomicRecoverable.recoverAtomicCall}.
 ///
 /// `flowId = keccak256(abi.encode(sortedBundleHashes, sortedChainIds, deadline))`,
 /// `bundleHash = keccak256(abi.encode(sourceChainId, interopBundleBytes))`; both arrays strictly
@@ -71,9 +72,6 @@ interface IAtomicFlowManager {
 
     /// @notice The interop commitment tree this manager inserts into.
     function commitmentTree() external view returns (address);
-
-    /// @notice The L2 asset router used for recovery.
-    function assetRouter() external view returns (address);
 
     /// @notice The interop center authorized to call `append`.
     function interopCenter() external view returns (address);

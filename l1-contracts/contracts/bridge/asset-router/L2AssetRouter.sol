@@ -18,6 +18,7 @@ import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
 import {InteropCallStarter} from "../../common/Messaging.sol";
+import {IAtomicRecoverable} from "../../atomic-interop/IAtomicRecoverable.sol";
 import {
     L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_BRIDGEHUB_ADDR,
@@ -47,7 +48,7 @@ import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol"
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
-contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC7786Recipient {
+contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC7786Recipient, IAtomicRecoverable {
     /// @dev Deprecated: previously stored the L2 Bridgehub. Now the address is resolved via
     /// `_bridgehub()` → `L2_BRIDGEHUB_ADDR` constant. Kept as an empty slot to preserve storage layout.
     IL2Bridgehub private __DEPRECATED_BRIDGE_HUB;
@@ -98,7 +99,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     }
 
     /// @notice Returns the canonical atomic-flow manager address — the contract whitelisted to call
-    /// `recoverAtomicBurn` (the IMT atomic flow's timeout recovery path). It is a genesis-deployed
+    /// `recoverAtomicCall` (the IMT atomic flow's timeout recovery path). It is a genesis-deployed
     /// built-in at a fixed address, like the interop center / handler above; chains without the
     /// atomic-flow stack simply have nothing deployed there, so the auth gate never passes. Virtual
     /// for private interop override.
@@ -161,7 +162,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     }
 
     /// @notice Checks that the message sender is the canonical atomic-flow manager, which drives
-    /// `recoverAtomicBurn` for the L1-free atomic interop flow's timeout path. On chains without the
+    /// `recoverAtomicCall` for the L1-free atomic interop flow's timeout path. On chains without the
     /// atomic-flow stack nothing is deployed at that address, so this gate naturally never passes.
     modifier onlyAtomicFlowManager() {
         require(msg.sender == _atomicFlowManagerAddr(), Unauthorized(msg.sender));
@@ -333,13 +334,34 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         emit DepositFinalizedAssetRouter(_originChainId, _assetId, _transferData);
     }
 
-    /// @inheritdoc IL2AssetRouter
-    function recoverAtomicBurn(
+    /// @inheritdoc IAtomicRecoverable
+    /// @dev Recovers the burn embedded in an atomic-bundle `finalizeDeposit(chainId, assetId, transferData)`
+    /// call: re-credits the burned asset to the original depositor (the burn's `originalCaller`) on the
+    /// burn's destination chain, swapping the receiver to the depositor. Returns `false` for any other
+    /// call so the {AtomicFlowManager} can skip non-recoverable bundle calls without reverting.
+    function recoverAtomicCall(
         uint256 _destChainId,
-        bytes32 _assetId,
-        bytes calldata _recoverData
-    ) external onlyAtomicFlowManager nonReentrant {
-        IL2NativeTokenVault(_nativeTokenVaultAddr()).bridgeRecoverFailedTransfer(_destChainId, _assetId, _recoverData);
+        bytes calldata _callData
+    ) external onlyAtomicFlowManager nonReentrant returns (bool recovered) {
+        if (_callData.length < 4 || bytes4(_callData[:4]) != AssetRouterBase.finalizeDeposit.selector) {
+            return false;
+        }
+
+        // Decode finalizeDeposit(sourceChainId, assetId, bridgeMintData); the source chain id is unused.
+        // slither-disable-next-line unused-return
+        (, bytes32 assetId, bytes memory mintData) = abi.decode(_callData[4:], (uint256, bytes32, bytes));
+        // slither-disable-next-line unused-return
+        (address depositor, , address originToken, uint256 amount, bytes memory erc20Metadata) = DataEncoding
+            .decodeBridgeMintData(mintData);
+        bytes memory recoverData = DataEncoding.encodeBridgeMintData({
+            _originalCaller: depositor,
+            _remoteReceiver: depositor,
+            _originToken: originToken,
+            _amount: amount,
+            _erc20Metadata: erc20Metadata
+        });
+        IL2NativeTokenVault(_nativeTokenVaultAddr()).bridgeRecoverFailedTransfer(_destChainId, assetId, recoverData);
+        return true;
     }
 
     /// @inheritdoc IL2CrossChainSender

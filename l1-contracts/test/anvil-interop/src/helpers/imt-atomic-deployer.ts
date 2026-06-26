@@ -14,7 +14,7 @@
  * Unlike the removed escrow-direct flow, the manager is fund-touchless: the source-side burn happens
  * through the normal interop path ({InteropCenter.sendBundle} -> {L2AssetRouter.initiateIndirectCall}),
  * and the destination mint is driven by {InteropHandler.executeAtomicBundle}. The manager only appends
- * commit values to the IMT (`append`, called by the InteropCenter) and drives `recoverAtomicBurn` on
+ * commit values to the IMT (`append`, called by the InteropCenter) and drives `recoverAtomicCall` on
  * the timeout path.
  *
  * Contracts are installed at their canonical addresses via `anvil_setCode` (the established harness
@@ -113,19 +113,19 @@ export async function deployAtomicStack(args: {
   // 3. Refresh the L2AssetRouter runtime code if it predates the atomic-flow additions.
   //
   // The pre-generated chain states were dumped before the AR's atomic-flow additions
-  // (`recoverAtomicBurn`, plus auth that recognises the canonical AtomicFlowManager at
+  // (`recoverAtomicCall`, plus auth that recognises the canonical AtomicFlowManager at
   // `L2_ATOMIC_FLOW_MANAGER_ADDR`), so refresh the AR's runtime code in place to the freshly-built
   // bytecode. This is a CODE upgrade only — the AR's storage is preserved, and the atomic-flow auth
   // keys off a fixed address (`_atomicFlowManagerAddr()`) rather than storage, so nothing needs wiring.
   // Same `anvil_setCode` built-in-install pattern the harness uses elsewhere. Selectors are computed
   // from the literal signatures (not via a loaded ABI): the committed zkstack-out ABIs can lag the
   // freshly-rebuilt contracts, so signature-derived selectors are the reliable probe.
-  if (!(await hasSelector(provider, assetRouter, selectorOf("recoverAtomicBurn(uint256,bytes32,bytes)")))) {
+  if (!(await hasSelector(provider, assetRouter, selectorOf("recoverAtomicCall(uint256,bytes)")))) {
     await provider.send("anvil_setCode", [assetRouter, getBytecode("L2AssetRouter")]);
   }
 
   // Likewise, refresh the L2NativeTokenVault if it predates `bridgeRecoverFailedTransfer` (the refund
-  // path the manager drives via `recoverAtomicBurn`). Code-only upgrade: the recover path reuses the
+  // path the manager drives via `recoverAtomicCall`). Code-only upgrade: the recover path reuses the
   // existing NTV storage (bridgedTokenBeacon / originChainId / tokenAddress / chainBalance), which is
   // identical between the standard and dev variants, so no slot is overwritten. We install the
   // `L2NativeTokenVaultDev` runtime — the variant the anvil harness deploys — because its
@@ -154,7 +154,7 @@ async function hasSelector(provider: providers.JsonRpcProvider, address: string,
   return code.includes(selector.slice(2).toLowerCase());
 }
 
-/** 4-byte function selector for a canonical signature string, e.g. `selectorOf("recoverAtomicBurn(uint256,bytes32,bytes)")`. */
+/** 4-byte function selector for a canonical signature string, e.g. `selectorOf("recoverAtomicCall(uint256,bytes)")`. */
 function selectorOf(signature: string): string {
   return ethers.utils.id(signature).slice(0, 10);
 }

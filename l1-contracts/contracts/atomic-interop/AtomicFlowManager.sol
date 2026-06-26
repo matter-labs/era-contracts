@@ -3,14 +3,12 @@ pragma solidity 0.8.28;
 
 import {IAtomicFlowManager} from "./IAtomicFlowManager.sol";
 import {IL2InteropCommitmentTree} from "./IL2InteropCommitmentTree.sol";
+import {IAtomicRecoverable} from "./IAtomicRecoverable.sol";
 import {AtomicInteropProof} from "./libraries/AtomicInteropProof.sol";
 import {LegState, ImtNonInclusionProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
-import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
 import {InteropDataEncoding} from "../interop/InteropDataEncoding.sol";
 import {
-    L2_ASSET_ROUTER_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_INTEROP_HANDLER_ADDR
@@ -28,12 +26,6 @@ import {
     ManagerNoRecoverableCalls
 } from "./AtomicInteropErrors.sol";
 
-/// @dev Local view of `AssetRouterBase.finalizeDeposit` (declared on the base, not the interface) so
-/// the manager can recognise and decode the destination mint call embedded in a bundle.
-interface IAssetRouterFinalizeDeposit {
-    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) external payable;
-}
-
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice See {IAtomicFlowManager}. Fund-touchless coordinator for the L1-free atomic interop flow.
@@ -44,18 +36,14 @@ interface IAssetRouterFinalizeDeposit {
 /// Receive: {InteropHandler.executeAtomicBundle} calls {requireFlowFinalized} (the atomicity gate) in
 /// place of the L1-message inclusion proof, then executes the bundle (and owns the replay guard).
 /// Timeout: {authorizeRefund} + {claimRefund} recover the burned source funds to the depositor by
-/// reversing the bundle's asset-router calls via `L2AssetRouter.recoverAtomicBurn`.
+/// asking each of the bundle's call targets to reverse itself via {IAtomicRecoverable.recoverAtomicCall}.
 ///
 /// Mutual exclusivity (no double-spend): an `executeAtomicBundle` requires every leg present in a root
 /// settled at SL block `<= deadline`, while a `claimRefund` requires some leg absent in a root settled
 /// at SL block `> deadline`. Because the per-chain IMTs are append-only, those cannot both hold.
 contract AtomicFlowManager is IAtomicFlowManager {
-    /// @dev `finalizeDeposit(uint256,bytes32,bytes)` — the selector of the destination mint call that
-    /// `initiateIndirectCall` embeds in an interop bundle (see `AssetRouterBase.getDepositCalldata`).
-    bytes4 internal constant FINALIZE_DEPOSIT_SELECTOR = IAssetRouterFinalizeDeposit.finalizeDeposit.selector;
-
     /// @dev (flowId, bundleHash) => source-leg state on this chain. All collaborators
-    /// (commitment tree, asset router, interop center, interop handler) are genesis-deployed built-ins
+    /// (commitment tree, interop center, interop handler) are genesis-deployed built-ins
     /// at canonical fixed addresses, so they are referenced as constants rather than stored/initialized.
     mapping(bytes32 flowId => mapping(bytes32 bundleHash => LegState)) internal _state;
 
@@ -162,11 +150,6 @@ contract AtomicFlowManager is IAtomicFlowManager {
     }
 
     /// @inheritdoc IAtomicFlowManager
-    function assetRouter() public view virtual returns (address) {
-        return L2_ASSET_ROUTER_ADDR;
-    }
-
-    /// @inheritdoc IAtomicFlowManager
     function interopCenter() public view virtual returns (address) {
         return L2_INTEROP_CENTER_ADDR;
     }
@@ -176,62 +159,22 @@ contract AtomicFlowManager is IAtomicFlowManager {
         return L2_INTEROP_HANDLER_ADDR;
     }
 
-    /// @dev Reverses every asset-router burn embedded in `_bundle`, re-minting each asset to its
-    /// depositor (the burn's `originalCaller`). Each destination mint call the source bundle carries
-    /// was `finalizeDeposit(sourceChainId, assetId, bridgeMintData)`; we recover the same
-    /// `(assetId, amount)` against the burn's destination chain via `recoverAtomicBurn`, swapping the
-    /// receiver to the depositor. Reverts if the bundle carries no such call.
-    // TODO(atomic-interop): clean this up. It reaches into the asset-router's deposit wire format —
-    // sniffing the `finalizeDeposit` selector via inline assembly, hand-stripping the selector
-    // byte-by-byte (`_decodeFinalizeDeposit`), and re-decoding/re-encoding `bridgeMintData` just to swap
-    // the receiver to the depositor. This duplicates AR encoding knowledge and is fragile to layout
-    // changes. The recovery-data construction should live in (or be delegated to) the asset router.
+    /// @dev Reverses every recoverable call embedded in `_bundle`, re-crediting the original depositor.
+    /// Each call's target (`InteropCall.to`) owns its own reversal via {IAtomicRecoverable.recoverAtomicCall}:
+    /// the manager is agnostic to the call/encoding format and simply forwards `(destinationChainId, data)`
+    /// to every target, counting the ones that report a recovery. Reverts if the bundle carries no
+    /// recoverable call. Targets must return `false` (not revert) for calls they do not recognise.
     function _recoverBundle(bytes32 _flowId, bytes32 _bundleHash, InteropBundle memory _bundle) internal {
         uint256 destChainId = _bundle.destinationChainId;
         uint256 callsLen = _bundle.calls.length;
         uint256 recovered = 0;
         for (uint256 i = 0; i < callsLen; ++i) {
             InteropCall memory c = _bundle.calls[i];
-            if (c.to != L2_ASSET_ROUTER_ADDR) continue;
-            bytes memory cd = c.data;
-            if (cd.length < 4) continue;
-            bytes4 selector;
-            // solhint-disable-next-line no-inline-assembly
-            assembly {
-                selector := mload(add(cd, 0x20))
+            if (IAtomicRecoverable(c.to).recoverAtomicCall(destChainId, c.data)) {
+                ++recovered;
             }
-            if (selector != FINALIZE_DEPOSIT_SELECTOR) continue;
-
-            // Decode finalizeDeposit(sourceChainId, assetId, bridgeMintData) and re-mint to depositor.
-            (bytes32 assetId, bytes memory mintData) = _decodeFinalizeDeposit(cd);
-            // slither-disable-next-line unused-return
-            (address depositor, , address originToken, uint256 amount, bytes memory erc20Metadata) = DataEncoding
-                .decodeBridgeMintData(mintData);
-            bytes memory recoverData = DataEncoding.encodeBridgeMintData({
-                _originalCaller: depositor,
-                _remoteReceiver: depositor,
-                _originToken: originToken,
-                _amount: amount,
-                _erc20Metadata: erc20Metadata
-            });
-            IL2AssetRouter(assetRouter()).recoverAtomicBurn(destChainId, assetId, recoverData);
-            ++recovered;
         }
         if (recovered == 0) revert ManagerNoRecoverableCalls(_flowId, _bundleHash);
-    }
-
-    /// @dev Strips the 4-byte selector from a `finalizeDeposit(uint256,bytes32,bytes)` calldata blob and
-    /// returns `(assetId, bridgeMintData)`. The source chain id (first arg) is not needed for recovery.
-    function _decodeFinalizeDeposit(
-        bytes memory _callData
-    ) private pure returns (bytes32 assetId, bytes memory mintData) {
-        uint256 argsLen = _callData.length - 4;
-        bytes memory args = new bytes(argsLen);
-        for (uint256 i = 0; i < argsLen; ++i) {
-            args[i] = _callData[i + 4];
-        }
-        // slither-disable-next-line unused-return
-        (, assetId, mintData) = abi.decode(args, (uint256, bytes32, bytes));
     }
 
     /// @dev Recomputes `flowId` and asserts it matches, enforcing strictly-ascending `_legBundleHashes`

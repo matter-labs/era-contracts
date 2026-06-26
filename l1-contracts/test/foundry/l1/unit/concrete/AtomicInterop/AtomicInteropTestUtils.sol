@@ -8,6 +8,7 @@ import {ATOMIC_COMMIT_LEAF_TAG} from "contracts/atomic-interop/IAtomicInterop.so
 import {IL2InteropCommitmentTree} from "contracts/atomic-interop/IL2InteropCommitmentTree.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
+import {IAtomicRecoverable} from "contracts/atomic-interop/IAtomicRecoverable.sol";
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
@@ -27,24 +28,30 @@ contract MockMessenger {
     }
 }
 
-/// @notice Minimal asset-router stand-in that records the recover call the manager makes on the refund
-/// path, so tests can assert the manager's orchestration without the full AR/NTV stack (the asset
-/// movement itself is the AR/NTV's concern, exercised in the heavier anvil-interop suite).
+/// @notice Minimal {IAtomicRecoverable} stand-in that records the recover call the manager forwards on
+/// the refund path, so tests can assert the manager's orchestration (it forwards each bundle call's
+/// `(destChainId, data)` to the call's target) without the full AR/NTV stack — the actual asset
+/// movement / depositor-swap is the AR's concern, exercised in the heavier anvil-interop suite.
 ///
-/// The fund-touchless {AtomicFlowManager} only ever drives `recoverAtomicBurn` (the source burn happens
-/// through the normal interop path during `sendBundle`, and the destination mint is driven by the
-/// {InteropHandler}); this mock therefore exposes only that one entrypoint.
-contract MockAtomicAssetRouter {
+/// `willRecover` controls the returned `recovered` flag so tests can model both a recoverable target
+/// (true) and a target that recognises nothing to recover (false).
+contract MockAtomicAssetRouter is IAtomicRecoverable {
     uint256 public recoverCount;
-    uint256 public lastChainId;
-    bytes32 public lastAssetId;
-    bytes public lastRecoverData;
+    uint256 public lastDestChainId;
+    bytes public lastCallData;
+    bool internal _willRecover = true;
 
-    function recoverAtomicBurn(uint256 _destChainId, bytes32 _assetId, bytes calldata _recoverData) external {
-        ++recoverCount;
-        lastChainId = _destChainId;
-        lastAssetId = _assetId;
-        lastRecoverData = _recoverData;
+    function setWillRecover(bool _v) external {
+        _willRecover = _v;
+    }
+
+    function recoverAtomicCall(uint256 _destChainId, bytes calldata _callData) external returns (bool recovered) {
+        lastDestChainId = _destChainId;
+        lastCallData = _callData;
+        recovered = _willRecover;
+        if (recovered) {
+            ++recoverCount;
+        }
     }
 }
 
@@ -64,27 +71,21 @@ contract TestL2InteropCommitmentTree is L2InteropCommitmentTree {
 }
 
 /// @notice Test-only subclass that overrides the manager's canonical collaborator getters so a unit
-/// test can wire its own tree / asset router and act as the interop center + handler. Production
-/// returns the fixed built-in addresses; these overrides let tests deploy multiple independent stacks.
+/// test can wire its own tree and act as the interop center + handler. Production returns the fixed
+/// built-in addresses; these overrides let tests deploy multiple independent stacks.
 contract TestAtomicFlowManager is AtomicFlowManager {
     address private _treeOverride;
-    address private _assetRouterOverride;
     address private _interopCenterOverride;
     address private _interopHandlerOverride;
 
-    function wire(address _tree, address _ar, address _ic, address _ih) external {
+    function wire(address _tree, address _ic, address _ih) external {
         _treeOverride = _tree;
-        _assetRouterOverride = _ar;
         _interopCenterOverride = _ic;
         _interopHandlerOverride = _ih;
     }
 
     function commitmentTree() public view override returns (address) {
         return _treeOverride;
-    }
-
-    function assetRouter() public view override returns (address) {
-        return _assetRouterOverride;
     }
 
     function interopCenter() public view override returns (address) {
