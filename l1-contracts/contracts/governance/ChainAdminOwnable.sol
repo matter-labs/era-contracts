@@ -16,7 +16,8 @@ import {NoCallsProvided, Unauthorized, ZeroAddress} from "../common/L1ContractEr
 contract ChainAdminOwnable is IChainAdminOwnable, Ownable2Step {
     /// @dev Deprecated: the expected upgrade timestamp is now tracked by the `ServerNotifier` contract.
     /// @dev Kept (renamed, no longer written) to preserve the storage layout. Must not be used.
-    mapping(uint256 protocolVersion => uint256 upgradeTimestamp) internal __DEPRECATED_protocolVersionToUpgradeTimestamp;
+    mapping(uint256 protocolVersion => uint256 upgradeTimestamp)
+        internal __DEPRECATED_protocolVersionToUpgradeTimestamp;
 
     /// @notice The address which can call `setTokenMultiplier` function to change the base token gas price in the Chain contract.
     /// @dev The token base price can be changed quite often, so the private key for this role is supposed to be stored in the node
