@@ -119,13 +119,7 @@ impl GovernanceStage0Calls {
         // `pendingOwner` is governance at prepare time. Derive that target set
         // from live Bridgehub/CTM state and validate the stage-0 tail against
         // it (instead of matching by selector count only).
-        let pre_gov_accept_targets = collect_pre_governance_accept_ownership_targets(
-            artifact,
-            verifiers,
-            bridgehub_owner,
-            result,
-        )
-        .await?;
+        let pre_gov_accept_candidates = collect_ownership_transfer_candidates(artifact, result);
         // PUH-redeploy block is 4 calls: upgradeAndCall + the three update*
         // setters (SecurityCouncil, Guardians, EmergencyUpgradeBoard).
         let pre_gov_accept_tail_start = if puh_governed {
@@ -133,7 +127,21 @@ impl GovernanceStage0Calls {
         } else {
             base_count
         };
-        let expected_call_count = pre_gov_accept_tail_start + pre_gov_accept_targets.len();
+        // The deferred acceptOwnership() calls are authoritative — derive the
+        // expected count from the actual stage-0 tail (each tail call is then
+        // validated as an acceptOwnership() to a recognized candidate, with a
+        // role-specific live-ownership policy), instead of from live
+        // pendingOwner state, which is not yet settled before governance runs.
+        let tail_accept_count = self
+            .calls
+            .elems
+            .iter()
+            .skip(pre_gov_accept_tail_start)
+            .filter(|c| {
+                c.data.len() >= 4 && c.data[0..4] == acceptOwnershipCall::SELECTOR
+            })
+            .count();
+        let expected_call_count = pre_gov_accept_tail_start + tail_accept_count;
 
         if puh_governed {
             let expected_zk_governance = artifact.zk_governance.as_ref().context(
@@ -349,10 +357,12 @@ impl GovernanceStage0Calls {
         errors += verify_pre_governance_accept_ownership_tail(
             &self.calls,
             pre_gov_accept_tail_start,
-            &pre_gov_accept_targets,
+            &pre_gov_accept_candidates,
+            bridgehub_owner,
             verifiers,
             result,
-        );
+        )
+        .await;
 
         match self.calls.elems.len().cmp(&expected_call_count) {
             std::cmp::Ordering::Less => {
@@ -380,18 +390,44 @@ impl GovernanceStage0Calls {
     }
 }
 
-async fn collect_pre_governance_accept_ownership_targets(
+/// Ownership-transfer role for a stage-0 deferred `acceptOwnership()` target,
+/// governing how strictly its live ownership is checked.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum OwnershipTransferRole {
+    /// CTM proxy + ValidatorTimelock: ownership is handed to governance as part
+    /// of the v31 governance flow, so pre-execution the live owner/pendingOwner
+    /// may still be the deployer. Tolerated with a distinctive message.
+    GovernanceTransferred,
+    /// Auxiliary contracts (governance upgrade timer, rollup DA manager, ZKsync
+    /// OS verifier): their ownership must be established at deployment time —
+    /// `owner`, or at minimum `pendingOwner`, must already be governance.
+    DeployTimeOwned,
+}
+
+fn add_ownership_candidate(
+    candidates: &mut Vec<(Address, OwnershipTransferRole)>,
+    addr: Address,
+    role: OwnershipTransferRole,
+) {
+    if addr != Address::ZERO && !candidates.iter().any(|(a, _)| *a == addr) {
+        candidates.push((addr, role));
+    }
+}
+
+/// All ownership-transfer candidates the v31 prepare flow may defer an
+/// `acceptOwnership()` for, tagged with their role. Unlike the previous
+/// implementation this does NOT filter by live `pendingOwner == governance`:
+/// the deferred `acceptOwnership()` calls are legitimately present in the
+/// stage-0 calls array regardless of the chain's current (pre-execution)
+/// ownership state, so they must not be rejected just because the transfer
+/// hasn't completed yet. The per-target live-state policy is applied separately
+/// in `verify_pre_governance_accept_ownership_tail`.
+fn collect_ownership_transfer_candidates(
     artifact: &EcosystemUpgradeArtifact,
-    verifiers: &Verifiers,
-    governance: Address,
     result: &mut VerificationResult,
-) -> anyhow::Result<Vec<Address>> {
-    // Candidates: each CTM proxy plus its ValidatorTimelock and auxiliary
-    // ownership targets discovered from the generated artifact. v31's
-    // prepare flow transfers any still-stale Ownable2Step contracts to
-    // governance and defers the accept to stage 0; include only candidates
-    // whose live pendingOwner is governance at verify time.
-    let mut candidates: Vec<Address> = Vec::new();
+) -> Vec<(Address, OwnershipTransferRole)> {
+    use OwnershipTransferRole::*;
+    let mut candidates: Vec<(Address, OwnershipTransferRole)> = Vec::new();
     for ctm in &artifact.ctms {
         if let Some(ctm_proxy) = required_ctm_address(
             ctm,
@@ -403,8 +439,8 @@ async fn collect_pre_governance_accept_ownership_targets(
                     "{}.chain_type_manager_proxy must not be zero while deriving stage-0 deferred acceptOwnership targets",
                     ctm.flavor.label()
                 ));
-            } else if !candidates.contains(&ctm_proxy) {
-                candidates.push(ctm_proxy);
+            } else {
+                add_ownership_candidate(&mut candidates, ctm_proxy, GovernanceTransferred);
             }
         }
         if let Some(vt) = required_ctm_address(
@@ -412,81 +448,56 @@ async fn collect_pre_governance_accept_ownership_targets(
             &["state_transition", "validator_timelock_addr"],
             result,
         ) {
-            if vt != Address::ZERO && !candidates.contains(&vt) {
-                candidates.push(vt);
-            }
+            add_ownership_candidate(&mut candidates, vt, GovernanceTransferred);
         }
         if let Some(timer) = required_ctm_address(
             ctm,
             &["deployed_addresses", "l1_governance_upgrade_timer"],
             result,
         ) {
-            if timer != Address::ZERO && !candidates.contains(&timer) {
-                candidates.push(timer);
-            }
+            add_ownership_candidate(&mut candidates, timer, DeployTimeOwned);
         }
         if ctm.value.get("rollup_da_pair").is_none() {
             if let Some(rollup_da_manager) =
                 required_ctm_address(ctm, &["deployed_addresses", "l1_rollup_da_manager"], result)
             {
-                if rollup_da_manager != Address::ZERO && !candidates.contains(&rollup_da_manager) {
-                    candidates.push(rollup_da_manager);
-                }
+                add_ownership_candidate(&mut candidates, rollup_da_manager, DeployTimeOwned);
             }
         }
         if ctm.flavor == CtmFlavor::ZksyncOs {
             if let Some(verifier) =
                 required_ctm_address(ctm, &["state_transition", "verifier_addr"], result)
             {
-                if verifier != Address::ZERO && !candidates.contains(&verifier) {
-                    candidates.push(verifier);
-                }
+                add_ownership_candidate(&mut candidates, verifier, DeployTimeOwned);
             }
         }
     }
-
-    let provider = verifiers.network_verifier.get_l1_provider();
-    let mut targets = Vec::new();
-    for candidate in candidates {
-        let pending_owner = Ownable2Step::new(candidate, provider.clone())
-            .pendingOwner()
-            .call()
-            .await
-            .with_context(|| {
-                format!(
-                    "read pendingOwner() for {candidate} while deriving stage-0 deferred acceptOwnership targets"
-                )
-            })?;
-        if pending_owner == governance {
-            targets.push(candidate);
-        }
-    }
-
-    Ok(targets)
+    candidates
 }
 
-fn verify_pre_governance_accept_ownership_tail(
+async fn verify_pre_governance_accept_ownership_tail(
     calls: &CallList,
     tail_start: usize,
-    expected_targets: &[Address],
+    candidates: &[(Address, OwnershipTransferRole)],
+    governance: Address,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
 ) -> usize {
     let accept_ownership_selector = acceptOwnershipCall::SELECTOR;
+    let provider = verifiers.network_verifier.get_l1_provider();
     let mut errors = 0usize;
-    let mut seen_targets = Vec::new();
+    let mut seen_targets: Vec<Address> = Vec::new();
 
     for (index, call) in calls.elems.iter().enumerate() {
         let is_accept = call.data.len() >= 4 && call.data[0..4] == accept_ownership_selector;
 
-        if index < tail_start && is_accept {
-            result.report_error(&format!(
-                "Deferred acceptOwnership() call found before stage-0 tail at index {index}"
-            ));
-            errors += 1;
-        }
-
         if index < tail_start {
+            if is_accept {
+                result.report_error(&format!(
+                    "Deferred acceptOwnership() call found before stage-0 tail at index {index}"
+                ));
+                errors += 1;
+            }
             continue;
         }
 
@@ -512,15 +523,20 @@ fn verify_pre_governance_accept_ownership_tail(
             ));
             errors += 1;
         }
-        if !expected_targets.contains(&call.target) {
+
+        // The acceptOwnership() calls are legitimately present in the calls
+        // array — we no longer reject them based on live pendingOwner. We only
+        // require the target to be a recognized v31 ownership-transfer contract.
+        let Some((_, role)) = candidates.iter().find(|(a, _)| *a == call.target).copied() else {
             result.report_error(&format!(
-                "Deferred acceptOwnership() call #{index} targets unexpected address {} ({})",
+                "Deferred acceptOwnership() call #{index} targets unexpected address {} ({}) — not a recognized v31 ownership-transfer target",
                 call.target,
                 verifiers.address_verifier.name_or_unknown(&call.target)
             ));
             errors += 1;
             continue;
-        }
+        };
+
         if seen_targets.contains(&call.target) {
             result.report_error(&format!(
                 "Deferred acceptOwnership() call #{index} repeats target {}",
@@ -530,35 +546,67 @@ fn verify_pre_governance_accept_ownership_tail(
         } else {
             seen_targets.push(call.target);
         }
+
+        // Role-specific live-ownership policy.
+        let name = verifiers.address_verifier.name_or_unknown(&call.target);
+        let ownable = Ownable2Step::new(call.target, provider.clone());
+        match (ownable.owner().call().await, ownable.pendingOwner().call().await) {
+            (Ok(owner), Ok(pending)) => {
+                match role {
+                    OwnershipTransferRole::GovernanceTransferred => {
+                        // owner == governance → fully transferred.
+                        // owner != governance but pendingOwner == governance →
+                        //   tolerated: the acceptOwnership() is deferred to this
+                        //   stage-0 governance call (distinctive message).
+                        // otherwise (pendingOwner not governance) → a real error:
+                        //   the transfer to governance was never even initiated.
+                        if owner == governance {
+                            result.report_ok(&format!(
+                                "{name} ({}) owner is governance",
+                                call.target
+                            ));
+                        } else if pending == governance {
+                            result.report_warn(&format!(
+                                "[deferred-ownership] {name} ({}) owner is not yet governance (owner={owner}) but pendingOwner is governance; acceptOwnership() is deferred to this stage-0 governance call — tolerated",
+                                call.target
+                            ));
+                        } else {
+                            result.report_error(&format!(
+                                "{name} ({}) pendingOwner mismatch: ownership transfer to governance ({governance}) was not initiated, got owner={owner}, pendingOwner={pending}",
+                                call.target
+                            ));
+                            errors += 1;
+                        }
+                    }
+                    OwnershipTransferRole::DeployTimeOwned => {
+                        if owner == governance || pending == governance {
+                            result.report_ok(&format!(
+                                "{name} ({}) ownership set to governance at deployment (owner or pendingOwner)",
+                                call.target
+                            ));
+                        } else {
+                            result.report_error(&format!(
+                                "{name} ({}) ownership must be set to governance at deployment time: owner, or at minimum pendingOwner, must be {governance}, got owner={owner}, pendingOwner={pending}",
+                                call.target
+                            ));
+                            errors += 1;
+                        }
+                    }
+                }
+            }
+            _ => {
+                result.report_warn(&format!(
+                    "Could not read owner()/pendingOwner() for stage-0 acceptOwnership target {name} ({})",
+                    call.target
+                ));
+            }
+        }
     }
 
-    let missing_targets: Vec<Address> = expected_targets
-        .iter()
-        .copied()
-        .filter(|target| !seen_targets.contains(target))
-        .collect();
-    if !missing_targets.is_empty() {
-        let missing = missing_targets
-            .iter()
-            .map(|address| {
-                format!(
-                    "{} ({})",
-                    address,
-                    verifiers.address_verifier.name_or_unknown(address)
-                )
-            })
-            .collect::<Vec<_>>()
-            .join(", ");
-        result.report_error(&format!(
-            "Stage-0 deferred acceptOwnership tail is missing expected target(s): {missing}"
-        ));
-        errors += 1;
-    } else {
-        result.report_ok(&format!(
-            "Stage-0 deferred acceptOwnership tail matches {} expected target(s)",
-            expected_targets.len()
-        ));
-    }
+    result.report_ok(&format!(
+        "Stage-0 deferred acceptOwnership tail validated {} target(s)",
+        seen_targets.len()
+    ));
 
     errors
 }

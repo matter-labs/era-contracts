@@ -209,6 +209,19 @@ jobs:
           # Top-level scalar salts (one fresh value each).
           sed -i -E "s|^(create2_factory_salt[[:space:]]*=[[:space:]]*)\"0x[0-9a-fA-F]+\"|\1\"$(newsalt)\"|" "$TOML"
           sed -i -E "s|^(legacy_gov_salt[[:space:]]*=[[:space:]]*)\"0x[0-9a-fA-F]+\"|\1\"$(newsalt)\"|" "$TOML"
+          # zk-governance redeploy salt (`[contracts] gov_salt`, wired to
+          # ZkGovernanceInputs.gov_salt_override). Rotating it forces a FRESH
+          # deploy of PUH impl / Guardians / SecurityCouncil / EmergencyUpgradeBoard
+          # (new addresses), so their deploy txs are captured in the transactions
+          # log and verify as present create2 deployments — instead of silently
+          # reusing the pre-existing fixed-salt (keccak256("v31:gov")) deployment
+          # whose deploy txs are in no log. Replace if present, else insert under
+          # [contracts] right after legacy_gov_salt.
+          if grep -qE '^gov_salt[[:space:]]*=' "$TOML"; then
+            sed -i -E "s|^(gov_salt[[:space:]]*=[[:space:]]*)\"0x[0-9a-fA-F]+\"|\1\"$(newsalt)\"|" "$TOML"
+          else
+            sed -i -E "s|^(legacy_gov_salt[[:space:]]*=[[:space:]]*\"0x[0-9a-fA-F]+\")|\1\ngov_salt = \"$(newsalt)\"|" "$TOML"
+          fi
           # Per-CTM salts under [create2_factory_salts] — each must stay DISTINCT,
           # so give every entry its own fresh random value.
           # NB: each line is `"0x<ctm-addr>" = "0x<salt>"` — only rotate the
@@ -223,7 +236,7 @@ jobs:
             { print }
           ' "$TOML" > "$TOML.tmp" && mv "$TOML.tmp" "$TOML"
           echo "Rotated deployment salts in $TOML:"
-          grep -nE '^(create2_factory_salt|legacy_gov_salt)[[:space:]]*=' "$TOML"
+          grep -nE '^(create2_factory_salt|legacy_gov_salt|gov_salt)[[:space:]]*=' "$TOML"
           sed -n '/^\[create2_factory_salts\]/,/^\[/p' "$TOML" | grep -E '= "0x'
 
       - name: Regenerate + verify calldata
