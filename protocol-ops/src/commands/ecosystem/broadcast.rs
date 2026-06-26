@@ -159,9 +159,15 @@ pub async fn run(args: UpgradeBroadcastArgs) -> anyhow::Result<()> {
                 .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
         } else {
             let key = &key_map[&bundle.target];
-            execute_one_bundle(&bundle_path, &args.l1_rpc_url, key, out_path)
-                .await
-                .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
+            execute_one_bundle(
+                &bundle_path,
+                &args.l1_rpc_url,
+                key,
+                out_path,
+                crate::commands::dev::execute_safe::GAS_PRICE_MULTIPLIER_BPS,
+            )
+            .await
+            .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
         }
     }
 

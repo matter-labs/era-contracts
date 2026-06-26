@@ -111,6 +111,7 @@ sol! {
 
     #[sol(rpc)]
     contract Ownable2Step {
+        function owner() external view returns (address);
         function pendingOwner() external view returns (address);
     }
 

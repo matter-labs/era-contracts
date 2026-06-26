@@ -20,6 +20,8 @@
 #
 # Required env vars:
 #   L1_FORK_URL                          — Sepolia RPC URL to fork
+#   DEPLOYER_ADDR=<0xhex>                — canonical deployer EOA (fork-rehearsal-
+#                                          only, impersonated; no key needed), OR
 #   DEPLOYER_PK=<0xhex>                  — broadcast signer's private key, OR
 #   DEPLOYER_PK_FILE=<path>              — file holding the same (trimmed)
 #
@@ -93,19 +95,27 @@ echo "Bridgehub:    $BRIDGEHUB"
 # Pass the PK one of two ways:
 #   DEPLOYER_PK=0x…        — raw hex
 #   DEPLOYER_PK_FILE=path  — read from file (trimmed of whitespace)
-if [[ -z "${DEPLOYER_PK:-}" ]]; then
-  if [[ -n "${DEPLOYER_PK_FILE:-}" ]]; then
-    if [[ ! -f "$DEPLOYER_PK_FILE" ]]; then
-      echo "DEPLOYER_PK_FILE=$DEPLOYER_PK_FILE does not exist" >&2
+if [[ -n "${DEPLOYER_ADDR:-}" ]]; then
+  # Fork-rehearsal-only override: prepare takes --deployer-address and the
+  # broadcast runs --unlocked (impersonation), so no signing happens against
+  # the fork. This lets a regen run with the canonical deployer EOA whose
+  # private key the runner does not hold (e.g. in CI).
+  DEPLOYER="$DEPLOYER_ADDR"
+else
+  if [[ -z "${DEPLOYER_PK:-}" ]]; then
+    if [[ -n "${DEPLOYER_PK_FILE:-}" ]]; then
+      if [[ ! -f "$DEPLOYER_PK_FILE" ]]; then
+        echo "DEPLOYER_PK_FILE=$DEPLOYER_PK_FILE does not exist" >&2
+        exit 1
+      fi
+      DEPLOYER_PK="$(tr -d '[:space:]' < "$DEPLOYER_PK_FILE")"
+    else
+      echo "Set either DEPLOYER_ADDR=<0xhex>, DEPLOYER_PK=<0xhex> or DEPLOYER_PK_FILE=<path> before running" >&2
       exit 1
     fi
-    DEPLOYER_PK="$(tr -d '[:space:]' < "$DEPLOYER_PK_FILE")"
-  else
-    echo "Set either DEPLOYER_PK=<0xhex> or DEPLOYER_PK_FILE=<path> before running" >&2
-    exit 1
   fi
+  DEPLOYER="$(cast wallet address --private-key "$DEPLOYER_PK")"
 fi
-DEPLOYER="$(cast wallet address --private-key "$DEPLOYER_PK")"
 echo "Deployer EOA: $DEPLOYER"
 
 ZK_ASSET_ID="$(read_toml_str "$PERMANENT_VALUES" zk_token_asset_id)"
@@ -133,9 +143,9 @@ GW_RPC_URL="${GW_RPC_URL:-https://zksync-os-stage-gateway.zksync.dev}"
 echo "GW RPC:       $GW_RPC_URL"
 # zk-governance commit whose AllContractsHashes.json PUVT uses to verify
 # PUH/Guardians bytecodes. Override via ZK_GOVERNANCE_COMMIT env var; the
-# default points to the latest kl/v31-puh-guardians-redeploy on upstream
-# (zksync-association/zk-governance) which carries the regenerated hashes.
-ZK_GOV_COMMIT="${ZK_GOVERNANCE_COMMIT:-3e516c5}"
+# default points to the v31 governance set on upstream
+# (zksync-association/zk-governance).
+ZK_GOV_COMMIT="${ZK_GOVERNANCE_COMMIT:-7c5e27b}"
 echo "zk-gov commit: $ZK_GOV_COMMIT"
 # 1e30 wei
 FUND_AMOUNT="1000000000000000000000000000000"
