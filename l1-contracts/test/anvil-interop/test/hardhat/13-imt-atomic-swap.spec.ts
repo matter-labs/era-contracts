@@ -284,8 +284,8 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     const flowId = computeFlowId(legHashesAsc, chainIdsAsc, deadline);
 
     // ── PHASE 1: atomic send on each source (burn + IMT insert) ──────────────────────────────
-    const aBefore: BigNumber = await chainA.testToken.balanceOf(user);
-    const bBefore: BigNumber = await chainB.testToken.balanceOf(user);
+    const aBalanceBefore: BigNumber = await chainA.testToken.balanceOf(user);
+    const bBalanceBefore: BigNumber = await chainB.testToken.balanceOf(user);
 
     const ab = await sendAtomicLeg({
       source: chainA,
@@ -309,8 +309,8 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     // Source legs are Committed; tokens left the depositor and were burned via AR/NTV.
     expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Committed, "AB committed on A");
     expect(await chainB.stack.manager.legState(flowId, hBA)).to.equal(LegState.Committed, "BA committed on B");
-    expect((await chainA.testToken.balanceOf(user)).toString()).to.equal(aBefore.sub(aAmount).toString());
-    expect((await chainB.testToken.balanceOf(user)).toString()).to.equal(bBefore.sub(bAmount).toString());
+    expect((await chainA.testToken.balanceOf(user)).toString()).to.equal(aBalanceBefore.sub(aAmount).toString());
+    expect((await chainB.testToken.balanceOf(user)).toString()).to.equal(bBalanceBefore.sub(bAmount).toString());
 
     // The commit values are now present in their source chains' IMTs (off-chain engine == on-chain).
     const abValue = commitValue(flowId, hAB);
@@ -402,7 +402,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     const flowId = computeFlowId(legHashesAsc, chainIdsAsc, deadline);
 
     // ── Commit only the AB leg on A. B never commits BA. ─────────────────────────────────────
-    const aBefore: BigNumber = await chainA.testToken.balanceOf(user);
+    const aBalanceBefore: BigNumber = await chainA.testToken.balanceOf(user);
     const ab = await sendAtomicLeg({
       source: chainA,
       dest: chainB,
@@ -415,7 +415,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
 
     expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Committed, "AB committed on A");
     expect((await chainA.testToken.balanceOf(user)).toString()).to.equal(
-      aBefore.sub(aTimeoutAmount).toString(),
+      aBalanceBefore.sub(aTimeoutAmount).toString(),
       "AB depositor burned tokens at commit"
     );
 
@@ -456,7 +456,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Reverted, "AB reverted on A");
 
     const aAfterRefund: BigNumber = await chainA.testToken.balanceOf(user);
-    expect(aAfterRefund.toString()).to.equal(aBefore.toString(), "AB depositor fully recovered the burned tokens");
+    expect(aAfterRefund.toString()).to.equal(aBalanceBefore.toString(), "AB depositor fully recovered the burned tokens");
 
     expect(
       claim.logs
