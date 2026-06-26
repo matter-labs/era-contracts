@@ -29,7 +29,7 @@ jobs:
           echo "Resolved TAG=${{ steps.vars.outputs.TAG }}"
 
       - name: Checkout the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ steps.vars.outputs.TAG }}
           submodules: recursive
@@ -43,7 +43,7 @@ jobs:
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
         with:
           node-version: 18.18.0
           cache: yarn
@@ -76,7 +76,7 @@ jobs:
           tar -czvf system-contracts.tar.gz ./system-contracts
 
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: ${{ steps.vars.outputs.TAG }}
           fail_on_unmatched_files: true

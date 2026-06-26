@@ -18,7 +18,7 @@ jobs:
 
   #   steps:
   #     - name: Checkout the repository
-  #       uses: actions/checkout@v4
+  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
   #     - name: pip cache
   #       uses: actions/cache@v4
@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Check for typos
-        uses: crate-ci/typos@master
+        uses: crate-ci/typos@37bb98842b0d8c4ffebdb75301a13db0267cef89 # v1.47.2
