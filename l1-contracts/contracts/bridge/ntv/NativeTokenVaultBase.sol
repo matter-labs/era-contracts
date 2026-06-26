@@ -217,6 +217,11 @@ abstract contract NativeTokenVaultBase is
     /// one), so it reverses the `bridgeBurn` that locked/burned the funds at `commitSend`. `_chainId`
     /// must be the destination chain used at burn time so `_handleBridgeFromChain` undoes the matching
     /// `_handleBridgeToChain`.
+    /// TODO(atomic-interop): this mints to the data's `remoteReceiver`, so the only caller
+    /// (L2AssetRouter.recoverAtomicCall, atomic-flow-only) has to rewrite that field to the depositor
+    /// first. Since recovery must always refund the SENDER, mint to the data's `originalCaller` here
+    /// instead (thread an explicit receiver through `_bridgeMint*` so normal mints still target
+    /// `remoteReceiver`), letting the caller forward the bundle's mint data verbatim.
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         bytes32 _assetId,
