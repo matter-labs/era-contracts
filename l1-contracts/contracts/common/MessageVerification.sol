@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // solhint-disable func-named-parameters
 
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.24; 
 
 import {L2Log, L2Message, TxStatus} from "./Messaging.sol";
 import {FinalizeL1DepositParams, IMessageVerification} from "./interfaces/IMessageVerification.sol";
