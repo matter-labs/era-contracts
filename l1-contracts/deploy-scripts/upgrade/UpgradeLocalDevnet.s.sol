@@ -62,7 +62,7 @@ contract UpgradeLocalDevnet is Script, EcosystemUpgrade {
         chainUpgrade.upgradeChain(diamondCutData);
 
         // Set timestamp of upgrade for server
-        chainUpgrade.setUpgradeTimestamp(getNewProtocolVersion(), block.timestamp + 60);
+        chainUpgrade.setUpgradeTimestamp(block.timestamp + 60);
     }
 
     function governanceMulticall(address governanceAddr, Call[] memory calls) internal {

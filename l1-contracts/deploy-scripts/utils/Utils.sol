@@ -1290,7 +1290,7 @@ library Utils {
         // ChainAdminOwnable.multicall is `onlyOwner` and executes inner calls
         // as msg.sender = ChainAdmin. External targets (Bridgehub, Diamond, etc.)
         // recognise ChainAdmin as their admin, so multicall is the right path.
-        // Self-targeted calls (e.g. `setUpgradeTimestamp`) are `onlyOwner` and
+        // Self-targeted calls (e.g. `setTokenMultiplierSetter`) are `onlyOwner` and
         // would see msg.sender = ChainAdmin != owner EOA, so those must be
         // called directly from the owner.
         Call[] memory externalCalls = new Call[](calls.length);

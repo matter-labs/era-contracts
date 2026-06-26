@@ -36,12 +36,7 @@ interface IAdminFunctions {
         address chainDiamondProxy
     ) external;
 
-    function adminScheduleUpgrade(
-        address adminAddr,
-        address accessControlRestriction,
-        uint256 newProtocolVersion,
-        uint256 timestamp
-    ) external;
+    function adminScheduleUpgrade(address bridgehub, uint256 chainId, uint256 timestamp, bool shouldSend) external;
 
     function upgradeChainFromCTM(address chainAddress, address adminAddr, address accessControlRestriction) external;
 

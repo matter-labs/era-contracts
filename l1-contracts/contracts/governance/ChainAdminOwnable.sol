@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IChainAdminOwnable} from "./IChainAdminOwnable.sol";
 import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
-import {NoCallsProvided, Unauthorized, ZeroAddress, ZeroUpgradeTimestamp} from "../common/L1ContractErrors.sol";
+import {NoCallsProvided, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -14,10 +14,9 @@ import {NoCallsProvided, Unauthorized, ZeroAddress, ZeroUpgradeTimestamp} from "
 /// the blockchain node to accept the protocol upgrade. Another role - `tokenMultiplierSetter` can be used in the contract
 /// to change the base token gas price in the Chain contract.
 contract ChainAdminOwnable is IChainAdminOwnable, Ownable2Step {
-    /// @notice Mapping of protocol versions to their expected upgrade timestamps.
-    /// @dev Needed for the offchain node administration to know when to start building batches with the new protocol version.
-    /// @dev Starting from v31, value 0 means "unset" (upgrade not scheduled). Use value 1 for instant upgrades.
-    mapping(uint256 protocolVersion => uint256 upgradeTimestamp) public protocolVersionToUpgradeTimestamp;
+    /// @dev Deprecated: the expected upgrade timestamp is now tracked by the `ServerNotifier` contract.
+    /// @dev Kept (renamed, no longer written) to preserve the storage layout. Must not be used.
+    mapping(uint256 protocolVersion => uint256 upgradeTimestamp) internal __DEPRECATED_protocolVersionToUpgradeTimestamp;
 
     /// @notice The address which can call `setTokenMultiplier` function to change the base token gas price in the Chain contract.
     /// @dev The token base price can be changed quite often, so the private key for this role is supposed to be stored in the node
@@ -39,17 +38,6 @@ contract ChainAdminOwnable is IChainAdminOwnable, Ownable2Step {
     function setTokenMultiplierSetter(address _tokenMultiplierSetter) external onlyOwner {
         emit NewTokenMultiplierSetter(tokenMultiplierSetter, _tokenMultiplierSetter);
         tokenMultiplierSetter = _tokenMultiplierSetter;
-    }
-
-    /// @notice Set the expected upgrade timestamp for a specific protocol version.
-    /// @param _protocolVersion The ZKsync chain protocol version.
-    /// @param _upgradeTimestamp The timestamp at which the chain node should expect the upgrade to happen.
-    function setUpgradeTimestamp(uint256 _protocolVersion, uint256 _upgradeTimestamp) external onlyOwner {
-        if (_upgradeTimestamp == 0) {
-            revert ZeroUpgradeTimestamp();
-        }
-        protocolVersionToUpgradeTimestamp[_protocolVersion] = _upgradeTimestamp;
-        emit UpdateUpgradeTimestamp(_protocolVersion, _upgradeTimestamp);
     }
 
     /// @notice Execute multiple calls as part of contract administration.

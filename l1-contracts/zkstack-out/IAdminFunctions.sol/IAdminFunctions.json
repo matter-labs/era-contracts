@@ -121,17 +121,12 @@
     "name": "adminScheduleUpgrade",
     "inputs": [
       {
-        "name": "adminAddr",
+        "name": "bridgehub",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "accessControlRestriction",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "newProtocolVersion",
+        "name": "chainId",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -139,6 +134,11 @@
         "name": "timestamp",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "shouldSend",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "outputs": [],

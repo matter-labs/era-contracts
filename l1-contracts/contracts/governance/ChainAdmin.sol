@@ -8,8 +8,7 @@ import {
     NoCallsProvided,
     OnlySelfAllowed,
     RestrictionWasAlreadyPresent,
-    RestrictionWasNotPresent,
-    ZeroUpgradeTimestamp
+    RestrictionWasNotPresent
 } from "../common/L1ContractErrors.sol";
 import {IChainAdmin} from "./IChainAdmin.sol";
 import {Restriction} from "./restriction/Restriction.sol";
@@ -30,10 +29,9 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    /// @notice Mapping of protocol versions to their expected upgrade timestamps.
-    /// @dev Needed for the offchain node administration to know when to start building batches with the new protocol version.
-    /// @dev Starting from v31, value 0 means "unset" (upgrade not scheduled). Use value 1 for instant upgrades.
-    mapping(uint256 protocolVersion => uint256 upgradeTimestamp) public protocolVersionToUpgradeTimestamp;
+    /// @dev Deprecated: the expected upgrade timestamp is now tracked by the `ServerNotifier` contract.
+    /// @dev Kept (renamed, no longer written) to preserve the storage layout. Must not be used.
+    mapping(uint256 protocolVersion => uint256 upgradeTimestamp) internal __DEPRECATED_protocolVersionToUpgradeTimestamp;
 
     /// @notice The set of active restrictions.
     EnumerableSet.AddressSet internal activeRestrictions;
@@ -77,17 +75,6 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
             revert RestrictionWasNotPresent(_restriction);
         }
         emit RestrictionRemoved(_restriction);
-    }
-
-    /// @notice Set the expected upgrade timestamp for a specific protocol version.
-    /// @param _protocolVersion The ZKsync chain protocol version.
-    /// @param _upgradeTimestamp The timestamp at which the chain node should expect the upgrade to happen.
-    function setUpgradeTimestamp(uint256 _protocolVersion, uint256 _upgradeTimestamp) external onlySelf {
-        if (_upgradeTimestamp == 0) {
-            revert ZeroUpgradeTimestamp();
-        }
-        protocolVersionToUpgradeTimestamp[_protocolVersion] = _upgradeTimestamp;
-        emit UpdateUpgradeTimestamp(_protocolVersion, _upgradeTimestamp);
     }
 
     /// @notice Execute multiple calls as part of contract administration.

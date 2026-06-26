@@ -267,20 +267,16 @@ contract AdminFunctions is Script, IAdminFunctions {
         console.log("AdminFunctions: upgrade completed successfully");
     }
 
-    function adminScheduleUpgrade(
-        address adminAddr,
-        address accessControlRestriction,
-        uint256 newProtocolVersion,
-        uint256 timestamp
-    ) public {
-        Utils.adminExecute(
-            adminAddr,
-            accessControlRestriction,
-            adminAddr,
-            // We do instant upgrades, but obviously it should be different in prod
-            abi.encodeCall(ChainAdmin.setUpgradeTimestamp, (newProtocolVersion, timestamp)),
-            0
-        );
+    function adminScheduleUpgrade(address _bridgehub, uint256 _chainId, uint256 _timestamp, bool _shouldSend) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.serverNotifier,
+            value: 0,
+            data: abi.encodeCall(ServerNotifier.setUpgradeTimestamp, (_chainId, _timestamp))
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
 
     function makePermanentRollup(ChainAdmin chainAdmin, address target) public {
