@@ -466,8 +466,12 @@ library L2GenesisForceDeploymentsHelper {
         // interop center / interop handler) is referenced by canonical fixed address in the contracts
         // themselves, so no initialize wiring is needed. The manager never custodies funds: the source
         // burn flows through the normal interop path and destination mints through the interop handler.
-        // Only ZKsync OS chains predeploy these (see the genesis gen tool).
-        if (_isZKsyncOS) {
+        //
+        // Gated on `_isGenesisUpgrade`: the atomic built-ins are predeployed ONLY in the ZKsync OS
+        // genesis (see the genesis gen tool), so they exist only on fresh chains. A pre-existing chain
+        // being upgraded to v31 has no code at L2_INTEROP_COMMITMENT_TREE_ADDR, so calling `initialize()`
+        // there would revert the whole upgrade transaction; such chains simply don't get atomic interop.
+        if (_isZKsyncOS && _isGenesisUpgrade) {
             L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initialize();
         }
     }
