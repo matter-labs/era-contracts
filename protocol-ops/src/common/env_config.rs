@@ -342,6 +342,24 @@ impl EnvConfig {
         Ok(read_core_legacy_gov_salt(&content))
     }
 
+    /// CREATE2 salt for the zk-governance redeploy (PUH impl / Guardians /
+    /// SecurityCouncil / EmergencyUpgradeBoard) from
+    /// `upgrade-envs/v0.31.0-interopB/<env>.toml [contracts] gov_salt`. Wired
+    /// into `ZkGovernanceInputs.gov_salt_override`. When absent, returns `None`
+    /// and the deploy falls back to the fixed `keccak256(GOV_SALT_SEED)` seed.
+    /// Rotating this per regen forces a *fresh* zk-governance deployment (new
+    /// addresses) so the redeployed contracts are captured in the transactions
+    /// log and verified as present create2 deployments, instead of reusing a
+    /// pre-existing fixed-salt deployment whose deploy txs are in no log.
+    pub fn v31_gov_salt(&self) -> anyhow::Result<Option<B256>> {
+        if !self.v31_input_path.exists() {
+            return Ok(None);
+        }
+        let content = fs::read_to_string(&self.v31_input_path)
+            .with_context(|| format!("read {}", self.v31_input_path.display()))?;
+        Ok(read_core_gov_salt(&content))
+    }
+
     /// Per-CTM CREATE2 salts from
     /// `upgrade-envs/v0.31.0-interopB/<env>.toml [create2_factory_salts]`,
     /// keyed by CTM proxy. Empty if the env doesn't declare any (legacy
@@ -442,6 +460,10 @@ fn read_core_create2_salt(content: &str) -> Option<B256> {
 
 fn read_core_legacy_gov_salt(content: &str) -> Option<B256> {
     read_h256_under_contracts(content, "legacy_gov_salt")
+}
+
+fn read_core_gov_salt(content: &str) -> Option<B256> {
+    read_h256_under_contracts(content, "gov_salt")
 }
 
 fn read_h256_under_contracts(content: &str, key: &str) -> Option<B256> {

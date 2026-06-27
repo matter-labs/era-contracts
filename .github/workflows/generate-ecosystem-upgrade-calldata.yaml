@@ -72,9 +72,28 @@ on:
         required: false
         default: "v0.1.5"
         type: string
+      push_artifacts:
+        description: "On a PUVT-green run, commit the regenerated artifacts (ecosystem.toml + sim-inputs/) and push them to the branch this run was dispatched on (refreshing its PR). Requires the RELEASE_TOKEN secret."
+        required: false
+        default: false
+        type: boolean
+      deploy:
+        description: "Also broadcast the deployer-EOA bundle to the real L1 (uses DEPLOYER_PRIVATE_KEY_<net>)"
+        required: false
+        default: false
+        type: boolean
+      use_new_salt:
+        description: "Use a fresh random CREATE2/gov deployment salt for this run (new addresses)"
+        required: false
+        default: false
+        type: boolean
 
+# Read-only GITHUB_TOKEN. The optional `push_artifacts` step does NOT rely on
+# write permissions here — it pushes via the scoped `RELEASE_TOKEN` secret,
+# mirroring update-generated-artifacts.yaml / update-hashes-on-demand.yaml.
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   regen:
@@ -176,6 +195,50 @@ jobs:
             echo "GW_RPC_URL=$GW_RPC_URL" >> "$GITHUB_ENV"
           fi
 
+      # Optional: rotate every deployment salt in the v31 input TOML to fresh
+      # random values so this run deploys to brand-new CREATE2 addresses (useful
+      # when the current salt's addresses are already occupied on-chain). Runs
+      # BEFORE prepare so the new salts flow into the generated calldata. The
+      # rotated salts land in the input TOML, so a push_artifacts run records them.
+      - name: Use new random deployment salt
+        if: ${{ inputs.use_new_salt }}
+        run: |
+          set -euo pipefail
+          TOML="l1-contracts/upgrade-envs/v0.31.0-interopB/${{ inputs.environment }}.toml"
+          newsalt() { echo "0x$(openssl rand -hex 32)"; }
+          # Top-level scalar salts (one fresh value each).
+          sed -i -E "s|^(create2_factory_salt[[:space:]]*=[[:space:]]*)\"0x[0-9a-fA-F]+\"|\1\"$(newsalt)\"|" "$TOML"
+          sed -i -E "s|^(legacy_gov_salt[[:space:]]*=[[:space:]]*)\"0x[0-9a-fA-F]+\"|\1\"$(newsalt)\"|" "$TOML"
+          # zk-governance redeploy salt (`[contracts] gov_salt`, wired to
+          # ZkGovernanceInputs.gov_salt_override). Rotating it forces a FRESH
+          # deploy of PUH impl / Guardians / SecurityCouncil / EmergencyUpgradeBoard
+          # (new addresses), so their deploy txs are captured in the transactions
+          # log and verify as present create2 deployments — instead of silently
+          # reusing the pre-existing fixed-salt (keccak256("v31:gov")) deployment
+          # whose deploy txs are in no log. Replace if present, else insert under
+          # [contracts] right after legacy_gov_salt.
+          if grep -qE '^gov_salt[[:space:]]*=' "$TOML"; then
+            sed -i -E "s|^(gov_salt[[:space:]]*=[[:space:]]*)\"0x[0-9a-fA-F]+\"|\1\"$(newsalt)\"|" "$TOML"
+          else
+            sed -i -E "s|^(legacy_gov_salt[[:space:]]*=[[:space:]]*\"0x[0-9a-fA-F]+\")|\1\ngov_salt = \"$(newsalt)\"|" "$TOML"
+          fi
+          # Per-CTM salts under [create2_factory_salts] — each must stay DISTINCT,
+          # so give every entry its own fresh random value.
+          # NB: each line is `"0x<ctm-addr>" = "0x<salt>"` — only rotate the
+          # VALUE after `=`, never the key (the CTM proxy address prepare keys on).
+          awk '
+            /^\[create2_factory_salts\]/ { intbl=1; print; next }
+            /^\[/ && !/^\[create2_factory_salts\]/ { intbl=0 }
+            intbl && /=[[:space:]]*"0x[0-9a-fA-F]+"/ {
+              cmd="openssl rand -hex 32"; cmd | getline r; close(cmd);
+              sub(/=[[:space:]]*"0x[0-9a-fA-F]+"/, "= \"0x" r "\"");
+            }
+            { print }
+          ' "$TOML" > "$TOML.tmp" && mv "$TOML.tmp" "$TOML"
+          echo "Rotated deployment salts in $TOML:"
+          grep -nE '^(create2_factory_salt|legacy_gov_salt|gov_salt)[[:space:]]*=' "$TOML"
+          sed -n '/^\[create2_factory_salts\]/,/^\[/p' "$TOML" | grep -E '= "0x'
+
       - name: Regenerate + verify calldata
         working-directory: l1-contracts/test/anvil-interop
         run: |
@@ -184,6 +247,43 @@ jobs:
           # localhost, so only anvil sees the real RPC.
           ./regen-and-verify.sh "${{ inputs.environment }}"
 
+      # Optional: broadcast the deployer-EOA bundle to the REAL L1. Ungated —
+      # just the `deploy` checkbox. Runs even if PUVT reported errors
+      # (`!cancelled()`), since prepare's bundles already exist; broadcasting
+      # only the deployer-EOA bundle (governance/multisig bundles are never sent
+      # here). `dev execute-safe` is idempotent (skips already-deployed CREATE2).
+      - name: Deploy deployer bundle to real L1
+        if: ${{ !cancelled() && inputs.deploy }}
+        run: |
+          set -euo pipefail
+          ENV="${{ inputs.environment }}"
+          OUT="l1-contracts/upgrade-envs/v0.31.0-interopB/output/$ENV"
+          MANIFEST="$OUT/prepare/manifest.json"
+          if [ ! -f "$MANIFEST" ]; then
+            echo "::error::No prepare manifest at $MANIFEST — prepare did not run; nothing to deploy." >&2
+            exit 1
+          fi
+          # DEPLOYER_PK + L1_FORK_URL (the real RPC) come from $GITHUB_ENV (masked).
+          DEPLOYER="$(cast wallet address --private-key "$DEPLOYER_PK")"
+          DEPLOYER_LC="$(echo "$DEPLOYER" | tr '[:upper:]' '[:lower:]')"
+          mapfile -t FILES < <(jq -r --arg d "$DEPLOYER_LC" \
+            '.bundles | sort_by(.index)[] | select((.target|ascii_downcase) == $d) | .file' "$MANIFEST")
+          if [ "${#FILES[@]}" -eq 0 ]; then
+            echo "::error::No deployer bundle for $DEPLOYER in $MANIFEST" >&2
+            exit 1
+          fi
+          OUT_DIR="$OUT/real-broadcast"; mkdir -p "$OUT_DIR"
+          EXECUTED="$OUT_DIR/executed.json"
+          for f in "${FILES[@]}"; do
+            echo "=== execute-safe: $f -> real $ENV ==="
+            ./protocol-ops/target/release/protocol_ops dev execute-safe \
+              --safe-file "$OUT/prepare/$f" \
+              --l1-rpc-url "$L1_FORK_URL" \
+              --private-key "$DEPLOYER_PK" \
+              --out "$EXECUTED"
+          done
+          echo "Broadcast complete. Receipts in $EXECUTED"
+
       - name: Emit git-portable sim-inputs handoff set
         run: |
           set -euo pipefail
@@ -191,6 +291,49 @@ jobs:
           ./protocol-ops/target/release/protocol_ops ecosystem governance-toml-to-simulator \
             --env "${{ inputs.environment }}" \
             --emit-sim-inputs "$OUT/sim-inputs"
+
+      # Optional: open a PR with the regenerated artifacts so the
+      # simulator-compatible sim-inputs/ are reviewable in a diff (not just a
+      # downloadable artifact). Only runs on a PUVT-green run (success()).
+      # Optional: commit the regenerated artifacts and push them back to the
+      # branch this run was dispatched on (refreshing its open PR), so the
+      # simulator-compatible sim-inputs/ are reviewable in the diff. Mirrors
+      # update-generated-artifacts.yaml: the workflow's GITHUB_TOKEN stays
+      # read-only, and the push is authenticated with the scoped RELEASE_TOKEN
+      # secret (not workflow write permissions). Only runs on a PUVT-green run.
+      - name: Commit + push regenerated artifacts
+        if: ${{ success() && inputs.push_artifacts }}
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RELEASE_TOKEN:-}" ]; then
+            echo "::error::push_artifacts is set but the RELEASE_TOKEN secret is missing." >&2
+            exit 1
+          fi
+          ENV="${{ inputs.environment }}"
+          OUT="l1-contracts/upgrade-envs/v0.31.0-interopB/output/$ENV"
+          BRANCH="${{ github.ref_name }}"
+
+          git config user.name "zksync[bot]"
+          git config user.email "zksync[bot]@users.noreply.github.com"
+
+          # Stage the whole output/<env>/ tree WITHOUT -f so .gitignore is
+          # honoured: anvil.log (can echo the RPC), prepare/*.safe.json,
+          # prepare/manifest.json and fork-rehearsal/ stay out, while the full
+          # committed artifact set (ecosystem.toml, *-verification-logs.txt,
+          # sim-inputs/*, preserved transactions.txt) is captured.
+          git add "$OUT"
+          if git diff --cached --quiet; then
+            echo "No artifact changes on $BRANCH — calldata already up to date; nothing to push."
+            exit 0
+          fi
+          git commit \
+            -m "ci(regen): refresh $ENV upgrade calldata (PUVT-green)" \
+            -m "Regenerated by generate-ecosystem-upgrade-calldata (run ${{ github.run_id }}); ecosystem verify-upgrade (PUVT) passed against a fresh anvil fork."
+          # Push via RELEASE_TOKEN (scoped), not the read-only workflow token.
+          git push "https://x-access-token:${RELEASE_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:${BRANCH}"
+          echo "Pushed refreshed artifacts to ${BRANCH}."
 
       # Upload only the calldata deliverables. Deliberately NOT anvil.log /
       # *-verification-logs.txt — anvil.log can echo the forked RPC URL.

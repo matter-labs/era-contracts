@@ -5,8 +5,10 @@ use std::path::{Path, PathBuf};
 use alloy::network::{EthereumWallet, TransactionBuilder};
 use alloy::primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy::providers::{Provider, ProviderBuilder};
+use alloy::rpc::client::ClientBuilder;
 use alloy::rpc::types::TransactionRequest;
 use alloy::signers::local::PrivateKeySigner;
+use alloy::transports::layers::RetryBackoffLayer;
 use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
@@ -47,29 +49,84 @@ const PER_TX_GAS_LIMIT_CAP: u64 = 20_000_000;
 /// Floor gas price (1 gwei). Used when the node returns `eth_gasPrice` below
 /// it (anvil/reth on a quiet local chain reports near-zero).
 const GAS_PRICE_FLOOR_WEI: u128 = 1_000_000_000;
-/// Multiplier (in basis points) applied to live `eth_gasPrice` so our txs
-/// outbid the base-fee floor on a busy public chain (Sepolia / mainnet). 300%
-/// gives us ~3x headroom over chain median which is what gets txs included
-/// within 1-2 blocks instead of hanging in the mempool for 30+ minutes.
-const GAS_PRICE_MULTIPLIER_BPS: u128 = 30_000;
+/// Default multiplier (in basis points) applied to live `eth_gasPrice` so our
+/// txs outbid the base-fee floor on a busy public chain (Sepolia / mainnet).
+/// 300% gives ~3x headroom over chain median which gets txs included within
+/// 1-2 blocks instead of hanging in the mempool for 30+ minutes. Callers can
+/// override per-invocation (e.g. `dev execute-safe --gas-price-multiplier`).
+pub const GAS_PRICE_MULTIPLIER_BPS: u128 = 30_000;
+
+/// Default `dev execute-safe --gas-price-multiplier` value (1.5x over the live
+/// `eth_gasPrice`). Exposed as a CLI knob so the real-L1 deploy job can pick how
+/// far above chain price to bid.
+const DEFAULT_GAS_PRICE_MULTIPLIER: f64 = 1.5;
 
 /// Receipt polling interval. Alloy's default is tuned for public chains;
 /// tighten it so per-tx receipt polling doesn't dominate bundle latency on
 /// anvil's instamine or reth's sub-second block time.
 const RECEIPT_POLL_INTERVAL_MS: u64 = 50;
 
+/// Effective receipt-poll interval. 50ms is right for a dedicated node, but it
+/// 429s public RPCs (e.g. broadcasting a 74-tx bundle to Sepolia over a shared
+/// endpoint). Allow an env override so a real-L1 deploy over a rate-limited RPC
+/// can back off without a dedicated node. Falls back to the const.
+fn receipt_poll_interval_ms() -> u64 {
+    std::env::var("EXECUTE_SAFE_POLL_INTERVAL_MS")
+        .ok()
+        .and_then(|s| s.trim().parse::<u64>().ok())
+        .filter(|&v| v > 0)
+        .unwrap_or(RECEIPT_POLL_INTERVAL_MS)
+}
+
+fn env_u64(key: &str, default: u64) -> u64 {
+    std::env::var(key)
+        .ok()
+        .and_then(|s| s.trim().parse::<u64>().ok())
+        .filter(|&v| v > 0)
+        .unwrap_or(default)
+}
+
+/// Build the rate-limit retry/backoff layer for the signer-path provider.
+/// Defaults are effectively unthrottled (preserving behaviour on a dedicated
+/// node) but retry on 429, so a transient rate limit no longer aborts a whole
+/// bundle. For a shared/public RPC, lower `EXECUTE_SAFE_CUPS` (compute units
+/// per second; ~20 CU per request → req/s ≈ CUPS/20) to throttle proactively.
+///   EXECUTE_SAFE_RETRY_MAX        max 429 retries per request (default 20)
+///   EXECUTE_SAFE_RETRY_BACKOFF_MS initial backoff (default 1000)
+///   EXECUTE_SAFE_CUPS             compute-units/s budget (default 100000)
+fn retry_layer() -> RetryBackoffLayer {
+    RetryBackoffLayer::new(
+        env_u64("EXECUTE_SAFE_RETRY_MAX", 20) as u32,
+        env_u64("EXECUTE_SAFE_RETRY_BACKOFF_MS", 1000),
+        env_u64("EXECUTE_SAFE_CUPS", 100_000),
+    )
+}
+
 /// Returns a legacy `gasPrice` that's high enough to land within ~1-2 blocks
 /// on busy public chains, but never below `GAS_PRICE_FLOOR_WEI` so local
 /// chains (anvil/reth at 0 base fee) still get a non-zero price. We use
 /// legacy (type-0) txs throughout this binary so an EIP-1559 split isn't
 /// needed.
-async fn resolve_gas_price<P: Provider>(provider: &P) -> anyhow::Result<u128> {
+async fn resolve_gas_price<P: Provider>(
+    provider: &P,
+    multiplier_bps: u128,
+) -> anyhow::Result<u128> {
     let live = provider
         .get_gas_price()
         .await
         .context("eth_gasPrice failed")?;
-    let bumped = live.saturating_mul(GAS_PRICE_MULTIPLIER_BPS) / 10_000;
+    let bumped = live.saturating_mul(multiplier_bps) / 10_000;
     Ok(std::cmp::max(bumped, GAS_PRICE_FLOOR_WEI))
+}
+
+/// Convert a human `--gas-price-multiplier` (e.g. `1.5`) into basis points
+/// (`15_000`). Rejects non-positive values so a typo can't zero out the bid.
+fn multiplier_to_bps(multiplier: f64) -> anyhow::Result<u128> {
+    anyhow::ensure!(
+        multiplier.is_finite() && multiplier > 0.0,
+        "--gas-price-multiplier must be a positive number, got {multiplier}"
+    );
+    Ok((multiplier * 10_000.0).round() as u128)
 }
 
 /// Render a wei gas price as gwei for logging.
@@ -122,14 +179,22 @@ pub struct DevExecuteSafeArgs {
     /// can reconstruct CREATE2 / TUPP deployments from the prepare output.
     #[clap(long)]
     pub out: Option<PathBuf>,
+
+    /// How far above the live `eth_gasPrice` to bid, as a multiplier (e.g.
+    /// `1.5` = 150% of chain price). Higher values land faster on a busy chain
+    /// at the cost of more gas; lower values risk hanging in the mempool.
+    #[clap(long, default_value_t = DEFAULT_GAS_PRICE_MULTIPLIER)]
+    pub gas_price_multiplier: f64,
 }
 
 pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
+    let multiplier_bps = multiplier_to_bps(args.gas_price_multiplier)?;
     execute_one_bundle(
         &args.safe_file,
         &args.l1_rpc_url,
         args.private_key.expose(),
         args.out.as_deref(),
+        multiplier_bps,
     )
     .await
 }
@@ -145,6 +210,7 @@ pub async fn execute_one_bundle(
     l1_rpc_url: &str,
     private_key: &str,
     out_path: Option<&Path>,
+    gas_price_multiplier_bps: u128,
 ) -> anyhow::Result<()> {
     logger::step(format!("Execute Safe file: {}", safe_file.display()));
 
@@ -168,12 +234,20 @@ pub async fn execute_one_bundle(
     // recommended fillers (chain_id, gas, nonce); we override nonce and gas
     // manually per-tx below so those fillers are effectively a no-op for
     // the fields we set.
+    // Layer a rate-limit retry/backoff onto the RPC client so a 429 from a
+    // shared/public RPC backs off and retries instead of aborting the bundle.
+    // (Hung requests on a flaky public RPC are bounded by the caller wrapping
+    // this command in a `timeout`, after which the idempotent resume loop
+    // retries — see run-local-workflow.sh.)
+    let rpc_client = ClientBuilder::default()
+        .layer(retry_layer())
+        .http(l1_rpc_url.parse().context("invalid L1 RPC URL")?);
     let provider = ProviderBuilder::new()
         .wallet(wallet)
-        .connect_http(l1_rpc_url.parse().context("invalid L1 RPC URL")?);
+        .connect_client(rpc_client);
     provider
         .client()
-        .set_poll_interval(std::time::Duration::from_millis(RECEIPT_POLL_INTERVAL_MS));
+        .set_poll_interval(std::time::Duration::from_millis(receipt_poll_interval_ms()));
 
     logger::info(format!(
         "Replaying {} tx(s) under broadcaster {:#x}",
@@ -195,10 +269,14 @@ pub async fn execute_one_bundle(
     // so a single snapshot is fine; if Sepolia gas spikes mid-bundle we'll
     // see slow blocks rather than dropped txs (still better than the old
     // hardcoded 1-gwei sub-base-fee behaviour).
-    let gas_price = resolve_gas_price(&provider)
+    let gas_price = resolve_gas_price(&provider, gas_price_multiplier_bps)
         .await
         .context("resolve gas price")?;
-    logger::info(format!("Using gas price {} gwei", format_gwei(gas_price)));
+    logger::info(format!(
+        "Using gas price {} gwei ({}x live eth_gasPrice)",
+        format_gwei(gas_price),
+        gas_price_multiplier_bps as f64 / 10_000.0,
+    ));
 
     // Per-bundle tx log loaded from `--out`; we only flush additions after
     // the entire bundle succeeds so failed bundles do not pollute outputs.
@@ -286,11 +364,16 @@ pub async fn execute_one_bundle(
                 // - AddressAlreadySet (0x0dfb42bf): setup call already executed
                 // - OperationMustBePending (0xb926a6b0): legacy Gov executeInstant
                 //   on an already-done operation
+                // - EVMBytecodeAlreadyPublished (0x61733a89) /
+                //   EraBytecodeAlreadyPublished (0x876e8b23): BytecodesSupplier
+                //   re-publish of a hash already published in a prior partial
+                //   broadcast (no-op; later txs don't depend on the re-publish).
                 let err_str = format!("{e}");
                 let known_idempotent = [
-                    "876e8b23", // OperationExists
+                    "876e8b23", // OperationExists / EraBytecodeAlreadyPublished
                     "0dfb42bf", // AddressAlreadySet
                     "b926a6b0", // OperationMustBePending
+                    "61733a89", // EVMBytecodeAlreadyPublished
                 ];
                 if let Some(sig) = known_idempotent.iter().find(|s| err_str.contains(**s)) {
                     logger::info(format!(
@@ -474,7 +557,7 @@ pub async fn execute_one_bundle_unlocked(
     let provider = get_provider(l1_rpc_url).context("connect L1 provider")?;
     provider
         .client()
-        .set_poll_interval(std::time::Duration::from_millis(RECEIPT_POLL_INTERVAL_MS));
+        .set_poll_interval(std::time::Duration::from_millis(receipt_poll_interval_ms()));
     let chain_id = provider.get_chain_id().await.context("eth_chainId")?;
 
     logger::info(format!(
@@ -566,7 +649,7 @@ pub async fn execute_one_bundle_unlocked(
                 let err_str = format!("{e}");
                 let known_idempotent = [
                     "1a21feed", // OperationExists (current Governance)
-                    "876e8b23", // OperationExists
+                    "876e8b23", // OperationExists / EraBytecodeAlreadyPublished
                     "61733a89", // EVMBytecodeAlreadyPublished(bytes32)
                     "0dfb42bf", // AddressAlreadySet
                     "eda2fbb1", // OperationMustBePending (current Governance)
