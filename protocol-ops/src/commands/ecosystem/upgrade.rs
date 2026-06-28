@@ -769,21 +769,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 bridgehub,
             );
         puh_inputs.zksync_os_ctm = zksync_os_ctm_proxy;
-        // Optional per-regen random salt for the zk-governance redeploy
-        // (`[contracts] gov_salt`). When set, PUH impl / Guardians /
-        // SecurityCouncil / EmergencyUpgradeBoard deploy to fresh addresses so
-        // their deploy txs land in the transactions log and verify as present
-        // create2 deployments (instead of reusing a pre-existing fixed-salt
-        // deployment). Falls back to keccak256(GOV_SALT_SEED) when absent.
-        if let Some(cfg) = env_cfg.as_ref() {
-            if let Some(gov_salt) = cfg.v31_gov_salt()? {
-                logger::info(format!(
-                    "Using gov_salt from {}: {gov_salt:#x}",
-                    cfg.v31_input_path.display(),
-                ));
-                puh_inputs.gov_salt_override = Some(gov_salt);
-            }
-        }
         Some(
             crate::commands::ecosystem::zk_governance::deploy_puh_guardians(
                 &mut runner,

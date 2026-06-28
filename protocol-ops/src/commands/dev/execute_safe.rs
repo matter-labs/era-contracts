@@ -49,17 +49,11 @@ const PER_TX_GAS_LIMIT_CAP: u64 = 20_000_000;
 /// Floor gas price (1 gwei). Used when the node returns `eth_gasPrice` below
 /// it (anvil/reth on a quiet local chain reports near-zero).
 const GAS_PRICE_FLOOR_WEI: u128 = 1_000_000_000;
-/// Default multiplier (in basis points) applied to live `eth_gasPrice` so our
-/// txs outbid the base-fee floor on a busy public chain (Sepolia / mainnet).
-/// 300% gives ~3x headroom over chain median which gets txs included within
-/// 1-2 blocks instead of hanging in the mempool for 30+ minutes. Callers can
-/// override per-invocation (e.g. `dev execute-safe --gas-price-multiplier`).
-pub const GAS_PRICE_MULTIPLIER_BPS: u128 = 30_000;
-
-/// Default `dev execute-safe --gas-price-multiplier` value (1.5x over the live
-/// `eth_gasPrice`). Exposed as a CLI knob so the real-L1 deploy job can pick how
-/// far above chain price to bid.
-const DEFAULT_GAS_PRICE_MULTIPLIER: f64 = 1.5;
+/// Multiplier (in basis points) applied to live `eth_gasPrice` so our txs
+/// outbid the base-fee floor on a busy public chain (Sepolia / mainnet). 300%
+/// gives us ~3x headroom over chain median which is what gets txs included
+/// within 1-2 blocks instead of hanging in the mempool for 30+ minutes.
+const GAS_PRICE_MULTIPLIER_BPS: u128 = 30_000;
 
 /// Receipt polling interval. Alloy's default is tuned for public chains;
 /// tighten it so per-tx receipt polling doesn't dominate bundle latency on
@@ -107,26 +101,13 @@ fn retry_layer() -> RetryBackoffLayer {
 /// chains (anvil/reth at 0 base fee) still get a non-zero price. We use
 /// legacy (type-0) txs throughout this binary so an EIP-1559 split isn't
 /// needed.
-async fn resolve_gas_price<P: Provider>(
-    provider: &P,
-    multiplier_bps: u128,
-) -> anyhow::Result<u128> {
+async fn resolve_gas_price<P: Provider>(provider: &P) -> anyhow::Result<u128> {
     let live = provider
         .get_gas_price()
         .await
         .context("eth_gasPrice failed")?;
-    let bumped = live.saturating_mul(multiplier_bps) / 10_000;
+    let bumped = live.saturating_mul(GAS_PRICE_MULTIPLIER_BPS) / 10_000;
     Ok(std::cmp::max(bumped, GAS_PRICE_FLOOR_WEI))
-}
-
-/// Convert a human `--gas-price-multiplier` (e.g. `1.5`) into basis points
-/// (`15_000`). Rejects non-positive values so a typo can't zero out the bid.
-fn multiplier_to_bps(multiplier: f64) -> anyhow::Result<u128> {
-    anyhow::ensure!(
-        multiplier.is_finite() && multiplier > 0.0,
-        "--gas-price-multiplier must be a positive number, got {multiplier}"
-    );
-    Ok((multiplier * 10_000.0).round() as u128)
 }
 
 /// Render a wei gas price as gwei for logging.
@@ -179,22 +160,14 @@ pub struct DevExecuteSafeArgs {
     /// can reconstruct CREATE2 / TUPP deployments from the prepare output.
     #[clap(long)]
     pub out: Option<PathBuf>,
-
-    /// How far above the live `eth_gasPrice` to bid, as a multiplier (e.g.
-    /// `1.5` = 150% of chain price). Higher values land faster on a busy chain
-    /// at the cost of more gas; lower values risk hanging in the mempool.
-    #[clap(long, default_value_t = DEFAULT_GAS_PRICE_MULTIPLIER)]
-    pub gas_price_multiplier: f64,
 }
 
 pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
-    let multiplier_bps = multiplier_to_bps(args.gas_price_multiplier)?;
     execute_one_bundle(
         &args.safe_file,
         &args.l1_rpc_url,
         args.private_key.expose(),
         args.out.as_deref(),
-        multiplier_bps,
     )
     .await
 }
@@ -210,7 +183,6 @@ pub async fn execute_one_bundle(
     l1_rpc_url: &str,
     private_key: &str,
     out_path: Option<&Path>,
-    gas_price_multiplier_bps: u128,
 ) -> anyhow::Result<()> {
     logger::step(format!("Execute Safe file: {}", safe_file.display()));
 
@@ -269,14 +241,10 @@ pub async fn execute_one_bundle(
     // so a single snapshot is fine; if Sepolia gas spikes mid-bundle we'll
     // see slow blocks rather than dropped txs (still better than the old
     // hardcoded 1-gwei sub-base-fee behaviour).
-    let gas_price = resolve_gas_price(&provider, gas_price_multiplier_bps)
+    let gas_price = resolve_gas_price(&provider)
         .await
         .context("resolve gas price")?;
-    logger::info(format!(
-        "Using gas price {} gwei ({}x live eth_gasPrice)",
-        format_gwei(gas_price),
-        gas_price_multiplier_bps as f64 / 10_000.0,
-    ));
+    logger::info(format!("Using gas price {} gwei", format_gwei(gas_price)));
 
     // Per-bundle tx log loaded from `--out`; we only flush additions after
     // the entire bundle succeeds so failed bundles do not pollute outputs.

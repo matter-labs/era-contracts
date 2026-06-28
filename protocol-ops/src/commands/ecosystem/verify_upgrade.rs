@@ -160,16 +160,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     }
     if env_cfg.governance_kind() == GovernanceKind::Puh {
         // The PUH/Guardians/SecurityCouncil/EmergencyUpgradeBoard redeploy uses
-        // a single shared salt for all four (distinct init code, so one salt is
-        // collision-free) — see `zk_governance::deploy_puh_guardians`. Prefer
-        // the per-regen `[contracts] gov_salt` (matches a fresh, randomized
-        // redeploy whose deploy txs are in the log); fall back to the fixed
-        // `keccak256(GOV_SALT_SEED)` seed when the env doesn't pin one.
-        expected_salts.push(
-            env_cfg
-                .v31_gov_salt()?
-                .unwrap_or_else(|| keccak256(GOV_SALT_SEED)),
-        );
+        // a single shared salt (`keccak256(GOV_SALT_SEED)`) for all four — see
+        // `puh_guardians::deploy_puh_guardians`. They have distinct init code,
+        // so one salt is collision-free.
+        expected_salts.push(keccak256(GOV_SALT_SEED));
     }
 
     let transactions_log_path = match args.transactions_log.clone() {
