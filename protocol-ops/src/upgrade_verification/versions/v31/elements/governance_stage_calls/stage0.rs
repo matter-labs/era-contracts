@@ -390,44 +390,26 @@ impl GovernanceStage0Calls {
     }
 }
 
-/// Ownership-transfer role for a stage-0 deferred `acceptOwnership()` target,
-/// governing how strictly its live ownership is checked.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum OwnershipTransferRole {
-    /// CTM proxy + ValidatorTimelock: ownership is handed to governance as part
-    /// of the v31 governance flow, so pre-execution the live owner/pendingOwner
-    /// may still be the deployer. Tolerated with a distinctive message.
-    GovernanceTransferred,
-    /// Auxiliary contracts (governance upgrade timer, rollup DA manager, ZKsync
-    /// OS verifier): their ownership must be established at deployment time —
-    /// `owner`, or at minimum `pendingOwner`, must already be governance.
-    DeployTimeOwned,
-}
-
-fn add_ownership_candidate(
-    candidates: &mut Vec<(Address, OwnershipTransferRole)>,
-    addr: Address,
-    role: OwnershipTransferRole,
-) {
-    if addr != Address::ZERO && !candidates.iter().any(|(a, _)| *a == addr) {
-        candidates.push((addr, role));
+fn add_ownership_candidate(candidates: &mut Vec<Address>, addr: Address) {
+    if addr != Address::ZERO && !candidates.contains(&addr) {
+        candidates.push(addr);
     }
 }
 
 /// All ownership-transfer candidates the v31 prepare flow may defer an
-/// `acceptOwnership()` for, tagged with their role. Unlike the previous
-/// implementation this does NOT filter by live `pendingOwner == governance`:
-/// the deferred `acceptOwnership()` calls are legitimately present in the
-/// stage-0 calls array regardless of the chain's current (pre-execution)
-/// ownership state, so they must not be rejected just because the transfer
-/// hasn't completed yet. The per-target live-state policy is applied separately
-/// in `verify_pre_governance_accept_ownership_tail`.
+/// `acceptOwnership()` for. Unlike the previous implementation this does NOT
+/// filter by live `pendingOwner == governance`: the deferred `acceptOwnership()`
+/// calls are legitimately present in the stage-0 calls array regardless of the
+/// chain's current (pre-execution) ownership state, so they must not be rejected
+/// just because the transfer hasn't completed yet. The per-target live-state
+/// policy is applied uniformly in `verify_pre_governance_accept_ownership_tail`:
+/// every target's `owner`, or at minimum `pendingOwner`, must already be
+/// governance at deployment time, else it's a hard error.
 fn collect_ownership_transfer_candidates(
     artifact: &EcosystemUpgradeArtifact,
     result: &mut VerificationResult,
-) -> Vec<(Address, OwnershipTransferRole)> {
-    use OwnershipTransferRole::*;
-    let mut candidates: Vec<(Address, OwnershipTransferRole)> = Vec::new();
+) -> Vec<Address> {
+    let mut candidates: Vec<Address> = Vec::new();
     for ctm in &artifact.ctms {
         if let Some(ctm_proxy) = required_ctm_address(
             ctm,
@@ -440,7 +422,7 @@ fn collect_ownership_transfer_candidates(
                     ctm.flavor.label()
                 ));
             } else {
-                add_ownership_candidate(&mut candidates, ctm_proxy, GovernanceTransferred);
+                add_ownership_candidate(&mut candidates, ctm_proxy);
             }
         }
         if let Some(vt) = required_ctm_address(
@@ -448,27 +430,27 @@ fn collect_ownership_transfer_candidates(
             &["state_transition", "validator_timelock_addr"],
             result,
         ) {
-            add_ownership_candidate(&mut candidates, vt, GovernanceTransferred);
+            add_ownership_candidate(&mut candidates, vt);
         }
         if let Some(timer) = required_ctm_address(
             ctm,
             &["deployed_addresses", "l1_governance_upgrade_timer"],
             result,
         ) {
-            add_ownership_candidate(&mut candidates, timer, DeployTimeOwned);
+            add_ownership_candidate(&mut candidates, timer);
         }
         if ctm.value.get("rollup_da_pair").is_none() {
             if let Some(rollup_da_manager) =
                 required_ctm_address(ctm, &["deployed_addresses", "l1_rollup_da_manager"], result)
             {
-                add_ownership_candidate(&mut candidates, rollup_da_manager, DeployTimeOwned);
+                add_ownership_candidate(&mut candidates, rollup_da_manager);
             }
         }
         if ctm.flavor == CtmFlavor::ZksyncOs {
             if let Some(verifier) =
                 required_ctm_address(ctm, &["state_transition", "verifier_addr"], result)
             {
-                add_ownership_candidate(&mut candidates, verifier, DeployTimeOwned);
+                add_ownership_candidate(&mut candidates, verifier);
             }
         }
     }
@@ -478,7 +460,7 @@ fn collect_ownership_transfer_candidates(
 async fn verify_pre_governance_accept_ownership_tail(
     calls: &CallList,
     tail_start: usize,
-    candidates: &[(Address, OwnershipTransferRole)],
+    candidates: &[Address],
     governance: Address,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
@@ -527,7 +509,7 @@ async fn verify_pre_governance_accept_ownership_tail(
         // The acceptOwnership() calls are legitimately present in the calls
         // array — we no longer reject them based on live pendingOwner. We only
         // require the target to be a recognized v31 ownership-transfer contract.
-        let Some((_, role)) = candidates.iter().find(|(a, _)| *a == call.target).copied() else {
+        if !candidates.contains(&call.target) {
             result.report_error(&format!(
                 "Deferred acceptOwnership() call #{index} targets unexpected address {} ({}) — not a recognized v31 ownership-transfer target",
                 call.target,
@@ -535,7 +517,7 @@ async fn verify_pre_governance_accept_ownership_tail(
             ));
             errors += 1;
             continue;
-        };
+        }
 
         if seen_targets.contains(&call.target) {
             result.report_error(&format!(
@@ -547,51 +529,25 @@ async fn verify_pre_governance_accept_ownership_tail(
             seen_targets.push(call.target);
         }
 
-        // Role-specific live-ownership policy.
+        // Uniform live-ownership policy: every ownership-transfer target must
+        // have its ownership established at deployment time — `owner`, or at
+        // minimum `pendingOwner`, must already be governance. Anything else is a
+        // hard error (no role-specific tolerance).
         let name = verifiers.address_verifier.name_or_unknown(&call.target);
         let ownable = Ownable2Step::new(call.target, provider.clone());
         match (ownable.owner().call().await, ownable.pendingOwner().call().await) {
             (Ok(owner), Ok(pending)) => {
-                match role {
-                    OwnershipTransferRole::GovernanceTransferred => {
-                        // owner == governance → fully transferred.
-                        // owner != governance but pendingOwner == governance →
-                        //   tolerated: the acceptOwnership() is deferred to this
-                        //   stage-0 governance call (distinctive message).
-                        // otherwise (pendingOwner not governance) → a real error:
-                        //   the transfer to governance was never even initiated.
-                        if owner == governance {
-                            result.report_ok(&format!(
-                                "{name} ({}) owner is governance",
-                                call.target
-                            ));
-                        } else if pending == governance {
-                            result.report_warn(&format!(
-                                "[deferred-ownership] {name} ({}) owner is not yet governance (owner={owner}) but pendingOwner is governance; acceptOwnership() is deferred to this stage-0 governance call — tolerated",
-                                call.target
-                            ));
-                        } else {
-                            result.report_error(&format!(
-                                "{name} ({}) pendingOwner mismatch: ownership transfer to governance ({governance}) was not initiated, got owner={owner}, pendingOwner={pending}",
-                                call.target
-                            ));
-                            errors += 1;
-                        }
-                    }
-                    OwnershipTransferRole::DeployTimeOwned => {
-                        if owner == governance || pending == governance {
-                            result.report_ok(&format!(
-                                "{name} ({}) ownership set to governance at deployment (owner or pendingOwner)",
-                                call.target
-                            ));
-                        } else {
-                            result.report_error(&format!(
-                                "{name} ({}) ownership must be set to governance at deployment time: owner, or at minimum pendingOwner, must be {governance}, got owner={owner}, pendingOwner={pending}",
-                                call.target
-                            ));
-                            errors += 1;
-                        }
-                    }
+                if owner == governance || pending == governance {
+                    result.report_ok(&format!(
+                        "{name} ({}) ownership set to governance at deployment (owner or pendingOwner)",
+                        call.target
+                    ));
+                } else {
+                    result.report_error(&format!(
+                        "{name} ({}) ownership must be set to governance at deployment time: owner, or at minimum pendingOwner, must be {governance}, got owner={owner}, pendingOwner={pending}",
+                        call.target
+                    ));
+                    errors += 1;
                 }
             }
             _ => {

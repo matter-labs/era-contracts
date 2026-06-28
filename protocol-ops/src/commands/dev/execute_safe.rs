@@ -5,10 +5,8 @@ use std::path::{Path, PathBuf};
 use alloy::network::{EthereumWallet, TransactionBuilder};
 use alloy::primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy::providers::{Provider, ProviderBuilder};
-use alloy::rpc::client::ClientBuilder;
 use alloy::rpc::types::TransactionRequest;
 use alloy::signers::local::PrivateKeySigner;
-use alloy::transports::layers::RetryBackoffLayer;
 use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
@@ -70,30 +68,6 @@ fn receipt_poll_interval_ms() -> u64 {
         .and_then(|s| s.trim().parse::<u64>().ok())
         .filter(|&v| v > 0)
         .unwrap_or(RECEIPT_POLL_INTERVAL_MS)
-}
-
-fn env_u64(key: &str, default: u64) -> u64 {
-    std::env::var(key)
-        .ok()
-        .and_then(|s| s.trim().parse::<u64>().ok())
-        .filter(|&v| v > 0)
-        .unwrap_or(default)
-}
-
-/// Build the rate-limit retry/backoff layer for the signer-path provider.
-/// Defaults are effectively unthrottled (preserving behaviour on a dedicated
-/// node) but retry on 429, so a transient rate limit no longer aborts a whole
-/// bundle. For a shared/public RPC, lower `EXECUTE_SAFE_CUPS` (compute units
-/// per second; ~20 CU per request → req/s ≈ CUPS/20) to throttle proactively.
-///   EXECUTE_SAFE_RETRY_MAX        max 429 retries per request (default 20)
-///   EXECUTE_SAFE_RETRY_BACKOFF_MS initial backoff (default 1000)
-///   EXECUTE_SAFE_CUPS             compute-units/s budget (default 100000)
-fn retry_layer() -> RetryBackoffLayer {
-    RetryBackoffLayer::new(
-        env_u64("EXECUTE_SAFE_RETRY_MAX", 20) as u32,
-        env_u64("EXECUTE_SAFE_RETRY_BACKOFF_MS", 1000),
-        env_u64("EXECUTE_SAFE_CUPS", 100_000),
-    )
 }
 
 /// Returns a legacy `gasPrice` that's high enough to land within ~1-2 blocks
@@ -206,17 +180,9 @@ pub async fn execute_one_bundle(
     // recommended fillers (chain_id, gas, nonce); we override nonce and gas
     // manually per-tx below so those fillers are effectively a no-op for
     // the fields we set.
-    // Layer a rate-limit retry/backoff onto the RPC client so a 429 from a
-    // shared/public RPC backs off and retries instead of aborting the bundle.
-    // (Hung requests on a flaky public RPC are bounded by the caller wrapping
-    // this command in a `timeout`, after which the idempotent resume loop
-    // retries — see run-local-workflow.sh.)
-    let rpc_client = ClientBuilder::default()
-        .layer(retry_layer())
-        .http(l1_rpc_url.parse().context("invalid L1 RPC URL")?);
     let provider = ProviderBuilder::new()
         .wallet(wallet)
-        .connect_client(rpc_client);
+        .connect_http(l1_rpc_url.parse().context("invalid L1 RPC URL")?);
     provider
         .client()
         .set_poll_interval(std::time::Duration::from_millis(receipt_poll_interval_ms()));
