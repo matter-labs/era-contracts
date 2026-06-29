@@ -16,13 +16,17 @@ import {FinalizeL1DepositParams, IL1Nullifier, TRANSIENT_SETTLEMENT_LAYER_SLOT} 
 
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IMailboxLegacy} from "../state-transition/chain-interfaces/IMailboxLegacy.sol";
-import {ConfirmTransferResultData, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
+import {BUNDLE_IDENTIFIER, ConfirmTransferResultData, InteropBundle, InteropCall, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_INTEROP_CENTER_ADDR
+} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {
     AddressAlreadySet,
     DepositDoesNotExist,
@@ -38,7 +42,15 @@ import {
     WithdrawalAlreadyFinalized,
     ZeroAddress
 } from "../common/L1ContractErrors.sol";
-import {NativeTokenVaultAlreadySet, WrongL2Sender} from "./L1BridgeContractErrors.sol";
+import {
+    InteropWithdrawalNotSingleCall,
+    InteropWithdrawalWrongDestination,
+    InteropWithdrawalWrongOrigin,
+    InteropWithdrawalWrongTarget,
+    NativeTokenVaultAlreadySet,
+    WrongL2Sender,
+    WrongMsgLength
+} from "./L1BridgeContractErrors.sol";
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 import {TransientPrimitivesLib} from "../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
@@ -317,8 +329,12 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         L2Message memory l2ToL1Message;
         {
             address l2Sender = _finalizeWithdrawalParams.l2Sender;
-            bool baseTokenWithdrawal = (assetId == BRIDGE_HUB.baseTokenAssetId(_finalizeWithdrawalParams.chainId));
-            if (baseTokenWithdrawal) {
+            if (_finalizeWithdrawalParams.message[0] == BUNDLE_IDENTIFIER) {
+                // Interop-routed withdrawals are emitted by the L2 InteropCenter (which wraps the asset-router
+                // call in a single-call bundle). The bundle itself additionally authenticates that the inner
+                // call originated from the L2 asset router (see `_parseInteropWithdrawalBundle`).
+                require(l2Sender == L2_INTEROP_CENTER_ADDR, WrongL2Sender(l2Sender));
+            } else if (assetId == BRIDGE_HUB.baseTokenAssetId(_finalizeWithdrawalParams.chainId)) {
                 require(l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, WrongL2Sender(l2Sender));
             } else {
                 bool isL2SenderCorrect = l2Sender == L2_ASSET_ROUTER_ADDR ||
@@ -383,12 +399,59 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         // 2. The message that is sent from L2 Legacy Shared Bridge to withdraw ERC20 tokens or base token.
         // 3. The message that is sent from L2 Asset Router to withdraw ERC20 tokens or base token.
 
+        // Interop-routed withdrawals arrive as a single-call InteropBundle prefixed with BUNDLE_IDENTIFIER.
+        if (_l2ToL1message[0] == BUNDLE_IDENTIFIER) {
+            return _parseInteropWithdrawalBundle(_chainId, _l2ToL1message);
+        }
+
         bytes4 functionSignature = DataEncoding.getSelector(_l2ToL1message);
         if (functionSignature == AssetRouterBase.finalizeDeposit.selector) {
             // slither-disable-next-line unused-return
             (, , assetId, transferData) = DataEncoding.decodeAssetRouterFinalizeDepositData(_l2ToL1message);
         } else {
             revert InvalidSelector(bytes4(functionSignature));
+        }
+    }
+
+    /// @notice Parses an interop-routed withdrawal: a single-call InteropBundle destined for this L1.
+    /// @dev The bundle is emitted by the L2 InteropCenter. It must contain exactly one call, originated by the
+    /// L2 asset router (`from`) and targeting this nullifier's L1 asset router (`to`) via `finalizeDeposit`.
+    /// @param _chainId The source ZK chain ID (must match the chainId encoded in the inner call).
+    /// @param _l2ToL1message The BUNDLE_IDENTIFIER-prefixed `abi.encode(InteropBundle)` message.
+    function _parseInteropWithdrawalBundle(
+        uint256 _chainId,
+        bytes memory _l2ToL1message
+    ) internal view returns (bytes32 assetId, bytes memory transferData) {
+        // Strip the 1-byte BUNDLE_IDENTIFIER prefix; the remainder is exactly `abi.encode(InteropBundle)`.
+        InteropBundle memory bundle = abi.decode(_sliceFromOffset(_l2ToL1message, 1), (InteropBundle));
+
+        require(bundle.destinationChainId == block.chainid, InteropWithdrawalWrongDestination());
+        require(bundle.calls.length == 1, InteropWithdrawalNotSingleCall());
+
+        InteropCall memory interopCall = bundle.calls[0];
+        require(interopCall.to == address(l1AssetRouter), InteropWithdrawalWrongTarget());
+        require(interopCall.from == L2_ASSET_ROUTER_ADDR, InteropWithdrawalWrongOrigin());
+
+        // The inner call is `abi.encodeCall(AssetRouterBase.finalizeDeposit, (sourceChainId, assetId, transferData))`.
+        require(
+            bytes4(interopCall.data) == AssetRouterBase.finalizeDeposit.selector,
+            InvalidSelector(bytes4(interopCall.data))
+        );
+        uint256 sourceChainId;
+        (sourceChainId, assetId, transferData) = abi.decode(
+            _sliceFromOffset(interopCall.data, 4),
+            (uint256, bytes32, bytes)
+        );
+        require(sourceChainId == _chainId, InteropWithdrawalWrongDestination());
+    }
+
+    /// @dev Returns a copy of `_data` starting at `_offset`. Used to drop a leading identifier/selector before
+    /// `abi.decode`. O(n) memory copy; acceptable for the withdrawal-finalization path.
+    function _sliceFromOffset(bytes memory _data, uint256 _offset) private pure returns (bytes memory result) {
+        require(_data.length >= _offset, WrongMsgLength(_offset, _data.length));
+        result = new bytes(_data.length - _offset);
+        for (uint256 i = 0; i < result.length; ++i) {
+            result[i] = _data[_offset + i];
         }
     }
 

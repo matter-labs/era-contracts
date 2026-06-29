@@ -47,6 +47,7 @@ import {
     InteroperableAddressChainReferenceNotEmpty,
     InteroperableAddressNotEmpty,
     FeeWithdrawalFailed,
+    MultiCallToL1NotSupported,
     ZKTokenNotAvailable
 } from "./InteropErrors.sol";
 
@@ -243,8 +244,8 @@ contract InteropCenter is
         // slither-disable-next-line unused-return
         (uint256 destinationChainId, ) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
 
-        // Ensure this is an L2 to L2 transaction
-        _ensureL2ToL2(destinationChainId);
+        // Ensure the destination is valid: L2->L2, or an L2->L1 withdrawal expressed as a single-call bundle.
+        _ensureValidDestination(destinationChainId, _callStarters.length);
         InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](
             _callStarters.length
         );
@@ -330,11 +331,18 @@ contract InteropCenter is
         require(addressLength == 0, InteroperableAddressNotEmpty(_interoperableAddress));
     }
 
-    function _ensureL2ToL2(uint256 _destinationChainId) internal view {
-        require(
-            L1_CHAIN_ID != block.chainid && _destinationChainId != L1_CHAIN_ID,
-            NotL2ToL2(block.chainid, _destinationChainId)
-        );
+    /// @notice Validates the bundle destination.
+    /// @dev The InteropCenter only runs on L2s (never on L1 itself). Destinations may be:
+    ///      - another L2 (the classic L2->L2 interop), or
+    ///      - L1, but only for a single-call bundle (an L2->L1 asset withdrawal). Multi-call bundles to L1
+    ///        are not supported, since an L1 withdrawal corresponds to exactly one finalizeDeposit call.
+    /// @param _destinationChainId Destination chain ID.
+    /// @param _callCount Number of calls in the bundle.
+    function _ensureValidDestination(uint256 _destinationChainId, uint256 _callCount) internal view {
+        require(L1_CHAIN_ID != block.chainid, NotL2ToL2(block.chainid, _destinationChainId));
+        if (_destinationChainId == L1_CHAIN_ID) {
+            require(_callCount == 1, MultiCallToL1NotSupported(_callCount));
+        }
     }
 
     /// @notice Ensures the received base token value matches expected for the destination chain

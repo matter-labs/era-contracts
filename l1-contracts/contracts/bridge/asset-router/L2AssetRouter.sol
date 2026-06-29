@@ -22,7 +22,6 @@ import {
     L2_INTEROP_HANDLER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {
     AmountMustBeGreaterThanZero,
@@ -303,60 +302,18 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         // as an ERC-7786 attribute to ensure proper value transfer in the interop call.
         bytes[] memory attributes = new bytes[](1);
         attributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, _value);
+
+        // For L2->L2 the counterpart is the L2 asset router (same address on every ZK chain). For an
+        // L2->L1 withdrawal the destination is L1, where the asset router lives at a different address,
+        // so we target the known L1 asset router instead. The finalizeDeposit calldata is identical.
+        address destinationAssetRouter = _chainId == L1_CHAIN_ID
+            ? address(L1_ASSET_ROUTER)
+            : request.l2Contract;
         interopCallStarter = InteropCallStarter({
-            to: InteroperableAddress.formatEvmV1(request.l2Contract),
+            to: InteroperableAddress.formatEvmV1(destinationAssetRouter),
             data: request.l2Calldata,
             callAttributes: attributes
         });
-    }
-
-    /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
-    /// where tokens would be unlocked
-    /// @dev IMPORTANT: this method will be deprecated in one of the future releases, so contracts
-    /// that rely on it must be upgradeable.
-    /// @param _assetId The asset id of the withdrawn asset
-    /// @param _assetData The data that is passed to the asset handler contract
-    function withdraw(bytes32 _assetId, bytes memory _assetData) public override nonReentrant returns (bytes32) {
-        return _withdrawSender(_assetId, _assetData, msg.sender);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                     Internal & Helpers
-    //////////////////////////////////////////////////////////////*/
-
-    /// @param _assetId The asset id of the withdrawn asset
-    /// @param _assetData The data that is passed to the asset handler contract
-    /// @param _sender The address of the sender of the message
-    function _withdrawSender(
-        bytes32 _assetId,
-        bytes memory _assetData,
-        address _sender
-    ) internal returns (bytes32 txHash) {
-        bytes memory l1bridgeMintData = _burn({
-            _chainId: L1_CHAIN_ID,
-            _nextMsgValue: 0,
-            _assetId: _assetId,
-            _originalCaller: _sender,
-            _transferData: _assetData,
-            _passValue: false,
-            _nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR
-        });
-
-        bytes memory message = _getAssetRouterWithdrawMessage(_assetId, l1bridgeMintData);
-        // slither-disable-next-line unused-return
-        txHash = L2ContractHelper.sendMessageToL1(message);
-
-        emit WithdrawalInitiatedAssetRouter(L1_CHAIN_ID, _sender, _assetId, _assetData);
-    }
-
-    /// @notice Encodes the message for l2ToL1log sent during withdraw initialization.
-    /// @param _assetId The encoding of the asset on L2 which is withdrawn.
-    /// @param _l1bridgeMintData The calldata used by l1 asset handler to unlock tokens for recipient.
-    function _getAssetRouterWithdrawMessage(
-        bytes32 _assetId,
-        bytes memory _l1bridgeMintData
-    ) internal view returns (bytes memory) {
-        return DataEncoding.encodeAssetRouterFinalizeDepositData(block.chainid, _assetId, _l1bridgeMintData);
     }
 
 }
