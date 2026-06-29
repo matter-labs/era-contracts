@@ -58,18 +58,6 @@ const GAS_PRICE_MULTIPLIER_BPS: u128 = 30_000;
 /// anvil's instamine or reth's sub-second block time.
 const RECEIPT_POLL_INTERVAL_MS: u64 = 50;
 
-/// Effective receipt-poll interval. 50ms is right for a dedicated node, but it
-/// 429s public RPCs (e.g. broadcasting a 74-tx bundle to Sepolia over a shared
-/// endpoint). Allow an env override so a real-L1 deploy over a rate-limited RPC
-/// can back off without a dedicated node. Falls back to the const.
-fn receipt_poll_interval_ms() -> u64 {
-    std::env::var("EXECUTE_SAFE_POLL_INTERVAL_MS")
-        .ok()
-        .and_then(|s| s.trim().parse::<u64>().ok())
-        .filter(|&v| v > 0)
-        .unwrap_or(RECEIPT_POLL_INTERVAL_MS)
-}
-
 /// Returns a legacy `gasPrice` that's high enough to land within ~1-2 blocks
 /// on busy public chains, but never below `GAS_PRICE_FLOOR_WEI` so local
 /// chains (anvil/reth at 0 base fee) still get a non-zero price. We use
@@ -185,7 +173,7 @@ pub async fn execute_one_bundle(
         .connect_http(l1_rpc_url.parse().context("invalid L1 RPC URL")?);
     provider
         .client()
-        .set_poll_interval(std::time::Duration::from_millis(receipt_poll_interval_ms()));
+        .set_poll_interval(std::time::Duration::from_millis(RECEIPT_POLL_INTERVAL_MS));
 
     logger::info(format!(
         "Replaying {} tx(s) under broadcaster {:#x}",
@@ -491,7 +479,7 @@ pub async fn execute_one_bundle_unlocked(
     let provider = get_provider(l1_rpc_url).context("connect L1 provider")?;
     provider
         .client()
-        .set_poll_interval(std::time::Duration::from_millis(receipt_poll_interval_ms()));
+        .set_poll_interval(std::time::Duration::from_millis(RECEIPT_POLL_INTERVAL_MS));
     let chain_id = provider.get_chain_id().await.context("eth_chainId")?;
 
     logger::info(format!(
