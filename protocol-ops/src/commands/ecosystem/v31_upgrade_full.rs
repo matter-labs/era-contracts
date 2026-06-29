@@ -76,7 +76,7 @@ impl<'a> V31UpgradeFull<'a> {
         self.run_pre_steps(runner, deployer).await?;
         let mut prepared = self.inner.prepare(runner, deployer, inputs).await?;
         self.run_ctm_admin_steps(runner, deployer, &prepared.ctm_tomls)?;
-        self.run_aux_ownership_steps(runner, deployer, &prepared.ctm_tomls)
+        self.run_aux_ownership_steps(runner, deployer, &prepared.core_toml, &prepared.ctm_tomls)
             .await?;
 
         if let Some(ref new_gw) = self.new_gateway {
@@ -195,16 +195,21 @@ impl<'a> V31UpgradeFull<'a> {
         Ok(())
     }
 
-    /// After prepare, some CTM-adjacent Ownable2Step contracts are known only
-    /// from the CTM output TOMLs. Transfer them to governance through the same
-    /// owner-wrapper machinery and persist their deferred PUH accepts.
+    /// After prepare, several Ownable2Step contracts still owned by the deployer
+    /// (or whose transfer was only just initiated) are known only from the prepare
+    /// output TOMLs: the core ecosystem AssetTracker + ChainRegistrationSender
+    /// (from the Core TOML) and the CTM-adjacent GovernanceUpgradeTimer /
+    /// RollupDAManager / ZKsync-OS verifier (from each CTM TOML). Transfer them to
+    /// governance through the same owner-wrapper machinery and persist their
+    /// deferred PUH accepts — these all land in the single stage-0 trailing block.
     async fn run_aux_ownership_steps(
         &self,
         runner: &mut ForgeRunner,
         deployer: &Wallet,
+        core_toml: &Path,
         ctm_entries: &[CtmPrepareEntry],
     ) -> anyhow::Result<()> {
-        let targets = read_aux_ownership_targets(ctm_entries)?;
+        let targets = read_aux_ownership_targets(core_toml, ctm_entries)?;
         let governance = crate::common::l1_contracts::resolve_governance(
             &runner.rpc_url,
             self.inner.bridgehub(),
@@ -231,7 +236,26 @@ impl<'a> V31UpgradeFull<'a> {
     }
 }
 
-fn read_aux_ownership_targets(ctm_entries: &[CtmPrepareEntry]) -> anyhow::Result<Vec<Address>> {
+fn read_aux_ownership_targets(
+    core_toml: &Path,
+    ctm_entries: &[CtmPrepareEntry],
+) -> anyhow::Result<Vec<Address>> {
+    #[derive(Deserialize)]
+    struct CoreOutput {
+        asset_tracker_proxy_addr: String,
+        upgrade_addresses: CoreUpgradeAddresses,
+    }
+
+    #[derive(Deserialize)]
+    struct CoreUpgradeAddresses {
+        bridgehub: CoreBridgehub,
+    }
+
+    #[derive(Deserialize)]
+    struct CoreBridgehub {
+        chain_registration_sender_proxy_addr: String,
+    }
+
     #[derive(Deserialize)]
     struct CtmOutput {
         deployed_addresses: DeployedAddresses,
@@ -265,6 +289,37 @@ fn read_aux_ownership_targets(ctm_entries: &[CtmPrepareEntry]) -> anyhow::Result
     }
 
     let mut targets = Vec::new();
+
+    // Core ecosystem Ownable2Step contracts: AssetTracker + ChainRegistrationSender.
+    // Their transfer to governance is initiated during the core deploy
+    // (`updateContractConnections`); routing them through this aux flow folds the
+    // deferred acceptOwnership() into stage 0 next to the CTM accepts.
+    {
+        let raw = fs::read_to_string(core_toml)
+            .with_context(|| format!("read {}", core_toml.display()))?;
+        let parsed: CoreOutput =
+            toml::from_str(&raw).with_context(|| format!("parse {}", core_toml.display()))?;
+        push_unique(
+            &mut targets,
+            parse_addr(
+                core_toml,
+                "asset_tracker_proxy_addr",
+                &parsed.asset_tracker_proxy_addr,
+            )?,
+        );
+        push_unique(
+            &mut targets,
+            parse_addr(
+                core_toml,
+                "upgrade_addresses.bridgehub.chain_registration_sender_proxy_addr",
+                &parsed
+                    .upgrade_addresses
+                    .bridgehub
+                    .chain_registration_sender_proxy_addr,
+            )?,
+        );
+    }
+
     for entry in ctm_entries {
         let raw = fs::read_to_string(&entry.toml)
             .with_context(|| format!("read {}", entry.toml.display()))?;

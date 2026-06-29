@@ -52,7 +52,7 @@ use super::{
 /// Number of generated ecosystem-wide stage-1 calls before any per-CTM block.
 /// On stage, PUVT additionally requires one leading `pauseMigration()` call
 /// because stage1 is executed through the emergency-upgrade path.
-const STAGE1_GENERATED_PREFIX_LEN: usize = 12;
+const STAGE1_GENERATED_PREFIX_LEN: usize = 10;
 const STAGE1_PER_CTM_LEN: usize = 6;
 
 /// Index of the per-CTM `ChainTypeManager` proxy upgrade within the
@@ -346,10 +346,8 @@ impl GovernanceStage1Calls {
     ) -> anyhow::Result<()> {
         result.print_info("== Gov stage 1 calls ===");
 
-        const ACCEPT_CHAIN_REGISTRATION_SENDER_OWNERSHIP: usize = 7;
-        const ACCEPT_ASSET_TRACKER_OWNERSHIP: usize = 8;
-        const SET_ASSET_TRACKER: usize = 9;
-        const SET_BRIDGEHUB_ADDRESSES_V31: usize = 10;
+        const SET_ASSET_TRACKER: usize = 7;
+        const SET_BRIDGEHUB_ADDRESSES_V31: usize = 8;
 
         let call_offset = STAGE1_LEADING_PAUSE_OFFSET;
         let mut errors = 0;
@@ -385,16 +383,12 @@ impl GovernanceStage1Calls {
             (5, "transparent_proxy_admin", "upgrade(address,address)"),
             // Upgrade chain asset handler proxy.
             (6, "transparent_proxy_admin", "upgrade(address,address)"),
-            // Accept ChainRegistrationSender ownership.
-            (7, "chain_registration_sender_proxy", "acceptOwnership()"),
-            // Accept AssetTracker ownership.
-            (8, "asset_tracker_proxy", "acceptOwnership()"),
             // Wire AssetTracker into NativeTokenVault.
-            (9, "native_token_vault", "setAssetTracker(address)"),
+            (7, "native_token_vault", "setAssetTracker(address)"),
             // Wire ChainRegistrationSender into the upgraded Bridgehub implementation.
-            (10, "bridgehub_proxy", "setAddressesV31(address)"),
+            (8, "bridgehub_proxy", "setAddressesV31(address)"),
             // Cache MessageRoot / AssetRouter inside L1ChainAssetHandler.
-            (11, "chain_asset_handler_proxy", "setAddresses()"),
+            (9, "chain_asset_handler_proxy", "setAddresses()"),
         ] {
             errors += verify_call_by_name(
                 &self.calls,
@@ -558,25 +552,18 @@ impl GovernanceStage1Calls {
             result,
         );
 
-        // The accepted AssetTracker proxy must be the one wired into NativeTokenVault.
-        if let (Some(accept_call), Some(set_asset_tracker_call)) = (
-            self.calls
-                .elems
-                .get(call_offset + ACCEPT_ASSET_TRACKER_OWNERSHIP),
-            self.calls.elems.get(call_offset + SET_ASSET_TRACKER),
-        ) {
+        // The AssetTracker wired into NativeTokenVault must be the known
+        // asset_tracker_proxy (whose ownership is accepted in stage 0).
+        if let Some(set_asset_tracker_call) = self.calls.elems.get(call_offset + SET_ASSET_TRACKER)
+        {
             match setAssetTrackerCall::abi_decode(&set_asset_tracker_call.data) {
-                Ok(decoded) if decoded._l1AssetTracker == accept_call.target => {
-                    result.report_ok(
-                        "AssetTracker ownership target matches setAssetTracker argument",
-                    );
-                }
                 Ok(decoded) => {
-                    result.report_error(&format!(
-                        "AssetTracker target mismatch: acceptOwnership targets {}, but setAssetTracker uses {}",
-                        accept_call.target, decoded._l1AssetTracker
-                    ));
-                    errors += 1;
+                    errors += expect_named_address(
+                        result,
+                        verifiers,
+                        &decoded._l1AssetTracker,
+                        "asset_tracker_proxy",
+                    );
                 }
                 Err(err) => {
                     result.report_error(&format!("Failed to decode setAssetTracker call: {err}"));
@@ -585,28 +572,21 @@ impl GovernanceStage1Calls {
             }
         }
 
-        // The accepted ChainRegistrationSender proxy must be the one wired into
-        // Bridgehub once the v31 implementation is live.
-        if let (Some(accept_call), Some(set_addresses_v31_call)) = (
-            self.calls
-                .elems
-                .get(call_offset + ACCEPT_CHAIN_REGISTRATION_SENDER_OWNERSHIP),
-            self.calls
-                .elems
-                .get(call_offset + SET_BRIDGEHUB_ADDRESSES_V31),
-        ) {
+        // The ChainRegistrationSender wired into Bridgehub must be the known
+        // chain_registration_sender_proxy (ownership accepted in stage 0).
+        if let Some(set_addresses_v31_call) = self
+            .calls
+            .elems
+            .get(call_offset + SET_BRIDGEHUB_ADDRESSES_V31)
+        {
             match setAddressesV31Call::abi_decode(&set_addresses_v31_call.data) {
-                Ok(decoded) if decoded._chainRegistrationSender == accept_call.target => {
-                    result.report_ok(
-                        "ChainRegistrationSender ownership target matches setAddressesV31 argument",
-                    );
-                }
                 Ok(decoded) => {
-                    result.report_error(&format!(
-                        "ChainRegistrationSender target mismatch: acceptOwnership targets {}, but setAddressesV31 uses {}",
-                        accept_call.target, decoded._chainRegistrationSender
-                    ));
-                    errors += 1;
+                    errors += expect_named_address(
+                        result,
+                        verifiers,
+                        &decoded._chainRegistrationSender,
+                        "chain_registration_sender_proxy",
+                    );
                 }
                 Err(err) => {
                     result.report_error(&format!("Failed to decode setAddressesV31 call: {err}"));

@@ -69,18 +69,22 @@ rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 
 [[ctm_contracts.ctms]]
 # Era CTM (witness chain: 301, v29)
-# v31-compatible RollupDAManager deployed for the Era CTM. This intentionally
-# differs from the pre-v31 chain getter value because the old manager uses the
-# legacy `(address,address)` DA pair API, while the v31 AdminFacet requires the
-# `(address,L2DACommitmentScheme)` API.
-# The prepare flow accepts ownership of this manager as PUH and allows the
-# permanent-rollup DA pair before any chain admin tries to set it on-chain.
+# The Era CTM does NOT reuse the pre-v31 RollupDAManager: its legacy
+# `(address,address)` DA-pair API is incompatible with the v31 AdminFacet, which
+# requires the `(address,L2DACommitmentScheme)` API. The v31 CTM prepare
+# (`CTMUpgrade_v31.deployEraRollupDA`) deploys a FRESH RollupDAManager +
+# RollupL1DAValidator and registers the rollup DA pair on it; the freshly
+# deployed manager is what the AdminFacet immutable and the merged ecosystem.toml
+# use, overriding the value below. `rollup_da_manager` is kept here only to skip
+# the pre-v31 on-chain auto-resolution (the v29 chain has no getRollupDAManager()
+# getter); its value is otherwise unused. No `rollup_da_pair` — the DA pair is set
+# at deploy time on the fresh manager, so the deferred acceptOwnership() lands in
+# stage 0 (no stage-1 updateDAPair call).
 # bytecodes_supplier from v0.29.1-interopA-ff/testnet.toml.
 proxy = "0x3Cc81628a14C824057a97C1B4Ab17758E5D18864"
 is_zk_sync_os = false
 bytecodes_supplier = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
 rollup_da_manager = "0x82Ad20F138A46998265Ba75fdf1da4bB2E949934"
-rollup_da_pair = { l1_da_validator = "0xcc46b186bd4515fa996adf3c40344ed7d546a65b", l2_da_commitment_scheme = "BlobsAndPubdataKeccak256" }
 
 # Contracts that own a CTM / ProxyAdmin and have no private key — ownership
 # transfers routed through them must be *wrapped* (called by their EOA owner via
