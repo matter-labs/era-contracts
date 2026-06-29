@@ -125,6 +125,8 @@ contract GatewayCTMDeployerTester {
 }
 
 contract GatewayCTMDeployerTest is Test {
+    string internal constant GW_IS_EVM_EQUIVALENT_ENV = "GW_IS_EVM_EQUIVALENT";
+
     GatewayCTMDeployerConfig deployerConfig;
 
     // This is done merely to publish the respective bytecodes.
@@ -208,6 +210,8 @@ contract GatewayCTMDeployerTest is Test {
 
     // It is more a smoke test that indeed the deployment works
     function testGatewayCTMDeployer() external {
+        vm.setEnv(GW_IS_EVM_EQUIVALENT_ENV, "false");
+
         // Calculate expected addresses using the helper FIRST
         // This is needed because some deployer constructors need addresses from earlier deployers
         (
@@ -239,6 +243,8 @@ contract GatewayCTMDeployerTest is Test {
 
         // Compare calculated addresses with actual deployed addresses
         DeployedContractsComparator.compareDeployedContracts(calculatedContracts, actualContracts);
+
+        vm.setEnv(GW_IS_EVM_EQUIVALENT_ENV, "true");
     }
 
     function _publishDeployerBytecodes(DeployedContracts memory calculatedContracts) internal {
