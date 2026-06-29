@@ -18,5 +18,6 @@ l1_bytecodes_supplier_addr = "0x0000000000000000000000000000000000000000"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 create2_factory_salt = "0x0000000000000000000000000000000000000000000000000000000000000000"
 
-[legacy_gateway]
-chain_id = 0
+# [legacy_gateway] intentionally omitted: the v29 fixture never registers a
+# legacy GW chain as a settlement layer, so emitting
+# `setSettlementLayerStatus(_, false)` would revert during stage-2 multicall.

@@ -100,8 +100,6 @@ error TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber();
 error TotalBatchesExecutedZero();
 // 0x883fc41b
 error V31UpgradeChainBatchNumberAlreadySet();
-// 0xde6d7b2f
-error V31UpgradeChainBatchNumberNotSet();
 // 0x92626457
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
 // 0x7b968d06
