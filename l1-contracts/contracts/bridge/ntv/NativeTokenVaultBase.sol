@@ -202,28 +202,34 @@ abstract contract NativeTokenVaultBase is
         uint256 amount;
         // we set all originChainId for all already bridged tokens with the setLegacyTokenAssetId and updateChainBalancesFromSharedBridge functions.
         // for tokens that are bridged for the first time, the originChainId will be 0.
-        if (originChainId[_assetId] == block.chainid) {
-            (receiver, amount) = _bridgeMintNativeToken(_chainId, _assetId, _data);
-        } else {
-            (receiver, amount) = _bridgeMintBridgedToken(_chainId, _assetId, _data);
-        }
+        (receiver, amount) = _bridgeMintToken(
+            _chainId,
+            _assetId,
+            _data,
+            originChainId[_assetId] != block.chainid
+        );
         // solhint-disable-next-line func-named-parameters
         emit BridgeMint(_chainId, _assetId, receiver, amount);
     }
 
-    function _bridgeMintBridgedToken(
+    /// @notice Mints/releases a bridged-in asset to the receiver and decreases the chain balance.
+    /// @dev Unifies the native and bridged-token paths. A bridged token is minted (and deployed on first
+    /// bridging if needed); a native token's escrowed funds are released via `_withdrawFunds`.
+    /// @param _isBridgedToken True if the token is bridged (not native to this chain).
+    function _bridgeMintToken(
         uint256 _chainId,
         bytes32 _assetId,
-        bytes calldata _data
-    ) internal virtual returns (address receiver, uint256 amount) {
+        bytes calldata _data,
+        bool _isBridgedToken
+    ) internal returns (address receiver, uint256 amount) {
         // Either it was bridged before, therefore address is not zero, or it is first time bridging and standard erc20 will be deployed
         address token = tokenAddress[_assetId];
-        bytes memory erc20Data;
         address originToken;
+        bytes memory erc20Data;
         // slither-disable-next-line unused-return
         (, receiver, originToken, amount, erc20Data) = DataEncoding.decodeBridgeMintData(_data);
 
-        if (token == address(0)) {
+        if (_isBridgedToken && token == address(0)) {
             token = _ensureAndSaveTokenDeployed(_assetId, originToken, erc20Data);
         }
 
@@ -231,23 +237,12 @@ abstract contract NativeTokenVaultBase is
         // because otherwise the latter operation (via a malicious token or ETH recipient)
         // could've overwritten the transient values from L1Nullifier.
         _handleBridgeFromChain({_chainId: _chainId, _assetId: _assetId, _amount: amount});
-        IBridgedStandardToken(token).bridgeMint(receiver, amount);
-    }
 
-    function _bridgeMintNativeToken(
-        uint256 _chainId,
-        bytes32 _assetId,
-        bytes calldata _data
-    ) internal returns (address receiver, uint256 amount) {
-        address token = tokenAddress[_assetId];
-        // slither-disable-next-line unused-return
-        (, receiver, , amount, ) = DataEncoding.decodeBridgeMintData(_data);
-
-        // IMPORTANT: We must handle chain balance decrease before giving out funds to the user,
-        // because otherwise the latter operation (via a malicious token or ETH recipient)
-        // could've overwritten the transient values from L1Nullifier.
-        _handleBridgeFromChain({_chainId: _chainId, _assetId: _assetId, _amount: amount});
-        _withdrawFunds(_assetId, receiver, token, amount);
+        if (_isBridgedToken) {
+            IBridgedStandardToken(token).bridgeMint(receiver, amount);
+        } else {
+            _withdrawFunds(_assetId, receiver, token, amount);
+        }
     }
 
     function _withdrawFunds(bytes32 _assetId, address _to, address _token, uint256 _amount) internal virtual;
