@@ -741,13 +741,13 @@
   },
   {
     "contractName": "l1-contracts/AdminFacet",
-    "zkBytecodeHash": "0x01000665df0b8037c9759c65ea6a3b8b4c82b572d0981cdb9cee4f5392df85cf",
+    "zkBytecodeHash": "0x01000669df72911bbd60c659f25a37ac6b51425696234be718c74fab182a113a",
     "zkBytecodePath": "/l1-contracts/zkout/Admin.sol/AdminFacet.json",
-    "evmBytecodeHash": "0xd3614820ff844126e915468e914edb699868e839f065683c673f52929c9541ca",
+    "evmBytecodeHash": "0x8edc04a4967c35029a1f4c2b57e305d453bbafced65a1216823b7da25642b6d7",
     "evmBytecodePath": "/l1-contracts/out/Admin.sol/AdminFacet.json",
-    "evmDeployedBytecodeHash": "0x53fd6e7ba4b9163bf6f472db32be0a7c6c2aec6e5eeee67ac560827269070d2a",
-    "evmDeployedBytecodeBlakeHash": "0x9d53022d5fde8bba24e0e59e15f74495e9203f4ee9747b5918689b6e7a5c7005",
-    "evmDeployedBytecodeLength": 21752
+    "evmDeployedBytecodeHash": "0x6b66519d94e4e3f078404afc7e6cf6e8d27c0339776e25f13feac6716878ba1c",
+    "evmDeployedBytecodeBlakeHash": "0x124909b9fa9e724a870e7d4548a94071190d509d54280924ffbfa5906feda826",
+    "evmDeployedBytecodeLength": 21871
   },
   {
     "contractName": "l1-contracts/Arrays",
@@ -2380,6 +2380,16 @@
     "zkBytecodePath": null
   },
   {
+    "contractName": "da-contracts/CalldataL1DAValidatorZKsyncOS",
+    "evmBytecodeHash": "0x22cd8dfba142929233abf72ff05e27f4e6fb5691af20f140a4d326e94a22043b",
+    "evmBytecodePath": "/da-contracts/out/CalldataL1DAValidatorZKsyncOS.sol/CalldataL1DAValidatorZKsyncOS.json",
+    "evmDeployedBytecodeHash": "0xb2fce7913d8566a175a4f09a9eb18969fcb16e6128a30060ac0f06bc92bb2c06",
+    "evmDeployedBytecodeBlakeHash": "0x984c11382887dcd9fee2e10596f9233b8b207ce0032d46405367c4cdcef1c4f7",
+    "evmDeployedBytecodeLength": 1286,
+    "zkBytecodeHash": null,
+    "zkBytecodePath": null
+  },
+  {
     "contractName": "da-contracts/DummyAvailBridge",
     "evmBytecodeHash": "0x999d4ab8230e7242bec5927ad7d30f915b64cc8918d2987dfc7acfa381a918be",
     "evmBytecodePath": "/da-contracts/out/DummyAvailBridge.sol/DummyAvailBridge.json",
@@ -2406,16 +2416,6 @@
     "evmDeployedBytecodeHash": "0x1178e7f5edd7832ca13e191bdcd950393f2fa203a4d057dfa744887da21dd606",
     "evmDeployedBytecodeBlakeHash": "0x262ab74e8982064476e80289913b3dc89df901997cb6f3ad14351bc146d3ac03",
     "evmDeployedBytecodeLength": 479,
-    "zkBytecodeHash": null,
-    "zkBytecodePath": null
-  },
-  {
-    "contractName": "da-contracts/L2ToL1OnlyL1DAValidator",
-    "evmBytecodeHash": "0x0cdcab3d470ea2b7f5c4076c4d78334fd5117f2f7789d42a6f7ab878dcba0308",
-    "evmBytecodePath": "/da-contracts/out/L2ToL1OnlyL1DAValidator.sol/L2ToL1OnlyL1DAValidator.json",
-    "evmDeployedBytecodeHash": "0x5763ec8d45297e9f70b968a9a5cdf113cecfb4617ce61b99a8b9a164adacece8",
-    "evmDeployedBytecodeBlakeHash": "0x34165a2a8d9fbc6695f34fcbf6e67b7c6585aaa52793649592a8c5c1224f8879",
-    "evmDeployedBytecodeLength": 1286,
     "zkBytecodeHash": null,
     "zkBytecodePath": null
   },
