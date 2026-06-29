@@ -1,13 +1,13 @@
+use alloy::primitives::{Address, B256};
 use clap::Parser;
-use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 
-use crate::commands::hub::accept_ownership::{accept_ownership, AcceptOwnershipInput};
 use crate::commands::hub::deploy::{deploy, DeployInput};
-use crate::commands::output::write_output_if_requested;
+use crate::common::abi::AdminFunctionsAbi;
+use crate::common::output::write_output_if_requested;
 
+use crate::common::forge::scripts::deploy_ecosystem::DeployL1CoreContractsOutput;
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet, SharedRunArgs};
-use crate::config::forge_interface::deploy_ecosystem::output::DeployL1CoreContractsOutput;
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 
@@ -36,7 +36,7 @@ pub struct HubInitArgs {
     pub with_legacy_bridge: bool,
     /// CREATE2 factory salt
     #[clap(long, help_heading = "Advanced input")]
-    pub create2_factory_salt: Option<H256>,
+    pub create2_factory_salt: Option<B256>,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
@@ -68,7 +68,7 @@ pub struct HubInitInput {
     pub owner: Address,
     pub era_chain_id: u64,
     pub with_legacy_bridge: bool,
-    pub create2_factory_salt: Option<H256>,
+    pub create2_factory_salt: Option<B256>,
 }
 
 /// Initialize hub: deploy contracts and accept ownership.
@@ -91,12 +91,24 @@ pub async fn hub_init(
 
     logger::step("Accepting ownership of Bridgehub contracts...");
     let deployed = &output.deployed_addresses;
-    let accept_input = AcceptOwnershipInput {
-        bridgehub: deployed.bridgehub.bridgehub_proxy_addr,
-        governance: deployed.governance_addr,
-        chain_admin: deployed.chain_admin,
-    };
-    accept_ownership(runner, owner, &accept_input).await?;
+    let bridgehub = deployed.bridgehub.bridgehub_proxy_addr;
+    let accept_scripts = [
+        runner
+            .script_call(AdminFunctionsAbi::chainAdminAcceptAdminCall {
+                _chainAdmin: deployed.chain_admin,
+                _target: bridgehub,
+            })
+            .with_wallet(owner)
+            .with_timing_label("hub.accept_admin"),
+        runner
+            .script_call(AdminFunctionsAbi::governanceAcceptOwnerAggregatedCall {
+                _governor: deployed.governance_addr,
+                _bridgehub: bridgehub,
+            })
+            .with_wallet(owner)
+            .with_timing_label("hub.accept_owner_aggregated"),
+    ];
+    runner.run_scripts(accept_scripts)?;
 
     Ok(output)
 }

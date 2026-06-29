@@ -68,9 +68,15 @@ export class AnvilManager {
       timestamp?: number;
       dumpStatePath?: string;
       loadStatePath?: string;
+      forkUrl?: string;
+      forkBlockNumber?: number;
     }
   ): Promise<void> {
-    const { chainId, port, role, blockTime, timestamp, dumpStatePath, loadStatePath } = config;
+    const { chainId, port, role, blockTime, timestamp, dumpStatePath, loadStatePath, forkUrl, forkBlockNumber } =
+      config;
+    if (loadStatePath && forkUrl) {
+      throw new Error(`Chain ${chainId}: loadStatePath and forkUrl are mutually exclusive`);
+    }
     const isL1 = role === "l1";
     const rpcUrl = `http://127.0.0.1:${port}`;
 
@@ -126,6 +132,13 @@ export class AnvilManager {
 
     if (loadStatePath) {
       args.push("--load-state", loadStatePath);
+    }
+
+    if (forkUrl) {
+      args.push("--fork-url", forkUrl);
+      if (forkBlockNumber !== undefined) {
+        args.push("--fork-block-number", forkBlockNumber.toString());
+      }
     }
 
     // Use pipe for stderr to capture error output, ignore stdin/stdout for detach

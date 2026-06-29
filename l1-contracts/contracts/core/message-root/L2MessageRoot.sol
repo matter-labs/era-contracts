@@ -33,19 +33,12 @@ contract L2MessageRoot is MessageRootBase {
     /// @dev Chain ID of L1 for bridging reasons.
     uint256 internal l1ChainId;
 
-    /// @notice The chain id of the Gateway chain.
-    uint256 public ERA_GATEWAY_CHAIN_ID;
-
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
     function _bridgehub() internal pure override returns (address) {
         return L2_BRIDGEHUB_ADDR;
-    }
-
-    function _eraGatewayChainId() internal view override returns (uint256) {
-        return ERA_GATEWAY_CHAIN_ID;
     }
 
     function _chainAssetHandler() internal view override returns (address) {
@@ -76,14 +69,13 @@ contract L2MessageRoot is MessageRootBase {
     /// @dev Expected to be called only once by the ComplexUpgrader and during genesis only, while
     /// for already existing chains an `updateL2` function should be used.
     /// @param _l1ChainId The chain id of L1.
-    function initL2(uint256 _l1ChainId, uint256 _eraGatewayChainId) public reentrancyGuardInitializer onlyUpgrader {
+    function initL2(uint256 _l1ChainId) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
-        updateL2(_l1ChainId, _eraGatewayChainId);
+        updateL2(_l1ChainId);
         _initialize();
     }
 
-    function updateL2(uint256 _l1ChainId, uint256 _eraGatewayChainId) public onlyUpgrader {
-        ERA_GATEWAY_CHAIN_ID = _eraGatewayChainId;
+    function updateL2(uint256 _l1ChainId) public onlyUpgrader {
         l1ChainId = _l1ChainId;
     }
 

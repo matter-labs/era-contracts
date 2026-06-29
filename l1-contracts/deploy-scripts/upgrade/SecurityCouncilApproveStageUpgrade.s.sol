@@ -4,7 +4,7 @@ pragma solidity ^0.8.21;
 import {Utils} from "../utils/Utils.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
-import {IProtocolUpgradeHandler} from "./interfaces/IProtocolUpgradeHandler.sol";
+import {IProtocolUpgradeHandler} from "../interfaces/IProtocolUpgradeHandler.sol";
 import {Script} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
 
