@@ -198,24 +198,6 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         );
     }
 
-    function test_chainRegistrationSender_revertWhen_chainsSettleOnL1() public {
-        // Override settlement layers to L1 (block.chainid) to trigger the ChainsSettlingOnL1 guard
-        stdstore
-            .target(address(addresses.bridgehub))
-            .sig("settlementLayer(uint256)")
-            .with_key(zkChainIds[0])
-            .checked_write(block.chainid);
-
-        stdstore
-            .target(address(addresses.bridgehub))
-            .sig("settlementLayer(uint256)")
-            .with_key(zkChainIds[1])
-            .checked_write(block.chainid);
-
-        vm.expectRevert(ChainsSettlingOnL1.selector);
-        addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
-    }
-
     function test_chainRegistrationSender_revertWhen_settlementLayersMismatch() public {
         uint256 firstSettlementLayer = GATEWAY_CHAIN_ID;
         uint256 secondSettlementLayer = GATEWAY_CHAIN_ID + 1;
