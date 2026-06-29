@@ -52,10 +52,6 @@ use super::{
 /// Number of generated ecosystem-wide stage-1 calls before any per-CTM block.
 /// On stage, PUVT additionally requires one leading `pauseMigration()` call
 /// because stage1 is executed through the emergency-upgrade path.
-///
-/// v31 moved the two core `acceptOwnership()` calls (ChainRegistrationSender,
-/// AssetTracker) into stage 0, so the stage-1 generated prefix is the 7 proxy
-/// upgrades + setAssetTracker + setAddressesV31 + setAddresses = 10 calls.
 const STAGE1_GENERATED_PREFIX_LEN: usize = 10;
 const STAGE1_PER_CTM_LEN: usize = 6;
 
@@ -350,9 +346,6 @@ impl GovernanceStage1Calls {
     ) -> anyhow::Result<()> {
         result.print_info("== Gov stage 1 calls ===");
 
-        // The two core acceptOwnership() calls (ChainRegistrationSender,
-        // AssetTracker) live in stage 0 now; stage 1 starts the setters right
-        // after the 7 proxy upgrades.
         const SET_ASSET_TRACKER: usize = 7;
         const SET_BRIDGEHUB_ADDRESSES_V31: usize = 8;
 
@@ -561,7 +554,8 @@ impl GovernanceStage1Calls {
 
         // The AssetTracker wired into NativeTokenVault must be the known
         // asset_tracker_proxy (whose ownership is accepted in stage 0).
-        if let Some(set_asset_tracker_call) = self.calls.elems.get(call_offset + SET_ASSET_TRACKER) {
+        if let Some(set_asset_tracker_call) = self.calls.elems.get(call_offset + SET_ASSET_TRACKER)
+        {
             match setAssetTrackerCall::abi_decode(&set_asset_tracker_call.data) {
                 Ok(decoded) => {
                     errors += expect_named_address(
@@ -580,8 +574,10 @@ impl GovernanceStage1Calls {
 
         // The ChainRegistrationSender wired into Bridgehub must be the known
         // chain_registration_sender_proxy (ownership accepted in stage 0).
-        if let Some(set_addresses_v31_call) =
-            self.calls.elems.get(call_offset + SET_BRIDGEHUB_ADDRESSES_V31)
+        if let Some(set_addresses_v31_call) = self
+            .calls
+            .elems
+            .get(call_offset + SET_BRIDGEHUB_ADDRESSES_V31)
         {
             match setAddressesV31Call::abi_decode(&set_addresses_v31_call.data) {
                 Ok(decoded) => {

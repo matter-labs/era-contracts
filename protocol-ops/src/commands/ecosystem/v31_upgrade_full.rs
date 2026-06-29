@@ -241,6 +241,22 @@ fn read_aux_ownership_targets(
     ctm_entries: &[CtmPrepareEntry],
 ) -> anyhow::Result<Vec<Address>> {
     #[derive(Deserialize)]
+    struct CoreOutput {
+        asset_tracker_proxy_addr: String,
+        upgrade_addresses: CoreUpgradeAddresses,
+    }
+
+    #[derive(Deserialize)]
+    struct CoreUpgradeAddresses {
+        bridgehub: CoreBridgehub,
+    }
+
+    #[derive(Deserialize)]
+    struct CoreBridgehub {
+        chain_registration_sender_proxy_addr: String,
+    }
+
+    #[derive(Deserialize)]
     struct CtmOutput {
         deployed_addresses: DeployedAddresses,
         state_transition: StateTransition,
@@ -281,35 +297,25 @@ fn read_aux_ownership_targets(
     {
         let raw = fs::read_to_string(core_toml)
             .with_context(|| format!("read {}", core_toml.display()))?;
-        let parsed: toml::Value =
+        let parsed: CoreOutput =
             toml::from_str(&raw).with_context(|| format!("parse {}", core_toml.display()))?;
-        let asset_tracker = parsed
-            .get("asset_tracker_proxy_addr")
-            .and_then(|v| v.as_str())
-            .with_context(|| {
-                format!("missing asset_tracker_proxy_addr in {}", core_toml.display())
-            })?;
-        push_unique(
-            &mut targets,
-            parse_addr(core_toml, "asset_tracker_proxy_addr", asset_tracker)?,
-        );
-        let chain_registration_sender = parsed
-            .get("upgrade_addresses")
-            .and_then(|v| v.get("bridgehub"))
-            .and_then(|v| v.get("chain_registration_sender_proxy_addr"))
-            .and_then(|v| v.as_str())
-            .with_context(|| {
-                format!(
-                    "missing upgrade_addresses.bridgehub.chain_registration_sender_proxy_addr in {}",
-                    core_toml.display()
-                )
-            })?;
         push_unique(
             &mut targets,
             parse_addr(
                 core_toml,
-                "chain_registration_sender_proxy_addr",
-                chain_registration_sender,
+                "asset_tracker_proxy_addr",
+                &parsed.asset_tracker_proxy_addr,
+            )?,
+        );
+        push_unique(
+            &mut targets,
+            parse_addr(
+                core_toml,
+                "upgrade_addresses.bridgehub.chain_registration_sender_proxy_addr",
+                &parsed
+                    .upgrade_addresses
+                    .bridgehub
+                    .chain_registration_sender_proxy_addr,
             )?,
         );
     }
