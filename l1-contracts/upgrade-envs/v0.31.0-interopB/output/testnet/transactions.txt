@@ -59,3 +59,9 @@
 0x4ae55308bae4429ff6635f4f456c3764e3777e073275c926d000f0f64c6563c7
 0x6c941e6a21a4e9f3b8d9ca8961d4c93c6f0fec0dbd1c72c3e6474ca35d848bf6
 0xf77dbb7b4e184b089890eb090ebd4e726a9345cc7adbbb8c56c4c099edf7f946
+# v31-fixes regen: Era CTM rollup-DA redeploy (RollupDAManager + RollupL1DAValidator + AdminFacet
+# rebuilt with the fresh manager immutable). Salts reused from the prior regen; only these 3 new
+# CREATE2 deployments were broadcast. Deployer 0xD742604A657A114ca6d59b4B0eA541ced7Bd9413, broadcast 2026-06-29.
+0xf0a91860b50f69a7963842958a0fddd050617212d5b445fc5ac3ceb83b669e33
+0xdd074cce3171e835b81bce58f737992776ca3872a799ab1fbd218f06317a3029
+0x0804ebd1ab5fd6c50dd737dbef13f3912ab5038b9a1335b136f409af3331b755

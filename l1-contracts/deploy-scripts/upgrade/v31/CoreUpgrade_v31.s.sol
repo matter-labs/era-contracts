@@ -40,10 +40,10 @@ import {UpgradeUtils} from "../default-upgrade/UpgradeUtils.sol";
 import {CoreUpgradeParams} from "../default-upgrade/UpgradeParams.sol";
 import {TokenMigrationUtils} from "./TokenMigrationUtils.s.sol";
 
-/// FIXME currently we accept ownership as part of stage1, but in fact we should do it as part of stage0.
 /// @notice Script used for v31 upgrade flow.
 /// @dev Owns all v31-specific core-side ecosystem behavior:
-///      - stage 1: AssetTracker.acceptOwnership, NTV.setAssetTracker, ChainAssetHandler.setAddresses
+///      - stage 0: ChainRegistrationSender.acceptOwnership, AssetTracker.acceptOwnership
+///      - stage 1: NTV.setAssetTracker, Bridgehub.setAddressesV31, ChainAssetHandler.setAddresses
 ///      - stage 2: legacy-GW historical migration intervals + old-GW blacklist (read from upgrade input TOML)
 ///      - stage3 (post-governance): bridged-token registration + balance migration
 contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
@@ -201,15 +201,53 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         return super.getInitializeCalldata(contractName, isZkBytecode);
     }
 
+    /// @notice Override to add version-specific governance calls for stage 0
+    /// @dev The two `acceptOwnership()` calls complete the 2-step ownership
+    ///      transfers initiated during deploy (`updateContractConnections`).
+    ///      They are emitted in stage 0 (before the proxy upgrades in stage 1)
+    ///      so that *all* deferred `acceptOwnership()` calls live in a single
+    ///      stage; neither accept depends on the new implementations being live.
+    /// @dev Two calls are emitted:
+    ///      1. ChainRegistrationSender.acceptOwnership (completes 2-step transfer started during deploy)
+    ///      2. AssetTracker.acceptOwnership (completes 2-step transfer started during deploy)
+    function prepareVersionSpecificStage0GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
+        console.log("Preparing v31-specific stage0 governance calls...");
+
+        address assetTrackerProxy = coreAddresses.bridgehub.proxies.assetTracker;
+        address chainRegistrationSenderProxy = coreAddresses.bridgehub.proxies.chainRegistrationSender;
+
+        require(assetTrackerProxy != address(0), "AssetTracker proxy address not found");
+        require(chainRegistrationSenderProxy != address(0), "ChainRegistrationSender proxy address not found");
+
+        console.log("Accepting ChainRegistrationSender ownership:", chainRegistrationSenderProxy);
+        console.log("Accepting AssetTracker ownership:", assetTrackerProxy);
+
+        calls = new Call[](2);
+
+        // Accept ownership of ChainRegistrationSender (completes the two-step transfer)
+        calls[0] = Call({
+            target: chainRegistrationSenderProxy,
+            value: 0,
+            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
+        });
+
+        // Accept ownership of AssetTracker (completes the two-step transfer)
+        calls[1] = Call({
+            target: assetTrackerProxy,
+            value: 0,
+            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
+        });
+
+        return calls;
+    }
+
     /// @notice Override to add version-specific governance calls for stage 1
     /// @dev Stage 1 runs after proxy upgrades, so the new `L1ChainAssetHandler`
     ///      implementation is already in place when these calls execute.
-    /// @dev Five calls are emitted:
-    ///      1. ChainRegistrationSender.acceptOwnership (completes 2-step transfer started during deploy)
-    ///      2. AssetTracker.acceptOwnership (completes 2-step transfer started during deploy)
-    ///      3. NTV.setAssetTracker (wires AssetTracker into NTV)
-    ///      4. L1Bridgehub.setAddressesV31 (wires ChainRegistrationSender into Bridgehub)
-    ///      5. L1ChainAssetHandler.setAddresses (caches messageRoot/assetRouter from bridgehub)
+    /// @dev Three calls are emitted (ownership accepts happen in stage 0):
+    ///      1. NTV.setAssetTracker (wires AssetTracker into NTV)
+    ///      2. L1Bridgehub.setAddressesV31 (wires ChainRegistrationSender into Bridgehub)
+    ///      3. L1ChainAssetHandler.setAddresses (caches messageRoot/assetRouter from bridgehub)
     function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
         console.log("Preparing v31-specific stage1 governance calls...");
 
@@ -225,40 +263,26 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         require(chainRegistrationSenderProxy != address(0), "ChainRegistrationSender proxy address not found");
         require(chainAssetHandlerProxy != address(0), "ChainAssetHandler proxy address not found");
 
-        console.log("Accepting AssetTracker ownership and setting in NativeTokenVault");
+        console.log("Wiring AssetTracker into NativeTokenVault");
         console.log("NTV address:", ntvProxy);
         console.log("AssetTracker address:", assetTrackerProxy);
         console.log("ChainRegistrationSender address:", chainRegistrationSenderProxy);
         console.log("ChainAssetHandler address:", chainAssetHandlerProxy);
         // Note: AssetTracker.setAddresses() was already called during deployment
         // in updateContractConnections(), and ownership was transferred to governance.
-        // Now governance needs to accept the ownership transfer.
+        // Governance accepts the ownership transfers in stage 0.
 
-        calls = new Call[](5);
-
-        // First, accept ownership of ChainRegistrationSender (completes the two-step transfer)
-        calls[0] = Call({
-            target: chainRegistrationSenderProxy,
-            value: 0,
-            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
-        });
-
-        // Accept ownership of AssetTracker (completes the two-step transfer)
-        calls[1] = Call({
-            target: assetTrackerProxy,
-            value: 0,
-            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
-        });
+        calls = new Call[](3);
 
         // Set AssetTracker reference in NTV
-        calls[2] = Call({
+        calls[0] = Call({
             target: ntvProxy,
             value: 0,
             data: abi.encodeCall(L1NativeTokenVault.setAssetTracker, (assetTrackerProxy))
         });
 
         // Wire ChainRegistrationSender into the freshly upgraded Bridgehub implementation.
-        calls[3] = Call({
+        calls[1] = Call({
             target: coreAddresses.bridgehub.proxies.bridgehub,
             value: 0,
             data: abi.encodeCall(BridgehubBase.setAddressesV31, (chainRegistrationSenderProxy))
@@ -266,7 +290,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
 
         // Cache messageRoot/assetRouter inside the new ChainAssetHandler implementation
         // so its facets don't re-query bridgehub on every call.
-        calls[4] = Call({
+        calls[2] = Call({
             target: chainAssetHandlerProxy,
             value: 0,
             data: abi.encodeCall(L1ChainAssetHandler.setAddresses, ())

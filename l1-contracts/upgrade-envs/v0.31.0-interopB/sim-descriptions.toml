@@ -78,7 +78,7 @@ tn_atlas_gov_upgrade_timer          = "0x360C49a3E63469846B68F86dB256D8f25B9a54e
 tn_era_upgrade_stage_validator      = "0xE58470eb2C86CDf7457aEBc5e1182841b00c6fCC"  # Testnet Era UpgradeStageValidator
 tn_atlas_upgrade_stage_validator    = "0x9CB4f7166bF7AD144A658554D6Ea9db976154cB0"  # Testnet Atlas (ZKsync OS) UpgradeStageValidator
 tn_atlas_rollup_da_manager          = "0xC90E4E4897421E9380d734b72221f5485C3fd116"  # Testnet Atlas RollupDAManager
-tn_era_rollup_da_manager            = "0x82Ad20F138A46998265Ba75fdf1da4bB2E949934"  # Testnet Era RollupDAManager
+tn_era_rollup_da_manager            = "0x3B92E09A53573bE654a75Ec0C0e36aD8C803C25E"  # Testnet Era RollupDAManager (v31-redeployed; DA pair set at deploy time)
 tn_atlas_verifier                   = "0x36bdD4226c312d782c218c813129935028139fA1"  # Testnet Atlas ZKsync OS verifier
 tn_chain_admin                      = "0x7cbdDA00285de05a1353803db38770043e359B6d"  # Testnet ChainAdmin (owner 0x5555…643c)
 tn_era_test_chain                   = "0xd3bc4353957bc0f138318384aa207c708a9455c4"  # Testnet Era chain 301 diamond (test_upgrade target)
@@ -676,12 +676,7 @@ desc = "Testnet PUH stage 1: ChainAssetHandler.setAddresses(...) — post-upgrad
 [[entries]]
 target = "tn_era_rollup_da_manager"
 selector = "0x79ba5097"  # acceptOwnership()
-desc = "Testnet PUH stage 1: Era RollupDAManager.acceptOwnership() — completes the deployer-issued transfer to PUH before configuring the DA pair."
-
-[[entries]]
-target = "tn_era_rollup_da_manager"
-selector = "0x0e52323f"  # updateDAPair(address,uint8,bool)
-desc = "Testnet PUH stage 1: Era RollupDAManager.updateDAPair(0xcc46…, BLOBS_AND_PUBDATA_KECCAK256, true) — allows the permanent-rollup DA pair."
+desc = "Testnet PUH stage 0: Era RollupDAManager.acceptOwnership() — completes the deployer-issued transfer to PUH. The v31-redeployed manager already has the rollup DA pair registered at deploy time, so no governance updateDAPair() call is needed."
 
 [[entries]]
 target = "tn_atlas_gov_upgrade_timer"
