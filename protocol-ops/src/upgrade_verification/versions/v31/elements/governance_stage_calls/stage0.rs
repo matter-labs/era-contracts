@@ -448,7 +448,8 @@ async fn collect_pre_governance_accept_ownership_targets(
     let provider = verifiers.network_verifier.get_l1_provider();
     let mut targets = Vec::new();
     for candidate in candidates {
-        let pending_owner = Ownable2Step::new(candidate, provider.clone())
+        let ownable = Ownable2Step::new(candidate, provider.clone());
+        let pending_owner = ownable
             .pendingOwner()
             .call()
             .await
@@ -459,6 +460,22 @@ async fn collect_pre_governance_accept_ownership_targets(
             })?;
         if pending_owner == governance {
             targets.push(candidate);
+        } else {
+            // pendingOwner is not governance. If the live owner is already
+            // governance the contract is fully owned and simply needs no
+            // deferred acceptOwnership(); but if neither owner nor pendingOwner
+            // is governance the transfer was never initiated — a hard error.
+            let owner = ownable.owner().call().await.with_context(|| {
+                format!(
+                    "read owner() for {candidate} while deriving stage-0 deferred acceptOwnership targets"
+                )
+            })?;
+            if owner != governance {
+                result.report_error(&format!(
+                    "Stage-0 deferred acceptOwnership candidate {candidate} ({}): ownership transfer to governance ({governance}) was not initiated — owner={owner}, pendingOwner={pending_owner}",
+                    verifiers.address_verifier.name_or_unknown(&candidate)
+                ));
+            }
         }
     }
 

@@ -286,11 +286,16 @@ pub async fn execute_one_bundle(
                 // - AddressAlreadySet (0x0dfb42bf): setup call already executed
                 // - OperationMustBePending (0xb926a6b0): legacy Gov executeInstant
                 //   on an already-done operation
+                // - EVMBytecodeAlreadyPublished (0x61733a89) /
+                //   EraBytecodeAlreadyPublished (0x876e8b23): BytecodesSupplier
+                //   re-publish of a hash already published in a prior partial
+                //   broadcast (no-op; later txs don't depend on the re-publish).
                 let err_str = format!("{e}");
                 let known_idempotent = [
-                    "876e8b23", // OperationExists
+                    "876e8b23", // OperationExists / EraBytecodeAlreadyPublished
                     "0dfb42bf", // AddressAlreadySet
                     "b926a6b0", // OperationMustBePending
+                    "61733a89", // EVMBytecodeAlreadyPublished
                 ];
                 if let Some(sig) = known_idempotent.iter().find(|s| err_str.contains(**s)) {
                     logger::info(format!(
@@ -566,7 +571,7 @@ pub async fn execute_one_bundle_unlocked(
                 let err_str = format!("{e}");
                 let known_idempotent = [
                     "1a21feed", // OperationExists (current Governance)
-                    "876e8b23", // OperationExists
+                    "876e8b23", // OperationExists / EraBytecodeAlreadyPublished
                     "61733a89", // EVMBytecodeAlreadyPublished(bytes32)
                     "0dfb42bf", // AddressAlreadySet
                     "eda2fbb1", // OperationMustBePending (current Governance)
