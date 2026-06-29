@@ -1,26 +1,19 @@
-use ethers::{
-    contract::BaseContract,
-    types::{Address, H256},
-};
-use lazy_static::lazy_static;
+use alloy::primitives::{Address, B256};
+use anyhow::bail;
 use serde::Serialize;
 
-use crate::abi::IDEPLOYCTMABI_ABI;
+use crate::common::abi::IDeployCTMAbi;
+use crate::common::forge::scripts::{
+    deploy_ctm::{DeployCTMConfig, DeployCTMOutput},
+    deploy_ecosystem::InitialDeploymentConfig,
+    DEPLOY_CTM_INVOCATION,
+};
 use crate::common::{
-    forge::{Forge, ForgeRunner},
+    forge::ForgeRunner,
     traits::{ReadConfig, SaveConfig},
     wallets::Wallet,
 };
-use crate::config::forge_interface::{
-    deploy_ctm::{input::DeployCTMConfig, output::DeployCTMOutput},
-    deploy_ecosystem::input::InitialDeploymentConfig,
-    script_params::DEPLOY_CTM_SCRIPT_PARAMS,
-};
 use crate::types::{L1Network, VMOption};
-
-lazy_static! {
-    static ref DEPLOY_CTM_FUNCTIONS: BaseContract = BaseContract::from(IDEPLOYCTMABI_ABI.clone());
-}
 
 /// Input parameters for deploying CTM contracts.
 #[derive(Debug, Clone, Serialize)]
@@ -31,8 +24,8 @@ pub struct CtmDeployInput {
     pub reuse_gov_and_admin: bool,
     pub with_testnet_verifier: bool,
     pub with_legacy_bridge: bool,
-    pub zk_token_asset_id: Option<H256>,
-    pub create2_factory_salt: Option<H256>,
+    pub zk_token_asset_id: Option<B256>,
+    pub create2_factory_salt: Option<B256>,
 }
 
 /// Deploy CTM contracts.
@@ -42,6 +35,7 @@ pub fn deploy(
     input: &CtmDeployInput,
 ) -> anyhow::Result<DeployCTMOutput> {
     let l1_network = L1Network::from_l1_rpc(&runner.rpc_url)?;
+    ensure_testnet_verifier_allowed(l1_network, input.with_testnet_verifier)?;
     let mut initial_deployment_config = InitialDeploymentConfig::default();
 
     // CREATE2 factory address isn't configurable: the Solidity script
@@ -52,7 +46,8 @@ pub fn deploy(
     }
     let zk_token_asset_id = input
         .zk_token_asset_id
-        .unwrap_or(l1_network.zk_token_asset_id());
+        .map(Ok)
+        .unwrap_or_else(|| l1_network.zk_token_asset_id())?;
 
     let deploy_config = DeployCTMConfig::new(
         input.owner,
@@ -63,25 +58,20 @@ pub fn deploy(
         input.vm_type,
     );
 
-    let input_path = DEPLOY_CTM_SCRIPT_PARAMS.input(&runner.foundry_scripts_path);
-    deploy_config.save(&runner.shell, input_path)?;
+    let input_path = runner.input_path(&DEPLOY_CTM_INVOCATION)?;
+    deploy_config.save(input_path)?;
 
-    let calldata = DEPLOY_CTM_FUNCTIONS
-        .encode(
-            "runWithBridgehub",
-            (input.bridgehub, input.reuse_gov_and_admin),
-        )
-        .map_err(|e| anyhow::anyhow!("Failed to encode calldata: {}", e))?;
-
-    let forge = Forge::new(&runner.foundry_scripts_path)
-        .script(
-            &DEPLOY_CTM_SCRIPT_PARAMS.script(),
-            runner.forge_args.clone(),
-        )
-        .with_ffi()
-        .with_calldata(&calldata)
-        .with_rpc_url(runner.rpc_url.clone())
-        .with_broadcast()
+    // protocol-ops always states the script's IO paths explicitly (the
+    // conventional ones unless a per-run --subdir is set); `runWithBridgehub`
+    // with its baked-in paths is for manual forge use.
+    let forge = runner
+        .script_call(IDeployCTMAbi::runInnerCall {
+            inputPath: runner.script_rel_path(DEPLOY_CTM_INVOCATION.input_rel()),
+            outputPath: runner.script_rel_path(DEPLOY_CTM_INVOCATION.output_rel()),
+            bridgehub: input.bridgehub,
+            reuseGovAndAdmin: input.reuse_gov_and_admin,
+            skipL1Deployments: false,
+        })
         .with_wallet(auth)
         .with_env(
             "CREATE2_FACTORY_SALT",
@@ -90,6 +80,45 @@ pub fn deploy(
 
     runner.run(forge)?;
 
-    let output_path = DEPLOY_CTM_SCRIPT_PARAMS.output(&runner.foundry_scripts_path);
-    DeployCTMOutput::read(&runner.shell, output_path)
+    let output_path = runner.output_path(&DEPLOY_CTM_INVOCATION);
+    DeployCTMOutput::read(output_path)
+}
+
+fn ensure_testnet_verifier_allowed(
+    l1_network: L1Network,
+    with_testnet_verifier: bool,
+) -> anyhow::Result<()> {
+    if with_testnet_verifier && matches!(l1_network, L1Network::Mainnet) {
+        bail!(
+            "--with-testnet-verifier cannot be used on mainnet. \
+             Testnet verifier constructors intentionally reject mainnet, and \
+             spoofing the simulation chain id would generate calldata for the wrong L1."
+        );
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_testnet_verifier_on_mainnet() {
+        let err = ensure_testnet_verifier_allowed(L1Network::Mainnet, true).unwrap_err();
+
+        assert!(err.to_string().contains("--with-testnet-verifier"));
+    }
+
+    #[test]
+    fn allows_real_verifier_on_mainnet() {
+        ensure_testnet_verifier_allowed(L1Network::Mainnet, false).unwrap();
+    }
+
+    #[test]
+    fn allows_testnet_verifier_off_mainnet() {
+        ensure_testnet_verifier_allowed(L1Network::Sepolia, true).unwrap();
+        ensure_testnet_verifier_allowed(L1Network::Holesky, true).unwrap();
+        ensure_testnet_verifier_allowed(L1Network::Localhost, true).unwrap();
+    }
 }

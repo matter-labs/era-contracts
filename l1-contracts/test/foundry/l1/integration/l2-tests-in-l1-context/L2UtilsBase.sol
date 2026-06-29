@@ -97,7 +97,7 @@ library L2UtilsBase {
             address messageRoot = address(new L2MessageRoot());
             vm.etch(L2_MESSAGE_ROOT_ADDR, messageRoot.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(_args.l1ChainId, _args.gatewayChainId);
+            L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(_args.l1ChainId);
         }
 
         {

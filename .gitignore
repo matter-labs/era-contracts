@@ -1,6 +1,7 @@
 .DS_Store
 .idea
-.vscode
+.vscode/*
+!.vscode/settings.json
 artifacts-forge/
 artifacts-zk/
 artifacts/
@@ -30,7 +31,34 @@ l1-contracts/broadcast/*
 l1-contracts/script-config/*
 l1-contracts/snapshots/*
 !l1-contracts/script-config/artifacts
+!l1-contracts/script-config/v31-bridged-tokens.toml
 l1-contracts/script-out/*
+# protocol-ops auto-emits per-signer Safe-bundle JSONs + a manifest.json
+# index per --out invocation. Those are debug artifacts; the merged
+# governance.toml (also under the same dir) IS the canonical artifact and
+# stays tracked.
+l1-contracts/upgrade-envs/**/output/**/*.safe.json
+l1-contracts/upgrade-envs/**/output/**/manifest.json
+# Exception: the curated, machine-independent `sim-inputs/` set (normalized
+# manifest.json minus metadata[] + the Camp-B *.safe.json bundles) IS tracked.
+# It's what `governance-toml-to-simulator --emit-sim-inputs` writes so the sim
+# can be reproduced from git on any machine (see the fix-calldata-bug skill).
+!l1-contracts/upgrade-envs/**/output/**/sim-inputs/manifest.json
+!l1-contracts/upgrade-envs/**/output/**/sim-inputs/*.safe.json
+# Regen / broadcast scratch artifacts (executed.json, anvil.log, raw forge
+# script outputs). Not the canonical governance.toml.
+l1-contracts/upgrade-envs/**/output/**/regen/
+l1-contracts/upgrade-envs/**/output/**/executed.json
+# Scratch from the native real-Sepolia broadcast (phase 2): the deployer-only
+# filtered manifest and the executed-tx log. Real deploy hashes land in the
+# tracked transactions.txt; these are throwaway.
+l1-contracts/upgrade-envs/**/output/**/manifest-deployer-only.json
+l1-contracts/upgrade-envs/**/output/**/sepolia-deploy-executed.json
+l1-contracts/upgrade-envs/**/output/**/anvil.log
+# Ephemeral fork-rehearsal tx log: hashes mined only on the local verification
+# fork, regenerated every run. Kept out of the committed `transactions.txt`
+# (which holds real-network deployments only) so it never accumulates.
+l1-contracts/upgrade-envs/**/output/**/fork-rehearsal/
 l1-contracts/test/foundry/l1/integration/deploy-scripts/script-out/*.toml
 !l1-contracts/script-out/.gitkeep
 *.timestamp
@@ -44,3 +72,7 @@ l1-contracts/zkout/*
 # Foundry binary
 foundry-zksync/
 l1-contracts/foundry-zksync/
+
+# Local secrets (never commit)
+.env
+protocol-ops/target-linux/

@@ -34,6 +34,13 @@ jobs:
       - name: Build artifacts
         run: yarn l1 build:foundry
 
+      # `deploy-scripts/` is outside the default forge build set (`src`/`test`),
+      # so scripts that are only invoked at runtime via `forge script` would
+      # otherwise bit-rot without CI noticing. Compile them all explicitly.
+      - name: Check deploy-scripts compile
+        working-directory: ./l1-contracts
+        run: forge build deploy-scripts
+
       - name: Build system-contract artifacts
         run: yarn sc build:foundry
 

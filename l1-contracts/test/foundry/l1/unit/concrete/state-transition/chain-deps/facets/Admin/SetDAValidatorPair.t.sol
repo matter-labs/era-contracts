@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
 import {InvalidL2DACommitmentScheme, Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {L1DAValidatorAddressIsZero, NotZKsyncOS} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {L1DAValidatorAddressIsZero} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 
@@ -51,39 +51,5 @@ contract SetDAValidatorPair is AdminTest {
         adminFacet.setDAValidatorPair(address(1), L2DACommitmentScheme.NONE);
 
         vm.stopPrank();
-    }
-
-    function test_revertWhen_l2ToL1OnlyOnEraChain() public {
-        address admin = utilsFacet.util_getAdmin();
-
-        // The chain is an Era VM chain by default (zksyncOS == false); L2_TO_L1_ONLY is ZKsync-OS-only.
-        vm.startPrank(admin);
-        vm.expectRevert(NotZKsyncOS.selector);
-        adminFacet.setDAValidatorPair(address(1), L2DACommitmentScheme.L2_TO_L1_ONLY);
-
-        vm.stopPrank();
-    }
-
-    function test_revertWhen_blobsZKsyncOSOnEraChain() public {
-        address admin = utilsFacet.util_getAdmin();
-
-        // BLOBS_ZKSYNC_OS is likewise ZKsync-OS-only and must be rejected on an Era VM chain.
-        vm.startPrank(admin);
-        vm.expectRevert(NotZKsyncOS.selector);
-        adminFacet.setDAValidatorPair(address(1), L2DACommitmentScheme.BLOBS_ZKSYNC_OS);
-
-        vm.stopPrank();
-    }
-
-    function test_SuccessfulSet_zksyncOSOnlySchemeAllowedOnZKsyncOS() public {
-        address admin = utilsFacet.util_getAdmin();
-        // Mark the chain as ZKsync OS so a ZKsync-OS-only scheme is accepted.
-        utilsFacet.util_setZksyncOS(true);
-
-        vm.startPrank(admin);
-        adminFacet.setDAValidatorPair(address(1), L2DACommitmentScheme.L2_TO_L1_ONLY);
-        vm.stopPrank();
-
-        assert(utilsFacet.util_getL2DACommimentScheme() == L2DACommitmentScheme.L2_TO_L1_ONLY);
     }
 }

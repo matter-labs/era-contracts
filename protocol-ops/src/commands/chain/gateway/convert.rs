@@ -1,22 +1,21 @@
-use std::path::Path;
-
+use alloy::hex;
+use alloy::primitives::{Address, Bytes, B256, U256};
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::commands::output::write_output_if_requested;
+use crate::common::abi::{
+    AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi,
+    IGatewayVotePreparationAbi,
+};
+use crate::common::addresses::{DEFAULT_ZK_TOKEN_ASSET_ID, ZERO_ADDRESS, ZERO_BYTES32};
+use crate::common::forge::scripts::GATEWAY_VOTE_PREPARATION_SCRIPT_PATH;
+use crate::common::output::write_output_if_requested;
 use crate::common::paths;
 use crate::common::EcosystemChainArgs;
 use crate::common::SharedRunArgs;
-use crate::common::{
-    forge::{Forge, ForgeRunner, ForgeScriptArg},
-    logger,
-    wallets::Wallet,
-};
-
-use super::build_admin_functions_script;
+use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
 
 /// Convert a relative TOML path to the form expected by forge env vars (`/`-prefixed).
 fn forge_env_path(rel: &str) -> String {
@@ -28,33 +27,18 @@ fn forge_env_path(rel: &str) -> String {
 /// Run deploy-filterer on an existing `runner` with `sender` already prepared
 /// (must be the chain admin owner EOA). Reusable from the fine-grained CLI
 /// entry point and the phase-level `chain gateway convert` command.
-pub(crate) async fn stage_deploy_filterer(
+pub async fn stage_deploy_filterer(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     bridgehub: Address,
     chain_id: u64,
 ) -> anyhow::Result<()> {
-    let contracts_path = paths::path_to_foundry_scripts();
-
-    let mut script_args = runner.forge_args.clone();
-    script_args.add_arg(ForgeScriptArg::Sig {
-        sig: "deployAndSetOnChain(address,uint256)".to_string(),
-    });
-    script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: runner.rpc_url.clone(),
-    });
-    script_args.add_arg(ForgeScriptArg::Broadcast);
-    script_args.add_arg(ForgeScriptArg::Ffi);
-    script_args
-        .additional_args
-        .extend([format!("{:#x}", bridgehub), chain_id.to_string()]);
-
-    let script = Forge::new(&contracts_path)
-        .script(
-            Path::new(
-                "deploy-scripts/gateway/DeployGatewayTransactionFilterer.s.sol:DeployGatewayTransactionFilterer",
-            ),
-            script_args,
+    let script = runner
+        .script_call(
+            DeployGatewayTransactionFiltererAbi::deployAndSetOnChainCall {
+                bridgehub,
+                chainId: U256::from(chain_id),
+            },
         )
         .with_wallet(sender);
 
@@ -75,14 +59,13 @@ pub(crate) async fn stage_deploy_filterer(
 /// Run grant-whitelist on an existing `runner`. `sender` must be the chain
 /// admin owner EOA. Auto-includes the CTM deployment tracker and governance
 /// address in the whitelist in addition to `extra_grantees`.
-pub(crate) async fn stage_grant_whitelist(
+pub async fn stage_grant_whitelist(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     bridgehub: Address,
     chain_id: u64,
     extra_grantees: &[Address],
 ) -> anyhow::Result<()> {
-    let contracts_path = paths::resolve_l1_contracts_path()?;
     // Always broadcast the admin call, including in `--simulate`. The simulate
     // fork is ephemeral, so broadcasting has no real-world side effect — but
     // the Safe bundle is built from forge's broadcast log, so the tx must be
@@ -97,8 +80,6 @@ pub(crate) async fn stage_grant_whitelist(
     // a real chain, we need to thread the ACR address through so the broadcast
     // goes out as `IAccessControlDefaultAdminRules(acr).defaultAdmin()`, which
     // is the account guaranteed to pass every selector's role check.
-    let should_send = "true".to_string();
-
     // Auto-resolve the CTM deployment tracker (STM tracker) from the bridgehub
     // and include it in the whitelist — it must be whitelisted on the gateway so
     // CTM registration can proceed during vote-prepare.
@@ -124,28 +105,14 @@ pub(crate) async fn stage_grant_whitelist(
         }
     }
 
-    // Encode grantees as a Solidity address[] literal: [addr1,addr2,...]
-    let grantees_str = format!(
-        "[{}]",
-        all_grantees
-            .iter()
-            .map(|a| format!("{a:#x}"))
-            .collect::<Vec<_>>()
-            .join(",")
-    );
-
-    let script = build_admin_functions_script(
-        &contracts_path,
-        runner,
-        "grantGatewayWhitelist(address,uint256,address[],bool)",
-        vec![
-            format!("{:#x}", bridgehub),
-            chain_id.to_string(),
-            grantees_str,
-            should_send,
-        ],
-    )?
-    .with_wallet(sender);
+    let script = runner
+        .script_call(AdminFunctionsAbi::grantGatewayWhitelistCall {
+            _bridgehub: bridgehub,
+            _chainId: U256::from(chain_id),
+            _grantees: all_grantees.clone(),
+            _shouldSend: true,
+        })
+        .with_wallet(sender);
 
     logger::step("Granting gateway whitelist");
     logger::info(format!("Gateway chain ID: {}", chain_id));
@@ -170,22 +137,8 @@ fn dump_force_deployments(runner: &mut ForgeRunner, ctm_proxy: Address) -> anyho
 
     let dump_toml_rel = "/script-out/force-deployments-dump.toml";
 
-    let mut script_args = runner.forge_args.clone();
-    script_args.add_arg(ForgeScriptArg::Sig {
-        sig: "dumpForceDeployments(address)".to_string(),
-    });
-    script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: runner.rpc_url.clone(),
-    });
-    script_args
-        .additional_args
-        .push(format!("{:#x}", ctm_proxy));
-
-    let script = Forge::new(&contracts_path)
-        .script(
-            Path::new("deploy-scripts/gateway/GatewayUtils.s.sol:GatewayUtils"),
-            script_args,
-        )
+    let script = runner
+        .script_call(GatewayUtilsAbi::dumpForceDeploymentsCall { _ctm: ctm_proxy })
         .with_env("FORCE_DEPLOYMENTS_DUMP_TOML_REL_PATH", dump_toml_rel);
 
     logger::info(format!(
@@ -216,17 +169,27 @@ fn dump_force_deployments(runner: &mut ForgeRunner, ctm_proxy: Address) -> anyho
 }
 
 /// Inputs for the vote-prepare stage.
-pub(crate) struct VotePrepareInputs<'a> {
+pub struct VotePrepareInputs<'a> {
     pub ctm_representative_chain_id: u64,
     pub vote_preparation_toml: &'a str,
     pub refund_recipient: Address,
-    pub gateway_settlement_fee: u64,
+    pub gateway_settlement_fee: U256,
+    /// Pre-resolved `force_deployments_data` (raw bytes — not 0x-prefixed
+    /// hex). When `Some`, `stage_vote_prepare` skips the on-chain dump and
+    /// uses this value directly. Required on pre-v31 ecosystems where the
+    /// CTM doesn't yet expose `newChainCreationParamsBlock`; readable from
+    /// the v31 CTM prepare's output TOML
+    /// (`contracts_newConfig.force_deployments_data`, see
+    /// `DefaultCTMUpgrade.s.sol:913`).
+    pub force_deployments_data_override: Option<Bytes>,
+    /// CREATE2 salt for the GW CTM deploy. When `None`, uses bytes32(0).
+    pub create2_salt: Option<B256>,
 }
 
 /// Run vote-prepare on an existing `runner`. `sender` must be the whitelisted
 /// deployer EOA (= `refund_recipient`) — the script deploys gateway CTM
 /// contracts and pays for L1→L2 priority txs from that EOA's balance.
-pub(crate) async fn stage_vote_prepare(
+pub async fn stage_vote_prepare(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     bridgehub: Address,
@@ -245,8 +208,29 @@ pub(crate) async fn stage_vote_prepare(
     .context("Failed to resolve CTM proxy from bridgehub")?;
     logger::info(format!("CTM proxy (from L1): {:#x}", ctm_proxy));
 
-    // Dump force deployments data from the CTM.
-    let force_deployments_data = dump_force_deployments(runner, ctm_proxy)?;
+    // Source force_deployments_data: prefer an explicit override (used by
+    // the v31 ecosystem flow, which has just produced the post-upgrade
+    // `force_deployments_data` in the CTM prepare's output TOML) over the
+    // on-chain dump. The on-chain dump path reads via
+    // `ctm.newChainCreationParamsBlock(version)`, a v31+ getter, so on
+    // pre-v31 ecosystems it reverts — the override avoids that.
+    // The Solidity side reads via `toml.readBytes` which requires the
+    // `"0x..."` prefix. `dump_force_deployments` returns the dump-script's
+    // serialized bytes (already 0x-prefixed); the override path supplies
+    // raw bytes that we re-encode the same way.
+    let force_deployments_data = match &inputs.force_deployments_data_override {
+        Some(bytes) => {
+            logger::info(format!(
+                "force_deployments_data (override, {} bytes)",
+                bytes.len()
+            ));
+            format!("0x{}", hex::encode(bytes.as_ref()))
+        }
+        None => {
+            logger::info("force_deployments_data (dumping from on-chain CTM)");
+            dump_force_deployments(runner, ctm_proxy)?
+        }
+    };
 
     // Build the vote preparation input TOML from CLI args.
     let toml_content = format!(
@@ -259,16 +243,18 @@ gateway_settlement_fee = {fee}
 force_deployments_data = "{fd}"
 
 # Not used by the gateway flow but required by the parent config parser (overridden from on-chain state)
-owner_address = "0x0000000000000000000000000000000000000000"
+owner_address = "{zero_address}"
 support_l2_legacy_shared_bridge_test = false
-zk_token_asset_id = "0x0000000000000000000000000000000000000000000000000000000000000001"
+zk_token_asset_id = "{default_zk_token_asset_id}"
 
 [contracts]
-create2_factory_salt = "0x0000000000000000000000000000000000000000000000000000000000000000"
-governance_security_council_address = "0x0000000000000000000000000000000000000000"
+create2_factory_salt = "{gw_create2_salt}"
+governance_security_council_address = "{zero_address}"
 governance_min_delay = 0
 validator_timelock_execution_delay = 0
 "#,
+        zero_address = ZERO_ADDRESS,
+        default_zk_token_asset_id = DEFAULT_ZK_TOKEN_ASSET_ID,
         refund = inputs.refund_recipient,
         testnet_verifier = {
             let v = crate::common::l1_contracts::resolve_is_testnet_verifier(
@@ -290,6 +276,10 @@ validator_timelock_execution_delay = 0
         gw = chain_id,
         fee = inputs.gateway_settlement_fee,
         fd = force_deployments_data,
+        gw_create2_salt = inputs
+            .create2_salt
+            .map(|s| format!("{s:#x}"))
+            .unwrap_or_else(|| ZERO_BYTES32.to_string()),
     );
 
     let script_config = contracts_path.join("script-config");
@@ -299,7 +289,7 @@ validator_timelock_execution_delay = 0
     let abs_path = contracts_path.join(generated_rel);
     std::fs::write(&abs_path, &toml_content)?;
 
-    let script_path = "deploy-scripts/gateway/GatewayVotePreparation.s.sol";
+    let script_path = GATEWAY_VOTE_PREPARATION_SCRIPT_PATH;
     let script_full_path = contracts_path.join(script_path);
     anyhow::ensure!(
         script_full_path.exists(),
@@ -307,25 +297,12 @@ validator_timelock_execution_delay = 0
         script_full_path.display()
     );
 
-    let mut script_args = runner.forge_args.clone();
-    script_args.add_arg(ForgeScriptArg::Sig {
-        sig: "run(address,uint256)".to_string(),
-    });
-    script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: runner.rpc_url.clone(),
-    });
-    script_args.add_arg(ForgeScriptArg::Broadcast);
-    script_args.add_arg(ForgeScriptArg::Ffi);
-    script_args.add_arg(ForgeScriptArg::GasLimit {
-        gas_limit: crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT,
-    });
-    script_args.additional_args.extend([
-        format!("{:#x}", bridgehub),
-        inputs.ctm_representative_chain_id.to_string(),
-    ]);
-
-    let script = Forge::new(&contracts_path)
-        .script(Path::new(script_path), script_args)
+    let script = runner
+        .script_call(IGatewayVotePreparationAbi::runCall {
+            bridgehubProxy: bridgehub,
+            ctmRepresentativeChainId: U256::from(inputs.ctm_representative_chain_id),
+        })
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
         .with_env(
             "GATEWAY_VOTE_PREPARATION_INPUT",
             forge_env_path(generated_rel),
@@ -377,7 +354,7 @@ struct VotePreparationOutput {
 
 /// Run governance-execute on an existing `runner`. `sender` must be the
 /// governance contract's owner EOA.
-pub(crate) async fn stage_governance_execute(
+pub async fn stage_governance_execute(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     bridgehub: Address,
@@ -403,27 +380,17 @@ pub(crate) async fn stage_governance_execute(
         toml::from_str(&toml_content).context("Failed to parse vote preparation output TOML")?;
 
     let encoded_calls_hex = &output.governance_calls_to_execute;
+    let encoded_calls = Bytes::from(
+        hex::decode(encoded_calls_hex.trim_start_matches("0x"))
+            .context("invalid governance calls hex")?,
+    );
 
-    let script_path = "deploy-scripts/AdminFunctions.s.sol";
-    let mut script_args = runner.forge_args.clone();
-    script_args.add_arg(ForgeScriptArg::Sig {
-        sig: "governanceExecuteCalls(bytes,address)".to_string(),
-    });
-    script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: runner.rpc_url.clone(),
-    });
-    script_args.add_arg(ForgeScriptArg::Broadcast);
-    script_args.add_arg(ForgeScriptArg::Ffi);
-    script_args.add_arg(ForgeScriptArg::GasLimit {
-        gas_limit: crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT,
-    });
-    script_args.additional_args.extend([
-        format!("0x{}", encoded_calls_hex.trim_start_matches("0x")),
-        format!("{:#x}", governance_address),
-    ]);
-
-    let script = Forge::new(&contracts_path)
-        .script(Path::new(script_path), script_args)
+    let script = runner
+        .script_call(AdminFunctionsAbi::governanceExecuteCallsCall {
+            _callsToExecute: encoded_calls,
+            _governanceAddr: governance_address,
+        })
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
         .with_wallet(sender);
 
     logger::step("Executing gateway governance calls");
@@ -441,14 +408,13 @@ pub(crate) async fn stage_governance_execute(
 
 /// Run revoke-whitelist on an existing `runner`. `sender` must be the chain
 /// admin owner EOA.
-pub(crate) async fn stage_revoke_whitelist(
+pub async fn stage_revoke_whitelist(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     bridgehub: Address,
     chain_id: u64,
     revoke_address: Address,
 ) -> anyhow::Result<()> {
-    let contracts_path = paths::resolve_l1_contracts_path()?;
     // See grant-whitelist for the rationale — always broadcast in simulate too
     // so the tx shows up in the bundle's --out / Safe file.
     //
@@ -457,20 +423,14 @@ pub(crate) async fn stage_revoke_whitelist(
     // `ChainAdmin.owner()`, which only works on chains without an ACR in
     // `activeRestrictions`. Thread the ACR address through for production
     // chains so the sender is the ACR's `defaultAdmin`.
-    let should_send = "true".to_string();
-
-    let script = build_admin_functions_script(
-        &contracts_path,
-        runner,
-        "revokeGatewayWhitelist(address,uint256,address,bool)",
-        vec![
-            format!("{:#x}", bridgehub),
-            chain_id.to_string(),
-            format!("{:#x}", revoke_address),
-            should_send,
-        ],
-    )?
-    .with_wallet(sender);
+    let script = runner
+        .script_call(AdminFunctionsAbi::revokeGatewayWhitelistCall {
+            _bridgehub: bridgehub,
+            _chainId: U256::from(chain_id),
+            _address: revoke_address,
+            _shouldSend: true,
+        })
+        .with_wallet(sender);
 
     logger::step("Revoking gateway whitelist");
     logger::info(format!("Revoking address: {:#x}", revoke_address));
@@ -533,7 +493,7 @@ pub struct ConvertArgs {
 }
 
 pub async fn run_convert(args: ConvertArgs) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
     // Stages 1 + 2: chain admin owner.
     let admin_sender = runner
@@ -564,7 +524,11 @@ pub async fn run_convert(args: ConvertArgs) -> anyhow::Result<()> {
             ctm_representative_chain_id: args.ctm_representative_chain_id,
             vote_preparation_toml: &args.vote_preparation_toml,
             refund_recipient: args.gateway_deployer,
-            gateway_settlement_fee: args.gateway_settlement_fee,
+            gateway_settlement_fee: U256::from(args.gateway_settlement_fee),
+            // CLI flow runs against a chain already on the latest version,
+            // so the on-chain dump works — no override needed.
+            force_deployments_data_override: None,
+            create2_salt: None,
         },
     )
     .await

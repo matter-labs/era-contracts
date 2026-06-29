@@ -22,7 +22,6 @@ import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {
     L1DAValidatorAddressIsZero,
     NotL1,
-    NotZKsyncOS,
     PriorityModeAlreadyAllowed,
     ExecutedIsNotConsistentWithVerified,
     VerifiedIsNotConsistentWithCommitted,
@@ -347,16 +346,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
         if (_l2DACommitmentScheme == L2DACommitmentScheme.NONE) {
             revert InvalidL2DACommitmentScheme(_l2DACommitmentScheme);
-        }
-
-        // `BLOBS_ZKSYNC_OS` and `L2_TO_L1_ONLY` are only supported on ZKsync OS, where the STF interprets the
-        // scheme. They have no commitment implementation on the Era VM (`L2DAValidator.makeDACommitment`
-        // reverts for them), so reject them here to avoid configuring an unusable DA pair.
-        if (
-            (_l2DACommitmentScheme == L2DACommitmentScheme.BLOBS_ZKSYNC_OS ||
-                _l2DACommitmentScheme == L2DACommitmentScheme.L2_TO_L1_ONLY) && !s.zksyncOS
-        ) {
-            revert NotZKsyncOS();
         }
 
         if (s.isPermanentRollup && !ROLLUP_DA_MANAGER.isPairAllowed(_l1DAValidator, _l2DACommitmentScheme)) {
