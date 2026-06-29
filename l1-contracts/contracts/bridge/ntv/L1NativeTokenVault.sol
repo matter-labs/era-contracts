@@ -30,7 +30,6 @@ import {
     AssetIdAlreadyRegistered,
     NoFundsTransferred,
     OriginChainIdNotFound,
-    Unauthorized,
     WithdrawFailed,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
@@ -106,13 +105,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return IAssetTrackerBase(address(l1AssetTracker));
     }
 
-    modifier onlyAssetTracker() {
-        if (msg.sender != address(l1AssetTracker)) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
     /*//////////////////////////////////////////////////////////////
                             Initialization
     //////////////////////////////////////////////////////////////*/
@@ -153,18 +145,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         l1AssetTracker = IL1AssetTracker(_l1AssetTracker);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            V31 migration
-    //////////////////////////////////////////////////////////////*/
-
-    function migrateTokenBalanceToAssetTracker(
-        uint256 _chainId,
-        bytes32 _assetId
-    ) external onlyAssetTracker returns (uint256) {
-        uint256 amount = DEPRECATED_chainBalance[_chainId][_assetId];
-        DEPRECATED_chainBalance[_chainId][_assetId] = 0;
-        return amount;
-    }
 
     /*//////////////////////////////////////////////////////////////
                             Check counterpart Functions

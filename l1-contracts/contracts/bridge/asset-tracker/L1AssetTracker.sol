@@ -127,7 +127,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @dev After all the pre-31 tokens are registered, this function can be deleted.
     /// @param _assetId The asset id of the token to migrate the token balance for.
     function registerLegacyToken(bytes32 _assetId) public {
-        IL1NativeTokenVault l1NTV = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT));
         uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
         require(originChainId != 0, InvalidChainId());
 
@@ -154,8 +153,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 continue;
             }
 
-            // slither-disable-next-line reentrancy-eth,reentrancy-no-eth
-            uint256 migratedBalance = l1NTV.migrateTokenBalanceToAssetTracker(chainId, _assetId);
+            // Clean-slate genesis chains have no pre-v31 balances to migrate from the NTV.
+            uint256 migratedBalance = 0;
 
             chainBalance[chainId][_assetId] = migratedBalance;
             interopInfo[chainId][_assetId].preV31ChainBalance = migratedBalance;
