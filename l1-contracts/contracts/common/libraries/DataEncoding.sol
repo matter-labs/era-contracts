@@ -3,8 +3,7 @@
 pragma solidity 0.8.28;
 
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
-import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
-import {IL1ERC20Bridge} from "../../bridge/interfaces/IL1ERC20Bridge.sol";
+import {NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
 import {
     AssetIdMismatch,
@@ -178,9 +177,7 @@ library DataEncoding {
             revert EmptyData();
         }
         bytes1 encodingVersion = _tokenData[0];
-        if (encodingVersion == LEGACY_ENCODING_VERSION) {
-            (name, symbol, decimals) = abi.decode(_tokenData, (bytes, bytes, bytes));
-        } else if (encodingVersion == NEW_ENCODING_VERSION) {
+        if (encodingVersion == NEW_ENCODING_VERSION) {
             return abi.decode(_tokenData[1:], (uint256, bytes, bytes, bytes));
         } else {
             revert UnsupportedEncodingVersion();
@@ -258,57 +255,6 @@ library DataEncoding {
             // Make sure that a NativeTokenVault sent the message
             revert AssetIdMismatch(expectedAssetId, _assetId);
         }
-    }
-
-    function decodeBaseTokenFinalizeWithdrawalData(
-        bytes memory _l2ToL1message
-    ) internal pure returns (bytes4 functionSignature, address l1Receiver, uint256 amount) {
-        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
-        functionSignature = bytes4(functionSignatureUint);
-
-        // The data is expected to be at least 56 bytes long.
-        require(_l2ToL1message.length >= 56, L2WithdrawalMessageWrongLength(_l2ToL1message.length));
-        // this message is a base token withdrawal
-        (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-        // slither-disable-next-line unused-return
-        (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
-    }
-
-    function encodeL1ERC20BridgeFinalizeWithdrawalData(
-        address _l1Receiver,
-        address _l1Token,
-        uint256 _amount
-    ) internal pure returns (bytes memory) {
-        // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _l1Receiver, _l1Token, _amount);
-    }
-
-    function decodeLegacyFinalizeWithdrawalData(
-        uint256 _l1ChainId,
-        bytes memory _l2ToL1message
-    ) internal pure returns (bytes4 functionSignature, address l1Token, bytes memory transferData) {
-        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
-        functionSignature = bytes4(functionSignatureUint);
-        // Check that the message length is correct.
-        // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
-        // 76 (bytes).
-        require(_l2ToL1message.length == 76, L2WithdrawalMessageWrongLength(_l2ToL1message.length));
-        address l1Receiver;
-        uint256 amount;
-        (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-        // We use the IL1ERC20Bridge for backward compatibility with old withdrawals.
-        (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-        // slither-disable-next-line unused-return
-        (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
-
-        // We also convert the data into the new format.
-        transferData = DataEncoding.encodeBridgeMintData({
-            _originalCaller: address(0),
-            _remoteReceiver: l1Receiver,
-            _originToken: l1Token,
-            _amount: amount,
-            _erc20Metadata: DataEncoding.encodeTokenData(_l1ChainId, bytes(""), bytes(""), bytes(""))
-        });
     }
 
     function encodeAssetRouterFinalizeDepositData(

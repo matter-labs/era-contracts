@@ -12,7 +12,6 @@ import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1CrossChainSender} from "../interfaces/IL1CrossChainSender.sol";
-import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 
@@ -64,9 +63,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
     /// @dev Address of native token vault.
     INativeTokenVaultBase public nativeTokenVault;
-
-    /// @dev Address of legacy bridge.
-    IL1ERC20Bridge public legacyBridge;
 
     /// @notice Legacy function to get the L2 shared bridge address for a chain.
     /// @dev In case the chain has been deployed after the gateway release,
@@ -144,15 +140,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         require(address(_nativeTokenVault) != address(0), ZeroAddress());
         nativeTokenVault = _nativeTokenVault;
         _setAssetHandler(ETH_TOKEN_ASSET_ID, address(_nativeTokenVault));
-    }
-
-    /// @notice Sets the L1ERC20Bridge contract address.
-    /// @dev Should be called only once by the owner.
-    /// @param _legacyBridge The address of the legacy bridge.
-    function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external override onlyOwner {
-        require(address(legacyBridge) == address(0), AddressAlreadySet(address(legacyBridge)));
-        require(address(_legacyBridge) != address(0), ZeroAddress());
-        legacyBridge = _legacyBridge;
     }
 
     /// @notice Used to set the asset deployment tracker address for given asset data.
@@ -349,10 +336,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         // Do the transfer if allowance to Shared bridge is bigger than amount
         // And if there is not enough allowance for the NTV
         bool weCanTransfer = false;
-        if (l1Token.allowance(address(legacyBridge), address(this)) >= _amount) {
-            _originalCaller = address(legacyBridge);
-            weCanTransfer = true;
-        } else if (
+        if (
             l1Token.allowance(_originalCaller, address(this)) >= _amount &&
             l1Token.allowance(_originalCaller, address(nativeTokenVault)) < _amount
         ) {

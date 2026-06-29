@@ -5,17 +5,15 @@ pragma solidity ^0.8.21;
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
-import {IL1SharedBridgeLegacy} from "../interfaces/IL1SharedBridgeLegacy.sol";
 import {IL1CrossChainSender} from "../interfaces/IL1CrossChainSender.sol";
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
-import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {TxStatus} from "../../common/Messaging.sol";
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy, IL1CrossChainSender {
+interface IL1AssetRouter is IAssetRouterBase, IL1CrossChainSender {
     event ClaimedFailedDepositAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
     function L1_NULLIFIER() external view returns (IL1Nullifier);
@@ -32,13 +30,9 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy, IL1CrossCha
 
     function nativeTokenVault() external view returns (INativeTokenVaultBase);
 
-    function legacyBridge() external view returns (IL1ERC20Bridge);
-
     function setAssetDeploymentTracker(bytes32 _assetRegistrationData, address _assetDeploymentTracker) external;
 
     function setNativeTokenVault(INativeTokenVaultBase _nativeTokenVault) external;
-
-    function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external;
 
     /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on L2.
     /// @param _chainId The ZK chain id to which the deposit was initiated.
