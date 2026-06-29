@@ -464,33 +464,25 @@ async fn collect_pre_governance_accept_ownership_targets(
     let mut targets = Vec::new();
     for candidate in candidates {
         let ownable = Ownable2Step::new(candidate, provider.clone());
-        let pending_owner = ownable
-            .pendingOwner()
-            .call()
-            .await
-            .with_context(|| {
-                format!(
-                    "read pendingOwner() for {candidate} while deriving stage-0 deferred acceptOwnership targets"
-                )
-            })?;
-        if pending_owner == governance {
+        // The prepare flow transfers every still-non-governance-owned Ownable2Step
+        // candidate to governance and emits a deferred `acceptOwnership()` for it,
+        // while contracts already owned by governance get neither. So the expected
+        // accept set is exactly the candidates whose live `owner()` is not
+        // governance — independent of whether the transfer has already been
+        // initiated (`pendingOwner == governance`, e.g. on a governance-replayed
+        // fork) or is still pending an out-of-band step (e.g. an Atlas CTM and its
+        // ValidatorTimelock / RollupDAManager owned by a legacy Governance, when
+        // verifying raw against live before that ceremony runs). The live ownership
+        // and transfer-progress state itself is verified separately in `rpc_state`
+        // (`verify_v31_validator_timelocks` / `verify_v31_rollup_da_managers` / …),
+        // so we deliberately do not re-flag it here.
+        let owner = ownable.owner().call().await.with_context(|| {
+            format!(
+                "read owner() for {candidate} while deriving stage-0 deferred acceptOwnership targets"
+            )
+        })?;
+        if owner != governance {
             targets.push(candidate);
-        } else {
-            // pendingOwner is not governance. If the live owner is already
-            // governance the contract is fully owned and simply needs no
-            // deferred acceptOwnership(); but if neither owner nor pendingOwner
-            // is governance the transfer was never initiated — a hard error.
-            let owner = ownable.owner().call().await.with_context(|| {
-                format!(
-                    "read owner() for {candidate} while deriving stage-0 deferred acceptOwnership targets"
-                )
-            })?;
-            if owner != governance {
-                result.report_error(&format!(
-                    "Stage-0 deferred acceptOwnership candidate {candidate} ({}): ownership transfer to governance ({governance}) was not initiated — owner={owner}, pendingOwner={pending_owner}",
-                    verifiers.address_verifier.name_or_unknown(&candidate)
-                ));
-            }
         }
     }
 
