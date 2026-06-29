@@ -42,7 +42,9 @@ import {TokenMigrationUtils} from "./TokenMigrationUtils.s.sol";
 
 /// @notice Script used for v31 upgrade flow.
 /// @dev Owns all v31-specific core-side ecosystem behavior:
-///      - stage 0: ChainRegistrationSender.acceptOwnership, AssetTracker.acceptOwnership
+///      - deploy: transfer AssetTracker + ChainRegistrationSender ownership to governance
+///        (their deferred acceptOwnership() is folded into stage 0 by the protocol-ops
+///        `ensureOwnable2StepTargetsOwnedByGovernance` aux flow, alongside the CTM accepts)
 ///      - stage 1: NTV.setAssetTracker, Bridgehub.setAddressesV31, ChainAssetHandler.setAddresses
 ///      - stage 2: legacy-GW historical migration intervals + old-GW blacklist (read from upgrade input TOML)
 ///      - stage3 (post-governance): bridged-token registration + balance migration
@@ -201,50 +203,16 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         return super.getInitializeCalldata(contractName, isZkBytecode);
     }
 
-    /// @notice Override to add version-specific governance calls for stage 0
-    /// @dev The two `acceptOwnership()` calls complete the 2-step ownership
-    ///      transfers initiated during deploy (`updateContractConnections`).
-    ///      They are emitted in stage 0 (before the proxy upgrades in stage 1)
-    ///      so that *all* deferred `acceptOwnership()` calls live in a single
-    ///      stage; neither accept depends on the new implementations being live.
-    /// @dev Two calls are emitted:
-    ///      1. ChainRegistrationSender.acceptOwnership (completes 2-step transfer started during deploy)
-    ///      2. AssetTracker.acceptOwnership (completes 2-step transfer started during deploy)
-    function prepareVersionSpecificStage0GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
-        console.log("Preparing v31-specific stage0 governance calls...");
-
-        address assetTrackerProxy = coreAddresses.bridgehub.proxies.assetTracker;
-        address chainRegistrationSenderProxy = coreAddresses.bridgehub.proxies.chainRegistrationSender;
-
-        require(assetTrackerProxy != address(0), "AssetTracker proxy address not found");
-        require(chainRegistrationSenderProxy != address(0), "ChainRegistrationSender proxy address not found");
-
-        console.log("Accepting ChainRegistrationSender ownership:", chainRegistrationSenderProxy);
-        console.log("Accepting AssetTracker ownership:", assetTrackerProxy);
-
-        calls = new Call[](2);
-
-        // Accept ownership of ChainRegistrationSender (completes the two-step transfer)
-        calls[0] = Call({
-            target: chainRegistrationSenderProxy,
-            value: 0,
-            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
-        });
-
-        // Accept ownership of AssetTracker (completes the two-step transfer)
-        calls[1] = Call({
-            target: assetTrackerProxy,
-            value: 0,
-            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
-        });
-
-        return calls;
-    }
-
     /// @notice Override to add version-specific governance calls for stage 1
     /// @dev Stage 1 runs after proxy upgrades, so the new `L1ChainAssetHandler`
     ///      implementation is already in place when these calls execute.
-    /// @dev Three calls are emitted (ownership accepts happen in stage 0):
+    /// @dev The AssetTracker / ChainRegistrationSender ownership accepts are NOT
+    ///      emitted here: their transfer to governance is initiated during deploy
+    ///      (`updateContractConnections`) and the deferred `acceptOwnership()` is
+    ///      folded into stage 0 by protocol-ops' `ensureOwnable2StepTargetsOwnedByGovernance`
+    ///      aux flow, together with the CTM-adjacent accepts (so every deferred
+    ///      accept lives in one stage and is verified by a single PUVT check).
+    /// @dev Three calls are emitted:
     ///      1. NTV.setAssetTracker (wires AssetTracker into NTV)
     ///      2. L1Bridgehub.setAddressesV31 (wires ChainRegistrationSender into Bridgehub)
     ///      3. L1ChainAssetHandler.setAddresses (caches messageRoot/assetRouter from bridgehub)

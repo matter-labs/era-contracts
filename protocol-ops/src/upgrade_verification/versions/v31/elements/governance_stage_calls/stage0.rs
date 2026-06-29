@@ -45,12 +45,6 @@ use super::{
     ProtocolUpgradeHandler,
 };
 
-/// Number of core-side deferred `acceptOwnership()` calls emitted by
-/// `CoreUpgrade_v31.prepareVersionSpecificStage0GovernanceCallsL1`, placed right
-/// after `pauseMigration()` (index 0): ChainRegistrationSender (index 1) and
-/// AssetTracker (index 2).
-const CORE_ACCEPT_OWNERSHIP_COUNT: usize = 2;
-
 impl GovernanceStage0Calls {
     /// Stage 0 — pause migrations, start per-CTM upgrade timers, and (on
     /// PUH-governed envs) redeploy PUH/Guardians + accept deferred pendingOwner
@@ -75,38 +69,11 @@ impl GovernanceStage0Calls {
             result,
         );
 
-        // Calls 1..=CORE_ACCEPT_OWNERSHIP_COUNT — core-side deferred
-        // `acceptOwnership()` calls. v31 emits the ChainRegistrationSender and
-        // AssetTracker ownership accepts (whose 2-step transfers were initiated
-        // during the core deploy) in stage 0, immediately after pauseMigration,
-        // so that ALL deferred accepts live in a single stage. They are emitted
-        // in CoreUpgrade_v31.prepareVersionSpecificStage0GovernanceCallsL1 in the
-        // order: ChainRegistrationSender, then AssetTracker.
-        errors += verify_call_by_name(
-            &self.calls,
-            1,
-            "chain_registration_sender_proxy",
-            "acceptOwnership()",
-            verifiers,
-            result,
-        );
-        errors += verify_call_by_name(
-            &self.calls,
-            2,
-            "asset_tracker_proxy",
-            "acceptOwnership()",
-            verifiers,
-            result,
-        );
-
-        // Calls (1 + CORE_ACCEPT)..=N — per-CTM GovernanceUpgradeTimer.startTimer(),
-        // one per CTM. The prepare emits these in env-config CTM order, which can
-        // differ from `artifact.ctms` order, so match each CTM's timer to its
-        // startTimer call by target (order-independent) rather than asserting a
-        // fixed position.
-        let timer_window_start = 1 + CORE_ACCEPT_OWNERSHIP_COUNT;
-        let timer_window_end =
-            (timer_window_start + artifact.ctms.len()).min(self.calls.elems.len());
+        // Calls 1..=N — per-CTM GovernanceUpgradeTimer.startTimer(), one per CTM.
+        // The prepare emits these in env-config CTM order, which can differ from
+        // `artifact.ctms` order, so match each CTM's timer to its startTimer call
+        // by target (order-independent) rather than asserting a fixed position.
+        let timer_window_end = (1 + artifact.ctms.len()).min(self.calls.elems.len());
         for ctm in artifact.ctms.iter() {
             let timer_label = format!("{}.upgrade_timer", ctm.flavor.label());
             let Some(timer) = required_ctm_address(
@@ -117,9 +84,7 @@ impl GovernanceStage0Calls {
                 errors += 1;
                 continue;
             };
-            match (timer_window_start..timer_window_end)
-                .find(|&idx| self.calls.elems[idx].target == timer)
-            {
+            match (1..timer_window_end).find(|&idx| self.calls.elems[idx].target == timer) {
                 Some(idx) => {
                     errors += verify_call_by_address(
                         &self.calls,
@@ -133,7 +98,7 @@ impl GovernanceStage0Calls {
                 }
                 None => {
                     result.report_error(&format!(
-                        "Stage-0 startTimer() call for {timer_label} ({timer}) not found in the timer window [{timer_window_start}, {timer_window_end})"
+                        "Stage-0 startTimer() call for {timer_label} ({timer}) not found in the timer window [1, {timer_window_end})"
                     ));
                     errors += 1;
                 }
@@ -148,9 +113,7 @@ impl GovernanceStage0Calls {
             .await;
         let puh_governed = bridgehub_owner_admin != Address::ZERO;
 
-        // pauseMigration (1) + core deferred accepts (CORE_ACCEPT_OWNERSHIP_COUNT)
-        // + one startTimer per CTM.
-        let base_count = 1 + CORE_ACCEPT_OWNERSHIP_COUNT + artifact.ctms.len();
+        let base_count = 1 + artifact.ctms.len();
         // `AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps`
         // writes one deferred `acceptOwnership()` call per unique CTM whose
         // `pendingOwner` is governance at prepare time. Derive that target set
@@ -385,10 +348,6 @@ impl GovernanceStage0Calls {
         }
         errors += verify_pre_governance_accept_ownership_tail(
             &self.calls,
-            // The core deferred accepts at indices [1, 1 + CORE_ACCEPT_OWNERSHIP_COUNT)
-            // are verified explicitly above; the tail check must not flag them as
-            // stray accepts appearing before the tail.
-            1 + CORE_ACCEPT_OWNERSHIP_COUNT,
             pre_gov_accept_tail_start,
             &pre_gov_accept_targets,
             verifiers,
@@ -427,12 +386,27 @@ async fn collect_pre_governance_accept_ownership_targets(
     governance: Address,
     result: &mut VerificationResult,
 ) -> anyhow::Result<Vec<Address>> {
-    // Candidates: each CTM proxy plus its ValidatorTimelock and auxiliary
-    // ownership targets discovered from the generated artifact. v31's
-    // prepare flow transfers any still-stale Ownable2Step contracts to
-    // governance and defers the accept to stage 0; include only candidates
-    // whose live pendingOwner is governance at verify time.
+    // Candidates: the core ecosystem Ownable2Step contracts (AssetTracker,
+    // ChainRegistrationSender) plus each CTM proxy with its ValidatorTimelock and
+    // auxiliary ownership targets discovered from the generated artifact. v31's
+    // prepare flow transfers any still-stale Ownable2Step contract to governance
+    // and defers the accept to stage 0; include only candidates whose live
+    // pendingOwner is governance at verify time. Both the core accepts and the
+    // CTM-adjacent accepts flow through the same `ensureOwnable2StepTargets…` aux
+    // mechanism, so they all land in (and are verified from) one trailing block.
     let mut candidates: Vec<Address> = Vec::new();
+    for name in ["asset_tracker_proxy", "chain_registration_sender_proxy"] {
+        match verifiers.address_verifier.get_by_name(name) {
+            Some(addr) if addr != Address::ZERO => {
+                if !candidates.contains(&addr) {
+                    candidates.push(addr);
+                }
+            }
+            _ => result.report_error(&format!(
+                "{name} must be a known non-zero address while deriving stage-0 deferred acceptOwnership targets"
+            )),
+        }
+    }
     for ctm in &artifact.ctms {
         if let Some(ctm_proxy) = required_ctm_address(
             ctm,
@@ -525,11 +499,6 @@ async fn collect_pre_governance_accept_ownership_targets(
 
 fn verify_pre_governance_accept_ownership_tail(
     calls: &CallList,
-    // First index that may legitimately hold an `acceptOwnership()` outside the
-    // tail. Calls in `[1, prefix_accept_end)` are the core deferred accepts
-    // verified separately; only accepts in `[prefix_accept_end, tail_start)`
-    // (the timer / PUH region) are stray and flagged.
-    prefix_accept_end: usize,
     tail_start: usize,
     expected_targets: &[Address],
     verifiers: &Verifiers,
@@ -542,7 +511,7 @@ fn verify_pre_governance_accept_ownership_tail(
     for (index, call) in calls.elems.iter().enumerate() {
         let is_accept = call.data.len() >= 4 && call.data[0..4] == accept_ownership_selector;
 
-        if index >= prefix_accept_end && index < tail_start && is_accept {
+        if index < tail_start && is_accept {
             result.report_error(&format!(
                 "Deferred acceptOwnership() call found before stage-0 tail at index {index}"
             ));
