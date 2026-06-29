@@ -30,6 +30,4 @@ interface IL2NativeTokenVault is INativeTokenVaultBase {
 
     /// @notice The wrapped base token (WETH) address
     function WETH_TOKEN() external view returns (address);
-
-    function setLegacyTokenAssetId(address _l2TokenAddress) external;
 }

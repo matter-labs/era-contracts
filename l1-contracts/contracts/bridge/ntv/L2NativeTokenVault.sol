@@ -194,15 +194,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         return bytes32(0);
     }
 
-    function _registerLegacyTokenAssetId(
-        address _l2TokenAddress,
-        address _l1TokenAddress
-    ) internal returns (bytes32 newAssetId) {
-        newAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1TokenAddress);
-        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).setLegacyTokenAssetHandler(newAssetId);
-        _setLegacyTokenData(newAssetId, _l2TokenAddress);
-    }
-
     /// @notice Ensures that the token is deployed.
     /// @param _assetId The asset ID.
     /// @param _originToken The origin token address.
@@ -222,17 +213,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             _erc20Data: _erc20Data,
             _expectedToken: expectedToken
         });
-    }
-
-    function _setLegacyTokenData(bytes32 _assetId, address _expectedToken) internal {
-        tokenAddress[_assetId] = _expectedToken;
-        assetId[_expectedToken] = _assetId;
-        originChainId[_assetId] = L1_CHAIN_ID;
-        _addTokenToTokensList(_assetId);
-        // Note, that here we assume that `L2_ASSET_TRACKER.registerLegacyToken` can only succeed
-        // if the token has been registered on L2NTV before, so it is not possible that someone
-        // front-runs and registers the token before we call the function here.
-        L2_ASSET_TRACKER.registerLegacyToken(_assetId);
     }
 
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.

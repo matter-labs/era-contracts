@@ -199,12 +199,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _setAssetHandlerAddressThisChain(L2_NATIVE_TOKEN_VAULT_ADDR, _assetRegistrationData, _assetHandlerAddress);
     }
 
-    function setLegacyTokenAssetHandler(bytes32 _assetId) external override onlyNTV {
-        // Note, that it is an asset handler, but not asset deployment tracker,
-        // which is located on L1.
-        _setAssetHandler(_assetId, L2_NATIVE_TOKEN_VAULT_ADDR);
-    }
-
     /// @notice Executes cross-chain interop messages following ERC-7786 standard
     /// @param sender ERC-7930 Address of the message sender
     /// @param payload Encoded function call data (must be finalizeDeposit)
