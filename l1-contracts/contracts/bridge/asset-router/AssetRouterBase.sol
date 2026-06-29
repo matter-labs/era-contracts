@@ -157,8 +157,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         });
 
         bytes32 txDataHash = DataEncoding.encodeTxDataHash({
-            _nativeTokenVault: _nativeTokenVault,
-            _encodingVersion: encodingVersion,
             _originalCaller: _originalCaller,
             _assetId: assetId,
             _transferData: transferData
@@ -306,12 +304,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     ) public view virtual returns (bytes memory) {
         return abi.encodeCall(AssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
     }
-
-    /// @notice Ensures that token is registered with native token vault.
-    /// @dev Only used when deposit is made with legacy data encoding format.
-    /// @param _token The native token address which should be registered with native token vault.
-    /// @return assetId The asset ID of the token provided.
-    function _ensureTokenRegisteredWithNTV(address _token) internal virtual returns (bytes32 assetId);
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE

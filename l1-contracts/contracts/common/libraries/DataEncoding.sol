@@ -8,7 +8,6 @@ import {IL1ERC20Bridge} from "../../bridge/interfaces/IL1ERC20Bridge.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
 import {
     AssetIdMismatch,
-    IncorrectTokenAddressFromNTV,
     InvalidNTVBurnData,
     L2WithdrawalMessageWrongLength,
     UnsupportedEncodingVersion,
@@ -20,7 +19,6 @@ import {InvalidFunctionSignature} from "../../bridge/asset-tracker/AssetTrackerE
 import {IAssetTrackerDataEncoding} from "../../bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 import {UnsafeBytes} from "./UnsafeBytes.sol";
 import {GatewayToL1TokenBalanceMigrationData, L1ToGatewayTokenBalanceMigrationData} from "../../common/Messaging.sol";
-import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
 
 /**
  * @author Matter Labs
@@ -156,42 +154,20 @@ library DataEncoding {
         return keccak256(abi.encode(_chainId, L2_NATIVE_TOKEN_VAULT_ADDR, _tokenAddress));
     }
 
-    /// @dev Encodes the transaction data hash using either the latest encoding standard or the legacy standard.
-    /// @param _encodingVersion EncodingVersion.
+    /// @dev Encodes the transaction data hash using the latest encoding standard.
     /// @param _originalCaller The address of the entity that initiated the deposit.
     /// @param _assetId The unique identifier of the deposited L1 token.
-    /// @param _nativeTokenVault The address of the token, only used if the encoding version is legacy.
     /// @param _transferData The encoded transfer data, which includes the deposit amount, the address of the L2 receiver, and potentially the token address.
     /// @return txDataHash The resulting encoded transaction data hash.
     function encodeTxDataHash(
-        bytes1 _encodingVersion,
         address _originalCaller,
         bytes32 _assetId,
-        address _nativeTokenVault,
         bytes memory _transferData
-    ) internal view returns (bytes32 txDataHash) {
-        if (_encodingVersion == LEGACY_ENCODING_VERSION) {
-            address tokenAddress = INativeTokenVaultBase(_nativeTokenVault).tokenAddress(_assetId);
-
-            // This is a double check to ensure that the used token for the legacy encoding is correct.
-            // This revert should never be emitted and in real life and should only serve as a guard in
-            // case of inconsistent state of Native Token Vault.
-            bytes32 expectedAssetId = encodeNTVAssetId(block.chainid, tokenAddress);
-            if (_assetId != expectedAssetId) {
-                revert IncorrectTokenAddressFromNTV(_assetId, tokenAddress);
-            }
-
-            (uint256 depositAmount, , ) = decodeBridgeBurnData(_transferData);
-            txDataHash = keccak256(abi.encode(_originalCaller, tokenAddress, depositAmount));
-        } else if (_encodingVersion == NEW_ENCODING_VERSION) {
-            // Similarly to calldata, the txDataHash is collision-resistant.
-            // In the legacy data hash, the first encoded variable was the address, which is padded with zeros during `abi.encode`.
-            txDataHash = keccak256(
-                bytes.concat(_encodingVersion, abi.encode(_originalCaller, _assetId, _transferData))
-            );
-        } else {
-            revert UnsupportedEncodingVersion();
-        }
+    ) internal pure returns (bytes32 txDataHash) {
+        // The txDataHash is collision-resistant with the removed legacy format: the legacy hash encoded an
+        // address as its first word, whose most significant bytes are always zero, so it can never collide
+        // with the `NEW_ENCODING_VERSION` (0x01) prefix used here.
+        txDataHash = keccak256(bytes.concat(NEW_ENCODING_VERSION, abi.encode(_originalCaller, _assetId, _transferData)));
     }
 
     /// @notice Decodes the token data by combining chain id, asset deployment tracker and asset data.

@@ -18,10 +18,6 @@ contract TestAssetRouterBase is AssetRouterBase {
 
     function finalizeDeposit(uint256, bytes32, bytes calldata) public payable override {}
 
-    function _ensureTokenRegisteredWithNTV(address) internal pure override returns (bytes32) {
-        return keccak256("test");
-    }
-
     // Use a specific name that won't trigger fuzz testing
     function callGetTransferData(bytes1 encodingVersion, bytes calldata data) external returns (bytes32, bytes memory) {
         return _getTransferData(encodingVersion, address(0), data);

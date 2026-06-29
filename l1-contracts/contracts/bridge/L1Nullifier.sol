@@ -8,7 +8,6 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "./asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "./asset-router/AssetRouterBase.sol";
 import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 
@@ -139,12 +138,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         _;
     }
 
-    /// @notice Checks that the message sender is the legacy bridge.
-    modifier onlyLegacyBridge() {
-        require(msg.sender == address(legacyBridge), Unauthorized(msg.sender));
-        _;
-    }
-
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
@@ -266,28 +259,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
 
-    /// @dev Calls the library `encodeTxDataHash`. Used as a wrapper for try / catch case.
-    /// @dev Encodes the transaction data hash using either the latest encoding standard or the legacy standard.
-    /// @param _encodingVersion EncodingVersion.
-    /// @param _originalCaller The address of the entity that initiated the deposit.
-    /// @param _assetId The unique identifier of the deposited L1 token.
-    /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
-    /// @return txDataHash The resulting encoded transaction data hash.
-    function encodeTxDataHash(
-        bytes1 _encodingVersion,
-        address _originalCaller,
-        bytes32 _assetId,
-        bytes calldata _transferData
-    ) external view returns (bytes32 txDataHash) {
-        txDataHash = DataEncoding.encodeTxDataHash({
-            _encodingVersion: _encodingVersion,
-            _originalCaller: _originalCaller,
-            _assetId: _assetId,
-            _nativeTokenVault: address(l1NativeTokenVault),
-            _transferData: _transferData
-        });
-    }
-
     function bridgeConfirmTransferResult(
         ConfirmTransferResultData memory _confirmTransferResultData
     ) public nonReentrant {
@@ -394,26 +365,13 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             bytes32 dataHash = depositHappened[_confirmTransferResultData._chainId][
                 _confirmTransferResultData._l2TxHash
             ];
-            // Determine if the given dataHash matches the calculated legacy transaction hash.
-            bool isLegacyTxDataHash = _isLegacyTxDataHash(
-                _confirmTransferResultData._depositSender,
-                _confirmTransferResultData._assetId,
-                _confirmTransferResultData._assetData,
-                dataHash
-            );
-            // If the dataHash matches the legacy transaction hash, skip the next step.
-            // Otherwise, perform the check using the new transaction data hash encoding.
-            if (!isLegacyTxDataHash) {
-                bytes32 txDataHash = DataEncoding.encodeTxDataHash({
-                    _encodingVersion: NEW_ENCODING_VERSION,
-                    _originalCaller: _confirmTransferResultData._depositSender,
-                    _assetId: _confirmTransferResultData._assetId,
-                    _nativeTokenVault: address(l1NativeTokenVault),
-                    _transferData: _confirmTransferResultData._assetData
-                });
-                if (dataHash != txDataHash) {
-                    revert DepositDoesNotExist(dataHash, txDataHash);
-                }
+            bytes32 txDataHash = DataEncoding.encodeTxDataHash({
+                _originalCaller: _confirmTransferResultData._depositSender,
+                _assetId: _confirmTransferResultData._assetId,
+                _transferData: _confirmTransferResultData._assetData
+            });
+            if (dataHash != txDataHash) {
+                revert DepositDoesNotExist(dataHash, txDataHash);
             }
         }
         delete depositHappened[_confirmTransferResultData._chainId][_confirmTransferResultData._l2TxHash];
@@ -476,27 +434,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             revert SharedBridgeValueNotSet(SharedBridgeKey.LegacyBridgeFirstBatch);
         }
         return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraPostLegacyBridgeUpgradeFirstBatch);
-    }
-
-    /// @dev Determines if the provided data for a failed deposit corresponds to a legacy failed deposit.
-    /// @param _depositSender The address of the entity that initiated the deposit.
-    /// @param _assetId The unique identifier of the deposited L1 token.
-    /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
-    /// @param _expectedTxDataHash The nullifier data hash stored for the failed deposit.
-    /// @return isLegacyTxDataHash True if the transaction is legacy, false otherwise.
-    function _isLegacyTxDataHash(
-        address _depositSender,
-        bytes32 _assetId,
-        bytes memory _transferData,
-        bytes32 _expectedTxDataHash
-    ) internal view returns (bool isLegacyTxDataHash) {
-        try this.encodeTxDataHash(LEGACY_ENCODING_VERSION, _depositSender, _assetId, _transferData) returns (
-            bytes32 txDataHash
-        ) {
-            return txDataHash == _expectedTxDataHash;
-        } catch {
-            return false;
-        }
     }
 
     /// @dev Determines if a deposit was initiated on ZKsync Era before the upgrade to the Shared Bridge.
@@ -691,64 +628,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
         l1AssetRouter.bridgeConfirmTransferResult({
             _chainId: _chainId,
-            _txStatus: TxStatus.Failure,
-            _depositSender: _depositSender,
-            _assetId: assetId,
-            _assetData: assetData
-        });
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                    ERA ERC20 LEGACY FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on ZKsync Era chain.
-    /// This function is specifically designed for maintaining backward-compatibility with legacy `claimFailedDeposit`
-    /// method in `L1ERC20Bridge`.
-    ///
-    /// @param _depositSender The address of the deposit initiator.
-    /// @param _l1Token The address of the deposited L1 ERC20 token.
-    /// @param _amount The amount of the deposit that failed.
-    /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization.
-    /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed.
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-    /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent.
-    /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization.
-    function claimFailedDepositLegacyErc20Bridge(
-        address _depositSender,
-        address _l1Token,
-        uint256 _amount,
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof
-    ) external override onlyLegacyBridge {
-        // For legacy deposits, the l2 receiver is not required to check tx data hash
-        // The token address does not have to be provided for this functionality either.
-        bytes memory assetData = DataEncoding.encodeBridgeBurnData(_amount, address(0), address(0));
-
-        /// the legacy bridge can only be used with L1 native tokens.
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Token);
-
-        _verifyAndClearTransfer(
-            true,
-            ConfirmTransferResultData({
-                _depositSender: _depositSender,
-                _chainId: ERA_CHAIN_ID,
-                _assetId: assetId,
-                _assetData: assetData,
-                _l2TxHash: _l2TxHash,
-                _l2BatchNumber: _l2BatchNumber,
-                _l2MessageIndex: _l2MessageIndex,
-                _l2TxNumberInBatch: _l2TxNumberInBatch,
-                _merkleProof: _merkleProof,
-                _txStatus: TxStatus.Failure
-            })
-        );
-
-        l1AssetRouter.bridgeConfirmTransferResult({
-            _chainId: ERA_CHAIN_ID,
             _txStatus: TxStatus.Failure,
             _depositSender: _depositSender,
             _assetId: assetId,

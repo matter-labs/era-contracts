@@ -11,44 +11,7 @@ import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Legacy Bridge interface before ZK chain migration, used for backward compatibility with ZKsync Era
 interface IL1ERC20Bridge {
-    event DepositInitiated(
-        bytes32 indexed l2DepositTxHash,
-        address indexed from,
-        address indexed to,
-        address l1Token,
-        uint256 amount
-    );
-
-    event ClaimedFailedDeposit(address indexed to, address indexed l1Token, uint256 amount);
-
     function isWithdrawalFinalized(uint256 _l2BatchNumber, uint256 _l2MessageIndex) external view returns (bool);
-
-    function deposit(
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        uint256 _l2TxGasLimit,
-        uint256 _l2TxGasPerPubdataByte,
-        address _refundRecipient
-    ) external payable returns (bytes32 txHash);
-
-    function deposit(
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        uint256 _l2TxGasLimit,
-        uint256 _l2TxGasPerPubdataByte
-    ) external payable returns (bytes32 txHash);
-
-    function claimFailedDeposit(
-        address _depositSender,
-        address _l1Token,
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof
-    ) external;
 
     function finalizeWithdrawal(
         uint256 _l2BatchNumber,

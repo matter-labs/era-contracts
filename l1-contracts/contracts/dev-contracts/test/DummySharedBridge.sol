@@ -54,31 +54,6 @@ contract DummySharedBridge is PausableUpgradeable {
 
     function receiveEth(uint256 _chainId) external payable {}
 
-    function depositLegacyErc20Bridge(
-        address, //_msgSender,
-        address, //_l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        uint256, //_l2TxGasLimit,
-        uint256, //_l2TxGasPerPubdataByte,
-        address //_refundRecipient
-    ) external payable returns (bytes32 txHash) {
-        txHash = dummyL2DepositTxHash;
-
-        // Legacy bridge requires this logic to work properly
-        IERC20(_l1Token).transferFrom(msg.sender, address(this), _amount);
-    }
-
-    function claimFailedDepositLegacyErc20Bridge(
-        address, //_depositSender,
-        address, //_l1Token,
-        uint256, //_amount,
-        bytes32, //_l2TxHash,
-        uint256, //_l2BatchNumber,
-        uint256, //_l2MessageIndex,
-        uint16, //_l2TxNumberInBatch,
-        bytes32[] calldata // _merkleProof
-    ) external {}
 
     function claimFailedDeposit(
         uint256, // _chainId,
