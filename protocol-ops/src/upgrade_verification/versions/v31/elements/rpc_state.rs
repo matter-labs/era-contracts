@@ -704,17 +704,38 @@ async fn verify_v31_rollup_da_managers(
         }
 
         // When v31 deployed a fresh rollup L1 DA validator for this CTM (Era),
-        // the freshly deployed RollupDAManager must have the rollup DA pair
-        // registered at deploy time: (validator, BLOBS_AND_PUBDATA_KECCAK256)
-        // must be an allowed configuration. A zero validator address means the
-        // CTM reuses its existing manager (ZKsync OS) — its pairs were set up in
-        // a prior upgrade and are out of scope here, so skip the check.
+        // verify the freshly deployed manager + validator bytecode and that the
+        // manager has the rollup DA pair registered at deploy time:
+        // (validator, BLOBS_AND_PUBDATA_KECCAK256) must be an allowed
+        // configuration. A zero validator address means the CTM reuses its
+        // existing manager (ZKsync OS) — its bytecode is a prior-version contract
+        // and its pairs were set up in a prior upgrade, both out of scope here, so
+        // skip these checks.
         let rollup_l1_da_validator = required_address(
             &ctm.value,
             &scope,
             &["deployed_addresses", "rollup_l1_da_validator_addr"],
         )?;
         if rollup_l1_da_validator != Address::ZERO {
+            // Neither contract has immutables, so their runtime bytecode is
+            // deterministic and must match the compiled artifact exactly.
+            result
+                .expect_deployed_bytecode(
+                    verifiers,
+                    &rollup_da_manager,
+                    "l1-contracts/RollupDAManager",
+                    false,
+                )
+                .await;
+            result
+                .expect_deployed_bytecode(
+                    verifiers,
+                    &rollup_l1_da_validator,
+                    "da-contracts/RollupL1DAValidator",
+                    false,
+                )
+                .await;
+
             let scheme = L2DACommitmentScheme::BlobsAndPubdataKeccak256 as u8;
             let manager = RollupDAManager::new(rollup_da_manager, provider.clone());
             match manager
