@@ -15,7 +15,6 @@ import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
-import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 import {IL1AssetTracker} from "../asset-tracker/IL1AssetTracker.sol";
 import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
@@ -182,32 +181,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /*//////////////////////////////////////////////////////////////
                             Start transaction Functions
     //////////////////////////////////////////////////////////////*/
-
-    function _bridgeBurnNativeToken(
-        uint256 _chainId,
-        bytes32 _assetId,
-        address _originalCaller,
-        // solhint-disable-next-line no-unused-vars
-        bool _depositChecked,
-        uint256 _depositAmount,
-        address _receiver,
-        address _nativeToken
-    ) internal override returns (bytes memory _bridgeMintData) {
-        bool depositChecked = IL1AssetRouter(address(ASSET_ROUTER)).transferFundsToNTV(
-            _assetId,
-            _depositAmount,
-            _originalCaller
-        );
-        _bridgeMintData = super._bridgeBurnNativeToken({
-            _chainId: _chainId,
-            _assetId: _assetId,
-            _originalCaller: _originalCaller,
-            _depositChecked: depositChecked,
-            _depositAmount: _depositAmount,
-            _receiver: _receiver,
-            _nativeToken: _nativeToken
-        });
-    }
 
     /*//////////////////////////////////////////////////////////////
                             L1 SPECIFIC FUNCTIONS

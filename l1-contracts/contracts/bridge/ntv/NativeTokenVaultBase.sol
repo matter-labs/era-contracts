@@ -290,7 +290,6 @@ abstract contract NativeTokenVaultBase is
                 _chainId: _chainId,
                 _assetId: _assetId,
                 _originalCaller: _originalCaller,
-                _depositChecked: false,
                 _depositAmount: amount,
                 _receiver: receiver,
                 _nativeToken: tokenAddress
@@ -355,7 +354,6 @@ abstract contract NativeTokenVaultBase is
         require(_amount != 0, AmountMustBeGreaterThanZero());
         _getTokenAndBridgeToChain({
             _isBridgedToken: true,
-            _depositChecked: false,
             _tokenAddress: _tokenAddress,
             _depositAmount: _amount,
             _chainId: _chainId,
@@ -392,7 +390,6 @@ abstract contract NativeTokenVaultBase is
         uint256 _chainId,
         bytes32 _assetId,
         address _originalCaller,
-        bool _depositChecked,
         uint256 _depositAmount,
         address _receiver,
         address _nativeToken
@@ -403,7 +400,6 @@ abstract contract NativeTokenVaultBase is
 
         _getTokenAndBridgeToChain({
             _isBridgedToken: false,
-            _depositChecked: _depositChecked,
             _tokenAddress: _nativeToken,
             _depositAmount: _depositAmount,
             _chainId: _chainId,
@@ -449,7 +445,6 @@ abstract contract NativeTokenVaultBase is
 
     function _getTokenAndBridgeToChain(
         bool _isBridgedToken,
-        bool _depositChecked,
         address _tokenAddress,
         uint256 _depositAmount,
         uint256 _chainId,
@@ -476,15 +471,9 @@ abstract contract NativeTokenVaultBase is
             if (_isBridgedToken) {
                 IBridgedStandardToken(_tokenAddress).bridgeBurn(_originalCaller, _depositAmount);
             } else {
-                if (!_depositChecked) {
-                    uint256 expectedDepositAmount = _depositFunds(
-                        _originalCaller,
-                        IERC20(_tokenAddress),
-                        _depositAmount
-                    ); // note if _originalCaller is this contract, this will return 0. This does not happen.
-                    // The token has non-standard transfer logic
-                    require(_depositAmount == expectedDepositAmount, TokensWithFeesNotSupported());
-                }
+                uint256 expectedDepositAmount = _depositFunds(_originalCaller, IERC20(_tokenAddress), _depositAmount); // note if _originalCaller is this contract, this will return 0. This does not happen.
+                // The token has non-standard transfer logic
+                require(_depositAmount == expectedDepositAmount, TokensWithFeesNotSupported());
             }
         }
     }
