@@ -50,7 +50,7 @@ struct SystemContract {
 uint256 constant SYSTEM_CONTRACTS_COUNT = 31;
 /// @dev Fixed-address CoreContract entries backed by l1-contracts bytecodes.
 ///      Era deploys them directly; ZKsyncOS upgrades them via universal force deployments.
-uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 12;
+uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 13;
 /// @dev Era runtime creation bytecodes published as factory deps but not force-deployed.
 uint256 constant RUNTIME_ONLY_FACTORY_DEPS_COUNT = 2;
 /// @dev Era factory deps: fixed-address core contracts plus runtime-only proxy creation bytecodes.
@@ -186,25 +186,19 @@ library SystemContractsProcessing {
     }
 
     function _fillFixedAddressCoreContracts(CoreContract[] memory ids) private pure {
-        // NOTE: L2WrappedBaseToken is intentionally NOT in this list. v31 must not touch the
-        // WrappedBaseToken impl on either VM, so it is excluded from both the force-deployment list
-        // and the factory deps (this list feeds Era + ZKsyncOS force deployments and factory deps).
-        uint256 i = 0;
-        ids[i++] = CoreContract.L2Bridgehub;
-        ids[i++] = CoreContract.L2AssetRouter;
-        ids[i++] = CoreContract.L2NativeTokenVault;
-        ids[i++] = CoreContract.L2MessageRoot;
-        ids[i++] = CoreContract.L2MessageVerification;
-        ids[i++] = CoreContract.L2ChainAssetHandler;
-        ids[i++] = CoreContract.L2InteropRootStorage;
-        ids[i++] = CoreContract.BaseTokenHolder;
-        ids[i++] = CoreContract.L2AssetTracker;
-        ids[i++] = CoreContract.InteropCenter;
-        ids[i++] = CoreContract.InteropHandler;
-        ids[i++] = CoreContract.GWAssetTracker;
-        // Under-filling would silently leave `CoreContract(0)` entries; over-filling
-        // already reverts with an out-of-bounds access on the fixed-length array.
-        require(i == FIXED_ADDRESS_CORE_CONTRACTS_COUNT, "fixed-address core contract count mismatch");
+        ids[0] = CoreContract.L2Bridgehub;
+        ids[1] = CoreContract.L2AssetRouter;
+        ids[2] = CoreContract.L2NativeTokenVault;
+        ids[3] = CoreContract.L2MessageRoot;
+        ids[4] = CoreContract.L2WrappedBaseToken;
+        ids[5] = CoreContract.L2MessageVerification;
+        ids[6] = CoreContract.L2ChainAssetHandler;
+        ids[7] = CoreContract.L2InteropRootStorage;
+        ids[8] = CoreContract.BaseTokenHolder;
+        ids[9] = CoreContract.L2AssetTracker;
+        ids[10] = CoreContract.InteropCenter;
+        ids[11] = CoreContract.InteropHandler;
+        ids[12] = CoreContract.GWAssetTracker;
     }
 
     /// @notice System contracts that have l1-contracts EVM bytecodes and need ZKsyncOS proxy upgrades.
@@ -338,9 +332,9 @@ library SystemContractsProcessing {
             //  - `SystemContractProxy`: every `updateZKsyncOSContract` call that needs
             //    to materialize a proxy at a previously-empty system address force-deploys
             //    this bytecode.
-            //  - `SystemContractProxyAdmin` (at 0x1000c): a direct-deployed ProxyAdmin present from
-            //    genesis. v31 no longer force-deploys it (see getBaseZKsyncOSForceDeployments), but its
-            //    bytecode preimage is still published as a ZKsyncOS baseline.
+            //  - `SystemContractProxyAdmin` (at 0x1000c): force-deployed once during every
+            //    upgrade via `_buildZKsyncOSProxyAdminEntry`, so its preimage must be
+            //    published too.
             factoryDeps = new bytes[](2);
             factoryDeps[0] = BytecodeUtils.readDeployedBytecodeL1(
                 true,
@@ -380,15 +374,7 @@ library SystemContractsProcessing {
     {
         CoreContract[] memory fixedAddressCoreContracts = getFixedAddressCoreContracts();
         ZkSyncOsSystemContract[] memory sysContracts = getZKsyncOSExtraSystemContracts();
-
-        // SystemContractProxyAdmin is intentionally NOT force-deployed here: it's a direct-deployed
-        // ProxyAdmin already present from genesis (owned by the ComplexUpgrader), so re-deploying it
-        // would require an unsafe overwrite. _setupProxyAdmin only reads its owner(), which is already
-        // correct. (L2WrappedBaseToken is likewise excluded — it is no longer in
-        // getFixedAddressCoreContracts.) The L2V31Upgrade delegate target remains the only legitimate
-        // ZKsyncOS unsafe force deployment (added in CTMUpgrade_v31); the PUVT guards that no other
-        // unsafe force deployment is present.
-        uint256 totalBase = fixedAddressCoreContracts.length + sysContracts.length;
+        uint256 totalBase = fixedAddressCoreContracts.length + sysContracts.length + 1;
 
         deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](totalBase);
 
@@ -400,6 +386,8 @@ library SystemContractsProcessing {
         for (uint256 i = 0; i < sysContracts.length; i++) {
             deployments[fixedAddressCoreContracts.length + i] = _buildZKsyncOSEntryForSystemContract(sysContracts[i]);
         }
+        // ProxyAdmin is direct-deployed on ZKsyncOS genesis and must also be available during upgrades.
+        deployments[totalBase - 1] = _buildZKsyncOSProxyAdminEntry();
     }
 
     function mergeUniversalForceDeployments(
@@ -421,8 +409,19 @@ library SystemContractsProcessing {
     ) private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
         (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, _id);
 
-        // Note: L2WrappedBaseToken is excluded from the ZKsyncOS force-deployment list (see
-        // getBaseZKsyncOSForceDeployments), so this builder only handles system-proxy upgrades.
+        // L2WrappedBaseToken sits directly at L2_WRAPPED_BASE_TOKEN_IMPL_ADDR as the
+        // implementation contract — it's *not* behind a TransparentUpgradeableProxy.
+        // User-space WETH proxies reference this address directly. So its upgrade is
+        // a plain bytecode replacement (Unsafe), not a system-proxy upgrade.
+        if (_id == CoreContract.L2WrappedBaseToken) {
+            return
+                IComplexUpgrader.UniversalContractUpgradeInfo({
+                    upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
+                    deployedBytecodeInfo: Utils.getZKOSBytecodeInfoForContract(fileName, contractName),
+                    newAddress: CoreOnGatewayHelper._resolveAddress(_id)
+                });
+        }
+
         bytes memory bytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
 
         return
@@ -446,6 +445,20 @@ library SystemContractsProcessing {
                 upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
                 deployedBytecodeInfo: bytecodeInfo,
                 newAddress: addr
+            });
+    }
+
+    function _buildZKsyncOSProxyAdminEntry() private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
+        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract(
+            "SystemContractProxyAdmin.sol",
+            "SystemContractProxyAdmin"
+        );
+
+        return
+            IComplexUpgrader.UniversalContractUpgradeInfo({
+                upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
+                deployedBytecodeInfo: bytecodeInfo,
+                newAddress: L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
             });
     }
 }

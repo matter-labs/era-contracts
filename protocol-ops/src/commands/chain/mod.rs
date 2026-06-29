@@ -7,12 +7,13 @@ use crate::commands::chain::{
     validator::ChainValidatorArgs,
 };
 
-pub mod gateway;
-pub mod init;
-pub mod set_da_validator_pair;
-pub mod set_upgrade_timestamp;
-pub mod upgrade;
-pub mod validator;
+pub(crate) mod admin_call_builder;
+pub(crate) mod gateway;
+pub(crate) mod init;
+pub(crate) mod set_da_validator_pair;
+pub(crate) mod set_upgrade_timestamp;
+pub(crate) mod upgrade;
+pub(crate) mod validator;
 
 #[derive(Subcommand, Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -36,7 +37,7 @@ pub enum ChainCommands {
     Gateway(GatewayCommands),
 }
 
-pub async fn run(args: ChainCommands) -> anyhow::Result<()> {
+pub(crate) async fn run(args: ChainCommands) -> anyhow::Result<()> {
     match args {
         ChainCommands::Init(args) => init::run(args).await,
         ChainCommands::Upgrade(args) => upgrade::run(args).await,

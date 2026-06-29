@@ -133,16 +133,13 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
 
     function migrateChainToGateway(uint256 migratingChainId) public {
         AdminFunctions adminScript = new AdminFunctions();
-        // Under `forge test` no fork URL is active, so `eth_getLogs` would
-        // revert if we tried to derive the diamond-cut data on the fly.
-        // `initializeConfig` preloads `gatewayDiamondCutData` from TOML, so we
-        // pass the cached value directly to `migrateChainToGatewayWithCutData`.
-        adminScript.migrateChainToGatewayWithCutData(
+        adminScript.migrateChainToGateway(
             _gatewayGovernanceConfig.bridgehubProxy,
             _getL1GasPrice(),
             migratingChainId,
             _gatewayGovernanceConfig.gatewayChainId,
-            gatewayDiamondCutData,
+            // Not checked in the test
+            hex"",
             msg.sender,
             true
         );
@@ -157,6 +154,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
                 _gatewayValidatorTimelock: gatewayValidatorTimelock,
                 _gatewayServerNotifier: gatewayServerNotifier,
                 _refundRecipient: msg.sender,
+                _ctmRepresentativeChainId: 0,
                 _gatewaySettlementFee: 0
             })
         );

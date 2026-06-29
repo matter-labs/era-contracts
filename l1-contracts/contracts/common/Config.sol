@@ -62,9 +62,6 @@ uint256 constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = 1 hours;
 /// @dev Shift to apply to verify public input before verifying.
 uint256 constant PUBLIC_INPUT_SHIFT = 32;
 
-/// @dev Maximum number of linked-list leaves checked when correcting a stale indexed Merkle tree low leaf.
-uint256 constant MAX_LOW_INDEX_SEARCH_ATTEMPTS = 5;
-
 /// @dev The maximum number of L2 gas that a user can request for an L2 transaction
 uint256 constant MAX_GAS_PER_TRANSACTION = 80_000_000;
 

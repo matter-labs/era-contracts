@@ -118,14 +118,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         address bridgehub,
         bool reuseGovAndAdmin,
         bool skipL1Deployments
-    ) public {
+    ) internal {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);
-        // Scratch file for the batch blake2s FFI call lives next to the
-        // output file, so concurrent runs (distinct output paths) don't
-        // clobber each other's batches.
-        _blakeBatchTmpFile = string.concat(outputPath, ".blake-batch.txt");
 
         initializeConfig(inputPath, bridgehub);
 
@@ -493,11 +489,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         return beacon;
     }
 
-    /// @dev Scratch file for `_precomputeBlakeHashes`. Set by `runInner`
-    ///      from the caller's output path; falls back to the conventional
-    ///      fixed name for entrypoints that don't take paths.
-    string private _blakeBatchTmpFile;
-
     /// @dev Precompute blake2s hashes for all unique bytecodes in a single FFI call.
     function _precomputeBlakeHashes() private {
         CoreContract[10] memory contracts = [
@@ -513,9 +504,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             CoreContract.BaseTokenHolder
         ];
 
-        string memory tmpFile = bytes(_blakeBatchTmpFile).length != 0
-            ? _blakeBatchTmpFile
-            : string.concat(vm.projectRoot(), "/script-out/tmp-blake-batch.txt");
+        string memory tmpFile = string.concat(vm.projectRoot(), "/script-out/tmp-blake-batch.txt");
         vm.writeFile(tmpFile, "");
 
         bytes[10] memory bytecodes;
@@ -604,6 +593,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
+            gatewayChainId: config.gatewayChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
             l2TokenProxyBytecodeHash: CoreOnGatewayHelper.getDeployedBytecodeHash(

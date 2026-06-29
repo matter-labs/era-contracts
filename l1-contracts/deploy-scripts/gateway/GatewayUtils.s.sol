@@ -4,21 +4,12 @@ pragma solidity 0.8.28;
 // solhint-disable no-console, gas-custom-errors, reason-string
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {Vm} from "forge-std/Vm.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {
-    IGatewayUtils,
-    FinishMigrateChainToGatewayParams,
-    FinishMigrateChainToGatewayWithCutDataParams
-} from "contracts/script-interfaces/IGatewayUtils.sol";
+import {IGatewayUtils} from "contracts/script-interfaces/IGatewayUtils.sol";
 
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
 
-import {BridgehubBurnCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {BridgehubBurnCTMAssetData} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -33,40 +24,57 @@ import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayUtils is Script, IGatewayUtils {
-    function finishMigrateChainToGateway(FinishMigrateChainToGatewayParams calldata params) external {
-        IL1Bridgehub bridgehub = IL1Bridgehub(params.bridgehubAddr);
-        bytes32 assetId = bridgehub.ctmAssetIdFromChainId(params.migratingChainId);
-        bytes memory gatewayDiamondCutData = GetDiamondCutData.readFromGateway(params.gatewayRpcUrl, assetId);
+    struct FinishMigrateChainToGatewayParams {
+        address bridgehubAddr;
+        bytes gatewayDiamondCutData;
+        uint256 migratingChainId;
+        uint256 gatewayChainId;
+        bytes32 l2TxHash;
+        uint256 l2BatchNumber;
+        uint256 l2MessageIndex;
+        uint16 l2TxNumberInBatch;
+        bytes32[] merkleProof;
+        TxStatus txStatus;
+    }
 
+    function finishMigrateChainToGateway(
+        address bridgehubAddr,
+        bytes memory gatewayDiamondCutData,
+        uint256 migratingChainId,
+        uint256 gatewayChainId,
+        bytes32 l2TxHash,
+        uint256 l2BatchNumber,
+        uint256 l2MessageIndex,
+        uint16 l2TxNumberInBatch,
+        bytes32[] calldata merkleProof,
+        TxStatus txStatus
+    ) public {
         _finishMigrateChainToGatewayInner(
-            FinishMigrateChainToGatewayWithCutDataParams({
-                bridgehubAddr: params.bridgehubAddr,
-                l2TxNumberInBatch: params.l2TxNumberInBatch,
-                txStatus: params.txStatus,
-                l2TxHash: params.l2TxHash,
-                migratingChainId: params.migratingChainId,
-                gatewayChainId: params.gatewayChainId,
-                l2BatchNumber: params.l2BatchNumber,
-                l2MessageIndex: params.l2MessageIndex,
+            FinishMigrateChainToGatewayParams({
+                bridgehubAddr: bridgehubAddr,
                 gatewayDiamondCutData: gatewayDiamondCutData,
-                merkleProof: params.merkleProof
+                migratingChainId: migratingChainId,
+                gatewayChainId: gatewayChainId,
+                l2TxHash: l2TxHash,
+                l2BatchNumber: l2BatchNumber,
+                l2MessageIndex: l2MessageIndex,
+                l2TxNumberInBatch: l2TxNumberInBatch,
+                merkleProof: merkleProof,
+                txStatus: txStatus
             })
         );
     }
 
-    function finishMigrateChainToGatewayWithCutData(
-        FinishMigrateChainToGatewayWithCutDataParams calldata params
-    ) external {
-        _finishMigrateChainToGatewayInner(params);
-    }
-
-    function _finishMigrateChainToGatewayInner(FinishMigrateChainToGatewayWithCutDataParams memory data) private {
+    // Using struct for input to avoid stack too deep errors
+    // The outer function does not expect it as input rightaway for easier encoding in zkstack Rust.
+    function _finishMigrateChainToGatewayInner(FinishMigrateChainToGatewayParams memory data) private {
         IL1Bridgehub bridgehub = IL1Bridgehub(data.bridgehubAddr);
         address assetRouter = address(bridgehub.assetRouter());
         IL1Nullifier l1Nullifier = L1AssetRouter(assetRouter).L1_NULLIFIER();
 
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(data.migratingChainId);
         address chainAdmin = IZKChain(bridgehub.getZKChain(data.migratingChainId)).getAdmin();
+
         bytes memory transferData = abi.encode(
             BridgehubBurnCTMAssetData({
                 chainId: data.migratingChainId,
@@ -125,7 +133,7 @@ contract GatewayUtils is Script, IGatewayUtils {
     /// used to build the `gateway-vote-preparation` input. Set env `FORCE_DEPLOYMENTS_DUMP_TOML_REL_PATH`
     /// to a path relative to project root (e.g. `/script-out/force-deployments-dump.toml`).
     function dumpForceDeployments(address _ctm) external {
-        (, bytes memory forceDeploymentsData) = GetDiamondCutData.getDiamondCutAndForceDeployment(_ctm, false);
+        (, bytes memory forceDeploymentsData) = GetDiamondCutData.getDiamondCutAndForceDeployment(_ctm);
 
         string memory root = vm.projectRoot();
         string memory rel = vm.envString("FORCE_DEPLOYMENTS_DUMP_TOML_REL_PATH");

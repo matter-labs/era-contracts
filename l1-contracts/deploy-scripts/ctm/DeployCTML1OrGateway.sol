@@ -180,11 +180,6 @@ library DeployCTML1OrGateway {
     ///         For ZKsyncOS: registers sub-verifiers at the default version and
     ///         transfers ownership. For Era: no-op.
     /// @dev Caller must handle vm.startBroadcast / vm.stopBroadcast around this call.
-    ///      Idempotent — `addVerifier` reverts with `AddressAlreadySet` on the
-    ///      second call, and `transferOwnership` is a no-op when the owner /
-    ///      pendingOwner is already what we'd set. We pre-check both so a
-    ///      partial prior broadcast (deploy + addVerifier landed on real chain,
-    ///      but ownership flow didn't finish) can be replayed cleanly.
     function initializeVerifier(
         address _verifier,
         address _fflonk,
@@ -196,22 +191,12 @@ library DeployCTML1OrGateway {
             return;
         }
 
-        ZKsyncOSDualVerifier verifier = ZKsyncOSDualVerifier(_verifier);
-
-        IVerifierV2 currentFflonk = verifier.fflonkVerifiers(DEFAULT_ZKSYNC_OS_VERIFIER_VERSION);
-        IVerifier currentPlonk = verifier.plonkVerifiers(DEFAULT_ZKSYNC_OS_VERIFIER_VERSION);
-        if (address(currentFflonk) == address(0) && address(currentPlonk) == address(0)) {
-            verifier.addVerifier(DEFAULT_ZKSYNC_OS_VERIFIER_VERSION, IVerifierV2(_fflonk), IVerifier(_plonk));
-        } else {
-            require(
-                address(currentFflonk) == _fflonk && address(currentPlonk) == _plonk,
-                "ZKsyncOSDualVerifier already initialised at the default version with a different (fflonk, plonk) pair"
-            );
-        }
-
-        if (verifier.owner() != _owner && verifier.pendingOwner() != _owner) {
-            verifier.transferOwnership(_owner);
-        }
+        ZKsyncOSDualVerifier(_verifier).addVerifier(
+            DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
+            IVerifierV2(_fflonk),
+            IVerifier(_plonk)
+        );
+        ZKsyncOSDualVerifier(_verifier).transferOwnership(_owner);
     }
 
     /// @notice Transfer ownership of a ZKsyncOS dual verifier. No-op for Era verifiers.

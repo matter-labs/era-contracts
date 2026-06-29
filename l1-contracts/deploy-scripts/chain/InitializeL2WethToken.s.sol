@@ -8,7 +8,6 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Utils} from "../utils/Utils.sol";
-import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {IL1Bridgehub, L2TransactionRequestDirect} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 contract InitializeL2WethTokenScript is Script {
@@ -44,9 +43,11 @@ contract InitializeL2WethTokenScript is Script {
         string memory root = vm.projectRoot();
 
         // Use AddressIntrospector to get addresses from deployed contracts
-        address assetRouter = address(IL1Bridgehub(bridgehubProxyAddr).assetRouter());
-        config.eraChainId = AddressIntrospector.getEraChainId(assetRouter);
-        config.bridgehubProxyAddr = bridgehubProxyAddr;
+        BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(
+            IL1Bridgehub(bridgehubProxyAddr)
+        );
+        config.eraChainId = AddressIntrospector.getEraChainId(bhAddresses.assetRouter);
+        config.proxies.bridgehubAddr = bridgehubProxyAddr;
 
         // Parse some config from output of erc20 tokens deployment
         string memory path = string.concat(root, "/script-out/output-deploy-erc20.toml");
@@ -70,7 +71,7 @@ contract InitializeL2WethTokenScript is Script {
     }
 
     function initializeL2WethToken() internal {
-        IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehubProxyAddr);
+        IL1Bridgehub bridgehub = IL1Bridgehub(config.proxies.bridgehubAddr);
 
         uint256 gasPrice = Utils.bytesToUint256(vm.rpc("eth_gasPrice", "[]")) * config.gasMultiplier;
         uint256 requiredValueToInitializeBridge = bridgehub.l2TransactionBaseCost(

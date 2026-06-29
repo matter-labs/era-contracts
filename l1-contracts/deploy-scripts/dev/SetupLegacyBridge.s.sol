@@ -123,7 +123,7 @@ contract SetupLegacyBridge is Create2FactoryUtils, ISetupLegacyBridge {
 
         Utils.executeUpgrade({
             _governor: address(governance),
-            _salt: Utils.currentLegacyGovSalt(),
+            _salt: bytes32(0),
             _target: address(addresses.transparentProxyAdmin),
             _data: proxyAdminUpgradeData,
             _value: 0,

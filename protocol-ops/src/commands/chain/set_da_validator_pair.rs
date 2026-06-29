@@ -1,28 +1,20 @@
-use alloy::primitives::{Address, U256};
+use std::path::Path;
+
 use anyhow::Context;
 use clap::Parser;
+use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 
-use crate::common::abi::AdminFunctionsAbi;
-use crate::common::addresses::ZERO_ADDRESS;
-use crate::common::forge::ForgeRunner;
+use crate::commands::output::write_output_if_requested;
+use crate::common::forge::{Forge, ForgeRunner, ForgeScriptArg};
 use crate::common::logger;
 use crate::common::SharedRunArgs;
 use crate::types::L2DACommitmentScheme;
 
-#[derive(Serialize)]
-struct SetDaValidatorPairOutput {
-    chain_id: u64,
-    admin_address: Address,
-    l1_da_validator: Address,
-    l2_da_commitment_scheme: L2DACommitmentScheme,
-}
-
 /// Set the DA validator pair for an L1-settling chain.
 ///
-/// Drives `AdminFunctions.s.sol::setDAValidatorPair(bridgehub,
-/// accessControlRestriction, chainId, l1DaValidator, l2DaCommitmentScheme,
-/// true)` against a forked anvil and
+/// Drives `AdminFunctions.s.sol::setDAValidatorPair(bridgehub, chainId,
+/// l1DaValidator, l2DaCommitmentScheme, false)` against a forked anvil and
 /// emits a Gnosis Safe Transaction Builder JSON bundle via `--out`. Replay
 /// the bundle via `protocol-ops dev execute-safe` (or any Safe-bundle-aware
 /// executor) to apply it.
@@ -41,11 +33,6 @@ pub struct ChainSetDaValidatorPairArgs {
     #[serde(flatten)]
     pub topology: crate::common::EcosystemChainArgs,
 
-    /// AccessControlRestriction contract address.
-    /// Use `ZERO_ADDRESS` for Ownable ChainAdmin.
-    #[clap(long, default_value = ZERO_ADDRESS)]
-    pub access_control_restriction: Address,
-
     /// L1 DA validator contract address. The post-upgrade `RollupL1DAValidator`
     /// (or analogous) deployed by the ecosystem upgrade.
     #[clap(long)]
@@ -62,38 +49,64 @@ pub struct ChainSetDaValidatorPairArgs {
     pub shared: SharedRunArgs,
 }
 
+#[derive(Serialize)]
+struct ChainSetDaValidatorPairOutputPayload {
+    chain_id: u64,
+    admin_address: Address,
+    l1_da_validator: Address,
+    l2_da_commitment_scheme: L2DACommitmentScheme,
+}
+
 pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve()?;
+    let (eco, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     let admin_address =
-        crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
+        crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, eco.bridgehub, chain_id)
             .await
             .context("resolving chain admin from L1")?;
-    // `AdminFunctions.setDAValidatorPair` → `Utils.adminExecuteCalls` internally
-    // `vm.startBroadcast(adminOwner)` (or the AccessControlRestriction default
-    // admin when `--access-control-restriction` is set), so Forge's sender must
-    // match that EOA for nonce tracking on the anvil fork.
+    // The Solidity script executes via ChainAdmin, but broadcasts from the
+    // ChainAdmin owner internally. Use that owner as Forge's sender so Foundry
+    // tracks the correct nonce on the anvil fork.
     let sender = runner
-        .prepare_chain_admin_broadcaster(bridgehub, chain_id, args.access_control_restriction)
+        .prepare_chain_admin_owner(eco.bridgehub, chain_id)
         .await?;
 
-    let forge = runner
-        .script_call(AdminFunctionsAbi::setDAValidatorPairCall {
-            _bridgehub: bridgehub,
-            _accessControlRestriction: args.access_control_restriction,
-            _chainId: U256::from(chain_id),
-            _l1DaValidator: args.l1_da_validator,
-            _l2DaCommitmentScheme: args.l2_da_commitment_scheme as u8,
-            _shouldSend: true,
-        })
-        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
+    let script_path = Path::new("deploy-scripts/AdminFunctions.s.sol");
+    let script_full_path = runner.foundry_scripts_path.join(script_path);
+    if !script_full_path.exists() {
+        anyhow::bail!("Script not found: {}", script_full_path.display());
+    }
+
+    let mut script_args = runner.forge_args.clone();
+    script_args.add_arg(ForgeScriptArg::Sig {
+        sig: "setDAValidatorPair(address,uint256,address,uint8,bool)".to_string(),
+    });
+    script_args.add_arg(ForgeScriptArg::RpcUrl {
+        url: runner.rpc_url.clone(),
+    });
+    script_args.add_arg(ForgeScriptArg::Ffi);
+    // Broadcast against the anvil fork so Forge records txs into its run
+    // file — protocol-ops extracts those into the Safe bundle.
+    script_args.add_arg(ForgeScriptArg::Broadcast);
+    // `_shouldSend = true` so the script actually invokes
+    // `Utils.adminExecuteCalls` and produces broadcast records.
+    script_args.additional_args.extend([
+        format!("{:#x}", eco.bridgehub),
+        chain_id.to_string(),
+        format!("{:#x}", args.l1_da_validator),
+        (args.l2_da_commitment_scheme as u8).to_string(),
+        "true".to_string(),
+    ]);
+
+    let forge = Forge::new(&runner.foundry_scripts_path)
+        .script(script_path, script_args)
         .with_wallet(&sender);
 
     logger::step(
         "Preparing set-da-validator-pair Safe bundle via AdminFunctions.s.sol (simulation)",
     );
-    logger::info(format!("Bridgehub: {:#x}", bridgehub));
+    logger::info(format!("Bridgehub: {:#x}", eco.bridgehub));
     logger::info(format!("Chain ID: {chain_id}"));
     logger::info(format!("Admin address: {:#x}", admin_address));
     logger::info(format!("L1 DA validator: {:#x}", args.l1_da_validator));
@@ -107,17 +120,19 @@ pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
         .run(forge)
         .context("Failed to execute forge script for set-da-validator-pair")?;
 
-    crate::common::output::write_output_if_requested(
+    let empty_input = serde_json::json!({});
+    let out_payload = ChainSetDaValidatorPairOutputPayload {
+        chain_id,
+        admin_address,
+        l1_da_validator: args.l1_da_validator,
+        l2_da_commitment_scheme: args.l2_da_commitment_scheme,
+    };
+    write_output_if_requested(
         "chain.set-da-validator-pair",
         &args.shared,
         &runner,
-        &serde_json::json!({}),
-        &SetDaValidatorPairOutput {
-            chain_id,
-            admin_address,
-            l1_da_validator: args.l1_da_validator,
-            l2_da_commitment_scheme: args.l2_da_commitment_scheme,
-        },
+        &empty_input,
+        &out_payload,
     )
     .await?;
 

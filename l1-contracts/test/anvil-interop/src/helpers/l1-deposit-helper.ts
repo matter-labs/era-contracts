@@ -9,8 +9,8 @@ import {
   ANVIL_INTEROP_PRIORITY_TX_L1_GAS_PRICE_WEI,
   ANVIL_INTEROP_REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   ETH_TOKEN_ADDRESS,
+  L1_CHAIN_ID,
 } from "../core/const";
-import { runtimeConfig } from "../core/runtime-config";
 import { encodeAssetRouterBridgehubDepositData, encodeBridgeBurnData, encodeNtvAssetId } from "../core/data-encoding";
 
 export interface DepositETHParams {
@@ -142,7 +142,7 @@ export async function depositERC20ToL2(params: DepositERC20Params): Promise<Depo
   const nativeTokenVault = new Contract(l1Addresses.l1NativeTokenVault, getAbi("L1NativeTokenVault"), l1Wallet);
   const token = new Contract(tokenAddress, getAbi("TestnetERC20Token"), l1Wallet);
 
-  const ethAssetId = encodeNtvAssetId(runtimeConfig.l1ChainId, ETH_TOKEN_ADDRESS);
+  const ethAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
   const chainBaseTokenAssetId: string = await bridgehub.baseTokenAssetId(chainId);
   if (chainBaseTokenAssetId !== ethAssetId) {
     throw new Error(

@@ -1,13 +1,21 @@
-use clap::{Parser, Subcommand};
-use protocol_ops::commands::{
+use crate::commands::{
     chain::ChainCommands, ctm::CtmCommands, dev::DevCommands, ecosystem::EcosystemCommands,
     hub::HubCommands,
 };
-use protocol_ops::common::{
+use crate::common::{
     config::{init_global_config, GlobalConfig},
     error::log_error,
     logger,
 };
+use clap::{Parser, Subcommand};
+
+mod common;
+mod config;
+mod types;
+
+pub mod abi;
+pub mod admin_functions;
+mod commands;
 
 #[derive(Parser, Debug)]
 #[command(name = "protocol-ops", about)]
@@ -19,7 +27,7 @@ struct ProtocolOps {
 }
 
 #[derive(Subcommand, Debug)]
-enum ProtocolOpsSubcommands {
+pub enum ProtocolOpsSubcommands {
     /// Ecosystem related commands
     #[command(subcommand, alias = "eco")]
     Ecosystem(Box<EcosystemCommands>),
@@ -43,9 +51,6 @@ struct ProtocolOpsGlobalArgs {
     /// Verbose mode
     #[clap(short, long, global = true)]
     verbose: bool,
-    /// Output results as machine-readable JSON (suppresses progress output)
-    #[clap(long, global = true)]
-    json: bool,
 }
 
 #[tokio::main]
@@ -63,25 +68,26 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn run_subcommand(cli_args: ProtocolOps) -> anyhow::Result<()> {
-    init_global_config(GlobalConfig {
-        verbose: cli_args.global.verbose,
-        json_output: cli_args.global.json,
-    });
+    logger::init_theme();
 
-    if !cli_args.global.json {
-        logger::init_theme();
-        logger::new_empty_line();
-        logger::intro();
-    }
+    logger::new_empty_line();
+    logger::intro();
+
+    init_global_config_inner(&cli_args.global)?;
 
     match cli_args.command {
-        ProtocolOpsSubcommands::Ecosystem(args) => {
-            protocol_ops::commands::ecosystem::run(*args).await?
-        }
-        ProtocolOpsSubcommands::Chain(args) => protocol_ops::commands::chain::run(*args).await?,
-        ProtocolOpsSubcommands::Hub(args) => protocol_ops::commands::hub::run(*args).await?,
-        ProtocolOpsSubcommands::Ctm(args) => protocol_ops::commands::ctm::run(*args).await?,
-        ProtocolOpsSubcommands::Dev(args) => protocol_ops::commands::dev::run(*args).await?,
+        ProtocolOpsSubcommands::Ecosystem(args) => commands::ecosystem::run(*args).await?,
+        ProtocolOpsSubcommands::Chain(args) => commands::chain::run(*args).await?,
+        ProtocolOpsSubcommands::Hub(args) => commands::hub::run(*args).await?,
+        ProtocolOpsSubcommands::Ctm(args) => commands::ctm::run(*args).await?,
+        ProtocolOpsSubcommands::Dev(args) => commands::dev::run(*args).await?,
     }
+    Ok(())
+}
+
+fn init_global_config_inner(cli_args: &ProtocolOpsGlobalArgs) -> anyhow::Result<()> {
+    init_global_config(GlobalConfig {
+        verbose: cli_args.verbose,
+    });
     Ok(())
 }

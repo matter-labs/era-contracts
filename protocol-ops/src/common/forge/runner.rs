@@ -1,7 +1,8 @@
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
-use alloy::primitives::Address;
 use anyhow::Context;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -10,18 +11,17 @@ use xshell::{cmd, Shell};
 
 use super::script::{ForgeScript, ForgeScriptArg, ForgeScriptArgs};
 // Forge is defined in the parent module (mod.rs); use the full path to avoid confusion.
-use crate::common::forge::scripts::{ForgeScriptParams, ScriptCall};
 use crate::common::forge::Forge;
 use crate::common::{
-    anvil,
+    anvil::{self, AnvilInstance},
     cmd::{Cmd, CmdResult},
     ethereum::query_chain_id_sync,
-    files::read_json_file,
     logger, paths,
+    traits::{ReadConfig, SaveConfig},
     wallets::Wallet,
     SharedRunArgs,
 };
-use alloy::node_bindings::AnvilInstance;
+use crate::config::forge_interface::script_params::ForgeScriptParams;
 
 /// Result of a forge script execution containing the broadcast JSON payload.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -32,11 +32,20 @@ pub struct ForgeScriptRun {
     pub ts_ms: i64,
 }
 
+impl ForgeScriptRun {
+    pub fn transactions(&self) -> Option<&[Value]> {
+        self.payload
+            .get("transactions")
+            .and_then(|value| value.as_array())
+            .map(|array| array.as_slice())
+    }
+}
+
 /// Encapsulates the full execution environment for forge scripts:
 /// shell, forge CLI args, target anvil-fork RPC, foundry path, and run history.
 pub struct ForgeRunner {
-    /// Shell used for command execution and directory management (xshell cmd! / push_dir).
-    shell: Shell,
+    /// Shell used for file I/O and command execution.
+    pub shell: Shell,
     /// User-supplied forge CLI flags (--verify, --verifier-url, etc.).
     pub forge_args: ForgeScriptArgs,
     /// Effective RPC URL for Forge simulations (always the anvil fork).
@@ -45,13 +54,7 @@ pub struct ForgeRunner {
     pub foundry_scripts_path: PathBuf,
     /// Keeps the anvil instance alive while this runner exists.
     _anvil: AnvilInstance,
-    /// Optional per-run subdirectory for script IO: scopes `script-config/`,
-    /// `script-out/` and `broadcast/` paths so concurrent runs against the
-    /// same checkout don't collide. See [`SharedRunArgs::subdir`].
-    subdir: Option<String>,
     runs: Vec<ForgeScriptRun>,
-    extra_verification_logs: Vec<String>,
-    gw_verification_logs: Vec<String>,
 }
 
 impl ForgeRunner {
@@ -67,74 +70,16 @@ impl ForgeRunner {
             shared.l1_rpc_url
         ));
         let anvil = anvil::start_anvil_fork(&shared.l1_rpc_url)?;
-        let rpc_url = anvil.endpoint();
-
-        let foundry_scripts_path = paths::path_to_foundry_scripts();
-
-        // Scripts write their outputs via `vm.writeToml`, which does not
-        // create parent directories — pre-create the scoped IO dirs.
-        // (forge creates the broadcast dir itself.)
-        if let Some(sub) = &shared.subdir {
-            for dir in ["script-config", "script-out"] {
-                let scoped = foundry_scripts_path.join(dir).join(sub);
-                fs::create_dir_all(&scoped)
-                    .with_context(|| format!("creating script IO dir {}", scoped.display()))?;
-            }
-        }
+        let rpc_url = anvil.rpc_url().to_string();
 
         Ok(ForgeRunner {
             shell,
             forge_args: shared.forge_args.clone(),
             rpc_url,
-            foundry_scripts_path,
+            foundry_scripts_path: paths::path_to_foundry_scripts(),
             _anvil: anvil,
-            subdir: shared.subdir.clone(),
             runs: Vec::new(),
-            extra_verification_logs: Vec::new(),
-            gw_verification_logs: Vec::new(),
         })
-    }
-
-    /// The per-run script-IO subdirectory, if one was requested.
-    pub fn subdir(&self) -> Option<&str> {
-        self.subdir.as_deref()
-    }
-
-    /// Root-relative path (with leading slash) to hand to a forge script,
-    /// honoring the per-run subdir:
-    /// `script-out/x.toml` → `/script-out/<subdir>/x.toml`.
-    pub fn script_rel_path(&self, conventional: &'static str) -> String {
-        match &self.subdir {
-            Some(sub) => {
-                let (dir, file) = conventional
-                    .split_once('/')
-                    .expect("conventional script IO path must be '<dir>/<file>'");
-                format!("/{dir}/{sub}/{file}")
-            }
-            None => format!("/{conventional}"),
-        }
-    }
-
-    /// Absolute path for the script's input file (Rust writes, Solidity
-    /// reads), honoring the per-run subdir. Creates the parent directory.
-    pub fn input_path(&self, params: &ForgeScriptParams) -> anyhow::Result<PathBuf> {
-        let path = self.abs_io_path(params.input_rel());
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("creating script IO dir {}", parent.display()))?;
-        }
-        Ok(path)
-    }
-
-    /// Absolute path for the script's output file (Solidity writes, Rust
-    /// reads), honoring the per-run subdir.
-    pub fn output_path(&self, params: &ForgeScriptParams) -> PathBuf {
-        self.abs_io_path(params.output_rel())
-    }
-
-    fn abs_io_path(&self, conventional: &'static str) -> PathBuf {
-        let rel = self.script_rel_path(conventional);
-        self.foundry_scripts_path.join(rel.trim_start_matches('/'))
     }
 
     /// Fund `address` on the anvil fork via `anvil_setBalance`.
@@ -142,7 +87,7 @@ impl ForgeRunner {
     /// Needed when the auto-resolved sender is a contract (e.g. Governance)
     /// or an EOA without ETH on the forked chain — forge's `--sender
     /// --unlocked` still requires the impersonated address to pay gas.
-    pub async fn fund_sender(&self, address: alloy::primitives::Address) -> anyhow::Result<()> {
+    pub async fn fund_sender(&self, address: ethers::types::Address) -> anyhow::Result<()> {
         anvil::set_balance(&self.rpc_url, address).await
     }
 
@@ -150,10 +95,7 @@ impl ForgeRunner {
     /// it on the anvil fork. Convenience wrapper around
     /// `Wallet::parse(None, Some(address))` + `fund_sender`, since every
     /// prepare-shape command needs both.
-    pub async fn prepare_sender(
-        &self,
-        address: alloy::primitives::Address,
-    ) -> anyhow::Result<Wallet> {
+    pub async fn prepare_sender(&self, address: ethers::types::Address) -> anyhow::Result<Wallet> {
         self.fund_sender(address).await?;
         Wallet::parse(None, Some(address))
     }
@@ -162,7 +104,7 @@ impl ForgeRunner {
     /// and prepare it as a sender on the fork (fund + impersonate).
     pub async fn prepare_chain_admin(
         &self,
-        bridgehub: alloy::primitives::Address,
+        bridgehub: ethers::types::Address,
         chain_id: u64,
     ) -> anyhow::Result<Wallet> {
         let admin =
@@ -178,7 +120,7 @@ impl ForgeRunner {
     /// ChainAdmin contract itself has no private key.
     pub async fn prepare_chain_admin_owner(
         &self,
-        bridgehub: Address,
+        bridgehub: ethers::types::Address,
         chain_id: u64,
     ) -> anyhow::Result<Wallet> {
         let owner = crate::common::l1_contracts::resolve_chain_admin_owner(
@@ -191,38 +133,11 @@ impl ForgeRunner {
         self.prepare_sender(owner).await
     }
 
-    /// Resolve the address that `Utils.adminExecuteCalls` will broadcast from
-    /// for a chain-admin operation and prepare it as a sender.
-    pub async fn prepare_chain_admin_broadcaster(
-        &self,
-        bridgehub: Address,
-        chain_id: u64,
-        access_control_restriction: Address,
-    ) -> anyhow::Result<Wallet> {
-        let sender = if access_control_restriction == Address::ZERO {
-            crate::common::l1_contracts::resolve_chain_admin_owner(
-                &self.rpc_url,
-                bridgehub,
-                chain_id,
-            )
-            .await
-            .context("resolving chain admin owner EOA from L1")?
-        } else {
-            crate::common::l1_contracts::resolve_access_control_default_admin(
-                &self.rpc_url,
-                access_control_restriction,
-            )
-            .await
-            .context("resolving AccessControlRestriction default admin from L1")?
-        };
-        self.prepare_sender(sender).await
-    }
-
     /// Resolve the governance contract's owner EOA via
     /// `Governance(bridgehub.owner()).owner()` and prepare it as a sender.
     pub async fn prepare_governance_owner(
         &self,
-        bridgehub: alloy::primitives::Address,
+        bridgehub: ethers::types::Address,
     ) -> anyhow::Result<Wallet> {
         let owner = crate::common::l1_contracts::resolve_governance_owner(&self.rpc_url, bridgehub)
             .await
@@ -232,12 +147,6 @@ impl ForgeRunner {
 
     /// Run a forge script.
     pub fn run(&mut self, mut script: ForgeScript) -> anyhow::Result<()> {
-        let start = script
-            .timing_label
-            .as_ref()
-            .map(|_| std::time::Instant::now());
-        let timing_label = script.timing_label.clone();
-
         if script.needs_bridgehub_skip() {
             let skip_path: String = String::from("contracts/bridgehub/*");
             script.args.add_arg(ForgeScriptArg::Skip { skip_path });
@@ -248,91 +157,43 @@ impl ForgeRunner {
         let command_result = self.execute(&script, &args, false)?;
 
         if command_result.proposal_error() {
-            logger::info(
-                "Governance proposal already exists on-chain — skipping broadcast for this step.",
-            );
             return Ok(());
         }
 
         if command_result.is_ok() {
             self.record_run(&script, pre_run_ts_ms)?;
         }
-        command_result?;
-        if let (Some(label), Some(start)) = (timing_label, start) {
-            logger::info(format!("[timing] {label}: {:.2?}", start.elapsed()));
-        }
-        Ok(())
+        Ok(command_result?)
     }
 
-    pub fn run_scripts<I>(&mut self, scripts: I) -> anyhow::Result<()>
-    where
-        I: IntoIterator<Item = ForgeScript>,
-    {
-        for script in scripts {
-            self.run(script)?;
-        }
-        Ok(())
-    }
+    /// Write `input` to the script's input path, run the script with `wallet` auth,
+    /// then read and return the output. Handles the standard input→forge→output pattern.
+    pub fn run_script<I: SaveConfig, O: ReadConfig>(
+        &mut self,
+        params: &ForgeScriptParams,
+        input: &I,
+        wallet: &Wallet,
+    ) -> anyhow::Result<O> {
+        let input_path = params.input(&self.foundry_scripts_path);
+        input.save(&self.shell, &input_path)?;
 
-    pub fn script(&self, invocation: &ForgeScriptParams) -> ForgeScript {
-        let mut forge = Forge::new(&self.foundry_scripts_path)
-            .script(&invocation.script(), self.forge_args.clone());
-
-        if invocation.ffi() {
-            forge = forge.with_ffi();
-        }
-        if invocation.rpc_url() {
-            forge = forge.with_rpc_url(self.rpc_url.clone());
-        }
-        if let Some(gas_limit) = invocation.gas_limit() {
-            forge = forge.with_gas_limit(gas_limit);
-        }
-        if let Some(sub) = &self.subdir {
-            // Scope forge's own broadcast output (run-latest.json etc.) the
-            // same way as script-config/script-out.
-            forge = forge.with_env("FOUNDRY_BROADCAST", format!("broadcast/{sub}"));
-        }
-
-        forge
-    }
-
-    /// Build a broadcasting script invocation from pre-encoded calldata.
-    ///
-    /// Pair with the typed `sol!` call encoders from `crate::common::abi`:
-    /// `runner.script_with_calldata(&INV, SomeAbi::someCall { ... }.abi_encode())`.
-    /// Function names, arity, and argument types are checked at compile time
-    /// against the bindings generated from the committed ABI artifacts.
-    pub fn script_with_calldata(
-        &self,
-        invocation: &ForgeScriptParams,
-        calldata: Vec<u8>,
-    ) -> ForgeScript {
-        self.script(invocation)
-            .with_calldata(&calldata.into())
-            .with_broadcast()
-    }
-
-    /// Build a broadcasting script invocation from a typed [`ScriptCall`].
-    ///
-    /// The invocation is derived from the call type; encoding is handled here.
-    /// Prefer this over [`Self::script_with_calldata`] for inline call sites.
-    pub fn script_call<C: ScriptCall>(&self, call: C) -> ForgeScript {
-        self.script(C::invocation())
-            .with_calldata(&call.abi_encode().into())
-            .with_broadcast()
-    }
-
-    pub fn script_path_from_root(&self, root: &Path, script_path: &Path) -> ForgeScript {
-        Forge::new(root)
-            .script(script_path, self.forge_args.clone())
+        let forge = Forge::new(&self.foundry_scripts_path)
+            .script(&params.script(), self.forge_args.clone())
+            .with_ffi()
             .with_rpc_url(self.rpc_url.clone())
+            .with_wallet(wallet);
+
+        self.run(forge)?;
+
+        let output_path = params.output(&self.foundry_scripts_path);
+        O::read(&self.shell, output_path)
     }
 
     fn execute(
-        &mut self,
+        &self,
         script: &ForgeScript,
         args: &[String],
-        _for_resume: bool,
+        for_resume: bool,
     ) -> anyhow::Result<CmdResult<()>> {
         let script_path = script.script_name().as_os_str();
         let _dir_guard = self.shell.push_dir(script.base_path());
@@ -343,20 +204,10 @@ impl ForgeRunner {
         for (key, value) in &script.envs {
             cmd = cmd.env(key, value);
         }
-        let result = cmd.run();
-        if let Ok(output) = &result {
-            let lines = extract_extra_verification_logs(output);
-            // GW CTM deploy script (`GatewayVotePreparation.s.sol`) is the
-            // only script whose `forge verify-contract` emissions target the
-            // ZK chain — route those to the GW bucket so they land in
-            // `gw-verification-logs.txt`. All other scripts deploy on L1.
-            if is_gw_deploy_script(script.script_name()) {
-                self.gw_verification_logs.extend(lines);
-            } else {
-                self.extra_verification_logs.extend(lines);
-            }
+        if for_resume {
+            cmd = cmd.with_piped_std_err();
         }
-        Ok(result.map(|_| ()))
+        Ok(cmd.run())
     }
 
     /// Record the broadcast run produced by `script`.
@@ -371,7 +222,12 @@ impl ForgeRunner {
                 (None, serde_json::Value::Null)
             }
             Some(broadcast_file) => {
-                let payload = read_json_file::<Value>(&broadcast_file)?;
+                let payload = read_json(&broadcast_file).with_context(|| {
+                    format!(
+                        "Failed to read JSON from broadcast file: {}",
+                        broadcast_file.display()
+                    )
+                })?;
                 let run_ts_raw = payload
                     .get("timestamp")
                     .and_then(|t| t.as_i64())
@@ -407,10 +263,7 @@ impl ForgeRunner {
 
     /// Returns the path to the run latest file for `script` or `None` if doesn't exist.
     fn find_run_latest_file(&self, script: &ForgeScript) -> anyhow::Result<Option<PathBuf>> {
-        let mut root = script.base_path().join("broadcast");
-        if let Some(sub) = &self.subdir {
-            root = root.join(sub);
-        }
+        let root = script.base_path().join("broadcast");
         if !root.exists() {
             return Ok(None);
         }
@@ -448,58 +301,6 @@ impl ForgeRunner {
     pub fn runs(&self) -> &[ForgeScriptRun] {
         &self.runs
     }
-
-    /// Write the L1 verification logs.
-    pub fn write_extra_verification_logs(&self, path: &Path) -> anyhow::Result<()> {
-        write_verification_logs(path, &self.extra_verification_logs)
-    }
-
-    /// Write the Gateway verification logs — `forge verify-contract` lines
-    /// emitted by the GW CTM deployer helper for contracts that live on the
-    /// ZK chain side of the bridge.
-    pub fn write_gw_verification_logs(&self, path: &Path) -> anyhow::Result<()> {
-        write_verification_logs(path, &self.gw_verification_logs)
-    }
-}
-
-fn write_verification_logs(path: &Path, lines: &[String]) -> anyhow::Result<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("failed to create {}", parent.display()))?;
-    }
-
-    let mut content = String::new();
-    for line in lines {
-        content.push_str(line);
-        content.push('\n');
-    }
-    fs::write(path, content).with_context(|| format!("failed to write {}", path.display()))?;
-    Ok(())
-}
-
-fn extract_extra_verification_logs(output: &str) -> Vec<String> {
-    output
-        .lines()
-        .filter_map(|line| {
-            let trimmed = line.trim();
-            is_extra_verification_log_line(trimmed).then(|| trimmed.to_string())
-        })
-        .collect()
-}
-
-fn is_extra_verification_log_line(line: &str) -> bool {
-    line.contains("forge verify-contract")
-}
-
-/// GW CTM contracts are deployed (via L1->L2 transactions) by
-/// `GatewayVotePreparation.s.sol`. Any `forge verify-contract` line emitted
-/// during that script run targets the ZK chain side of the bridge.
-fn is_gw_deploy_script(script_name: &Path) -> bool {
-    script_name
-        .file_name()
-        .and_then(|s| s.to_str())
-        .map(|s| s.starts_with("GatewayVotePreparation"))
-        .unwrap_or(false)
 }
 
 // Trait for handling forge errors. Required for implementing method for CmdResult
@@ -551,4 +352,15 @@ fn derive_run_latest_filename(sig: Option<String>) -> String {
             }
         }
     }
+}
+
+fn read_json(path: &Path) -> anyhow::Result<Value> {
+    let content = fs::read_to_string(path)
+        .with_context(|| format!("failed to read forge broadcast file {}", path.display()))?;
+    serde_json::from_str(&content).with_context(|| {
+        format!(
+            "failed to parse forge broadcast file {} as JSON",
+            path.display()
+        )
+    })
 }

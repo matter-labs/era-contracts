@@ -10,6 +10,8 @@ import {
 
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
@@ -288,7 +290,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     }
 
     function _legacyGwChainId() internal view returns (uint256) {
-        return IL1MessageRoot(ecosystemAddresses.bridgehub.proxies.messageRoot).ERA_GATEWAY_CHAIN_ID();
+        return IMessageRootBase(ecosystemAddresses.bridgehub.proxies.messageRoot).ERA_GATEWAY_CHAIN_ID();
     }
 
     function test_setHistoricalMigrationInterval_success() public {
@@ -492,7 +494,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         uint256 gwChainId = 506;
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.proxies.messageRoot),
-            abi.encodeWithSelector(IL1MessageRoot.ERA_GATEWAY_CHAIN_ID.selector),
+            abi.encodeWithSelector(IMessageRootBase.ERA_GATEWAY_CHAIN_ID.selector),
             abi.encode(gwChainId)
         );
 

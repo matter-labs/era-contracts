@@ -1,71 +1,15 @@
-l1_chain_id = 11155111
-
-# Stage fixed-fee ZK asset ID. This is the L2NativeTokenVault asset ID for the
-# stage-proofs ZkTokenV2 deployment on chain 499, not the L1 bridgehub base
-# token asset ID for chain 499.
-zk_token_asset_id = "0xd7912bfd25000ee1b3355167866f960a61787b79cd2c7e791036fe6e85a73823"
-
 [permanent_contracts]
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
-# `create2_factory_salt` lives in the v31 input TOML
-# (`upgrade-envs/v0.31.0-interopB/<env>.toml [contracts] create2_factory_salt`),
-# not here — it rotates every regen so it isn't a permanent value.
+# this salt can be changed from run to run to. Todo: move this to input of script.
+create2_factory_salt = "0x0000000000000000000000000000000000000000000000000000000000000000"
 
 [core_contracts]
 bridgehub_proxy_addr = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
-# Stage's bridgehub.owner() returns a ProtocolUpgradeHandler (decentralized
-# governance) — no `Ownable.owner()` / no fork-friendly schedule+execute path
-# without guardian sigs. Replay short-circuits via direct anvil impersonation.
-governance_kind = "puh"
 
 [ctm_contracts]
-# Legacy single-CTM (Era) — kept for anvil-interop synthetic-state harnesses
-# that read the flat fields directly. The v31 multi-CTM upgrade flow uses the
-# `[[ctm_contracts.ctms]]` array below.
 ctm_proxy_addr = "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b"
 l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
-rollup_da_manager = "0x5af0d94e50b271005AF1687e363FD104771EAe9d"
-
-# v31 multi-CTM list, consumed by `scripts/v31-simulate-upgrade.ts`.
-# Schema mirrors `protocol-ops ecosystem upgrade-prepare-all --ctm-config`:
-#   proxy, is_zk_sync_os, bytecodes_supplier, rollup_da_manager.
-# Stage is currently pre-v31 — overrides are required because the v31 getters
-# (`ctm.isZKsyncOS()`, `ctm.L1_BYTECODES_SUPPLIER()`) don't exist yet.
-[[ctm_contracts.ctms]]
-# Era CTM (witness chain: 270)
-proxy = "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b"
-is_zk_sync_os = false
-bytecodes_supplier = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
-rollup_da_manager = "0x5af0d94e50b271005AF1687e363FD104771EAe9d"
-
-[[ctm_contracts.ctms]]
-# Atlas (ZKsyncOS) CTM (witness chain: 2702)
-# rollup_da_manager queried via `chain.getRollupDAManager()` on the diamond proxy.
-# bytecodes_supplier shared with Era on stage (per v0.30.0-zksync-os-blobs deployment yaml).
-proxy = "0x73bee414c6e006525f3CceeDf6D8004c0370502E"
-is_zk_sync_os = true
-bytecodes_supplier = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
-rollup_da_manager = "0x461099b710C3Bd538FFF0bB0F817EDA52B5A532b"
-
-# Contracts that currently own a CTM or ProxyAdmin and have no private key —
-# any ownership-transfer call routed through them must be *wrapped* (called by
-# their EOA owner via `executeInstant` / `multicall`) rather than impersonated.
-# Consumed by `protocol-ops` via the `IAdminFunctions.OwnerWrap` registry; see
-# `AdminFunctions.s.sol::ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps`.
-[[ownable_proxies]]
-# Old zkOS `Governance.sol` instance — owns the Atlas (ZKsyncOS) CTM today.
-# Owner = securityCouncil = 0x5555555590930f501c88B73Ea43B3EEb5A71643c (EOA on stage).
-# minDelay = 0, so `scheduleTransparent(op, 0)` + `executeInstant(op)` works
-# in two consecutive txs from the same EOA.
-addr = "0xC66f0B45c05cF654eeC093650FD67865E85E8566"
-kind = "legacy_governance"
-
-[[ownable_proxies]]
-# Legacy OZ `ChainAdmin` (Ownable2Step). Owner = 0x5555…643c (same EOA).
-# Wrapped via `multicall([call], true)`. Registered defensively even though
-# stage's current CTM/ProxyAdmin set doesn't transit through it today.
-addr = "0x933dEA2C4241B1537fDD6da277eA62841B490172"
-kind = "oz_chain_admin"
+rollup_da_manager = "0x064ac968CCad1948fceE025fD59c20b153c88072"
 
 # Legacy Gateway configuration for settlement layer validation
 # This section contains historical data about chains that settled on the legacy Gateway
@@ -109,13 +53,3 @@ migrate_to_sl_batch = 7371
 migrate_from_sl_batch = 8416
 sl_batch_lower_bound = 8663
 sl_batch_upper_bound = 26620
-
-# New Gateway brought up by v31. Drives `GatewayVotePreparation.s.sol` (full
-# bring-up bundle into stage 2). `refund_recipient` defaults to the deployer
-# EOA when omitted; only set it to override.
-[new_gateway]
-chain_id = 2709
-# 0.2 ZK = 2e17 wei ≈ $0.01 USD at ZK ≈ $0.05. Bump up/down as price moves.
-settlement_fee = "0x2C68AF0BB140000"
-# Atlas (ZKsyncOS) witness chain — resolves to the Atlas CTM.
-ctm_representative_chain_id = 2702

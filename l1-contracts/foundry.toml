@@ -16,7 +16,6 @@ fs_permissions = [
     { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-out/" },
     { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/permanent-values/" },
     { access = "read-write", path = "./upgrade-envs/permanent-values/local.toml" },
-    { access = "read-write", path = "./upgrade-envs/" },
     { access = "read-write", path = "./script-out" },
     { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
     { access = "read", path = "../system-contracts/artifacts-zk/" },
@@ -110,6 +109,3 @@ suppressed_warnings = ["txorigin"]
 [profile.invariant_tests_l2context_ci.invariant]
 runs = 2
 depth = 1000
-
-[lint]
-lint_on_build = false

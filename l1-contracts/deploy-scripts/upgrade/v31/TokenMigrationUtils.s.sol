@@ -18,7 +18,7 @@ import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 /// @notice Shared token migration utilities for the v31 upgrade.
-/// @dev Used by both `CoreUpgrade_v31.stage3` (post-governance migration) and `ChainUpgrade_v31`.
+/// @dev Used by both EcosystemUpgrade_v31 (stage3) and ChainUpgrade_v31.
 library TokenMigrationUtils {
     using stdToml for string;
 
@@ -143,16 +143,8 @@ library TokenMigrationUtils {
         console.log("Bridged tokens registration complete");
     }
 
-    /// @notice Read the legacy L1 tokens to register from a TOML file.
-    /// @dev Default path is the committed `upgrade-envs/v0.31.0-interopB/local-bridged-tokens.toml`
-    ///      (used by local fixtures). `protocol-ops ecosystem stage3 --env <env>`
-    ///      sets `UPGRADE_BRIDGED_TOKENS_INPUT_OVERRIDE` to the per-env file at
-    ///      `/upgrade-envs/v0.31.0-interopB/<env>-bridged-tokens.toml` that the
-    ///      discovery script (`scripts/discover-legacy-bridged-tokens.ts`)
-    ///      generates. The anvil-interop test harness also uses the override
-    ///      to point at its per-scenario fixture under `outputs/`.
     function _readConfiguredBridgedTokens() private view returns (address[] memory) {
-        string memory inputPath = "/upgrade-envs/v0.31.0-interopB/local-bridged-tokens.toml";
+        string memory inputPath = "/script-config/v31-bridged-tokens.toml";
         try vm.envString("UPGRADE_BRIDGED_TOKENS_INPUT_OVERRIDE") returns (string memory overridePath) {
             inputPath = overridePath;
         } catch {}

@@ -16,7 +16,7 @@ const SKIPPED_FOLDERS = [
   "l1-contracts/contracts/dev-contracts",
   "system-contracts/bootloader/tests/bootloader",
 ];
-const FORCE_INCLUDE = ["Create2AndTransfer.sol", "L1MessageRootStageSepolia.sol"];
+const FORCE_INCLUDE = ["Create2AndTransfer.sol"];
 
 // Opens a Solidity file and returns all the contracts/libraries created inside of it.
 function parseSolFile(filePath: string): string[] {

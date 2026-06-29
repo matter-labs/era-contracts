@@ -103,7 +103,7 @@ contract GWAssetTrackerExtendedTest is Test {
         // L2MessageRoot: real bytecode + init so getEmptyMultichainBatchRoot works.
         vm.etch(L2_MESSAGE_ROOT_ADDR, type(L2MessageRoot).runtimeCode);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(L1_CHAIN_ID);
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(L1_CHAIN_ID, 0);
 
         // Mock the WETH_TOKEN() call on NativeTokenVault (required by initL2)
         vm.mockCall(

@@ -20,35 +20,3 @@ struct EcosystemUpgradeParams {
     ///         revert the L2 upgrade transaction.
     bytes32 zkTokenAssetId;
 }
-
-/// @notice Parameters for the standalone core upgrade entry point.
-// solhint-disable-next-line gas-struct-packing
-struct CoreUpgradeParams {
-    address bridgehubProxyAddress;
-    bool isZKsyncOS;
-    bytes32 create2FactorySalt;
-    string upgradeInputPath;
-    string outputPath;
-}
-
-/// @notice Parameters for the standalone CTM upgrade entry point.
-///         Used by `CTMUpgrade_v31.noGovernancePrepare` when running per-CTM in a multi-CTM
-///         ecosystem (e.g. ZKsyncOS + EraVM on stage).
-// solhint-disable-next-line gas-struct-packing
-struct CTMUpgradeParams {
-    address ctmProxy;
-    address bytecodesSupplier;
-    bool isZKsyncOS;
-    address rollupDAManager;
-    bytes32 create2FactorySalt;
-    string upgradeInputPath;
-    string outputPath;
-    address governance;
-    /// @notice Optional v31 core output override. Pre-v31 Bridgehub introspection cannot discover this address.
-    address chainRegistrationSender;
-    /// @notice Asset ID of the ZK token used by the InteropCenter for fixed-fee bundles.
-    ///         MUST be non-zero — `InteropCenter.initL2` (called by `_initializeV31Contracts`
-    ///         on every chain being upgraded to v31) enforces this, and a zero value would
-    ///         revert the L2 upgrade transaction.
-    bytes32 zkTokenAssetId;
-}

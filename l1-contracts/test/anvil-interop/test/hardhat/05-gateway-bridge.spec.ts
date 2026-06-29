@@ -14,8 +14,7 @@ import {
   getGWChainBalance,
 } from "../../src/helpers/process-logs-helper";
 import { migrateTokenBalanceToGW } from "../../src/helpers/token-balance-migration-helper";
-import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_RECIPIENT_ADDR, ETH_TOKEN_ADDRESS } from "../../src/core/const";
-import { runtimeConfig } from "../../src/core/runtime-config";
+import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_RECIPIENT_ADDR, ETH_TOKEN_ADDRESS, L1_CHAIN_ID } from "../../src/core/const";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
 import {
   getL1RpcUrl,
@@ -134,7 +133,7 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
     it("processes a withdrawal log and decreases GWAssetTracker.chainBalance", async () => {
       const gwProvider = new ethers.providers.JsonRpcProvider(getL2RpcUrl(state, gwChainId));
 
-      const assetId = encodeNtvAssetId(runtimeConfig.l1ChainId, ETH_TOKEN_ADDRESS);
+      const assetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
       const withdrawalAmount = ethers.utils.parseEther("0.1");
       const wallet = ANVIL_DEFAULT_ACCOUNT_ADDR;
 
@@ -166,7 +165,7 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
         receiver: wallet,
         originToken: ETH_TOKEN_ADDRESS,
         originalCaller: wallet,
-        tokenOriginChainId: runtimeConfig.l1ChainId,
+        tokenOriginChainId: L1_CHAIN_ID,
       });
 
       const result = await callProcessLogsAndMessages({

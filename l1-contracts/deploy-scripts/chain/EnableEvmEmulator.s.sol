@@ -18,7 +18,7 @@ contract EnableEvmEmulator is Script, IEnableEvmEmulator {
         IAdmin adminContract = IAdmin(target);
         Utils.executeUpgrade({
             _governor: governor,
-            _salt: Utils.currentLegacyGovSalt(),
+            _salt: bytes32(0),
             _target: target,
             _data: abi.encodeCall(adminContract.allowEvmEmulation, ()),
             _value: 0,

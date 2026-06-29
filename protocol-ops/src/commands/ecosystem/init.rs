@@ -1,33 +1,22 @@
-use alloy::primitives::{Address, B256};
 use clap::Parser;
+use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 
-use crate::commands::ctm::init::ctm_init;
-use crate::commands::ctm::init::CtmInitInput;
-use crate::commands::hub::init::hub_init;
-use crate::commands::hub::init::HubInitInput;
+use crate::commands::ctm::init::{ctm_init, CtmInitInput};
+use crate::commands::hub::init::{hub_init, HubInitInput};
 
-use crate::common::env_config::EnvConfig;
-use crate::common::forge::scripts::deploy_ctm::DeployCTMOutput;
-use crate::common::forge::scripts::deploy_ecosystem::DeployL1CoreContractsOutput;
-use crate::common::output::write_output_if_requested;
+use crate::commands::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
+use crate::config::forge_interface::deploy_ctm::output::DeployCTMOutput;
+use crate::config::forge_interface::deploy_ecosystem::output::DeployL1CoreContractsOutput;
 use crate::types::VMOption;
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct EcosystemInitArgs {
-    /// Per-env preset (`stage` / `testnet` / `mainnet` / `local`). Loads
-    /// `upgrade-envs/permanent-values/<env>.toml` and supplies defaults for
-    /// `--zk-token-asset-id`, `--era-chain-id`, and `--owner` when those flags
-    /// are omitted. Explicit flags still win.
-    #[clap(long, help_heading = "Topology")]
-    pub env: Option<String>,
-
-    /// Owner address for the deployed contracts (default: deployer, or env's
-    /// `owner_address` when `--env` is set).
+    /// Owner address for the deployed contracts (default: deployer)
     #[clap(long, help_heading = "Signers")]
     pub owner: Option<Address>,
 
@@ -43,9 +32,9 @@ pub struct EcosystemInitArgs {
     pub shared: SharedRunArgs,
 
     // Advanced input
-    /// Era chain ID (default: 270, or env's `era_chain_id` when `--env` is set).
-    #[clap(long, help_heading = "Advanced input")]
-    pub era_chain_id: Option<u64>,
+    /// Era chain ID
+    #[clap(long, default_value_t = 270, help_heading = "Advanced input")]
+    pub era_chain_id: u64,
     /// VM type: zksyncos (default) or eravm
     #[clap(long, value_enum, default_value_t = VMOption::ZKSyncOsVM, help_heading = "Advanced input")]
     pub vm_type: VMOption,
@@ -55,46 +44,29 @@ pub struct EcosystemInitArgs {
     /// Enable support for legacy bridge testing (default: false)
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_legacy_bridge: bool,
-    /// ZK token asset ID (defaults from env's `zk_token_asset_id` when
-    /// `--env` is set).
+    /// ZK token asset ID
     #[clap(long, help_heading = "Advanced input")]
-    pub zk_token_asset_id: Option<B256>,
-    /// CREATE2 factory salt (random by default).
+    pub zk_token_asset_id: Option<H256>,
+    /// CREATE2 factory salt (random by default)
     #[clap(long, help_heading = "Advanced input")]
-    pub create2_factory_salt: Option<B256>,
+    pub create2_factory_salt: Option<H256>,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
 
 pub async fn run(args: EcosystemInitArgs) -> anyhow::Result<()> {
-    let env_cfg = match args.env.as_deref() {
-        Some(env) => Some(EnvConfig::load(env)?),
-        None => None,
-    };
-
     let mut runner = ForgeRunner::new(&args.shared)?;
     let sender = runner.prepare_sender(args.deployer_address).await?;
-    let owner_override = args
-        .owner
-        .or_else(|| env_cfg.as_ref().and_then(|c| c.owner_address()));
-    let owner = Wallet::resolve(owner_override, None, &sender)?;
-
-    let era_chain_id = args
-        .era_chain_id
-        .or_else(|| env_cfg.as_ref().and_then(|c| c.era_chain_id()))
-        .unwrap_or(270);
-    let zk_token_asset_id = args
-        .zk_token_asset_id
-        .or_else(|| env_cfg.as_ref().and_then(|c| c.zk_token_asset_id()));
+    let owner = Wallet::resolve(args.owner, None, &sender)?;
 
     let input = EcosystemInitInput {
         sender: sender.address,
         owner: owner.address,
-        era_chain_id,
+        era_chain_id: args.era_chain_id,
         vm_type: args.vm_type,
         with_testnet_verifier: args.with_testnet_verifier,
         with_legacy_bridge: args.with_legacy_bridge,
-        zk_token_asset_id,
+        zk_token_asset_id: args.zk_token_asset_id,
         create2_factory_salt: args.create2_factory_salt,
     };
     let output = ecosystem_init(&mut runner, &sender, &owner, &input).await?;
@@ -166,8 +138,8 @@ pub struct EcosystemInitInput {
     pub vm_type: VMOption,
     pub with_testnet_verifier: bool,
     pub with_legacy_bridge: bool,
-    pub zk_token_asset_id: Option<B256>,
-    pub create2_factory_salt: Option<B256>,
+    pub zk_token_asset_id: Option<H256>,
+    pub create2_factory_salt: Option<H256>,
 }
 
 #[derive(Serialize)]

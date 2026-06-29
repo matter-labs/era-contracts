@@ -73,35 +73,18 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
     ZkChainAddresses internal output;
 
     function run(address _chainTypeManagerProxy, uint256 _chainChainId) public {
-        runWithPaths(
-            "/script-config/register-zk-chain.toml",
-            "/script-out/output-register-zk-chain.toml",
-            _chainTypeManagerProxy,
-            _chainChainId
-        );
-    }
-
-    /// @notice Same as `run`, with the input/output TOML paths (project-root
-    /// relative) supplied by the caller instead of the conventional defaults.
-    function runWithPaths(
-        string memory inputPath,
-        string memory outputPath,
-        address _chainTypeManagerProxy,
-        uint256 _chainChainId
-    ) public {
         console.log("Deploying ZKChain");
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, inputPath);
+        string memory path = string.concat(root, "/script-config/register-zk-chain.toml");
         initializeConfig(path, _chainTypeManagerProxy, _chainChainId);
         loadChainCreationData(_chainTypeManagerProxy);
         // TODO: some chains may not want to have a legacy shared bridge
-        runInner(outputPath);
+        runInner("/script-out/output-register-zk-chain.toml");
     }
 
     function loadChainCreationData(address _ctmAddress) internal {
         (config.diamondCutData, config.forceDeploymentsData) = GetDiamondCutData.getDiamondCutAndForceDeployment(
-            _ctmAddress,
-            false
+            _ctmAddress
         );
     }
 

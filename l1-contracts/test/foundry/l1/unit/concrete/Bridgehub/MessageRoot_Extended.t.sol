@@ -17,7 +17,8 @@ import {
     OnlyChain,
     OnlyGateway,
     OnlyOnSettlementLayer,
-    TotalBatchesExecutedZero
+    TotalBatchesExecutedZero,
+    V31UpgradeChainBatchNumberNotSet
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 import {
@@ -83,7 +84,7 @@ contract MessageRoot_Extended_Test is Test {
         );
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2MessageRoot.initL2(L1_CHAIN_ID);
+        l2MessageRoot.initL2(L1_CHAIN_ID, gatewayChainId);
     }
 
     function test_ChainRegistered_CurrentChain() public {

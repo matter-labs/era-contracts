@@ -14,6 +14,19 @@
   },
   {
     "type": "function",
+    "name": "ERA_GATEWAY_CHAIN_ID",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "L1_CHAIN_ID",
     "inputs": [],
     "outputs": [

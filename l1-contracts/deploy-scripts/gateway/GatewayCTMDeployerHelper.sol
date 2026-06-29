@@ -2,9 +2,6 @@
 
 pragma solidity 0.8.28;
 
-// solhint-disable no-console
-
-import {console2 as console} from "forge-std/Script.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
@@ -108,9 +105,6 @@ struct L1L2DeployPrepareResult {
 }
 
 library GatewayCTMDeployerHelper {
-    // GW deploys are EVM-equivalent by default, but tests may force EraVM mode.
-    string internal constant GW_IS_EVM_EQUIVALENT_ENV = "GW_IS_EVM_EQUIVALENT";
-
     /// @notice Calculates all addresses for the deployment.
     /// @dev Uses 5 deployers + direct contract deployments.
     /// @param _create2Salt Salt used for CREATE2 when deploying the deployers.
@@ -133,9 +127,7 @@ library GatewayCTMDeployerHelper {
             address create2FactoryAddress
         )
     {
-        // Use Arachnid deterministic CREATE2 by default (GW path),
-        // unless the env override switches to EraVM factory mode.
-        create2FactoryAddress = _getDeploymentTarget(_isGatewayEvmEquivalentInCurrentContext());
+        create2FactoryAddress = _getDeploymentTarget(config.isZKsyncOS);
         (contracts, deployerCalldata, deployers, directCalldata) = _calculateAddressesInner(_create2Salt, config);
     }
 
@@ -212,14 +204,13 @@ library GatewayCTMDeployerHelper {
         bytes memory constructorArgs = abi.encode(daConfig);
 
         L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(
-            true,
+            config.isZKsyncOS,
             _create2Salt,
             bytecode,
             constructorArgs
         );
         deployer = deployResult.expectedAddress;
         data = deployResult.data;
-        _logGatewayVerifyContract(deployer, "GatewayCTMDeployerDA", constructorArgs);
         result = _calculateDADeployerAddresses(deployer, daConfig, config.isZKsyncOS);
     }
 
@@ -242,14 +233,13 @@ library GatewayCTMDeployerHelper {
         bytes memory constructorArgs = abi.encode(proxyAdminConfig);
 
         L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(
-            true,
+            config.isZKsyncOS,
             _create2Salt,
             bytecode,
             constructorArgs
         );
         deployer = deployResult.expectedAddress;
         data = deployResult.data;
-        _logGatewayVerifyContract(deployer, "GatewayCTMDeployerProxyAdmin", constructorArgs);
         result = _calculateProxyAdminDeployerAddresses(deployer, proxyAdminConfig, config.isZKsyncOS);
     }
 
@@ -274,14 +264,13 @@ library GatewayCTMDeployerHelper {
         bytes memory constructorArgs = abi.encode(vtConfig);
 
         L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(
-            true,
+            config.isZKsyncOS,
             _create2Salt,
             bytecode,
             constructorArgs
         );
         deployer = deployResult.expectedAddress;
         data = deployResult.data;
-        _logGatewayVerifyContract(deployer, "GatewayCTMDeployerValidatorTimelock", constructorArgs);
         result = _calculateValidatorTimelockDeployerAddresses(deployer, vtConfig, config.isZKsyncOS);
     }
 
@@ -306,14 +295,13 @@ library GatewayCTMDeployerHelper {
         bytes memory constructorArgs = abi.encode(verifiersConfig);
 
         L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(
-            true,
+            config.isZKsyncOS,
             _create2Salt,
             bytecode,
             constructorArgs
         );
         deployer = deployResult.expectedAddress;
         data = deployResult.data;
-        _logGatewayVerifyContract(deployer, vdName, constructorArgs);
         result = _calculateVerifiersDeployerAddresses(deployer, verifiersConfig, config.isZKsyncOS);
     }
 
@@ -331,8 +319,7 @@ library GatewayCTMDeployerHelper {
             "Admin.sol",
             "AdminFacet",
             adminFacetArgs,
-            config.isZKsyncOS,
-            true
+            config.isZKsyncOS
         );
 
         // MailboxFacet
@@ -348,8 +335,7 @@ library GatewayCTMDeployerHelper {
             "Mailbox.sol",
             "MailboxFacet",
             mailboxFacetArgs,
-            config.isZKsyncOS,
-            true
+            config.isZKsyncOS
         );
 
         // ExecutorFacet
@@ -359,8 +345,7 @@ library GatewayCTMDeployerHelper {
             "Executor.sol",
             "ExecutorFacet",
             executorFacetArgs,
-            config.isZKsyncOS,
-            true
+            config.isZKsyncOS
         );
 
         // GettersFacet
@@ -369,8 +354,7 @@ library GatewayCTMDeployerHelper {
             "Getters.sol",
             "GettersFacet",
             hex"",
-            config.isZKsyncOS,
-            true
+            config.isZKsyncOS
         );
 
         // MigratorFacet
@@ -380,8 +364,7 @@ library GatewayCTMDeployerHelper {
             "Migrator.sol",
             "MigratorFacet",
             migratorFacetArgs,
-            config.isZKsyncOS,
-            true
+            config.isZKsyncOS
         );
 
         // CommitterFacet
@@ -391,8 +374,7 @@ library GatewayCTMDeployerHelper {
             "Committer.sol",
             "CommitterFacet",
             committerFacetArgs,
-            config.isZKsyncOS,
-            true
+            config.isZKsyncOS
         );
 
         // DiamondInit
@@ -402,8 +384,7 @@ library GatewayCTMDeployerHelper {
             "DiamondInit.sol",
             "DiamondInit",
             diamondInitArgs,
-            config.isZKsyncOS,
-            true
+            config.isZKsyncOS
         );
 
         // L1GenesisUpgrade
@@ -412,8 +393,7 @@ library GatewayCTMDeployerHelper {
             "L1GenesisUpgrade.sol",
             "L1GenesisUpgrade",
             hex"",
-            config.isZKsyncOS,
-            true
+            config.isZKsyncOS
         );
 
         // Multicall3
@@ -422,8 +402,7 @@ library GatewayCTMDeployerHelper {
             "Multicall3.sol",
             "Multicall3",
             hex"",
-            config.isZKsyncOS,
-            true
+            config.isZKsyncOS
         );
     }
 
@@ -432,38 +411,27 @@ library GatewayCTMDeployerHelper {
         string memory fileName,
         string memory contractName,
         bytes memory constructorArgs,
-        bool _isZKsyncOS,
-        bool _gwIsEvmEquivalent
+        bool _isZKsyncOS
     ) internal returns (address addr, bytes memory data) {
         bytes memory bytecode = BytecodeUtils.readBytecodeL1(_isZKsyncOS, fileName, contractName);
         L1L2DeployPrepareResult memory result = _prepareL1L2Deployment(
-            _gwIsEvmEquivalent,
+            _isZKsyncOS,
             _create2Salt,
             bytecode,
             constructorArgs
         );
         addr = result.expectedAddress;
         data = result.data;
-        _logGatewayVerifyContract(addr, contractName, constructorArgs);
     }
 
     function _calculateCreate2AddressAndCalldata(
         bytes32 _create2Salt,
         CTMContract vmContract,
         bytes memory constructorArgs,
-        bool _isZKsyncOS,
-        bool _gwIsEvmEquivalent
+        bool _isZKsyncOS
     ) internal returns (address addr, bytes memory data) {
         (string memory fileName, string memory contractName) = DeployCTML1OrGateway.resolve(_isZKsyncOS, vmContract);
-        return
-            _calculateCreate2AddressAndCalldata(
-                _create2Salt,
-                fileName,
-                contractName,
-                constructorArgs,
-                _isZKsyncOS,
-                _gwIsEvmEquivalent
-            );
+        return _calculateCreate2AddressAndCalldata(_create2Salt, fileName, contractName, constructorArgs, _isZKsyncOS);
     }
 
     // ============ CTM Deployer ============
@@ -487,8 +455,7 @@ library GatewayCTMDeployerHelper {
             _create2Salt,
             CTMContract.GatewayCTMDeployerCTM,
             abi.encode(ctmConfig),
-            config.isZKsyncOS,
-            true
+            config.isZKsyncOS
         );
         result = _calculateCTMDeployerAddresses(deployer, ctmConfig, config.isZKsyncOS);
     }
@@ -857,17 +824,9 @@ library GatewayCTMDeployerHelper {
         bytes memory params,
         InnerDeployConfig memory config,
         bool _isZKsyncOS
-    ) private returns (address addr) {
+    ) private returns (address) {
         bytes memory bytecode = BytecodeUtils.readBytecodeL1(_isZKsyncOS, fileName, contractName);
-        // Address derivation must match the factory mode selected for this context.
-        addr = _computeCreate2Address(
-            _isGatewayEvmEquivalentInCurrentContext(),
-            config.deployerAddr,
-            config.salt,
-            bytecode,
-            params
-        );
-        _logGatewayVerifyContract(addr, contractName, params);
+        return _computeCreate2Address(_isZKsyncOS, config.deployerAddr, config.salt, bytecode, params);
     }
 
     // ============ Factory Dependencies ============
@@ -937,24 +896,18 @@ library GatewayCTMDeployerHelper {
 
     // ======================== VM-branching utilities ========================
 
-    function _isGatewayEvmEquivalentInCurrentContext() private view returns (bool) {
-        // Default: true (real GW deploy flow).
-        // Tests may set GW_IS_EVM_EQUIVALENT=false to force EraVM-native factory mode.
-        return Utils.vm.envOr(GW_IS_EVM_EQUIVALENT_ENV, true);
-    }
-
-    function _getDeploymentTarget(bool _gwIsEvmEquivalent) private view returns (address) {
-        return _gwIsEvmEquivalent ? Utils.DETERMINISTIC_CREATE2_ADDRESS : L2_CREATE2_FACTORY_ADDR;
+    function _getDeploymentTarget(bool _isZKsyncOS) private view returns (address) {
+        return _isZKsyncOS ? Utils.DETERMINISTIC_CREATE2_ADDRESS : L2_CREATE2_FACTORY_ADDR;
     }
 
     function _computeCreate2Address(
-        bool _gwIsEvmEquivalent,
+        bool _isZKsyncOS,
         address _deployer,
         bytes32 _salt,
         bytes memory _bytecode,
         bytes memory _constructorArgs
     ) private returns (address) {
-        if (_gwIsEvmEquivalent) {
+        if (_isZKsyncOS) {
             bytes memory initCode = abi.encodePacked(_bytecode, _constructorArgs);
             return Utils.vm.computeCreate2Address(_salt, keccak256(initCode), _deployer);
         }
@@ -968,15 +921,13 @@ library GatewayCTMDeployerHelper {
     }
 
     function _prepareL1L2Deployment(
-        bool /* _gwIsEvmEquivalent */,
+        bool _isZKsyncOS,
         bytes32 _salt,
         bytes memory _bytecode,
         bytes memory _constructorArgs
     ) private view returns (L1L2DeployPrepareResult memory result) {
-        // Keep target/call-data/address derivation in sync with the selected mode.
-        bool gwIsEvmEquivalent = _isGatewayEvmEquivalentInCurrentContext();
-        result.targetAddress = _getDeploymentTarget(gwIsEvmEquivalent);
-        if (gwIsEvmEquivalent) {
+        result.targetAddress = _getDeploymentTarget(_isZKsyncOS);
+        if (_isZKsyncOS) {
             bytes memory initCode = abi.encodePacked(_bytecode, _constructorArgs);
             result.expectedAddress = Utils.getL2AddressViaDeterministicCreate2(_salt, initCode);
             result.data = Utils.getDeterministicCreate2FactoryCalldata(_salt, initCode);
@@ -985,32 +936,5 @@ library GatewayCTMDeployerHelper {
             result.expectedAddress = Utils.getL2AddressViaCreate2Factory(_salt, bytecodeHash, _constructorArgs);
             (, result.data) = Utils.getDeploymentCalldata(_salt, _bytecode, _constructorArgs);
         }
-    }
-
-    /// Emit a `forge verify-contract` line for a GW-side deploy. GW contracts
-    /// are EVM-equivalent (ZKsync OS), so no toolchain flag is needed — the
-    /// operator supplies the GW chain id and (if required) a custom
-    /// `--verifier-url` at script invocation time. Routing into
-    /// `gw-verification-logs.txt` is handled on the Rust side based on the
-    /// emitting forge script (`GatewayVotePreparation.s.sol`).
-    function _logGatewayVerifyContract(
-        address contractAddr,
-        string memory contractName,
-        bytes memory constructorArgs
-    ) internal view {
-        string memory msgStr;
-        if (constructorArgs.length == 0) {
-            msgStr = string.concat("forge verify-contract ", Utils.vm.toString(contractAddr), " ", contractName);
-        } else {
-            msgStr = string.concat(
-                "forge verify-contract ",
-                Utils.vm.toString(contractAddr),
-                " ",
-                contractName,
-                " --constructor-args ",
-                Utils.vm.toString(constructorArgs)
-            );
-        }
-        console.log(msgStr);
     }
 }

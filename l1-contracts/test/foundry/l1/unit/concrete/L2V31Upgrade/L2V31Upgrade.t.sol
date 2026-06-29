@@ -278,6 +278,7 @@ contract L2V31UpgradeUnitTest is Test {
         return
             FixedForceDeploymentsData({
                 l1ChainId: L1_CHAIN_ID,
+                gatewayChainId: GATEWAY_CHAIN_ID,
                 eraChainId: ERA_CHAIN_ID,
                 l1AssetRouter: L1_ASSET_ROUTER,
                 l2TokenProxyBytecodeHash: L2_TOKEN_PROXY_BYTECODE_HASH,

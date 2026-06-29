@@ -17,6 +17,8 @@ use std::{
 pub struct Cmd<'a> {
     inner: xshell::Cmd<'a>,
     force_run: bool,
+    // For resume functionality we must pipe the output, otherwise it only shows less information
+    piped_std_err: bool,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -70,7 +72,13 @@ impl<'a> Cmd<'a> {
         Self {
             inner: cmd,
             force_run: false,
+            piped_std_err: false,
         }
+    }
+
+    pub fn with_piped_std_err(mut self) -> Self {
+        self.piped_std_err = true;
+        self
     }
 
     /// Set env variables for the command.
@@ -79,21 +87,16 @@ impl<'a> Cmd<'a> {
         self
     }
 
-    /// Run the command and return its stdout/stderr.
-    pub fn run(mut self) -> CmdResult<String> {
+    /// Run the command without capturing its output.
+    pub fn run(mut self) -> CmdResult<()> {
         let command_txt = self.inner.to_string();
         let output = if global_config().verbose || self.force_run {
             logger::debug(format!("Running: {}", self.inner));
             logger::new_empty_line();
-            let output = run_low_level_process_command(self.inner.into())?;
-            if let Ok(data) = String::from_utf8(output.stdout.clone()) {
-                if !data.is_empty() {
-                    logger::info(data);
-                }
-            }
+            let output = run_low_level_process_command(self.inner.into(), self.piped_std_err)?;
             if let Ok(data) = String::from_utf8(output.stderr.clone()) {
                 if !data.is_empty() {
-                    logger::info(data);
+                    logger::info(data)
                 }
             }
             output
@@ -110,11 +113,7 @@ impl<'a> Cmd<'a> {
             logger::debug(format!("Command completed: {}", command_txt));
         }
 
-        Ok(format!(
-            "{}{}",
-            String::from_utf8(output.stdout)?,
-            String::from_utf8(output.stderr)?
-        ))
+        Ok(())
     }
 }
 
@@ -131,9 +130,13 @@ fn check_output_status(command_text: &str, output: &std::process::Output) -> Cmd
     Ok(())
 }
 
-fn run_low_level_process_command(mut command: Command) -> io::Result<Output> {
-    command.stdout(Stdio::piped());
-    command.stderr(Stdio::piped());
+fn run_low_level_process_command(mut command: Command, piped_std_err: bool) -> io::Result<Output> {
+    command.stdout(Stdio::inherit());
+    if piped_std_err {
+        command.stderr(Stdio::piped());
+    } else {
+        command.stderr(Stdio::inherit());
+    }
     let child = command.spawn()?;
     child.wait_with_output()
 }

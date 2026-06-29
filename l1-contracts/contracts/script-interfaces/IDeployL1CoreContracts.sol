@@ -10,10 +10,6 @@ interface IDeployL1CoreContracts {
     /// @notice Runs the deployment with default paths
     function run() external;
 
-    /// @notice Same as `run`, with the input/output TOML paths (project-root
-    /// relative) supplied by the caller instead of the conventional defaults.
-    function runInner(string calldata inputPath, string calldata outputPath) external;
-
     /// @notice Runs the deployment for testing purposes
     /// @dev Accepts admin role after deployment for testing
     function runForTest() external;

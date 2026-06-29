@@ -1,3 +1,4 @@
+use ethers::types::U64;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{fmt, str::FromStr};
 
@@ -65,15 +66,17 @@ impl FromStr for L2ChainId {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // Try decimal first, then hex (with or without 0x prefix)
-        let number: u64 = if let Ok(n) = s.parse::<u64>() {
-            n
-        } else {
-            let hex = s.trim_start_matches("0x").trim_start_matches("0X");
-            u64::from_str_radix(hex, 16)
-                .map_err(|err| format!("Failed to parse L2ChainId: Err {err}"))?
+        // Parse the string as a U64
+        // try to parse as decimal first
+        let number = match U64::from_dec_str(s) {
+            Ok(u) => u,
+            Err(_) => {
+                // try to parse as hex
+                s.parse::<U64>()
+                    .map_err(|err| format!("Failed to parse L2ChainId: Err {err}"))?
+            }
         };
-        L2ChainId::new(number)
+        L2ChainId::new(number.as_u64())
     }
 }
 

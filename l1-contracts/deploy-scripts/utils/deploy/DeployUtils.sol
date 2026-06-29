@@ -34,7 +34,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         proxy = deployViaCreate2AndNotify(
             type(TransparentUpgradeableProxy).creationCode,
             abi.encode(implementation, proxyAdmin, getInitializeCalldata(contractName, false)),
-            "TransparentUpgradeableProxy",
+            contractName,
             string.concat(contractName, " Proxy"),
             isZKBytecode
         );

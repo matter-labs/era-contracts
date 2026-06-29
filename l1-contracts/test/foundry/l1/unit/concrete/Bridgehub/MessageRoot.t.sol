@@ -38,6 +38,7 @@ contract MessageRootTest is Test {
     L1MessageRoot messageRoot;
     L2MessageRoot l2MessageRoot;
     uint256 L1_CHAIN_ID;
+    uint256 gatewayChainId;
     address assetTracker;
 
     function setUp() public {
@@ -62,6 +63,7 @@ contract MessageRootTest is Test {
             abi.encode(makeAddr("chainAssetHandler"))
         );
         L1_CHAIN_ID = 5;
+        gatewayChainId = 506;
         address chainAssetHandler = makeAddr("chainAssetHandler");
         messageRoot = L1MessageRoot(
             address(
@@ -89,7 +91,7 @@ contract MessageRootTest is Test {
 
         vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector), abi.encode(0));
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2MessageRoot.initL2(L1_CHAIN_ID);
+        l2MessageRoot.initL2(L1_CHAIN_ID, gatewayChainId);
         vm.mockCall(address(bridgeHub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(assetTracker));
     }
 

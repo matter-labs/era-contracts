@@ -320,7 +320,7 @@ npx ts-node setup-and-dump-state.ts
    ```bash
    cd l1-contracts
    forge build
-   yarn copy-to-zkstack-out.ts
+   npx ts-node scripts/copy-to-zkstack-out.ts
    cd ..
    yarn prettier:fix  # Required to add trailing newlines to JSON files
    ```

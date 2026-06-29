@@ -66,13 +66,13 @@ import {
   ETH_TOKEN_ADDRESS,
   GW_ASSET_TRACKER_ADDR,
   INTEROP_CENTER_ADDR,
+  L1_CHAIN_ID,
   L2_ASSET_TRACKER_ADDR,
   L2_BRIDGEHUB_ADDR,
   L2_CHAIN_ASSET_HANDLER_ADDR,
   L2_INTEROP_HANDLER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../../src/core/const";
-import { runtimeConfig } from "../../src/core/runtime-config";
 import {
   migrateTokenBalanceToGW,
   queryAssetMigrationNumber,
@@ -301,7 +301,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
     gwDiamondProxy = getChainDiamondProxy(state.chainAddresses!, gwChainId);
     reverseTbmDiamondProxy = getChainDiamondProxy(state.chainAddresses!, reverseTbmChainId);
 
-    ethAssetId = encodeNtvAssetId(runtimeConfig.l1ChainId, ETH_TOKEN_ADDRESS);
+    ethAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
     reverseTbmTestTokenAssetId = encodeNtvAssetId(reverseTbmChainId, state.testTokens![reverseTbmChainId]);
 
     // Install the dev variant of L2ChainAssetHandler on GW so the reverse-TBM setup
@@ -651,7 +651,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         await expectRevert(
           () =>
             l2AssetTracker.callStatic.handleInitiateBridgingOnL2(
-              runtimeConfig.l1ChainId,
+              L1_CHAIN_ID,
               unmigratedAssetId,
               BigNumber.from(1),
               reverseTbmChainId,
@@ -846,7 +846,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
     it("change L2 settlement layer back to L1 (real SystemContext path)", async () => {
       await setSettlementLayerViaBootloader({
         provider: reverseTbmProvider,
-        settlementLayerChainId: runtimeConfig.l1ChainId,
+        settlementLayerChainId: L1_CHAIN_ID,
       });
 
       // L2ChainAssetHandler tracks the `migrationNumber[block.chainid]` transition
@@ -895,7 +895,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       await simulateGWChainMigrationBurn({
         gwProvider,
         chainId: reverseTbmChainId,
-        newSettlementLayerChainId: runtimeConfig.l1ChainId,
+        newSettlementLayerChainId: L1_CHAIN_ID,
         newMigrationNumber: POST_REVERSE_MIGRATION_NUMBER,
       });
 
@@ -904,9 +904,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       const sl: BigNumber = BigNumber.from(await bridgehub.settlementLayer(reverseTbmChainId));
       const gwMigNum: BigNumber = BigNumber.from(await chainAssetHandler.migrationNumber(reverseTbmChainId));
 
-      expect(sl.eq(runtimeConfig.l1ChainId), `GW L2Bridgehub.settlementLayer[${reverseTbmChainId}] == L1`).to.equal(
-        true
-      );
+      expect(sl.eq(L1_CHAIN_ID), `GW L2Bridgehub.settlementLayer[${reverseTbmChainId}] == L1`).to.equal(true);
       expect(
         gwMigNum.eq(POST_REVERSE_MIGRATION_NUMBER),
         `GW L2ChainAssetHandler.migrationNumber[${reverseTbmChainId}] == ${POST_REVERSE_MIGRATION_NUMBER}`
@@ -1007,13 +1005,13 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         bridgehubAddr,
         chainId: reverseTbmChainId,
         baseTokenAssetId: ethAssetId,
-        baseTokenOriginChainId: runtimeConfig.l1ChainId,
+        baseTokenOriginChainId: L1_CHAIN_ID,
         baseTokenOriginAddress: ETH_TOKEN_ADDRESS,
       });
 
       const l1Bridgehub = new Contract(bridgehubAddr, getAbi("IL1Bridgehub"), l1Provider);
       const sl: BigNumber = BigNumber.from(await l1Bridgehub.settlementLayer(reverseTbmChainId));
-      expect(sl.eq(runtimeConfig.l1ChainId), `L1 Bridgehub.settlementLayer[${reverseTbmChainId}] == L1`).to.equal(true);
+      expect(sl.eq(L1_CHAIN_ID), `L1 Bridgehub.settlementLayer[${reverseTbmChainId}] == L1`).to.equal(true);
     });
 
     it("withdraw ETH and the NTV test token from the chain (pending on L1 until reverse TBM completes)", async () => {
@@ -1252,7 +1250,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       await (await freshL1Token.mint(deployer.address, mintAmount, { gasLimit: 500_000 })).wait();
 
       const depositAmount = randomBigNumber(TBM_WITHDRAWAL_AMOUNT_RANGE.min, TBM_WITHDRAWAL_AMOUNT_RANGE.max.mul(10));
-      const freshAssetId = encodeNtvAssetId(runtimeConfig.l1ChainId, freshL1Token.address);
+      const freshAssetId = encodeNtvAssetId(L1_CHAIN_ID, freshL1Token.address);
       const accountingBefore = await snapshotTrackerBalances(reverseTbmChainId, freshAssetId);
       const depositResult = await depositERC20ToL2({
         l1RpcUrl: getL1RpcUrl(state),

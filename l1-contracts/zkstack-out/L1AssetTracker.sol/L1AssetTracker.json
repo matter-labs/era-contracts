@@ -860,6 +860,11 @@
   },
   {
     "type": "error",
+    "name": "V31UpgradeChainBatchNumberNotSet",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "ZeroAddress",
     "inputs": []
   }

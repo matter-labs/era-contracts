@@ -29,7 +29,7 @@ contract DecentralizeGovernanceUpgradeScript is Script {
 
         Utils.executeUpgrade({
             _governor: address(_governance),
-            _salt: Utils.currentLegacyGovSalt(),
+            _salt: bytes32(0),
             _target: address(_proxyAdmin),
             _data: proxyAdminUpgradeData,
             _value: 0,
@@ -41,7 +41,7 @@ contract DecentralizeGovernanceUpgradeScript is Script {
         bytes memory upgradeData = abi.encodeCall(IChainTypeManager.setPendingAdmin, (_pendingAdmin));
         Utils.executeUpgrade({
             _governor: address(_governance),
-            _salt: Utils.currentLegacyGovSalt(),
+            _salt: bytes32(0),
             _target: _target,
             _data: upgradeData,
             _value: 0,

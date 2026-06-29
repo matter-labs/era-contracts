@@ -1,29 +1,32 @@
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
-use alloy::primitives::{Address, Bytes, B256, U256};
-use alloy::providers::Provider;
-use alloy::signers::local::PrivateKeySigner;
 use clap::{Parser, ValueEnum};
+use ethers::{
+    core::types::Bytes,
+    prelude::{LocalWallet, Middleware, Signer},
+    types::{Address, H256, U256},
+    utils::{hex, hex::ToHexExt},
+};
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
-use crate::common::ethereum::get_provider;
+use crate::common::ethereum::create_ethers_client;
 use crate::common::wallets::Wallet;
 
 /// ForgeScript is a wrapper around the forge script command.
-#[derive(Clone)]
 pub struct ForgeScript {
     pub(crate) base_path: PathBuf,
     pub(crate) script_path: PathBuf,
     pub(crate) args: ForgeScriptArgs,
     pub(crate) envs: Vec<(String, String)>,
-    pub(crate) timing_label: Option<String>,
 }
 
 impl ForgeScript {
-    pub fn with_timing_label(mut self, label: impl Into<String>) -> Self {
-        self.timing_label = Some(label.into());
-        self
+    pub fn wallet_args_passed(&self) -> bool {
+        self.args.wallet_args_passed()
     }
 
     /// Add the ffi flag to the forge script command.
@@ -60,26 +63,27 @@ impl ForgeScript {
         self
     }
 
+    pub fn with_signature(mut self, signature: &str) -> Self {
+        self.args.add_arg(ForgeScriptArg::Sig {
+            sig: signature.to_string(),
+        });
+        self
+    }
+
+    pub fn with_zksync(mut self) -> Self {
+        self.args.add_arg(ForgeScriptArg::Zksync);
+        self
+    }
+
     pub fn with_calldata(mut self, calldata: &Bytes) -> Self {
         self.args.add_arg(ForgeScriptArg::Sig {
-            sig: alloy::hex::encode(calldata.as_ref()),
+            sig: hex::encode(calldata),
         });
         self
     }
 
     pub fn with_gas_limit(mut self, gas_limit: u64) -> Self {
         self.args.add_arg(ForgeScriptArg::GasLimit { gas_limit });
-        self
-    }
-
-    /// Skip forge's post-run label collection. After every script run forge
-    /// queries Sourcify (+ Etherscan if a key is configured) to map every
-    /// traced address to its contract name. Those lookups frequently hang
-    /// for 5–30+ minutes per CTM today, even though the underlying script
-    /// work has finished. `--disable-labels` skips the lookups entirely;
-    /// `--silent` only suppresses the printout (the work still runs).
-    pub fn with_disable_labels(mut self) -> Self {
-        self.args.add_arg(ForgeScriptArg::DisableLabels);
         self
     }
 
@@ -99,23 +103,22 @@ impl ForgeScript {
     }
 
     /// Adds the private key of the deployer account.
-    pub fn with_private_key(mut self, private_key: B256) -> Self {
+    pub fn with_private_key(mut self, private_key: H256) -> Self {
         self.args.add_arg(ForgeScriptArg::PrivateKey {
-            private_key: alloy::hex::encode(private_key),
+            private_key: private_key.encode_hex(),
         });
         self
     }
 
     // Do not start the script if balance is not enough
-    pub fn private_key(&self) -> anyhow::Result<Option<PrivateKeySigner>> {
+    pub fn private_key(&self) -> anyhow::Result<Option<LocalWallet>> {
         for a in &self.args.args {
             if let ForgeScriptArg::PrivateKey { private_key } = a {
-                let key: B256 = private_key
-                    .parse()
+                let key = H256::from_str(private_key)
                     .map_err(|e| anyhow::anyhow!("invalid private key hex: {e}"))?;
-                let signer = PrivateKeySigner::from_bytes(&key)
+                let wallet = LocalWallet::from_bytes(key.as_bytes())
                     .map_err(|e| anyhow::anyhow!("invalid private key: {e}"))?;
-                return Ok(Some(signer));
+                return Ok(Some(wallet));
             }
         }
         Ok(None)
@@ -131,7 +134,7 @@ impl ForgeScript {
         })
     }
 
-    pub fn sig(&self) -> Option<String> {
+    pub(crate) fn sig(&self) -> Option<String> {
         self.args.args.iter().find_map(|a| {
             if let ForgeScriptArg::Sig { sig } = a {
                 Some(sig.clone())
@@ -141,7 +144,7 @@ impl ForgeScript {
         })
     }
 
-    pub fn is_broadcast(&self) -> bool {
+    pub(crate) fn is_broadcast(&self) -> bool {
         self.args
             .args
             .iter()
@@ -156,23 +159,23 @@ impl ForgeScript {
         let Some(rpc_url) = self.rpc_url() else {
             return Ok(None);
         };
-        let Some(signer) = self.private_key()? else {
+        let Some(private_key) = self.private_key()? else {
             return Ok(None);
         };
-        let provider = get_provider(&rpc_url)?;
-        let balance = provider.get_balance(signer.address()).await?;
+        let client = create_ethers_client(private_key, rpc_url, None)?;
+        let balance = client.get_balance(client.address(), None).await?;
         Ok(Some(balance))
     }
 
-    pub fn needs_bridgehub_skip(&self) -> bool {
+    pub(crate) fn needs_bridgehub_skip(&self) -> bool {
         self.script_path == Path::new("deploy-scripts/DeployCTM.s.sol")
     }
 
-    pub fn script_name(&self) -> &Path {
+    pub(crate) fn script_name(&self) -> &Path {
         &self.script_path
     }
 
-    pub fn base_path(&self) -> &Path {
+    pub(crate) fn base_path(&self) -> &Path {
         &self.base_path
     }
 }
@@ -188,6 +191,27 @@ const PROHIBITED_ARGS: [&str; 10] = [
     "-C",
     "-O",
     "-s",
+];
+
+const WALLET_ARGS: [&str; 18] = [
+    "-a",
+    "--from",
+    "-i",
+    "--private-keys",
+    "--private-key",
+    "--mnemonics",
+    "--mnemonic-passphrases",
+    "--mnemonic-derivation-paths",
+    "--mnemonic-indexes",
+    "--keystore",
+    "--account",
+    "--password",
+    "--password-file",
+    "-l",
+    "--ledger",
+    "-t",
+    "--trezor",
+    "--aws",
 ];
 
 /// Set of known forge script arguments necessary for execution.
@@ -222,6 +246,7 @@ pub enum ForgeScriptArg {
         url: String,
     },
     Verify,
+    Resume,
     #[strum(to_string = "sender={address}")]
     Sender {
         address: String,
@@ -230,8 +255,6 @@ pub enum ForgeScriptArg {
     GasLimit {
         gas_limit: u64,
     },
-    DisableLabels,
-    Silent,
     Unlocked,
     Zksync,
     #[strum(to_string = "skip={skip_path}")]
@@ -366,6 +389,16 @@ impl ForgeScriptArgs {
             return;
         }
         self.args.push(arg);
+    }
+
+    pub fn wallet_args_passed(&self) -> bool {
+        self.additional_args
+            .iter()
+            .any(|arg| WALLET_ARGS.contains(&arg.as_ref()))
+    }
+
+    pub fn with_zksync(&mut self) {
+        self.zksync = true;
     }
 }
 

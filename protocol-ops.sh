@@ -22,12 +22,11 @@
 #   ./protocol-ops.sh --tag latest cast call 0xaddr 'foo()(uint256)' --rpc-url …
 #
 # Environment:
+#   WORK_DIR         — Docker mode: host directory mounted into the container
+#                      for output files (default: ./protocol-ops-workdir).
+#                      Ignored in local mode.
 #   EXTRA_MOUNTS     — Docker mode: space-separated host:container mount pairs,
-#                      e.g. "/tmp/cfg:/contracts/cfg". Use this to point output
-#                      somewhere other than the in-tree default (the host's
-#                      l1-contracts/upgrade-envs/ — which is mounted by default
-#                      so `--env <env>` writes land in
-#                      upgrade-envs/<v>/output/<env>/ on the host).
+#                      e.g. "/tmp/cfg:/contracts/cfg".
 #   PROTOCOL_OPS_BIN — Local mode only: path to a pre-built protocol_ops
 #                      binary. If unset, the wrapper runs `cargo build
 #                      --release` inside protocol-ops/ and uses the resulting
@@ -118,15 +117,11 @@ fi
 # ──────────────────────────────────────────────────────────────────────
 IMAGE="${IMAGE_REPO}:${TAG}"
 
-# Mount the host's `l1-contracts/upgrade-envs/` over the container's so
-# `--env <env>` writes (Safe bundles, manifest.json, ecosystem.toml) land
-# directly in the in-tree path (upgrade-envs/<v>/output/<env>/) the operator
-# already commits. The host's checkout shadows the image's baked-in copy —
-# both are the same git source, so the override is invisible at read time
-# and only matters at write time.
-HOST_UPGRADE_ENVS="${ERA_PATH}/l1-contracts/upgrade-envs"
-HOST_SCRIPT_OUT="${ERA_PATH}/l1-contracts/script-out"
-mkdir -p "${HOST_SCRIPT_OUT}"
+WORK_DIR="${WORK_DIR:-$(pwd)/protocol-ops-workdir}"
+mkdir -p "${WORK_DIR}/script-out"
+WORK_DIR="$(cd "${WORK_DIR}" && pwd)"   # absolute path
+
+CONTAINER_WORK="/contracts/work/session"
 
 # Container-side working directory. forge needs /contracts/l1-contracts so it
 # can find foundry.toml; protocol_ops and cast don't care.
@@ -143,8 +138,8 @@ docker_args=(
   run --rm
   --platform=linux/amd64
   -e FOUNDRY_DISABLE_NIGHTLY_WARNING=1
-  -v "${HOST_UPGRADE_ENVS}:/contracts/l1-contracts/upgrade-envs"
-  -v "${HOST_SCRIPT_OUT}:/contracts/l1-contracts/script-out"
+  -v "${WORK_DIR}:${CONTAINER_WORK}"
+  -v "${WORK_DIR}/script-out:/contracts/l1-contracts/script-out"
 )
 
 run_args=("$TOOL" "$@")

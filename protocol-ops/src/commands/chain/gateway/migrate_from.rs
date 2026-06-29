@@ -14,34 +14,25 @@
 //! single stage each; the phase names stay to keep the CLI symmetric with
 //! `migrate-to` and to match the per-phase workflow split.
 
-use alloy::dyn_abi::DynSolValue;
-use alloy::hex;
-use alloy::primitives::{Address, Bytes, B256, U256};
+use std::path::Path;
+
 use anyhow::Context;
 use clap::{Parser, Subcommand};
+use ethers::types::{Address, Bytes, H256};
+use ethers::utils::hex;
 use serde::{Deserialize, Serialize};
 
+use super::build_admin_functions_script;
 use super::migrate_to::{stage_pause_deposits, wait_for_l2_tx_receipt};
-use crate::common::abi::{AdminFunctionsAbi, BridgehubAbi, GatewayUtilsAbi, IChainTypeManagerAbi};
-use crate::common::addresses::L2_L1_MESSENGER;
-use crate::common::output::write_output_if_requested;
+use crate::commands::output::write_output_if_requested;
+use crate::common::paths;
 use crate::common::EcosystemChainArgs;
 use crate::common::SharedRunArgs;
-use crate::common::{forge::ForgeRunner, logger};
+use crate::common::{
+    forge::{Forge, ForgeRunner, ForgeScriptArg},
+    logger,
+};
 use crate::types::L2DACommitmentScheme;
-
-/// Sentinel error type for a reverted L2 priority tx.
-///
-/// Returned by `get_finalize_withdrawal_params` when the receipt shows
-/// `status == 0x0`. The retry loop uses `anyhow::Error::downcast_ref` to
-/// distinguish this terminal condition from transient failures (e.g. batch
-/// not yet sealed) that should be retried.
-#[derive(thiserror::Error, Debug)]
-#[error("L2 priority tx {hash:#x} reverted on gateway: {reason}")]
-struct TxRevertedError {
-    hash: B256,
-    reason: String,
-}
 
 // ── CLI args ──────────────────────────────────────────────────────────────
 
@@ -146,7 +137,7 @@ pub struct Phase2FinalizeArgs {
     /// transaction. Extract from the `NewPriorityRequest` event in the
     /// phase-1 L1 receipt.
     #[clap(long)]
-    pub migration_l2_tx_hash: B256,
+    pub migration_l2_tx_hash: H256,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
@@ -186,7 +177,7 @@ pub async fn run(cmd: MigrateFromCommands) -> anyhow::Result<()> {
 // ── Phase 0: pause-deposits + notify-server ───────────────────────────────
 
 pub async fn run_phase0_pause_deposits(args: Phase0PauseDepositsArgs) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve()?;
+    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     // Pause-deposits is shared with the to-gateway flow: it's the same L1
@@ -211,7 +202,7 @@ pub async fn run_phase0_pause_deposits(args: Phase0PauseDepositsArgs) -> anyhow:
 // ── Phase 1: submit ───────────────────────────────────────────────────────
 
 pub async fn run_phase1_submit(args: Phase1SubmitArgs) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve()?;
+    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     let gateway_chain_id = stage_submit_from(
@@ -244,7 +235,7 @@ pub async fn run_phase1_submit(args: Phase1SubmitArgs) -> anyhow::Result<()> {
 pub async fn run_phase3_set_da_validator_pair(
     args: Phase3SetDaValidatorPairArgs,
 ) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve()?;
+    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     stage_set_da_validator_pair_from(
@@ -272,20 +263,27 @@ pub async fn run_phase3_set_da_validator_pair(
 
 // ── Stage helpers ─────────────────────────────────────────────────────────
 
-pub async fn stage_notify_server_from(
+pub(crate) async fn stage_notify_server_from(
     runner: &mut ForgeRunner,
     bridgehub: Address,
     chain_id: u64,
 ) -> anyhow::Result<()> {
     let sender = runner.prepare_chain_admin(bridgehub, chain_id).await?;
 
-    let script = runner
-        .script_call(AdminFunctionsAbi::notifyServerMigrationFromGatewayCall {
-            _bridgehub: bridgehub,
-            _chainId: U256::from(chain_id),
-            _shouldSend: true,
-        })
-        .with_wallet(&sender);
+    let contracts_path = paths::resolve_l1_contracts_path()?;
+    let should_send = "true".to_string();
+
+    let script = build_admin_functions_script(
+        &contracts_path,
+        runner,
+        "notifyServerMigrationFromGateway(address,uint256,bool)",
+        vec![
+            format!("{:#x}", bridgehub),
+            chain_id.to_string(),
+            should_send,
+        ],
+    )?
+    .with_wallet(&sender);
 
     logger::step("Notifying server about migration from gateway");
     logger::info(format!("Chain ID: {}", chain_id));
@@ -299,7 +297,7 @@ pub async fn stage_notify_server_from(
 }
 
 /// Returns the resolved gateway chain id for downstream logging/output.
-pub async fn stage_submit_from(
+pub(crate) async fn stage_submit_from(
     runner: &mut ForgeRunner,
     bridgehub: Address,
     chain_id: u64,
@@ -315,6 +313,9 @@ pub async fn stage_submit_from(
             .await
             .context("Failed to resolve gateway chain ID from bridgehub")?;
     logger::info(format!("Gateway chain ID (from L1): {gateway_chain_id}"));
+
+    let contracts_path = paths::resolve_l1_contracts_path()?;
+    let should_send = "true".to_string();
 
     let l1_diamond_cut_data_hex = match l1_diamond_cut_data {
         Some(provided) => format!("0x{}", provided.trim_start_matches("0x")),
@@ -333,22 +334,22 @@ pub async fn stage_submit_from(
             format!("0x{}", hex::encode(&bytes))
         }
     };
-    let l1_diamond_cut_data = Bytes::from(
-        hex::decode(l1_diamond_cut_data_hex.trim_start_matches("0x"))
-            .context("invalid L1 diamond cut data hex")?,
-    );
 
-    let script = runner
-        .script_call(AdminFunctionsAbi::startMigrateChainFromGatewayCall {
-            _bridgehub: bridgehub,
-            _l1GasPrice: U256::from(l1_gas_price),
-            _l2ChainId: U256::from(chain_id),
-            _gatewayChainId: U256::from(gateway_chain_id),
-            _l1DiamondCutData: l1_diamond_cut_data,
-            _refundRecipient: refund_recipient,
-            _shouldSend: true,
-        })
-        .with_wallet(&sender);
+    let script = build_admin_functions_script(
+        &contracts_path,
+        runner,
+        "startMigrateChainFromGateway(address,uint256,uint256,uint256,bytes,address,bool)",
+        vec![
+            format!("{:#x}", bridgehub),
+            l1_gas_price.to_string(),
+            chain_id.to_string(),
+            gateway_chain_id.to_string(),
+            l1_diamond_cut_data_hex,
+            format!("{:#x}", refund_recipient),
+            should_send,
+        ],
+    )?
+    .with_wallet(&sender);
 
     logger::step("Submitting chain migration FROM gateway");
     logger::info(format!("Chain ID: {}", chain_id));
@@ -367,35 +368,35 @@ pub async fn stage_submit_from(
     Ok(gateway_chain_id)
 }
 
-pub async fn stage_set_da_validator_pair_from(
+pub(crate) async fn stage_set_da_validator_pair_from(
     runner: &mut ForgeRunner,
     bridgehub: Address,
     chain_id: u64,
     l1_da_validator: Address,
     l2_da_commitment_scheme: L2DACommitmentScheme,
 ) -> anyhow::Result<()> {
-    // migrate_from has no `--access-control-restriction` flag — chains that
-    // migrate off the gateway use the Ownable ChainAdmin path. If/when that
-    // changes, lift the flag into this helper too.
-    let access_control_restriction = Address::ZERO;
-    let sender = runner
-        .prepare_chain_admin_broadcaster(bridgehub, chain_id, access_control_restriction)
-        .await?;
+    let sender = runner.prepare_chain_admin(bridgehub, chain_id).await?;
+    let contracts_path = paths::resolve_l1_contracts_path()?;
 
     // Use the existing Admin.setDAValidatorPair flow (NOT the gateway-routed
     // setDAValidatorPairWithGateway) — after migrating back, the chain's
     // settlement layer is L1 and `Admin.setDAValidatorPair` is callable
     // directly via the L1 chain admin.
-    let script = runner
-        .script_call(AdminFunctionsAbi::setDAValidatorPairCall {
-            _bridgehub: bridgehub,
-            _accessControlRestriction: access_control_restriction,
-            _chainId: U256::from(chain_id),
-            _l1DaValidator: l1_da_validator,
-            _l2DaCommitmentScheme: l2_da_commitment_scheme as u8,
-            _shouldSend: true,
-        })
-        .with_wallet(&sender);
+    let should_send = "true".to_string();
+
+    let script = build_admin_functions_script(
+        &contracts_path,
+        runner,
+        "setDAValidatorPair(address,uint256,address,uint8,bool)",
+        vec![
+            format!("{:#x}", bridgehub),
+            chain_id.to_string(),
+            format!("{:#x}", l1_da_validator),
+            (l2_da_commitment_scheme as u8).to_string(),
+            should_send,
+        ],
+    )?
+    .with_wallet(&sender);
 
     logger::step("Setting L1 DA validator pair (post-migration)");
     runner
@@ -418,7 +419,7 @@ pub async fn stage_set_da_validator_pair_from(
 // `InvalidProof()`.
 
 pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve()?;
+    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
     // Resolve the gateway chain ID off real L1 BEFORE creating the forge
     // runner. With `--simulate`, `ForgeRunner::new` forks L1 via anvil at a
     // single block height; any L1 state change after the fork is created is
@@ -435,6 +436,7 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
     .await
     .context("Failed to resolve gateway chain ID from bridgehub")?;
     logger::info(format!("Gateway chain ID (from L1): {gateway_chain_id}"));
+    let contracts_path = paths::resolve_l1_contracts_path()?;
 
     // Step 1: wait for the priority tx to execute on the gateway.
     logger::step("Waiting for migration tx to execute on gateway");
@@ -455,8 +457,10 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
             {
                 Ok(p) => break p,
                 Err(e) => {
-                    if e.downcast_ref::<TxRevertedError>().is_some() {
-                        return Err(e).context("Migration tx reverted — cannot retry");
+                    // Fatal errors (e.g. tx reverted) should not be retried.
+                    let msg = format!("{e:#}");
+                    if msg.contains("REVERTED") {
+                        return Err(e).context("Failed to get withdrawal params");
                     }
                     if start.elapsed() >= timeout {
                         return Err(e).context("Failed to get withdrawal params (timed out)");
@@ -513,18 +517,38 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
 
     // Step 4: call finishMigrateChainFromGateway via forge (deployer key).
     logger::step("Finalizing migration on L1 (finishMigrateChainFromGateway)");
-    let script = runner
-        .script_call(GatewayUtilsAbi::finishMigrateChainFromGatewayCall {
-            bridgehubAddr: bridgehub,
-            migratingChainId: U256::from(chain_id),
-            gatewayChainId: U256::from(gateway_chain_id),
-            l2BatchNumber: U256::from(withdrawal.l2_batch_number),
-            l2MessageIndex: U256::from(withdrawal.l2_message_index),
-            l2TxNumberInBatch: withdrawal.l2_tx_number_in_batch,
-            message: withdrawal.message.clone(),
-            merkleProof: withdrawal.merkle_proof.clone(),
-        })
-        .with_ffi()
+    let mut sa = args.shared.forge_args.clone();
+    sa.add_arg(ForgeScriptArg::Sig {
+        sig:
+            "finishMigrateChainFromGateway(address,uint256,uint256,uint256,uint256,uint16,bytes,bytes32[])"
+                .to_string(),
+    });
+    sa.add_arg(ForgeScriptArg::RpcUrl {
+        url: runner.rpc_url.clone(),
+    });
+    sa.add_arg(ForgeScriptArg::Broadcast);
+    sa.add_arg(ForgeScriptArg::Ffi);
+    let proof_str = format!(
+        "[{}]",
+        withdrawal
+            .merkle_proof
+            .iter()
+            .map(|h| h.to_string())
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    sa.additional_args.extend([
+        format!("{:#x}", bridgehub),
+        chain_id.to_string(),
+        gateway_chain_id.to_string(),
+        withdrawal.l2_batch_number.to_string(),
+        withdrawal.l2_message_index.to_string(),
+        withdrawal.l2_tx_number_in_batch.to_string(),
+        format!("0x{}", hex::encode(&withdrawal.message.0)),
+        proof_str,
+    ]);
+    let script = Forge::new(&contracts_path)
+        .script(Path::new("deploy-scripts/gateway/GatewayUtils.s.sol"), sa)
         .with_wallet(&sender);
     runner
         .run(script)
@@ -549,13 +573,17 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 /// L1Messenger event topic for `L1MessageSent(address,bytes32,bytes)`.
-fn l1_message_sent_topic() -> B256 {
-    alloy::primitives::keccak256(b"L1MessageSent(address,bytes32,bytes)")
+fn l1_message_sent_topic() -> H256 {
+    H256::from(ethers::utils::keccak256(
+        b"L1MessageSent(address,bytes32,bytes)",
+    ))
 }
 
 /// L1 Messenger system contract address on L2 (`0x...8008`).
 fn l1_messenger_address() -> Address {
-    L2_L1_MESSENGER.parse().unwrap()
+    "0x0000000000000000000000000000000000008008"
+        .parse()
+        .unwrap()
 }
 
 #[derive(Debug)]
@@ -564,7 +592,12 @@ struct WithdrawalParams {
     l2_message_index: u64,
     l2_tx_number_in_batch: u16,
     message: Bytes,
-    merkle_proof: Vec<B256>,
+    merkle_proof: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct JsonRpcResponse<T> {
+    result: Option<T>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -598,7 +631,7 @@ struct L2ToL1LogProof {
     /// `l1BatchNumber`, so we read it from this response instead.
     batch_number: u64,
     id: u64,
-    proof: Vec<B256>,
+    proof: Vec<String>,
 }
 
 /// Build the `FinalizeWithdrawalParams` for the L1Nullifier.finalizeDeposit
@@ -606,27 +639,26 @@ struct L2ToL1LogProof {
 /// and a Merkle proof of inclusion.
 async fn get_finalize_withdrawal_params(
     gateway_rpc_url: &str,
-    tx_hash: B256,
+    tx_hash: H256,
 ) -> anyhow::Result<WithdrawalParams> {
-    use alloy::providers::Provider;
-    let provider = crate::common::ethereum::get_provider(gateway_rpc_url)?;
+    let client = reqwest::Client::new();
 
     // 1. Pull the L2 receipt.
-    // raw_request unwraps the JSON-RPC envelope — `result` IS the receipt object.
-    let raw_resp: serde_json::Value = provider
-        .raw_request(
-            "eth_getTransactionReceipt".into(),
-            (format!("{:#x}", tx_hash),),
-        )
-        .await
-        .context("eth_getTransactionReceipt")?;
-    anyhow::ensure!(
-        !raw_resp.is_null(),
-        "eth_getTransactionReceipt returned null for {:#x}",
-        tx_hash
-    );
-    {
-        let result = &raw_resp;
+    let receipt_body = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "eth_getTransactionReceipt",
+        "params": [format!("{:#x}", tx_hash)],
+    });
+    // First fetch as raw JSON to log the full response for debugging.
+    let raw_resp: serde_json::Value = client
+        .post(gateway_rpc_url)
+        .json(&receipt_body)
+        .send()
+        .await?
+        .json()
+        .await?;
+    if let Some(result) = raw_resp.get("result") {
         let status = result.get("status").and_then(|v| v.as_str()).unwrap_or("?");
         let gas_used = result
             .get("gasUsed")
@@ -651,59 +683,71 @@ async fn get_finalize_withdrawal_params(
                 .and_then(|v| v.as_str())
                 .unwrap_or("(not provided in receipt)");
 
-            // Fetch tx input data for debugging (raw_request unwraps result).
-            let tx_resp: serde_json::Value = provider
-                .raw_request(
-                    "eth_getTransactionByHash".into(),
-                    (format!("{:#x}", tx_hash),),
-                )
+            // Also try to get the tx input data for debugging.
+            let tx_body = serde_json::json!({
+                "jsonrpc": "2.0", "id": 1,
+                "method": "eth_getTransactionByHash",
+                "params": [format!("{:#x}", tx_hash)],
+            });
+            let tx_resp: serde_json::Value = client
+                .post(gateway_rpc_url)
+                .json(&tx_body)
+                .send()
                 .await
+                .ok()
+                .and_then(|r| futures::executor::block_on(r.json()).ok())
                 .unwrap_or_default();
             let input_prefix = tx_resp
-                .get("input")
+                .get("result")
+                .and_then(|r| r.get("input"))
                 .and_then(|v| v.as_str())
                 .map(|s| &s[..s.len().min(74)]) // selector + first arg
                 .unwrap_or("?");
+
+            // Try eth_call to replay and get revert data.
+            let tx_result = result;
+            let from_addr = tx_result
+                .get("from")
+                .and_then(|v| v.as_str())
+                .unwrap_or("0x0");
             let input_full = tx_resp
-                .get("input")
+                .get("result")
+                .and_then(|r| r.get("input"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("0x");
-
-            let from_addr = result.get("from").and_then(|v| v.as_str()).unwrap_or("0x0");
-            let block_num = result
+            let block_num = tx_result
                 .get("blockNumber")
                 .and_then(|v| v.as_str())
                 .unwrap_or("latest");
-
-            // Try eth_call to replay and get revert data.
-            let eth_call_error: String = match provider
-                .raw_request::<_, serde_json::Value>(
-                    "eth_call".into(),
-                    (
-                        serde_json::json!({
-                            "from": from_addr,
-                            "to": to,
-                            "data": input_full,
-                        }),
-                        block_num,
-                    ),
-                )
+            let call_body = serde_json::json!({
+                "jsonrpc": "2.0", "id": 1,
+                "method": "eth_call",
+                "params": [{
+                    "from": from_addr,
+                    "to": to,
+                    "data": input_full,
+                }, block_num],
+            });
+            let call_resp: serde_json::Value = client
+                .post(gateway_rpc_url)
+                .json(&call_body)
+                .send()
                 .await
-            {
-                Ok(_) => "(no error from eth_call)".to_string(),
-                Err(e) => e.to_string(),
-            };
+                .ok()
+                .and_then(|r| futures::executor::block_on(r.json()).ok())
+                .unwrap_or_default();
+            let eth_call_error = call_resp
+                .get("error")
+                .map(|e| format!("{}", e))
+                .unwrap_or_else(|| "(no error from eth_call)".to_string());
 
-            return Err(TxRevertedError {
-                hash: tx_hash,
-                reason: format!(
-                    "status=0x0, to={to}, gasUsed={gas_used}\n\
-                     Revert reason from receipt: {revert_reason}\n\
-                     eth_call replay error: {eth_call_error}\n\
-                     Input prefix: {input_prefix}"
-                ),
-            }
-            .into());
+            anyhow::bail!(
+                "L2 priority tx {:#x} REVERTED on gateway (status=0x0, to={to}, gasUsed={gas_used}).\n\
+                 Revert reason from receipt: {revert_reason}\n\
+                 eth_call replay error: {eth_call_error}\n\
+                 Input prefix: {input_prefix}",
+                tx_hash,
+            );
         }
         if let Some(l2_to_l1) = result.get("l2ToL1Logs") {
             logger::info(format!(
@@ -717,8 +761,11 @@ async fn get_finalize_withdrawal_params(
             }
         }
     }
-    let receipt: ZksyncL2Receipt =
+    let receipt_resp: JsonRpcResponse<ZksyncL2Receipt> =
         serde_json::from_value(raw_resp).context("Failed to parse receipt response")?;
+    let receipt = receipt_resp
+        .result
+        .context("eth_getTransactionReceipt returned null")?;
 
     // 2. Find the L2→L1 message index in `l2ToL1Logs` for the proof RPC.
     //    `l1Nullifier.finalizeDeposit` (called by `finishMigrateChainFromGateway`)
@@ -781,28 +828,37 @@ async fn get_finalize_withdrawal_params(
     // `event L1MessageSent(address indexed _sender, bytes32 indexed _hash, bytes _message);`
     // Both `_sender` and `_hash` are indexed — they live in `topics[1..=2]`, not
     // in `data`. The `data` payload carries ONLY the `bytes _message` field.
-    use alloy::dyn_abi::DynSolType;
-    let bytes_type = DynSolType::Bytes;
-    let decoded = bytes_type
-        .abi_decode(&log_data)
+    let decoded = ethers::abi::decode(&[ethers::abi::ParamType::Bytes], &log_data)
         .context("Failed to ABI-decode L1MessageSent log data")?;
-    let message: Vec<u8> = match decoded {
-        DynSolValue::Bytes(b) => b,
-        _ => anyhow::bail!("L1MessageSent message field was not Bytes"),
-    };
+    let message_token = decoded
+        .into_iter()
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("L1MessageSent decoded data missing message field"))?;
+    let message: Vec<u8> = message_token
+        .into_bytes()
+        .ok_or_else(|| anyhow::anyhow!("L1MessageSent message field was not Bytes"))?;
 
     // 4. Fetch the merkle proof. zksync-os exposes the batch number directly
     //    in the proof response (rather than as an `l1BatchNumber` extension
     //    on `eth_getTransactionReceipt`, which zksync-os does not emit). The
     //    proof RPC itself is the polling signal: it returns `null` until the
     //    containing batch has been sealed.
-    let proof: L2ToL1LogProof = provider
-        .raw_request(
-            "zks_getL2ToL1LogProof".into(),
-            (format!("{:#x}", tx_hash), l2_to_l1_log_index),
-        )
-        .await
-        .context("zks_getL2ToL1LogProof")?;
+    let proof_body = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "zks_getL2ToL1LogProof",
+        "params": [format!("{:#x}", tx_hash), l2_to_l1_log_index],
+    });
+    let proof_resp: JsonRpcResponse<L2ToL1LogProof> = client
+        .post(gateway_rpc_url)
+        .json(&proof_body)
+        .send()
+        .await?
+        .json()
+        .await?;
+    let proof = proof_resp
+        .result
+        .context("zks_getL2ToL1LogProof returned null")?;
 
     Ok(WithdrawalParams {
         l2_batch_number: proof.batch_number,
@@ -826,11 +882,12 @@ async fn wait_for_gateway_batch_executed_on_l1(
     gateway_chain_id: u64,
     target_batch: u64,
 ) -> anyhow::Result<()> {
-    use crate::common::abi::ZkChainAbi;
-    use crate::common::ethereum::get_provider;
+    use crate::abi::ZkChainAbi;
     use crate::common::l1_contracts;
+    use ethers::providers::{Http, Provider};
 
-    let provider = get_provider(l1_rpc_url).context("connect L1 provider")?;
+    let provider =
+        std::sync::Arc::new(Provider::<Http>::try_from(l1_rpc_url).context("connect L1 provider")?);
     let gateway_diamond = l1_contracts::resolve_zk_chain(l1_rpc_url, bridgehub, gateway_chain_id)
         .await
         .context("resolve gateway diamond proxy on L1")?;
@@ -838,10 +895,10 @@ async fn wait_for_gateway_batch_executed_on_l1(
 
     let timeout = std::time::Duration::from_secs(300);
     let start = std::time::Instant::now();
-    let target = U256::from(target_batch);
+    let target = ethers::types::U256::from(target_batch);
     loop {
         let executed = zk_chain
-            .getTotalBatchesExecuted()
+            .get_total_batches_executed()
             .call()
             .await
             .context("gateway diamond getTotalBatchesExecuted")?;
@@ -872,37 +929,49 @@ async fn resolve_l1_diamond_cut_data(
     bridgehub: Address,
     chain_id: u64,
 ) -> anyhow::Result<Vec<u8>> {
-    use crate::common::ethereum::get_provider;
-    use alloy::dyn_abi::DynSolType;
-    use alloy::primitives::keccak256;
-    use alloy::providers::Provider;
-    use alloy::rpc::types::Filter;
+    use ethers::providers::{Http, Middleware, Provider};
+    use ethers::types::{Filter, H256};
 
-    let provider = get_provider(l1_rpc_url)?;
+    let provider = std::sync::Arc::new(Provider::<Http>::try_from(l1_rpc_url)?);
 
     // 1) bridgehub.chainTypeManager(chainId)
-    let bridgehub = BridgehubAbi::new(bridgehub, provider.clone());
-    let ctm = bridgehub
-        .chainTypeManager(U256::from(chain_id))
-        .call()
+    let mut data = ethers::utils::id("chainTypeManager(uint256)").to_vec();
+    data.extend_from_slice(&ethers::abi::encode(&[ethers::abi::Token::Uint(
+        chain_id.into(),
+    )]));
+    let tx = ethers::types::TransactionRequest::new()
+        .to(bridgehub)
+        .data(data);
+    let result = provider
+        .call(&tx.into(), None)
         .await
         .context("bridgehub.chainTypeManager call")?;
+    anyhow::ensure!(result.len() >= 32, "chainTypeManager returned <32 bytes");
+    let ctm = Address::from_slice(&result[12..32]);
 
     // 2) ctm.getProtocolVersion(chainId)
-    let ctm_contract = IChainTypeManagerAbi::new(ctm, provider.clone());
-    let protocol_version = ctm_contract
-        .getProtocolVersion(U256::from(chain_id))
-        .call()
+    let mut data = ethers::utils::id("getProtocolVersion(uint256)").to_vec();
+    data.extend_from_slice(&ethers::abi::encode(&[ethers::abi::Token::Uint(
+        chain_id.into(),
+    )]));
+    let tx = ethers::types::TransactionRequest::new().to(ctm).data(data);
+    let result = provider
+        .call(&tx.into(), None)
         .await
         .context("ctm.getProtocolVersion call")?;
+    anyhow::ensure!(result.len() >= 32, "getProtocolVersion returned <32 bytes");
+    let protocol_version = ethers::types::U256::from_big_endian(&result[..32]);
 
     // 3) scan CTM for NewUpgradeCutData(protocolVersion, ...)
-    let topic0 =
-        keccak256(b"NewUpgradeCutData(uint256,(((address,uint8,bool,bytes4[]))[],address,bytes))");
-    let topic1 = alloy::primitives::B256::from(protocol_version.to_be_bytes::<32>());
+    let topic0 = H256::from(ethers::utils::keccak256(
+        b"NewUpgradeCutData(uint256,(((address,uint8,bool,bytes4[]))[],address,bytes))",
+    ));
+    let mut version_topic = [0u8; 32];
+    protocol_version.to_big_endian(&mut version_topic);
+    let topic1 = H256::from(version_topic);
     let filter = Filter::new()
         .address(ctm)
-        .event_signature(topic0)
+        .topic0(topic0)
         .topic1(topic1)
         .from_block(0u64);
     let logs = provider
@@ -920,19 +989,23 @@ async fn resolve_l1_diamond_cut_data(
     //    The event log data is the ABI-encoding of a single tuple containing
     //    that struct. After decoding we re-encode the inner struct alone,
     //    which is the format `startMigrateChainFromGateway` expects.
-    let facet_cut_type = DynSolType::Tuple(vec![
-        DynSolType::Address,                                    // facet
-        DynSolType::Uint(8),                                    // action
-        DynSolType::Bool,                                       // isFreezable
-        DynSolType::Array(Box::new(DynSolType::FixedBytes(4))), // selectors
+    use ethers::abi::ParamType;
+    let facet_cut = ParamType::Tuple(vec![
+        ParamType::Address,                                   // facet
+        ParamType::Uint(8),                                   // action
+        ParamType::Bool,                                      // isFreezable
+        ParamType::Array(Box::new(ParamType::FixedBytes(4))), // selectors
     ]);
-    let diamond_cut_data_type = DynSolType::Tuple(vec![
-        DynSolType::Array(Box::new(facet_cut_type)), // facetCuts
-        DynSolType::Address,                         // initAddress
-        DynSolType::Bytes,                           // initCalldata
+    let diamond_cut_data = ParamType::Tuple(vec![
+        ParamType::Array(Box::new(facet_cut)), // facetCuts
+        ParamType::Address,                    // initAddress
+        ParamType::Bytes,                      // initCalldata
     ]);
-    let decoded = diamond_cut_data_type
-        .abi_decode(log.data().data.as_ref())
+    let tokens = ethers::abi::decode(&[diamond_cut_data], &log.data)
         .context("ABI-decode NewUpgradeCutData log")?;
-    Ok(decoded.abi_encode())
+    let inner = tokens
+        .into_iter()
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("NewUpgradeCutData decoded into zero tokens"))?;
+    Ok(ethers::abi::encode(&[inner]))
 }

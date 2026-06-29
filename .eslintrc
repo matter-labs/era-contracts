@@ -12,8 +12,6 @@
   },
   "ignorePatterns": [
     "**/lib/*",
-    "lib/*",
-    "**/dist/**",
-    "**/node_modules/**"
+    "lib/*"
   ]
 }
