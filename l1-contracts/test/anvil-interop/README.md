@@ -228,6 +228,49 @@ L1 withdrawal finalization normally requires batch proofs. For Anvil testing, we
 
 L1 `bridgeMint` expects `DataEncoding.encodeBridgeMintData` format: `(address originalCaller, address receiver, address originToken, uint256 amount, bytes metadata)`. This is different from the L2 burn data format `(uint256 amount, address receiver, address token)`.
 
+## Limitations & Deviations from Production
+
+### Not Supported
+
+- **L1→L2 transaction failures / refundRecipient**: Priority requests always succeed on Anvil; failure + refund logic is untested
+- **Batch settlement**: No real sequencer or prover; batches are never committed/proved/executed
+- **Custom pubdata pricing**: Gas and pubdata costs use Anvil defaults, not ZKsync fee models
+- **L1→GW→L2 relay via NewPriorityRequest on GW**: GW does not emit `NewPriorityRequest` during relay; the `relayChains` next-hop path in `extractAndRelayNewPriorityRequests` is not exercised
+
+### Mock Contracts
+
+| Mock                        | Address   | Replaces              | Difference                                           |
+| --------------------------- | --------- | --------------------- | ---------------------------------------------------- |
+| `MockL2ToL1Messenger`       | `0x8008`  | L2ToL1Messenger       | Only emits `L1MessageSent`; no merkle tree           |
+| `MockL2MessageVerification` | `0x10009` | L2MessageVerification | All proof checks return `true`                       |
+| `MockSystemContext`         | `0x800b`  | SystemContext         | Minimal; no ZK-VM state                              |
+| `MockMintBaseTokenHook`     | `0x7100`  | MINT_BASE_TOKEN_HOOK  | No-op; L2BaseToken pre-funded via `anvil_setBalance` |
+| `DummyL1MessageRoot`        | L1        | L1MessageRoot         | All proof verification returns `true`                |
+
+Real contracts used: `L2BaseTokenZKOS` at `0x800a`, all other L2 system contracts at their production addresses.
+
+### L2 Deployment: `anvil_setCode` + Real Genesis Upgrade
+
+Contracts are placed at hardcoded addresses via `anvil_setCode` (production has them in genesis state). The real genesis upgrade calldata from L1's `GenesisUpgrade` event is relayed to L2, initializing all contracts via `initL2()` with production-identical data.
+
+### Impersonation
+
+| What                          | Who                      | Production equivalent               |
+| ----------------------------- | ------------------------ | ----------------------------------- |
+| Genesis upgrade relay         | `L2_FORCE_DEPLOYER_ADDR` | Bootloader executes upgrade tx      |
+| Interop chain registration    | `SERVICE_TX_SENDER_ADDR` | Service transactions from sequencer |
+| GW chain registration         | `ChainAssetHandler`      | Governance flow                     |
+| Settlement layer notification | `L2_BOOTLOADER_ADDR`     | Bootloader at batch start           |
+| Governance calls              | Governance contract      | Multi-sig / timelock                |
+| GW L2Bridgehub ownership      | Aliased CTM governance   | Shared governance from deployment   |
+
+### Other Shortcuts
+
+- **Fake GW diamond proxies**: Placeholder addresses via `anvil_setCode` for `getZKChain() != 0`
+- **GW L2Bridgehub ownership transfer**: CTM deploys a per-chain Governance, but `fullRegistration` sends from ecosystem Governance. The test transfers ownership before relay.
+- **Synthetic merkle proofs**: Encode settlement layer chain ID but contain no real cryptographic data
+- **Interop proofs**: Correct struct shape but empty proof arrays
+
 ## Cleanup
 
 ```bash

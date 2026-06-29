@@ -17,7 +17,13 @@ import { migrateTokenBalanceToGW } from "../../src/helpers/token-balance-migrati
 import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_RECIPIENT_ADDR, ETH_TOKEN_ADDRESS } from "../../src/core/const";
 import { runtimeConfig } from "../../src/core/runtime-config";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
-import { getL2Chain, getChainDiamondProxy, getChainIdByRole, getChainIdsByRole } from "../../src/core/utils";
+import {
+  getL1RpcUrl,
+  getL2RpcUrl,
+  getChainDiamondProxy,
+  getChainIdByRole,
+  getChainIdsByRole,
+} from "../../src/core/utils";
 
 describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
   this.timeout(0);
@@ -41,8 +47,6 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
       const tracker = createBalanceTrackerFromState(state);
       const assetId = await queryEthAssetIdFromState(state);
       const amount = ethers.utils.parseEther("0.5");
-      const l2Chain = getL2Chain(state.chains!, gwSettledChainId);
-      const gwChain = getL2Chain(state.chains!, gwChainId);
       const gwDiamondProxy = getChainDiamondProxy(state.chainAddresses!, gwChainId);
       const senderAddr = ANVIL_DEFAULT_ACCOUNT_ADDR;
 
@@ -51,13 +55,13 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
       const senderBefore = await tracker.takeSnapshot(gwChainId, assetId, undefined, undefined, senderAddr, true);
 
       const result = await depositETHToL2({
-        l1RpcUrl: state.chains!.l1!.rpcUrl,
-        l2RpcUrl: l2Chain.rpcUrl,
+        l1RpcUrl: getL1RpcUrl(state),
+        l2RpcUrl: getL2RpcUrl(state, gwSettledChainId),
         chainId: gwSettledChainId,
         l1Addresses: state.l1Addresses!,
         amount,
         l1DiamondProxy: gwDiamondProxy,
-        gwRpcUrl: gwChain.rpcUrl,
+        gwRpcUrl: getL2RpcUrl(state, gwChainId),
       });
 
       expect(result.l1TxHash).to.not.be.null;
@@ -88,7 +92,6 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
       const tracker = createBalanceTrackerFromState(state);
       const assetId = await queryEthAssetIdFromState(state);
       const amount = ethers.utils.parseEther("0.2");
-      const l2Chain = getL2Chain(state.chains!, gwSettledChainId);
       const recipientAddr = ANVIL_RECIPIENT_ADDR;
 
       // Snapshot chain balance and the recipient's L1 balance so we can assert they actually receive it.
@@ -96,8 +99,8 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
       const recipientL1Before = await tracker.getL1EthBalance(recipientAddr);
 
       const result = await withdrawETHFromL2({
-        l1RpcUrl: state.chains!.l1!.rpcUrl,
-        l2RpcUrl: l2Chain.rpcUrl,
+        l1RpcUrl: getL1RpcUrl(state),
+        l2RpcUrl: getL2RpcUrl(state, gwSettledChainId),
         chainId: gwSettledChainId,
         l1Addresses: state.l1Addresses!,
         amount,
@@ -129,17 +132,15 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
 
   describe("processLogsAndMessages on GW for withdrawal", () => {
     it("processes a withdrawal log and decreases GWAssetTracker.chainBalance", async () => {
-      const gwChain = getL2Chain(state.chains!, gwChainId);
-      const gwProvider = new ethers.providers.JsonRpcProvider(gwChain.rpcUrl);
+      const gwProvider = new ethers.providers.JsonRpcProvider(getL2RpcUrl(state, gwChainId));
 
       const assetId = encodeNtvAssetId(runtimeConfig.l1ChainId, ETH_TOKEN_ADDRESS);
       const withdrawalAmount = ethers.utils.parseEther("0.1");
       const wallet = ANVIL_DEFAULT_ACCOUNT_ADDR;
 
       // Establish GWAssetTracker.chainBalance via the full Token Balance Migration flow
-      const l1Provider = new ethers.providers.JsonRpcProvider(state.chains!.l1!.rpcUrl);
-      const l2Chain = getL2Chain(state.chains!, gwSettledChainId);
-      const l2Provider = new ethers.providers.JsonRpcProvider(l2Chain.rpcUrl);
+      const l1Provider = new ethers.providers.JsonRpcProvider(getL1RpcUrl(state));
+      const l2Provider = new ethers.providers.JsonRpcProvider(getL2RpcUrl(state, gwSettledChainId));
       const gwDiamondProxy = getChainDiamondProxy(state.chainAddresses!, gwChainId);
       const l2DiamondProxy = getChainDiamondProxy(state.chainAddresses!, gwSettledChainId);
 
@@ -170,7 +171,7 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
 
       const result = await callProcessLogsAndMessages({
         gwProvider,
-        gwRpcUrl: gwChain.rpcUrl,
+        gwRpcUrl: getL2RpcUrl(state, gwChainId),
         chainId: gwSettledChainId,
         logs: [withdrawalLog],
         messages: [message],
@@ -194,8 +195,7 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
     it("sum of GW per-chain balances <= L1 GW balance", async () => {
       const tracker = createBalanceTrackerFromState(state);
       const assetId = await queryEthAssetIdFromState(state);
-      const gwChain = getL2Chain(state.chains!, gwChainId);
-      const gwProvider = new ethers.providers.JsonRpcProvider(gwChain.rpcUrl);
+      const gwProvider = new ethers.providers.JsonRpcProvider(getL2RpcUrl(state, gwChainId));
 
       const l1Snapshot = await tracker.takeChainBalanceSnapshot(gwChainId, assetId, true);
       const l1GWBalance = BigNumber.from(l1Snapshot.l1ChainBalance);
