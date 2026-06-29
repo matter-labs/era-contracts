@@ -133,7 +133,7 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
 
     /// @notice The contract records each (sender, salt) pair and rejects a reused salt, guaranteeing unique bundle hashes.
     /// @dev Unlike the removed auto-incrementing nonce, the sender must now provide a fresh salt to re-send an otherwise
-    ///      identical bundle. Re-using the salt reverts with `InteropBundleSaltAlreadyUsed`.
+    ///      identical bundle. Reusing the salt reverts with `InteropBundleSaltAlreadyUsed`.
     function test_sendBundle_revertsWhenSaltReused() public {
         _setupGatewayMode();
         address sender = makeAddr("saltSender");
@@ -142,7 +142,7 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
         _sendAndDecodeBundle(sender, _buildBundleAttributesWithSalt(userSalt, true));
         assertTrue(l2InteropCenter.isInteropBundleSaltUsed(sender, userSalt), "used salt should be recorded");
 
-        // Re-using the same salt must revert via the unique-salt guard, even with completely different bundle content.
+        // Reusing the same salt must revert via the unique-salt guard, even with completely different bundle content.
         InteropCallStarter[] memory calls = _buildSimpleCall();
         bytes[] memory attrs = _buildBundleAttributesWithSalt(userSalt, true);
         vm.prank(sender);
