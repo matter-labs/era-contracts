@@ -668,7 +668,7 @@ desc = "Testnet PUH stage 1: NTV.setAssetTracker(L1AssetTracker 0x150d2f16…) �
 [[entries]]
 target = "tn_bridgehub"
 selector = "0xa17223b0"  # setAddressesV31(address)
-desc = "Testnet PUH stage 1: Bridgehub.setAddressesV31(ChainRegistrationSender 0xded97b2E…) — wires Bridgehub to the v31 ChainRegistrationSender."
+desc = "Testnet PUH stage 1: Bridgehub.setAddressesV31(ChainRegistrationSender 0xdFf4C579…) — wires Bridgehub to the v31 ChainRegistrationSender."
 
 [[entries]]
 target = "tn_chain_asset_handler"
