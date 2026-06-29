@@ -38,7 +38,7 @@ import {
     WithdrawalAlreadyFinalized,
     ZeroAddress
 } from "../common/L1ContractErrors.sol";
-import {EthAlreadyMigratedToL1NTV, NativeTokenVaultAlreadySet, WrongL2Sender} from "./L1BridgeContractErrors.sol";
+import {NativeTokenVaultAlreadySet, WrongL2Sender} from "./L1BridgeContractErrors.sol";
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 import {TransientPrimitivesLib} from "../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
@@ -145,18 +145,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         _transferOwnership(_owner);
         if (eraPostDiamondUpgradeFirstBatch == 0) {
             eraPostDiamondUpgradeFirstBatch = _eraPostDiamondUpgradeFirstBatch;
-        }
-    }
-
-    /// @notice Transfers tokens from shared bridge to native token vault.
-    /// @dev This function is part of the upgrade process used to transfer liquidity.
-    /// @param _token The address of the token to be transferred to NTV.
-    function transferTokenToNTV(address _token) external onlyL1NTV {
-        address ntvAddress = address(l1NativeTokenVault);
-        if (ETH_TOKEN_ADDRESS == _token) {
-            revert EthAlreadyMigratedToL1NTV();
-        } else {
-            IERC20(_token).safeTransfer(ntvAddress, IERC20(_token).balanceOf(address(this)));
         }
     }
 
