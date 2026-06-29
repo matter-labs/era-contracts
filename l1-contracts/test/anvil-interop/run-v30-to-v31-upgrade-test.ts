@@ -5,7 +5,7 @@ import { runV31UpgradeScenario } from "./src/helpers/v31-upgrade-test-runner";
 runV31UpgradeScenario({
   label: "v30-zksync-os",
   stateVersion: "v0.30.0",
-  permanentValuesTemplatePath: "upgrade-envs/permanent-values/local.toml",
+  permanentValuesTemplatePath: "test/anvil-interop/config/v30-permanent-values.toml",
   upgradeInputTemplatePath: "upgrade-envs/v0.30.0-zksync-os-blobs/localhost.toml",
   isZKsyncOS: true,
   targetRoles: ["gateway", "gwSettled"],

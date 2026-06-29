@@ -7,3 +7,6 @@ node_modules/
 
 # Logs
 *.log
+
+# Fork-mode L2 RPC map (developer-local)
+config/fork-l2-rpcs.json
