@@ -54,7 +54,11 @@ import { getAbi } from "../../src/core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   BundleStatus,
+  INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
+  L2_ATOMIC_FLOW_MANAGER_ADDR,
+  L2_INTEROP_COMMITMENT_TREE_ADDR,
+  L2_INTEROP_HANDLER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
   ATOMIC_SEND_BUNDLE_GAS_LIMIT,
   DEFAULT_TX_GAS_LIMIT,
@@ -68,8 +72,6 @@ import {
   indirectCallAttr,
   sendInteropBundle,
 } from "../../src/helpers/interop-helpers";
-import type { AtomicStack } from "../../src/helpers/imt-atomic-deployer";
-import { deployAtomicStack } from "../../src/helpers/imt-atomic-deployer";
 import {
   atomicFinalityProofTuple,
   buildInclusionProof,
@@ -89,6 +91,37 @@ enum LegState {
   Committed = 1,
   Revertable = 2,
   Reverted = 3,
+}
+
+/**
+ * Handles to the atomic-interop built-ins on one L2 chain. These contracts are predeployed into the
+ * ZKsync OS genesis (see `src/core/predeploys.ts`) and the {L2InteropCommitmentTree}'s IMT is seeded
+ * by the harness's relayed v31 genesis upgrade (`_initializeV31Contracts` -> `tree.initialize()`), so
+ * no install/seed step is needed here — we just bind contract objects to their canonical addresses.
+ */
+type AtomicStack = {
+  chainId: number;
+  provider: ethers.providers.JsonRpcProvider;
+  /** {L2InteropCommitmentTree} at the canonical 0x10012. */
+  tree: Contract;
+  /** {AtomicFlowManager} at the canonical 0x10014. */
+  manager: Contract;
+  /** {InteropCenter} at the canonical 0x1000d (the atomic SEND entry point). */
+  interopCenter: Contract;
+  /** {InteropHandler} at the canonical 0x1000e (the atomic RECEIVE entry point). */
+  interopHandler: Contract;
+};
+
+/** Bind the predeployed, genesis-seeded atomic-interop built-ins to their canonical addresses. */
+function atomicStack(chainId: number, provider: ethers.providers.JsonRpcProvider, wallet: Wallet): AtomicStack {
+  return {
+    chainId,
+    provider,
+    tree: new Contract(L2_INTEROP_COMMITMENT_TREE_ADDR, getAbi("L2InteropCommitmentTree"), wallet),
+    manager: new Contract(L2_ATOMIC_FLOW_MANAGER_ADDR, getAbi("AtomicFlowManager"), wallet),
+    interopCenter: new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet),
+    interopHandler: new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet),
+  };
 }
 
 type ChainCtx = {
@@ -193,7 +226,9 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
         const tokenAddress = state.testTokens![chainId];
         if (!tokenAddress) throw new Error(`No test token registered for chain ${chainId}`);
         const testToken = new Contract(tokenAddress, getAbi("TestnetERC20Token"), user);
-        const stack = await deployAtomicStack({ chainId, provider });
+        // Atomic-interop built-ins are predeployed in genesis and the tree is genesis-seeded
+        // (leafCount=1), so just bind handles to their canonical addresses — no install/initialize.
+        const stack = atomicStack(chainId, provider, user);
         return { chainId, rpcUrl, provider, user, testToken, stack };
       })
     );
