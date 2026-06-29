@@ -8,7 +8,6 @@ import {AssetRouterBase} from "./AssetRouterBase.sol";
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 
 import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
-import {NativeTokenVaultBase} from "../ntv/NativeTokenVaultBase.sol";
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL2Bridgehub} from "../../core/bridgehub/IL2Bridgehub.sol";
@@ -578,30 +577,5 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         }
 
         return IBridgedStandardToken(_l2Token).originToken();
-    }
-
-    /// @notice Legacy function used for backward compatibility to return L2 wrapped token
-    /// @notice address corresponding to provided L1 token address and deployed through NTV.
-    /// @dev However, the shared bridge can use custom asset handlers such that L2 addresses differ,
-    /// @dev or an L1 token may not have an L2 counterpart.
-    /// @param _l1Token The address of token on L1.
-    /// @return Address of an L2 token counterpart
-    function l2TokenAddress(address _l1Token) public view returns (address) {
-        IL2NativeTokenVault l2NativeTokenVault = IL2NativeTokenVault(_nativeTokenVaultAddr());
-        address currentlyDeployedAddress = l2NativeTokenVault.l2TokenAddress(_l1Token);
-
-        if (currentlyDeployedAddress != address(0)) {
-            return currentlyDeployedAddress;
-        }
-
-        // For backwards compatibility, the bridge must return the address of the token even if it
-        // has not been deployed yet.
-        return NativeTokenVaultBase(address(l2NativeTokenVault)).calculateCreate2TokenAddress(L1_CHAIN_ID, _l1Token);
-    }
-
-    /// @notice Returns the address of the L1 asset router.
-    /// @dev The old name is kept for backward compatibility.
-    function l1Bridge() external view returns (address) {
-        return address(L1_ASSET_ROUTER);
     }
 }
