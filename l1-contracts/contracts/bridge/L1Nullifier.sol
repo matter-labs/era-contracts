@@ -111,12 +111,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         _;
     }
 
-    /// @notice Checks that the message sender is the native token vault.
-    modifier onlyL1NTV() {
-        require(msg.sender == address(l1NativeTokenVault), Unauthorized(msg.sender));
-        _;
-    }
-
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
@@ -146,14 +140,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         if (eraPostDiamondUpgradeFirstBatch == 0) {
             eraPostDiamondUpgradeFirstBatch = _eraPostDiamondUpgradeFirstBatch;
         }
-    }
-
-    /// @notice Clears chain balance for specific token.
-    /// @dev This function is part of the upgrade process used to nullify chain balances once they are credited to NTV.
-    /// @param _chainId The ID of the ZK chain.
-    /// @param _token The address of the token which was previously deposit to shared bridge.
-    function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external onlyL1NTV {
-        __DEPRECATED_chainBalance[_chainId][_token] = 0;
     }
 
     /// @notice Sets the nativeTokenVault contract address.

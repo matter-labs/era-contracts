@@ -65,7 +65,6 @@ interface IL1Nullifier {
 
     function l2BridgeAddress(uint256 _chainId) external view returns (address);
 
-    function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external;
 
     /// @notice Confirms the result of a deposit, whether it was successful or not.
     /// @dev This function is used to confirm the migration of a chain to Gateway.
