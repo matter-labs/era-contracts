@@ -918,11 +918,6 @@
   },
   {
     "type": "error",
-    "name": "ClaimFailedDepositFailed",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "DeployingBridgedTokenForNativeToken",
     "inputs": []
   },

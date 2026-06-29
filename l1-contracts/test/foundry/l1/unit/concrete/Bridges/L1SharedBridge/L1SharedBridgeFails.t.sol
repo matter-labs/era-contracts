@@ -50,12 +50,7 @@ import {
 import {InsufficientChainBalance} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
-import {
-    ClaimFailedDepositFailed,
-    EmptyToken,
-    NativeTokenVaultAlreadySet,
-    WrongCounterpart
-} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {EmptyToken, NativeTokenVaultAlreadySet, WrongCounterpart} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
@@ -301,7 +296,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         });
     }
 
-    function test_bridgeRecoverFailedTransfer_Eth_claimFailedDepositFailed() public {
+    function test_bridgeRecoverFailedTransfer_Eth_withdrawFailed() public {
         vm.deal(address(nativeTokenVault), 0);
         bytes memory transferData = abi.encode(amount, alice, ETH_TOKEN_ADDRESS);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
@@ -333,7 +328,9 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert(ClaimFailedDepositFailed.selector);
+        // The failed-deposit ETH refund now routes through the shared `_withdrawFunds`, which reverts
+        // `WithdrawFailed()` on a failed send.
+        vm.expectRevert(WithdrawFailed.selector);
         l1Nullifier.bridgeRecoverFailedTransfer({
             _chainId: chainId,
             _depositSender: alice,

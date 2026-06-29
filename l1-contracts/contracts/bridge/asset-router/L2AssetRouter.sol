@@ -348,26 +348,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         }
 
         // Decode finalizeDeposit(sourceChainId, assetId, bridgeMintData); the source chain id is unused.
+        // The bundle's mint data is forwarded verbatim: NTV.bridgeRecoverFailedTransfer refunds the data's
+        // `originalCaller` (the source depositor), so the receiver swap no longer happens here.
         // slither-disable-next-line unused-return
         (, bytes32 assetId, bytes memory mintData) = abi.decode(_callData[4:], (uint256, bytes32, bytes));
-        // The bundle's mint data targets the DESTINATION receiver (`remoteReceiver`), but a refund must
-        // return the burned asset to the source DEPOSITOR (`originalCaller`). NTV.bridgeRecoverFailedTransfer
-        // mints to the data's `remoteReceiver`, so we rewrite that field to the depositor.
-        // TODO(atomic-interop): push this "refund the sender" rule into NTV.bridgeRecoverFailedTransfer
-        // (which is atomic-only) so it mints to the data's `originalCaller` directly — then this function
-        // can forward `mintData` verbatim and drop the decode/re-encode. See discussion: thread an explicit
-        // receiver through _bridgeMint* so the recover branch can target originalCaller.
-        // slither-disable-next-line unused-return
-        (address depositor, , address originToken, uint256 amount, bytes memory erc20Metadata) = DataEncoding
-            .decodeBridgeMintData(mintData);
-        bytes memory recoverData = DataEncoding.encodeBridgeMintData({
-            _originalCaller: depositor,
-            _remoteReceiver: depositor,
-            _originToken: originToken,
-            _amount: amount,
-            _erc20Metadata: erc20Metadata
-        });
-        IL2NativeTokenVault(_nativeTokenVaultAddr()).bridgeRecoverFailedTransfer(_destChainId, assetId, recoverData);
+        IL2NativeTokenVault(_nativeTokenVaultAddr()).bridgeRecoverFailedTransfer(_destChainId, assetId, mintData);
         return true;
     }
 

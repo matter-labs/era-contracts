@@ -213,29 +213,31 @@ abstract contract NativeTokenVaultBase is
     }
 
     /// @inheritdoc INativeTokenVaultBase
-    /// @dev Reuses the `bridgeMint` branches (unlock for an origin-native asset, re-mint for a bridged
-    /// one), so it reverses the `bridgeBurn` that locked/burned the funds at `commitSend`. `_chainId`
-    /// must be the destination chain used at burn time so `_handleBridgeFromChain` undoes the matching
-    /// `_handleBridgeToChain`.
-    /// TODO(atomic-interop): this mints to the data's `remoteReceiver`, so the only caller
-    /// (L2AssetRouter.recoverAtomicCall, atomic-flow-only) has to rewrite that field to the depositor
-    /// first. Since recovery must always refund the SENDER, mint to the data's `originalCaller` here
-    /// instead (thread an explicit receiver through `_bridgeMint*` so normal mints still target
-    /// `remoteReceiver`), letting the caller forward the bundle's mint data verbatim.
+    /// @dev Refunds the original depositor (the burn data's `originalCaller`) by unlocking an
+    /// origin-native asset or re-minting a bridged one, reversing the `bridgeBurn` that locked/burned the
+    /// funds at `commitSend`. The bundle's mint data is forwarded verbatim, so the refund always targets
+    /// the depositor regardless of the data's `remoteReceiver`. `_chainId` must be the destination chain
+    /// used at burn time so `_handleBridgeFromChain` undoes the matching `_handleBridgeToChain`.
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _data
     ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused {
-        address receiver;
-        uint256 amount;
-        if (originChainId[_assetId] == block.chainid) {
-            (receiver, amount) = _bridgeMintNativeToken(_chainId, _assetId, _data);
-        } else {
-            (receiver, amount) = _bridgeMintBridgedToken(_chainId, _assetId, _data);
-        }
+        // slither-disable-next-line unused-return
+        (address originalCaller, , address originToken, uint256 amount, bytes memory erc20Data) = DataEncoding
+            .decodeBridgeMintData(_data);
+        bool isNative = originChainId[_assetId] == block.chainid;
+        _disburseFailedTransfer({
+            _chainId: _chainId,
+            _assetId: _assetId,
+            _receiver: originalCaller,
+            _amount: amount,
+            _isNative: isNative,
+            _originToken: originToken,
+            _erc20Data: erc20Data
+        });
         // solhint-disable-next-line func-named-parameters
-        emit BridgeRecoverFailedTransfer(_chainId, _assetId, receiver, amount);
+        emit BridgeRecoverFailedTransfer(_chainId, _assetId, originalCaller, amount);
     }
 
     function _bridgeMintBridgedToken(
@@ -278,6 +280,43 @@ abstract contract NativeTokenVaultBase is
     }
 
     function _withdrawFunds(bytes32 _assetId, address _to, address _token, uint256 _amount) internal virtual;
+
+    /// @notice Disburses a failed/recovered transfer's funds to `_receiver`, reversing the source-side
+    /// `bridgeBurn` that locked/burned them.
+    /// @dev Shared by `bridgeRecoverFailedTransfer` (atomic-interop recovery) and the L1
+    /// `bridgeConfirmTransferResult` (failed-deposit claim). The chain balance is decreased before any
+    /// funds are released, mirroring the `_bridgeMint*` ordering, so a malicious token/ETH recipient cannot
+    /// overwrite the transient values from L1Nullifier.
+    /// @param _chainId The chain the funds are being recovered from (the burn-time destination chain).
+    /// @param _assetId The assetId of the asset being recovered.
+    /// @param _receiver The address that receives the recovered funds (always the original depositor).
+    /// @param _amount The amount to recover.
+    /// @param _isNative Whether `_assetId` is native to this chain (unlock) or bridged (re-mint).
+    /// @param _originToken The origin token address, used to deploy the bridged token if it is not yet known.
+    /// @param _erc20Data The ERC20 metadata, used to deploy the bridged token if it is not yet known.
+    function _disburseFailedTransfer(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _receiver,
+        uint256 _amount,
+        bool _isNative,
+        address _originToken,
+        bytes memory _erc20Data
+    ) internal {
+        // IMPORTANT: We must handle chain balance decrease before giving out funds to the user,
+        // because otherwise the latter operation (via a malicious token or ETH recipient)
+        // could've overwritten the transient values from L1Nullifier.
+        _handleBridgeFromChain({_chainId: _chainId, _assetId: _assetId, _amount: _amount});
+        if (_isNative) {
+            _withdrawFunds(_assetId, _receiver, tokenAddress[_assetId], _amount);
+        } else {
+            address token = tokenAddress[_assetId];
+            if (token == address(0)) {
+                token = _ensureAndSaveTokenDeployed(_assetId, _originToken, _erc20Data);
+            }
+            IBridgedStandardToken(token).bridgeMint(_receiver, _amount);
+        }
+    }
 
     /*//////////////////////////////////////////////////////////////
                             Start transaction Functions

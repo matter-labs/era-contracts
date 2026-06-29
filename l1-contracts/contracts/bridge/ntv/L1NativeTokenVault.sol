@@ -14,7 +14,6 @@ import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
-import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 import {IL1AssetTracker} from "../asset-tracker/IL1AssetTracker.sol";
 import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
@@ -34,7 +33,7 @@ import {
     WithdrawFailed,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
-import {ClaimFailedDepositFailed, OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
+import {OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -244,33 +243,28 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         require(_txStatus == TxStatus.Failure, OnlyFailureStatusAllowed());
         // slither-disable-next-line unused-return
         (uint256 _amount, , ) = DataEncoding.decodeBridgeBurnData(_data);
-        address l1Token = tokenAddress[_assetId];
         require(_amount != 0, NoFundsTransferred());
 
-        // IMPORTANT: We must handle chain balance decrease before giving out funds to the user,
-        // because otherwise the latter operation (via a malicious token or ETH recipient)
-        // could've overwritten the transient values from L1Nullifier.
-        _handleBridgeFromChain({_chainId: _chainId, _assetId: _assetId, _amount: _amount});
-
-        if (l1Token == ETH_TOKEN_ADDRESS) {
-            bool callSuccess;
-            // Low-level assembly call, to avoid any memory copying (save gas)
-            assembly {
-                callSuccess := call(gas(), _depositSender, _amount, 0, 0, 0, 0)
-            }
-            require(callSuccess, ClaimFailedDepositFailed());
-        } else {
-            uint256 originChainId = _getOriginChainId(_assetId);
-            if (originChainId == block.chainid) {
-                IERC20(l1Token).safeTransfer(_depositSender, _amount);
-            } else if (originChainId != 0) {
-                IBridgedStandardToken(l1Token).bridgeMint(_depositSender, _amount);
-            } else {
-                revert OriginChainIdNotFound();
-            }
-            // Note we don't allow weth deposits anymore, but there might be legacy weth deposits.
-            // until we add Weth bridging capabilities, we don't wrap/unwrap weth to ether.
+        uint256 originChain = _getOriginChainId(_assetId);
+        if (originChain == 0) {
+            revert OriginChainIdNotFound();
         }
+        // For a native asset (ETH or native ERC20) `_disburseFailedTransfer` unlocks via `_withdrawFunds`
+        // (assembly ETH send for the base token, `safeTransfer` otherwise); for a bridged asset it re-mints
+        // to `_depositSender`. The token is always already known here, so the deploy branch is never taken
+        // and the `_originToken`/`_erc20Data` arguments are unused.
+        // Note we don't allow weth deposits anymore, but there might be legacy weth deposits.
+        // until we add Weth bridging capabilities, we don't wrap/unwrap weth to ether.
+        bool isNative = originChain == block.chainid;
+        _disburseFailedTransfer({
+            _chainId: _chainId,
+            _assetId: _assetId,
+            _receiver: _depositSender,
+            _amount: _amount,
+            _isNative: isNative,
+            _originToken: address(0),
+            _erc20Data: ""
+        });
     }
 
     /*//////////////////////////////////////////////////////////////
