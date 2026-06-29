@@ -1,0 +1,184 @@
+name: Update Generated Artifacts
+
+# Regenerates committed generated artifacts for a PR branch:
+#   1. contract hashes (AllContractsHashes.json)
+#   2. anvil-interop chain states (l1-contracts/test/anvil-interop/chain-states/)
+#
+# This workflow must live on the default branch (main) so it can be triggered
+# from the Actions UI / `gh workflow run`. The 'state-generation-check' job in
+# anvil-interop-ci.yaml stays disabled until this is on main, then points users
+# here to refresh states when the determinism check fails.
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Pull Request number to update"
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  # Step 1: rebuild contract bytecode hashes and commit AllContractsHashes.json.
+  update-hashes:
+    name: Update contract hashes
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # we need full history to fetch PR branch
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Get PR branch info
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: parseInt(context.payload.inputs.pr_number, 10),
+            });
+            core.setOutput("head_ref", pr.data.head.ref);
+            core.setOutput("head_repo", pr.data.head.repo.full_name);
+
+            if (pr.data.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              core.setFailed(`PR head repo is ${pr.data.head.repo.full_name}, expected ${context.repo.owner}/${context.repo.repo}`);
+            }
+
+      - name: Checkout PR branch
+        run: |
+          git fetch origin "${{ steps.pr.outputs.head_ref }}"
+          git checkout "${{ steps.pr.outputs.head_ref }}"
+          git submodule update --init --recursive
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build artifacts and recompute hashes
+        run: |
+          yarn --cwd da-contracts build:foundry
+          yarn --cwd l1-contracts build:foundry
+          yarn --cwd l2-contracts build:foundry
+          yarn --cwd system-contracts build:foundry
+          yarn calculate-hashes:fix
+
+      - name: Commit and push updated hashes
+        run: |
+          set -euo pipefail
+          git config user.name "zksync[bot]"
+          git config user.email "zksync[bot]@users.noreply.github.com"
+
+          git add AllContractsHashes.json
+          git diff --cached --quiet && { echo "No hash changes to commit"; exit 0; }
+          git commit -m "chore: update contract hashes from CI"
+          git push origin HEAD
+
+  # Step 2: regenerate anvil-interop chain states and commit them.
+  # Runs after update-hashes so both commits land sequentially on the same branch
+  # (avoids a non-fast-forward push race). Uses plain foundry (no foundry-zksync)
+  # with the anvil-interop profile for deterministic bytecode.
+  regenerate-chain-states:
+    name: Regenerate chain states
+    needs: [update-hashes]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Get PR branch info
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: parseInt(context.payload.inputs.pr_number, 10),
+            });
+            core.setOutput("head_ref", pr.data.head.ref);
+            core.setOutput("head_repo", pr.data.head.repo.full_name);
+
+            if (pr.data.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              core.setFailed(`PR head repo is ${pr.data.head.repo.full_name}, expected ${context.repo.owner}/${context.repo.repo}`);
+            }
+
+      - name: Checkout PR branch
+        run: |
+          git fetch origin "${{ steps.pr.outputs.head_ref }}"
+          git checkout "${{ steps.pr.outputs.head_ref }}"
+          git submodule update --init --recursive
+
+      - name: Install Foundry (no foundry-zksync — deterministic bytecode)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build da-contracts artifacts (no CBOR metadata for determinism)
+        run: FOUNDRY_PROFILE=anvil-interop yarn da build:foundry
+
+      - name: Build l1-contracts artifacts (no CBOR metadata for determinism)
+        working-directory: l1-contracts
+        run: FOUNDRY_PROFILE=anvil-interop forge build
+
+      - name: Install anvil-interop dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install
+
+      - name: Generate chain state
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          echo "Generating chain state from scratch..."
+          npx ts-node setup-and-dump-state.ts
+
+      - name: Cleanup Anvil
+        if: always()
+        run: |
+          pkill -9 anvil 2>/dev/null || true
+
+      - name: Commit and push updated chain states
+        run: |
+          set -euo pipefail
+          git config user.name "zksync[bot]"
+          git config user.email "zksync[bot]@users.noreply.github.com"
+
+          git add l1-contracts/test/anvil-interop/chain-states/
+          git diff --cached --quiet && { echo "No chain state changes to commit"; exit 0; }
+          git commit -m "chore: regenerate anvil-interop chain states
+
+          Auto-generated by CI with foundry v1.5.1 and FOUNDRY_PROFILE=anvil-interop."
+          git push origin HEAD
