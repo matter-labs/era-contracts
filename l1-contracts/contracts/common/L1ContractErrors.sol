@@ -222,6 +222,22 @@ error InvalidThreshold(uint256 max, uint256 got);
 error InvalidTxCountInPriorityMode(uint256 l2TxCount, uint256 l1TxCount);
 // 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
+// 0xf11438d9
+error IMTAlreadyInitialized();
+// 0x037dc2ed
+error IMTLowLeafIndexOutOfBounds(uint256 lowLeafIndex, uint256 leafCount);
+// 0xd87e0e66
+error IMTLowLeafNextTooSmall(uint256 lowNextValue, uint256 newValue);
+// 0x74470b8f
+error IMTLowLeafValueTooLarge(uint256 lowValue, uint256 newValue);
+// 0x62f8ffe2
+error IMTLeafValueMismatch(uint256 expectedValue, uint256 actualValue);
+// 0xae48798a
+error IMTNotInitialized();
+// 0x68051076
+error IMTValueAlreadyExists(uint256 value);
+// 0xbd1de53d
+error IMTValueZero();
 // 0xfb5c22e6
 error L2TimestampTooBig();
 // 0x97e1359e
