@@ -681,26 +681,6 @@
   },
   {
     "type": "error",
-    "name": "InteropWithdrawalNotSingleCall",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InteropWithdrawalWrongDestination",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InteropWithdrawalWrongOrigin",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InteropWithdrawalWrongTarget",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "InvalidProof",
     "inputs": []
   },
@@ -712,6 +692,17 @@
         "name": "func",
         "type": "bytes4",
         "internalType": "bytes4"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "L2WithdrawalMessageWrongLength",
+    "inputs": [
+      {
+        "name": "messageLen",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },

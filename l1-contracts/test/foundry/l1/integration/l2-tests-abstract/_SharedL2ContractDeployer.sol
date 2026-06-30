@@ -307,8 +307,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         uint8 decimals
     ) internal pure returns (bytes memory) {
         // Use the current (versioned) token-data encoding; the legacy unversioned format is no longer supported.
-        return
-            DataEncoding.encodeTokenData(L1_CHAIN_ID, abi.encode(name), abi.encode(symbol), abi.encode(decimals));
+        return DataEncoding.encodeTokenData(L1_CHAIN_ID, abi.encode(name), abi.encode(symbol), abi.encode(decimals));
     }
 
     function deployL2Weth() internal returns (L2WrappedBaseToken) {

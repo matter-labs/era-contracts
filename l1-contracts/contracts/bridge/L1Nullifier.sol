@@ -20,10 +20,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {IMailboxLegacy} from "../state-transition/chain-interfaces/IMailboxLegacy.sol";
-import {
-    L2_ASSET_ROUTER_ADDR,
-    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
-} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {
     AddressAlreadySet,
     DepositDoesNotExist,
