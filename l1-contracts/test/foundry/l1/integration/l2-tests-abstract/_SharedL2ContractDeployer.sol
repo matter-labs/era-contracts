@@ -123,7 +123,11 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         }
         standardErc20Impl = new BridgedStandardERC20();
         beacon = new UpgradeableBeacon(address(standardErc20Impl));
-        // beacon.transferOwnership(ownerWallet);
+        // Transfer beacon ownership to the governor so that bridged-token reinitialization
+        // (BridgedStandardERC20.reinitializeToken, gated on the beacon owner) can be exercised.
+        // In the L1-context tests the bridged token uses a separate L1-deployed beacon owned by
+        // the governor, so this only affects the L2-context (which uses this test beacon).
+        beacon.transferOwnership(ownerWallet);
 
         // One of the purposes of deploying it here is to publish its bytecode
         BeaconProxy beaconProxy = new BeaconProxy(address(beacon), new bytes(0));
