@@ -259,13 +259,13 @@ desc = "PUH stage 0: PUH ProxyAdmin.upgradeAndCall(PUH proxy 0x8f086275…, newI
 [[entries]]
 target = "chain_registration_sender"  # ChainRegistrationSender
 selector = "0x79ba5097"  # acceptOwnership
-desc = "PUH stage 1: ChainRegistrationSender.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns ChainRegistrationSender."
+desc = "PUH stage 0: ChainRegistrationSender.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns ChainRegistrationSender."
 
 # L1AssetTracker.acceptOwnership — PUH accepts ownership of L1AT that the deployer created+transferred in phase 2.
 [[entries]]
 target = "l1_asset_tracker"  # L1AssetTracker
 selector = "0x79ba5097"  # acceptOwnership
-desc = "PUH stage 1: L1AssetTracker.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns L1AT."
+desc = "PUH stage 0: L1AssetTracker.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns L1AT."
 
 [[entries]]
 target = "ntv"  # NTV
@@ -668,7 +668,7 @@ desc = "Testnet PUH stage 1: NTV.setAssetTracker(L1AssetTracker 0x150d2f16…) �
 [[entries]]
 target = "tn_bridgehub"
 selector = "0xa17223b0"  # setAddressesV31(address)
-desc = "Testnet PUH stage 1: Bridgehub.setAddressesV31(ChainRegistrationSender 0xded97b2E…) — wires Bridgehub to the v31 ChainRegistrationSender."
+desc = "Testnet PUH stage 1: Bridgehub.setAddressesV31(ChainRegistrationSender 0xdFf4C579…) — wires Bridgehub to the v31 ChainRegistrationSender."
 
 [[entries]]
 target = "tn_chain_asset_handler"

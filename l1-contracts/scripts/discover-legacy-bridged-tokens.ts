@@ -21,14 +21,17 @@
  * Usage:
  *
  *   discover --env <name> --rpc <url> [--from-block <n>] [--to-block <n>]
- *            [--block-step <n>] [--out <path>]
+ *            [--block-step <n>] [--out <path>] [--resume]
  *
  *     Reads `core_contracts.bridgehub_proxy_addr` from
  *     `upgrade-envs/permanent-values/<env>.toml`, resolves AssetRouter,
  *     NativeTokenVault and L1ERC20Bridge on-chain, scans logs over the
  *     supplied (or full-history) block range, and writes the deduped,
  *     EIP-55-checksummed token list to `--out` (default
- *     `upgrade-envs/v0.31.0-interopB/<env>-bridged-tokens.toml`).
+ *     `upgrade-envs/v0.31.0-interopB/<env>-bridged-tokens.toml`). With
+ *     `--resume`, reads the existing output TOML, starts from the previous
+ *     `Block range` end + 1 unless `--from-block` is passed, and writes the
+ *     union of old and newly discovered tokens.
  *
  * Output schema mirrors what `TokenMigrationUtils._readConfiguredBridgedTokens`
  * expects (`[tokens] bridged_tokens = ["0x..", …]`), so the same file feeds
@@ -108,6 +111,13 @@ interface DiscoveryResult {
   };
 }
 
+interface ExistingDiscoveryState {
+  tokens: string[];
+  fromBlock: number;
+  toBlock: number;
+  counts: DiscoveryResult["counts"];
+}
+
 // ─── Resolution ───────────────────────────────────────────────────────────
 
 async function resolveAddresses(provider: ethers.providers.Provider, bridgehub: string): Promise<ResolvedAddresses> {
@@ -169,6 +179,7 @@ async function getLogsPaginated({
   let step = blockStep;
   while (cursor <= toBlock) {
     const end = Math.min(cursor + step - 1, toBlock);
+    console.log(`  querying blocks [${cursor}, ${end}] (step=${step})...`);
     try {
       const logs = await provider.getLogs({
         address,
@@ -177,6 +188,7 @@ async function getLogsPaginated({
         toBlock: end,
       });
       out.push(...logs);
+      console.log(`  blocks [${cursor}, ${end}] returned ${logs.length} log(s)`);
       cursor = end + 1;
       // Gently grow the window back after a successful chunk so we don't
       // stay stuck at a tiny step after a single transient failure.
@@ -190,6 +202,11 @@ async function getLogsPaginated({
         );
       }
       step = Math.max(1, Math.floor(step / 2));
+      console.log(
+        `  blocks [${cursor}, ${end}] failed; retrying from ${cursor} with step=${step}. Error: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
       // Don't advance cursor — retry the same starting block at the
       // smaller window size.
     }
@@ -348,6 +365,79 @@ async function discover({
 
 // ─── Output ──────────────────────────────────────────────────────────────
 
+function zeroCounts(): DiscoveryResult["counts"] {
+  return {
+    legacyDepositInitiated: 0,
+    bridgehubDepositInitiated: 0,
+    erc20BridgeDepositInitiated: 0,
+    assetIdsResolved: 0,
+    assetIdsSkippedNonL1Native: 0,
+  };
+}
+
+function parseExistingTomlOutput(filePath: string): ExistingDiscoveryState | null {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+
+  const body = fs.readFileSync(filePath, "utf8");
+  const range = body.match(/^# Block range:\s+\[(\d+),\s*(\d+)\]$/m);
+  if (!range) {
+    throw new Error(`Cannot resume: existing file ${filePath} has no '# Block range: [from, to]' header`);
+  }
+
+  const tokenList = body.match(/bridged_tokens\s*=\s*\[([\s\S]*?)\]/);
+  if (!tokenList) {
+    throw new Error(`Cannot resume: existing file ${filePath} has no bridged_tokens array`);
+  }
+  const tokens = Array.from(tokenList[1].matchAll(/"((?:0x)?[0-9a-fA-F]{40})"/g), (match) =>
+    ethers.utils.getAddress(match[1])
+  );
+
+  const counts = zeroCounts();
+  const legacy = body.match(/^#   AssetRouter\.LegacyDepositInitiated:\s+(\d+)$/m);
+  const bridgehub = body.match(
+    /^#   AssetRouter\.BridgehubDepositInitiated:\s+(\d+) logs => (\d+) L1-native \((\d+) non-L1-native skipped\)$/m
+  );
+  const erc20 = body.match(/^#   L1ERC20Bridge\.DepositInitiated:\s+(\d+)$/m);
+
+  if (legacy) counts.legacyDepositInitiated = parseInt(legacy[1], 10);
+  if (bridgehub) {
+    counts.bridgehubDepositInitiated = parseInt(bridgehub[1], 10);
+    counts.assetIdsResolved = parseInt(bridgehub[2], 10);
+    counts.assetIdsSkippedNonL1Native = parseInt(bridgehub[3], 10);
+  }
+  if (erc20) counts.erc20BridgeDepositInitiated = parseInt(erc20[1], 10);
+
+  return {
+    tokens,
+    fromBlock: parseInt(range[1], 10),
+    toBlock: parseInt(range[2], 10),
+    counts,
+  };
+}
+
+function mergeDiscoveryResult(existing: ExistingDiscoveryState, next: DiscoveryResult): DiscoveryResult {
+  const tokens = new Set<string>();
+  for (const token of existing.tokens) tokens.add(ethers.utils.getAddress(token));
+  for (const token of next.tokens) tokens.add(ethers.utils.getAddress(token));
+  tokens.delete(ethers.utils.getAddress(ETH_TOKEN_ADDRESS));
+
+  return {
+    tokens: Array.from(tokens).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())),
+    fromBlock: Math.min(existing.fromBlock, next.fromBlock),
+    toBlock: Math.max(existing.toBlock, next.toBlock),
+    counts: {
+      legacyDepositInitiated: existing.counts.legacyDepositInitiated + next.counts.legacyDepositInitiated,
+      bridgehubDepositInitiated: existing.counts.bridgehubDepositInitiated + next.counts.bridgehubDepositInitiated,
+      erc20BridgeDepositInitiated:
+        existing.counts.erc20BridgeDepositInitiated + next.counts.erc20BridgeDepositInitiated,
+      assetIdsResolved: existing.counts.assetIdsResolved + next.counts.assetIdsResolved,
+      assetIdsSkippedNonL1Native: existing.counts.assetIdsSkippedNonL1Native + next.counts.assetIdsSkippedNonL1Native,
+    },
+  };
+}
+
 function writeTomlOutput(filePath: string, env: string, result: DiscoveryResult, resolved: ResolvedAddresses): void {
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -404,6 +494,10 @@ async function main(): Promise<void> {
       DEFAULT_BLOCK_STEP
     )
     .option("--out <path>", "Output TOML path (default: upgrade-envs/v0.31.0-interopB/<env>-bridged-tokens.toml)")
+    .option(
+      "--resume",
+      "Merge into the existing output TOML and default --from-block to its previous Block range end + 1"
+    )
     .action(
       async (opts: {
         env: string;
@@ -412,19 +506,31 @@ async function main(): Promise<void> {
         toBlock?: number;
         blockStep: number;
         out?: string;
+        resume?: boolean;
       }) => {
         const bridgehub = getBridgehubAddress(opts.env);
         const outPath = opts.out ?? defaultOutPath(opts.env);
+        const existing = opts.resume ? parseExistingTomlOutput(outPath) : null;
+        const fromBlock = opts.fromBlock ?? (existing ? existing.toBlock + 1 : null);
+
+        if (opts.resume && existing) {
+          console.log(`Resuming from ${outPath}`);
+          console.log(`  Previous block range: [${existing.fromBlock}, ${existing.toBlock}]`);
+          console.log(`  Existing tokens:      ${existing.tokens.length}`);
+          console.log(`  Next from block:      ${fromBlock}`);
+        } else if (opts.resume) {
+          console.log(`--resume requested, but ${outPath} does not exist yet; starting a fresh discovery.`);
+        }
 
         const { result, resolved } = await discover({
           rpcUrl: opts.rpc,
           bridgehub,
-          fromBlockArg: opts.fromBlock ?? null,
+          fromBlockArg: fromBlock,
           toBlockArg: opts.toBlock ?? null,
           blockStep: opts.blockStep,
         });
 
-        writeTomlOutput(outPath, opts.env, result, resolved);
+        writeTomlOutput(outPath, opts.env, existing ? mergeDiscoveryResult(existing, result) : result, resolved);
       }
     );
 
