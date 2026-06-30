@@ -117,27 +117,16 @@ library InteropLibrary {
             });
     }
 
-    /// @notice Bundle-level attributes.
-    function buildBundleAttributes(
-        address unbundlerAddress,
-        bool useFixedFee
-    ) internal pure returns (bytes[] memory attrs) {
-        attrs = new bytes[](2);
-        attrs[0] = abi.encodeCall(
-            IERC7786Attributes.unbundlerAddress,
-            (InteroperableAddress.formatEvmV1(unbundlerAddress))
-        );
-        attrs[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (useFixedFee));
-    }
-
-    /// @notice Build bundle attributes with execution address, unbundler address, fee type, and an optional salt.
+    /// @notice Build bundle attributes with execution address, unbundler address, fee type, and a salt.
     /// @param executionAddress     Optional executor (EOA/contract) on destination chain
     /// @param unbundlerAddress     Unbundler address on destination chain
     /// @param useFixedFee          Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
-    /// @param salt                 User-provided salt mixed into the bundle's `interopBundleSalt`. When `bytes32(0)`
-    ///                             the attribute is omitted (InteropCenter defaults it to `bytes32(0)`); a sender that
-    ///                             sends several otherwise-identical bundles must pass distinct salts so that each
-    ///                             produces a unique bundle hash (enforced by InteropCenter).
+    /// @param salt                 User-provided salt mixed into the bundle's `interopBundleSalt`. Must be supplied
+    ///                             explicitly (pass `bytes32(0)` for the default); when `bytes32(0)` the attribute is
+    ///                             omitted (InteropCenter defaults it to `bytes32(0)`). A sender that sends several
+    ///                             otherwise-identical bundles must pass distinct salts so that each produces a unique
+    ///                             bundle hash (enforced by InteropCenter). There is intentionally no salt-less overload
+    ///                             so that callers cannot create a bundle without consciously choosing a salt.
     function buildBundleAttributes(
         address executionAddress,
         address unbundlerAddress,
@@ -167,15 +156,6 @@ library InteropLibrary {
             attributes[attributesPointer++] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (salt));
         }
         return attributes;
-    }
-
-    /// @notice Convenience overload of {buildBundleAttributes} that uses the default salt (`bytes32(0)`).
-    function buildBundleAttributes(
-        address executionAddress,
-        address unbundlerAddress,
-        bool useFixedFee
-    ) internal pure returns (bytes[] memory) {
-        return buildBundleAttributes(executionAddress, unbundlerAddress, useFixedFee, bytes32(0));
     }
 
     /// @notice Appends an `interopBundleSalt` attribute to an existing bundle attributes array.

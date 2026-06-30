@@ -169,7 +169,8 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(
             address(0),
             UNBUNDLER_ADDRESS,
-            false // useFixedFee = false means base token fees
+            false, // useFixedFee = false means base token fees
+            bytes32(0)
         );
 
         InteropCallStarter[] memory calls = _buildSimpleCall();
@@ -219,7 +220,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
             });
         }
 
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false);
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false, bytes32(0));
 
         // Total fee should be protocolFee * 3
         uint256 totalFee = protocolFee * 3;
@@ -252,7 +253,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         vm.coinbase(coinbaseAddr);
         uint256 coinbaseBalanceBefore = coinbaseAddr.balance;
 
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false);
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false, bytes32(0));
 
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
@@ -281,7 +282,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         address coinbaseAddr = makeAddr("coinbase");
         vm.coinbase(coinbaseAddr);
 
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false);
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false, bytes32(0));
 
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
@@ -333,7 +334,8 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(
             address(0),
             UNBUNDLER_ADDRESS,
-            true // useFixedFee = true means ZK token fees
+            true, // useFixedFee = true means ZK token fees
+            bytes32(0)
         );
 
         InteropCallStarter[] memory calls = _buildSimpleCall();
@@ -391,7 +393,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
             });
         }
 
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, true);
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, true, bytes32(0));
 
         vm.prank(sender);
         l2InteropCenter.sendBundle{value: 0}(
@@ -434,7 +436,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         address coinbaseAddr = makeAddr("coinbase");
         vm.coinbase(coinbaseAddr);
 
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, true);
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, true, bytes32(0));
 
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
@@ -485,7 +487,8 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(
             address(0),
             UNBUNDLER_ADDRESS,
-            true // useFixedFee = true
+            true, // useFixedFee = true
+            bytes32(0)
         );
 
         InteropCallStarter[] memory calls = _buildSimpleCall();
@@ -519,7 +522,8 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(
             address(0),
             UNBUNDLER_ADDRESS,
-            true // useFixedFee = true requires ZK token
+            true, // useFixedFee = true requires ZK token
+            bytes32(0)
         );
 
         InteropCallStarter[] memory calls = _buildSimpleCall();
@@ -553,7 +557,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         // Check initial accumulated fees
         assertEq(l2InteropCenter.accumulatedProtocolFees(address(revertingCoinbase)), 0);
 
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false);
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false, bytes32(0));
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
         // Expect accumulation event instead of collection event
@@ -591,7 +595,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         address sender = makeAddr("feeSender");
         vm.deal(sender, 10 ether);
 
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false);
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false, bytes32(0));
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
         vm.prank(sender);
@@ -665,7 +669,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         // Check initial accumulated fees
         assertEq(l2InteropCenter.accumulatedZKFees(coinbaseAddr), 0);
 
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, true);
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, true, bytes32(0));
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
         // Expect accumulation event
@@ -717,7 +721,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         vm.prank(sender);
         zkToken.approve(L2_INTEROP_CENTER_ADDR, type(uint256).max);
 
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, true);
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, true, bytes32(0));
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
         vm.prank(sender);
@@ -859,7 +863,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         address sender = makeAddr("feeSender");
         vm.deal(sender, 10 ether);
 
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false);
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false, bytes32(0));
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
         vm.prank(sender);
@@ -891,7 +895,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         address sender = makeAddr("feeSender");
         vm.deal(sender, 10 ether);
 
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false);
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false, bytes32(0));
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
         vm.prank(sender);
@@ -935,7 +939,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         vm.prank(sender);
         zkToken.approve(L2_INTEROP_CENTER_ADDR, type(uint256).max);
 
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, true);
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, true, bytes32(0));
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
         vm.prank(sender);
@@ -969,7 +973,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         address sender = makeAddr("feeSender");
         vm.deal(sender, 100 ether);
 
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false);
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false, bytes32(0));
 
         uint256 totalExpectedFees;
 
@@ -1066,7 +1070,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         vm.prank(sender);
         zkToken.approve(L2_INTEROP_CENTER_ADDR, type(uint256).max);
 
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, true);
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, true, bytes32(0));
 
         uint256 senderBalanceBefore = zkToken.balanceOf(sender);
 
@@ -1149,7 +1153,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         // as InteropCenter rejects re-sending a bundle with an already-used hash.
         for (uint256 i = 0; i < 3; i++) {
             bytes[] memory bundleAttributes = InteropLibrary.withInteropBundleSalt(
-                InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false),
+                InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false, bytes32(0)),
                 bytes32(i)
             );
             vm.prank(sender);
