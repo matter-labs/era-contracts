@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {
     GatewayToL1TokenBalanceMigrationData,
@@ -15,7 +14,7 @@ import {
     L2_CHAIN_ASSET_HANDLER_ADDR
 } from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
-import {InvalidChainId, InvalidProof, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {InvalidProof, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {
     IMessageRootBase,
     V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE
@@ -30,7 +29,6 @@ import {
     AmountToKeepOnL1NotUint256,
     AssetIdNotRegistered,
     AssetNotMigratedFromNTV,
-    ChainBalanceMustBeZeroBeforeMigration,
     InvalidAssetMigrationNumber,
     InvalidChainMigrationNumber,
     InvalidMigrationAmount,
@@ -39,7 +37,6 @@ import {
     InvalidSettlementLayer,
     InvalidVersion,
     InvalidWithdrawalChainId,
-    AssetAlreadyRegistered,
     NotMigratedChain,
     OnlyWhitelistedSettlementLayer,
     TransientBalanceChangeAlreadySet
@@ -116,77 +113,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         if (!isAssetRegistered[_assetId]) {
             revert AssetIdNotRegistered(_assetId);
         }
-    }
-
-    /// @notice This function is used to migrate the token balance from the NTV to the AssetTracker for V31 upgrade.
-    /// @dev The only way to register a legacy token.
-    /// @dev Note, that this function performs O(number of chains) calls to NTV. It relies on the fact
-    /// that the max number of chains is bound by 100, so this function should be always processable.
-    /// @dev We need to migrate the balance for every single chain first to ensure that the `preV31ChainBalance`
-    /// is set correctly for the origin chain.
-    /// @dev After all the pre-31 tokens are registered, this function can be deleted.
-    /// @param _assetId The asset id of the token to migrate the token balance for.
-    function registerLegacyToken(bytes32 _assetId) public {
-        uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
-        require(originChainId != 0, InvalidChainId());
-
-        // This function is only intended to be used for legacy tokens that have not yet been registered.
-        if (isAssetRegistered[_assetId]) {
-            revert AssetAlreadyRegistered(_assetId);
-        }
-
-        uint256[] memory allZKChainIds = BRIDGE_HUB.getAllZKChainChainIDs();
-        uint256 allZKChainIdsLength = allZKChainIds.length;
-
-        uint256 totalBridgedOut = 0;
-
-        for (uint256 i = 0; i < allZKChainIdsLength; ++i) {
-            uint256 chainId = allZKChainIds[i];
-            // This require should never be triggered in production, it is an invariant check
-            // chainBalance inside the L1AT should never be incremented until the token is registered.
-            if (chainBalance[chainId][_assetId] != 0) {
-                revert ChainBalanceMustBeZeroBeforeMigration(chainId, _assetId, chainBalance[chainId][_assetId]);
-            }
-
-            // Origin chain id will be handled later in this function.
-            if (chainId == originChainId) {
-                continue;
-            }
-
-            // Clean-slate genesis chains have no pre-v31 balances to migrate from the NTV.
-            uint256 migratedBalance = 0;
-
-            chainBalance[chainId][_assetId] = migratedBalance;
-            interopInfo[chainId][_assetId].preV31ChainBalance = migratedBalance;
-            totalBridgedOut += migratedBalance;
-        }
-        // Similar to the above, it is just an invariant check that should never be hit
-        if (chainBalance[block.chainid][_assetId] != 0) {
-            revert ChainBalanceMustBeZeroBeforeMigration(
-                block.chainid,
-                _assetId,
-                chainBalance[block.chainid][_assetId]
-            );
-        }
-
-        // The token is not native to L1, so we also have to account for the amount bridged to L1.
-        if (originChainId != block.chainid) {
-            address tokenAddress = NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
-            // Note, that here we have an implicit invariant that the token's total supply
-            // can never be changed before this migration happens. So until a token is registered, all withdrawals must fail.
-            // Note, that if a token is a bridged token native to L2, its representation on L1
-            // is deployed by NativeTokenVault as `BridgedStandardERC20`, so we can safely assume the returned value
-            // will be correct.
-            uint256 migratedBalance = IERC20(tokenAddress).totalSupply();
-            chainBalance[block.chainid][_assetId] = migratedBalance;
-            interopInfo[block.chainid][_assetId].preV31ChainBalance = migratedBalance;
-            totalBridgedOut += migratedBalance;
-        }
-
-        // Handling origin chain case.
-        chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - totalBridgedOut;
-        interopInfo[originChainId][_assetId].preV31ChainBalance = MAX_TOKEN_BALANCE - totalBridgedOut;
-        isAssetRegistered[_assetId] = true;
     }
 
     /// @inheritdoc AssetTrackerBase
