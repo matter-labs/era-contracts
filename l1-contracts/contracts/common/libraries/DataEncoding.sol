@@ -290,6 +290,7 @@ library DataEncoding {
         transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
     }
 
+
     function decodeL1ToGatewayTokenBalanceMigrationData(
         bytes memory _l2ToL1message
     ) internal pure returns (bytes4 functionSignature, L1ToGatewayTokenBalanceMigrationData memory data) {

@@ -17,7 +17,6 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
-import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
 
 abstract contract L2NativeTokenVaultOriginTokenRegressionTestAbstract is Test, SharedL2ContractDeployer {
@@ -147,12 +146,6 @@ abstract contract L2NativeTokenVaultOriginTokenRegressionTestAbstract is Test, S
         );
         bytes memory data = DataEncoding.encodeBridgeMintData(depositor, receiver, originToken, amount, erc20Metadata);
 
-        // Mock legacy bridge to trigger the legacy token path
-        vm.mockCall(
-            sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (expectedL2TokenAddress)),
-            abi.encode(originToken)
-        );
         vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IBridgedStandardToken.bridgeMint, (receiver, amount)), "");
         vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20.totalSupply, ()), abi.encode(amount));
 

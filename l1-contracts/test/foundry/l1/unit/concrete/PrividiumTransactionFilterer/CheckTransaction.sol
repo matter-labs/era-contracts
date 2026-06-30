@@ -5,7 +5,6 @@ import {PrividiumTransactionFiltererTest} from "./_PrividiumTransactionFilterer_
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {InvalidSelector} from "contracts/common/L1ContractErrors.sol";
-import {IL2SharedBridgeLegacyFunctions} from "contracts/bridge/interfaces/IL2SharedBridgeLegacyFunctions.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {PrividiumTransactionFilterer} from "contracts/transactionFilterer/PrividiumTransactionFilterer.sol";
 
@@ -80,22 +79,6 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
             address(0)
         ); // Other arguments do not make a difference for the test
         assertFalse(isTxAllowed, "Transaction should not be allowed");
-    }
-
-    function test_TransactonAllowedNonBaseTokenDepositLegacyInterface() public {
-        bytes memory txCalladata = abi.encodeCall(
-            IL2SharedBridgeLegacyFunctions.finalizeDeposit,
-            (sender, sender, makeAddr("token"), 1 ether, "")
-        );
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
-            assetRouter,
-            L2_ASSET_ROUTER_ADDR,
-            0,
-            0,
-            txCalladata,
-            address(0)
-        ); // Other arguments do not make a difference for the test
-        assertTrue(isTxAllowed, "Transaction should be allowed");
     }
 
     function test_ArbitraryTransactionNotAllowed() public {

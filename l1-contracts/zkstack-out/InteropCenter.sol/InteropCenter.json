@@ -1006,6 +1006,17 @@
   },
   {
     "type": "error",
+    "name": "MultiCallToL1NotSupported",
+    "inputs": [
+      {
+        "name": "callCount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "NotInGatewayMode",
     "inputs": []
   },

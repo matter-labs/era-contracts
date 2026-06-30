@@ -202,12 +202,7 @@ abstract contract NativeTokenVaultBase is
         uint256 amount;
         // we set all originChainId for all already bridged tokens with the setLegacyTokenAssetId and updateChainBalancesFromSharedBridge functions.
         // for tokens that are bridged for the first time, the originChainId will be 0.
-        (receiver, amount) = _bridgeMintToken(
-            _chainId,
-            _assetId,
-            _data,
-            originChainId[_assetId] != block.chainid
-        );
+        (receiver, amount) = _bridgeMintToken(_chainId, _assetId, _data);
         // solhint-disable-next-line func-named-parameters
         emit BridgeMint(_chainId, _assetId, receiver, amount);
     }
@@ -215,13 +210,14 @@ abstract contract NativeTokenVaultBase is
     /// @notice Mints/releases a bridged-in asset to the receiver and decreases the chain balance.
     /// @dev Unifies the native and bridged-token paths. A bridged token is minted (and deployed on first
     /// bridging if needed); a native token's escrowed funds are released via `_withdrawFunds`.
-    /// @param _isBridgedToken True if the token is bridged (not native to this chain).
+    /// @dev `_isBridgedToken` is derived from `originChainId` rather than passed in, to keep the stack small
+    /// enough for the zksolc compiler (which is stricter than solc about stack depth).
     function _bridgeMintToken(
         uint256 _chainId,
         bytes32 _assetId,
-        bytes calldata _data,
-        bool _isBridgedToken
+        bytes calldata _data
     ) internal returns (address receiver, uint256 amount) {
+        bool _isBridgedToken = originChainId[_assetId] != block.chainid;
         // Either it was bridged before, therefore address is not zero, or it is first time bridging and standard erc20 will be deployed
         address token = tokenAddress[_assetId];
         address originToken;
@@ -276,8 +272,7 @@ abstract contract NativeTokenVaultBase is
             _originalCaller: _originalCaller,
             _amount: amount,
             _receiver: receiver,
-            _tokenAddress: tokenAddress,
-            _isBridgedToken: originChainId[_assetId] != block.chainid
+            _tokenAddress: tokenAddress
         });
     }
 
@@ -330,16 +325,17 @@ abstract contract NativeTokenVaultBase is
     /// @notice Burns an asset on the source chain and produces the bridge-mint data for the destination.
     /// @dev Unifies the native and bridged-token paths; they only differ in the WETH guard (native only),
     /// the metadata flag, and how the origin token is resolved.
-    /// @param _isBridgedToken True if the token is bridged (not native to this chain).
+    /// @dev `_isBridgedToken` is derived from `originChainId` rather than passed in, and the ERC20 metadata is
+    /// inlined, to keep the stack small enough for the zksolc compiler (stricter than solc about stack depth).
     function _bridgeBurnToken(
         uint256 _chainId,
         bytes32 _assetId,
         address _originalCaller,
         uint256 _amount,
         address _receiver,
-        address _tokenAddress,
-        bool _isBridgedToken
+        address _tokenAddress
     ) internal returns (bytes memory _bridgeMintData) {
+        bool _isBridgedToken = originChainId[_assetId] != block.chainid;
         require(_amount != 0, AmountMustBeGreaterThanZero());
 
         if (!_isBridgedToken) {
@@ -358,8 +354,6 @@ abstract contract NativeTokenVaultBase is
         });
         /// Note L2->L2 asset transfers will accrue a fee in some form in later versions.
 
-        bytes memory erc20Metadata = _getERC20Metadata(_tokenAddress, _assetId, _isBridgedToken);
-
         // For native tokens the origin token is the token itself; for bridged tokens it must be resolved.
         address originToken = _tokenAddress;
         if (_isBridgedToken) {
@@ -372,7 +366,7 @@ abstract contract NativeTokenVaultBase is
             _remoteReceiver: _receiver,
             _originToken: originToken,
             _amount: _amount,
-            _erc20Metadata: erc20Metadata
+            _erc20Metadata: _getERC20Metadata(_tokenAddress, _assetId, _isBridgedToken)
         });
 
         emit BridgeBurn({

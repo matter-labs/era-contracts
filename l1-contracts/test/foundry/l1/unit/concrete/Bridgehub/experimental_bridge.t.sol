@@ -19,7 +19,6 @@ import {
 } from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
 import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
-import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {DummyBridgehubSetter} from "contracts/dev-contracts/test/DummyBridgehubSetter.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
@@ -84,8 +83,10 @@ contract ExperimentalBridgeTest is Test {
     address public testTokenAddress;
     DummyChainTypeManagerWBH mockCTM;
     DummyZKChain mockChainContract;
-    DummySharedBridge mockSharedBridge;
-    DummySharedBridge mockSecondSharedBridge;
+    // These are real `L1AssetRouter` instances used as stand-in asset routers in the
+    // bridgehub tests; the legacy `DummySharedBridge` dev stub has been removed.
+    L1AssetRouter mockSharedBridge;
+    L1AssetRouter mockSecondSharedBridge;
     L1AssetRouter sharedBridge;
     address sharedBridgeAddress;
     address secondBridgeAddress;
@@ -172,8 +173,8 @@ contract ExperimentalBridgeTest is Test {
         l1Nullifier = new L1Nullifier(bridgehub, messageRoot, eraChainId, eraDiamondProxy);
         l1NullifierAddress = address(l1Nullifier);
 
-        mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
-        mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
+        mockSharedBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
+        mockSecondSharedBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
 
         // kl todo: clean this up. NTV id deployed below in deployNTV. its was a mess before this upgrade.
         ntv = _deployNTVWithoutEthToken(address(mockSharedBridge));
@@ -183,6 +184,7 @@ contract ExperimentalBridgeTest is Test {
         ntv.setAssetTracker(address(assetTracker));
         ntv.registerEthToken();
 
+        vm.prank(bridgeOwner);
         mockSecondSharedBridge.setNativeTokenVault(ntv);
 
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
@@ -200,31 +202,8 @@ contract ExperimentalBridgeTest is Test {
             )
         );
 
-        sharedBridge = new L1AssetRouter(
-            mockL1WethAddress,
-            address(bridgehub),
-            l1NullifierAddress,
-            eraChainId,
-            eraDiamondProxy
-        );
-        address defaultOwner = sharedBridge.owner();
-        vm.prank(defaultOwner);
-        sharedBridge.transferOwnership(bridgeOwner);
-        vm.prank(bridgeOwner);
-        sharedBridge.acceptOwnership();
-
-        secondBridge = new L1AssetRouter(
-            mockL1WethAddress,
-            address(bridgehub),
-            l1NullifierAddress,
-            eraChainId,
-            eraDiamondProxy
-        );
-        defaultOwner = secondBridge.owner();
-        vm.prank(defaultOwner);
-        secondBridge.transferOwnership(bridgeOwner);
-        vm.prank(bridgeOwner);
-        secondBridge.acceptOwnership();
+        sharedBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
+        secondBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
 
         sharedBridgeAddress = address(sharedBridge);
         secondBridgeAddress = address(secondBridge);
@@ -233,7 +212,7 @@ contract ExperimentalBridgeTest is Test {
         testToken8 = new TestnetERC20Token("WBTC", "Wrapped Bitcoin", 8);
 
         // test if the ownership of the bridgehub is set correctly or not
-        defaultOwner = bridgehub.owner();
+        address defaultOwner = bridgehub.owner();
 
         // Now, the `reentrancyGuardInitializer` should prevent anyone from calling `initialize` since we have called the constructor of the contract
         vm.expectRevert(SlotOccupied.selector);
@@ -266,6 +245,27 @@ contract ExperimentalBridgeTest is Test {
         assertEq(bridgehub.owner(), bridgeOwner);
 
         simpleExecutor = new SimpleExecutor();
+    }
+
+    /// @dev Deploys a real `L1AssetRouter` and transfers ownership to `bridgeOwner`,
+    /// mirroring the production ownership handover. Used everywhere the tests previously
+    /// relied on the (now removed) `DummySharedBridge` dev stub.
+    function _deployAssetRouter(
+        address _l1WethAddress,
+        address _eraDiamondProxy
+    ) internal returns (L1AssetRouter assetRouter) {
+        assetRouter = new L1AssetRouter(
+            _l1WethAddress,
+            address(bridgehub),
+            l1NullifierAddress,
+            eraChainId,
+            _eraDiamondProxy
+        );
+        address defaultOwner = assetRouter.owner();
+        vm.prank(defaultOwner);
+        assetRouter.transferOwnership(bridgeOwner);
+        vm.prank(bridgeOwner);
+        assetRouter.acceptOwnership();
     }
 
     function _deployNTVWithoutEthToken(address _sharedBridgeAddr) internal returns (L1NativeTokenVault addr) {

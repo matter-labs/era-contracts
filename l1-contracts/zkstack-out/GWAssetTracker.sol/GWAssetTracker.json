@@ -530,31 +530,6 @@
   },
   {
     "type": "function",
-    "name": "setLegacySharedBridgeAddress",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setLegacySharedBridgeAddress",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_legacySharedBridgeAddress",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "setSettlementFeePayerAgreement",
     "inputs": [
       {
@@ -1060,17 +1035,6 @@
   },
   {
     "type": "error",
-    "name": "InvalidL1AssetRouter",
-    "inputs": [
-      {
-        "name": "l1AssetRouter",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "InvalidL2ShardId",
     "inputs": []
   },
@@ -1083,17 +1047,6 @@
     "type": "error",
     "name": "InvalidServiceLog",
     "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "L2WithdrawalMessageWrongLength",
-    "inputs": [
-      {
-        "name": "messageLen",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
   },
   {
     "type": "error",

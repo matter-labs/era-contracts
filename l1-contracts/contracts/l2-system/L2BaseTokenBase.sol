@@ -3,8 +3,9 @@
 pragma solidity 0.8.28;
 
 import {IL2BaseTokenBase} from "./interfaces/IL2BaseTokenBase.sol";
-import {IMailboxLegacy} from "../state-transition/chain-interfaces/IMailboxLegacy.sol";
-import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {IL2NativeTokenVault} from "../bridge/ntv/IL2NativeTokenVault.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {L2_BASE_TOKEN_HOLDER, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {Unauthorized} from "../common/L1ContractErrors.sol";
 
@@ -82,11 +83,14 @@ abstract contract L2BaseTokenBase is IL2BaseTokenBase {
     }
 
     /// @dev Get the message to be sent to L1 to initiate a withdrawal.
+    /// @dev Base-token withdrawals use the same asset-router `finalizeDeposit` message format as ERC20
+    /// withdrawals, so that L1 finalization has a single code path (the L1Nullifier distinguishes the base
+    /// token by `assetId == baseTokenAssetId` and validates the L2 base-token system contract as the sender).
     /// @param _to The L1 receiver address.
     /// @param _amount The amount being withdrawn.
     /// @return The encoded withdrawal message.
-    function _getL1WithdrawMessage(address _to, uint256 _amount) internal pure returns (bytes memory) {
-        return abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, _to, _amount);
+    function _getL1WithdrawMessage(address _to, uint256 _amount) internal view returns (bytes memory) {
+        return _getBaseTokenWithdrawMessage(_to, _amount, address(0), new bytes(0));
     }
 
     /// @dev Get the extended message to be sent to L1 to initiate a withdrawal with additional data.
@@ -100,8 +104,27 @@ abstract contract L2BaseTokenBase is IL2BaseTokenBase {
         uint256 _amount,
         address _sender,
         bytes memory _additionalData
-    ) internal pure returns (bytes memory) {
-        // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, _to, _amount, _sender, _additionalData);
+    ) internal view returns (bytes memory) {
+        return _getBaseTokenWithdrawMessage(_to, _amount, _sender, _additionalData);
+    }
+
+    /// @dev Builds the asset-router `finalizeDeposit` withdrawal message for the base token.
+    /// `_sender`/`_additionalData` ride along in the proven message (mapped to the bridge-mint
+    /// originalCaller/erc20Metadata fields); L1 finalization consumes only the receiver and amount.
+    function _getBaseTokenWithdrawMessage(
+        address _to,
+        uint256 _amount,
+        address _sender,
+        bytes memory _additionalData
+    ) private view returns (bytes memory) {
+        bytes32 baseTokenAssetId = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).BASE_TOKEN_ASSET_ID();
+        bytes memory transferData = DataEncoding.encodeBridgeMintData({
+            _originalCaller: _sender,
+            _remoteReceiver: _to,
+            _originToken: address(0),
+            _amount: _amount,
+            _erc20Metadata: _additionalData
+        });
+        return DataEncoding.encodeAssetRouterFinalizeDepositData(block.chainid, baseTokenAssetId, transferData);
     }
 }

@@ -69,13 +69,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     // slither-disable-next-line uninitialized-state
     address private __DEPRECATED_legacyBridge;
 
-    /// @notice Legacy function to get the L2 shared bridge address for a chain.
-    /// @dev In case the chain has been deployed after the gateway release,
-    /// the returned value is 0.
-    function l2BridgeAddress(uint256 _chainId) external view override returns (address) {
-        return L1_NULLIFIER.l2BridgeAddress(_chainId);
-    }
-
     /// @notice Checks that the message sender is the nullifier.
     modifier onlyNullifier() {
         require(msg.sender == address(L1_NULLIFIER), Unauthorized(msg.sender));

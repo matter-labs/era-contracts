@@ -345,6 +345,16 @@ contract InteropCenter is
         }
     }
 
+    /// @notice Strict L2->L2 destination check used by the generic single-message `sendMessage` entry point.
+    /// @dev Unlike `_ensureValidDestination`, this never allows an L1 destination; the L2->L1 withdrawal path
+    /// goes through `sendBundle` (single-call bundle) instead.
+    function _ensureL2ToL2(uint256 _destinationChainId) internal view {
+        require(
+            L1_CHAIN_ID != block.chainid && _destinationChainId != L1_CHAIN_ID,
+            NotL2ToL2(block.chainid, _destinationChainId)
+        );
+    }
+
     /// @notice Ensures the received base token value matches expected for the destination chain
     /// @dev Handles fee collection based on useFixedFee flag. When useFixedFee is true, no base token fee is charged.
     /// @dev When useFixedFee is false, interopProtocolFee is charged in base tokens.

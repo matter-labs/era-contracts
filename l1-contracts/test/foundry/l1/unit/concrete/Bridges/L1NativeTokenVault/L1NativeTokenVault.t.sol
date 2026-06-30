@@ -27,7 +27,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
-import {OriginChainIdNotFound, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {OriginChainIdNotFound} from "contracts/common/L1ContractErrors.sol";
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 
 /// @dev Test helper contract that exposes internal functions
@@ -331,22 +331,6 @@ contract L1NativeTokenVaultTest is Test {
 
         vm.prank(address(assetRouter));
         nativeTokenVault.bridgeConfirmTransferResult(chainId, TxStatus.Failure, bridgedAssetId, owner, data);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        onlyAssetTracker modifier Tests
-    //////////////////////////////////////////////////////////////*/
-
-    function test_migrateTokenBalanceToAssetTracker_RevertWhen_NotAssetTracker() public {
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        nativeTokenVault.migrateTokenBalanceToAssetTracker(chainId, tokenAssetId);
-    }
-
-    function test_migrateTokenBalanceToAssetTracker_Success() public {
-        // This should work when called by asset tracker
-        vm.prank(address(l1AssetTracker));
-        uint256 result = nativeTokenVault.migrateTokenBalanceToAssetTracker(chainId, tokenAssetId);
-        assertEq(result, 0); // No deprecated balance set
     }
 
     // add this to be excluded from coverage report

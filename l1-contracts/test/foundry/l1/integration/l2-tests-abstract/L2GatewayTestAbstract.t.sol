@@ -163,82 +163,11 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         vm.stopPrank();
     }
 
-    function test_withdrawFromGateway() public {
-        finalizeDeposit();
-
-        // Verify chain is registered before withdrawal
-        address diamondProxyBefore = l2Bridgehub.getZKChain(mintChainId);
-        assertTrue(diamondProxyBefore != address(0), "Diamond proxy should exist before withdrawal");
-
-        clearPriorityQueue(address(coreAddresses.bridgehub.proxies.bridgehub), mintChainId);
-        _pauseDeposits(mintChainId);
-        address newAdmin = makeAddr("newAdmin");
-        BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
-            chainId: mintChainId,
-            ctmData: abi.encode(newAdmin, config.contracts.diamondCutData),
-            chainData: abi.encode(chainTypeManager.protocolVersion())
-        });
-
-        // Snapshot migrationNumber so the post-call assert can verify it advances by exactly one.
-        uint256 migrationNumberBefore = IChainAssetHandlerBase(L2_CHAIN_ASSET_HANDLER_ADDR).migrationNumber(
-            mintChainId
-        );
-
-        vm.prank(ownerWallet);
-        vm.mockCall(
-            address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
-            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
-            abi.encode(bytes(""))
-        );
-
-        vm.recordLogs();
-        l2AssetRouter.withdraw(ctmAssetId, abi.encode(data));
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-
-        // Verify WithdrawalInitiatedAssetRouter event content. The event has 2 indexed params
-        // (l2Sender, assetId); chainId and assetData live in the data field.
-        Vm.Log memory withdrawalLog = logs.requireOneFrom(
-            "WithdrawalInitiatedAssetRouter(uint256,address,bytes32,bytes)",
-            L2_ASSET_ROUTER_ADDR
-        );
-        assertEq(
-            withdrawalLog.topics[1],
-            bytes32(uint256(uint160(ownerWallet))),
-            "WithdrawalInitiatedAssetRouter: l2Sender should be ownerWallet"
-        );
-        assertEq(
-            withdrawalLog.topics[2],
-            ctmAssetId,
-            "WithdrawalInitiatedAssetRouter: assetId should match ctmAssetId"
-        );
-        (uint256 emittedChainId, bytes memory emittedAssetData) = abi.decode(withdrawalLog.data, (uint256, bytes));
-        assertEq(emittedChainId, L1_CHAIN_ID, "WithdrawalInitiatedAssetRouter: destination chain must be L1");
-        assertEq(
-            keccak256(emittedAssetData),
-            keccak256(abi.encode(data)),
-            "WithdrawalInitiatedAssetRouter: assetData must match the encoded BurnCTMAssetData input"
-        );
-
-        // Verify the chain-asset-handler MigrationStarted event. 3 indexed params
-        // (chainId, assetId, settlementLayerChainId); migrationNumber lives in the data field.
-        Vm.Log memory migrationLog = logs.requireOneFrom(
-            "MigrationStarted(uint256,uint256,bytes32,uint256)",
-            L2_CHAIN_ASSET_HANDLER_ADDR
-        );
-        assertEq(uint256(migrationLog.topics[1]), mintChainId, "MigrationStarted: chainId mismatch");
-        assertEq(migrationLog.topics[2], ctmAssetId, "MigrationStarted: assetId mismatch");
-
-        // Verify migrationNumber on the chain-asset-handler advanced by exactly one.
-        uint256 migrationNumberAfter = IChainAssetHandlerBase(L2_CHAIN_ASSET_HANDLER_ADDR).migrationNumber(mintChainId);
-        assertEq(migrationNumberAfter, migrationNumberBefore + 1, "migrationNumber must increment by 1");
-
-        // Verify the chain registration is preserved on this settlement layer until the migration is finalized elsewhere.
-        assertEq(
-            l2Bridgehub.getZKChain(mintChainId),
-            diamondProxyBefore,
-            "Chain registration must be unchanged after withdraw"
-        );
-    }
+    // TODO(interop-withdrawal): re-wire via InteropCenter.
+    // The L2->L1 withdrawal path used to go through `l2AssetRouter.withdraw(...)`, which has been
+    // removed. Once the InteropCenter withdrawal path is wired for tests, this test should be
+    // restored to exercise the chain-migration withdrawal (MigrationStarted event, migrationNumber
+    // increment, and preserved chain registration).
 
     function test_finalizeDepositWithRealChainData() public {
         // This test verifies that finalizeDeposit works with explicitly encoded data

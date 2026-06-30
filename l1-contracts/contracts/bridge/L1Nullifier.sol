@@ -417,6 +417,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             return _parseInteropWithdrawalBundle(_chainId, _l2ToL1message);
         }
 
+        // Base-token (ETH) and ERC20 withdrawals both arrive in the asset-router finalizeDeposit format.
         bytes4 functionSignature = DataEncoding.getSelector(_l2ToL1message);
         if (functionSignature == AssetRouterBase.finalizeDeposit.selector) {
             // slither-disable-next-line unused-return

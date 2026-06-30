@@ -21,7 +21,6 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IRollupDAManager} from "../interfaces/IRollupDAManager.sol";
-import {L2LegacySharedBridgeTestHelper} from "../dev/L2LegacySharedBridgeTestHelper.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 
@@ -40,7 +39,6 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
@@ -336,9 +334,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "bridgehub_proxy_addr",
             coreAddresses.bridgehub.proxies.bridgehub
         );
-        // Note: AssetRouterAddresses doesn't have legacyBridge, so we get it directly
-        L1AssetRouter assetRouter = L1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
-        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", address(assetRouter.legacyBridge()));
+        // The legacy ERC20 bridge has been removed; emit address(0) for backwards-compatible output.
+        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", address(0));
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
         string memory bridges = vm.serializeAddress(
             "bridges",
@@ -479,18 +476,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         return abi.encode(data);
     }
 
-    function _getDangerousTestOnlyForcedBeacon() private returns (address) {
-        if (!config.supportL2LegacySharedBridgeTest) {
-            return address(0);
-        }
-
-        L1AssetRouter assetRouter = L1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
-        (address beacon, ) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
-            address(assetRouter.legacyBridge()),
-            coreAddresses.bridges.proxies.l1Nullifier,
-            ctmAddresses.admin.governance
-        );
-        return beacon;
+    function _getDangerousTestOnlyForcedBeacon() private pure returns (address) {
+        // The legacy shared bridge (and its test helper) has been removed, so there is no
+        // forced beacon to compute. New chains always deploy their own token beacon.
+        return address(0);
     }
 
     /// @dev Scratch file for `_precomputeBlakeHashes`. Set by `runInner`

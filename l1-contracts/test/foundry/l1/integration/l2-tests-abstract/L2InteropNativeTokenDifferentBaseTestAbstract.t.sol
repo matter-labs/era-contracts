@@ -9,7 +9,6 @@ import "forge-std/console.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
-import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
@@ -20,7 +19,6 @@ import {
     L2_INTEROP_CENTER,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 
@@ -64,11 +62,6 @@ abstract contract L2InteropNativeTokenDifferentBaseTestAbstract is L2InteropTest
             abi.encodeCall(IBridgedStandardToken.originToken, ()),
             abi.encode(address(otherBaseTokenAddress))
         );
-
-        // Register the token in NTV and set up asset handler
-        // vm.prank is used to call from NTV context for setLegacyTokenAssetHandler
-        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
-        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).setLegacyTokenAssetHandler(otherBaseTokenAssetId);
 
         // Set tokenAddress and assetId mappings in NTV (these are still internal storage)
         bytes32 originChainIdSlot = keccak256(abi.encode(otherBaseTokenAssetId, uint256(202)));
@@ -115,10 +108,6 @@ abstract contract L2InteropNativeTokenDifferentBaseTestAbstract is L2InteropTest
         vm.store(L2_ASSET_ROUTER_ADDR, bytes32(uint256(256)), otherBaseTokenAssetId);
         // Set BASE_TOKEN_ASSET_ID on destination chain L2NativeTokenVault (slot 252)
         vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(252)), otherBaseTokenAssetId);
-
-        // Register asset handler on destination chain for source base token
-        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
-        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).setLegacyTokenAssetHandler(baseTokenAssetId);
 
         // Deploy the source base token as a bridged token on destination chain
         BridgedStandardERC20 sourceBaseToken = new BridgedStandardERC20();

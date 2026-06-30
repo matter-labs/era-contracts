@@ -92,34 +92,8 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         BridgedStandardERC20(l2TokenAddress).reinitializeToken(getters, "TestTokenNewName", "TTN", 20);
     }
 
-    function test_withdrawTokenNoRegistration() public {
-        TestnetERC20Token l2NativeToken = new TestnetERC20Token("token", "T", 18);
-
-        uint256 mintAmount = 100;
-        l2NativeToken.mint(address(this), mintAmount);
-        l2NativeToken.approve(L2_NATIVE_TOKEN_VAULT_ADDR, mintAmount);
-
-        // Verify initial balance
-        assertEq(l2NativeToken.balanceOf(address(this)), mintAmount, "Initial balance should be minted amount");
-
-        // Basically we want all L2->L1 transactions to pass
-        vm.mockCall(
-            address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
-            abi.encodeWithSignature("sendToL1(bytes)"),
-            abi.encode(bytes32(uint256(1)))
-        );
-
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(l2NativeToken));
-
-        // Verify asset ID is properly constructed
-        assertTrue(assetId != bytes32(0), "Asset ID should be non-zero");
-
-        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).withdraw(
-            assetId,
-            DataEncoding.encodeBridgeBurnData(mintAmount, address(1), address(l2NativeToken))
-        );
-
-        // After withdrawal, tokens should be burned from the sender
-        assertEq(l2NativeToken.balanceOf(address(this)), 0, "Balance should be zero after withdrawal");
-    }
+    // TODO(interop-withdrawal): re-wire via InteropCenter
+    // Removed test_withdrawTokenNoRegistration: it exercised an L2->L1 withdrawal via the
+    // removed L2AssetRouter.withdraw(...). The replacement withdrawal flow (via InteropCenter)
+    // is not wired yet.
 }

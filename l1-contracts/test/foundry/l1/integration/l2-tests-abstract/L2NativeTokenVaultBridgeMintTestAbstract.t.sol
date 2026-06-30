@@ -16,7 +16,6 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
-import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
 
 abstract contract L2NativeTokenVaultBridgeMintTestAbstract is Test, SharedL2ContractDeployer {
@@ -48,14 +47,6 @@ abstract contract L2NativeTokenVaultBridgeMintTestAbstract is Test, SharedL2Cont
         assertEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
         assertEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), bytes32(0));
 
-        // this `mockCall` ensures the branch for legacy tokens is chosen
-        vm.mockCall(
-            sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (expectedL2TokenAddress)),
-            abi.encode(originToken)
-        );
-        // fails on the following line without this `mockCall`
-        // https://github.com/matter-labs/era-contracts/blob/cebfe26a41f3b83039a7d36558bf4e0401b154fc/l1-contracts/contracts/bridge/ntv/NativeTokenVault.sol#L163
         vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IBridgedStandardToken.bridgeMint, (receiver, amount)), "");
         vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20.totalSupply, ()), abi.encode(amount));
         vm.prank(L2_ASSET_ROUTER_ADDR);
