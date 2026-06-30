@@ -6,8 +6,6 @@ pragma solidity ^0.8.20;
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 
-import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -146,21 +144,20 @@ abstract contract L2NativeTokenVaultOriginTokenRegressionTestAbstract is Test, S
         );
         bytes memory data = DataEncoding.encodeBridgeMintData(depositor, receiver, originToken, amount, erc20Metadata);
 
-        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IBridgedStandardToken.bridgeMint, (receiver, amount)), "");
-        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20.totalSupply, ()), abi.encode(amount));
-
-        // Perform bridge mint
+        // Perform a real bridge mint: since this is the first time the asset is bridged, the NTV deploys the
+        // bridged token via CREATE2 at `expectedL2TokenAddress` and mints to the receiver. We deliberately do NOT
+        // mock the token here (a mock would inject code at the deploy target and collide with CREATE2); the legacy
+        // shared-bridge "adopt existing token" path that previously skipped the deploy has been removed.
         vm.prank(L2_ASSET_ROUTER_ADDR);
         IAssetHandler(address(l2NativeTokenVault)).bridgeMint(originChainId, assetId, data);
 
-        // Now mock the originToken call on the bridged token
-        vm.mockCall(
+        assertEq(
+            l2NativeTokenVault.tokenAddress(assetId),
             expectedL2TokenAddress,
-            abi.encodeCall(IBridgedStandardToken.originToken, ()),
-            abi.encode(originToken)
+            "bridged token should be deployed at the expected CREATE2 address"
         );
 
-        // Call originToken and verify it returns the correct L1 origin token
+        // Call originToken and verify it returns the correct L1 origin token via the deployed bridged token.
         // Before the fix: would return address(0)
         // After the fix: should return originToken
         address returnedOriginToken = l2NativeTokenVault.originToken(assetId);

@@ -1195,6 +1195,8 @@ contract ExperimentalBridgeTest is Test {
 
         address randomCaller = makeAddr("RANDOM_CALLER");
         mockChainId = bound(mockChainId, 1, type(uint48).max);
+        // Base-token burns require a non-zero amount, so the mint value must be positive for a successful request.
+        mockMintValue = bound(mockMintValue, 1, type(uint128).max);
 
         (L2TransactionRequestDirect memory l2TxnReqDirect, bytes32 hash) = _prepareETHL2TransactionDirectRequest({
             mockChainId: mockChainId,
@@ -1383,6 +1385,8 @@ contract ExperimentalBridgeTest is Test {
         vm.assume(magicValue != TWO_BRIDGES_MAGIC_VALUE);
 
         chainId = bound(chainId, 1, type(uint48).max);
+        // Base-token burns require a non-zero amount; bound the mint value so the flow reaches the magic-value check.
+        mintValue = bound(mintValue, 1, type(uint128).max);
 
         L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter({
             chainId: chainId,

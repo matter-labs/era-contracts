@@ -6,11 +6,8 @@ pragma solidity ^0.8.20;
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 
-import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -47,8 +44,9 @@ abstract contract L2NativeTokenVaultBridgeMintTestAbstract is Test, SharedL2Cont
         assertEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
         assertEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), bytes32(0));
 
-        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IBridgedStandardToken.bridgeMint, (receiver, amount)), "");
-        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20.totalSupply, ()), abi.encode(amount));
+        // Perform a real bridge mint: the NTV deploys the bridged token via CREATE2 at `expectedL2TokenAddress`
+        // and mints to the receiver. We deliberately do NOT mock the token (a mock would inject code at the deploy
+        // target and collide with CREATE2).
         vm.prank(L2_ASSET_ROUTER_ADDR);
         IAssetHandler(address(l2NativeTokenVault)).bridgeMint(originChainId, assetId, data);
 
