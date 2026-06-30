@@ -10,7 +10,6 @@ import {
     L2TransactionRequestDirect,
     L2TransactionRequestTwoBridgesOuter
 } from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -688,20 +687,6 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             data: message
         });
 
-        vm.mockCall(
-            addresses.bridgehubProxyAddress,
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                IBridgehubBase.proveL2MessageInclusion.selector,
-                currentChainId,
-                l2BatchNumber,
-                l2MessageIndex,
-                l2ToL1Message,
-                merkleProof
-            ),
-            abi.encode(true)
-        );
-
         vm.recordLogs();
         addresses.sharedBridge.finalizeWithdrawal({
             _chainId: currentChainId,
@@ -778,20 +763,6 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             data: message
         });
-
-        vm.mockCall(
-            addresses.bridgehubProxyAddress,
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                IBridgehubBase.proveL2MessageInclusion.selector,
-                currentChainId,
-                l2BatchNumber,
-                l2MessageIndex,
-                l2ToL1Message,
-                merkleProof
-            ),
-            abi.encode(true)
-        );
 
         vm.recordLogs();
         addresses.sharedBridge.finalizeWithdrawal({
