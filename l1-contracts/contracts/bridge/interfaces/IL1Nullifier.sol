@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
-import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
 import {ConfirmTransferResultData, FinalizeL1DepositParams} from "../../common/Messaging.sol";
 
 /// @dev Transient storage slot for storing the settlement layer chain ID during proof verification.
@@ -48,8 +47,6 @@ interface IL1Nullifier {
     function BRIDGE_HUB() external view returns (IL1Bridgehub);
 
     function l1AssetRouter() external view returns (IL1AssetRouter);
-
-    function legacyBridge() external view returns (IL1ERC20Bridge);
 
     function depositHappened(uint256 _chainId, bytes32 _l2TxHash) external view returns (bytes32);
 

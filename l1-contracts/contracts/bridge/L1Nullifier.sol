@@ -79,6 +79,19 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// than this value are considered to have been finalized prior to the upgrade and handled separately.
     uint256 internal eraPostDiamondUpgradeFirstBatch;
 
+    /// @dev Deprecated legacy-bridge slots, retained ONLY to preserve the upgradeable storage layout.
+    /// Formerly: eraPostLegacyBridgeUpgradeFirstBatch, eraLegacyBridgeLastDepositBatch,
+    /// eraLegacyBridgeLastDepositTxNumber, and legacyBridge (the L1ERC20 legacy-bridge support).
+    /// These are no longer read or written; do not reuse them.
+    // slither-disable-next-line uninitialized-state
+    uint256 internal __DEPRECATED_eraPostLegacyBridgeUpgradeFirstBatch;
+    // slither-disable-next-line uninitialized-state
+    uint256 internal __DEPRECATED_eraLegacyBridgeLastDepositBatch;
+    // slither-disable-next-line uninitialized-state
+    uint256 internal __DEPRECATED_eraLegacyBridgeLastDepositTxNumber;
+    // slither-disable-next-line uninitialized-state
+    address private __DEPRECATED_legacyBridge;
+
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
     // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => address l2Bridge) public __DEPRECATED_l2BridgeAddress;
