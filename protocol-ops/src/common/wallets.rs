@@ -1,21 +1,22 @@
+#[cfg(test)]
+use crate::common::addresses::DEFAULT_TEST_WALLET_ADDRESS;
+use alloy::primitives::{Address, B256};
+use alloy::signers::local::PrivateKeySigner;
+#[cfg(test)]
+use alloy::signers::local::{coins_bip39::English, MnemonicBuilder};
 use anyhow::Context as _;
-use ethers::{
-    core::rand::{CryptoRng, Rng},
-    signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer},
-    types::{Address, H256},
-};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 struct WalletSerde {
     pub address: Address,
-    pub private_key: Option<H256>,
+    pub private_key: Option<B256>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Wallet {
     pub address: Address,
-    pub private_key: Option<LocalWallet>,
+    pub private_key: Option<PrivateKeySigner>,
 }
 
 impl<'de> Deserialize<'de> for Wallet {
@@ -27,15 +28,15 @@ impl<'de> Deserialize<'de> for Wallet {
                 private_key: None,
             },
             Some(k) => {
-                let k = LocalWallet::from_bytes(k.as_bytes()).map_err(serde::de::Error::custom)?;
-                if k.address() != x.address {
+                let signer = PrivateKeySigner::from_bytes(&k).map_err(serde::de::Error::custom)?;
+                if signer.address() != x.address {
                     return Err(serde::de::Error::custom(format!(
                         "address does not match private key: got address {:#x}, want {:#x}",
                         x.address,
-                        k.address(),
+                        signer.address(),
                     )));
                 }
-                Self::new(k)
+                Self::new(signer)
             }
         })
     }
@@ -45,7 +46,7 @@ impl Serialize for Wallet {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         WalletSerde {
             address: self.address,
-            private_key: self.private_key_h256(),
+            private_key: self.private_key_b256(),
         }
         .serialize(s)
     }
@@ -57,20 +58,20 @@ impl Wallet {
     /// - If `private_key`: derive address, validate against `address` if provided.
     /// - If `address` only: return address-only wallet (needs `--unlocked` at node).
     /// - If neither: bail.
-    pub fn parse(private_key: Option<H256>, address: Option<Address>) -> anyhow::Result<Self> {
+    pub fn parse(private_key: Option<B256>, address: Option<Address>) -> anyhow::Result<Self> {
         if let Some(pk) = private_key {
-            let wallet = LocalWallet::from_bytes(pk.as_bytes())
+            let signer = PrivateKeySigner::from_bytes(&pk)
                 .map_err(|e| anyhow::anyhow!("invalid private key: {}", e))?;
             if let Some(addr) = address {
-                if addr != wallet.address() {
+                if addr != signer.address() {
                     anyhow::bail!(
                         "address {:#x} does not match private key (derives {:#x})",
                         addr,
-                        wallet.address()
+                        signer.address()
                     );
                 }
             }
-            Ok(Self::new(wallet))
+            Ok(Self::new(signer))
         } else if let Some(addr) = address {
             Ok(Self {
                 address: addr,
@@ -89,22 +90,22 @@ impl Wallet {
     /// - Neither: clone `fallback`.
     pub fn resolve(
         addr: Option<Address>,
-        private_key: Option<H256>,
+        private_key: Option<B256>,
         fallback: &Wallet,
     ) -> anyhow::Result<Self> {
         match (addr, private_key) {
             (addr, Some(pk)) => {
-                let wallet = LocalWallet::from_bytes(pk.as_bytes())
+                let signer = PrivateKeySigner::from_bytes(&pk)
                     .map_err(|e| anyhow::anyhow!("invalid private key: {}", e))?;
                 if let Some(addr) = addr {
                     anyhow::ensure!(
-                        wallet.address() == addr,
+                        signer.address() == addr,
                         "private key derives {:#x} but address is {:#x}",
-                        wallet.address(),
+                        signer.address(),
                         addr
                     );
                 }
-                Ok(Self::new(wallet))
+                Ok(Self::new(signer))
             }
             (Some(addr), None) => Ok(Self {
                 address: addr,
@@ -114,42 +115,60 @@ impl Wallet {
         }
     }
 
-    pub fn private_key_h256(&self) -> Option<H256> {
-        self.private_key
-            .as_ref()
-            .map(|k| parse_h256(&k.signer().to_bytes()).unwrap())
+    pub fn private_key_b256(&self) -> Option<B256> {
+        self.private_key.as_ref().map(|k| k.to_bytes())
     }
 
-    pub fn random(rng: &mut (impl Rng + CryptoRng)) -> Self {
-        Self::new(LocalWallet::new(rng))
-    }
-
-    pub fn new(private_key: LocalWallet) -> Self {
+    pub fn new(private_key: PrivateKeySigner) -> Self {
         Self {
             address: private_key.address(),
             private_key: Some(private_key),
         }
     }
 
+    #[cfg(test)]
     pub fn from_mnemonic(mnemonic: &str, base_path: &str, index: u32) -> anyhow::Result<Self> {
-        let wallet = MnemonicBuilder::<English>::default()
+        let signer = MnemonicBuilder::<English>::default()
             .phrase(mnemonic)
-            .derivation_path(&format!("{}/{}", base_path, index))?
+            .derivation_path(format!("{}/{}", base_path, index))?
             .build()?;
-        Ok(Self::new(wallet))
+        Ok(Self::new(signer))
     }
 
     pub fn empty() -> Self {
         Self {
-            address: Address::zero(),
+            address: Address::ZERO,
             private_key: None,
         }
     }
 }
 
-/// Parses H256 from a slice of bytes.
-pub fn parse_h256(bytes: &[u8]) -> anyhow::Result<H256> {
-    Ok(<[u8; 32]>::try_from(bytes).context("invalid size")?.into())
+// ---------------------------------------------------------------------------
+// Wallets YAML schema (used by `apply` to load operator keys for each chain)
+// ---------------------------------------------------------------------------
+
+// Wallet's Debug impl redacts PrivateKeySigner automatically.
+#[derive(Debug, serde::Deserialize)]
+pub struct ChainWallets {
+    pub owner: Wallet,
+    pub operator_commit_sk: Wallet,
+    pub operator_prove_sk: Wallet,
+    pub operator_execute_sk: Wallet,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct WalletsYaml {
+    #[allow(dead_code)]
+    pub ecosystem: serde_yaml::Value,
+    #[serde(flatten)]
+    pub chains: std::collections::BTreeMap<String, ChainWallets>,
+}
+
+pub fn load_wallets(path: &std::path::PathBuf) -> anyhow::Result<WalletsYaml> {
+    let content = std::fs::read_to_string(path)
+        .with_context(|| format!("reading wallets file {}", path.display()))?;
+    serde_yaml::from_str(&content)
+        .with_context(|| format!("parsing wallets file {}", path.display()))
 }
 
 #[test]
@@ -162,8 +181,8 @@ fn test_load_localhost_wallets() {
     .unwrap();
     assert_eq!(
         wallet.address,
-        Address::from_slice(
-            &ethers::utils::hex::decode("0xa61464658AfeAf65CccaaFD3a512b69A83B77618").unwrap()
-        )
+        DEFAULT_TEST_WALLET_ADDRESS
+            .parse::<alloy::primitives::Address>()
+            .unwrap()
     );
 }

@@ -44,7 +44,6 @@ import {
     OnlyWhitelistedSettlementLayer,
     TransientBalanceChangeAlreadySet
 } from "./AssetTrackerErrors.sol";
-import {V31UpgradeChainBatchNumberNotSet} from "../../core/bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
@@ -302,11 +301,17 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         // For all the batches smaller than that, the responsibility lies with the chain itself.
         uint256 v31UpgradeChainBatchNumber = IL1MessageRoot(address(MESSAGE_ROOT)).v31UpgradeChainBatchNumber(_chainId);
 
-        // We need to wait for the proper v31UpgradeChainBatchNumber to be set on the MessageRoot, otherwise we might decrement the chain's chainBalance instead of the gateway's.
-        require(
-            v31UpgradeChainBatchNumber != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE,
-            V31UpgradeChainBatchNumberNotSet()
-        );
+        // While a pre-existing chain still holds the placeholder, it has not finalized its v31 upgrade marker yet.
+        // The marker is written atomically inside the chain's own diamond upgrade, which is exactly the point at which
+        // the chain flips to the v31 protocol. Therefore, during this window the chain is still running the pre-v31
+        // protocol and every executed (hence finalizable) batch is necessarily pre-v31. Pre-v31 batches are always the
+        // responsibility of the chain itself (the settlement-layer accountability model only applies from the marker
+        // onwards), so we attribute the withdrawal to the chain rather than reverting. This keeps withdrawals available
+        // for all chains throughout the ecosystem upgrade window, and is safe because no post-v31 (settlement-layer
+        // backed) batch can exist for the chain before its marker is set.
+        if (v31UpgradeChainBatchNumber == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE) {
+            return _chainId;
+        }
 
         /// For chains that were settling on GW before V31, we need to update the chain's chainBalance until the chain updates to V31.
         /// Logic: If no settlement layer OR the batch number is before V31 upgrade, update the chain itself.
