@@ -67,6 +67,11 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// the old version where it was an immutable.
     uint256 public L1_CHAIN_ID;
 
+    /// @dev Deprecated slot, retained to preserve the upgradeable storage layout.
+    /// Formerly `L2_LEGACY_SHARED_BRIDGE` (the L2 legacy shared bridge). No longer read or written.
+    // slither-disable-next-line uninitialized-state
+    address private __DEPRECATED_L2_LEGACY_SHARED_BRIDGE;
+
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.

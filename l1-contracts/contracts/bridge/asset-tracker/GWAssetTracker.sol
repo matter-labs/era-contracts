@@ -107,6 +107,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// @notice The chain on which the token was originally issued. For tokens issued on L1, this will be equal to the L1 chain ID.
     mapping(bytes32 assetId => uint256 originChainId) internal tokenOriginChainId;
 
+    /// @notice Deprecated slot, retained to preserve the upgradeable storage layout.
+    /// Formerly `legacySharedBridgeAddress` (per-chain L2 legacy shared bridge). No longer read or written.
+    // slither-disable-next-line uninitialized-state
+    mapping(uint256 chainId => address legacySharedBridgeAddress) internal __DEPRECATED_legacySharedBridgeAddress;
+
     /// @notice Empty multichainBatchRoot calculated for specific chain.
     mapping(uint256 chainId => bytes32 emptyMultichainBatchRoot) internal emptyMultichainBatchRoot;
 

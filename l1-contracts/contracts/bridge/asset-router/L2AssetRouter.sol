@@ -62,6 +62,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// the old version where it was an immutable.
     IL1AssetRouter public L1_ASSET_ROUTER;
 
+    /// @dev Deprecated slot, retained to preserve the upgradeable storage layout.
+    /// Formerly `L2_LEGACY_SHARED_BRIDGE` (the L2 legacy shared bridge). No longer read or written.
+    // slither-disable-next-line uninitialized-state
+    address private __DEPRECATED_L2_LEGACY_SHARED_BRIDGE;
+
     /// @dev The asset id of the base token.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
