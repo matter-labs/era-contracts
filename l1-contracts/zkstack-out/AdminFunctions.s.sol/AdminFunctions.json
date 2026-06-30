@@ -1129,5 +1129,38 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "upgradeChainFromCTMAndSetDAValidatorPair",
+    "inputs": [
+      {
+        "name": "_chainAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_adminAddr",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_accessControlRestriction",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_l1DaValidator",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_l2DaCommitmentScheme",
+        "type": "uint8",
+        "internalType": "enum L2DACommitmentScheme"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   }
 ]

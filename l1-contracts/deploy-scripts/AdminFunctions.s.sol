@@ -656,10 +656,13 @@ contract AdminFunctions is Script, IAdminFunctions {
         );
     }
 
-    /// @notice Upgrade a chain by reading the diamond cut directly from the CTM.
+    /// @notice Build the `upgradeChainFromVersion` admin Call for a CTM-driven
+    ///         upgrade, reading the diamond cut directly from the CTM.
     /// @dev Reads the diamond cut from the CTM's storage to avoid TOML parsing
-    ///      issues with large hex strings.
-    function upgradeChainFromCTM(address _chainAddress, address _adminAddr, address _accessControlRestriction) public {
+    ///      issues with large hex strings. Shared by `upgradeChainFromCTM` and
+    ///      `upgradeChainFromCTMAndSetDAValidatorPair` so the version-selection
+    ///      logic lives in one place.
+    function _buildUpgradeChainFromCTMCall(address _chainAddress) internal returns (Call memory upgradeCallStruct) {
         console.log("AdminFunctions: upgrading chain", _chainAddress);
 
         IZKChain chain = IZKChain(_chainAddress);
@@ -691,9 +694,64 @@ contract AdminFunctions is Script, IAdminFunctions {
             ? abi.encodeCall(IAdminLegacy.upgradeChainFromVersion, (currentProtocolVersion, diamondCut))
             : abi.encodeCall(IAdmin.upgradeChainFromVersion, (_chainAddress, currentProtocolVersion, diamondCut));
 
-        Utils.adminExecute(_adminAddr, _accessControlRestriction, _chainAddress, upgradeCall, 0);
+        upgradeCallStruct = Call({target: _chainAddress, value: 0, data: upgradeCall});
+    }
+
+    /// @notice Upgrade a chain by reading the diamond cut directly from the CTM.
+    /// @dev Reads the diamond cut from the CTM's storage to avoid TOML parsing
+    ///      issues with large hex strings.
+    function upgradeChainFromCTM(address _chainAddress, address _adminAddr, address _accessControlRestriction) public {
+        Call memory upgradeCallStruct = _buildUpgradeChainFromCTMCall(_chainAddress);
+
+        Utils.adminExecute(
+            _adminAddr,
+            _accessControlRestriction,
+            upgradeCallStruct.target,
+            upgradeCallStruct.data,
+            upgradeCallStruct.value
+        );
 
         console.log("AdminFunctions: upgrade completed successfully");
+    }
+
+    /// @notice Upgrade a chain from the CTM and set its DA validator pair in the
+    ///         SAME admin multicall, so both apply atomically in one L1 tx.
+    /// @dev The v31 CTM upgrade resets the chain's L1 DA validator, so the
+    ///      operator must re-set the DA validator pair before the chain can
+    ///      commit batches. For Era this must be done atomically: bundling the
+    ///      upgrade and the `setDAValidatorPair` into one `ChainAdmin.multicall`
+    ///      removes any window where the chain is upgraded but missing its DA
+    ///      validator pair. The `setDAValidatorPair` call runs after the upgrade
+    ///      within the multicall, so it hits the freshly-installed v31 AdminFacet
+    ///      (the new `(address, L2DACommitmentScheme)` signature).
+    /// @param _chainAddress       The chain's diamond proxy.
+    /// @param _adminAddr          The chain's ChainAdmin.
+    /// @param _accessControlRestriction AccessControlRestriction address, or
+    ///        `address(0)` for an Ownable ChainAdmin.
+    /// @param _l1DaValidator      The post-upgrade L1 DA validator to set.
+    /// @param _l2DaCommitmentScheme The L2 DA commitment scheme to set.
+    function upgradeChainFromCTMAndSetDAValidatorPair(
+        address _chainAddress,
+        address _adminAddr,
+        address _accessControlRestriction,
+        address _l1DaValidator,
+        L2DACommitmentScheme _l2DaCommitmentScheme
+    ) public {
+        Call[] memory calls = new Call[](2);
+        // Order matters: the upgrade installs the v31 AdminFacet, and only then
+        // does the chain expose the new `setDAValidatorPair(address,
+        // L2DACommitmentScheme)` signature used below.
+        calls[0] = _buildUpgradeChainFromCTMCall(_chainAddress);
+        calls[1] = Call({
+            target: _chainAddress,
+            value: 0,
+            data: abi.encodeCall(IAdmin.setDAValidatorPair, (_l1DaValidator, _l2DaCommitmentScheme))
+        });
+
+        Utils.adminExecuteCalls(_adminAddr, _accessControlRestriction, calls);
+
+        console.log("AdminFunctions: upgrade + setDAValidatorPair completed successfully");
+        console.log("AdminFunctions: L1 DA validator", _l1DaValidator);
     }
 
     function adminScheduleUpgrade(
