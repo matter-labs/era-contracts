@@ -144,7 +144,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         l1AssetTracker = IL1AssetTracker(_l1AssetTracker);
     }
 
-
     /*//////////////////////////////////////////////////////////////
                             Check counterpart Functions
     //////////////////////////////////////////////////////////////*/

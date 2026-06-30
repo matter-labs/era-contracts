@@ -20,9 +20,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
 import {
-    AddressAlreadySet,
     NonEmptyMsgValue,
-    TokensWithFeesNotSupported,
     Unauthorized,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
@@ -290,5 +288,4 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             emit ClaimedFailedDepositAssetRouter(_chainId, _assetId, _assetData);
         }
     }
-
 }

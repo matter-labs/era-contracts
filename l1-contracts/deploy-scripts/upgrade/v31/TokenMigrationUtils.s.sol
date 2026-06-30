@@ -35,9 +35,11 @@ library TokenMigrationUtils {
     /// @dev No-op on clean-slate deployments (no pre-v31 chain balances to migrate); see
     /// `registerAllLegacyTokens`.
     // solhint-disable-next-line no-empty-blocks
-    function migrateTokenBalancesForChain(uint256 _chainId, L1NativeTokenVault _ntv, IL1AssetTracker _assetTracker)
-        internal
-    {}
+    function migrateTokenBalancesForChain(
+        uint256 _chainId,
+        L1NativeTokenVault _ntv,
+        IL1AssetTracker _assetTracker
+    ) internal {}
 
     /// @notice Migrate token balances from NTV chainBalance to AssetTracker for all chains.
     function migrateAllTokenBalances(address _ntv, address _assetTracker, IBridgehubBase _bridgehub) internal {

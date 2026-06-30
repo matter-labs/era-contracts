@@ -7,7 +7,6 @@ import {IL2CrossChainSender} from "../interfaces/IL2CrossChainSender.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 
-import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL2Bridgehub} from "../../core/bridgehub/IL2Bridgehub.sol";
 
 import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
@@ -22,15 +21,12 @@ import {
     L2_INTEROP_HANDLER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {
-    AmountMustBeGreaterThanZero,
-    AssetIdNotSupported,
+        AssetIdNotSupported,
     EmptyAddress,
     ExecuteMessageFailed,
     InvalidSelector,
     PayloadTooShort,
-    TokenNotLegacy,
     Unauthorized
 } from "../../common/L1ContractErrors.sol";
 import {IERC7786Recipient} from "../../interop/IERC7786Recipient.sol";
@@ -311,14 +307,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         // For L2->L2 the counterpart is the L2 asset router (same address on every ZK chain). For an
         // L2->L1 withdrawal the destination is L1, where the asset router lives at a different address,
         // so we target the known L1 asset router instead. The finalizeDeposit calldata is identical.
-        address destinationAssetRouter = _chainId == L1_CHAIN_ID
-            ? address(L1_ASSET_ROUTER)
-            : request.l2Contract;
+        address destinationAssetRouter = _chainId == L1_CHAIN_ID ? address(L1_ASSET_ROUTER) : request.l2Contract;
         interopCallStarter = InteropCallStarter({
             to: InteroperableAddress.formatEvmV1(destinationAssetRouter),
             data: request.l2Calldata,
             callAttributes: attributes
         });
     }
-
 }

@@ -14,11 +14,16 @@ import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 import {FinalizeL1DepositParams, IL1Nullifier, TRANSIENT_SETTLEMENT_LAYER_SLOT} from "./interfaces/IL1Nullifier.sol";
 
-import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
-import {IMailboxLegacy} from "../state-transition/chain-interfaces/IMailboxLegacy.sol";
-import {BUNDLE_IDENTIFIER, ConfirmTransferResultData, InteropBundle, InteropCall, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
+import {
+    BUNDLE_IDENTIFIER,
+    ConfirmTransferResultData,
+    InteropBundle,
+    InteropCall,
+    L2Log,
+    L2Message,
+    TxStatus
+} from "../common/Messaging.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
@@ -33,11 +38,6 @@ import {
     DepositExists,
     InvalidProof,
     InvalidSelector,
-    LegacyBridgeNotSet,
-    LegacyMethodForNonL1Token,
-    SharedBridgeKey,
-    SharedBridgeValueNotSet,
-    TokenNotLegacy,
     Unauthorized,
     WithdrawalAlreadyFinalized,
     ZeroAddress
@@ -203,7 +203,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     function bridgeConfirmTransferResult(
         ConfirmTransferResultData memory _confirmTransferResultData
     ) public nonReentrant {
-        _verifyAndClearTransfer(false, _confirmTransferResultData);
+        _verifyAndClearTransfer(_confirmTransferResultData);
         l1AssetRouter.bridgeConfirmTransferResult({
             _chainId: _confirmTransferResultData._chainId,
             _txStatus: _confirmTransferResultData._txStatus,
@@ -226,7 +226,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32[] calldata _merkleProof
     ) public nonReentrant {
         _verifyAndClearTransfer(
-            false,
             ConfirmTransferResultData({
                 _chainId: _chainId,
                 _depositSender: _depositSender,
@@ -251,11 +250,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
-    /// @param _checkedInLegacyBridge Whether the deposit was already checked in the legacy bridge system.
     /// @param _confirmTransferResultData The data for confirming the transfer result.
-    /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
+    /// @dev Processes claims of failed deposits.
     function _verifyAndClearTransfer(
-        bool _checkedInLegacyBridge,
         ConfirmTransferResultData memory _confirmTransferResultData
     ) internal whenNotPaused {
         {
@@ -463,8 +460,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// `abi.decode`. O(n) memory copy; acceptable for the withdrawal-finalization path.
     function _sliceFromOffset(bytes memory _data, uint256 _offset) private pure returns (bytes memory result) {
         require(_data.length >= _offset, WrongMsgLength(_offset, _data.length));
-        result = new bytes(_data.length - _offset);
-        for (uint256 i = 0; i < result.length; ++i) {
+        uint256 resultLength = _data.length - _offset;
+        result = new bytes(resultLength);
+        for (uint256 i = 0; i < resultLength; ++i) {
             result[i] = _data[_offset + i];
         }
     }
@@ -482,5 +480,4 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     function unpause() external onlyOwner {
         _unpause();
     }
-
 }

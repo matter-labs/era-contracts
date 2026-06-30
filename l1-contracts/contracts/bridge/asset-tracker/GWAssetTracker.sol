@@ -19,7 +19,6 @@ import {
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER_ADDR,
-    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BOOTLOADER_ADDRESS,
     L2_BRIDGEHUB,
     L2_CHAIN_ASSET_HANDLER,
@@ -33,7 +32,6 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
     MAX_BUILT_IN_CONTRACT_ADDR,
-    L2_ASSET_ROUTER,
     L2_BRIDGEHUB_ADDR
 } from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
@@ -286,7 +284,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
         uint256 msgCount = 0;
         uint256 logsLength = _processLogsInputs.logs.length;
-        bytes32 baseTokenAssetId = _bridgehub().baseTokenAssetId(_processLogsInputs.chainId);
 
         // Count chargeable interop messages during processing
         uint256 chargeableInteropCount = 0;

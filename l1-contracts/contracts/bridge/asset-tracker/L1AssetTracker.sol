@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.28;
 
-
 import {
     GatewayToL1TokenBalanceMigrationData,
     L1ToGatewayTokenBalanceMigrationData,

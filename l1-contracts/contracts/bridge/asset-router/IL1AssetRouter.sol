@@ -47,5 +47,4 @@ interface IL1AssetRouter is IAssetRouterBase, IL1CrossChainSender {
         bytes32 _assetId,
         bytes calldata _assetData
     ) external;
-
 }

@@ -8,7 +8,6 @@ import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.s
 import {
     AssetIdMismatch,
     InvalidNTVBurnData,
-    L2WithdrawalMessageWrongLength,
     UnsupportedEncodingVersion,
     BadTransferDataLength,
     EmptyData
@@ -166,7 +165,9 @@ library DataEncoding {
         // The txDataHash is collision-resistant with the removed legacy format: the legacy hash encoded an
         // address as its first word, whose most significant bytes are always zero, so it can never collide
         // with the `NEW_ENCODING_VERSION` (0x01) prefix used here.
-        txDataHash = keccak256(bytes.concat(NEW_ENCODING_VERSION, abi.encode(_originalCaller, _assetId, _transferData)));
+        txDataHash = keccak256(
+            bytes.concat(NEW_ENCODING_VERSION, abi.encode(_originalCaller, _assetId, _transferData))
+        );
     }
 
     /// @notice Decodes the token data by combining chain id, asset deployment tracker and asset data.
@@ -289,7 +290,6 @@ library DataEncoding {
         (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
         transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
     }
-
 
     function decodeL1ToGatewayTokenBalanceMigrationData(
         bytes memory _l2ToL1message

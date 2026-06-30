@@ -74,7 +74,6 @@ interface IL1Nullifier {
         bytes32[] calldata _merkleProof
     ) external;
 
-
     /// @notice When verifying recursive proofs, we mark the transient settlement layer,
     /// this function retrieves the currently stored transient settlement layer chain ID.
     /// @dev The transient settlement layer is cleared at the end of each transaction.

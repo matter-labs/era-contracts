@@ -11,7 +11,6 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 import {IL2NativeTokenVault} from "./IL2NativeTokenVault.sol";
 import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 
-import {IL2AssetRouter} from "../asset-router/IL2AssetRouter.sol";
 import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 
 import {
@@ -29,16 +28,12 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {
     AddressMismatch,
-    AssetIdAlreadyRegistered,
     AssetIdNotSupported,
     ChainIdMismatch,
     DeployFailed,
     EmptyAddress,
     EmptyBytes32,
-    InvalidCaller,
-    NoLegacySharedBridge,
-    TokenIsLegacy,
-    TokenNotLegacy
+    InvalidCaller
 } from "../../common/L1ContractErrors.sol";
 
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
@@ -228,6 +223,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// @return proxy The beacon proxy, i.e. L2 bridged token.
     function _deployBeaconProxy(
         bytes32 _salt,
+        // solhint-disable-next-line no-unused-vars
         uint256 _tokenOriginChainId
     ) internal virtual override returns (BeaconProxy proxy) {
         // Deploy the beacon proxy for the L2 token
