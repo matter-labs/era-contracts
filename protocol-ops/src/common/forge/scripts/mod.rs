@@ -243,6 +243,7 @@ script_calls! {
     AdminFunctionsAbi::ensureOwnable2StepTargetsOwnedByGovernanceWithWrapsCall => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::executeOwnableCallsWithWrapsCall                 => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::upgradeChainFromCTMCall                          => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::upgradeChainFromCTMAndSetDAValidatorPairCall     => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::updateValidatorCall                              => ADMIN_FUNCTIONS_INVOCATION,
     // GatewayUtils
     GatewayUtilsAbi::finishMigrateChainFromGatewayCall                 => GATEWAY_UTILS_INVOCATION,
