@@ -10,7 +10,6 @@ import {
     L2TransactionRequestDirect,
     L2TransactionRequestTwoBridgesOuter
 } from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
