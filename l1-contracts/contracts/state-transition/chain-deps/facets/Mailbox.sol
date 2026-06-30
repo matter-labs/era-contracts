@@ -35,7 +35,6 @@ import {
     PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET
 } from "../../../common/Config.sol";
 import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
-import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterShared} from "../../../bridge/asset-router/IAssetRouterShared.sol";
 import {
     AddressNotZero,
@@ -619,26 +618,11 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
     //////// Legacy Era functions
 
     /// @inheritdoc IMailboxLegacy
-    function finalizeEthWithdrawal(
-        // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external nonReentrant onlyL1 {
-        if (s.chainId != ERA_CHAIN_ID) {
-            revert OnlyEraSupported();
-        }
-        address sharedBridge = address(IBridgehubBase(s.bridgehub).assetRouter());
-        IL1AssetRouter(sharedBridge).finalizeWithdrawal({
-            _chainId: ERA_CHAIN_ID,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _message: _message,
-            _merkleProof: _merkleProof
-        });
+    /// @dev Deprecated. The legacy ETH-withdrawal finalization entry was removed together with the legacy
+    /// bridge; withdrawals are finalized through the asset-router / L1Nullifier path. The signature is kept
+    /// for IMailboxLegacy compatibility, but the method always reverts.
+    function finalizeEthWithdrawal(uint256, uint256, uint16, bytes calldata, bytes32[] calldata) external onlyL1 {
+        revert TransactionNotAllowed();
     }
 
     /// @inheritdoc IMailboxLegacy

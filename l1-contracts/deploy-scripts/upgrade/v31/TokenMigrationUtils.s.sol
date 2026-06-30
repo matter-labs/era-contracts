@@ -25,54 +25,21 @@ library TokenMigrationUtils {
     VmSafe private constant vm = VmSafe(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     /// @notice Register all legacy bridged tokens in the AssetTracker.
-    /// @dev Iterates through all bridged tokens in NTV and calls registerLegacyToken on the AssetTracker.
-    function registerAllLegacyTokens(address _bridgehub) internal {
-        address ntvAddress = address(
-            IL1AssetRouter(address(IBridgehubBase(_bridgehub).assetRouter())).nativeTokenVault()
-        );
-
-        IL1AssetTracker l1AssetTracker = IL1NativeTokenVault(ntvAddress).l1AssetTracker();
-        INativeTokenVaultBase ntv = INativeTokenVaultBase(ntvAddress);
-
-        uint256 bridgedTokensCount = ntv.bridgedTokensCount();
-        for (uint256 i = 0; i < bridgedTokensCount; ++i) {
-            bytes32 assetId = ntv.bridgedTokens(i);
-            // Skip tokens that are already registered to avoid reverting with AssetAlreadyRegistered.
-            if (!IAssetTrackerBase(address(l1AssetTracker)).isAssetRegistered(assetId)) {
-                l1AssetTracker.registerLegacyToken(assetId);
-            }
-        }
-    }
+    /// @dev No-op on clean-slate deployments: there are no pre-v31 bridged tokens to register, and the
+    /// AssetTracker's `registerLegacyToken` migration entry point has been removed. Kept as a stub so the
+    /// v31 upgrade scripts continue to compile and call into a single place.
+    // solhint-disable-next-line no-empty-blocks
+    function registerAllLegacyTokens(address _bridgehub) internal {}
 
     /// @notice Migrate token balances for a specific chain from NTV to AssetTracker.
+    /// @dev No-op on clean-slate deployments (no pre-v31 chain balances to migrate); see
+    /// `registerAllLegacyTokens`.
+    // solhint-disable-next-line no-empty-blocks
     function migrateTokenBalancesForChain(
         uint256 _chainId,
         L1NativeTokenVault _ntv,
         IL1AssetTracker _assetTracker
-    ) internal {
-        console.log("Processing chain:", _chainId);
-
-        uint256 tokenCount = _ntv.bridgedTokensCount();
-
-        for (uint256 j = 0; j < tokenCount; ++j) {
-            bytes32 assetId = _ntv.bridgedTokens(j);
-
-            // Check if there's a balance to migrate
-            uint256 balance = _ntv.chainBalance(_chainId, assetId);
-            if (balance > 0) {
-                address tokenAddress = _ntv.tokenAddress(assetId);
-                console.log("  Migrating token:", tokenAddress);
-                console.log("  Balance:", balance);
-
-                // Skip tokens that are already registered to avoid reverting with AssetAlreadyRegistered.
-                if (!IAssetTrackerBase(address(_assetTracker)).isAssetRegistered(assetId)) {
-                    _assetTracker.registerLegacyToken(assetId);
-                }
-
-                console.log("  Migration successful");
-            }
-        }
-    }
+    ) internal {}
 
     /// @notice Migrate token balances from NTV chainBalance to AssetTracker for all chains.
     function migrateAllTokenBalances(address _ntv, address _assetTracker, IBridgehubBase _bridgehub) internal {

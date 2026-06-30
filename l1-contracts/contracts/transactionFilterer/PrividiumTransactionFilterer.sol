@@ -7,7 +7,6 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {AlreadyWhitelisted, NotWhitelisted, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
 import {AssetRouterBase} from "../bridge/asset-router/AssetRouterBase.sol";
-import {IL2SharedBridgeLegacyFunctions} from "../bridge/interfaces/IL2SharedBridgeLegacyFunctions.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
@@ -113,12 +112,6 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
                 (, , bytes memory data) = abi.decode(_l2Calldata[4:], (uint256, bytes32, bytes));
                 // slither-disable-next-line unused-return
                 (address depositor, address receiver, , uint256 amount, ) = DataEncoding.decodeBridgeMintData(data);
-                return (depositor == receiver && amount > 0 && depositsAllowed) || whitelistedSenders[depositor];
-            } else if (l2TxSelector == IL2SharedBridgeLegacyFunctions.finalizeDeposit.selector) {
-                // slither-disable-next-line unused-return
-                (address depositor, address receiver, , uint256 amount, ) = DataEncoding.decodeBridgeMintData(
-                    _l2Calldata[4:]
-                );
                 return (depositor == receiver && amount > 0 && depositsAllowed) || whitelistedSenders[depositor];
             } else {
                 return false;

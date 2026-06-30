@@ -170,8 +170,6 @@ error IncorrectBatchBounds(
 error IncorrectBatchChainId(uint256, uint256);
 // 0xdd381a4c
 error IncorrectBridgeHubAddress(address bridgehub);
-// 0x1929b7de
-error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
 // 0x03eb8b54
 error InsufficientFunds(uint256 required, uint256 actual);
 // 0x9bf8b9aa
@@ -246,10 +244,6 @@ error L2TimestampTooBig();
 error L2WithdrawalMessageWrongLength(uint256 messageLen);
 // 0x8efef97a
 error LegacyBridgeNotSet();
-// 0x29963361
-error LegacyBridgeUsesNonNativeToken();
-// 0xfade089a
-error LegacyEncodingUsedForNonL1Token();
 // 0x767eed08
 error LegacyMethodForNonL1Token();
 // 0xe37d2c02

@@ -221,14 +221,4 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         if (availableGetters.ignoreDecimals) revert();
         return decimals_;
     }
-
-    /*//////////////////////////////////////////////////////////////
-                            LEGACY FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Returns the address of the token on its native chain.
-    /// Legacy for the l2 bridge.
-    function l1Address() public view override returns (address) {
-        return originToken;
-    }
 }

@@ -418,7 +418,7 @@ contract GWAssetTrackerExtendedTest is Test {
         uint256 withdrawAmount = 100;
         address l1Receiver = address(0x456);
 
-        // Create message using abi.encodePacked (matching DataEncoding decodeBaseTokenFinalizeWithdrawalData format)
+        // Create message using abi.encodePacked (matching the base token withdrawal message format)
         bytes memory message = abi.encodePacked(
             IMailboxLegacy.finalizeEthWithdrawal.selector,
             l1Receiver,
