@@ -74,7 +74,8 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         assertEq(chainIds[0], chainId);
 
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(chainId);
-        assertEq(protocolVersion, 133143986176);
+        // v32.0.0 (32 << 32) — chains are created at the genesis protocol version.
+        assertEq(protocolVersion, 137438953472);
     }
 
     function test_registerAlreadyDeployedZKChain() public {
