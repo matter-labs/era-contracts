@@ -198,25 +198,23 @@ jobs:
         run: |
           bash cleanup.sh
 
-  # Determinism check for the current protocol version's chain state: rebuilds
-  # the state from scratch and compares it to the committed snapshots (semantic
-  # compare, ignoring volatile Anvil fields). Reports drift when a contract
-  # change alters genesis state — regenerate via the 'Regenerate Anvil Interop
-  # Chain States' workflow and push.
+  # Drift report for the current protocol version's chain state: rebuilds the
+  # state from scratch and compares it to the committed snapshots (semantic
+  # compare, ignoring volatile Anvil fields), surfacing any drift as a CI
+  # warning. It does NOT fail the build.
   #
-  # NON-BLOCKING (continue-on-error) for now: the generation is not yet fully
-  # deterministic. The harness runs Anvil with interval mining (`--block-time 1`,
-  # required so the interop relayers/TBM keep progressing), so the block count is
-  # wall-clock-dependent and block-derived values (block numbers/timestamps) leak
-  # into contract storage — two identical runs differ. Making this a blocking
-  # gate requires reworking the mining model (auto-mine / deterministic block
-  # progression) without stalling the relayers. Until then this runs for
-  # visibility but does not fail the PR. Once deterministic, drop
-  # continue-on-error and add it to the branch protection required checks.
+  # Why report-only (not a hard gate): the generation is not yet deterministic.
+  # The harness runs Anvil with interval mining (`--block-time 1`, required so
+  # the interop relayers / TBM keep progressing), so the block count is
+  # wall-clock-dependent and block-derived values (block numbers/timestamps)
+  # leak into contract storage — two identical runs differ. Turning this into a
+  # blocking gate requires reworking the mining model (auto-mine / deterministic
+  # block progression) without stalling the relayers. Once deterministic, make
+  # the compare failure `exit 1` again and add "state-generation-check" to the
+  # branch protection required checks.
   state-generation-check:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    continue-on-error: true
 
     steps:
       - name: Checkout the repository
@@ -259,17 +257,17 @@ jobs:
           echo "Generating chain state from scratch..."
           yarn ts-node setup-and-dump-state.ts
 
-      - name: Verify committed state matches generated state
+      - name: Report committed vs generated state drift
         working-directory: l1-contracts/test/anvil-interop
         run: |
           echo "Comparing generated state against committed chain-states..."
+          # Report-only: emit a CI warning on drift but never fail. The
+          # generation is not yet deterministic (see job comment), so a hard
+          # failure would be spurious. Once deterministic, restore `exit 1`.
           if yarn ts-node compare-chain-states.ts chain-states-committed chain-states; then
             echo "Committed chain states are up to date"
           else
-            echo ""
-            echo "Committed chain-states differ from freshly generated state."
-            echo "Run the 'Regenerate Anvil Interop Chain States' workflow from the Actions tab to update them."
-            exit 1
+            echo "::warning title=anvil-interop chain-state drift::Committed chain-states differ from freshly generated state. If this is a real change (not just non-deterministic block progression), run the 'Regenerate Anvil Interop Chain States' workflow to update them."
           fi
 
       - name: Cleanup
