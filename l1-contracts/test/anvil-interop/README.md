@@ -36,9 +36,11 @@ yarn test:hardhat:interop --keep-chains
 
 ## Pregenerated Chain States
 
-Tests load pregenerated Anvil snapshots from `chain-states/v0.31.0/` by default. This skips the full deployment and cuts test time from ~5 min to ~85s.
+Tests load pregenerated Anvil snapshots from `chain-states/v0.32.0/` by default (the current protocol version). This skips the full deployment and cuts test time from ~5 min to ~85s.
 
-The runner auto-detects pregenerated state by checking for `chain-states/<protocol-version>/addresses.json`. If found, it restores each chain via `anvil_loadState`. If not found (or `FRESH_DEPLOY=1`), it runs the full 5-step deployment.
+The runner auto-detects pregenerated state by checking for `chain-states/<protocol-version>/addresses.json`. If found, it gunzips each `<chainId>.json.gz` dump and starts each Anvil process with `--load-state`. If not found (or `FRESH_DEPLOY=1`), it runs the full 5-step deployment.
+
+The per-chain state dumps are committed **gzip-compressed** (`<chainId>.json.gz`). These snapshots are multi-MB; storing them as raw JSON floods every regeneration with an enormous, unreviewable diff. GitHub renders `.gz` as binary ("Binary file not shown"), keeping them out of PR diffs, and gzip shrinks them ~10x. `addresses.json` stays plain text so contract-address changes remain reviewable. Compression/decompression is handled automatically by `dumpAllStates()` / `loadChainStates()` in `deployment-runner.ts` — no manual step.
 
 To regenerate pregenerated state after contract changes:
 
@@ -163,9 +165,9 @@ test/anvil-interop/
 │   ├── permanent-values.toml      # Immutable protocol values
 │   └── chain-{10,11,12,13}.toml   # Per-chain deployment params (generated)
 ├── chain-states/
-│   └── v0.31.0/                   # Pregenerated Anvil state snapshots
-│       ├── 31337.json             # L1 state dump
-│       ├── {10,11,12,13}.json     # L2 chain state dumps
+│   └── v0.32.0/                   # Pregenerated Anvil state snapshots
+│       ├── 31337.json.gz          # L1 state dump (gzip; kept out of diffs)
+│       ├── {10,11,12,13}.json.gz  # L2 chain state dumps (gzip)
 │       └── addresses.json         # All contract addresses + test tokens
 ├── src/
 │   ├── deployment-runner.ts       # Orchestrates all deployment steps
