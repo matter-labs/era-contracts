@@ -28,7 +28,6 @@ import {
     NEW_ENCODING_VERSION
 } from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
-import {IL2AssetRouter, L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
@@ -454,12 +453,15 @@ contract GatewayPreparation is Script {
         );
 
         bytes32 ctmAssetId = bridgehub.ctmAssetIdFromChainId(chainId);
-        L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
 
         bytes memory l2Calldata;
 
         {
-            bytes memory data = abi.encodeCall(IL2AssetRouter.withdraw, (ctmAssetId, bridgehubBurnData));
+            // TODO(interop-withdrawal): the L2->L1 withdrawal of the CTM asset now goes through the
+            // InteropCenter (a single-call bundle to the L1 asset router) instead of the removed
+            // L2AssetRouter.withdraw. Build that bundle calldata here. Placeholder keeps the inputs
+            // referenced so the script compiles.
+            bytes memory data = abi.encode(ctmAssetId, bridgehubBurnData);
 
             Call[] memory calls = new Call[](1);
             calls[0] = Call({target: L2_ASSET_ROUTER_ADDR, value: 0, data: data});

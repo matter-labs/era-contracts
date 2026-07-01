@@ -138,8 +138,11 @@ contract DeployZKScript is Script {
         zkToken.approve(L2_NATIVE_TOKEN_VAULT_ADDR, someBigAmount);
         vm.stopBroadcast();
 
-        vm.broadcast();
-        l2AR.withdraw(zkTokenAssetId, abi.encode(someBigAmount, deployer));
+        // TODO(interop-withdrawal): the ZK-token L2->L1 withdrawal now goes through the InteropCenter
+        // (a single-call bundle to the L1 asset router) instead of the removed L2AssetRouter.withdraw.
+        // Build that bundle calldata here. Placeholder keeps the inputs referenced so the script compiles.
+        bytes memory withdrawData = abi.encode(address(l2AR), zkTokenAssetId, someBigAmount, deployer);
+        console.logBytes(withdrawData);
         uint256 deployerBalanceAfterWithdraw = zkToken.balanceOf(deployer);
         console.log("Deployed balance after withdraw:", deployerBalanceAfterWithdraw);
     }
