@@ -184,7 +184,8 @@ contract DeployL2Script is Script, IDeployL2Contracts {
 
         address assetRouter = address(IL1Bridgehub(bridgehubAddress).assetRouter());
         config.l1SharedBridgeProxy = assetRouter;
-        config.erc20BridgeProxy = AddressIntrospector.getLegacyBridgeAddress(assetRouter);
+        // The legacy ERC20 bridge has been removed; retained as address(0) for backwards-compatible output.
+        config.erc20BridgeProxy = address(0);
         config.eraChainId = AddressIntrospector.getEraChainId(assetRouter);
     }
 

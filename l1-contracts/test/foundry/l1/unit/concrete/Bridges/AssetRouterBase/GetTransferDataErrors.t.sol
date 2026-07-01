@@ -20,7 +20,7 @@ contract TestAssetRouterBase is AssetRouterBase {
 
     // Use a specific name that won't trigger fuzz testing
     function callGetTransferData(bytes1 encodingVersion, bytes calldata data) external returns (bytes32, bytes memory) {
-        return _getTransferData(encodingVersion, address(0), data);
+        return _getTransferData(encodingVersion, data);
     }
 
     function BRIDGE_HUB() external view returns (IBridgehubBase) {

@@ -148,8 +148,6 @@ library AddressIntrospector {
     ) private view returns (BridgesDeployedAddresses memory info) {
         L1AssetRouter assetRouter = L1AssetRouter(_assetRouter);
 
-        // The legacy ERC20 bridge has been removed; its address is no longer tracked.
-        address erc20BridgeProxy = address(0);
         address l1NullifierProxy = address(assetRouter.L1_NULLIFIER());
         address l1NativeTokenVaultProxy = address(assetRouter.nativeTokenVault());
 
@@ -160,8 +158,9 @@ library AddressIntrospector {
             ? UpgradeableBeacon(bridgedTokenBeacon).implementation()
             : address(0);
 
+        // `erc20Bridge` is retained in the struct for backwards-compatible output; the legacy bridge is gone.
         BridgeContracts memory proxies = BridgeContracts({
-            erc20Bridge: erc20BridgeProxy,
+            erc20Bridge: address(0),
             l1AssetRouter: _assetRouter,
             l1Nullifier: l1NullifierProxy,
             l1NativeTokenVault: l1NativeTokenVaultProxy
@@ -359,18 +358,6 @@ library AddressIntrospector {
         revert NoUptoDateZkChainFound();
     }
 
-    // ============ Legacy Bridge Addresses ============
-
-    /// @notice The legacy ERC20 bridge has been removed; this always returns address(0).
-    function getLegacyBridgeAddress(address) public pure returns (address legacyBridge) {
-        return address(0);
-    }
-
-    /// @notice The legacy ERC20 bridge has been removed; this always returns an empty struct.
-    function getLegacyBridgeAddresses(address) public pure returns (L2ERC20BridgeAddresses memory info) {
-        return info;
-    }
-
     function getEraChainId(address _assetRouter) public view returns (uint256 eraChainId) {
         return IL1AssetRouter(_assetRouter).ERA_CHAIN_ID();
     }
@@ -420,10 +407,7 @@ library AddressIntrospector {
         address assetRouter = address(_bridgehub.assetRouter());
         bridges = getBridgesDeployedAddresses(assetRouter);
 
-        address legacyBridgeAddress = getLegacyBridgeAddress(assetRouter);
-        if (legacyBridgeAddress != address(0)) {
-            legacyBridge = getLegacyBridgeAddresses(assetRouter);
-        }
+        // The legacy ERC20 bridge has been removed; `legacyBridge` is intentionally left empty.
     }
 
     // ============ Private Helpers ============

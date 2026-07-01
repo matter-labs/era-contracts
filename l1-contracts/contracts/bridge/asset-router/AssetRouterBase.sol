@@ -143,7 +143,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     ) internal returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes1 encodingVersion = _data[0];
 
-        (bytes32 assetId, bytes memory transferData) = _getTransferData(encodingVersion, _originalCaller, _data);
+        (bytes32 assetId, bytes memory transferData) = _getTransferData(encodingVersion, _data);
         require(_bridgehub().baseTokenAssetId(_chainId) != assetId, AssetIdNotSupported(assetId));
 
         bytes memory bridgeMintCalldata = _burn({
@@ -180,7 +180,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
     function _getTransferData(
         bytes1 /* _encodingVersion */,
-        address,
         bytes calldata _data
     ) internal virtual returns (bytes32 assetId, bytes memory transferData) {
         // slither-disable-next-line unused-return
