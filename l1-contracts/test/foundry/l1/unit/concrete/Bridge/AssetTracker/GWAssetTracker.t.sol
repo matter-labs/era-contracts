@@ -34,7 +34,6 @@ import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExe
 import {ProcessLogsTestHelper} from "./ProcessLogsTestHelper.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
@@ -51,10 +50,6 @@ contract GWAssetTrackerTestHelper is GWAssetTrackerDev {
 
     function getTokenOriginChainId(bytes32 _assetId) external view returns (uint256) {
         return tokenOriginChainId[_assetId];
-    }
-
-    function getLegacySharedBridgeAddress(uint256 _chainId) external view returns (address) {
-        return legacySharedBridgeAddress[_chainId];
     }
 
     /// @notice Helper to set chain balance directly for testing
@@ -113,7 +108,7 @@ contract GWAssetTrackerTest is Test {
         // L2MessageRoot: real bytecode + init so getEmptyMultichainBatchRoot works.
         vm.etch(L2_MESSAGE_ROOT_ADDR, type(L2MessageRoot).runtimeCode);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(L1_CHAIN_ID, 0);
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(L1_CHAIN_ID);
 
         // Mock the WETH_TOKEN() call on NativeTokenVault
         address mockWrappedZKToken = makeAddr("mockWrappedZKToken");
@@ -235,20 +230,6 @@ contract GWAssetTrackerTest is Test {
         gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, CANONICAL_TX_HASH, balanceChange);
     }
 
-    function test_SetLegacySharedBridgeAddress() public {
-        address legacyBridge = makeAddr("legacyBridge");
-
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        gwAssetTracker.setLegacySharedBridgeAddress(CHAIN_ID, legacyBridge);
-    }
-
-    function test_SetLegacySharedBridgeAddress_Unauthorized() public {
-        address legacyBridge = makeAddr("legacyBridge");
-
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        gwAssetTracker.setLegacySharedBridgeAddress(CHAIN_ID, legacyBridge);
-    }
-
     function test_ConfirmMigrationOnGateway_Unauthorized() public {
         MigrationConfirmationData memory data = MigrationConfirmationData({
             chainId: CHAIN_ID,
@@ -283,7 +264,7 @@ contract GWAssetTrackerTest is Test {
         vm.chainId(CHAIN_ID);
         L2MessageRoot dummyL2MessageRoot = new L2MessageRoot();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        dummyL2MessageRoot.initL2(L1_CHAIN_ID, block.chainid);
+        dummyL2MessageRoot.initL2(L1_CHAIN_ID);
 
         assertEq(dummyL2MessageRoot.getAggregatedRoot(), emptyRoot);
     }
@@ -296,7 +277,7 @@ contract GWAssetTrackerTest is Test {
         vm.chainId(CHAIN_ID);
         L2MessageRoot l2MessageRoot = new L2MessageRoot();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2MessageRoot.initL2(L1_CHAIN_ID, block.chainid);
+        l2MessageRoot.initL2(L1_CHAIN_ID);
 
         // Get the aggregated root from L2MessageRoot (which uses MessageRootBase initialization)
         bytes32 l2AggregatedRoot = l2MessageRoot.getAggregatedRoot();
@@ -329,7 +310,7 @@ contract GWAssetTrackerTest is Test {
             vm.chainId(chainId);
             L2MessageRoot l2MessageRoot = new L2MessageRoot();
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            l2MessageRoot.initL2(L1_CHAIN_ID, block.chainid);
+            l2MessageRoot.initL2(L1_CHAIN_ID);
 
             // Get the aggregated root from L2MessageRoot
             bytes32 l2AggregatedRoot = l2MessageRoot.getAggregatedRoot();
@@ -341,20 +322,6 @@ contract GWAssetTrackerTest is Test {
                 string.concat("Empty root mismatch for chain ID: ", vm.toString(chainId))
             );
         }
-    }
-
-    function test_SetLegacySharedBridgeAddressForLocalTesting() public {
-        address legacyBridge = makeAddr("legacyBridge");
-
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        gwAssetTracker.setLegacySharedBridgeAddressForLocalTesting(CHAIN_ID, legacyBridge);
-    }
-
-    function test_SetLegacySharedBridgeAddressForLocalTesting_Unauthorized() public {
-        address legacyBridge = makeAddr("legacyBridge");
-
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        gwAssetTracker.setLegacySharedBridgeAddressForLocalTesting(CHAIN_ID, legacyBridge);
     }
 
     function test_ConfirmMigrationOnGateway_L1ToGateway() public {
@@ -533,24 +500,6 @@ contract GWAssetTrackerTest is Test {
 
         // Different chain IDs should produce different roots
         assertTrue(emptyRoot1 != emptyRoot2);
-    }
-
-    function test_SetLegacySharedBridgeAddress_DifferentChains() public {
-        address legacyBridge1 = makeAddr("legacyBridge1");
-        address legacyBridge2 = makeAddr("legacyBridge2");
-        uint256 chainId1 = 100;
-        uint256 chainId2 = 200;
-
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        gwAssetTracker.setLegacySharedBridgeAddress(chainId1, legacyBridge1);
-
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        gwAssetTracker.setLegacySharedBridgeAddress(chainId2, legacyBridge2);
-    }
-
-    function testFuzz_SetLegacySharedBridgeAddress(uint256 _chainId, address _legacyBridge) public {
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        gwAssetTracker.setLegacySharedBridgeAddress(_chainId, _legacyBridge);
     }
 
     function test_HandleChainBalanceIncreaseOnGateway_SameAssetAndBaseToken() public {
@@ -900,164 +849,6 @@ contract GWAssetTrackerTest is Test {
             _amount,
             "Destination chainBalance after confirmation"
         );
-    }
-
-    /// @notice Regression: legacy bridge message decoding does not revert (parseTokenData on empty bytes was fixed).
-    function test_regression_legacySharedBridgeMessageDecodingDoesNotFail() public {
-        uint256 legacyChainId = 324; // Era chain ID
-        address l1Token = makeAddr("l1Token");
-        address l1Receiver = makeAddr("l1Receiver");
-        uint256 withdrawAmount = 1000;
-
-        address legacyBridge = makeAddr("legacySharedBridge");
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        gwAssetTracker.setLegacySharedBridgeAddressForLocalTesting(legacyChainId, legacyBridge);
-
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
-        gwAssetTracker.setChainBalance(legacyChainId, assetId, withdrawAmount * 2);
-
-        bytes memory legacyMessage = abi.encodePacked(
-            IL1ERC20Bridge.finalizeWithdrawal.selector,
-            l1Receiver,
-            l1Token,
-            withdrawAmount
-        );
-
-        uint256 balanceBefore = gwAssetTracker.chainBalance(legacyChainId, assetId);
-
-        _submitLegacyBridgeWithdrawal(legacyChainId, legacyBridge, legacyMessage);
-
-        assertEq(
-            gwAssetTracker.chainBalance(legacyChainId, assetId),
-            balanceBefore - withdrawAmount,
-            "Chain balance should decrease after legacy withdrawal"
-        );
-        assertEq(gwAssetTracker.pendingInteropBalance(legacyChainId, assetId), 0);
-    }
-
-    /// @notice Test that the legacy token data is properly encoded with L1 chain ID
-    /// @dev Verifies the fix encodes the L1 chain ID in the token metadata
-    function test_regression_legacyTokenDataEncodesL1ChainId() public {
-        // Test that decodeLegacyFinalizeWithdrawalData produces properly encoded token data
-        address l1Token = makeAddr("testToken");
-        address l1Receiver = makeAddr("testReceiver");
-        uint256 amount = 500;
-
-        // Construct a legacy message
-        bytes memory legacyMessage = abi.encodePacked(
-            IL1ERC20Bridge.finalizeWithdrawal.selector,
-            l1Receiver,
-            l1Token,
-            amount
-        );
-
-        // Decode it using the library function
-        (bytes4 sig, address token, bytes memory transferData) = DataEncoding.decodeLegacyFinalizeWithdrawalData(
-            L1_CHAIN_ID,
-            legacyMessage
-        );
-
-        assertEq(sig, IL1ERC20Bridge.finalizeWithdrawal.selector, "Function signature mismatch");
-        assertEq(token, l1Token, "Token address mismatch");
-
-        // Decode the transfer data to get erc20Metadata
-        (, , , , bytes memory erc20Metadata) = DataEncoding.decodeBridgeMintData(transferData);
-
-        // Verify the metadata is not empty and can be parsed
-        assertTrue(erc20Metadata.length > 0, "erc20Metadata should not be empty");
-
-        // Parse the token data - this is what was failing before the fix
-        (uint256 originChainId, bytes memory name, bytes memory symbol, bytes memory decimals) = gwAssetTracker
-            .parseTokenData(erc20Metadata);
-
-        // The origin chain ID should be L1_CHAIN_ID (legacy tokens are L1 tokens)
-        assertEq(originChainId, L1_CHAIN_ID, "Origin chain ID should be L1 chain ID");
-
-        // Name, symbol, decimals should be empty but valid
-        assertEq(name.length, 0, "Name should be empty");
-        assertEq(symbol.length, 0, "Symbol should be empty");
-        assertEq(decimals.length, 0, "Decimals should be empty");
-    }
-
-    /// @notice Test multiple legacy withdrawals can be processed via processLogsAndMessages.
-    function test_regression_multipleLegacyWithdrawalsSucceed() public {
-        uint256 legacyChainId = 324;
-        address l1Token = makeAddr("l1Token");
-        uint256 withdrawAmount = 100;
-
-        address legacyBridge = makeAddr("legacySharedBridge");
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        gwAssetTracker.setLegacySharedBridgeAddressForLocalTesting(legacyChainId, legacyBridge);
-
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
-        gwAssetTracker.setChainBalance(legacyChainId, assetId, withdrawAmount * 10);
-
-        for (uint256 i = 0; i < 5; i++) {
-            address receiver = makeAddr(string(abi.encodePacked("receiver", i)));
-
-            bytes memory legacyMessage = abi.encodePacked(
-                IL1ERC20Bridge.finalizeWithdrawal.selector,
-                receiver,
-                l1Token,
-                withdrawAmount
-            );
-
-            uint256 balanceBefore = gwAssetTracker.chainBalance(legacyChainId, assetId);
-
-            _submitLegacyBridgeWithdrawal(legacyChainId, legacyBridge, legacyMessage);
-
-            assertEq(
-                gwAssetTracker.chainBalance(legacyChainId, assetId),
-                balanceBefore - withdrawAmount,
-                "Balance should decrease for each withdrawal"
-            );
-            assertEq(gwAssetTracker.pendingInteropBalance(legacyChainId, assetId), 0);
-        }
-
-        assertEq(
-            gwAssetTracker.chainBalance(legacyChainId, assetId),
-            withdrawAmount * 5,
-            "Final balance should reflect all withdrawals"
-        );
-        assertEq(gwAssetTracker.pendingInteropBalance(legacyChainId, assetId), 0);
-    }
-
-    /// @notice Fuzz test: legacy withdrawal message processing via processLogsAndMessages.
-    function testFuzz_regression_legacyWithdrawalMessage(
-        address _l1Token,
-        address _l1Receiver,
-        uint256 _amount
-    ) public {
-        _amount = bound(_amount, 1, type(uint128).max);
-        vm.assume(_l1Token != address(0));
-        vm.assume(_l1Receiver != address(0));
-
-        uint256 legacyChainId = 324;
-
-        address legacyBridge = makeAddr("legacySharedBridge");
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        gwAssetTracker.setLegacySharedBridgeAddressForLocalTesting(legacyChainId, legacyBridge);
-
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
-        gwAssetTracker.setChainBalance(legacyChainId, assetId, _amount * 2);
-
-        bytes memory legacyMessage = abi.encodePacked(
-            IL1ERC20Bridge.finalizeWithdrawal.selector,
-            _l1Receiver,
-            _l1Token,
-            _amount
-        );
-
-        uint256 balanceBefore = gwAssetTracker.chainBalance(legacyChainId, assetId);
-
-        _submitLegacyBridgeWithdrawal(legacyChainId, legacyBridge, legacyMessage);
-
-        assertEq(
-            gwAssetTracker.chainBalance(legacyChainId, assetId),
-            balanceBefore - _amount,
-            "Balance should decrease"
-        );
-        assertEq(gwAssetTracker.pendingInteropBalance(legacyChainId, assetId), 0);
     }
 
     function test_regression_firstDepositSetsAssetMigrationNumber() public {
@@ -1520,24 +1311,6 @@ contract GWAssetTrackerTest is Test {
         ProcessLogsInput memory input = ProcessLogsTestHelper.buildProcessLogsInput(
             gwAssetTracker,
             _srcChainId,
-            1,
-            logs,
-            messages,
-            address(0)
-        );
-        vm.prank(mockZKChain);
-        gwAssetTracker.processLogsAndMessages(input);
-    }
-
-    /// @dev Submits a legacy bridge withdrawal for the given chain via processLogsAndMessages.
-    function _submitLegacyBridgeWithdrawal(uint256 _chainId, address _legacyBridge, bytes memory _legacyMsg) internal {
-        L2Log[] memory logs = new L2Log[](1);
-        logs[0] = ProcessLogsTestHelper.createLegacyBridgeLog(0, _legacyBridge, _legacyMsg);
-        bytes[] memory messages = new bytes[](1);
-        messages[0] = _legacyMsg;
-        ProcessLogsInput memory input = ProcessLogsTestHelper.buildProcessLogsInput(
-            gwAssetTracker,
-            _chainId,
             1,
             logs,
             messages,

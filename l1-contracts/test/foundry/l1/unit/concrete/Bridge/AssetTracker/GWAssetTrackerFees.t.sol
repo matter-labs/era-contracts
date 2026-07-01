@@ -85,7 +85,7 @@ contract GWAssetTrackerFeesTest is Test {
         // L2MessageRoot: real bytecode + init so getEmptyMultichainBatchRoot works.
         vm.etch(L2_MESSAGE_ROOT_ADDR, type(L2MessageRoot).runtimeCode);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(1, 0);
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(1);
 
         // L2ChainAssetHandler: real bytecode + init.
         vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, type(L2ChainAssetHandler).runtimeCode);

@@ -12,7 +12,6 @@ import {Governance} from "contracts/governance/Governance.sol";
 import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
-import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {DummyL1MessageRoot} from "contracts/dev-contracts/test/DummyL1MessageRoot.sol";
@@ -35,6 +34,7 @@ struct Config {
     uint256 eraChainId;
     address eraDiamondProxyAddress;
     bool supportL2LegacySharedBridgeTest;
+    uint256 legacyGatewayChainId;
     ContractsConfig contracts;
     TokensConfig tokens;
 }
@@ -81,6 +81,12 @@ contract DeployL1CoreUtils is DeployUtils {
             config.eraDiamondProxyAddress = toml.readAddress("$.contracts.era_diamond_proxy_addr");
         }
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
+        // Legacy Era gateway chain ID, baked into L1MessageRoot as immutable
+        // ERA_GATEWAY_CHAIN_ID and used by L1ChainAssetHandler.setHistoricalMigrationInterval
+        // to gate intervals settled on the legacy GW. Optional: absent on fresh deployments.
+        if (vm.keyExistsToml(toml, "$.gateway.chain_id")) {
+            config.legacyGatewayChainId = toml.readUint("$.gateway.chain_id");
+        }
     }
 
     ////////////////////////////// Contract deployment modes /////////////////////////////////
@@ -100,14 +106,16 @@ contract DeployL1CoreUtils is DeployUtils {
         } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
             return abi.encode(coreAddresses.bridges.bridgedStandardERC20Implementation);
         } else if (compareStrings(contractName, "L1Bridgehub")) {
-            return abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains));
+            return abi.encode(config.ownerAddress, config.contracts.maxNumberOfChains);
         } else if (
-            compareStrings(contractName, "L1MessageRoot") || compareStrings(contractName, "DummyL1MessageRoot")
+            compareStrings(contractName, "L1MessageRoot") ||
+            compareStrings(contractName, "DummyL1MessageRoot") ||
+            compareStrings(contractName, "L1MessageRootStageSepolia")
         ) {
             return
                 abi.encode(
                     coreAddresses.bridgehub.proxies.bridgehub,
-                    config.l1ChainId,
+                    config.legacyGatewayChainId,
                     coreAddresses.bridgehub.proxies.chainAssetHandler
                 );
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
@@ -139,14 +147,6 @@ contract DeployL1CoreUtils is DeployUtils {
                     coreAddresses.bridges.proxies.l1Nullifier,
                     config.eraChainId,
                     config.eraDiamondProxyAddress
-                );
-        } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-            return
-                abi.encode(
-                    coreAddresses.bridges.proxies.l1Nullifier,
-                    coreAddresses.bridges.proxies.l1AssetRouter,
-                    coreAddresses.bridges.proxies.l1NativeTokenVault,
-                    config.eraChainId
                 );
         } else if (compareStrings(contractName, "L1NativeTokenVault")) {
             return
@@ -219,11 +219,9 @@ contract DeployL1CoreUtils is DeployUtils {
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
                 return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1Nullifier")) {
-                return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1, 1, 1, 0));
+                return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1));
             } else if (compareStrings(contractName, "L1AssetRouter")) {
                 return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-                return abi.encodeCall(L1ERC20Bridge.initialize, ());
             } else if (compareStrings(contractName, "L1NativeTokenVault")) {
                 return
                     abi.encodeCall(

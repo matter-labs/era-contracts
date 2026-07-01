@@ -132,27 +132,27 @@
     "name": "finalizeEthWithdrawal",
     "inputs": [
       {
-        "name": "_l2BatchNumber",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "_l2MessageIndex",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "_l2TxNumberInBatch",
+        "name": "",
         "type": "uint16",
         "internalType": "uint16"
       },
       {
-        "name": "_message",
+        "name": "",
         "type": "bytes",
         "internalType": "bytes"
       },
       {
-        "name": "_merkleProof",
+        "name": "",
         "type": "bytes32[]",
         "internalType": "bytes32[]"
       }

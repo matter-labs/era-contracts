@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
@@ -36,7 +35,6 @@ abstract contract L1FixedForceDeploymentsHelper {
         address _baseTokenAddress
     ) internal view returns (bytes memory) {
         address sharedBridge = address(IL1Bridgehub(s.bridgehub).assetRouter());
-        address legacySharedBridge = IL1SharedBridgeLegacy(sharedBridge).l2BridgeAddress(s.chainId);
 
         address l2WBaseToken;
         if (_wrappedBaseTokenStore != address(0)) {
@@ -91,7 +89,8 @@ abstract contract L1FixedForceDeploymentsHelper {
 
         ZKChainSpecificForceDeploymentsData
             memory additionalForceDeploymentsData = ZKChainSpecificForceDeploymentsData({
-                l2LegacySharedBridge: legacySharedBridge,
+                // The legacy shared bridge has been removed; this ABI placeholder is always address(0).
+                l2LegacySharedBridge: address(0),
                 predeployedL2WethAddress: l2WBaseToken,
                 baseTokenL1Address: _baseTokenAddress,
                 baseTokenMetadata: tokenData,

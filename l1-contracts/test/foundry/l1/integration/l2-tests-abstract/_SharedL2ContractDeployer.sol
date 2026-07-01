@@ -51,7 +51,6 @@ import {
 } from "../../../../../contracts/common/Messaging.sol";
 import {InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
 import {L2WrappedBaseToken} from "../../../../../contracts/bridge/L2WrappedBaseToken.sol";
-import {L2SharedBridgeLegacy} from "../../../../../contracts/bridge/L2SharedBridgeLegacy.sol";
 import {MailboxFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {AdminFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Admin.sol";
 import {DataEncoding} from "../../../../../contracts/common/libraries/DataEncoding.sol";
@@ -104,8 +103,6 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     bytes internal exampleChainCommitment;
 
-    address internal sharedBridgeLegacy;
-
     IChainTypeManager internal chainTypeManager;
 
     address UNBUNDLER_ADDRESS;
@@ -126,7 +123,11 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         }
         standardErc20Impl = new BridgedStandardERC20();
         beacon = new UpgradeableBeacon(address(standardErc20Impl));
-        // beacon.transferOwnership(ownerWallet);
+        // Transfer beacon ownership to the governor so that bridged-token reinitialization
+        // (BridgedStandardERC20.reinitializeToken, gated on the beacon owner) can be exercised.
+        // In the L1-context tests the bridged token uses a separate L1-deployed beacon owned by
+        // the governor, so this only affects the L2-context (which uses this test beacon).
+        beacon.transferOwnership(ownerWallet);
 
         // One of the purposes of deploying it here is to publish its bytecode
         BeaconProxy beaconProxy = new BeaconProxy(address(beacon), new bytes(0));
@@ -144,13 +145,6 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         originalChainId = block.chainid;
 
         coreAddresses.bridgehub.proxies.bridgehub = L2_BRIDGEHUB_ADDR;
-        sharedBridgeLegacy = deployL2SharedBridgeLegacy(
-            L1_CHAIN_ID,
-            ERA_CHAIN_ID,
-            ownerWallet,
-            l1AssetRouter,
-            beaconProxyBytecodeHash
-        );
 
         L2WrappedBaseToken weth = deployL2Weth();
         if (_skip) {
@@ -163,7 +157,6 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
                 eraChainId: ERA_CHAIN_ID,
                 gatewayChainId: GATEWAY_CHAIN_ID,
                 l1AssetRouter: l1AssetRouter,
-                legacySharedBridge: sharedBridgeLegacy,
                 l2TokenBeacon: address(beacon),
                 l2TokenProxyBytecodeHash: beaconProxyBytecodeHash,
                 aliasedOwner: ownerWallet,
@@ -256,11 +249,6 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             abi.encode(L2_ASSET_ROUTER_ADDR)
         );
         vm.mockCall(
-            L2_ASSET_ROUTER_ADDR,
-            abi.encodeWithSelector(IL1Nullifier.l2BridgeAddress.selector),
-            abi.encode(address(0))
-        );
-        vm.mockCall(
             L2_BRIDGEHUB_ADDR,
             abi.encodeWithSelector(IBridgehubBase.baseToken.selector, ERA_CHAIN_ID + 1),
             abi.encode(address(uint160(1)))
@@ -322,37 +310,8 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         string memory symbol,
         uint8 decimals
     ) internal pure returns (bytes memory) {
-        bytes memory encodedName = abi.encode(name);
-        bytes memory encodedSymbol = abi.encode(symbol);
-        bytes memory encodedDecimals = abi.encode(decimals);
-
-        return abi.encode(encodedName, encodedSymbol, encodedDecimals);
-    }
-
-    function deployL2SharedBridgeLegacy(
-        uint256 _l1ChainId,
-        uint256 _eraChainId,
-        address _aliasedOwner,
-        address _l1SharedBridge,
-        bytes32 _l2TokenProxyBytecodeHash
-    ) internal returns (address) {
-        bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
-
-        L2SharedBridgeLegacy bridge = new L2SharedBridgeLegacy();
-        console.log("bridge", address(bridge));
-        address proxyAdmin = makeAddr("proxyAdmin");
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(bridge),
-            proxyAdmin,
-            abi.encodeWithSelector(
-                L2SharedBridgeLegacy.initialize.selector,
-                _l1SharedBridge,
-                _l2TokenProxyBytecodeHash,
-                _aliasedOwner
-            )
-        );
-        console.log("proxy", address(proxy));
-        return address(proxy);
+        // Use the current (versioned) token-data encoding; the legacy unversioned format is no longer supported.
+        return DataEncoding.encodeTokenData(L1_CHAIN_ID, abi.encode(name), abi.encode(symbol), abi.encode(decimals));
     }
 
     function deployL2Weth() internal returns (L2WrappedBaseToken) {
@@ -400,14 +359,16 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
     }
 
     function performDeposit(address depositor, address receiver, uint256 amount) internal {
-        vm.prank(aliasedL1AssetRouter);
-        L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDeposit({
-            _l1Sender: depositor,
-            _l2Receiver: receiver,
-            _l1Token: L1_TOKEN_ADDRESS,
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, L1_TOKEN_ADDRESS);
+        bytes memory transferData = DataEncoding.encodeBridgeMintData({
+            _originalCaller: depositor,
+            _remoteReceiver: receiver,
+            _originToken: L1_TOKEN_ADDRESS,
             _amount: amount,
-            _data: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
+            _erc20Metadata: encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
         });
+        vm.prank(aliasedL1AssetRouter);
+        AssetRouterBase(address(l2AssetRouter)).finalizeDeposit(L1_CHAIN_ID, assetId, transferData);
     }
 
     function initializeTokenByDeposit() internal returns (address l2TokenAddress) {

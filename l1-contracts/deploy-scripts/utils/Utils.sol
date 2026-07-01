@@ -475,14 +475,23 @@ library Utils {
     {
         IL1Bridgehub bridgehub = IL1Bridgehub(params.bridgehubAddress);
 
+        // Headroom multiplier on `baseCost`. The prepare emits a fixed
+        // `mintValue`, but `baseCost = _deriveL2GasPrice(tx.gasprice, ...) * l2GasLimit`
+        // is re-computed at broadcast time from the *live* L1 gas price.
+        // A 2x buffer was insufficient when L1 gas tripled between prepare
+        // (e.g. 1 gwei) and broadcast (e.g. 3 gwei) — `MsgValueTooLow` reverts.
+        // 10x absorbs the typical 1→10 gwei swings on Sepolia.
+        // Cap `l1GasPrice` at `block.basefee` so we never compute below the
+        // current floor.
+        uint256 effectiveGasPrice = params.l1GasPrice > block.basefee ? params.l1GasPrice : block.basefee;
         requiredValueToDeploy =
             bridgehub.l2TransactionBaseCost(
                 params.chainId,
-                params.l1GasPrice,
+                effectiveGasPrice,
                 params.l2GasLimit,
                 REQUIRED_L2_GAS_PRICE_PER_PUBDATA
             ) *
-                2 +
+                10 +
             params.l2Value;
 
         l2TransactionRequestDirect = L2TransactionRequestDirect({
@@ -514,8 +523,17 @@ library Utils {
     {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddress);
 
+        // 10x headroom — see `prepareL1L2Transaction` comment for rationale.
+        // Cap `l1GasPrice` at `block.basefee` so mintValue covers the case
+        // where actual L1 gas at broadcast time exceeds the prepare-time
+        // snapshot.
         requiredValueToDeploy =
-            bridgehub.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) * 2;
+            bridgehub.l2TransactionBaseCost(
+                chainId,
+                l1GasPrice > block.basefee ? l1GasPrice : block.basefee,
+                l2GasLimit,
+                REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+            ) * 10;
 
         l2TransactionRequest = L2TransactionRequestTwoBridgesOuter({
             chainId: chainId,
@@ -925,6 +943,142 @@ library Utils {
         console.logBytes32(txHash);
     }
 
+    function runGovernanceL1L2DirectTransaction(
+        uint256 l1GasPrice,
+        address governor,
+        bytes32 salt,
+        bytes memory l2Calldata,
+        uint256 l2GasLimit,
+        bytes[] memory factoryDeps,
+        address dstAddress,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy
+    ) internal returns (bytes32 txHash) {
+        (
+            L2TransactionRequestDirect memory l2TransactionRequestDirect,
+            uint256 requiredValueToDeploy
+        ) = prepareL1L2Transaction(
+                PrepareL1L2TransactionParams({
+                    l1GasPrice: l1GasPrice,
+                    l2Calldata: l2Calldata,
+                    l2GasLimit: l2GasLimit,
+                    l2Value: 0,
+                    factoryDeps: factoryDeps,
+                    dstAddress: dstAddress,
+                    chainId: chainId,
+                    bridgehubAddress: bridgehubAddress,
+                    l1SharedBridgeProxy: l1SharedBridgeProxy,
+                    refundRecipient: msg.sender
+                })
+            );
+
+        requiredValueToDeploy = approveBaseTokenGovernance(
+            IL1Bridgehub(bridgehubAddress),
+            l1SharedBridgeProxy,
+            governor,
+            salt,
+            chainId,
+            requiredValueToDeploy
+        );
+
+        bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
+            IL1Bridgehub.requestL2TransactionDirect,
+            (l2TransactionRequestDirect)
+        );
+
+        console.log("Executing transaction");
+        vm.recordLogs();
+        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequestDirectCalldata, requiredValueToDeploy, 0);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        console.log("Transaction executed successfully! Extracting logs...");
+
+        address expectedDiamondProxyAddress = IL1Bridgehub(bridgehubAddress).getZKChain(chainId);
+
+        txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
+
+        console.log("L2 Transaction hash is ");
+        console.logBytes32(txHash);
+    }
+
+    function runGovernanceL1L2TwoBridgesTransaction(
+        uint256 l1GasPrice,
+        address governor,
+        bytes32 salt,
+        uint256 l2GasLimit,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy,
+        address secondBridgeAddress,
+        uint256 secondBridgeValue,
+        bytes memory secondBridgeCalldata
+    ) internal returns (bytes32 txHash) {
+        (
+            L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
+            uint256 requiredValueToDeploy
+        ) = prepareL1L2TransactionTwoBridges(
+                l1GasPrice,
+                l2GasLimit,
+                chainId,
+                bridgehubAddress,
+                secondBridgeAddress,
+                secondBridgeValue,
+                secondBridgeCalldata,
+                msg.sender
+            );
+
+        requiredValueToDeploy = approveBaseTokenGovernance(
+            IL1Bridgehub(bridgehubAddress),
+            l1SharedBridgeProxy,
+            governor,
+            salt,
+            chainId,
+            requiredValueToDeploy
+        );
+
+        bytes memory l2TransactionRequestCalldata = abi.encodeCall(
+            IL1Bridgehub.requestL2TransactionTwoBridges,
+            (l2TransactionRequest)
+        );
+
+        console.log("Executing transaction");
+        vm.recordLogs();
+        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequestCalldata, requiredValueToDeploy, 0);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        console.log("Transaction executed successfully! Extracting logs...");
+
+        address expectedDiamondProxyAddress = IL1Bridgehub(bridgehubAddress).getZKChain(chainId);
+
+        txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
+
+        console.log("L2 Transaction hash is ");
+        console.logBytes32(txHash);
+    }
+
+    function approveBaseTokenGovernance(
+        IL1Bridgehub bridgehub,
+        address l1SharedBridgeProxy,
+        address governor,
+        bytes32 salt,
+        uint256 chainId,
+        uint256 amountToApprove
+    ) internal returns (uint256 ethAmountToPass) {
+        address baseTokenAddress = bridgehub.baseToken(chainId);
+        if (ADDRESS_ONE != baseTokenAddress) {
+            console.log("Base token not ETH, approving");
+            IERC20 baseToken = IERC20(baseTokenAddress);
+
+            bytes memory approvalCalldata = abi.encodeCall(baseToken.approve, (l1SharedBridgeProxy, amountToApprove));
+
+            executeUpgrade(governor, salt, address(baseToken), approvalCalldata, 0, 0);
+
+            ethAmountToPass = 0;
+        } else {
+            console.log("Base token is ETH, no need to approve");
+            ethAmountToPass = amountToApprove;
+        }
+    }
+
     function prepareApproveBaseTokenAdminCalls(
         IL1Bridgehub bridgehub,
         address l1SharedBridgeProxy,
@@ -1024,6 +1178,17 @@ library Utils {
         input[1] = "./scripts/blake2s256.js";
         input[2] = vm.toString(_bytecode);
         hashedBytecode = bytes32(vm.ffi(input));
+    }
+
+    /// Per-regen salt for legacy `Governance.sol` ceremonies. The op id is
+    /// `hash(targets, values, calldatas, predecessor, salt)`; rotating the salt
+    /// each regen prevents collisions with prior op ids that may still sit in
+    /// the legacy Gov's `Done` map from earlier broadcasts. Set via the
+    /// `LEGACY_GOV_SALT` env var (protocol-ops reads it from `stage.toml`'s
+    /// `legacy_gov_salt` field). Defaults to `bytes32(0)` so existing
+    /// non-regen flows keep working unchanged.
+    function currentLegacyGovSalt() internal view returns (bytes32) {
+        return vm.envOr("LEGACY_GOV_SALT", bytes32(0));
     }
 
     function executeUpgrade(

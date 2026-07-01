@@ -191,19 +191,6 @@
   },
   {
     "type": "function",
-    "name": "setLegacyTokenAssetId",
-    "inputs": [
-      {
-        "name": "_l2TokenAddress",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "tokenAddress",
     "inputs": [
       {

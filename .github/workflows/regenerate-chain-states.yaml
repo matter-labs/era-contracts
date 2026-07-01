@@ -95,7 +95,11 @@ jobs:
           git config user.name "zksync[bot]"
           git config user.email "zksync[bot]@users.noreply.github.com"
 
-          git add l1-contracts/test/anvil-interop/chain-states/
+          # -A so the committed directory exactly mirrors what was generated:
+          # new/updated `<chainId>.json.gz` are added, and any stale files (e.g.
+          # a leftover raw `.json` from before the gzip migration, or a chain
+          # dropped from the config) are removed from the index.
+          git add -A l1-contracts/test/anvil-interop/chain-states/
           git diff --cached --quiet && { echo "No chain state changes to commit"; exit 0; }
           git commit -m "chore: regenerate anvil-interop chain states
 

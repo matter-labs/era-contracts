@@ -25,8 +25,6 @@ struct RegisterZKChainConfig {
     address create2FactoryAddress;
     bytes32 create2Salt;
     bool allowEvmEmulator;
-    // optional - if not set, then equal to 0
-    address l1Erc20Bridge;
     address l1SharedBridgeProxy;
     bytes diamondCutData;
     bytes forceDeploymentsData;
@@ -39,6 +37,15 @@ interface IRegisterZKChain {
     /// @param _chainTypeManagerProxy Address of the chain type manager proxy (bridgehub is derived from this)
     /// @param _chainChainId Chain ID for the new ZK chain
     function run(address _chainTypeManagerProxy, uint256 _chainChainId) external;
+
+    /// @notice Same as `run`, with the input/output TOML paths (project-root
+    /// relative) supplied by the caller instead of the conventional defaults.
+    function runWithPaths(
+        string calldata inputPath,
+        string calldata outputPath,
+        address _chainTypeManagerProxy,
+        uint256 _chainChainId
+    ) external;
 
     /// @notice Runs the ZK chain registration for testing purposes
     /// @param _chainTypeManagerProxy Address of the chain type manager proxy (bridgehub is derived from this)
