@@ -18,6 +18,10 @@ governance_min_delay = 0
 max_number_of_chains = 100
 create2_factory_salt = "0x55de3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfb5"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+# Per-regen salt for the legacy `Governance.sol` ceremony (Atlas CTM owner
+# wrap). Rotate on every regen so the op id doesn't collide with a previously
+# broadcast op of the same content. Mirrors testnet's `legacy_gov_salt`.
+legacy_gov_salt = "0x55c3d1e06e8064724e9928f1b2f7417d0d6db867295e145a77477c15528a1e10"
 validator_timelock_execution_delay = 10800
 genesis_root = "0xe167dcb28722cee8fc953ea70d8fb2adaffe2806d9fd194da79bd84e19adbae3"
 genesis_rollup_leaf_index = 84
@@ -47,7 +51,12 @@ protocol_upgrade_handler_implementation_address = "0x36625Bd3dDB469377C6e9893712
 [tokens]
 token_weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
 
-[gateway]
+# Legacy Era gateway chain id. Read as `$.legacy_gateway.chain_id` by
+# `DefaultCoreUpgrade` and baked into L1MessageRoot's immutable
+# `ERA_GATEWAY_CHAIN_ID`. Must use the `[legacy_gateway]` key (matching stage) —
+# the old `[gateway]` key is not read by the v31 core upgrade, so the constructor
+# would otherwise get 0.
+[legacy_gateway]
 chain_id = 9075
 
 [gateway.gateway_state_transition]

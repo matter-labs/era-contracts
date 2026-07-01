@@ -3,7 +3,12 @@ l1_chain_id = 1
 zk_token_asset_id = "0x83e2fbc0a739b3c765de4c2b4bf8072a71ea8fbb09c8cf579c71425d8bc8804a"
 
 [permanent_contracts]
-create2_factory_addr = "0xf1Ebfaa992854ECcB01Ac1F60e5b5279095cca7F"
+# Canonical deterministic CREATE2 deployer (Arachnid/foundry), the same
+# factory used on stage/testnet/local and in the v31 input `[contracts]`.
+# The previous value (0xf1Ebfaa9…) has no code on mainnet, so the
+# zk-governance `deployViaCreate2` (which expects the factory to return the
+# deployed address) reverted with "Invalid address data".
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 # `create2_factory_salt` lives in the v31 input TOML
 # (`upgrade-envs/v0.31.0-interopB/<env>.toml [contracts] create2_factory_salt`),
 # not here — it rotates every regen so it isn't a permanent value.
@@ -44,6 +49,21 @@ proxy = "0x1adf137f59949c9081157d5dE1e002D1c992071F"
 is_zk_sync_os = true
 bytecodes_supplier = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
 rollup_da_manager = "0x3F54A35a979Fe576159002B05bE2eDf9b455FAAA"
+
+# Contracts that own a CTM / ProxyAdmin and have no private key — ownership
+# transfers routed through them must be *wrapped* (called by their EOA owner via
+# scheduleTransparent+executeInstant), not impersonated. Mirrors stage/testnet's
+# `[[ownable_proxies]]`; consumed by protocol-ops via the `OwnerWrap` registry.
+[[ownable_proxies]]
+# Legacy ZKsync `Governance.sol` — owns the mainnet Atlas (ZKsyncOS) CTM today
+# (AtlasCTM 0x1adf137f….owner() == this). owner() =
+# 0x4e4943346848c4867F81dFb37c4cA9C5715A7828, securityCouncil() = 0x0,
+# minDelay() = 0, so scheduleTransparent(op, 0) (from the owner) +
+# executeInstant(op) works to route the transferOwnership to governance.
+# (Bridgehub and the Era CTM are already PUH-owned, so only the Atlas CTM
+# needs a wrap.)
+addr = "0xC66f0B45c05cF654eeC093650FD67865E85E8566"
+kind = "legacy_governance"
 
 # Legacy Gateway configuration for settlement layer validation
 # This section contains historical data about chains that settled on the legacy Gateway

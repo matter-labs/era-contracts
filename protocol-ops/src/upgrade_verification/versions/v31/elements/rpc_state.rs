@@ -32,6 +32,12 @@ const CREATE2_FACTORY_CONTRACT_NAME: &str = "Create2Factory";
 const FEE_PARAMS_STORAGE_SLOT: u64 = 38;
 const MAINNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 10_800;
 const TESTNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 0;
+// ZKsync OS (Atlas) chains commit through the `MultisigCommitter` rather than
+// the classic ValidatorTimelock flow, and their ValidatorTimelock proxy carries
+// a zero execution delay on every environment (mainnet included) — unlike Era,
+// which uses the env-standard delay. The v31 upgrade reuses the existing VT
+// proxy, preserving this delay.
+const ZKSYNC_OS_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 0;
 
 /// Core proxies whose EIP-1967 admin slot must match the ecosystem
 /// `transparent_proxy_admin`.
@@ -608,7 +614,12 @@ async fn verify_v31_validator_timelocks(
         )?;
         let expected_owner =
             required_address(&ctm.value, &scope, &["admin", "timer_governance_addr"])?;
-        let expected_delay = if ctm.contracts_config.is_testnet {
+        // ZKsync OS CTMs keep a zero VT execution delay on every env; only the
+        // Era CTM uses the env-standard delay (0 on testnet/stage, 10800 on
+        // mainnet).
+        let expected_delay = if ctm.flavor == CtmFlavor::ZksyncOs {
+            ZKSYNC_OS_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS
+        } else if ctm.contracts_config.is_testnet {
             TESTNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS
         } else {
             MAINNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS

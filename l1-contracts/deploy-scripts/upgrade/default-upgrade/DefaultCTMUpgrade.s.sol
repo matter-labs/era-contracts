@@ -191,14 +191,13 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(
             ctmAddresses.stateTransition.proxies.validatorTimelock
         ).executionDelay();
-        // FIXME: need to provide the params as the input for the function, since
-        // on mainnet testnetVerifier must be false. Right now the introspection is not available
-        // due to the previous version being v29.
-        // TODO: restore introspection when L1 state is regenerated with ZKsyncOSTestnetVerifier.IS_TESTNET_VERIFIER
-        // (bool ok, bytes memory data) = ctmAddresses.stateTransition.verifiers.verifier.staticcall(
-        //     abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
-        // );
-        // config.testnetVerifier = ok;
+        // `testnetVerifier` cannot be introspected from the on-chain verifier
+        // here: the previous version is v29, whose verifier predates the
+        // `IS_TESTNET_VERIFIER()` getter (and staticcall probing is forbidden
+        // in this codebase). It is instead read from the per-env upgrade input
+        // TOML (`testnet_verifier`) in `initializeConfigFromArgs`. On mainnet
+        // this MUST be false; testnet/stage use the testnet verifier. Default
+        // to `true` here for envs whose input omits the key.
         config.testnetVerifier = true;
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
@@ -239,6 +238,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         }
 
         initializeConfig(chainCreationParams, permanentConfig, governance);
+
+        // Select the verifier flavor from the per-env upgrade input. `initializeConfig`
+        // defaults `testnetVerifier` to true (it can't introspect the pre-v29 verifier);
+        // override it from config so mainnet (`testnet_verifier = false`) deploys the real
+        // DualVerifier while testnet/stage keep the *TestnetVerifier.
+        if (toml.keyExists("$.testnet_verifier")) {
+            config.testnetVerifier = toml.readBool("$.testnet_verifier");
+        }
 
         // Read governance upgrade timer initial delay from config
         if (toml.keyExists("$.governance_upgrade_timer_initial_delay")) {
