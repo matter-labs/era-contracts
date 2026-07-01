@@ -46,6 +46,34 @@ const IGNORED_BLOCK_FIELDS = new Set([
 // Maximum allowed balance difference in wei (0.01 ETH) — covers gas cost variations
 const BALANCE_TOLERANCE_WEI = BigInt("10000000000000000"); // 10^16
 
+// The interop harness runs Anvil with interval mining (`--block-time 1`, needed
+// so the relayers/TBM keep progressing), so the number of L2 blocks produced is
+// wall-clock-dependent. Two identical runs therefore differ ONLY in state that
+// records the current L2 block/batch number. That drift is confined to the
+// specific account and slots below (verified by diffing two fresh Linux
+// generations); everything else is byte-for-byte deterministic. We ignore
+// exactly these by explicit identity — NOT by value magnitude, since many real
+// slots legitimately hold small integers (0/1/2).
+
+// Accounts whose storage is a block/batch-indexed accumulator, so ~all of their
+// storage tracks the (non-deterministic) block count — skip it entirely.
+// 0x…010005 = L2MessageRoot: `historicalRoot[blockNumber]`, `chainBatchRoots`,
+// the shared/chain incremental Merkle trees and batch counters all grow with the
+// number of blocks/batches produced.
+const BLOCK_INDEXED_STORAGE_ACCOUNTS = new Set(["0x0000000000000000000000000000000000010005"]);
+
+// Specific storage slots (keccak-derived, so collision-free across contracts)
+// that hold an L2 block/batch number in the interop bookkeeping contracts
+// (L2InteropRootStorage / ChainAssetHandler / AssetTracker instances). These
+// were the only common-slot value diffs between two fresh runs, each differing
+// by exactly the block-count delta. Ignored in whichever account they appear.
+const BLOCK_NUMBER_STORAGE_SLOTS = new Set([
+  "0x22157c206018468b45ae7922bc7a0b0cb8feed201dac3c6fb5e7876aa94e11e9",
+  "0xcae482817da5739a72d01cb9874e04d330e5e8dc74bc0bece220f5b3532c14b8",
+  "0xe12917faa952038297cceeb966eb4f054126fd0f1307df22b19432454cb24b37",
+  "0xa1a0bcd6e1eb10e34e86589f0737ed295f21e2780238b04598ea22e184199ff6",
+]);
+
 interface ChainStateAccount {
   nonce?: number;
   code?: string;
@@ -111,14 +139,22 @@ function compareChainState(data1: ChainStateData, data2: ChainStateData, name: s
       }
     }
 
-    const s1 = a1.storage || {};
-    const s2 = a2.storage || {};
-    if (JSON.stringify(s1) !== JSON.stringify(s2)) {
-      const allSlots = [...new Set([...Object.keys(s1), ...Object.keys(s2)])].sort();
-      const diffSlots = allSlots.filter((s) => s1[s] !== s2[s]);
-      diffs.push(`  ${name}: account ${addr} storage differs in ${diffSlots.length} slot(s)`);
-      for (const slot of diffSlots.slice(0, 5)) {
-        diffs.push(`    slot ${slot}: ${s1[slot]} != ${s2[slot]}`);
+    // Skip storage for block-indexed system contracts (e.g. MessageRoot): their
+    // state is keyed by the non-deterministic block count.
+    if (!BLOCK_INDEXED_STORAGE_ACCOUNTS.has(addr.toLowerCase())) {
+      const s1 = a1.storage || {};
+      const s2 = a2.storage || {};
+      if (JSON.stringify(s1) !== JSON.stringify(s2)) {
+        const allSlots = [...new Set([...Object.keys(s1), ...Object.keys(s2)])].sort();
+        // Drop the explicitly-listed block-number slots (see above); everything
+        // else must match exactly.
+        const diffSlots = allSlots.filter((s) => s1[s] !== s2[s] && !BLOCK_NUMBER_STORAGE_SLOTS.has(s));
+        if (diffSlots.length > 0) {
+          diffs.push(`  ${name}: account ${addr} storage differs in ${diffSlots.length} slot(s)`);
+          for (const slot of diffSlots.slice(0, 5)) {
+            diffs.push(`    slot ${slot}: ${s1[slot]} != ${s2[slot]}`);
+          }
+        }
       }
     }
 
