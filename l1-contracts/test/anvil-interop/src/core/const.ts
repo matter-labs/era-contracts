@@ -60,9 +60,9 @@ export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFf
 // Default gas limits for test transactions
 export const INTEROP_SEND_BUNDLE_GAS_LIMIT = 500_000;
 // Atomic sends additionally append the leg's commit value to the chain's {L2InteropCommitmentTree}
-// via {AtomicFlowManager.append}. The depth-32 sparse IndexedMerkleTree insert materialises a full
-// root-to-leaf path (~1.1M gas for the first insert into a fresh tree), so the atomic `sendBundle`
-// needs a much larger cap than the plain L1-publish path above.
+// via {AtomicFlowManager.append}. The dynamic-height IndexedMerkleTree (#2235, FullMerkle-backed)
+// insert grows the tree and rehashes the populated path, so the atomic `sendBundle` needs a much
+// larger cap than the plain L1-publish path above.
 export const ATOMIC_SEND_BUNDLE_GAS_LIMIT = 3_000_000;
 export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
 // 7 gwei, used by Anvil interop specs to exercise the non-zero dynamic fee path.

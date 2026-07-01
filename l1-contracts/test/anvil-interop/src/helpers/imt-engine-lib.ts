@@ -21,15 +21,19 @@
  *     off-chain BEFORE the send — which breaks the old circular dependency.
  *   - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
  *
- * Engine B specifics (must match contracts/common/libraries/IndexedMerkleTree.sol):
- *   - fixed depth 32 (`IMT_DEPTH`); 2^32 leaf slots,
+ * Engine B specifics (must match contracts/common/libraries/IndexedMerkleTree.sol + FullMerkle.sol,
+ * i.e. #2235's DYNAMIC-height tree — NOT the old fixed-depth-32 lib):
+ *   - dynamic height: the underlying {FullMerkle} tree starts at height 0 and grows by one whenever a
+ *     leaf is pushed at index == (1 << height); root() is the node at the current top level, and
+ *     merklePath(i) has length == the current height,
  *   - leaf is `IMTLeaf { uint256 value; uint256 nextIndex; uint256 nextValue }` — NOTE the field
  *     order (value, nextIndex, nextValue),
  *   - leaf hash = keccak256(abi.encode(value, nextIndex, nextValue)),
- *   - sparse tree with precomputed zero-subtree hashes: zeros[0] = hashLeaf({0,0,0}),
- *     zeros[i+1] = efficientHash(zeros[i], zeros[i]) where efficientHash(a,b) = keccak256(a ++ b),
- *   - the commitment tree seeds the {0,0,0} head at index 0 (`setup`), then appends each inserted
- *     leaf and repoints its low-nullifier (`insert`).
+ *   - node hashing via efficientHash(a,b) = keccak256(a ++ b); zeros[0] = hashLeaf({0,0,0}),
+ *     zeros[i+1] = efficientHash(zeros[i], zeros[i]) (built lazily as the tree grows),
+ *   - the commitment tree seeds the {0,0,0} head at index 0 (`setup` + first `pushNewLeaf`), then
+ *     appends each inserted leaf and repoints its low-nullifier (`insert`), splicing the sorted
+ *     linked list with the forward low-leaf search bounded by MAX_LOW_INDEX_SEARCH_ATTEMPTS.
  *
  * The cross-chain `(root)` message that authenticates a chain's IMT root is verified on-chain via
  * {L2_MESSAGE_VERIFICATION}.proveL2MessageInclusionShared. On the anvil harness that address hosts
@@ -45,8 +49,11 @@ import type { providers, Wallet } from "ethers";
 import { BigNumber, Contract, utils } from "ethers";
 import { getAbi } from "../core/contracts";
 
-/** Fixed depth of the Indexed Merkle Tree — matches IMT_DEPTH in IndexedMerkleTree.sol. */
-export const IMT_DEPTH = 32;
+/**
+ * Max forward hops of the low-leaf search when the caller-supplied low-nullifier index is stale —
+ * mirrors MAX_LOW_INDEX_SEARCH_ATTEMPTS in contracts/common/Config.sol.
+ */
+export const MAX_LOW_INDEX_SEARCH_ATTEMPTS = 5;
 
 /** Domain tag for commit values: bytes4(keccak256("AtomicInterop.commit.v1")). */
 export const ATOMIC_COMMIT_LEAF_TAG: string = utils
@@ -114,7 +121,7 @@ export function computeFlowId(
   );
 }
 
-// ── Engine B: zeros / leaf hashing / root / path ──────────────────────────────────────────
+// ── Engine B: dynamic-height FullMerkle port (leaf hashing / root / path) ───────────────────
 
 /** efficientHash(a, b) = keccak256(a ++ b) over the two 32-byte siblings — matches Merkle.sol. */
 function efficientHash(left: string, right: string): string {
@@ -122,75 +129,147 @@ function efficientHash(left: string, right: string): string {
 }
 
 /**
- * Precomputed zero-subtree hashes, length IMT_DEPTH + 1.
- *   zeros[0] = hashLeaf({0,0,0}); zeros[i+1] = efficientHash(zeros[i], zeros[i]).
- */
-export function computeZeros(): string[] {
-  const zeros: string[] = new Array(IMT_DEPTH + 1);
-  zeros[0] = indexedLeafHash({ value: "0", nextIndex: "0", nextValue: "0" });
-  for (let i = 0; i < IMT_DEPTH; i++) {
-    zeros[i + 1] = efficientHash(zeros[i], zeros[i]);
-  }
-  return zeros;
-}
-
-const ZEROS = computeZeros();
-
-/**
- * Sparse fixed-depth Indexed Merkle Tree reconstructed from the index-ordered leaf set
- * `leaves[0..leafCount-1]` (index 0 is the {0,0,0} head). Mirrors the on-chain `IMT` storage:
- * `nodes[level][index]` holds written nodes, and unwritten siblings default to `zeros[level]`.
+ * Dynamic-height Indexed Merkle Tree, a byte-for-byte off-chain port of
+ * {FullMerkle}+{IndexedMerkleTree} (#2235). It replays the EXACT on-chain build sequence
+ * (`setup` -> `pushNewLeaf` per leaf, with `updateLeaf` mutating the populated path) so that
+ * `root()` and `merklePath(i)` equal the on-chain `tree.root()` / `tree.merklePath(i)`.
+ *
+ * The constructor takes the index-ordered leaf set (index 0 = the {0,0,0} sentinel head, exactly
+ * what `setup` seeds). It does NOT re-derive the sorted linked list; the leaves passed in are the
+ * live on-chain leaf preimages (or the result of local `insert` calls), so their `nextIndex`/
+ * `nextValue` are already spliced. Only the FullMerkle node bookkeeping is replayed here.
+ *
+ * FullMerkle storage mirror:
+ *   - `height`             : current tree height (0 for a single-leaf tree),
+ *   - `nodes[level][index]`: written node hashes (dynamic arrays, matching `_nodes`),
+ *   - `zeros[level]`       : zero-subtree hash at `level` (matching `_zeros`),
+ *   - `leafNumber`         : number of leaves pushed so far.
  */
 export class IndexedMerkleTree {
   /** Index-ordered leaves (leaf 0 = head). */
   readonly leaves: IMTLeaf[];
-  /** nodes[level] : Map<index, hash> — only the populated path nodes are materialized. */
-  private readonly nodes: Array<Map<number, string>>;
+  /** _nodes[level][index] — populated node hashes; higher indices are implicitly zeros[level]. */
+  private nodes: string[][];
+  /** _zeros[level] — zero-subtree hash per level, grown lazily with the tree. */
+  private zeros: string[];
+  /** _height — current top level. */
+  private height: number;
+  /** _leafNumber — leaves pushed so far. */
+  private leafNumber: number;
 
   constructor(leaves: IMTLeaf[]) {
     this.leaves = leaves;
-    this.nodes = Array.from({ length: IMT_DEPTH + 1 }, () => new Map<number, string>());
-    // Level 0: write each leaf hash at its index.
-    for (let i = 0; i < leaves.length; i++) {
-      this.nodes[0].set(i, indexedLeafHash(leaves[i]));
+    this.nodes = [];
+    this.zeros = [];
+    this.height = 0;
+    this.leafNumber = 0;
+
+    if (leaves.length === 0) {
+      throw new Error("IndexedMerkleTree requires at least the sentinel leaf at index 0");
     }
-    // Build every higher level from the parents of populated children (and their zero-filled
-    // siblings), so a node is materialized iff at least one descendant leaf is populated. This
-    // matches the on-chain `_updatePath` write set and therefore yields identical roots / paths.
-    for (let level = 0; level < IMT_DEPTH; level++) {
-      const parents = new Set<number>();
-      for (const childIndex of this.nodes[level].keys()) {
-        parents.add(childIndex >> 1);
-      }
-      for (const parentIndex of parents) {
-        const leftIndex = parentIndex * 2;
-        const left = this.nodeAt(level, leftIndex);
-        const right = this.nodeAt(level, leftIndex + 1);
-        this.nodes[level + 1].set(parentIndex, efficientHash(left, right));
-      }
+
+    // Mirror IndexedMerkleTree.setup: FullMerkle.setup(zeroLeafHash) seeds zeros[0] + nodes[0]=[zero],
+    // then pushNewLeaf(zeroLeafHash) inserts the sentinel {0,0,0} at index 0.
+    const zeroLeafHash = indexedLeafHash({ value: "0", nextIndex: "0", nextValue: "0" });
+    this.setup(zeroLeafHash);
+    this.pushNewLeaf(zeroLeafHash);
+
+    // The `setup`/`pushNewLeaf` above seed index 0 from a pristine {0,0,0} sentinel. In a live tree the
+    // head leaf has been repointed (its `nextIndex`/`nextValue` splice to the smallest inserted value),
+    // so re-write index 0 with its actual on-chain preimage before pushing leaves 1..n-1 in order.
+    this.updateLeaf(0, indexedLeafHash(leaves[0]));
+    for (let i = 1; i < leaves.length; i++) {
+      this.pushNewLeaf(indexedLeafHash(leaves[i]));
     }
   }
 
-  /** Read a node, falling back to the level's zero hash when unwritten. */
-  private nodeAt(level: number, index: number): string {
-    return this.nodes[level].get(index) ?? ZEROS[level];
+  // ── FullMerkle port ───────────────────────────────────────────────────────────────────────
+
+  /** FullMerkle.setup: push the zero value into zeros[0] and seed nodes[0] = [zero]. */
+  private setup(zero: string): void {
+    this.zeros.push(zero);
+    this.nodes.push([zero]);
   }
 
-  /** The current IMT root (level IMT_DEPTH, index 0). */
+  /** FullMerkle.pushNewLeaf: append a leaf, growing the tree height when index == 1<<height. */
+  private pushNewLeaf(leaf: string): string {
+    const index = this.leafNumber;
+    this.leafNumber += 1;
+
+    if (index === 1 << this.height) {
+      const newHeight = this.height + 1;
+      this.height = newHeight;
+      const topZero = this.zeros[newHeight - 1];
+      const newZero = efficientHash(topZero, topZero);
+      this.zeros.push(newZero);
+      this.nodes.push([newZero]);
+    }
+    if (index !== 0) {
+      let oldMaxNodeNumber = index - 1;
+      let maxNodeNumber = index;
+      for (let i = 0; i < this.height; i++) {
+        if (oldMaxNodeNumber === maxNodeNumber) {
+          break;
+        }
+        this.nodes[i].push(this.zeros[i]);
+        maxNodeNumber = Math.floor(maxNodeNumber / 2);
+        oldMaxNodeNumber = Math.floor(oldMaxNodeNumber / 2);
+      }
+    }
+    return this.updateLeaf(index, leaf);
+  }
+
+  /** FullMerkle.updateLeaf: set leaf hash at `index` and rehash the populated path to the root. */
+  private updateLeaf(indexIn: number, itemHash: string): string {
+    let maxNodeNumber = this.leafNumber - 1;
+    if (indexIn > maxNodeNumber) {
+      throw new Error(`MerkleWrongIndex(${indexIn}, ${maxNodeNumber})`);
+    }
+    let index = indexIn;
+    this.nodes[0][index] = itemHash;
+    let currentHash = itemHash;
+    for (let i = 0; i < this.height; i++) {
+      if (index % 2 === 0) {
+        currentHash = efficientHash(
+          currentHash,
+          maxNodeNumber === index ? this.zeros[i] : this.nodes[i][index + 1]
+        );
+      } else {
+        currentHash = efficientHash(this.nodes[i][index - 1], currentHash);
+      }
+      index = Math.floor(index / 2);
+      maxNodeNumber = Math.floor(maxNodeNumber / 2);
+      this.nodes[i + 1][index] = currentHash;
+    }
+    return currentHash;
+  }
+
+  /** FullMerkle.root: the node at the current top level. */
   root(): string {
-    return this.nodeAt(IMT_DEPTH, 0);
+    return this.nodes[this.height][0];
   }
 
-  /** Fixed-depth Merkle path (32 siblings, leaf level up) for the leaf at `index`. */
-  merklePath(index: number): string[] {
-    const path: string[] = new Array(IMT_DEPTH);
-    let idx = index;
-    for (let level = 0; level < IMT_DEPTH; level++) {
-      const siblingIdx = idx % 2 === 0 ? idx + 1 : idx - 1;
-      path[level] = this.nodeAt(level, siblingIdx);
-      idx = Math.floor(idx / 2);
+  /** FullMerkle.merklePath: dynamic-length path (length == current height) for the leaf at `index`. */
+  merklePath(indexIn: number): string[] {
+    if (this.leafNumber === 0) {
+      throw new Error("MerkleNothingToProve");
     }
-    return path;
+    let maxNodeNumber = this.leafNumber - 1;
+    if (indexIn > maxNodeNumber) {
+      throw new Error(`MerkleWrongIndex(${indexIn}, ${maxNodeNumber})`);
+    }
+    let index = indexIn;
+    const proof: string[] = new Array(this.height);
+    for (let i = 0; i < this.height; i++) {
+      if (index % 2 === 0) {
+        proof[i] = maxNodeNumber === index ? this.zeros[i] : this.nodes[i][index + 1];
+      } else {
+        proof[i] = this.nodes[i][index - 1];
+      }
+      index = Math.floor(index / 2);
+      maxNodeNumber = Math.floor(maxNodeNumber / 2);
+    }
+    return proof;
   }
 }
 
