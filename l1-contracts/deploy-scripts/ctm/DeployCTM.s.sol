@@ -334,8 +334,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "bridgehub_proxy_addr",
             coreAddresses.bridgehub.proxies.bridgehub
         );
-        // The legacy ERC20 bridge has been removed; emit address(0) for backwards-compatible output.
-        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", address(0));
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
         string memory bridges = vm.serializeAddress(
             "bridges",

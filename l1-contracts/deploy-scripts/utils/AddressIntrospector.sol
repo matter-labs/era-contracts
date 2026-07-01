@@ -158,15 +158,12 @@ library AddressIntrospector {
             ? UpgradeableBeacon(bridgedTokenBeacon).implementation()
             : address(0);
 
-        // `erc20Bridge` is retained in the struct for backwards-compatible output; the legacy bridge is gone.
         BridgeContracts memory proxies = BridgeContracts({
-            erc20Bridge: address(0),
             l1AssetRouter: _assetRouter,
             l1Nullifier: l1NullifierProxy,
             l1NativeTokenVault: l1NativeTokenVaultProxy
         });
         BridgeContracts memory implementations = BridgeContracts({
-            erc20Bridge: address(0),
             l1AssetRouter: Utils.getImplementation(_assetRouter),
             l1Nullifier: Utils.getImplementation(l1NullifierProxy),
             l1NativeTokenVault: Utils.getImplementation(l1NativeTokenVaultProxy)
