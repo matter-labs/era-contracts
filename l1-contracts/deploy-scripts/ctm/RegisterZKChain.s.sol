@@ -219,7 +219,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
             config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
         }
 
-        config.l1Erc20Bridge = coreAddresses.bridges.proxies.erc20Bridge;
         config.l1SharedBridgeProxy = coreAddresses.bridges.proxies.l1AssetRouter;
 
         (config.create2FactoryAddress, config.create2Salt) = getCreate2FactoryParams();

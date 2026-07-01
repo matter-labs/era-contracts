@@ -130,7 +130,6 @@ export class DeploymentRunner {
       l1NullifierProxy: params.l1Nullifier ?? ZERO_ADDRESS,
       l1NativeTokenVault: params.l1NativeTokenVault ?? ZERO_ADDRESS,
       l1AssetTracker: ZERO_ADDRESS,
-      l1ERC20Bridge: ZERO_ADDRESS,
       governance: ZERO_ADDRESS,
       transparentProxyAdmin: ZERO_ADDRESS,
       blobVersionedHashRetriever: ZERO_ADDRESS,

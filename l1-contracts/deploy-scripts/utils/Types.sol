@@ -51,7 +51,6 @@ struct L2ERC20BridgeAddresses {
 }
 
 struct BridgeContracts {
-    address erc20Bridge;
     address l1AssetRouter;
     address l1Nullifier;
     address l1NativeTokenVault;

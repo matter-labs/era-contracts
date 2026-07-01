@@ -277,12 +277,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
 
         vm.serializeAddress(
             "bridges",
-            "erc20_bridge_implementation_addr",
-            coreAddresses.bridges.implementations.erc20Bridge
-        );
-        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", coreAddresses.bridges.proxies.erc20Bridge);
-        vm.serializeAddress(
-            "bridges",
             "l1_nullifier_implementation_addr",
             coreAddresses.bridges.implementations.l1Nullifier
         );

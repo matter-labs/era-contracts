@@ -37,7 +37,6 @@ contract DeployL2Script is Script, IDeployL2Contracts {
         address l1SharedBridgeProxy;
         address bridgehubAddress;
         address governance;
-        address erc20BridgeProxy;
         address proposalAuthor;
         DAValidatorType validatorType;
         // The owner of the contract sets the validator/attester weights.
@@ -184,8 +183,6 @@ contract DeployL2Script is Script, IDeployL2Contracts {
 
         address assetRouter = address(IL1Bridgehub(bridgehubAddress).assetRouter());
         config.l1SharedBridgeProxy = assetRouter;
-        // The legacy ERC20 bridge has been removed; retained as address(0) for backwards-compatible output.
-        config.erc20BridgeProxy = address(0);
         config.eraChainId = AddressIntrospector.getEraChainId(assetRouter);
     }
 
