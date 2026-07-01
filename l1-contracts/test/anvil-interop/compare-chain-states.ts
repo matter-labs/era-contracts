@@ -29,7 +29,19 @@ function readStateJson(p: string): unknown {
   return JSON.parse(buf.toString("utf-8"));
 }
 
-const IGNORED_BLOCK_FIELDS = new Set(["timestamp", "basefee", "difficulty", "prevrandao", "blob_excess_gas_and_price"]);
+// `number` is wall-clock-volatile: the harness runs Anvil with interval mining
+// (`--block-time 1`, required so the interop relayers/TBM keep progressing), so
+// the final block height depends on how long generation took, not on the state
+// itself. Ignore it alongside timestamp/basefee/etc. so the check validates the
+// substantive state (accounts/code/storage) rather than the block count.
+const IGNORED_BLOCK_FIELDS = new Set([
+  "number",
+  "timestamp",
+  "basefee",
+  "difficulty",
+  "prevrandao",
+  "blob_excess_gas_and_price",
+]);
 
 // Maximum allowed balance difference in wei (0.01 ETH) — covers gas cost variations
 const BALANCE_TOLERANCE_WEI = BigInt("10000000000000000"); // 10^16
