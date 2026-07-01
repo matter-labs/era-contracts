@@ -22,8 +22,6 @@ error ChainExists();
 error ChainNotReadyForMigration(uint256 chainId);
 // 0x824e4e26
 error ChainsSettlementLayerMismatch(uint256 chainToRegisterSL, uint256 chainRegisteredOnSL);
-// 0x1ed6c04f
-error ChainsSettlingOnL1();
 // 0x5d03f19d
 error CurrentBatchNumberAlreadySet();
 // 0x68d91b49
