@@ -36,7 +36,6 @@ import {
     BridgehubAddresses,
     BridgehubContracts,
     ZkChainAddresses,
-    L2ERC20BridgeAddresses,
     StateTransitionDeployedAddresses,
     StateTransitionContracts,
     Verifiers,
@@ -388,7 +387,6 @@ library AddressIntrospector {
             StateTransitionDeployedAddresses memory ctm,
             ZkChainAddresses memory zk,
             address[] memory zkFacets,
-            L2ERC20BridgeAddresses memory legacyBridge,
             BridgesDeployedAddresses memory bridges
         )
     {
@@ -403,8 +401,6 @@ library AddressIntrospector {
 
         address assetRouter = address(_bridgehub.assetRouter());
         bridges = getBridgesDeployedAddresses(assetRouter);
-
-        // The legacy ERC20 bridge has been removed; `legacyBridge` is intentionally left empty.
     }
 
     // ============ Private Helpers ============

@@ -44,12 +44,6 @@ struct ZkChainAddresses {
     address l2LegacySharedBridge;
 }
 
-struct L2ERC20BridgeAddresses {
-    address l2TokenBeacon;
-    address l2Bridge;
-    bytes32 l2TokenProxyBytecodeHash;
-}
-
 struct BridgeContracts {
     address l1AssetRouter;
     address l1Nullifier;
