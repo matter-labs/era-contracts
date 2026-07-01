@@ -220,20 +220,17 @@ export class IndexedMerkleTree {
   }
 
   /** FullMerkle.updateLeaf: set leaf hash at `index` and rehash the populated path to the root. */
-  private updateLeaf(indexIn: number, itemHash: string): string {
+  private updateLeaf(startIndex: number, itemHash: string): string {
     let maxNodeNumber = this.leafNumber - 1;
-    if (indexIn > maxNodeNumber) {
-      throw new Error(`MerkleWrongIndex(${indexIn}, ${maxNodeNumber})`);
+    if (startIndex > maxNodeNumber) {
+      throw new Error(`MerkleWrongIndex(${startIndex}, ${maxNodeNumber})`);
     }
-    let index = indexIn;
+    let index = startIndex;
     this.nodes[0][index] = itemHash;
     let currentHash = itemHash;
     for (let i = 0; i < this.height; i++) {
       if (index % 2 === 0) {
-        currentHash = efficientHash(
-          currentHash,
-          maxNodeNumber === index ? this.zeros[i] : this.nodes[i][index + 1]
-        );
+        currentHash = efficientHash(currentHash, maxNodeNumber === index ? this.zeros[i] : this.nodes[i][index + 1]);
       } else {
         currentHash = efficientHash(this.nodes[i][index - 1], currentHash);
       }
@@ -250,15 +247,15 @@ export class IndexedMerkleTree {
   }
 
   /** FullMerkle.merklePath: dynamic-length path (length == current height) for the leaf at `index`. */
-  merklePath(indexIn: number): string[] {
+  merklePath(startIndex: number): string[] {
     if (this.leafNumber === 0) {
       throw new Error("MerkleNothingToProve");
     }
     let maxNodeNumber = this.leafNumber - 1;
-    if (indexIn > maxNodeNumber) {
-      throw new Error(`MerkleWrongIndex(${indexIn}, ${maxNodeNumber})`);
+    if (startIndex > maxNodeNumber) {
+      throw new Error(`MerkleWrongIndex(${startIndex}, ${maxNodeNumber})`);
     }
-    let index = indexIn;
+    let index = startIndex;
     const proof: string[] = new Array(this.height);
     for (let i = 0; i < this.height; i++) {
       if (index % 2 === 0) {
