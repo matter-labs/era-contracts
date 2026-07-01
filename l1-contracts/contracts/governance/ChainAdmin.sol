@@ -29,11 +29,6 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    /// @dev Deprecated: the expected upgrade timestamp is now tracked by the `ServerNotifier` contract.
-    /// @dev Kept (renamed, no longer written) to preserve the storage layout. Must not be used.
-    mapping(uint256 protocolVersion => uint256 upgradeTimestamp)
-        internal __DEPRECATED_protocolVersionToUpgradeTimestamp;
-
     /// @notice The set of active restrictions.
     EnumerableSet.AddressSet internal activeRestrictions;
 
