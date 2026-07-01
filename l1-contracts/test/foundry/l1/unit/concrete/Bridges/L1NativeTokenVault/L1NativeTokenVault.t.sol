@@ -42,10 +42,6 @@ contract L1NativeTokenVaultTestHelper is L1NativeTokenVault {
         return _getOriginChainId(_assetId);
     }
 
-    function registerTokenIfBridgedLegacyPublic(address _token) external returns (bytes32) {
-        return _registerTokenIfBridgedLegacy(_token);
-    }
-
     // Expose internal state setters for testing
     function setOriginChainId(bytes32 _assetId, uint256 _chainId) external {
         originChainId[_assetId] = _chainId;
@@ -233,23 +229,6 @@ contract L1NativeTokenVaultTest is Test {
 
         uint256 result = nativeTokenVault.getOriginChainIdPublic(token3AssetId);
         assertEq(result, 0);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                    _registerTokenIfBridgedLegacy Tests
-    //////////////////////////////////////////////////////////////*/
-
-    function test_registerTokenIfBridgedLegacy_ReturnsZero() public {
-        // On L1, there are no legacy tokens, so this should always return bytes32(0)
-        bytes32 result = nativeTokenVault.registerTokenIfBridgedLegacyPublic(address(testToken));
-        assertEq(result, bytes32(0));
-    }
-
-    function test_registerTokenIfBridgedLegacy_ReturnsZeroForAnyToken() public {
-        // Test with a random address
-        address randomToken = makeAddr("randomToken");
-        bytes32 result = nativeTokenVault.registerTokenIfBridgedLegacyPublic(randomToken);
-        assertEq(result, bytes32(0));
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -189,11 +189,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         return IAssetTrackerBase(L2_ASSET_TRACKER_ADDR);
     }
 
-    function _registerTokenIfBridgedLegacy(address) internal override returns (bytes32) {
-        // No legacy bridge, the token must be native
-        return bytes32(0);
-    }
-
     /// @notice Ensures that the token is deployed.
     /// @param _assetId The asset ID.
     /// @param _originToken The origin token address.

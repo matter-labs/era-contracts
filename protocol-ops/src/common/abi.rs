@@ -307,15 +307,6 @@ pub mod igw_asset_tracker {
 }
 pub use igw_asset_tracker::IGWAssetTrackerAbi;
 
-pub mod i_setup_legacy_bridge {
-    alloy::sol!(
-        #[sol(rpc)]
-        ISetupLegacyBridgeAbi,
-        "../l1-contracts/zkstack-out/ISetupLegacyBridge.sol/ISetupLegacyBridge.json"
-    );
-}
-pub use i_setup_legacy_bridge::ISetupLegacyBridgeAbi;
-
 pub mod ctm_ext {
     alloy::sol!(
         #[sol(rpc)]

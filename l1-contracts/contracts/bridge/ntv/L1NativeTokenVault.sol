@@ -53,7 +53,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev The chain ID of L1.
     uint256 public immutable L1_CHAIN_ID;
 
-    /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
+    /// @dev L1 nullifier contract that handles finalize withdrawal and confirm l2 tx mappings
     IL1Nullifier public immutable L1_NULLIFIER;
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
@@ -228,11 +228,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /*//////////////////////////////////////////////////////////////
                             INTERNAL & HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-
-    function _registerTokenIfBridgedLegacy(address) internal pure override returns (bytes32) {
-        // There are no legacy tokens present on L1.
-        return bytes32(0);
-    }
 
     /// @notice Used to get the expected bridged token address corresponding to its native counterpart.
     /// @param _originChainId The chain id of the origin token.

@@ -9,8 +9,7 @@ import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2Contract
 import {
     InvalidNTVBurnData,
     UnsupportedEncodingVersion,
-    BadTransferDataLength,
-    L2WithdrawalMessageWrongLength
+    BadTransferDataLength
 } from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Unit tests for DataEncoding library

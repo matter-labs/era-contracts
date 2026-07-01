@@ -285,18 +285,9 @@ abstract contract NativeTokenVaultBase is
         bytes32 storedAssetId = assetId[tokenAddress];
         require(storedAssetId == bytes32(0), AssetIdAlreadyRegistered());
 
-        // This token has not been registered within this NTV yet. Usually this means that the
+        // This token has not been registered within this NTV yet. This means that the
         // token is native to the chain and the user would prefer to get it registered as such.
-        // However, there are exceptions (e.g. bridged legacy ERC20 tokens on L2) when the
-        // assetId has not been stored yet. We will ask the implementer to double check that the token
-        // is not legacy.
-
-        // We try to register it as legacy token. If it fails, we know
-        // it is a native one and so register it as a native token.
-        bytes32 newAssetId = _registerTokenIfBridgedLegacy(tokenAddress);
-        if (newAssetId == bytes32(0)) {
-            newAssetId = _registerToken(tokenAddress);
-        }
+        bytes32 newAssetId = _registerToken(tokenAddress);
 
         require(newAssetId == _expectedAssetId, AssetIdMismatch(_expectedAssetId, newAssetId));
     }
@@ -319,8 +310,6 @@ abstract contract NativeTokenVaultBase is
         bytes32 storedAssetId = assetId[parsedTokenAddress];
         require(_suppliedAssetId == storedAssetId, AssetIdMismatch(storedAssetId, _suppliedAssetId));
     }
-
-    function _registerTokenIfBridgedLegacy(address _token) internal virtual returns (bytes32);
 
     /// @notice Burns an asset on the source chain and produces the bridge-mint data for the destination.
     /// @dev Unifies the native and bridged-token paths; they only differ in the WETH guard (native only),
