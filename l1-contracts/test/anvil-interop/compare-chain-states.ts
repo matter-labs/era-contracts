@@ -17,6 +17,17 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import * as zlib from "zlib";
+
+// Read a chain-state file, transparently gunzipping the compressed `.json.gz`
+// dumps (see deployment-runner.ts). `addresses.json` stays plain text.
+function readStateJson(p: string): unknown {
+  const buf = fs.readFileSync(p);
+  if (p.endsWith(".gz") || (buf.length >= 2 && buf[0] === 0x1f && buf[1] === 0x8b)) {
+    return JSON.parse(zlib.gunzipSync(buf).toString("utf-8"));
+  }
+  return JSON.parse(buf.toString("utf-8"));
+}
 
 const IGNORED_BLOCK_FIELDS = new Set(["timestamp", "basefee", "difficulty", "prevrandao", "blob_excess_gas_and_price"]);
 
@@ -122,8 +133,8 @@ function compareJsonFiles(path1: string, path2: string, name: string): string[] 
   if (!fs.existsSync(path1)) return [`  Missing in committed: ${name}`];
   if (!fs.existsSync(path2)) return [`  Missing in generated: ${name}`];
 
-  const data1: unknown = JSON.parse(fs.readFileSync(path1, "utf-8"));
-  const data2: unknown = JSON.parse(fs.readFileSync(path2, "utf-8"));
+  const data1: unknown = readStateJson(path1);
+  const data2: unknown = readStateJson(path2);
 
   if (name.endsWith("addresses.json")) {
     if (JSON.stringify(data1) !== JSON.stringify(data2)) {
@@ -171,10 +182,11 @@ function main() {
       continue;
     }
 
+    const isStateFile = (f: string) => f.endsWith(".json") || f.endsWith(".json.gz");
     const allFiles = [
       ...new Set([
-        ...fs.readdirSync(committedVersion).filter((f) => f.endsWith(".json")),
-        ...fs.readdirSync(generatedVersion).filter((f) => f.endsWith(".json")),
+        ...fs.readdirSync(committedVersion).filter(isStateFile),
+        ...fs.readdirSync(generatedVersion).filter(isStateFile),
       ]),
     ].sort();
 
