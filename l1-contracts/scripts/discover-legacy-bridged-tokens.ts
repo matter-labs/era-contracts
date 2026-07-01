@@ -17,6 +17,10 @@
  *   - L1ERC20Bridge.DepositInitiated(l2DepositTxHash, from, to, l1Token,
  *       amount) — pre-AssetRouter deposits straight against the old shared
  *       bridge.
+ *   - Bridgehub.getAllZKChainChainIDs() + baseTokenAssetId(chainId) —
+ *       current base tokens for all registered chains, resolved through
+ *       `L1NativeTokenVault.tokenAddress(assetId)`. This source is always
+ *       refetched, including when `--resume` is used.
  *
  * Usage:
  *
@@ -58,7 +62,11 @@ const DEFAULT_BLOCK_STEP = 10_000;
 // Minimal inline ABIs only for the bridgehub getter we need before any
 // foundry-output ABI is loaded. Once we have the bridgehub we read the
 // fuller ABIs from foundry-output JSON.
-const BRIDGEHUB_GETTER_ABI = ["function assetRouter() view returns (address)"];
+const BRIDGEHUB_GETTER_ABI = [
+  "function assetRouter() view returns (address)",
+  "function baseTokenAssetId(uint256) view returns (bytes32)",
+  "function getAllZKChainChainIDs() view returns (uint256[])",
+];
 const ASSET_ROUTER_GETTER_ABI = [
   "function nativeTokenVault() view returns (address)",
   "function legacyBridge() view returns (address)",
@@ -108,6 +116,9 @@ interface DiscoveryResult {
     erc20BridgeDepositInitiated: number;
     assetIdsResolved: number;
     assetIdsSkippedNonL1Native: number;
+    baseTokenChainsScanned: number;
+    baseTokenAssetIdsResolved: number;
+    baseTokenAssetIdsSkippedNonL1Native: number;
   };
 }
 
@@ -260,11 +271,14 @@ async function discover({
     erc20BridgeDepositInitiated: 0,
     assetIdsResolved: 0,
     assetIdsSkippedNonL1Native: 0,
+    baseTokenChainsScanned: 0,
+    baseTokenAssetIdsResolved: 0,
+    baseTokenAssetIdsSkippedNonL1Native: 0,
   };
 
   // ── 1. AssetRouter.LegacyDepositInitiated ────────────────────────────
   const legacyDepositTopic = arIface.getEventTopic("LegacyDepositInitiated");
-  console.log("\n[1/3] AssetRouter.LegacyDepositInitiated...");
+  console.log("\n[1/4] AssetRouter.LegacyDepositInitiated...");
   const legacyDepositLogs = await getLogsPaginated({
     provider,
     fromBlock,
@@ -282,7 +296,7 @@ async function discover({
 
   // ── 2. AssetRouter.BridgehubDepositInitiated (resolve assetIds via NTV)
   const bridgehubDepositTopic = arIface.getEventTopic("BridgehubDepositInitiated");
-  console.log("\n[2/3] AssetRouter.BridgehubDepositInitiated...");
+  console.log("\n[2/4] AssetRouter.BridgehubDepositInitiated...");
   const bridgehubDepositLogs = await getLogsPaginated({
     provider,
     fromBlock,
@@ -318,7 +332,7 @@ async function discover({
   );
 
   // ── 3. L1ERC20Bridge.DepositInitiated (if a legacy bridge exists) ────
-  console.log("\n[3/3] L1ERC20Bridge.DepositInitiated...");
+  console.log("\n[3/4] L1ERC20Bridge.DepositInitiated...");
   if (resolved.legacyErc20Bridge) {
     const erc20DepositTopic = erc20Iface.getEventTopic("DepositInitiated");
     const erc20DepositLogs = await getLogsPaginated({
@@ -338,6 +352,33 @@ async function discover({
   } else {
     console.log("  skipped: no L1ERC20Bridge wired on this env");
   }
+
+  // ── 4. Bridgehub base tokens for all registered chains ───────────────
+  console.log("\n[4/4] Bridgehub base tokens...");
+  const bridgehubContract = new ethers.Contract(resolved.bridgehub, BRIDGEHUB_GETTER_ABI, provider);
+  const chainIds: ethers.BigNumber[] = await bridgehubContract.getAllZKChainChainIDs();
+  counts.baseTokenChainsScanned = chainIds.length;
+  console.log(`  chains: ${chainIds.length}`);
+
+  const baseTokenAssetIds = new Set<string>();
+  for (const chainId of chainIds) {
+    const assetId: string = await bridgehubContract.baseTokenAssetId(chainId);
+    baseTokenAssetIds.add(assetId);
+  }
+  console.log(`  unique base token assetIds: ${baseTokenAssetIds.size}`);
+
+  for (const assetId of baseTokenAssetIds) {
+    const tokenAddress: string = await ntv.tokenAddress(assetId);
+    if (tokenAddress === ethers.constants.AddressZero) {
+      counts.baseTokenAssetIdsSkippedNonL1Native += 1;
+      continue;
+    }
+    tokens.add(ethers.utils.getAddress(tokenAddress));
+    counts.baseTokenAssetIdsResolved += 1;
+  }
+  console.log(
+    `  resolved: ${counts.baseTokenAssetIdsResolved} addresses, skipped ${counts.baseTokenAssetIdsSkippedNonL1Native} non-L1-native; unique tokens so far: ${tokens.size}`
+  );
 
   // Make sure the foundry-output ABI is at least present so callers know
   // the script was run against a current build (it isn't used at runtime,
@@ -372,6 +413,9 @@ function zeroCounts(): DiscoveryResult["counts"] {
     erc20BridgeDepositInitiated: 0,
     assetIdsResolved: 0,
     assetIdsSkippedNonL1Native: 0,
+    baseTokenChainsScanned: 0,
+    baseTokenAssetIdsResolved: 0,
+    baseTokenAssetIdsSkippedNonL1Native: 0,
   };
 }
 
@@ -395,11 +439,14 @@ function parseExistingTomlOutput(filePath: string): ExistingDiscoveryState | nul
   );
 
   const counts = zeroCounts();
-  const legacy = body.match(/^#   AssetRouter\.LegacyDepositInitiated:\s+(\d+)$/m);
+  const legacy = body.match(/^#[ ]{3}AssetRouter\.LegacyDepositInitiated:\s+(\d+)$/m);
   const bridgehub = body.match(
-    /^#   AssetRouter\.BridgehubDepositInitiated:\s+(\d+) logs => (\d+) L1-native \((\d+) non-L1-native skipped\)$/m
+    /^#[ ]{3}AssetRouter\.BridgehubDepositInitiated:\s+(\d+) logs => (\d+) L1-native \((\d+) non-L1-native skipped\)$/m
   );
-  const erc20 = body.match(/^#   L1ERC20Bridge\.DepositInitiated:\s+(\d+)$/m);
+  const erc20 = body.match(/^#[ ]{3}L1ERC20Bridge\.DepositInitiated:\s+(\d+)$/m);
+  const baseTokens = body.match(
+    /^#[ ]{3}Bridgehub base tokens:\s+(\d+) chains => (\d+) L1-native \((\d+) non-L1-native skipped\)$/m
+  );
 
   if (legacy) counts.legacyDepositInitiated = parseInt(legacy[1], 10);
   if (bridgehub) {
@@ -408,6 +455,11 @@ function parseExistingTomlOutput(filePath: string): ExistingDiscoveryState | nul
     counts.assetIdsSkippedNonL1Native = parseInt(bridgehub[3], 10);
   }
   if (erc20) counts.erc20BridgeDepositInitiated = parseInt(erc20[1], 10);
+  if (baseTokens) {
+    counts.baseTokenChainsScanned = parseInt(baseTokens[1], 10);
+    counts.baseTokenAssetIdsResolved = parseInt(baseTokens[2], 10);
+    counts.baseTokenAssetIdsSkippedNonL1Native = parseInt(baseTokens[3], 10);
+  }
 
   return {
     tokens,
@@ -434,6 +486,9 @@ function mergeDiscoveryResult(existing: ExistingDiscoveryState, next: DiscoveryR
         existing.counts.erc20BridgeDepositInitiated + next.counts.erc20BridgeDepositInitiated,
       assetIdsResolved: existing.counts.assetIdsResolved + next.counts.assetIdsResolved,
       assetIdsSkippedNonL1Native: existing.counts.assetIdsSkippedNonL1Native + next.counts.assetIdsSkippedNonL1Native,
+      baseTokenChainsScanned: next.counts.baseTokenChainsScanned,
+      baseTokenAssetIdsResolved: next.counts.baseTokenAssetIdsResolved,
+      baseTokenAssetIdsSkippedNonL1Native: next.counts.baseTokenAssetIdsSkippedNonL1Native,
     },
   };
 }
@@ -454,6 +509,7 @@ function writeTomlOutput(filePath: string, env: string, result: DiscoveryResult,
     `#   AssetRouter.LegacyDepositInitiated:     ${result.counts.legacyDepositInitiated}`,
     `#   AssetRouter.BridgehubDepositInitiated:  ${result.counts.bridgehubDepositInitiated} logs => ${result.counts.assetIdsResolved} L1-native (${result.counts.assetIdsSkippedNonL1Native} non-L1-native skipped)`,
     `#   L1ERC20Bridge.DepositInitiated:         ${result.counts.erc20BridgeDepositInitiated}`,
+    `#   Bridgehub base tokens:                  ${result.counts.baseTokenChainsScanned} chains => ${result.counts.baseTokenAssetIdsResolved} L1-native (${result.counts.baseTokenAssetIdsSkippedNonL1Native} non-L1-native skipped)`,
     `# Unique L1-native tokens: ${result.tokens.length}`,
     "",
   ].join("\n");
