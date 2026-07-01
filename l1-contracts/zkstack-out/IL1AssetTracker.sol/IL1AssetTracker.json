@@ -194,19 +194,6 @@
   },
   {
     "type": "function",
-    "name": "registerLegacyToken",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "requestPauseDepositsForChainOnGateway",
     "inputs": [
       {

@@ -30,11 +30,7 @@ import {
     WithdrawFailed,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
-import {
-    ClaimFailedDepositFailed,
-    WrongCounterpart,
-    OnlyFailureStatusAllowed
-} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {WrongCounterpart, OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 
 contract MockERC20 is ERC20 {
     constructor() ERC20("MockToken", "MTK") {
@@ -199,26 +195,6 @@ contract L1NativeTokenVaultExtendedTest is Test {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
         uint256 balance = l1NTV.chainBalance(CHAIN_ID, assetId);
         assertEq(balance, 0);
-    }
-
-    function test_MigrateTokenBalanceToAssetTracker() public {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
-
-        // Only asset tracker can call this
-        vm.prank(assetTracker);
-        uint256 migratedAmount = l1NTV.migrateTokenBalanceToAssetTracker(CHAIN_ID, assetId);
-
-        // Since we didn't set a balance, it should be 0
-        assertEq(migratedAmount, 0);
-    }
-
-    function test_MigrateTokenBalanceToAssetTracker_RevertWhen_NotAssetTracker() public {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
-        address notAssetTracker = makeAddr("notAssetTracker");
-
-        vm.prank(notAssetTracker);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notAssetTracker));
-        l1NTV.migrateTokenBalanceToAssetTracker(CHAIN_ID, assetId);
     }
 
     function test_BridgeConfirmTransferResult_RevertWhen_NotFailure() public {

@@ -33,7 +33,6 @@ import {IContractDeployer, L2ContractHelper} from "contracts/common/l2-helpers/L
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
@@ -132,7 +131,7 @@ library L2Utils {
         new L2MessageRoot();
         forceDeployWithoutConstructor("L2MessageRoot", L2_MESSAGE_ROOT_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(_args.l1ChainId, _args.gatewayChainId);
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(_args.l1ChainId);
     }
 
     function forceDeployBridgehub(SystemContractsArgs memory _args) internal {
@@ -227,7 +226,6 @@ library L2Utils {
             _args.l1ChainId,
             _args.eraChainId,
             IL1AssetRouter(_args.l1AssetRouter),
-            IL2SharedBridgeLegacy(_args.legacySharedBridge),
             ethAssetId,
             _args.aliasedOwner
         );
@@ -247,7 +245,6 @@ library L2Utils {
             _args.l1ChainId,
             _args.aliasedOwner,
             _args.l2TokenProxyBytecodeHash,
-            _args.legacySharedBridge,
             _args.l2TokenBeacon,
             _args.wethToken,
             TokenBridgingData({assetId: ethAssetId, originChainId: _args.l1ChainId, originToken: ETH_TOKEN_ADDRESS}),

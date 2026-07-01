@@ -41,7 +41,6 @@ import {GWAssetTracker} from "../bridge/asset-tracker/GWAssetTracker.sol";
 import {L2ChainAssetHandler} from "../core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {InteropHandler} from "../interop/InteropHandler.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
-import {IL2SharedBridgeLegacy} from "../bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {
     DeployFailed,
     UnsupportedUpgradeType,
@@ -283,10 +282,7 @@ library L2GenesisForceDeploymentsHelper {
         ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData,
         address _wrappedBaseTokenAddress
     ) private {
-        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(
-            _fixedForceDeploymentsData.l1ChainId,
-            _fixedForceDeploymentsData.gatewayChainId
-        );
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
 
         L2Bridgehub(L2_BRIDGEHUB_ADDR).initL2(
             _fixedForceDeploymentsData.l1ChainId,
@@ -299,7 +295,6 @@ library L2GenesisForceDeploymentsHelper {
             _fixedForceDeploymentsData.l1ChainId,
             _fixedForceDeploymentsData.eraChainId,
             IL1AssetRouter(_fixedForceDeploymentsData.l1AssetRouter),
-            IL2SharedBridgeLegacy(address(0)), // no legacy bridge for new chains
             _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
             _fixedForceDeploymentsData.aliasedL1Governance
         );
@@ -318,7 +313,6 @@ library L2GenesisForceDeploymentsHelper {
             _fixedForceDeploymentsData.l1ChainId,
             _fixedForceDeploymentsData.aliasedL1Governance,
             _fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
-            _additionalForceDeploymentsData.l2LegacySharedBridge,
             deployedTokenBeacon,
             _wrappedBaseTokenAddress,
             _additionalForceDeploymentsData.baseTokenBridgingData,
@@ -337,10 +331,7 @@ library L2GenesisForceDeploymentsHelper {
         ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData,
         address _wrappedBaseTokenAddress
     ) private {
-        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).updateL2(
-            _fixedForceDeploymentsData.l1ChainId,
-            _fixedForceDeploymentsData.gatewayChainId
-        );
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).updateL2(_fixedForceDeploymentsData.l1ChainId);
 
         L2Bridgehub(L2_BRIDGEHUB_ADDR).updateL2(
             _fixedForceDeploymentsData.l1ChainId,
@@ -353,7 +344,6 @@ library L2GenesisForceDeploymentsHelper {
             _fixedForceDeploymentsData.l1ChainId,
             _fixedForceDeploymentsData.eraChainId,
             IL1AssetRouter(_fixedForceDeploymentsData.l1AssetRouter),
-            IL2SharedBridgeLegacy(_getLegacySharedBridge()),
             _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
             _fixedForceDeploymentsData.aliasedL1Governance
         );
@@ -365,7 +355,6 @@ library L2GenesisForceDeploymentsHelper {
             // Legacy Era chains exposed this via an immutable. After the v31 code replacement,
             // reading it back from storage returns zero, so the L1-provided value is authoritative.
             _fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
-            _getLegacySharedBridge(),
             _wrappedBaseTokenAddress,
             _additionalForceDeploymentsData.baseTokenBridgingData,
             _additionalForceDeploymentsData.baseTokenMetadata
@@ -458,11 +447,6 @@ library L2GenesisForceDeploymentsHelper {
         // For Era: initializes holder balance, with __DEPRECATED_totalSupply kept in totalSupply().
         // For ZKOS: mints via MINT_BASE_TOKEN_HOOK and transfers to holder.
         IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
-    }
-
-    /// @notice Returns the address of the legacy shared bridge from the L2 Asset Router.
-    function _getLegacySharedBridge() private view returns (address) {
-        return address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
     }
 
     /// @notice Constructs the initialization calldata for the L2WrappedBaseToken.

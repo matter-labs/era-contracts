@@ -50,7 +50,6 @@ import {
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
-import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
@@ -103,7 +102,7 @@ contract GWAssetTrackerExtendedTest is Test {
         // L2MessageRoot: real bytecode + init so getEmptyMultichainBatchRoot works.
         vm.etch(L2_MESSAGE_ROOT_ADDR, type(L2MessageRoot).runtimeCode);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(L1_CHAIN_ID, 0);
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(L1_CHAIN_ID);
 
         // Mock the WETH_TOKEN() call on NativeTokenVault (required by initL2)
         vm.mockCall(
@@ -414,86 +413,6 @@ contract GWAssetTrackerExtendedTest is Test {
     }
 
     // Test processLogsAndMessages with base token system contract message (lines 233, 510, 516-517, 521)
-    function test_ProcessLogsAndMessages_BaseToken() public {
-        uint256 withdrawAmount = 100;
-        address l1Receiver = address(0x456);
-
-        // Create message using abi.encodePacked (matching DataEncoding decodeBaseTokenFinalizeWithdrawalData format)
-        bytes memory message = abi.encodePacked(
-            IMailboxLegacy.finalizeEthWithdrawal.selector,
-            l1Receiver,
-            withdrawAmount
-        );
-
-        L2Log[] memory logs = new L2Log[](1);
-        logs[0] = L2Log({
-            l2ShardId: 0,
-            isService: true,
-            txNumberInBatch: 0,
-            sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            key: bytes32(uint256(uint160(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR))),
-            value: keccak256(message)
-        });
-
-        bytes[] memory messages = new bytes[](1);
-        messages[0] = message;
-
-        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
-        bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
-
-        ProcessLogsInput memory input = ProcessLogsInput({
-            chainId: CHAIN_ID,
-            batchNumber: 1,
-            logs: logs,
-            messages: messages,
-            chainBatchRoot: chainBatchRoot,
-            multichainBatchRoot: emptyMultichainBatchRoot,
-            settlementFeePayer: address(0)
-        });
-
-        // Need to set up initial balance for the chain first
-        BalanceChange memory balanceChange = BalanceChange({
-            version: BALANCE_CHANGE_VERSION,
-            assetId: ASSET_ID,
-            baseTokenAssetId: BASE_TOKEN_ASSET_ID,
-            amount: AMOUNT,
-            baseTokenAmount: BASE_TOKEN_AMOUNT,
-            originToken: ORIGIN_TOKEN,
-            tokenOriginChainId: ORIGIN_CHAIN_ID
-        });
-        vm.prank(INTEROP_CENTER_ADDR);
-        gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, CANONICAL_TX_HASH, balanceChange);
-
-        // Mock getZKChain
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, CHAIN_ID),
-            abi.encode(mockZKChain)
-        );
-
-        // Mock base token asset ID
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, CHAIN_ID),
-            abi.encode(BASE_TOKEN_ASSET_ID)
-        );
-
-        // Mock message root addChainBatchRoot
-        vm.mockCall(
-            L2_MESSAGE_ROOT_ADDR,
-            abi.encodeWithSignature("addChainBatchRoot(uint256,uint256,bytes32)", CHAIN_ID, 1, chainBatchRoot),
-            abi.encode()
-        );
-
-        uint256 balanceBefore = gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID);
-
-        vm.prank(mockZKChain);
-        gwAssetTracker.processLogsAndMessages(input);
-
-        // Verify balance was decreased (line 521)
-        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), balanceBefore - withdrawAmount);
-    }
 
     // Test processLogsAndMessages with compressor message (line 240)
     function test_ProcessLogsAndMessages_Compressor() public {

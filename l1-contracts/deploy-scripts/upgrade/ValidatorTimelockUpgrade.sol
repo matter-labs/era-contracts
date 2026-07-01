@@ -5,12 +5,12 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
-import {Create2FactoryUtils} from "deploy-scripts/Create2FactoryUtils.s.sol";
-import {MultisigCommitter} from "contracts/state-transition/MultisigCommitter.sol";
+import {Create2FactoryUtils} from "deploy-scripts/utils/deploy/Create2FactoryUtils.s.sol";
+import {MultisigCommitter} from "contracts/state-transition/validators/MultisigCommitter.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {Utils} from "deploy-scripts/Utils.sol";
+import {Utils} from "deploy-scripts/utils/Utils.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 

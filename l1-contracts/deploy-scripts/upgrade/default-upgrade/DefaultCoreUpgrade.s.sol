@@ -132,6 +132,13 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         // Protocol version comes from genesis config
         additionalConfig.newProtocolVersion = loadProtocolVersionFromGenesis();
 
+        // Legacy Era gateway chain ID — baked into L1MessageRoot as immutable
+        // ERA_GATEWAY_CHAIN_ID. Read from the upgrade input TOML ([legacy_gateway] section)
+        // so the constructor gets the right value. Optional: absent on fresh/local.
+        if (upgradeToml.keyExists("$.legacy_gateway.chain_id")) {
+            config.legacyGatewayChainId = upgradeToml.readUint("$.legacy_gateway.chain_id");
+        }
+
         coreAddresses.bridgehub.proxies.bridgehub = bridgehubProxyAddress;
         require(coreAddresses.bridgehub.proxies.bridgehub != address(0), "bridgehub_proxy_addr is zero");
         setAddressesBasedOnBridgehub();
@@ -199,6 +206,35 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             "chain_asset_handler_proxy_addr",
             coreAddresses.bridgehub.proxies.chainAssetHandler
         );
+        if (coreAddresses.bridgehub.proxies.chainRegistrationSender != address(0)) {
+            require(
+                coreAddresses.bridgehub.implementations.chainRegistrationSender != address(0),
+                "chainRegistrationSenderImpl is zero"
+            );
+            vm.serializeAddress(
+                "bridgehub",
+                "chain_registration_sender_implementation_addr",
+                coreAddresses.bridgehub.implementations.chainRegistrationSender
+            );
+            vm.serializeAddress(
+                "bridgehub",
+                "chain_registration_sender_proxy_addr",
+                coreAddresses.bridgehub.proxies.chainRegistrationSender
+            );
+        }
+        if (coreAddresses.bridgehub.proxies.assetTracker != address(0)) {
+            require(coreAddresses.bridgehub.implementations.assetTracker != address(0), "assetTrackerImpl is zero");
+            vm.serializeAddress(
+                "bridgehub",
+                "l1_asset_tracker_implementation_addr",
+                coreAddresses.bridgehub.implementations.assetTracker
+            );
+            vm.serializeAddress(
+                "bridgehub",
+                "l1_asset_tracker_proxy_addr",
+                coreAddresses.bridgehub.proxies.assetTracker
+            );
+        }
         vm.serializeAddress("bridgehub", "message_root_proxy_addr", coreAddresses.bridgehub.proxies.messageRoot);
         string memory bridgehubSerialized = vm.serializeAddress(
             "bridgehub",
@@ -207,12 +243,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         );
 
         // Serialize bridges addresses
-        vm.serializeAddress(
-            "bridges",
-            "erc20_bridge_implementation_addr",
-            coreAddresses.bridges.implementations.erc20Bridge
-        );
-        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", coreAddresses.bridges.proxies.erc20Bridge);
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
         vm.serializeAddress(
             "bridges",
@@ -256,7 +286,16 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridges.implementations.l1NativeTokenVault
         );
 
-        string memory toml = vm.serializeString("root", "upgrade_addresses", deployedAddresses);
+        string memory shared = vm.serializeAddress(
+            "shared",
+            "transparent_proxy_admin",
+            coreAddresses.shared.transparentProxyAdmin
+        );
+        deployedAddresses = vm.serializeString("deployed_addresses", "shared", shared);
+
+        string memory misc = vm.serializeAddress("misc", "deployer_addr", config.deployerAddress);
+        vm.serializeString("root", "upgrade_addresses", deployedAddresses);
+        string memory toml = vm.serializeString("root", "misc", misc);
 
         vm.writeToml(toml, outputPath);
 
@@ -320,13 +359,19 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](3);
+        Call[][] memory allCalls = new Call[][](4);
 
+        // Re-assert the migration pause as the first stage-1 call. When this upgrade is executed via the
+        // EmergencyUpgradeBoard, PUH.executeEmergencyUpgrade runs a built-in unfreeze/unpause pre-step that
+        // calls ChainAssetHandler.unpauseMigration(), clearing the pause set in stage 0; stage 1's
+        // checkMigrationsPaused() would then revert with MigrationsNotPaused(). Harmless on the normal
+        // governance path (the pause from stage 0 is simply re-asserted).
+        allCalls[0] = preparePauseGatewayMigrationsCall();
         console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
-        allCalls[0] = prepareUpgradeProxiesCalls();
-        allCalls[1] = provideSetNewVersionUpgradeCall();
+        allCalls[1] = prepareUpgradeProxiesCalls();
+        allCalls[2] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
-        allCalls[2] = prepareVersionSpecificStage1GovernanceCallsL1();
+        allCalls[3] = prepareVersionSpecificStage1GovernanceCallsL1();
 
         calls = UpgradeUtils.mergeCallsArray(allCalls);
     }

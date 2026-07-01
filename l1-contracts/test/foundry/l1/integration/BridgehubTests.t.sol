@@ -10,12 +10,10 @@ import {
     L2TransactionRequestDirect,
     L2TransactionRequestTwoBridgesOuter
 } from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
@@ -30,7 +28,6 @@ import {
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
 
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
@@ -651,180 +648,18 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         l2ValuesSum[currentTokenAddress] += l2Value;
     }
 
-    /// @notice Finalizes an ERC20 token withdrawal from L2 to L1 via the shared bridge.
-    /// @dev Constructs an L2-to-L1 message with `IL1ERC20Bridge.finalizeWithdrawal` selector,
-    /// mocks the L2 message inclusion proof on the bridgehub, then calls
-    /// `sharedBridge.finalizeWithdrawal`. The `isWithdrawalFinalized` flag is force-set to
-    /// false via `stdstore` before the call to allow repeated invocations with the same params.
-    /// Mock justification: L2 proof verification is mocked because L2 batch commitments and
-    /// merkle trees are unavailable in this L1-only integration test environment.
-    function withdrawERC20Token(uint256 amountToWithdraw, address tokenAddress) private useGivenToken(tokenAddress) {
-        uint256 l2BatchNumber = uint256(uint160(makeAddr("l2BatchNumber")));
-        uint256 l2MessageIndex = uint256(uint160(makeAddr("l2MessageIndex")));
-        uint16 l2TxNumberInBatch = uint16(uint160(makeAddr("l2TxNumberInBatch")));
-        bytes32[] memory merkleProof = new bytes32[](1);
+    /// @notice Finalizes an ERC20 token withdrawal from L2 to L1.
+    /// TODO(interop-withdrawal): re-wire via InteropCenter
+    /// @dev The legacy L2->L1 withdrawal flow relied on the removed
+    /// `L1AssetRouter.finalizeWithdrawal` and `L1Nullifier.isWithdrawalFinalized` functions.
+    /// The body has been removed until the withdrawal path is re-wired through the InteropCenter.
+    /// The function (and `withdrawSuccess`) is kept so the invariant subclasses still compile.
+    function withdrawERC20Token(uint256 amountToWithdraw, address tokenAddress) private useGivenToken(tokenAddress) {}
 
-        _setSharedBridgeIsWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex, false);
-        uint256 beforeChainBalance = addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress);
-        uint256 beforeBridgeBalance = currentToken.balanceOf(address(addresses.sharedBridge));
-        uint256 beforeUserBalance = currentToken.balanceOf(currentUser);
-
-        if (beforeChainBalance < amountToWithdraw) {
-            vm.expectRevert("L1AR: not enough funds 2");
-        } else {
-            tokenSumWithdrawal[currentTokenAddress] += amountToWithdraw;
-        }
-
-        bytes memory message = abi.encodePacked(
-            IL1ERC20Bridge.finalizeWithdrawal.selector,
-            currentUser,
-            currentTokenAddress,
-            amountToWithdraw
-        );
-
-        L2Message memory l2ToL1Message = L2Message({
-            txNumberInBatch: l2TxNumberInBatch,
-            sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            data: message
-        });
-
-        vm.mockCall(
-            addresses.bridgehubProxyAddress,
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                IBridgehubBase.proveL2MessageInclusion.selector,
-                currentChainId,
-                l2BatchNumber,
-                l2MessageIndex,
-                l2ToL1Message,
-                merkleProof
-            ),
-            abi.encode(true)
-        );
-
-        vm.recordLogs();
-        addresses.sharedBridge.finalizeWithdrawal({
-            _chainId: currentChainId,
-            _l2BatchNumber: l2BatchNumber,
-            _l2MessageIndex: l2MessageIndex,
-            _l2TxNumberInBatch: l2TxNumberInBatch,
-            _message: message,
-            _merkleProof: merkleProof
-        });
-
-        // If we reach here, the withdrawal succeeded — assert outcomes unconditionally
-        // Chain balance decreased by withdrawal amount
-        assertEq(
-            beforeChainBalance - addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
-            amountToWithdraw,
-            "Chain balance should decrease by withdrawal amount"
-        );
-
-        // Bridge token balance decreased
-        assertEq(
-            beforeBridgeBalance - currentToken.balanceOf(address(addresses.sharedBridge)),
-            amountToWithdraw,
-            "Bridge token balance should decrease by withdrawal amount"
-        );
-
-        // Recipient received tokens
-        assertEq(
-            currentToken.balanceOf(currentUser) - beforeUserBalance,
-            amountToWithdraw,
-            "User should receive withdrawn tokens"
-        );
-
-        // Withdrawal marked as finalized (replay protection)
-        assertTrue(
-            addresses.l1Nullifier.isWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex),
-            "Withdrawal should be marked as finalized"
-        );
-
-        // Verify DepositFinalizedAssetRouter event emission
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        Vm.Log memory finalizedLog = logs.requireOne("DepositFinalizedAssetRouter(uint256,bytes32,bytes)");
-        assertEq(uint256(finalizedLog.topics[1]), currentChainId, "DepositFinalizedAssetRouter chainId mismatch");
-    }
-
-    /// @notice Finalizes an ETH withdrawal from L2 to L1 via the shared bridge.
-    /// @dev Same flow as `withdrawERC20Token` but uses `IMailboxLegacy.finalizeEthWithdrawal`
-    /// selector and asserts ETH balances instead of ERC20 balances.
-    /// Mock justification: L2 proof verification is mocked because L2 batch commitments and
-    /// merkle trees are unavailable in this L1-only integration test environment.
-    function withdrawETHToken(uint256 amountToWithdraw, address tokenAddress) private useGivenToken(tokenAddress) {
-        uint256 l2BatchNumber = uint256(uint160(makeAddr("l2BatchNumber")));
-        uint256 l2MessageIndex = uint256(uint160(makeAddr("l2MessageIndex")));
-        uint16 l2TxNumberInBatch = uint16(uint160(makeAddr("l2TxNumberInBatch")));
-        bytes32[] memory merkleProof = new bytes32[](1);
-
-        _setSharedBridgeIsWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex, false);
-        uint256 beforeChainBalance = addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress);
-        uint256 beforeBridgeBalance = address(addresses.sharedBridge).balance;
-        uint256 beforeUserBalance = currentUser.balance;
-
-        if (beforeChainBalance < amountToWithdraw) {
-            vm.expectRevert("L1AR: not enough funds 2");
-        } else {
-            tokenSumWithdrawal[currentTokenAddress] += amountToWithdraw;
-        }
-
-        bytes memory message = abi.encodePacked(
-            IMailboxLegacy.finalizeEthWithdrawal.selector,
-            currentUser,
-            amountToWithdraw
-        );
-        L2Message memory l2ToL1Message = L2Message({
-            txNumberInBatch: l2TxNumberInBatch,
-            sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            data: message
-        });
-
-        vm.mockCall(
-            addresses.bridgehubProxyAddress,
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                IBridgehubBase.proveL2MessageInclusion.selector,
-                currentChainId,
-                l2BatchNumber,
-                l2MessageIndex,
-                l2ToL1Message,
-                merkleProof
-            ),
-            abi.encode(true)
-        );
-
-        vm.recordLogs();
-        addresses.sharedBridge.finalizeWithdrawal({
-            _chainId: currentChainId,
-            _l2BatchNumber: l2BatchNumber,
-            _l2MessageIndex: l2MessageIndex,
-            _l2TxNumberInBatch: l2TxNumberInBatch,
-            _message: message,
-            _merkleProof: merkleProof
-        });
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-
-        // If we reach here, the withdrawal succeeded — assert outcomes unconditionally
-        assertEq(
-            beforeChainBalance - addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
-            amountToWithdraw,
-            "Chain balance should decrease by withdrawal amount"
-        );
-        assertEq(
-            beforeBridgeBalance - address(addresses.sharedBridge).balance,
-            amountToWithdraw,
-            "Bridge ETH balance should decrease by withdrawal amount"
-        );
-        assertEq(currentUser.balance - beforeUserBalance, amountToWithdraw, "User should receive withdrawn ETH");
-        assertTrue(
-            addresses.l1Nullifier.isWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex),
-            "Withdrawal should be marked as finalized"
-        );
-
-        // Verify DepositFinalizedAssetRouter event emission
-        Vm.Log memory finalizedLog = logs.requireOne("DepositFinalizedAssetRouter(uint256,bytes32,bytes)");
-        assertEq(uint256(finalizedLog.topics[1]), currentChainId, "DepositFinalizedAssetRouter chainId mismatch");
-    }
+    /// @notice Finalizes an ETH withdrawal from L2 to L1.
+    /// TODO(interop-withdrawal): re-wire via InteropCenter
+    /// @dev The legacy ETH withdrawal flow relied on the removed `L1AssetRouter.finalizeWithdrawal`.
+    function withdrawETHToken(uint256 amountToWithdraw, address tokenAddress) private useGivenToken(tokenAddress) {}
 
     /// @notice Routes an ETH deposit to the correct internal handler based on the selected
     /// chain's base token.

@@ -23,7 +23,6 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
-import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
@@ -138,6 +137,9 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
         if (toml.keyExists("$.is_zk_sync_os")) {
             config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
+        }
+        if (toml.keyExists("$.era_chain_id")) {
+            config.eraChainId = toml.readUint("$.era_chain_id");
         }
         if (toml.keyExists("$.zk_token_asset_id")) {
             config.zkTokenAssetId = toml.readBytes32("$.zk_token_asset_id");
@@ -353,6 +355,9 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "ServerNotifier")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "MultisigCommitter")) {
+            // Same constructor as ValidatorTimelock (it derives from it): the bridgehub immutable.
+            return abi.encode(coreAddresses.bridgehub.proxies.bridgehub);
         } else if (compareStrings(contractName, "L1AssetTracker")) {
             return
                 abi.encode(

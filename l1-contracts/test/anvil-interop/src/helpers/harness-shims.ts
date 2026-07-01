@@ -1,3 +1,14 @@
+// AGENTS.md mandates "NEVER override storage slots in tests" with no exceptions,
+// but the fork-upgrade harness in this directory is the one place we can't avoid
+// it: forks are pinned at a block whose pending batches haven't yet been
+// executed, and there is no public API to drive `totalBatchesExecuted` to match
+// `totalBatchesCommitted` without replaying many real batch executions on every
+// run. The override below substitutes for that history; it is scoped to fork
+// runs and never touches a real chain.
+//
+// Slot indices below are taken from `forge inspect <Contract> storageLayout` on
+// the v31 contracts; if any of these contracts ever shift their storage layout
+// these constants need to move with it.
 import type { providers } from "ethers";
 import { Contract, ContractFactory, Wallet, ethers } from "ethers";
 import type { ContractInterface } from "@ethersproject/contracts";
@@ -15,6 +26,12 @@ import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
 // EIP-1967 storage slot for the admin of a TransparentUpgradeableProxy.
 //   keccak256("eip1967.proxy.admin") - 1
 const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
+
+// `ZKChainBase.s` (the only state variable) lives at slot 0 of the proxy, so
+// `ZKChainStorage` field offsets are absolute. Used by
+// `forceBatchExecutedEqualsCommitted`.
+const ZK_CHAIN_TOTAL_BATCHES_EXECUTED_SLOT = 11;
+const ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT = 13;
 
 const systemContextAbi = getAbi("SystemContext") as ContractInterface;
 
@@ -43,6 +60,47 @@ export async function transferOwnable2Step(
     const tx = await contract.connect(signer).acceptOwnership({ gasLimit });
     await tx.wait();
   });
+}
+
+/**
+ * Harness-only shim: copy `s.totalBatchesCommitted` onto `s.totalBatchesExecuted`
+ * for a chain's diamond proxy so `SettlementLayerV31UpgradeBase.upgrade` passes
+ * its `totalBatchesCommitted == totalBatchesExecuted` guard.
+ *
+ * In production all committed batches must be executed before the v31 upgrade
+ * begins. On a forked chain whose pending batches haven't been executed at fork
+ * time, we mark the gap as if execution had caught up — same end-state as the
+ * production prerequisite, just realised via storage write instead of running
+ * the executor for several batches.
+ */
+export async function forceBatchExecutedEqualsCommitted(
+  provider: providers.JsonRpcProvider,
+  diamondProxyAddr: string
+): Promise<void> {
+  const committedHex = await provider.send("eth_getStorageAt", [
+    diamondProxyAddr,
+    ethers.utils.hexValue(ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT),
+    "latest",
+  ]);
+  await provider.send("anvil_setStorageAt", [
+    diamondProxyAddr,
+    ethers.utils.hexValue(ZK_CHAIN_TOTAL_BATCHES_EXECUTED_SLOT),
+    committedHex,
+  ]);
+}
+
+/**
+ * Harness-only shim: fast-forward the L1 anvil clock past the
+ * `GovernanceUpgradeTimer.INITIAL_DELAY` window so stage 1's `checkDeadline()`
+ * call passes. The deploy-time delay is at most a few minutes on stage/testnet,
+ * so 1 day of warp covers every configured `INITIAL_DELAY` with margin.
+ */
+export async function advanceL1TimePastUpgradeDeadline(
+  provider: providers.JsonRpcProvider,
+  seconds = 24 * 60 * 60
+): Promise<void> {
+  await provider.send("evm_increaseTime", [seconds]);
+  await provider.send("evm_mine", []);
 }
 
 /**

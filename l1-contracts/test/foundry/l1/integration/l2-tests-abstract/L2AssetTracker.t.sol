@@ -29,15 +29,15 @@ import {MAX_TOKEN_BALANCE} from "contracts/bridge/asset-tracker/IAssetTrackerBas
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {AssetAlreadyRegistered, AssetIdNotRegistered} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {L2BaseTokenZKOS} from "contracts/l2-system/zksync-os/L2BaseTokenZKOS.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
-import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {L2AssetTrackerData} from "./L2AssetTrackerData.sol";
 import {L2UtilsBase} from "../l2-tests-in-l1-context/L2UtilsBase.sol";
 
-import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, BaseTokenPreV31TotalSupplyNotSet} from "contracts/common/L1ContractErrors.sol";
 import {RAND_ADDRESS} from "test/foundry/TestConstants.sol";
 
 import {LogFinder} from "../utils/LogFinder.sol";
@@ -219,62 +219,6 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             .checked_write(balance);
     }
 
-    function test_registerLegacyToken_nativeToken() public {
-        bytes32 assetId = keccak256("test_asset_id");
-
-        // Mock the asset as being native to the current chain
-        stdstore
-            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
-            .sig("originChainId(bytes32)")
-            .with_key(assetId)
-            .checked_write(block.chainid);
-
-        // Mock token address
-        address mockTokenAddress = address(0x1234);
-        stdstore
-            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
-            .sig("tokenAddress(bytes32)")
-            .with_key(assetId)
-            .checked_write(uint256(uint160(mockTokenAddress)));
-
-        // Mock NTV balance (tokens locked from previous bridge operations)
-        uint256 ntvBalance = 300;
-        vm.mockCall(
-            mockTokenAddress,
-            abi.encodeWithSelector(IERC20.balanceOf.selector, address(L2_NATIVE_TOKEN_VAULT_ADDR)),
-            abi.encode(ntvBalance)
-        );
-
-        // Pre-state: registerLegacyToken early-returns if the asset is already registered (see
-        // L2AssetTracker.registerLegacyToken). Lock that the fixture is fresh and the native-branch
-        // invariant chainBalance == 0 (see L2AssetTracker._registerLegacyToken) holds.
-        L2AssetTracker tracker = L2AssetTracker(L2_ASSET_TRACKER_ADDR);
-        assertFalse(tracker.isAssetRegistered(assetId), "Asset should not be registered before call");
-        assertEq(tracker.chainBalance(block.chainid, assetId), 0, "Origin-chain balance must be 0 pre-migration");
-
-        // Call the migration function
-        L2_ASSET_TRACKER.registerLegacyToken(assetId);
-
-        // ---- Outcome assertions ----
-
-        // Verify chainBalance is set to MAX_TOKEN_BALANCE - ntvBalance (native branch)
-        uint256 expectedBalance = MAX_TOKEN_BALANCE - ntvBalance;
-        assertEq(
-            tracker.chainBalance(block.chainid, assetId),
-            expectedBalance,
-            "Chain balance should be correctly migrated"
-        );
-
-        // Verify isAssetRegistered flipped to true at the end of _registerLegacyToken.
-        assertTrue(tracker.isAssetRegistered(assetId), "Asset should be registered after call");
-
-        // Verify totalPreV31TotalSupply: native branch saves {isSaved: true, amount: chainTotalSupply}
-        // where chainTotalSupply equals the freshly written chainBalance.
-        (bool isSaved, uint256 amount) = tracker.totalPreV31TotalSupply(assetId);
-        assertTrue(isSaved, "totalPreV31TotalSupply.isSaved should be true");
-        assertEq(amount, expectedBalance, "totalPreV31TotalSupply.amount should equal chainTotalSupply");
-    }
-
     function test_handleInitiateBridgingOnL2_requiresTokenRegistration() public {
         TestnetERC20Token token = new TestnetERC20Token("NativeToken", "NTV", 18);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
@@ -301,20 +245,10 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
         uint256 amount = 11;
 
+        // An unregistered foreign asset must be rejected by handleFinalizeBridgingOnL2.
         vm.expectRevert(abi.encodeWithSelector(AssetIdNotRegistered.selector, assetId));
         vm.prank(address(L2_NATIVE_TOKEN_VAULT_ADDR));
         L2_ASSET_TRACKER.handleFinalizeBridgingOnL2(L1_CHAIN_ID, assetId, amount, L1_CHAIN_ID, address(token));
-
-        stdstore.target(sharedBridgeLegacy).sig("l1TokenAddress(address)").with_key(address(token)).checked_write(
-            l1Token
-        );
-        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setLegacyTokenAssetId(address(token));
-
-        vm.prank(address(L2_NATIVE_TOKEN_VAULT_ADDR));
-        L2_ASSET_TRACKER.handleFinalizeBridgingOnL2(L1_CHAIN_ID, assetId, amount, L1_CHAIN_ID, address(token));
-
-        uint256 chainBalance = L2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, assetId);
-        assertEq(chainBalance, 0, "Foreign token chain balance should remain zero");
     }
 
     function test_handleFinalizeBaseTokenBridgingOnL2() public {
@@ -614,5 +548,65 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         (bool isSaved, uint256 amount) = L2AssetTracker(L2_ASSET_TRACKER_ADDR).totalPreV31TotalSupply(assetId);
         assertTrue(isSaved, "totalPreV31TotalSupply.isSaved should be true");
         assertEq(amount, totalSupply, "totalPreV31TotalSupply.amount should match token totalSupply");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════════
+    //  Regression: `handleFinalizeBaseTokenBridgingOnL2` must not read the base-token
+    //  `totalSupply()` while the pre-V31 supply is still pending backfill.
+    //
+    //  `_needToForceSetAssetMigrationOnL2` reads `totalSupply()` as a proxy for "no deposit
+    //  finalized yet". On a ZKsync OS chain upgraded from a pre-v31 version, the base token's
+    //  `totalSupply()` reverts with `BaseTokenPreV31TotalSupplyNotSet` until it is backfilled,
+    //  so before the fix the first base-token deposit finalization reverted. With a real
+    //  `L2BaseTokenZKOS` at the base-token address (whose `totalSupply()` genuinely reverts
+    //  while the backfill is pending) the finalization must still succeed.
+    // ════════════════════════════════════════════════════════════════════════════════
+    function test_handleFinalizeBaseTokenBridgingOnL2_succeedsWhileBackfillPending() public {
+        bytes32 baseTokenAssetId = keccak256("zkos_base_token_pending_backfill");
+        uint256 l1ChainId = 1;
+
+        // Use the real ZKsync OS base token: its `totalSupply()` reverts while the pre-V31
+        // supply has not been backfilled, so no mock is needed for the behaviour under test.
+        vm.etch(address(L2_BASE_TOKEN_SYSTEM_CONTRACT), address(new L2BaseTokenZKOS()).code);
+
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("L1_CHAIN_ID()").checked_write(l1ChainId);
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("needBaseTokenTotalSupplyBackfill()").checked_write(true);
+        stdstore
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig("originChainId(bytes32)")
+            .with_key(baseTokenAssetId)
+            .checked_write(l1ChainId);
+
+        // Pin down the precondition the fix relies on: while the backfill is pending, the real
+        // base token's `totalSupply()` genuinely reverts with `BaseTokenPreV31TotalSupplyNotSet`.
+        // This is the exact call `_needToForceSetAssetMigrationOnL2` makes, so without the fix the
+        // finalization below reverts with this very error instead of recording the deposit.
+        vm.expectRevert(BaseTokenPreV31TotalSupplyNotSet.selector);
+        IERC20(address(L2_BASE_TOKEN_SYSTEM_CONTRACT)).totalSupply();
+
+        // Register the base token exactly as the V31 upgrade does for an existing chain.
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2_ASSET_TRACKER.registerBaseTokenDuringUpgrade();
+
+        // Settle on L1 so the deposit is accounted (same mock the sibling base-token tests use).
+        vm.mockCall(
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
+            abi.encode(l1ChainId)
+        );
+
+        uint256 depositsBefore = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
+
+        // The asset migration number is 0 (never set), which is exactly the path that reached the
+        // reverting `totalSupply()` read before the fix; the finalization must now succeed.
+        vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
+        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(l1ChainId, 300);
+
+        assertEq(
+            _readTotalSuccessfulDepositsFromL1(baseTokenAssetId) - depositsBefore,
+            300,
+            "base-token deposit should be recorded while the supply is pending backfill"
+        );
     }
 }
