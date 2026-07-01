@@ -16,7 +16,7 @@ const SYSTEM_PARAMS = require("../../SystemConfig.json");
 const OUTPUT_DIR_1 = "contracts-preprocessed/bootloader";
 const OUTPUT_DIR_2 = "bootloader/build";
 
-const PREPROCCESING_MODES = ["proved_batch", "playground_batch"];
+const PREPROCESSING_MODES = ["proved_batch", "playground_batch"];
 
 function getSelector(contractName: string, method: string): string {
   let contractInterface;
@@ -175,7 +175,7 @@ function createTestFramework(tests: string[]): string {
 function validateSource(source: string) {
   const matches = source.matchAll(/<!-- @if BOOTLOADER_TYPE=='([^']*)' -->/g);
   for (const match of matches) {
-    if (!PREPROCCESING_MODES.includes(match[1])) {
+    if (!PREPROCESSING_MODES.includes(match[1])) {
       throw Error(`Invalid preprocessing mode '${match[1]}' at position ${match.index}`);
     }
   }
