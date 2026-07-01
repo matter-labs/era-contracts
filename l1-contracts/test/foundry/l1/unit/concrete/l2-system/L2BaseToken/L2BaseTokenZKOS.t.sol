@@ -20,7 +20,8 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2_BASE_TOKEN_HOLDER} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
-import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
+import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {
     BaseTokenHolderAlreadyInitialized,
     BaseTokenHolderMintFailed,
@@ -41,6 +42,7 @@ contract L2BaseTokenZKOSTest is Test {
 
     address internal l1Receiver;
     uint256 internal constant WITHDRAW_AMOUNT = 1 ether;
+    bytes32 internal constant BASE_TOKEN_ASSET_ID_FIXTURE = keccak256("L2BaseToken.test.baseTokenAssetId");
 
     event Withdrawal(address indexed _l2Sender, address indexed _l1Receiver, uint256 _amount);
     event WithdrawalWithMessage(
@@ -65,6 +67,14 @@ contract L2BaseTokenZKOSTest is Test {
         // Deploy dummy BaseTokenHolder that accepts ETH from any sender.
         // Tests that need real access-control checks etch the real BaseTokenHolder instead.
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new DummyL2BaseTokenHolder()).code);
+
+        // The withdrawal message is built via the NTV base-token asset id; there is no real NTV
+        // deployed in these unit tests, so return a fixed test asset id.
+        vm.mockCall(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            abi.encodeCall(IL2NativeTokenVault.BASE_TOKEN_ASSET_ID, ()),
+            abi.encode(BASE_TOKEN_ASSET_ID_FIXTURE)
+        );
     }
 
     /// @dev Helper to initialize l2BaseToken via initL2() — sets L1_CHAIN_ID and transfers to BaseTokenHolder.
@@ -73,6 +83,21 @@ contract L2BaseTokenZKOSTest is Test {
         vm.deal(address(l2BaseToken), INITIAL_BASE_TOKEN_HOLDER_BALANCE);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2BaseToken.initL2(1);
+    }
+
+    /// @dev Builds the expected base-token withdrawal message in the asset-router finalizeDeposit format.
+    function _expectedWithdrawMessage(
+        address _sender,
+        address _to,
+        uint256 _amount,
+        bytes memory _additionalData
+    ) internal view returns (bytes memory) {
+        return
+            DataEncoding.encodeAssetRouterFinalizeDepositData(
+                block.chainid,
+                BASE_TOKEN_ASSET_ID_FIXTURE,
+                DataEncoding.encodeBridgeMintData(_sender, _to, address(0), _amount, _additionalData)
+            );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -87,11 +112,7 @@ contract L2BaseTokenZKOSTest is Test {
         uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
 
         // Expect the L1Messenger call
-        bytes memory expectedMessage = abi.encodePacked(
-            IMailboxImpl.finalizeEthWithdrawal.selector,
-            l1Receiver,
-            WITHDRAW_AMOUNT
-        );
+        bytes memory expectedMessage = _expectedWithdrawMessage(address(0), l1Receiver, WITHDRAW_AMOUNT, new bytes(0));
         vm.expectCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSignature("sendToL1(bytes)", expectedMessage)
@@ -147,11 +168,7 @@ contract L2BaseTokenZKOSTest is Test {
         uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
 
         // Expected message format
-        bytes memory expectedMessage = abi.encodePacked(
-            IMailboxImpl.finalizeEthWithdrawal.selector,
-            l1Receiver,
-            WITHDRAW_AMOUNT
-        );
+        bytes memory expectedMessage = _expectedWithdrawMessage(address(0), l1Receiver, WITHDRAW_AMOUNT, new bytes(0));
 
         // Expect the L1Messenger call
         vm.expectCall(
@@ -268,13 +285,7 @@ contract L2BaseTokenZKOSTest is Test {
         bytes memory additionalData = "test message";
 
         // Expected extended message format
-        bytes memory expectedMessage = abi.encodePacked(
-            IMailboxImpl.finalizeEthWithdrawal.selector,
-            l1Receiver,
-            WITHDRAW_AMOUNT,
-            sender,
-            additionalData
-        );
+        bytes memory expectedMessage = _expectedWithdrawMessage(sender, l1Receiver, WITHDRAW_AMOUNT, additionalData);
 
         // Expect the L1Messenger call
         vm.expectCall(
@@ -742,42 +753,39 @@ contract L2BaseTokenZKOSTest is Test {
                         MESSAGE FORMAT TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_withdrawMessage_format() public {
-        // Verify the message format matches what L1 expects
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
+    function test_withdrawMessage_format() public view {
+        // Verify the message format matches what L1 expects (asset-router finalizeDeposit format).
+        address receiver = address(0x1234);
 
-        bytes memory expectedMessage = abi.encodePacked(
-            IMailboxImpl.finalizeEthWithdrawal.selector,
-            l1Receiver,
-            WITHDRAW_AMOUNT
+        // A basic withdrawal uses sender = address(0) and empty additional data.
+        bytes memory expectedMessage = _expectedWithdrawMessage(address(0), receiver, WITHDRAW_AMOUNT, new bytes(0));
+
+        assertEq(
+            expectedMessage,
+            DataEncoding.encodeAssetRouterFinalizeDepositData(
+                block.chainid,
+                BASE_TOKEN_ASSET_ID_FIXTURE,
+                DataEncoding.encodeBridgeMintData(address(0), receiver, address(0), WITHDRAW_AMOUNT, new bytes(0))
+            ),
+            "Basic withdrawal message should use asset-router finalizeDeposit format"
         );
-
-        // The selector should be 4 bytes + address (20 bytes) + uint256 (32 bytes) = 56 bytes
-        assertEq(expectedMessage.length, 56, "Basic withdrawal message should be 56 bytes");
-
-        // First 4 bytes should be the selector
-        bytes4 selector;
-        assembly {
-            selector := mload(add(expectedMessage, 32))
-        }
-        assertEq(selector, IMailboxImpl.finalizeEthWithdrawal.selector, "Selector should match");
     }
 
     function test_withdrawWithMessage_extendedFormat() public {
         address sender = makeAddr("sender");
         bytes memory additionalData = "hello";
 
-        bytes memory expectedMessage = abi.encodePacked(
-            IMailboxImpl.finalizeEthWithdrawal.selector,
-            l1Receiver,
-            WITHDRAW_AMOUNT,
-            sender,
-            additionalData
-        );
+        bytes memory expectedMessage = _expectedWithdrawMessage(sender, l1Receiver, WITHDRAW_AMOUNT, additionalData);
 
-        // selector (4) + l1Receiver (20) + amount (32) + sender (20) + data (5) = 81 bytes
-        assertEq(expectedMessage.length, 81, "Extended withdrawal message should be 81 bytes");
+        assertEq(
+            expectedMessage,
+            DataEncoding.encodeAssetRouterFinalizeDepositData(
+                block.chainid,
+                BASE_TOKEN_ASSET_ID_FIXTURE,
+                DataEncoding.encodeBridgeMintData(sender, l1Receiver, address(0), WITHDRAW_AMOUNT, additionalData)
+            ),
+            "Extended withdrawal message should carry the sender and additional data"
+        );
     }
 }
 
