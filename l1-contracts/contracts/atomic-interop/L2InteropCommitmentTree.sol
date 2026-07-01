@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IndexedMerkleTreeLib, IMT, IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
+import {IndexedMerkleTree, IMT, IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
 import {IL2InteropCommitmentTree} from "./IL2InteropCommitmentTree.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
@@ -9,8 +9,8 @@ import {CommitmentTreeNotAppender} from "./AtomicInteropErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice See {IL2InteropCommitmentTree}. A thin shell over the shared fixed-depth Indexed Merkle
-/// Tree engine ({IndexedMerkleTreeLib}): it owns the `_appender` ACL, the `initialize` wiring, and
+/// @notice See {IL2InteropCommitmentTree}. A thin shell over the shared dynamic-height Indexed Merkle
+/// Tree engine ({IndexedMerkleTree}): it owns the `_appender` ACL, the `initialize` wiring, and
 /// the L2->L1 root publication, while the engine owns the tree storage, insert/update logic, leaf
 /// hashing, and Merkle paths.
 ///
@@ -22,9 +22,9 @@ import {CommitmentTreeNotAppender} from "./AtomicInteropErrors.sol";
 ///
 /// Deployed in L2 userspace (no constructor); wiring is done in `initialize`.
 contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
-    using IndexedMerkleTreeLib for IMT;
+    using IndexedMerkleTree for IMT;
 
-    /// @dev The append-only indexed tree. A non-zero `_imt.leafCount` doubles as the "initialized" flag.
+    /// @dev The append-only indexed tree. A non-zero `_imt.tree._leafNumber` doubles as the "initialized" flag.
     IMT internal _imt;
 
     /// @notice One-shot initializer: seeds the IMT (the `{0,0,0}` head leaf at index 0) and publishes
@@ -54,7 +54,7 @@ contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
 
     /// @inheritdoc IL2InteropCommitmentTree
     function leafCount() external view returns (uint256) {
-        return _imt.leafCount;
+        return _imt.tree._leafNumber;
     }
 
     /// @inheritdoc IL2InteropCommitmentTree

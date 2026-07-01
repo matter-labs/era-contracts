@@ -50,8 +50,6 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     // solhint-disable-next-line func-name-mixedcase
     function L1_CHAIN_ID() public view virtual returns (uint256);
 
-    function _eraGatewayChainId() internal view virtual returns (uint256);
-
     /// @notice The number of chains that are registered.
     uint256 public chainCount;
 

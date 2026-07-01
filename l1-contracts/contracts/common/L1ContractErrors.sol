@@ -161,18 +161,16 @@ error HashedLogIsDefault();
 error HashMismatch(bytes32 expected, bytes32 actual);
 // 0xf11438d9
 error IMTAlreadyInitialized();
-// 0x848374d5
-error IMTCapacityExceeded();
 // 0x037dc2ed
 error IMTLowLeafIndexOutOfBounds(uint256 lowLeafIndex, uint256 leafCount);
 // 0xd87e0e66
 error IMTLowLeafNextTooSmall(uint256 lowNextValue, uint256 newValue);
 // 0x74470b8f
 error IMTLowLeafValueTooLarge(uint256 lowValue, uint256 newValue);
+// 0x62f8ffe2
+error IMTLeafValueMismatch(uint256 expectedValue, uint256 actualValue);
 // 0xae48798a
 error IMTNotInitialized();
-// 0x1bb259f4
-error IMTProofWrongLength(uint256 expected, uint256 actual);
 // 0x68051076
 error IMTValueAlreadyExists(uint256 value);
 // 0xbd1de53d

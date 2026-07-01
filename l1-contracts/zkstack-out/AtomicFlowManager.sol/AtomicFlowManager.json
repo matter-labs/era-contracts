@@ -395,19 +395,56 @@
   },
   {
     "type": "error",
-    "name": "IMTProofWrongLength",
+    "name": "IMTLeafValueMismatch",
     "inputs": [
       {
-        "name": "expected",
+        "name": "expectedValue",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "actual",
+        "name": "actualValue",
         "type": "uint256",
         "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "IMTLowLeafNextTooSmall",
+    "inputs": [
+      {
+        "name": "lowNextValue",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "newValue",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "IMTLowLeafValueTooLarge",
+    "inputs": [
+      {
+        "name": "lowValue",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "newValue",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "IMTValueZero",
+    "inputs": []
   },
   {
     "type": "error",

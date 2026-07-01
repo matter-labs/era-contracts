@@ -39,7 +39,7 @@ enum LegState {
 ///      pinned to the canonical commitment-tree address) is proven included; this authenticates the
 ///      root.
 ///   2. `leaf` at `imtLeafIndex` with `imtProof` hashes up to `chainImtRoot` (delegated to
-///      {IndexedMerkleTreeLib.verifyInclusion} / `verifyNonInclusion`).
+///      {IndexedMerkleTree.verifyInclusion} / `verifyNonInclusion`).
 /// The settlement-layer (SL) block number the root settled at is NOT carried as a struct field — that
 /// would be spoofable. It is parsed in-module from `messageProof` (the same multi-hop proof the
 /// verifier checks) via {MessageHashing._getProofData}, so it is bound to the verified

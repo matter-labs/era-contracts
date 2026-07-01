@@ -285,10 +285,7 @@ library L2GenesisForceDeploymentsHelper {
         ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData,
         address _wrappedBaseTokenAddress
     ) private {
-        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(
-            _fixedForceDeploymentsData.l1ChainId,
-            _fixedForceDeploymentsData.gatewayChainId
-        );
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
 
         L2Bridgehub(L2_BRIDGEHUB_ADDR).initL2(
             _fixedForceDeploymentsData.l1ChainId,
@@ -339,10 +336,7 @@ library L2GenesisForceDeploymentsHelper {
         ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData,
         address _wrappedBaseTokenAddress
     ) private {
-        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).updateL2(
-            _fixedForceDeploymentsData.l1ChainId,
-            _fixedForceDeploymentsData.gatewayChainId
-        );
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).updateL2(_fixedForceDeploymentsData.l1ChainId);
 
         L2Bridgehub(L2_BRIDGEHUB_ADDR).updateL2(
             _fixedForceDeploymentsData.l1ChainId,

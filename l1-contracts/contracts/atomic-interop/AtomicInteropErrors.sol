@@ -4,7 +4,7 @@ pragma solidity ^0.8.21;
 import {LegState} from "./IAtomicInterop.sol";
 
 // ── L2InteropCommitmentTree errors ───────────────────────────────────────────────────
-// Value / low-nullifier validation now lives in {IndexedMerkleTreeLib} (the IMT engine) and surfaces
+// Value / low-nullifier validation now lives in {IndexedMerkleTree} (the IMT engine) and surfaces
 // its own `IMT*` errors; only the shell's appender ACL error remains here.
 /// @dev `insert` is restricted to the canonical {AtomicFlowManager}.
 error CommitmentTreeNotAppender(address sender);

@@ -85,7 +85,7 @@ The two L2 contracts are predeployed in the ZKsync OS genesis (no `Executor` / c
 
 - `src/helpers/imt-engine-lib.ts` — the off-chain IMT engine: commit values, the
   low-nullifier index for an insert, and the O(log n) inclusion / non-inclusion proofs (must match
-  `IndexedMerkleTreeLib` bit-for-bit).
+  `IndexedMerkleTree` bit-for-bit).
 - `src/helpers/imt-atomic-deployer.ts` — installs the atomic built-ins (`anvil_setCode`) on the anvil
   harness chains and wires them as genesis would, for the hardhat spec.
 - `test/hardhat/13-imt-atomic-swap.spec.ts` — the anvil-interop atomic-swap spec.

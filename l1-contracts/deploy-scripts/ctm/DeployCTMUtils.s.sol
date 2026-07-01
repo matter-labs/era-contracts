@@ -70,7 +70,6 @@ struct Config {
     uint256 l1ChainId;
     address deployerAddress;
     uint256 eraChainId;
-    uint256 eraGatewayChainId;
     uint256 gatewayChainId;
     address ownerAddress;
     bytes32 zkTokenAssetId;
@@ -142,9 +141,6 @@ abstract contract DeployCTMUtils is DeployUtils {
         }
         if (toml.keyExists("$.era_chain_id")) {
             config.eraChainId = toml.readUint("$.era_chain_id");
-        }
-        if (toml.keyExists("$.legacy_gateway.chain_id")) {
-            config.eraGatewayChainId = toml.readUint("$.legacy_gateway.chain_id");
         }
         if (toml.keyExists("$.zk_token_asset_id")) {
             config.zkTokenAssetId = toml.readBytes32("$.zk_token_asset_id");

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IndexedMerkleTreeLib} from "../../common/libraries/IndexedMerkleTree.sol";
+import {IndexedMerkleTree} from "../../common/libraries/IndexedMerkleTree.sol";
 import {ImtProof, ATOMIC_COMMIT_LEAF_TAG} from "../IAtomicInterop.sol";
 import {L2Message, ProofData} from "../../common/Messaging.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
@@ -39,7 +39,7 @@ import {
 /// (`pd.settlementLayerChainId`) is returned so a caller may assert consistency across a flow's proofs.
 ///
 /// Membership (inclusion) and non-membership (low-nullifier) against the authenticated root are
-/// delegated to {IndexedMerkleTreeLib}, the single shared IMT engine.
+/// delegated to {IndexedMerkleTree}, the single shared IMT engine.
 library AtomicInteropProof {
     /// @notice The value inserted into a chain's IMT when a flow leg is committed.
     function commitValue(bytes32 _flowId, bytes32 _specHash) internal pure returns (uint256) {
@@ -64,7 +64,7 @@ library AtomicInteropProof {
         if (slBlock > _deadline) {
             revert ProofDeadlineExceeded(slBlock, _deadline);
         }
-        bool included = IndexedMerkleTreeLib.verifyInclusion({
+        bool included = IndexedMerkleTree.verifyInclusion({
             _root: _proof.chainImtRoot,
             _value: _commitValue,
             _leaf: _proof.leaf,
@@ -92,7 +92,7 @@ library AtomicInteropProof {
         if (slBlock <= _deadline) {
             revert ProofDeadlineNotExceeded(slBlock, _deadline);
         }
-        bool absent = IndexedMerkleTreeLib.verifyNonInclusion({
+        bool absent = IndexedMerkleTree.verifyNonInclusion({
             _root: _proof.chainImtRoot,
             _value: _commitValue,
             _lowLeaf: _proof.leaf,
