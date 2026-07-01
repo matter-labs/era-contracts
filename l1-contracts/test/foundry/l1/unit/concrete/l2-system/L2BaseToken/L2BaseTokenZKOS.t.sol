@@ -8,7 +8,6 @@ import {L2BaseTokenZKOS} from "contracts/l2-system/zksync-os/L2BaseTokenZKOS.sol
 import {IL2BaseTokenBase} from "contracts/l2-system/interfaces/IL2BaseTokenBase.sol";
 import {IL2BaseTokenZKOS} from "contracts/l2-system/zksync-os/interfaces/IL2BaseTokenZKOS.sol";
 import {
-    L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -20,12 +19,6 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2_BASE_TOKEN_HOLDER} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
-import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {InteropCallStarter} from "contracts/common/Messaging.sol";
-import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
-import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
-import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {
     BaseTokenHolderAlreadyInitialized,
     BaseTokenHolderMintFailed,
@@ -44,21 +37,8 @@ import {DummyL2BaseTokenHolder} from "contracts/dev-contracts/test/DummyL2BaseTo
 contract L2BaseTokenZKOSTest is Test {
     L2BaseTokenZKOS internal l2BaseToken;
 
-    address internal l1Receiver;
-    uint256 internal constant WITHDRAW_AMOUNT = 1 ether;
-    bytes32 internal constant BASE_TOKEN_ASSET_ID_FIXTURE = keccak256("L2BaseToken.test.baseTokenAssetId");
-
-    event Withdrawal(address indexed _l2Sender, address indexed _l1Receiver, uint256 _amount);
-    event WithdrawalWithMessage(
-        address indexed _l2Sender,
-        address indexed _l1Receiver,
-        uint256 _amount,
-        bytes _additionalData
-    );
-
     function setUp() public {
         l2BaseToken = new L2BaseTokenZKOS();
-        l1Receiver = makeAddr("l1Receiver");
 
         // Deploy dummy dependencies at system addresses (replaces broad vm.mockCall)
         vm.etch(
@@ -70,175 +50,6 @@ contract L2BaseTokenZKOSTest is Test {
         // Deploy dummy BaseTokenHolder that accepts ETH from any sender.
         // Tests that need real access-control checks etch the real BaseTokenHolder instead.
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new DummyL2BaseTokenHolder()).code);
-
-        // The withdrawal message is built via the NTV base-token asset id; there is no real NTV
-        // deployed in these unit tests, so return a fixed test asset id.
-        vm.mockCall(
-            L2_NATIVE_TOKEN_VAULT_ADDR,
-            abi.encodeCall(IL2NativeTokenVault.BASE_TOKEN_ASSET_ID, ()),
-            abi.encode(BASE_TOKEN_ASSET_ID_FIXTURE)
-        );
-
-        // Withdrawals now route through the InteropCenter; there is no real InteropCenter deployed
-        // in these unit tests, so make sendBundle a no-op returning a bytes32.
-        vm.mockCall(
-            L2_INTEROP_CENTER_ADDR,
-            abi.encodeWithSelector(IInteropCenter.sendBundle.selector),
-            abi.encode(bytes32(0))
-        );
-    }
-
-    /// @dev Helper to initialize l2BaseToken via initL2() — sets L1_CHAIN_ID and transfers to BaseTokenHolder.
-    function _initL2() internal {
-        vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
-        vm.deal(address(l2BaseToken), INITIAL_BASE_TOKEN_HOLDER_BALANCE);
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2BaseToken.initL2(1);
-    }
-
-    /// @dev Builds the exact expected `sendBundle` calldata for a base-token withdrawal.
-    /// @dev The destination is L1 (`L1_CHAIN_ID == 1` after `initL2(1)`), the single call is an indirect
-    /// call to the L2 AssetRouter carrying the base-token assetId and bridge-burn data, with the withdrawn
-    /// amount forwarded as the indirect-call value and zero interop call value.
-    function _expectedSendBundleCall(address _l1Receiver, uint256 _amount) internal pure returns (bytes memory) {
-        bytes memory depositData = DataEncoding.encodeAssetRouterBridgehubDepositData(
-            BASE_TOKEN_ASSET_ID_FIXTURE,
-            DataEncoding.encodeBridgeBurnData(_amount, _l1Receiver, address(0))
-        );
-
-        bytes[] memory callAttributes = new bytes[](2);
-        callAttributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (_amount));
-        callAttributes[1] = abi.encodeCall(IERC7786Attributes.interopCallValue, (0));
-
-        InteropCallStarter[] memory callStarters = new InteropCallStarter[](1);
-        callStarters[0] = InteropCallStarter({
-            to: InteroperableAddress.formatEvmV1(L2_ASSET_ROUTER_ADDR),
-            data: depositData,
-            callAttributes: callAttributes
-        });
-
-        return
-            abi.encodeCall(
-                IInteropCenter.sendBundle,
-                (InteroperableAddress.formatEvmV1(uint256(1)), callStarters, new bytes[](0))
-            );
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            withdraw() TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_withdraw_success() public {
-        _initL2();
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
-
-        // Expect the InteropCenter sendBundle call, forwarding the withdrawn amount as value.
-        vm.expectCall(L2_INTEROP_CENTER_ADDR, WITHDRAW_AMOUNT, _expectedSendBundleCall(l1Receiver, WITHDRAW_AMOUNT));
-
-        // Expect the Withdrawal event
-        vm.expectEmit(true, true, false, true);
-        emit Withdrawal(sender, l1Receiver, WITHDRAW_AMOUNT);
-
-        vm.prank(sender);
-        l2BaseToken.withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
-    }
-
-    function test_withdraw_revertsIfInteropCenterReverts() public {
-        _initL2();
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
-
-        // Make the InteropCenter reject the bundle.
-        vm.mockCallRevert(
-            L2_INTEROP_CENTER_ADDR,
-            abi.encodeWithSelector(IInteropCenter.sendBundle.selector),
-            "Rejected"
-        );
-
-        vm.prank(sender);
-        vm.expectRevert("Rejected");
-        l2BaseToken.withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
-    }
-
-    function testFuzz_withdraw_variousAmounts(uint256 amount) public {
-        _initL2();
-        vm.assume(amount > 0 && amount < type(uint128).max);
-
-        address sender = makeAddr("sender");
-        vm.deal(sender, amount);
-
-        vm.expectCall(L2_INTEROP_CENTER_ADDR, amount, _expectedSendBundleCall(l1Receiver, amount));
-
-        vm.prank(sender);
-        l2BaseToken.withdraw{value: amount}(l1Receiver);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        withdrawWithMessage() TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_withdrawWithMessage_success() public {
-        _initL2();
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
-        bytes memory additionalData = "test message";
-
-        // Expect the InteropCenter sendBundle call, forwarding the withdrawn amount as value.
-        vm.expectCall(L2_INTEROP_CENTER_ADDR, WITHDRAW_AMOUNT, _expectedSendBundleCall(l1Receiver, WITHDRAW_AMOUNT));
-
-        // Expect the WithdrawalWithMessage event
-        vm.expectEmit(true, true, false, true);
-        emit WithdrawalWithMessage(sender, l1Receiver, WITHDRAW_AMOUNT, additionalData);
-
-        vm.prank(sender);
-        l2BaseToken.withdrawWithMessage{value: WITHDRAW_AMOUNT}(l1Receiver, additionalData);
-    }
-
-    function test_withdrawWithMessage_emptyAdditionalData() public {
-        _initL2();
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
-        bytes memory additionalData = "";
-
-        vm.expectCall(L2_INTEROP_CENTER_ADDR, WITHDRAW_AMOUNT, _expectedSendBundleCall(l1Receiver, WITHDRAW_AMOUNT));
-
-        vm.expectEmit(true, true, false, true);
-        emit WithdrawalWithMessage(sender, l1Receiver, WITHDRAW_AMOUNT, additionalData);
-
-        vm.prank(sender);
-        l2BaseToken.withdrawWithMessage{value: WITHDRAW_AMOUNT}(l1Receiver, additionalData);
-    }
-
-    function test_withdrawWithMessage_revertsIfInteropCenterReverts() public {
-        _initL2();
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
-        bytes memory additionalData = "test message";
-
-        // Make the InteropCenter reject the bundle.
-        vm.mockCallRevert(
-            L2_INTEROP_CENTER_ADDR,
-            abi.encodeWithSelector(IInteropCenter.sendBundle.selector),
-            "Rejected"
-        );
-
-        vm.prank(sender);
-        vm.expectRevert("Rejected");
-        l2BaseToken.withdrawWithMessage{value: WITHDRAW_AMOUNT}(l1Receiver, additionalData);
-    }
-
-    function testFuzz_withdrawWithMessage_variousAmountsAndData(uint256 amount, bytes calldata additionalData) public {
-        _initL2();
-        vm.assume(amount > 0 && amount < type(uint128).max);
-
-        address sender = makeAddr("sender");
-        vm.deal(sender, amount);
-
-        vm.expectCall(L2_INTEROP_CENTER_ADDR, amount, _expectedSendBundleCall(l1Receiver, amount));
-
-        vm.prank(sender);
-        l2BaseToken.withdrawWithMessage{value: amount}(l1Receiver, additionalData);
     }
 
     /*//////////////////////////////////////////////////////////////

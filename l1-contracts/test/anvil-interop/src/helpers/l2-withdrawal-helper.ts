@@ -81,8 +81,14 @@ export interface InitiateErc20WithdrawalParams extends InitiateWithdrawalParams 
 }
 
 /**
- * Initiate an ETH withdrawal from L2 to L1 via `L2BaseToken.withdraw()` and
+ * Initiate an ETH (base-token) withdrawal from L2 to L1 via the InteropCenter and
  * return a {@link PendingWithdrawal} handle that can be finalised later.
+ *
+ * Base-token withdrawals use the same unified path as ERC20s: a single-call interop
+ * bundle whose indirect call targets the L2 AssetRouter with the base-token assetId,
+ * destined for L1. The withdrawn ETH rides as the indirect-call message value, so the
+ * AssetRouter/NTV burn it (via BaseTokenHolder) and produce the `finalizeDeposit`
+ * message. (The dedicated `L2BaseToken.withdraw` entrypoint was removed.)
  */
 export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): Promise<PendingWithdrawal> {
   const { l2RpcUrl, l1RpcUrl, chainId, l1Addresses, amount } = params;
@@ -93,18 +99,38 @@ export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): P
   const l2Wallet = new Wallet(privateKey, l2Provider);
   const l1Recipient = params.l1Recipient || l2Wallet.address;
 
+  // The base-token assetId is the ETH NTV assetId (identical on L1 and L2).
   const ntv = new Contract(l1Addresses.l1NativeTokenVault, getAbi("L1NativeTokenVault"), l1Provider);
   const l1EthAssetId = await ntv.assetId(ETH_TOKEN_ADDRESS);
 
-  const l2BaseToken = new Contract(L2_BASE_TOKEN_ADDR, getAbi("IBaseToken"), l2Wallet);
+  // Build the indirect-call bundle targeting the L2 AssetRouter with the base-token
+  // assetId. The burn token address is left as `address(0)` so the NTV resolves the
+  // base token from the assetId; the withdrawn ETH rides as the indirect-call message
+  // value (so `interopCallValue` is zero).
+  const transferData = encodeBridgeBurnData(amount, l1Recipient, ethers.constants.AddressZero);
+  const depositData = encodeAssetRouterBridgehubDepositData(l1EthAssetId, transferData);
+  const callStarter = {
+    to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
+    data: depositData,
+    callAttributes: [indirectCallAttr(amount), interopCallValueAttr(ethers.constants.Zero)],
+  };
 
-  console.log(`   Initiating ETH withdrawal from chain ${chainId} via L2BaseToken.withdraw()...`);
-  const l2Tx = await l2BaseToken.withdraw(l1Recipient, { value: amount, gasLimit: 5_000_000 });
-  await l2Tx.wait();
-  console.log(`   L2 withdraw tx: cast run ${l2Tx.hash} -r ${l2RpcUrl}`);
+  const l1ChainId = (await l1Provider.getNetwork()).chainId;
+  const interopFee = await getInteropProtocolFee(l2Provider);
+
+  console.log(
+    `   Initiating ETH withdrawal from chain ${chainId} via InteropCenter.sendBundle (destination L1 chain ${l1ChainId})...`
+  );
+  const sendResult = await sendInteropBundle({
+    sourceProvider: l2Provider,
+    destinationChainId: l1ChainId,
+    callStarters: [callStarter],
+    value: amount.add(interopFee),
+  });
+  console.log(`   L2 withdraw tx: cast run ${sendResult.txHash} -r ${l2RpcUrl}`);
 
   return {
-    l2TxHash: l2Tx.hash,
+    l2TxHash: sendResult.txHash,
     chainId,
     assetId: l1EthAssetId,
     amount,
