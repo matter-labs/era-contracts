@@ -72,12 +72,22 @@ export class DeploymentRunner {
     return config;
   }
 
-  /** Read protocol version from configs/genesis/era/latest.json (the source of truth). */
+  /**
+   * Protocol version string used to name the chain-states folder (e.g. "v0.32.0").
+   *
+   * Read from the anvil-interop harness's OWN config (`config/anvil-config.json`
+   * → `stateVersion`), NOT the shared `configs/genesis/era/latest.json`. The
+   * shared genesis is the base protocol version for the L1 foundry suite (v31);
+   * the anvil harness runs atomic-interop (v32). Keeping the harness version
+   * local decouples the two, so the anvil state can live under `v0.32.0` without
+   * re-versioning the whole L1 test suite (which pins v31).
+   */
   getProtocolVersionString(): string {
-    const genesisPath = path.resolve(this.configDir, "../../../../configs/genesis/era/latest.json");
-    const genesis = JSON.parse(fs.readFileSync(genesisPath, "utf-8"));
-    const { major, minor, patch } = genesis.protocol_semantic_version;
-    return `v${major}.${minor}.${patch}`;
+    const cfg = JSON.parse(fs.readFileSync(this.configPath, "utf-8")) as { stateVersion?: string };
+    if (!cfg.stateVersion) {
+      throw new Error(`stateVersion missing in ${this.configPath}`);
+    }
+    return cfg.stateVersion;
   }
 
   loadState(): DeploymentState {

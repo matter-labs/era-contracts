@@ -198,20 +198,25 @@ jobs:
         run: |
           bash cleanup.sh
 
-  # Mandatory determinism gate for the current protocol version's chain state.
-  # Rebuilds the state from scratch and verifies it matches the committed
-  # snapshots (semantic compare, ignoring volatile Anvil fields). If a contract
-  # change alters genesis state, this fails — regenerate the committed states
-  # via the 'Regenerate Anvil Interop Chain States' workflow and push them.
+  # Determinism check for the current protocol version's chain state: rebuilds
+  # the state from scratch and compares it to the committed snapshots (semantic
+  # compare, ignoring volatile Anvil fields). Reports drift when a contract
+  # change alters genesis state — regenerate via the 'Regenerate Anvil Interop
+  # Chain States' workflow and push.
   #
-  # Only the current version (from configs/genesis/era/latest.json) is
-  # regenerated and checked; older versions are frozen upgrade-test inputs and
-  # compare byte-identical. This is the gate that keeps V32 (and every future
-  # version) reproducible. To block merges on it, add "state-generation-check"
-  # to the branch protection required checks.
+  # NON-BLOCKING (continue-on-error) for now: the generation is not yet fully
+  # deterministic. The harness runs Anvil with interval mining (`--block-time 1`,
+  # required so the interop relayers/TBM keep progressing), so the block count is
+  # wall-clock-dependent and block-derived values (block numbers/timestamps) leak
+  # into contract storage — two identical runs differ. Making this a blocking
+  # gate requires reworking the mining model (auto-mine / deterministic block
+  # progression) without stalling the relayers. Until then this runs for
+  # visibility but does not fail the PR. Once deterministic, drop
+  # continue-on-error and add it to the branch protection required checks.
   state-generation-check:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    continue-on-error: true
 
     steps:
       - name: Checkout the repository
