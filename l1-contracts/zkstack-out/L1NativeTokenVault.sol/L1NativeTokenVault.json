@@ -835,12 +835,12 @@
   },
   {
     "type": "error",
-    "name": "BurningNativeWETHNotSupported",
+    "name": "BaseTokenTransferFailed",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "ClaimFailedDepositFailed",
+    "name": "BurningNativeWETHNotSupported",
     "inputs": []
   },
   {

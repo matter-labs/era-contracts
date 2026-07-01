@@ -464,20 +464,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     function prepareForceDeploymentsData() internal returns (bytes memory) {
         require(ctmAddresses.admin.governance != address(0), "Governance address is not set");
 
-        address dangerousTestOnlyForcedBeacon = _getDangerousTestOnlyForcedBeacon();
-
-        FixedForceDeploymentsData memory data = _buildForceDeploymentsData(
-            ctmAddresses.admin.governance,
-            dangerousTestOnlyForcedBeacon
-        );
+        FixedForceDeploymentsData memory data = _buildForceDeploymentsData(ctmAddresses.admin.governance);
 
         return abi.encode(data);
-    }
-
-    function _getDangerousTestOnlyForcedBeacon() private pure returns (address) {
-        // The legacy shared bridge (and its test helper) has been removed, so there is no
-        // forced beacon to compute. New chains always deploy their own token beacon.
-        return address(0);
     }
 
     /// @dev Scratch file for `_precomputeBlakeHashes`. Set by `runInner`
@@ -582,8 +571,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function _buildForceDeploymentsData(
-        address _governance,
-        address _dangerousTestOnlyForcedBeacon
+        address _governance
     ) internal virtual returns (FixedForceDeploymentsData memory data) {
         if (config.isZKsyncOS) {
             _precomputeBlakeHashes();
@@ -614,7 +602,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
                 coreAddresses.bridgehub.proxies.chainRegistrationSender
             ),
-            dangerousTestOnlyForcedBeacon: _dangerousTestOnlyForcedBeacon,
+            // Retained as address(0) for force-deployments ABI compatibility; the legacy forced beacon is gone.
+            dangerousTestOnlyForcedBeacon: address(0),
             zkTokenAssetId: config.zkTokenAssetId
         });
     }
