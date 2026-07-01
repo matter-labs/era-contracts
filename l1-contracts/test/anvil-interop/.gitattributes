@@ -1,0 +1,4 @@
+# Pregenerated Anvil chain-state dumps are committed gzip-compressed so the
+# multi-MB snapshots stay out of PR diffs. Mark them binary + generated so git
+# and GitHub treat them as opaque blobs (no textual diff, no linguist stats).
+chain-states/**/*.json.gz binary linguist-generated

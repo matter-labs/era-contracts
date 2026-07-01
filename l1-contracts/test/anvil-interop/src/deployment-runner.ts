@@ -72,12 +72,22 @@ export class DeploymentRunner {
     return config;
   }
 
-  /** Read protocol version from configs/genesis/era/latest.json (the source of truth). */
+  /**
+   * Protocol version string used to name the chain-states folder (e.g. "v0.32.0").
+   *
+   * Read from the anvil-interop harness's OWN config (`config/anvil-config.json`
+   * → `stateVersion`), NOT the shared `configs/genesis/era/latest.json`. The
+   * shared genesis is the base protocol version for the L1 foundry suite (v31);
+   * the anvil harness runs atomic-interop (v32). Keeping the harness version
+   * local decouples the two, so the anvil state can live under `v0.32.0` without
+   * re-versioning the whole L1 test suite (which pins v31).
+   */
   getProtocolVersionString(): string {
-    const genesisPath = path.resolve(this.configDir, "../../../../configs/genesis/era/latest.json");
-    const genesis = JSON.parse(fs.readFileSync(genesisPath, "utf-8"));
-    const { major, minor, patch } = genesis.protocol_semantic_version;
-    return `v${major}.${minor}.${patch}`;
+    const cfg = JSON.parse(fs.readFileSync(this.configPath, "utf-8")) as { stateVersion?: string };
+    if (!cfg.stateVersion) {
+      throw new Error(`stateVersion missing in ${this.configPath}`);
+    }
+    return cfg.stateVersion;
   }
 
   loadState(): DeploymentState {
@@ -665,23 +675,30 @@ export class DeploymentRunner {
   }
 
   /**
-   * Decompress a hex-gzip state file (produced by --dump-state) into native JSON
-   * that --load-state CLI accepts. Writes a temp file and returns its path.
+   * Decompress a committed state file into the native JSON that the --load-state
+   * CLI accepts. Writes a temp file and returns its path.
    *
-   * State files from --dump-state contain a hex-encoded gzip string ("0x1f8b08...").
-   * The --load-state CLI expects native JSON (SerializableState struct), so we
-   * decompress on the fly. This avoids anvil version issues with anvil_loadState RPC.
+   * Committed states are gzip-compressed (`<chainId>.json.gz`, gzip magic bytes
+   * 0x1f 0x8b) — see dumpAllStates() for why. We gunzip on the fly. The other
+   * branches are backward-compat for older dumps: a hex-encoded gzip string
+   * ("0x1f8b08...") as produced directly by anvil --dump-state, or plain native
+   * JSON. --load-state expects the native SerializableState struct.
    */
-  private decompressStateFile(hexGzipFile: string, outputFile: string): void {
-    const raw = JSON.parse(fs.readFileSync(hexGzipFile, "utf-8"));
+  private decompressStateFile(stateFile: string, outputFile: string): void {
+    const rawBuf = fs.readFileSync(stateFile);
+    // Binary gzip (current format): decompress raw bytes → native JSON.
+    if (rawBuf.length >= 2 && rawBuf[0] === 0x1f && rawBuf[1] === 0x8b) {
+      fs.writeFileSync(outputFile, zlib.gunzipSync(rawBuf));
+      return;
+    }
+    const raw = JSON.parse(rawBuf.toString("utf-8"));
     if (typeof raw === "string" && raw.startsWith("0x1f8b")) {
-      // Hex-encoded gzip: decode hex → decompress gzip → native JSON
+      // Hex-encoded gzip string: decode hex → decompress gzip → native JSON.
       const gzipBuf = Buffer.from(raw.slice(2), "hex");
-      const nativeJson = zlib.gunzipSync(gzipBuf);
-      fs.writeFileSync(outputFile, nativeJson);
+      fs.writeFileSync(outputFile, zlib.gunzipSync(gzipBuf));
     } else {
-      // Already native JSON — copy as-is
-      fs.copyFileSync(hexGzipFile, outputFile);
+      // Already native JSON — copy as-is.
+      fs.writeFileSync(outputFile, rawBuf);
     }
   }
 
@@ -714,7 +731,7 @@ export class DeploymentRunner {
 
     const loadStatePaths: Record<number, string> = {};
     for (const chainConfig of config.chains) {
-      const stateFile = path.join(stateDir, `${chainConfig.chainId}.json`);
+      const stateFile = path.join(stateDir, `${chainConfig.chainId}.json.gz`);
       if (!fs.existsSync(stateFile)) {
         throw new Error(`State file not found: ${stateFile}`);
       }
@@ -826,10 +843,19 @@ export class DeploymentRunner {
       const raw = JSON.parse(fs.readFileSync(statePath, "utf-8"));
       delete raw.transactions;
       delete raw.historical_states;
-      fs.writeFileSync(statePath, JSON.stringify(raw, null, 2));
 
-      const size = fs.statSync(statePath).size;
-      console.log(`  Chain ${chainConfig.chainId} state saved (${(size / 1024).toFixed(0)} KB)`);
+      // Commit the state gzip-compressed (`<chainId>.json.gz`) rather than as raw
+      // JSON. These dumps are multi-MB; committing them as text floods every
+      // regeneration with an enormous, unreviewable diff. GitHub renders .gz as
+      // binary ("Binary file not shown"), keeping it out of PR diffs, and gzip
+      // shrinks the files ~10x. loadChainStates() gunzips them on the fly.
+      const gzipPath = `${statePath}.gz`;
+      fs.writeFileSync(gzipPath, zlib.gzipSync(JSON.stringify(raw), { level: 9 }));
+      // Drop the raw JSON dump so only the compressed artifact is committed.
+      fs.rmSync(statePath);
+
+      const size = fs.statSync(gzipPath).size;
+      console.log(`  Chain ${chainConfig.chainId} state saved (${(size / 1024).toFixed(0)} KB, gzip)`);
     }
   }
 
