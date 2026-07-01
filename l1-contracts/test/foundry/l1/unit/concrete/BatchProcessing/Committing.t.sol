@@ -611,6 +611,53 @@ contract CommittingTest is ExecutorTest {
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
+    /// @notice For the first Era batch committed after a protocol upgrade, the event reports the system upgrade
+    /// transaction hash (which the commit verifies against the L2 system logs), and the batch is recorded as the
+    /// upgrade batch. This exercises the non-zero upgrade-tx-hash path, which Era explicitly supports.
+    function test_emitsProtocolVersionEventForUpgradeBatch() public {
+        bytes32 upgradeTxHash = Utils.randomBytes32("upgradeTx");
+        utilsFacet.util_setL2SystemContractsUpgradeTxHash(upgradeTxHash);
+
+        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
+        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+        );
+        // The first batch after an upgrade must additionally carry the expected system-contract upgrade tx hash log.
+        bytes[] memory logsWithUpgrade = new bytes[](correctL2Logs.length + 1);
+        for (uint256 i = 0; i < correctL2Logs.length; ++i) {
+            logsWithUpgrade[i] = correctL2Logs[i];
+        }
+        logsWithUpgrade[correctL2Logs.length] = Utils.constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY),
+            upgradeTxHash
+        );
+
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(logsWithUpgrade);
+        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
+
+        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
+        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            genesisStoredBatchInfo,
+            correctCommitBatchInfoArray
+        );
+
+        vm.prank(validator);
+        vm.blobhashes(defaultBlobVersionedHashes);
+        vm.expectEmit(true, true, true, true, address(committer));
+        emit ICommitter.ReportCommittedBatchProtocolVersion(1, 0, upgradeTxHash);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+
+        assertEq(utilsFacet.util_getL2SystemContractsUpgradeBatchNumber(), 1, "upgrade batch number recorded");
+    }
+
     function test_SuccessfullyCommitBatchWithOneBlob() public {
         bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
         correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(

@@ -4,12 +4,10 @@ pragma solidity 0.8.28;
 import "forge-std/console.sol";
 
 import {Utils} from "../Utils/Utils.sol";
-import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {CommitBatchInfoZKsyncOS, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {MismatchL2DACommitmentScheme} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {
@@ -20,28 +18,11 @@ import {
 import {BlobsL1DAValidatorZKsyncOS} from "../../../da-contracts-imports/BlobsL1DAValidatorZKsyncOS.sol";
 
 contract CommittingTest is ExecutorTest {
-    UtilsFacet internal utilsFacet;
-
     function isZKsyncOS() internal pure override returns (bool) {
         return true;
     }
 
-    function setUp() public {
-        // Attach UtilsFacet via a real diamond upgrade (not storage-slot overrides) so the protocol-version tests
-        // can configure the protocol version and a pending upgrade. Mirrors ExecutorRevertBatchesTest.
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: address(new UtilsFacet()),
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getUtilsFacetSelectors()
-        });
-        vm.prank(getters.getChainTypeManager());
-        admin.executeUpgrade(
-            Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: bytes("")})
-        );
-        utilsFacet = UtilsFacet(address(committer));
-    }
+    function setUp() public {}
 
     function test_SuccessfullyCommitBatchWithCalldata() public {
         // Calldata DA
