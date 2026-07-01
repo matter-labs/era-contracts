@@ -198,14 +198,18 @@ jobs:
         run: |
           bash cleanup.sh
 
-  # TODO: Re-enable after merging to main. The 'Regenerate Anvil Interop Chain States'
-  # workflow_dispatch workflow needs to be on main before it can be triggered from the UI/CLI.
-  # Once on main, re-enable this check and use the regenerate workflow to update states.
+  # Mandatory determinism gate for the current protocol version's chain state.
+  # Rebuilds the state from scratch and verifies it matches the committed
+  # snapshots (semantic compare, ignoring volatile Anvil fields). If a contract
+  # change alters genesis state, this fails — regenerate the committed states
+  # via the 'Regenerate Anvil Interop Chain States' workflow and push them.
   #
-  # Parallel job: rebuilds chain state from scratch and verifies determinism.
-  # This ensures the committed chain-states stay reproducible.
+  # Only the current version (from configs/genesis/era/latest.json) is
+  # regenerated and checked; older versions are frozen upgrade-test inputs and
+  # compare byte-identical. This is the gate that keeps V32 (and every future
+  # version) reproducible. To block merges on it, add "state-generation-check"
+  # to the branch protection required checks.
   state-generation-check:
-    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
