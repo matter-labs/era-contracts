@@ -10,8 +10,15 @@ import {
   L2_NATIVE_TOKEN_VAULT_ADDR,
   FINALIZE_DEPOSIT_SIG,
 } from "../core/const";
-import { encodeBridgeBurnData, encodeBridgeMintData, encodeNtvAssetId } from "../core/data-encoding";
+import {
+  encodeAssetRouterBridgehubDepositData,
+  encodeBridgeBurnData,
+  encodeBridgeMintData,
+  encodeNtvAssetId,
+} from "../core/data-encoding";
 import type { CoreDeployedAddresses } from "../core/types";
+import { indirectCallAttr, interopCallValueAttr, sendInteropBundle, getInteropProtocolFee } from "./interop-helpers";
+import { encodeEvmAddress } from "./erc7930";
 
 export interface WithdrawETHParams {
   l1RpcUrl: string;
@@ -109,17 +116,24 @@ export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): P
 }
 
 /**
- * Initiate an ERC20 withdrawal from L2 to L1 via `L2AssetRouter.withdraw(assetId, data)`.
+ * Initiate an ERC20 withdrawal from L2 to L1 via the InteropCenter.
  *
- * Approves the L2 `NativeTokenVault` to transfer the tokens, then calls
- * `L2AssetRouter.withdraw` which burns on L2 and emits the L2→L1 message that
- * `L1Nullifier.finalizeDeposit` consumes.
+ * Approves the L2 `NativeTokenVault` to transfer the tokens, then sends an
+ * interop bundle whose single indirect call targets the L2 `AssetRouter` with a
+ * destination of the L1 chain. The InteropCenter invokes
+ * `L2AssetRouter.initiateIndirectCall`, which builds the bridgehub-deposit
+ * request; because the destination is L1, it burns on L2 and produces the
+ * `finalizeDeposit` message that `L1Nullifier.finalizeDeposit` consumes.
+ *
+ * (The legacy `L2AssetRouter.withdraw(assetId, data)` entrypoint was removed; all
+ * L2→L1 withdrawals now flow through the InteropCenter.)
  */
 export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalParams): Promise<PendingWithdrawal> {
-  const { l2RpcUrl, l2TokenAddress, tokenOriginChainId, chainId, amount } = params;
+  const { l2RpcUrl, l1RpcUrl, l2TokenAddress, tokenOriginChainId, chainId, amount } = params;
   const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
 
   const l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
+  const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
   const l2Wallet = new Wallet(privateKey, l2Provider);
   const l1Recipient = params.l1Recipient || l2Wallet.address;
 
@@ -127,14 +141,13 @@ export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalPar
   // L2 NTV assigns the same value during `registerToken`.
   const assetId = encodeNtvAssetId(tokenOriginChainId, l2TokenAddress);
 
-  // Approve the L2 NTV to spend the caller's tokens, then withdraw via the
-  // AssetRouter. The `_assetData` format is `abi.encode(amount, l1Receiver, l2TokenAddress)`.
+  // Approve the L2 NTV to spend the caller's tokens. The InteropCenter routes
+  // the burn through `L2AssetRouter.initiateIndirectCall` -> `_bridgehubDeposit`,
+  // which pulls the tokens from the original caller (the `sendBundle` sender)
+  // via the NTV.
   const erc20 = new Contract(l2TokenAddress, getAbi("TestnetERC20Token"), l2Wallet);
   const approveTx = await erc20.approve(L2_NATIVE_TOKEN_VAULT_ADDR, amount, { gasLimit: 500_000 });
   await approveTx.wait();
-
-  const assetData = encodeBridgeBurnData(amount, l1Recipient, l2TokenAddress);
-  const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, getAbi("L2AssetRouter"), l2Wallet);
 
   // Capture the exact ERC20 metadata bytes that the L2 NTV injects into the
   // withdrawal message via `_getERC20Metadata` / `getERC20Getters`. Reading
@@ -143,13 +156,35 @@ export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalPar
   const l2Ntv = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), l2Provider);
   const erc20Metadata: string = await l2Ntv.getERC20Getters(l2TokenAddress, tokenOriginChainId);
 
-  console.log(`   Initiating ERC20 withdrawal from chain ${chainId} via L2AssetRouter.withdraw()...`);
-  const l2Tx = await l2AssetRouter["withdraw(bytes32,bytes)"](assetId, assetData, { gasLimit: 5_000_000 });
-  await l2Tx.wait();
-  console.log(`   L2 withdraw tx: cast run ${l2Tx.hash} -r ${l2RpcUrl}`);
+  // Build the indirect-call bundle targeting the L2 AssetRouter. The burn data
+  // is `abi.encode(amount, l1Receiver, l2TokenAddress)`, wrapped as the
+  // bridgehub-deposit payload the AssetRouter expects.
+  const transferData = encodeBridgeBurnData(amount, l1Recipient, l2TokenAddress);
+  const depositData = encodeAssetRouterBridgehubDepositData(assetId, transferData);
+  const callStarter = {
+    to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
+    data: depositData,
+    callAttributes: [indirectCallAttr(), interopCallValueAttr(ethers.constants.Zero)],
+  };
+
+  // Destination is the L1 chain: `L2AssetRouter.initiateIndirectCall` targets the
+  // L1 AssetRouter's `finalizeDeposit` when the destination chain is L1.
+  const l1ChainId = (await l1Provider.getNetwork()).chainId;
+  const interopFee = await getInteropProtocolFee(l2Provider);
+
+  console.log(
+    `   Initiating ERC20 withdrawal from chain ${chainId} via InteropCenter.sendBundle (destination L1 chain ${l1ChainId})...`
+  );
+  const sendResult = await sendInteropBundle({
+    sourceProvider: l2Provider,
+    destinationChainId: l1ChainId,
+    callStarters: [callStarter],
+    value: interopFee,
+  });
+  console.log(`   L2 withdraw tx: cast run ${sendResult.txHash} -r ${l2RpcUrl}`);
 
   return {
-    l2TxHash: l2Tx.hash,
+    l2TxHash: sendResult.txHash,
     chainId,
     assetId,
     amount,
@@ -183,10 +218,21 @@ export async function finalizeWithdrawalOnL1(
   let l2Sender: string;
 
   if (isBaseToken) {
-    const selector = ethers.utils.id("finalizeEthWithdrawal(uint256,uint256,uint16,bytes,bytes32[])").slice(0, 10);
+    // Base-token (ETH) withdrawals now use the asset-router `finalizeDeposit` format,
+    // emitted by `L2BaseToken.withdraw` (see `L2BaseTokenBase._getBaseTokenWithdrawMessage`).
+    // The plain `withdraw` path sets the original caller and additional data to empty,
+    // and the origin token to `address(0)`.
+    const transferData = encodeBridgeMintData(
+      ethers.constants.AddressZero,
+      pending.l1Recipient,
+      ethers.constants.AddressZero,
+      pending.amount,
+      "0x"
+    );
+    const selector = ethers.utils.id(FINALIZE_DEPOSIT_SIG).slice(0, 10);
     message = ethers.utils.solidityPack(
-      ["bytes4", "address", "uint256"],
-      [selector, pending.l1Recipient, pending.amount]
+      ["bytes4", "uint256", "bytes32", "bytes"],
+      [selector, pending.chainId, pending.assetId, transferData]
     );
     l2Sender = L2_BASE_TOKEN_ADDR;
   } else {
