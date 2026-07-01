@@ -55,12 +55,41 @@ const BALANCE_TOLERANCE_WEI = BigInt("10000000000000000"); // 10^16
 // exactly these by explicit identity — NOT by value magnitude, since many real
 // slots legitimately hold small integers (0/1/2).
 
-// Accounts whose storage is a block/batch-indexed accumulator, so ~all of their
-// storage tracks the (non-deterministic) block count — skip it entirely.
-// 0x…010005 = L2MessageRoot: `historicalRoot[blockNumber]`, `chainBatchRoots`,
-// the shared/chain incremental Merkle trees and batch counters all grow with the
-// number of blocks/batches produced.
+// Accounts whose storage is a block/batch-indexed accumulator (or otherwise
+// tracks the non-deterministic block count / gas cost), so ~all of their storage
+// legitimately drifts run-to-run — skip storage compare for them entirely.
+//
+// Two sources:
+//  1. Fixed L2 predeploys listed here — 0x…010005 = L2MessageRoot
+//     (`historicalRoot[blockNumber]`, `chainBatchRoots`, incremental Merkle trees
+//     and batch counters all grow with the number of blocks/batches produced).
+//  2. Deployment-specific L1 contracts resolved by ROLE from addresses.json (see
+//     collectSkipStorageAccounts): the L1 messageRoot, every chain diamond proxy
+//     (per-batch `storedBatchHashes`/`l2LogsRootHashes` + batch counters) and the
+//     L1 asset tracker (gas-cost-dependent balances).
+//
+// Everything NOT in this set is still storage-compared exactly, so real drift in
+// the bridgehub, CTM, bridges, NTV, tokens, etc. is still caught.
 const BLOCK_INDEXED_STORAGE_ACCOUNTS = new Set(["0x0000000000000000000000000000000000010005"]);
+
+// Resolve the deployment-specific batch-indexed / fee-dependent L1 contracts by
+// role from the committed addresses.json, unioned with the fixed set above.
+function collectSkipStorageAccounts(versionDir: string): Set<string> {
+  const skip = new Set(BLOCK_INDEXED_STORAGE_ACCOUNTS);
+  const p = path.join(versionDir, "addresses.json");
+  if (!fs.existsSync(p)) return skip;
+  const a = JSON.parse(fs.readFileSync(p, "utf-8")) as {
+    l1Addresses?: { messageRoot?: string; l1AssetTracker?: string };
+    chainAddresses?: Array<{ diamondProxy?: string }>;
+  };
+  const add = (v: unknown) => {
+    if (typeof v === "string" && /^0x[0-9a-fA-F]{40}$/.test(v)) skip.add(v.toLowerCase());
+  };
+  add(a.l1Addresses?.messageRoot);
+  add(a.l1Addresses?.l1AssetTracker);
+  for (const c of a.chainAddresses ?? []) add(c.diamondProxy);
+  return skip;
+}
 
 // Specific storage slots (keccak-derived, so collision-free across contracts)
 // that hold an L2 block/batch number in the interop bookkeeping contracts
@@ -86,7 +115,12 @@ interface ChainStateData {
   accounts?: Record<string, ChainStateAccount>;
 }
 
-function compareChainState(data1: ChainStateData, data2: ChainStateData, name: string): string[] {
+function compareChainState(
+  data1: ChainStateData,
+  data2: ChainStateData,
+  name: string,
+  skipStorageAccounts: Set<string>
+): string[] {
   const diffs: string[] = [];
 
   // Block: compare only deterministic fields
@@ -139,9 +173,10 @@ function compareChainState(data1: ChainStateData, data2: ChainStateData, name: s
       }
     }
 
-    // Skip storage for block-indexed system contracts (e.g. MessageRoot): their
-    // state is keyed by the non-deterministic block count.
-    if (!BLOCK_INDEXED_STORAGE_ACCOUNTS.has(addr.toLowerCase())) {
+    // Skip storage for batch-indexed / fee-dependent contracts (MessageRoots,
+    // chain diamonds, asset tracker): their state tracks the non-deterministic
+    // block count / gas cost.
+    if (!skipStorageAccounts.has(addr.toLowerCase())) {
       const s1 = a1.storage || {};
       const s2 = a2.storage || {};
       if (JSON.stringify(s1) !== JSON.stringify(s2)) {
@@ -177,7 +212,7 @@ function compareChainState(data1: ChainStateData, data2: ChainStateData, name: s
   return diffs;
 }
 
-function compareJsonFiles(path1: string, path2: string, name: string): string[] {
+function compareJsonFiles(path1: string, path2: string, name: string, skipStorageAccounts: Set<string>): string[] {
   if (!fs.existsSync(path1)) return [`  Missing in committed: ${name}`];
   if (!fs.existsSync(path2)) return [`  Missing in generated: ${name}`];
 
@@ -200,7 +235,7 @@ function compareJsonFiles(path1: string, path2: string, name: string): string[] 
     return [];
   }
 
-  return compareChainState(data1 as ChainStateData, data2 as ChainStateData, name);
+  return compareChainState(data1 as ChainStateData, data2 as ChainStateData, name, skipStorageAccounts);
 }
 
 function main() {
@@ -230,6 +265,10 @@ function main() {
       continue;
     }
 
+    // Resolve batch-indexed / fee-dependent contracts (whose storage to skip)
+    // by role from this version's committed addresses.json.
+    const skipStorageAccounts = collectSkipStorageAccounts(committedVersion);
+
     const isStateFile = (f: string) => f.endsWith(".json") || f.endsWith(".json.gz");
     const allFiles = [
       ...new Set([
@@ -241,7 +280,7 @@ function main() {
     for (const filename of allFiles) {
       const p1 = path.join(committedVersion, filename);
       const p2 = path.join(generatedVersion, filename);
-      allDiffs.push(...compareJsonFiles(p1, p2, `${versionDir}/${filename}`));
+      allDiffs.push(...compareJsonFiles(p1, p2, `${versionDir}/${filename}`, skipStorageAccounts));
     }
   }
 
