@@ -45,10 +45,6 @@ contract TestAssetRouterBase is AssetRouterBase {
         _finalizeDeposit(_chainId, _assetId, _transferData, nativeTokenVault);
     }
 
-    function _ensureTokenRegisteredWithNTV(address) internal pure override returns (bytes32) {
-        return keccak256("test");
-    }
-
     function setNTV(address _ntv) external {
         nativeTokenVault = _ntv;
     }

@@ -9,7 +9,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 
-import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 
 import {L1_TOKEN_ADDRESS} from "../common/Constants.sol";
 
@@ -18,13 +18,10 @@ contract UserActorHandler is Test {
     uint256 public ghost_totalFunctionCalls;
 
     function withdraw(uint256 _amount, address _receiver) public {
-        address l2Token = L2AssetRouter(L2_ASSET_ROUTER_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
+        address l2Token = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
 
-        // using `L2NativeTokenVault` instead of `IL2NativeTokenVault` because the latter doesn't have `L2_LEGACY_SHARED_BRIDGE`
-        if (
-            L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).L2_LEGACY_SHARED_BRIDGE().l1TokenAddress(l2Token) ==
-            address(0)
-        ) {
+        // Skip if the token has not been bridged/deployed on L2 yet (NTV returns address(0)).
+        if (l2Token == address(0)) {
             return;
         }
 

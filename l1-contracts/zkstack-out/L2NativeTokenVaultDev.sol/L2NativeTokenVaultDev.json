@@ -79,19 +79,6 @@
   },
   {
     "type": "function",
-    "name": "L2_LEGACY_SHARED_BRIDGE",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IL2SharedBridgeLegacy"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "L2_TOKEN_PROXY_BYTECODE_HASH",
     "inputs": [],
     "outputs": [
@@ -362,11 +349,6 @@
         "internalType": "bytes32"
       },
       {
-        "name": "_legacySharedBridge",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "_bridgedTokenBeacon",
         "type": "address",
         "internalType": "address"
@@ -556,19 +538,6 @@
   },
   {
     "type": "function",
-    "name": "setLegacyTokenAssetId",
-    "inputs": [
-      {
-        "name": "_l2TokenAddress",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "test",
     "inputs": [],
     "outputs": [],
@@ -687,11 +656,6 @@
         "name": "_l2TokenProxyBytecodeHash",
         "type": "bytes32",
         "internalType": "bytes32"
-      },
-      {
-        "name": "_legacySharedBridge",
-        "type": "address",
-        "internalType": "address"
       },
       {
         "name": "_wethToken",
@@ -1057,11 +1021,6 @@
   },
   {
     "type": "error",
-    "name": "EmptyDeposit",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "EmptyToken",
     "inputs": []
   },
@@ -1083,11 +1042,6 @@
   },
   {
     "type": "error",
-    "name": "NoLegacySharedBridge",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "NonEmptyMsgValue",
     "inputs": []
   },
@@ -1099,11 +1053,6 @@
   {
     "type": "error",
     "name": "TokenAlreadyInBridgedTokensList",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "TokenIsLegacy",
     "inputs": []
   },
   {
