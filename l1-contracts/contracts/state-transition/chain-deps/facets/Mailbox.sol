@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
-import {IMailboxLegacy} from "../../chain-interfaces/IMailboxLegacy.sol";
 import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 
@@ -62,7 +61,7 @@ import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAs
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailboxLegacy {
+contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     using UncheckedMath for uint256;
     using PriorityTree for PriorityTree.Tree;
 
@@ -617,15 +616,16 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
     ///////////////////////////////////////////////////////
     //////// Legacy Era functions
 
-    /// @inheritdoc IMailboxLegacy
-    /// @dev Deprecated. The legacy ETH-withdrawal finalization entry was removed together with the legacy
-    /// bridge; withdrawals are finalized through the asset-router / L1Nullifier path. The signature is kept
-    /// for IMailboxLegacy compatibility, but the method always reverts.
+    /// @inheritdoc IMailboxImpl
+    /// @dev Deprecated stub. The L2->L1 base-token withdrawal message is still tagged with the
+    /// `finalizeEthWithdrawal` selector, so the selector must remain part of the facet's ABI even though funds
+    /// are now finalized through the asset-router / L1Nullifier path. The entry point itself always reverts;
+    /// full removal is tracked separately (EVM-1216).
     function finalizeEthWithdrawal(uint256, uint256, uint16, bytes calldata, bytes32[] calldata) external onlyL1 {
         revert TransactionNotAllowed();
     }
 
-    /// @inheritdoc IMailboxLegacy
+    /// @inheritdoc IMailboxImpl
     function requestL2Transaction(
         // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
         address _contractL2,

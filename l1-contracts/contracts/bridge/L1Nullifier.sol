@@ -19,7 +19,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
-import {IMailboxLegacy} from "../state-transition/chain-interfaces/IMailboxLegacy.sol";
+import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {
     AddressAlreadySet,
@@ -389,7 +389,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         address l1Receiver;
 
         bytes4 functionSignature = DataEncoding.getSelector(_l2ToL1message);
-        if (functionSignature == IMailboxLegacy.finalizeEthWithdrawal.selector) {
+        if (functionSignature == IMailboxImpl.finalizeEthWithdrawal.selector) {
             // slither-disable-next-line unused-return
             (, l1Receiver, amount) = DataEncoding.decodeBaseTokenFinalizeWithdrawalData(_l2ToL1message);
             assetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
