@@ -5,8 +5,15 @@ pragma solidity 0.8.28;
 import {IL2BaseTokenBase} from "./interfaces/IL2BaseTokenBase.sol";
 import {IL2NativeTokenVault} from "../bridge/ntv/IL2NativeTokenVault.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {L2_BASE_TOKEN_HOLDER, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractInterfaces.sol";
+import {InteropCallStarter} from "../common/Messaging.sol";
+import {IERC7786Attributes} from "../interop/IERC7786Attributes.sol";
+import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
+import {
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_ASSET_ROUTER_ADDR
+} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_CENTER} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {Unauthorized} from "../common/L1ContractErrors.sol";
 
 /**
@@ -45,86 +52,59 @@ abstract contract L2BaseTokenBase is IL2BaseTokenBase {
     /// @dev Storage gap to allow adding new shared storage variables in future upgrades.
     uint256[46] private __gap;
 
-    /// @notice Initiate the withdrawal of the base token, funds will be available to claim on L1 `finalizeEthWithdrawal` method.
+    /// @notice Initiate the withdrawal of the base token to L1.
     /// @param _l1Receiver The address on L1 to receive the funds.
     function withdraw(address _l1Receiver) external payable override {
-        uint256 amount = _burnMsgValue(L1_CHAIN_ID);
-
-        // Send the L2 log, a user could use it as proof of the withdrawal
-        bytes memory message = _getL1WithdrawMessage(_l1Receiver, amount);
-        // slither-disable-next-line unused-return
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(message);
+        uint256 amount = msg.value;
+        _withdrawViaAssetRouter(_l1Receiver, amount);
 
         emit Withdrawal(msg.sender, _l1Receiver, amount);
     }
 
-    /// @notice Initiate the withdrawal of the base token, with the sent message. The funds will be available to claim on L1 `finalizeEthWithdrawal` method.
+    /// @notice Initiate the withdrawal of the base token to L1.
+    /// @dev Base-token withdrawals now flow through the AssetRouter/InteropCenter — the same unified path
+    /// as ERC20 withdrawals. `_additionalData` is emitted for L2 observers but is not carried in the proven
+    /// withdrawal (L1 finalization only consumes the receiver and amount, so this matches prior behavior).
     /// @param _l1Receiver The address on L1 to receive the funds.
-    /// @param _additionalData Additional data to be sent to L1 with the withdrawal.
+    /// @param _additionalData Additional data emitted alongside the withdrawal event.
     function withdrawWithMessage(address _l1Receiver, bytes calldata _additionalData) external payable override {
-        uint256 amount = _burnMsgValue(L1_CHAIN_ID);
-
-        // Send the L2 log, a user could use it as proof of the withdrawal
-        bytes memory message = _getExtendedWithdrawMessage(_l1Receiver, amount, msg.sender, _additionalData);
-        // slither-disable-next-line unused-return
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(message);
+        uint256 amount = msg.value;
+        _withdrawViaAssetRouter(_l1Receiver, amount);
 
         emit WithdrawalWithMessage(msg.sender, _l1Receiver, amount, _additionalData);
     }
 
-    /// @dev Burns the sent `msg.value` by sending it to BaseTokenHolder and notifying the AssetTracker.
-    /// @param _toChainId The chain ID which the funds are sent to.
-    /// @return amount The amount of ETH that was burned.
-    function _burnMsgValue(uint256 _toChainId) internal virtual returns (uint256 amount) {
-        amount = msg.value;
-
-        // Transfer the ether to BaseTokenHolder and notify L2AssetTracker
-        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: amount}(_toChainId);
-    }
-
-    /// @dev Get the message to be sent to L1 to initiate a withdrawal.
-    /// @dev Base-token withdrawals use the same asset-router `finalizeDeposit` message format as ERC20
-    /// withdrawals, so that L1 finalization has a single code path (the L1Nullifier distinguishes the base
-    /// token by `assetId == baseTokenAssetId` and validates the L2 base-token system contract as the sender).
-    /// @param _to The L1 receiver address.
-    /// @param _amount The amount being withdrawn.
-    /// @return The encoded withdrawal message.
-    function _getL1WithdrawMessage(address _to, uint256 _amount) internal view returns (bytes memory) {
-        return _getBaseTokenWithdrawMessage(_to, _amount, address(0), new bytes(0));
-    }
-
-    /// @dev Get the extended message to be sent to L1 to initiate a withdrawal with additional data.
-    /// @param _to The L1 receiver address.
-    /// @param _amount The amount being withdrawn.
-    /// @param _sender The L2 sender address.
-    /// @param _additionalData Additional data to include in the message.
-    /// @return The encoded extended withdrawal message.
-    function _getExtendedWithdrawMessage(
-        address _to,
-        uint256 _amount,
-        address _sender,
-        bytes memory _additionalData
-    ) internal view returns (bytes memory) {
-        return _getBaseTokenWithdrawMessage(_to, _amount, _sender, _additionalData);
-    }
-
-    /// @dev Builds the asset-router `finalizeDeposit` withdrawal message for the base token.
-    /// `_sender`/`_additionalData` ride along in the proven message (mapped to the bridge-mint
-    /// originalCaller/erc20Metadata fields); L1 finalization consumes only the receiver and amount.
-    function _getBaseTokenWithdrawMessage(
-        address _to,
-        uint256 _amount,
-        address _sender,
-        bytes memory _additionalData
-    ) private view returns (bytes memory) {
+    /// @dev Routes the base-token withdrawal through the InteropCenter as a single-call bundle destined for
+    /// L1, mirroring the ERC20 withdrawal flow: an indirect call to the L2 AssetRouter carrying the
+    /// base-token assetId. The AssetRouter/NTV burn the value (via BaseTokenHolder) and produce the
+    /// `finalizeDeposit` message that L1 consumes, so the base token no longer builds its own message.
+    /// @dev The withdrawn ETH rides as the indirect-call message value (`msg.value` is forwarded to
+    /// `sendBundle`); no value is delivered to an L1 call, so `interopCallValue` is zero.
+    /// @param _l1Receiver The L1 receiver address.
+    /// @param _amount The amount being withdrawn (equal to `msg.value`).
+    function _withdrawViaAssetRouter(address _l1Receiver, uint256 _amount) internal {
         bytes32 baseTokenAssetId = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).BASE_TOKEN_ASSET_ID();
-        bytes memory transferData = DataEncoding.encodeBridgeMintData({
-            _originalCaller: _sender,
-            _remoteReceiver: _to,
-            _originToken: address(0),
-            _amount: _amount,
-            _erc20Metadata: _additionalData
+        bytes memory depositData = DataEncoding.encodeAssetRouterBridgehubDepositData(
+            baseTokenAssetId,
+            DataEncoding.encodeBridgeBurnData(_amount, _l1Receiver, address(0))
+        );
+
+        bytes[] memory callAttributes = new bytes[](2);
+        callAttributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (_amount));
+        callAttributes[1] = abi.encodeCall(IERC7786Attributes.interopCallValue, (0));
+
+        InteropCallStarter[] memory callStarters = new InteropCallStarter[](1);
+        callStarters[0] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(L2_ASSET_ROUTER_ADDR),
+            data: depositData,
+            callAttributes: callAttributes
         });
-        return DataEncoding.encodeAssetRouterFinalizeDepositData(block.chainid, baseTokenAssetId, transferData);
+
+        // slither-disable-next-line unused-return
+        L2_INTEROP_CENTER.sendBundle{value: _amount}(
+            InteroperableAddress.formatEvmV1(L1_CHAIN_ID),
+            callStarters,
+            new bytes[](0)
+        );
     }
 }

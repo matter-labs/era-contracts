@@ -7,14 +7,14 @@ import {Test} from "forge-std/Test.sol";
 import {L2BaseTokenEra} from "contracts/l2-system/era/L2BaseTokenEra.sol";
 import {IL2BaseTokenBase} from "contracts/l2-system/interfaces/IL2BaseTokenBase.sol";
 import {IL2BaseTokenEra} from "contracts/l2-system/era/interfaces/IL2BaseTokenEra.sol";
-import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
 import {
+    L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
-    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BOOTLOADER_ADDRESS,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+    L2_INTEROP_CENTER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
     MSG_VALUE_SYSTEM_CONTRACT
@@ -22,12 +22,15 @@ import {
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {InteropCallStarter} from "contracts/common/Messaging.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {
     BaseTokenHolderAlreadyInitialized,
     InsufficientFunds,
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
-import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 import {DummyL2AssetTracker} from "contracts/dev-contracts/test/DummyL2AssetTracker.sol";
 import {DummyL2L1Messenger} from "contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 import {DummyL2BaseTokenHolder} from "contracts/dev-contracts/test/DummyL2BaseTokenHolder.sol";
@@ -78,6 +81,14 @@ contract L2BaseTokenEraTest is Test {
             abi.encodeCall(IL2NativeTokenVault.BASE_TOKEN_ASSET_ID, ()),
             abi.encode(BASE_TOKEN_ASSET_ID_FIXTURE)
         );
+
+        // Withdrawals now route through the InteropCenter; there is no real InteropCenter deployed
+        // in these unit tests, so make sendBundle a no-op returning a bytes32.
+        vm.mockCall(
+            L2_INTEROP_CENTER_ADDR,
+            abi.encodeWithSelector(IInteropCenter.sendBundle.selector),
+            abi.encode(bytes32(0))
+        );
     }
 
     /// @dev Helper to initialize l2BaseToken via initL2() — sets L1_CHAIN_ID and baseTokenHolderBalanceInitialized.
@@ -86,18 +97,31 @@ contract L2BaseTokenEraTest is Test {
         l2BaseToken.initL2(1);
     }
 
-    /// @dev Builds the expected base-token withdrawal message in the asset-router finalizeDeposit format.
-    function _expectedWithdrawMessage(
-        address _sender,
-        address _to,
-        uint256 _amount,
-        bytes memory _additionalData
-    ) internal view returns (bytes memory) {
+    /// @dev Builds the exact expected `sendBundle` calldata for a base-token withdrawal.
+    /// @dev The destination is L1 (`L1_CHAIN_ID == 1` after `initL2(1)`), the single call is an indirect
+    /// call to the L2 AssetRouter carrying the base-token assetId and bridge-burn data, with the withdrawn
+    /// amount forwarded as the indirect-call value and zero interop call value.
+    function _expectedSendBundleCall(address _l1Receiver, uint256 _amount) internal pure returns (bytes memory) {
+        bytes memory depositData = DataEncoding.encodeAssetRouterBridgehubDepositData(
+            BASE_TOKEN_ASSET_ID_FIXTURE,
+            DataEncoding.encodeBridgeBurnData(_amount, _l1Receiver, address(0))
+        );
+
+        bytes[] memory callAttributes = new bytes[](2);
+        callAttributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (_amount));
+        callAttributes[1] = abi.encodeCall(IERC7786Attributes.interopCallValue, (0));
+
+        InteropCallStarter[] memory callStarters = new InteropCallStarter[](1);
+        callStarters[0] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(L2_ASSET_ROUTER_ADDR),
+            data: depositData,
+            callAttributes: callAttributes
+        });
+
         return
-            DataEncoding.encodeAssetRouterFinalizeDepositData(
-                block.chainid,
-                BASE_TOKEN_ASSET_ID_FIXTURE,
-                DataEncoding.encodeBridgeMintData(_sender, _to, address(0), _amount, _additionalData)
+            abi.encodeCall(
+                IInteropCenter.sendBundle,
+                (InteroperableAddress.formatEvmV1(uint256(1)), callStarters, new bytes[](0))
             );
     }
 
@@ -538,88 +562,32 @@ contract L2BaseTokenEraTest is Test {
                         withdraw() TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_withdraw_successTransfersToHolder() public {
+    function test_withdraw_success() public {
         _initL2();
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
-        uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
-
-        // Expect the L1Messenger call
-        bytes memory expectedMessage = _expectedWithdrawMessage(address(0), l1Receiver, WITHDRAW_AMOUNT, new bytes(0));
-        vm.expectCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSignature("sendToL1(bytes)", expectedMessage)
-        );
+        // Expect the InteropCenter sendBundle call, forwarding the withdrawn amount as value.
+        vm.expectCall(L2_INTEROP_CENTER_ADDR, WITHDRAW_AMOUNT, _expectedSendBundleCall(l1Receiver, WITHDRAW_AMOUNT));
 
         vm.expectEmit(true, true, false, true);
         emit Withdrawal(sender, l1Receiver, WITHDRAW_AMOUNT);
 
         vm.prank(sender);
         l2BaseToken.withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
-
-        assertEq(
-            L2_BASE_TOKEN_HOLDER_ADDR.balance,
-            holderBalanceBefore + WITHDRAW_AMOUNT,
-            "BaseTokenHolder should receive ETH"
-        );
     }
 
-    function test_withdraw_callsAssetTrackerWithL1ChainId() public {
-        // Deploy real BaseTokenHolder so the full call chain reaches L2AssetTracker
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
-
-        // Deploy at system contract address so it passes onlyBridgingCaller check
-        L2BaseTokenEra l2BaseTokenAtSystemAddr = new L2BaseTokenEra();
-        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
-        // Initialize L1_CHAIN_ID on the system-address instance via initL2()
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2BaseTokenEra(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(1);
-
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
-
-        // L1_CHAIN_ID = 1, so expect toChainId = 1
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 1, WITHDRAW_AMOUNT)
-        );
-
-        vm.prank(sender);
-        L2BaseTokenEra(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
-    }
-
-    function test_withdraw_callsL1Messenger() public {
+    function test_withdraw_revertsIfInteropCenterReverts() public {
         _initL2();
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
-        uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
-
-        bytes memory expectedMessage = _expectedWithdrawMessage(address(0), l1Receiver, WITHDRAW_AMOUNT, new bytes(0));
-
-        vm.expectCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSignature("sendToL1(bytes)", expectedMessage)
+        // Make the InteropCenter reject the bundle.
+        vm.mockCallRevert(
+            L2_INTEROP_CENTER_ADDR,
+            abi.encodeWithSelector(IInteropCenter.sendBundle.selector),
+            "Rejected"
         );
-
-        vm.prank(sender);
-        l2BaseToken.withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
-
-        assertEq(
-            L2_BASE_TOKEN_HOLDER_ADDR.balance,
-            holderBalanceBefore + WITHDRAW_AMOUNT,
-            "BaseTokenHolder should receive ETH"
-        );
-    }
-
-    function test_withdraw_revertsIfBaseTokenHolderRejects() public {
-        _initL2();
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
-
-        RejectingBurnAndStartBridgingContract rejecting = new RejectingBurnAndStartBridgingContract();
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(rejecting).code);
 
         vm.prank(sender);
         vm.expectRevert("Rejected");
@@ -633,55 +601,27 @@ contract L2BaseTokenEraTest is Test {
         address sender = makeAddr("sender");
         vm.deal(sender, amount);
 
-        uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
+        vm.expectCall(L2_INTEROP_CENTER_ADDR, amount, _expectedSendBundleCall(l1Receiver, amount));
 
         vm.prank(sender);
         l2BaseToken.withdraw{value: amount}(l1Receiver);
-
-        assertEq(
-            L2_BASE_TOKEN_HOLDER_ADDR.balance,
-            holderBalanceBefore + amount,
-            "BaseTokenHolder should receive correct amount"
-        );
     }
 
     /*//////////////////////////////////////////////////////////////
                     withdrawWithMessage() TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_withdrawWithMessage_successTransfersToHolder() public {
+    function test_withdrawWithMessage_success() public {
         _initL2();
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
         bytes memory additionalData = "test message";
 
-        uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
+        // Expect the InteropCenter sendBundle call, forwarding the withdrawn amount as value.
+        vm.expectCall(L2_INTEROP_CENTER_ADDR, WITHDRAW_AMOUNT, _expectedSendBundleCall(l1Receiver, WITHDRAW_AMOUNT));
 
         vm.expectEmit(true, true, false, true);
         emit WithdrawalWithMessage(sender, l1Receiver, WITHDRAW_AMOUNT, additionalData);
-
-        vm.prank(sender);
-        l2BaseToken.withdrawWithMessage{value: WITHDRAW_AMOUNT}(l1Receiver, additionalData);
-
-        assertEq(
-            L2_BASE_TOKEN_HOLDER_ADDR.balance,
-            holderBalanceBefore + WITHDRAW_AMOUNT,
-            "BaseTokenHolder should receive ETH"
-        );
-    }
-
-    function test_withdrawWithMessage_callsL1MessengerWithExtendedMessage() public {
-        _initL2();
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
-        bytes memory additionalData = "test message";
-
-        bytes memory expectedMessage = _expectedWithdrawMessage(sender, l1Receiver, WITHDRAW_AMOUNT, additionalData);
-
-        vm.expectCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSignature("sendToL1(bytes)", expectedMessage)
-        );
 
         vm.prank(sender);
         l2BaseToken.withdrawWithMessage{value: WITHDRAW_AMOUNT}(l1Receiver, additionalData);
@@ -692,25 +632,26 @@ contract L2BaseTokenEraTest is Test {
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
-        uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
+        vm.expectCall(L2_INTEROP_CENTER_ADDR, WITHDRAW_AMOUNT, _expectedSendBundleCall(l1Receiver, WITHDRAW_AMOUNT));
+
+        vm.expectEmit(true, true, false, true);
+        emit WithdrawalWithMessage(sender, l1Receiver, WITHDRAW_AMOUNT, "");
 
         vm.prank(sender);
         l2BaseToken.withdrawWithMessage{value: WITHDRAW_AMOUNT}(l1Receiver, "");
-
-        assertEq(
-            L2_BASE_TOKEN_HOLDER_ADDR.balance,
-            holderBalanceBefore + WITHDRAW_AMOUNT,
-            "BaseTokenHolder should receive ETH"
-        );
     }
 
-    function test_withdrawWithMessage_revertsIfBaseTokenHolderRejects() public {
+    function test_withdrawWithMessage_revertsIfInteropCenterReverts() public {
         _initL2();
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
-        RejectingBurnAndStartBridgingContract rejecting = new RejectingBurnAndStartBridgingContract();
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(rejecting).code);
+        // Make the InteropCenter reject the bundle.
+        vm.mockCallRevert(
+            L2_INTEROP_CENTER_ADDR,
+            abi.encodeWithSelector(IInteropCenter.sendBundle.selector),
+            "Rejected"
+        );
 
         vm.prank(sender);
         vm.expectRevert("Rejected");
@@ -724,16 +665,10 @@ contract L2BaseTokenEraTest is Test {
         address sender = makeAddr("sender");
         vm.deal(sender, amount);
 
-        uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
+        vm.expectCall(L2_INTEROP_CENTER_ADDR, amount, _expectedSendBundleCall(l1Receiver, amount));
 
         vm.prank(sender);
         l2BaseToken.withdrawWithMessage{value: amount}(l1Receiver, additionalData);
-
-        assertEq(
-            L2_BASE_TOKEN_HOLDER_ADDR.balance,
-            holderBalanceBefore + amount,
-            "BaseTokenHolder should receive correct amount"
-        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -783,45 +718,6 @@ contract L2BaseTokenEraTest is Test {
         // totalSupply = INITIAL - holderBalance. Minting decreases holder balance,
         // so totalSupply increases by the minted amounts.
         assertEq(l2BaseToken.totalSupply(), mint1 + mint2, "totalSupply should equal total minted amount");
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        MESSAGE FORMAT TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_withdrawMessage_format() public view {
-        address receiver = address(0x1234);
-        uint256 amount = 1 ether;
-
-        // A basic withdrawal uses sender = address(0) and empty additional data.
-        bytes memory expectedMessage = _expectedWithdrawMessage(address(0), receiver, amount, new bytes(0));
-
-        assertEq(
-            expectedMessage,
-            DataEncoding.encodeAssetRouterFinalizeDepositData(
-                block.chainid,
-                BASE_TOKEN_ASSET_ID_FIXTURE,
-                DataEncoding.encodeBridgeMintData(address(0), receiver, address(0), amount, new bytes(0))
-            ),
-            "Basic withdrawal message should use asset-router finalizeDeposit format"
-        );
-    }
-
-    function test_withdrawWithMessage_extendedFormat() public {
-        address sender = makeAddr("sender");
-        bytes memory additionalData = "hello";
-
-        bytes memory expectedMessage = _expectedWithdrawMessage(sender, l1Receiver, WITHDRAW_AMOUNT, additionalData);
-
-        assertEq(
-            expectedMessage,
-            DataEncoding.encodeAssetRouterFinalizeDepositData(
-                block.chainid,
-                BASE_TOKEN_ASSET_ID_FIXTURE,
-                DataEncoding.encodeBridgeMintData(sender, l1Receiver, address(0), WITHDRAW_AMOUNT, additionalData)
-            ),
-            "Extended withdrawal message should carry the sender and additional data"
-        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -877,16 +773,5 @@ contract L2BaseTokenEraTest is Test {
     function test_implementsIL2BaseTokenEra() public view {
         IL2BaseTokenEra token = IL2BaseTokenEra(address(l2BaseToken));
         assert(address(token) == address(l2BaseToken));
-    }
-}
-
-/// @notice Helper contract that rejects burnAndStartBridging calls
-contract RejectingBurnAndStartBridgingContract {
-    function burnAndStartBridging(uint256) external payable {
-        revert("Rejected");
-    }
-
-    receive() external payable {
-        revert("Rejected");
     }
 }
