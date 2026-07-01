@@ -389,6 +389,25 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     });
 
     // ── PHASE 3: execute each destination leg via executeAtomicBundle ─────────────────────────
+    // Snapshot the recipient shim balances BEFORE execute. The coverage harness runs every spec on
+    // one shared chain set, so `user` may already hold these bridged shims from earlier specs — so we
+    // assert the DELTA credited by this swap, not the absolute balance (the source-side checks above
+    // are delta-based for the same reason).
+    const abAssetId = ntvAssetId(chainA.chainId, chainA.testToken.address);
+    const baAssetId = ntvAssetId(chainB.chainId, chainB.testToken.address);
+    const ntvOnB = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, NTV_TOKEN_ADDRESS_ABI, chainB.provider);
+    const ntvOnA = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, NTV_TOKEN_ADDRESS_ABI, chainA.provider);
+    const shimAonBAddrBefore: string = await ntvOnB.tokenAddress(abAssetId);
+    const shimAonBBefore: BigNumber =
+      shimAonBAddrBefore === ethers.constants.AddressZero
+        ? BigNumber.from(0)
+        : await new Contract(shimAonBAddrBefore, ERC20_BALANCE_ABI, chainB.provider).balanceOf(user);
+    const shimBonAAddrBefore: string = await ntvOnA.tokenAddress(baAssetId);
+    const shimBonABefore: BigNumber =
+      shimBonAAddrBefore === ethers.constants.AddressZero
+        ? BigNumber.from(0)
+        : await new Contract(shimBonAAddrBefore, ERC20_BALANCE_ABI, chainA.provider).balanceOf(user);
+
     const handlerB = chainB.stack.interopHandler.connect(chainB.user);
     const handlerA = chainA.stack.interopHandler.connect(chainA.user);
     await (await handlerB.executeAtomicBundle(ab.bundleData, finality, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
@@ -400,22 +419,24 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Committed, "AB stays Committed on A");
     expect(await chainB.stack.manager.legState(flowId, hBA)).to.equal(LegState.Committed, "BA stays Committed on B");
 
-    // ── Destination mint assertions ──────────────────────────────────────────────────────────
-    // B receives a freshly-deployed bridged shim for A's token (assetId of A.testToken on chain A).
-    const abAssetId = ntvAssetId(chainA.chainId, chainA.testToken.address);
-    const ntvOnB = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, NTV_TOKEN_ADDRESS_ABI, chainB.provider);
+    // ── Destination mint assertions (delta — robust to pre-existing shim balance) ──────────────
+    // B receives a bridged shim for A's token (assetId of A.testToken on chain A).
     const shimAonB = await ntvOnB.tokenAddress(abAssetId);
     expect(shimAonB).to.not.equal(ethers.constants.AddressZero, "shim for A's token deployed on B");
-    const shimAonBBal = await new Contract(shimAonB, ERC20_BALANCE_ABI, chainB.provider).balanceOf(user);
-    expect(shimAonBBal.toString()).to.equal(aAmount.toString(), "recipient on B received aAmount");
+    const shimAonBAfter: BigNumber = await new Contract(shimAonB, ERC20_BALANCE_ABI, chainB.provider).balanceOf(user);
+    expect(shimAonBAfter.sub(shimAonBBefore).toString()).to.equal(
+      aAmount.toString(),
+      "recipient on B received aAmount"
+    );
 
     // A receives a bridged shim for B's token.
-    const baAssetId = ntvAssetId(chainB.chainId, chainB.testToken.address);
-    const ntvOnA = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, NTV_TOKEN_ADDRESS_ABI, chainA.provider);
     const shimBonA = await ntvOnA.tokenAddress(baAssetId);
     expect(shimBonA).to.not.equal(ethers.constants.AddressZero, "shim for B's token deployed on A");
-    const shimBonABal = await new Contract(shimBonA, ERC20_BALANCE_ABI, chainA.provider).balanceOf(user);
-    expect(shimBonABal.toString()).to.equal(bAmount.toString(), "recipient on A received bAmount");
+    const shimBonAAfter: BigNumber = await new Contract(shimBonA, ERC20_BALANCE_ABI, chainA.provider).balanceOf(user);
+    expect(shimBonAAfter.sub(shimBonABefore).toString()).to.equal(
+      bAmount.toString(),
+      "recipient on A received bAmount"
+    );
   });
 
   it("timeout path: one leg commits, peer never does -> authorizeRefund + claimRefund recovers depositor", async () => {
