@@ -33,8 +33,9 @@ enum LegState {
 /// The two structs were identical in layout, so they are unified; the meaning of `leaf` (the value's
 /// own leaf vs. its predecessor) is fixed by which verify function consumes the proof.
 ///
-/// Authentication has two layers, both resolved against the interop root the verifying chain imported
-/// for `(sourceChainId, batchNumber)`:
+/// Authentication has two layers, both resolved against an SL aggregation root the verifying chain
+/// imported (`interopRoots[slChainId][slBlock]`; the claimed `(sourceChainId, batchNumber)` binds via
+/// the source chain's chain-id leaf inside that root):
 ///   1. The origin {L2InteropCommitmentTree}'s `abi.encode(chainImtRoot)` L2->L1 message (sender
 ///      pinned to the canonical commitment-tree address) is proven included; this authenticates the
 ///      root.

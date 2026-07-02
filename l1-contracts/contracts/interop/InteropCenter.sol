@@ -542,8 +542,9 @@ contract InteropCenter is
     /// {_sendBundleToL1}.
     /// @dev `_atomicSend` (flowId/deadline/lowNullifierIndex) is passed out-of-band and is intentionally
     /// NOT embedded in `_bundle`, so `bundleHash` is independent of `flowId`. This is required:
-    /// `flowId = keccak256(abi.encode(sortedBundleHashes, chainIds, deadline))` must be computable
-    /// off-chain before the send, which is impossible if a `bundleHash` (a flowId input) embedded `flowId`.
+    /// `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`
+    /// must be computable off-chain before the send, which is impossible if a `bundleHash` (a flowId
+    /// input) embedded `flowId`.
     function _dispatchBundle(
         InteropBundle memory _bundle,
         AtomicSend memory _atomicSend

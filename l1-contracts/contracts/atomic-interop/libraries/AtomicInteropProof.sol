@@ -25,9 +25,10 @@ import {
 ///
 /// A flow leg's commit value lives in its origin chain's {L2InteropCommitmentTree} (an Indexed
 /// Merkle Tree). On every insert that tree publishes `abi.encode(root)` to L1 via the L2->L1
-/// messenger. The verifying chain authenticates that single message against the interop root it
-/// imported for `(sourceChainId, batchNumber)` — which it only holds once the source batch has
-/// settled, so the root cannot be forged.
+/// messenger. The verifying chain authenticates that single message against an imported SL
+/// aggregation root: the accepted (multi-hop) proof terminates at `interopRoots[slChainId][slBlock]`
+/// and binds the message to `sourceChainId` via that chain's chain-id leaf inside the SL root —
+/// which the verifier only holds once the source batch has settled, so the root cannot be forged.
 ///
 /// The flow `deadline` is a settlement-layer timestamp. It is not carried in the proof struct
 /// (that would be spoofable); instead each batch's `l1Timestamp` — the settlement-layer block
@@ -50,6 +51,12 @@ import {
 /// successor would still be `<= deadline`) while keeping a genuine no-show refundable.
 /// TODO: add a halt branch that restores refund liveness for a halted source with no successor
 /// batch; it needs a "highest-leaf" SL chain-tree proof not yet exposed by proveL2MessageInclusionShared.
+/// TODO: a source with NO settled batch with `t <= deadline` (first-ever settlement lands after the
+/// deadline) is a second refund-liveness gap: absence needs a batch `N` with `t_N <= deadline`, so a
+/// no-show there is neither finalizable nor refundable and counterparties' committed legs lock. Until
+/// a first-batch variant exists (prove the chain's first batch has `t > deadline`), flow builders must
+/// only include legs on chains that already have a settled batch (any chain settled before flow
+/// creation qualifies).
 ///
 /// Membership (inclusion) and non-membership (low-nullifier) against the authenticated root are
 /// delegated to {IndexedMerkleTree}, the single shared IMT engine.
@@ -150,13 +157,15 @@ library AtomicInteropProof {
         }
     }
 
-    /// @dev Authenticates the commitment tree's `(root)` L2->L1 message against the interop root imported
-    /// for `(_sourceChainId, _batchNumber)`, and derives the settlement-layer metadata (SL snapshot block,
-    /// SL chain id, and the batch's `l1Timestamp`) from that same proof.
+    /// @dev Authenticates the commitment tree's `(root)` L2->L1 message for `(_sourceChainId,
+    /// _batchNumber)` against the imported SL aggregation root — the accepted (multi-hop) proof
+    /// terminates at `interopRoots[slChainId][slBlock]`, with the source chain bound via its chain-id
+    /// leaf inside that root — and derives the settlement-layer metadata (SL snapshot block, SL chain
+    /// id, and the batch's `l1Timestamp`) from that same proof.
     ///
     /// Step 1 (auth, unchanged): build the {L2Message} (sender pinned to {L2_INTEROP_COMMITMENT_TREE_ADDR},
-    /// identical on every chain — this binds the root to the real tree; the interop-root channel binds
-    /// it to `_sourceChainId`) and verify inclusion via `proveL2MessageInclusionShared`. The `abi.encode`
+    /// identical on every chain — this binds the root to the real tree; the chain-id leaf binds it to
+    /// `_sourceChainId`) and verify inclusion via `proveL2MessageInclusionShared`. The `abi.encode`
     /// here must match what {L2InteropCommitmentTree} publishes.
     ///
     /// Step 2: re-parse the same proof to read the SL metadata. We compute the same leaf the verifier
