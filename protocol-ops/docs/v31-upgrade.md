@@ -71,6 +71,35 @@ cargo run --release -- ecosystem upgrade-broadcast \
   --key <bundle-target-address>=<private-key>
 ```
 
+### Providing the pre-v31 total supply
+
+After a ZKsync OS chain is upgraded to v31, provide its pre-v31 base-token total supply.
+First calculate the value from the repository root:
+
+```
+yarn ts-node l1-contracts/scripts/calculate-zkos-pre-v31-total-supply.ts \
+  --chain-id <chain-id> \
+  --bridgehub <bridgehub> \
+  --l1-rpc <l1-rpc-url> \
+  --l2-rpc <chain-rpc> \
+  --upgrade-l1-tx <chain-upgrade-l1-tx-hash>
+```
+
+The script prints `raw uint256`; use that value as `--pre-v31-total-supply` in
+the protocol-ops command that generates the Safe calldata:
+
+```
+cd protocol-ops
+
+cargo run --release -- chain set-zkos-pre-v31-total-supply \
+  --env <env> \
+  --chain-id <chain-id> \
+  --l1-rpc-url <l1-rpc-url> \
+  --pre-v31-total-supply <raw-uint256> \
+  --out ./v31-upgrade/set-zkos-pre-v31-total-supply \
+  --subdir <unique-run-name>-set-zkos-pre-v31-total-supply
+```
+
 ## Era
 
 Note, that the server needs the bytecode supplier to be provided manually into the config. 
