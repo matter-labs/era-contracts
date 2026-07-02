@@ -19,7 +19,6 @@ import {
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER_ADDR,
-    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BOOTLOADER_ADDRESS,
     L2_BRIDGEHUB,
     L2_CHAIN_ASSET_HANDLER,
@@ -33,7 +32,6 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
     MAX_BUILT_IN_CONTRACT_ADDR,
-    L2_ASSET_ROUTER,
     L2_BRIDGEHUB_ADDR
 } from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
@@ -79,10 +77,7 @@ import {
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
-import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
-import {IMailboxLegacy} from "../../state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
-import {LegacySharedBridgeAddresses, SharedBridgeOnChainId} from "./LegacySharedBridgeAddresses.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
@@ -110,9 +105,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// @notice The chain on which the token was originally issued. For tokens issued on L1, this will be equal to the L1 chain ID.
     mapping(bytes32 assetId => uint256 originChainId) internal tokenOriginChainId;
 
-    /// @notice The address of the L2 shared bridge. It is used only on some old EraVM-based chains.
-    /// On such chains, it is responsible for sending withdrawal messages.
-    mapping(uint256 chainId => address legacySharedBridgeAddress) internal legacySharedBridgeAddress;
+    /// @notice Deprecated slot, retained to preserve the upgradeable storage layout.
+    /// Formerly `legacySharedBridgeAddress` (per-chain L2 legacy shared bridge). No longer read or written.
+    // slither-disable-next-line uninitialized-state
+    mapping(uint256 chainId => address legacySharedBridgeAddress) internal __DEPRECATED_legacySharedBridgeAddress;
 
     /// @notice Empty multichainBatchRoot calculated for specific chain.
     mapping(uint256 chainId => bytes32 emptyMultichainBatchRoot) internal emptyMultichainBatchRoot;
@@ -207,18 +203,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         emit SettlementFeePayerAgreementUpdated(msg.sender, _chainId, _agreed);
     }
 
-    /// @inheritdoc IGWAssetTracker
-    function setLegacySharedBridgeAddress() external onlyUpgrader {
-        address l1AssetRouter = address(L2_ASSET_ROUTER.L1_ASSET_ROUTER());
-        SharedBridgeOnChainId[] memory sharedBridgeOnChainIds = LegacySharedBridgeAddresses
-            .getLegacySharedBridgeAddressOnGateway(l1AssetRouter);
-        uint256 length = sharedBridgeOnChainIds.length;
-        for (uint256 i = 0; i < length; ++i) {
-            legacySharedBridgeAddress[sharedBridgeOnChainIds[i].chainId] = sharedBridgeOnChainIds[i]
-                .legacySharedBridgeAddress;
-        }
-    }
-
     function _l1ChainId() internal view returns (uint256) {
         return L1_CHAIN_ID;
     }
@@ -284,14 +268,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         balanceChange[_chainId][_canonicalTxHash] = _balanceChange;
     }
 
-    /// @inheritdoc IGWAssetTracker
-    function setLegacySharedBridgeAddress(
-        uint256 _chainId,
-        address _legacySharedBridgeAddress
-    ) external onlyServiceTransactionSender {
-        legacySharedBridgeAddress[_chainId] = _legacySharedBridgeAddress;
-    }
-
     /*//////////////////////////////////////////////////////////////
                     Chain settlement logs processing on Gateway
     //////////////////////////////////////////////////////////////*/
@@ -308,7 +284,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
         uint256 msgCount = 0;
         uint256 logsLength = _processLogsInputs.logs.length;
-        bytes32 baseTokenAssetId = _bridgehub().baseTokenAssetId(_processLogsInputs.chainId);
 
         // Count chargeable interop messages during processing
         uint256 chargeableInteropCount = 0;
@@ -334,8 +309,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 if (log.key == bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
                     // Handle interop message and get count of chargeable calls for settlement fees
                     chargeableInteropCount += _handleInteropCenterMessage(_processLogsInputs.chainId, message);
-                } else if (log.key == bytes32(uint256(uint160(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)))) {
-                    _handleBaseTokenSystemContractMessage(_processLogsInputs.chainId, baseTokenAssetId, message);
                 } else if (log.key == bytes32(uint256(uint160(L2_ASSET_ROUTER_ADDR)))) {
                     _handleAssetRouterMessage(_processLogsInputs.chainId, message);
                 } else if (log.key == bytes32(uint256(uint160(L2_ASSET_TRACKER_ADDR)))) {
@@ -349,11 +322,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 } else if (uint256(log.key) <= MAX_BUILT_IN_CONTRACT_ADDR) {
                     // This Log is not supported
                     revert InvalidBuiltInContractMessage(logCount, msgCount - 1, log.key);
-                } else {
-                    address legacySharedBridge = legacySharedBridgeAddress[_processLogsInputs.chainId];
-                    if (log.key == bytes32(uint256(uint160(legacySharedBridge))) && legacySharedBridge != address(0)) {
-                        _handleLegacySharedBridgeMessage(_processLogsInputs.chainId, message);
-                    }
                 }
             }
         }
@@ -614,47 +582,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             // This error should never be triggered, it is just an invariant check.
             require(_destinationChainId == L1_CHAIN_ID, MustBeWithdrawalToL1(_destinationChainId));
         }
-    }
-
-    /// @notice Handles withdrawal messages from legacy shared bridge contracts on pre-V31 chains.
-    /// @dev This function provides backwards compatibility for chains that used the old bridge system.
-    /// @param _chainId The chain ID that sent the legacy withdrawal message.
-    /// @param _message The raw legacy bridge message containing withdrawal data.
-    function _handleLegacySharedBridgeMessage(uint256 _chainId, bytes memory _message) internal {
-        (bytes4 functionSignature, address l1Token, bytes memory transferData) = DataEncoding
-            .decodeLegacyFinalizeWithdrawalData(L1_CHAIN_ID, _message);
-        require(
-            functionSignature == IL1ERC20Bridge.finalizeWithdrawal.selector,
-            InvalidFunctionSignature(functionSignature)
-        );
-        // The legacy shared bridge message is only for L1 tokens on legacy chains where the legacy L2 shared bridge is deployed.
-        // Convert legacy L1 token to modern asset ID format
-        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
-
-        // Process the withdrawal using the modern asset router logic
-        // slither-disable-next-line unused-return
-        _handleAssetRouterMessageInner({
-            _sourceChainId: _chainId,
-            _destinationChainId: L1_CHAIN_ID,
-            _assetId: expectedAssetId,
-            _transferData: transferData,
-            _isInteropCall: false
-        });
-    }
-
-    /// @notice L2->L1 base token withdrawals go through the L2BaseTokenSystemContract directly.
-    function _handleBaseTokenSystemContractMessage(
-        uint256 _chainId,
-        bytes32 _baseTokenAssetId,
-        bytes memory _message
-    ) internal {
-        // slither-disable-next-line unused-return
-        (bytes4 functionSignature, , uint256 amount) = DataEncoding.decodeBaseTokenFinalizeWithdrawalData(_message);
-        require(
-            functionSignature == IMailboxLegacy.finalizeEthWithdrawal.selector,
-            InvalidFunctionSignature(functionSignature)
-        );
-        _decreaseChainBalance(_chainId, _baseTokenAssetId, amount);
     }
 
     /// @notice Validates selectors for messages emitted by L2AssetTracker.

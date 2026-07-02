@@ -25,9 +25,6 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     /// ETH token is expected to have been already initialized in production.
     function registerEthToken() external;
 
-    /// Used for V31 migrating token balances to AssetTracker
-    function migrateTokenBalanceToAssetTracker(uint256 _chainId, bytes32 _assetId) external returns (uint256);
-
     function l1AssetTracker() external view returns (IL1AssetTracker);
 
     event TokenBeaconUpdated(address indexed l2TokenBeacon);

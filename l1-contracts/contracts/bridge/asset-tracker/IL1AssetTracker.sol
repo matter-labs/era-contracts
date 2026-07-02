@@ -44,8 +44,6 @@ interface IL1AssetTracker {
 
     function receiveGatewayToL1MigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
 
-    function registerLegacyToken(bytes32 _assetId) external;
-
     function consumeBalanceChange(
         uint256 _callerChainId,
         uint256 _chainId

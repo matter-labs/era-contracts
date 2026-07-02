@@ -6,7 +6,7 @@ import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 
 import {ETH_TOKEN_ADDRESS, MAX_NEW_FACTORY_DEPS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 
-import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 import {
     GasPerPubdataMismatch,
     MsgValueTooLow,
@@ -15,18 +15,39 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
+/// @dev Minimal asset-router mock for the legacy `requestL2Transaction` base-token deposit path.
+/// The previous dev `DummySharedBridge` was removed alongside the legacy bridging code; this local
+/// mock only replicates the `bridgehubDepositBaseToken` accounting and pausing that these tests rely on.
+contract MockBaseTokenAssetRouter is PausableUpgradeable {
+    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
+
+    function pause() external {
+        _pause();
+    }
+
+    function bridgehubDepositBaseToken(
+        uint256 _chainId,
+        bytes32, // _assetId
+        address, // _originalCaller
+        uint256 _amount
+    ) external payable whenNotPaused {
+        require(msg.value == _amount, "L1AR: msg.value not equal to amount");
+        chainBalance[_chainId][ETH_TOKEN_ADDRESS] += _amount;
+    }
+}
+
 // TODO(EVM-1216): delete test file after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
 contract MailboxRequestL2TransactionTest is MailboxTest {
     address tempAddress;
     bytes[] tempBytesArr;
     bytes tempBytes;
-    DummySharedBridge l1SharedBridge;
+    MockBaseTokenAssetRouter l1SharedBridge;
     address baseTokenBridgeAddress;
 
     function setUp() public virtual {
         setupDiamondProxy();
 
-        l1SharedBridge = new DummySharedBridge(keccak256("dummyDepositHash"));
+        l1SharedBridge = new MockBaseTokenAssetRouter();
         baseTokenBridgeAddress = address(l1SharedBridge);
         vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.assetRouter, ()), abi.encode(baseTokenBridgeAddress));
 

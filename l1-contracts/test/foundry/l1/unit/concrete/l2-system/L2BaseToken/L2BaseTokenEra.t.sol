@@ -19,7 +19,7 @@ import {
     MSG_VALUE_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
-import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
+import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {
     BaseTokenHolderAlreadyInitialized,
     InsufficientFunds,
@@ -521,7 +521,7 @@ contract L2BaseTokenEraTest is Test {
 
         // Expect the L1Messenger call
         bytes memory expectedMessage = abi.encodePacked(
-            IMailboxLegacy.finalizeEthWithdrawal.selector,
+            IMailboxImpl.finalizeEthWithdrawal.selector,
             l1Receiver,
             WITHDRAW_AMOUNT
         );
@@ -575,7 +575,7 @@ contract L2BaseTokenEraTest is Test {
         uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
 
         bytes memory expectedMessage = abi.encodePacked(
-            IMailboxLegacy.finalizeEthWithdrawal.selector,
+            IMailboxImpl.finalizeEthWithdrawal.selector,
             l1Receiver,
             WITHDRAW_AMOUNT
         );
@@ -659,7 +659,7 @@ contract L2BaseTokenEraTest is Test {
         bytes memory additionalData = "test message";
 
         bytes memory expectedMessage = abi.encodePacked(
-            IMailboxLegacy.finalizeEthWithdrawal.selector,
+            IMailboxImpl.finalizeEthWithdrawal.selector,
             l1Receiver,
             WITHDRAW_AMOUNT,
             sender,
@@ -781,11 +781,7 @@ contract L2BaseTokenEraTest is Test {
         address receiver = address(0x1234);
         uint256 amount = 1 ether;
 
-        bytes memory expectedMessage = abi.encodePacked(
-            IMailboxLegacy.finalizeEthWithdrawal.selector,
-            receiver,
-            amount
-        );
+        bytes memory expectedMessage = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, receiver, amount);
 
         // selector (4) + address (20) + uint256 (32) = 56 bytes
         assertEq(expectedMessage.length, 56, "Basic withdrawal message should be 56 bytes");
@@ -796,7 +792,7 @@ contract L2BaseTokenEraTest is Test {
         bytes memory additionalData = "hello";
 
         bytes memory expectedMessage = abi.encodePacked(
-            IMailboxLegacy.finalizeEthWithdrawal.selector,
+            IMailboxImpl.finalizeEthWithdrawal.selector,
             l1Receiver,
             WITHDRAW_AMOUNT,
             sender,

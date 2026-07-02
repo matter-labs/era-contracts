@@ -3,24 +3,21 @@
 pragma solidity 0.8.28;
 
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
-import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
-import {IL1ERC20Bridge} from "../../bridge/interfaces/IL1ERC20Bridge.sol";
+import {NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
 import {
     AssetIdMismatch,
-    IncorrectTokenAddressFromNTV,
     InvalidNTVBurnData,
-    L2WithdrawalMessageWrongLength,
     UnsupportedEncodingVersion,
     BadTransferDataLength,
-    EmptyData
+    EmptyData,
+    L2WithdrawalMessageWrongLength
 } from "../L1ContractErrors.sol";
 import {WrongMsgLength} from "../../bridge/L1BridgeContractErrors.sol";
 import {InvalidFunctionSignature} from "../../bridge/asset-tracker/AssetTrackerErrors.sol";
 import {IAssetTrackerDataEncoding} from "../../bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 import {UnsafeBytes} from "./UnsafeBytes.sol";
 import {GatewayToL1TokenBalanceMigrationData, L1ToGatewayTokenBalanceMigrationData} from "../../common/Messaging.sol";
-import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
 
 /**
  * @author Matter Labs
@@ -156,42 +153,22 @@ library DataEncoding {
         return keccak256(abi.encode(_chainId, L2_NATIVE_TOKEN_VAULT_ADDR, _tokenAddress));
     }
 
-    /// @dev Encodes the transaction data hash using either the latest encoding standard or the legacy standard.
-    /// @param _encodingVersion EncodingVersion.
+    /// @dev Encodes the transaction data hash using the latest encoding standard.
     /// @param _originalCaller The address of the entity that initiated the deposit.
     /// @param _assetId The unique identifier of the deposited L1 token.
-    /// @param _nativeTokenVault The address of the token, only used if the encoding version is legacy.
     /// @param _transferData The encoded transfer data, which includes the deposit amount, the address of the L2 receiver, and potentially the token address.
     /// @return txDataHash The resulting encoded transaction data hash.
     function encodeTxDataHash(
-        bytes1 _encodingVersion,
         address _originalCaller,
         bytes32 _assetId,
-        address _nativeTokenVault,
         bytes memory _transferData
-    ) internal view returns (bytes32 txDataHash) {
-        if (_encodingVersion == LEGACY_ENCODING_VERSION) {
-            address tokenAddress = INativeTokenVaultBase(_nativeTokenVault).tokenAddress(_assetId);
-
-            // This is a double check to ensure that the used token for the legacy encoding is correct.
-            // This revert should never be emitted and in real life and should only serve as a guard in
-            // case of inconsistent state of Native Token Vault.
-            bytes32 expectedAssetId = encodeNTVAssetId(block.chainid, tokenAddress);
-            if (_assetId != expectedAssetId) {
-                revert IncorrectTokenAddressFromNTV(_assetId, tokenAddress);
-            }
-
-            (uint256 depositAmount, , ) = decodeBridgeBurnData(_transferData);
-            txDataHash = keccak256(abi.encode(_originalCaller, tokenAddress, depositAmount));
-        } else if (_encodingVersion == NEW_ENCODING_VERSION) {
-            // Similarly to calldata, the txDataHash is collision-resistant.
-            // In the legacy data hash, the first encoded variable was the address, which is padded with zeros during `abi.encode`.
-            txDataHash = keccak256(
-                bytes.concat(_encodingVersion, abi.encode(_originalCaller, _assetId, _transferData))
-            );
-        } else {
-            revert UnsupportedEncodingVersion();
-        }
+    ) internal pure returns (bytes32 txDataHash) {
+        // The txDataHash is collision-resistant with the removed legacy format: the legacy hash encoded an
+        // address as its first word, whose most significant bytes are always zero, so it can never collide
+        // with the `NEW_ENCODING_VERSION` (0x01) prefix used here.
+        txDataHash = keccak256(
+            bytes.concat(NEW_ENCODING_VERSION, abi.encode(_originalCaller, _assetId, _transferData))
+        );
     }
 
     /// @notice Decodes the token data by combining chain id, asset deployment tracker and asset data.
@@ -202,9 +179,7 @@ library DataEncoding {
             revert EmptyData();
         }
         bytes1 encodingVersion = _tokenData[0];
-        if (encodingVersion == LEGACY_ENCODING_VERSION) {
-            (name, symbol, decimals) = abi.decode(_tokenData, (bytes, bytes, bytes));
-        } else if (encodingVersion == NEW_ENCODING_VERSION) {
+        if (encodingVersion == NEW_ENCODING_VERSION) {
             return abi.decode(_tokenData[1:], (uint256, bytes, bytes, bytes));
         } else {
             revert UnsupportedEncodingVersion();
@@ -284,57 +259,6 @@ library DataEncoding {
         }
     }
 
-    function decodeBaseTokenFinalizeWithdrawalData(
-        bytes memory _l2ToL1message
-    ) internal pure returns (bytes4 functionSignature, address l1Receiver, uint256 amount) {
-        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
-        functionSignature = bytes4(functionSignatureUint);
-
-        // The data is expected to be at least 56 bytes long.
-        require(_l2ToL1message.length >= 56, L2WithdrawalMessageWrongLength(_l2ToL1message.length));
-        // this message is a base token withdrawal
-        (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-        // slither-disable-next-line unused-return
-        (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
-    }
-
-    function encodeL1ERC20BridgeFinalizeWithdrawalData(
-        address _l1Receiver,
-        address _l1Token,
-        uint256 _amount
-    ) internal pure returns (bytes memory) {
-        // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _l1Receiver, _l1Token, _amount);
-    }
-
-    function decodeLegacyFinalizeWithdrawalData(
-        uint256 _l1ChainId,
-        bytes memory _l2ToL1message
-    ) internal pure returns (bytes4 functionSignature, address l1Token, bytes memory transferData) {
-        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
-        functionSignature = bytes4(functionSignatureUint);
-        // Check that the message length is correct.
-        // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
-        // 76 (bytes).
-        require(_l2ToL1message.length == 76, L2WithdrawalMessageWrongLength(_l2ToL1message.length));
-        address l1Receiver;
-        uint256 amount;
-        (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-        // We use the IL1ERC20Bridge for backward compatibility with old withdrawals.
-        (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-        // slither-disable-next-line unused-return
-        (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
-
-        // We also convert the data into the new format.
-        transferData = DataEncoding.encodeBridgeMintData({
-            _originalCaller: address(0),
-            _remoteReceiver: l1Receiver,
-            _originToken: l1Token,
-            _amount: amount,
-            _erc20Metadata: DataEncoding.encodeTokenData(_l1ChainId, bytes(""), bytes(""), bytes(""))
-        });
-    }
-
     function encodeAssetRouterFinalizeDepositData(
         uint256 _messageSourceChainId,
         bytes32 _assetId,
@@ -366,6 +290,25 @@ library DataEncoding {
         (_messageSourceChainId, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset); // originChainId, not used for L2->L1 txs
         (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
         transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
+    }
+
+    /// @notice Decodes the base token withdrawal message emitted by the L2 base token system contract.
+    /// @param _l2ToL1message The L2 to L1 message to be decoded.
+    /// @return functionSignature The function signature of the message.
+    /// @return l1Receiver The address of the L1 receiver.
+    /// @return amount The amount of base token withdrawn.
+    function decodeBaseTokenFinalizeWithdrawalData(
+        bytes memory _l2ToL1message
+    ) internal pure returns (bytes4 functionSignature, address l1Receiver, uint256 amount) {
+        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
+        functionSignature = bytes4(functionSignatureUint);
+
+        // The data is expected to be at least 56 bytes long.
+        require(_l2ToL1message.length >= 56, L2WithdrawalMessageWrongLength(_l2ToL1message.length));
+        // this message is a base token withdrawal
+        (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
+        // slither-disable-next-line unused-return
+        (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
     }
 
     function decodeL1ToGatewayTokenBalanceMigrationData(
