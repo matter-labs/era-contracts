@@ -234,11 +234,15 @@ export function applyL1ToL2Alias(l1Address: string): string {
  */
 export function buildWithdrawalMerkleProof(settlementLayerChainId: number): string[] {
   if (settlementLayerChainId > 0) {
-    // New format: metadata + logLeafSibling + batchLeafProofMask + packedBatchInfo + slChainId
-    // Metadata: version=0x01, logLeafProofLen=1, batchLeafProofLen=0, finalProofNode=0
+    // New format: metadata + logLeafSibling + batchSettlementTimestamp + batchLeafProofMask +
+    // packedBatchInfo + slChainId. Metadata: version=0x01, logLeafProofLen=1, batchLeafProofLen=0,
+    // finalProofNode=0. Non-final proofs now carry the batch settlement timestamp `t` word (folded into
+    // the chain batch leaf by addChainBatchRoot) right after the log-leaf proof nodes, which
+    // getProofData() parses before batchLeafProofMask.
     return [
       "0x0101000000000000000000000000000000000000000000000000000000000000",
       ethers.constants.HashZero, // log leaf merkle sibling (dummy)
+      ethers.constants.HashZero, // batchSettlementTimestamp t = 0 (0 on ZKsync OS)
       ethers.constants.HashZero, // batchLeafProofMask = 0
       ethers.constants.HashZero, // packed(settlementLayerBatchNumber=0, batchRootMask=0)
       ethers.utils.hexZeroPad(ethers.utils.hexlify(settlementLayerChainId), 32),

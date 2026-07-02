@@ -74,12 +74,14 @@ import {
 } from "../../src/helpers/interop-helpers";
 import {
   atomicFinalityProofTuple,
+  atomicTimeoutProofTuple,
   buildInclusionProof,
   buildNonInclusionProof,
+  buildSuccessorProof,
   commitValue,
   computeFlowId,
+  DEFAULT_SL_CHAIN_ID,
   lowNullifierIndexFor,
-  proofTuple,
   reconstructChainImt,
 } from "../../src/helpers/imt-engine-lib";
 
@@ -307,15 +309,23 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
   it("happy path: atomic send -> executeAtomicBundle mints both legs and leaves source Committed", async () => {
     const user = chainA.user.address; // anvil acct #0, the depositor + recipient on both chains
     const now = Math.max(await chainNow(chainA.provider), await chainNow(chainB.provider));
-    // The deadline is an SL block number; the harness picks SL block == deadline for inclusion proofs.
+    // The deadline is an SL timestamp; the harness sets each leg's batch settlement timestamp
+    // `t == deadline` so every inclusion proof satisfies `t <= deadline`.
     const deadline = now + 3600;
 
     // ── Predict each leg's bundleHash (no state change), then derive flowId ──────────────────
     const hAB = await predictLegBundleHash(chainA, chainB, aAmount, user);
     const hBA = await predictLegBundleHash(chainB, chainA, bAmount, user);
 
-    const legHashesAsc = BigNumber.from(hAB).lt(BigNumber.from(hBA)) ? [hAB, hBA] : [hBA, hAB];
-    const chainIdsAsc = [chainA.chainId, chainB.chainId].sort((x, y) => x - y);
+    // Legs sorted by ascending bundleHash; each leg's source chain id stays positionally aligned
+    // (BIND-CHAIN): chainIdsAsc[i] is the source chain of legHashesAsc[i]. Sorting the chain ids
+    // independently would misalign them, which the source-chain binding now rejects.
+    const legs = [
+      { hash: hAB, chainId: chainA.chainId },
+      { hash: hBA, chainId: chainB.chainId },
+    ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
+    const legHashesAsc = legs.map((l) => l.hash);
+    const chainIdsAsc = legs.map((l) => l.chainId);
     const flowId = computeFlowId(legHashesAsc, chainIdsAsc, deadline);
 
     // ── PHASE 1: atomic send on each source (burn + IMT insert) ──────────────────────────────
@@ -370,13 +380,13 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       l2Tree: chainA.stack.tree,
       chainId: chainA.chainId,
       value: abValue,
-      slBlock: deadline,
+      t: deadline,
     });
     const baProof = await buildInclusionProof({
       l2Tree: chainB.stack.tree,
       chainId: chainB.chainId,
       value: baValue,
-      slBlock: deadline,
+      t: deadline,
     });
     // proofs must be in legBundleHashes (ascending) order.
     const proofsAsc = BigNumber.from(hAB).lt(BigNumber.from(hBA)) ? [abProof, baProof] : [baProof, abProof];
@@ -441,8 +451,9 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
 
   it("timeout path: one leg commits, peer never does -> authorizeRefund + claimRefund recovers depositor", async () => {
     const user = chainA.user.address;
-    // The deadline is an SL block number; the missing leg's non-inclusion proof carries a post-deadline
-    // SL block (deadline + 1). Both are arbitrary on the harness — only the deadline check is exercised.
+    // The deadline is an SL timestamp. The adjacency proof pins the missing leg absent from the last
+    // batch with `t <= deadline`, using a successor batch with `t = deadline + 1`. Both `t`s are
+    // fabricated on the harness — only the deadline/adjacency checks are exercised.
     const deadline = 1_000;
 
     const refundRecipient = chainB.user.address; // irrelevant for refund; distinct dest recipient
@@ -453,8 +464,15 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     const hAB = await predictLegBundleHash(chainA, chainB, aTimeoutAmount, refundRecipient);
     const hBA = await predictLegBundleHash(chainB, chainA, bTimeoutAmount, refundRecipient);
 
-    const legHashesAsc = BigNumber.from(hAB).lt(BigNumber.from(hBA)) ? [hAB, hBA] : [hBA, hAB];
-    const chainIdsAsc = [chainA.chainId, chainB.chainId].sort((x, y) => x - y);
+    // Legs sorted by ascending bundleHash; each leg's source chain id stays positionally aligned
+    // (BIND-CHAIN): chainIdsAsc[i] is the source chain of legHashesAsc[i]. Sorting the chain ids
+    // independently would misalign them, which the source-chain binding now rejects.
+    const legs = [
+      { hash: hAB, chainId: chainA.chainId },
+      { hash: hBA, chainId: chainB.chainId },
+    ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
+    const legHashesAsc = legs.map((l) => l.hash);
+    const chainIdsAsc = legs.map((l) => l.chainId);
     const flowId = computeFlowId(legHashesAsc, chainIdsAsc, deadline);
 
     // ── Commit only the AB leg on A. B never commits BA. ─────────────────────────────────────
@@ -475,23 +493,37 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       "AB depositor burned tokens at commit"
     );
 
-    // ── Build a single-root non-inclusion proof for the missing BA leg against B's IMT, with an
-    //    SL block strictly past the deadline. ──────────────────────────────────────────────────
+    // ── Build the adjacency timeout proof for the missing BA leg against B's IMT: absence at the last
+    //    in-time batch N (`t_N <= deadline`) pinned by the consecutive successor N+1 (`t_{N+1} > deadline`).
     const baValue = commitValue(flowId, hBA);
-    const nonIncl = await buildNonInclusionProof({
+    const absence = await buildNonInclusionProof({
       l2Tree: chainB.stack.tree,
       chainId: chainB.chainId,
       value: baValue,
-      slBlock: deadline + 1,
+      t: deadline, // t_N <= deadline
+      batchNumber: 1, // batch N
+    });
+    const successor = await buildSuccessorProof({
+      l2Tree: chainB.stack.tree,
+      chainId: chainB.chainId,
+      t: deadline + 1, // t_{N+1} > deadline
+      batchNumber: 2, // batch N+1 (consecutive)
     });
     const missingIdx = legHashesAsc[0] === hBA ? 0 : 1;
 
     // ── authorizeRefund on A (A is AB's source) -> AB becomes Revertable. ────────────────────
     const managerA = chainA.stack.manager.connect(chainA.user);
     const refundAuth = await (
-      await managerA.authorizeRefund(flowId, legHashesAsc, chainIdsAsc, deadline, missingIdx, proofTuple(nonIncl), {
-        gasLimit: DEFAULT_TX_GAS_LIMIT,
-      })
+      await managerA.authorizeRefund(
+        flowId,
+        legHashesAsc,
+        chainIdsAsc,
+        deadline,
+        DEFAULT_SL_CHAIN_ID,
+        missingIdx,
+        atomicTimeoutProofTuple(absence, successor),
+        { gasLimit: DEFAULT_TX_GAS_LIMIT }
+      )
     ).wait();
     expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Revertable, "AB revertable on A");
     expect(
