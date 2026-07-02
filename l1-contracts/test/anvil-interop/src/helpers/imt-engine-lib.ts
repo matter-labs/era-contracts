@@ -346,17 +346,24 @@ export const DEFAULT_SL_CHAIN_ID = 506;
  * Byte layout (logLeafProofLen=0, batchLeafProofLen=0 -> no path nodes, so the mask words are 0):
  *   [0] metadata header = version(0x01) << 248 | logLeafProofLen(0) | batchLeafProofLen(0) |
  *       finalProofNode(0); the low 28 bytes MUST be zero (new versioned format).
- *   [1] batchLeafProofMask = 0.
- *   [2] settlementLayerPackedBatchInfo = (slBlock << 128) | mask(0).
- *   [3] settlementLayerChainId.
+ *   [1] l1Timestamp = the settlement-layer timestamp bound into the batch leaf (read right after the
+ *       log-leaf proof). Format-only on the harness (the mock accepts any message), so a chosen value.
+ *   [2] batchLeafProofMask = 0.
+ *   [3] settlementLayerPackedBatchInfo = (slBlock << 128) | mask(0).
+ *   [4] settlementLayerChainId.
  * `messageIndex` (the leaf-proof mask) must be 0, since logLeafProofLen==0 requires index < 1.
  */
-export function buildSlProofBytes(slBlock: number, slChainId: number = DEFAULT_SL_CHAIN_ID): string[] {
+export function buildSlProofBytes(
+  slBlock: number,
+  slChainId: number = DEFAULT_SL_CHAIN_ID,
+  l1Timestamp = 0
+): string[] {
   const metadata = utils.hexZeroPad(BigNumber.from(0x01).shl(248).toHexString(), 32);
+  const l1TimestampWord = utils.hexZeroPad(BigNumber.from(l1Timestamp).toHexString(), 32);
   const batchLeafProofMask = utils.hexZeroPad("0x00", 32);
   const packedBatchInfo = utils.hexZeroPad(BigNumber.from(slBlock).shl(128).toHexString(), 32);
   const settlementLayerChainId = utils.hexZeroPad(BigNumber.from(slChainId).toHexString(), 32);
-  return [metadata, batchLeafProofMask, packedBatchInfo, settlementLayerChainId];
+  return [metadata, l1TimestampWord, batchLeafProofMask, packedBatchInfo, settlementLayerChainId];
 }
 
 /**

@@ -234,11 +234,12 @@ export function applyL1ToL2Alias(l1Address: string): string {
  */
 export function buildWithdrawalMerkleProof(settlementLayerChainId: number): string[] {
   if (settlementLayerChainId > 0) {
-    // New format: metadata + logLeafSibling + batchLeafProofMask + packedBatchInfo + slChainId
+    // New format: metadata + logLeafSibling + l1Timestamp + batchLeafProofMask + packedBatchInfo + slChainId
     // Metadata: version=0x01, logLeafProofLen=1, batchLeafProofLen=0, finalProofNode=0
     return [
       "0x0101000000000000000000000000000000000000000000000000000000000000",
       ethers.constants.HashZero, // log leaf merkle sibling (dummy)
+      ethers.constants.HashZero, // l1Timestamp (bound into the batch leaf; dummy here)
       ethers.constants.HashZero, // batchLeafProofMask = 0
       ethers.constants.HashZero, // packed(settlementLayerBatchNumber=0, batchRootMask=0)
       ethers.utils.hexZeroPad(ethers.utils.hexlify(settlementLayerChainId), 32),

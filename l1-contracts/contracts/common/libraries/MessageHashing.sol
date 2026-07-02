@@ -71,8 +71,12 @@ library MessageHashing {
     /// @dev Returns the leaf hash for a chain with batch number and batch root.
     /// @param batchRoot The root hash of the batch.
     /// @param batchNumber The number of the batch.
-    function batchLeafHash(bytes32 batchRoot, uint256 batchNumber) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber));
+    /// @param l1Timestamp The settlement-layer block timestamp at which the batch root was aggregated into
+    /// the message root (i.e. when the chain settled). Binding it into the leaf makes the timestamp
+    /// provable via the same inclusion proof: a single aggregated (multi-chain) root can prove many
+    /// chain batch roots, and each carries its own settlement timestamp.
+    function batchLeafHash(bytes32 batchRoot, uint256 batchNumber, uint256 l1Timestamp) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber, l1Timestamp));
     }
 
     /// @dev Returns the leaf hash for a chain with chain root and chain id.
@@ -163,6 +167,7 @@ library MessageHashing {
         ProofMetadata memory proofMetadata = MessageHashing.parseProofMetadata(_proof);
         result.ptr = proofMetadata.proofStartIndex;
 
+        uint256 l1BatchTimestamp;
         {
             bytes32 batchSettlementRoot = Merkle.calculateRootMemory(
                 extractSlice(_proof, result.ptr, result.ptr + proofMetadata.logLeafProofLen),
@@ -176,8 +181,14 @@ library MessageHashing {
             if (proofMetadata.finalProofNode) {
                 return result;
             }
+            // The settlement-layer block timestamp at which the batch root was aggregated. It is bound
+            // into the batch leaf below, so an inclusion proof against the aggregated root also proves
+            // this timestamp — a wrong value makes the reconstructed leaf mismatch the tree.
+            l1BatchTimestamp = uint256(_proof[result.ptr]);
+            ++result.ptr;
+
             // Now, we'll have to check that the Gateway included the message.
-            bytes32 localBatchLeafHash = MessageHashing.batchLeafHash(batchSettlementRoot, _batchNumber);
+            bytes32 localBatchLeafHash = MessageHashing.batchLeafHash(batchSettlementRoot, _batchNumber, l1BatchTimestamp);
 
             uint256 batchLeafProofMask = uint256(bytes32(_proof[result.ptr]));
             ++result.ptr;
@@ -213,6 +224,7 @@ library MessageHashing {
             batchLeafProofLen: proofMetadata.batchLeafProofLen,
             batchSettlementRoot: result.batchSettlementRoot,
             chainIdLeaf: result.chainIdLeaf,
+            l1BatchTimestamp: l1BatchTimestamp,
             ptr: result.ptr,
             finalProofNode: proofMetadata.finalProofNode
         });

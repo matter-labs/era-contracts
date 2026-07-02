@@ -335,6 +335,10 @@ struct ProofData {
     uint256 batchLeafProofLen;
     bytes32 batchSettlementRoot;
     bytes32 chainIdLeaf;
+    /// @dev Settlement-layer block timestamp at which the batch root was aggregated into the message
+    /// root (bound into the batch leaf, so it is proven by the inclusion proof). Zero for final-node
+    /// proofs, which carry no aggregation hop.
+    uint256 l1BatchTimestamp;
     uint256 ptr;
     bool finalProofNode;
 }

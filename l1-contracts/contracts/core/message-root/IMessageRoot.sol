@@ -36,7 +36,14 @@ interface IMessageRootBase is IMessageVerification {
     /// @param chainId The ID of the chain whose chain batch root is being added to the chainTree.
     /// @param batchNumber The number of the batch to which chain batch root belongs.
     /// @param chainBatchRoot The value of chain batch root which is being added.
-    event AppendedChainBatchRoot(uint256 indexed chainId, uint256 indexed batchNumber, bytes32 chainBatchRoot);
+    /// @param l1Timestamp The settlement-layer block timestamp at which the batch root was aggregated,
+    /// bound into the batch leaf so it is provable via the aggregated-root inclusion proof.
+    event AppendedChainBatchRoot(
+        uint256 indexed chainId,
+        uint256 indexed batchNumber,
+        bytes32 chainBatchRoot,
+        uint256 l1Timestamp
+    );
 
     /// @notice Emitted when a new chainTree root is produced and its corresponding leaf in sharedTree is updated.
     /// @param chainId The ID of the chain whose chainTree root is being updated.
