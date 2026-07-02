@@ -7,7 +7,7 @@ import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {AssetTrackerBase} from "contracts/bridge/asset-tracker/AssetTrackerBase.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {AssetIdAlreadyRegistered, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {AssetIdAlreadyRegistered} from "contracts/common/L1ContractErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
@@ -72,19 +72,6 @@ contract L1NativeTokenVaultTest is Test {
         assertEq(balance, 0);
     }
 
-    function test_MigrateTokenBalanceToAssetTracker_OnlyAssetTracker() external {
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        ntv.migrateTokenBalanceToAssetTracker(CHAIN_ID, ASSET_ID);
-    }
-
-    function test_MigrateTokenBalanceToAssetTracker_Success() external {
-        // Call as assetTracker should succeed
-        vm.prank(assetTracker);
-        uint256 amount = ntv.migrateTokenBalanceToAssetTracker(CHAIN_ID, ASSET_ID);
-        // Should return 0 since DEPRECATED_chainBalance is not set
-        assertEq(amount, 0);
-    }
-
     function test_SetAssetTracker_OnlyOwner() external {
         address newAssetTracker = makeAddr("newAssetTracker");
 
@@ -101,9 +88,8 @@ contract L1NativeTokenVaultTest is Test {
         vm.prank(address(0));
         ntv.setAssetTracker(newAssetTracker);
 
-        // Verify by checking the new assetTracker can call onlyAssetTracker functions
-        vm.prank(newAssetTracker);
-        ntv.migrateTokenBalanceToAssetTracker(CHAIN_ID, ASSET_ID);
+        // Verify the asset tracker was updated
+        assertEq(address(ntv.l1AssetTracker()), newAssetTracker);
     }
 
     function test_RegisterEthToken() external {

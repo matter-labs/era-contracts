@@ -157,9 +157,13 @@ export async function depositERC20ToL2(params: DepositERC20Params): Promise<Depo
     assetId = await nativeTokenVault.assetId(tokenAddress);
   }
 
-  const currentAllowance = await token.allowance(l1Wallet.address, l1Addresses.l1SharedBridge);
+  // The NativeTokenVault pulls the tokens directly via `safeTransferFrom` during
+  // `bridgehubDeposit` (see `NativeTokenVaultBase._depositFunds`), so the caller
+  // must approve the NTV — not the asset router. (Legacy removal deleted the
+  // shared-bridge token-pull path that used to require an asset-router approval.)
+  const currentAllowance = await token.allowance(l1Wallet.address, l1Addresses.l1NativeTokenVault);
   if (currentAllowance.lt(amount)) {
-    const approveTx = await token.approve(l1Addresses.l1SharedBridge, amount);
+    const approveTx = await token.approve(l1Addresses.l1NativeTokenVault, amount);
     await approveTx.wait();
   }
 

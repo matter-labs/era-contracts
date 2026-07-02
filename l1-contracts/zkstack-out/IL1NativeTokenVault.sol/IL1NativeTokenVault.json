@@ -209,30 +209,6 @@
   },
   {
     "type": "function",
-    "name": "migrateTokenBalanceToAssetTracker",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "originChainId",
     "inputs": [
       {

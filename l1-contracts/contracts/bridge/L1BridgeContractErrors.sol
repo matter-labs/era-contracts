@@ -4,8 +4,6 @@ pragma solidity ^0.8.21;
 
 // 0x066f53b1
 error EmptyToken();
-// 0x82b0de47
-error EthAlreadyMigratedToL1NTV();
 // 0x1c55230b
 error NativeTokenVaultAlreadySet();
 // 0x7ec6d3a1

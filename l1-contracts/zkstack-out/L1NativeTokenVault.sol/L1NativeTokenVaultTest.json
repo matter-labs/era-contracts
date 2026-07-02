@@ -233,20 +233,6 @@
   },
   {
     "type": "function",
-    "name": "test_MigrateTokenBalanceToAssetTracker_OnlyAssetTracker",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "test_MigrateTokenBalanceToAssetTracker_Success",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "test_RegisterEthToken",
     "inputs": [],
     "outputs": [],
