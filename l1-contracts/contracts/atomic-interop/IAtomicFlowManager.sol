@@ -25,7 +25,7 @@ import {LegState, AtomicTimeoutProof, AtomicFinalityProof} from "./IAtomicIntero
 /// `bundleHash = keccak256(abi.encode(sourceChainId, interopBundleBytes))`. `legBundleHashes` is strictly
 /// ascending (canonical order + dedup); `legSourceChainIds` is positionally aligned with it (may repeat,
 /// need not be ascending). All legs settle on one `settlementLayerChainId`, so the deadline (a settlement-
-/// layer timestamp) is comparable to each batch's settlement timestamp `t`.
+/// layer timestamp) is comparable to each batch's `l1Timestamp`.
 ///
 /// Deployed as an L2 predeploy (no constructor); wiring is done in `initialize`.
 interface IAtomicFlowManager {
@@ -43,7 +43,7 @@ interface IAtomicFlowManager {
 
     /// @notice Revert if the flow is not fully committed in time. Callable only by the {InteropHandler}.
     /// Verifies an inclusion proof for every leg against its source chain's IMT (each in a batch whose
-    /// settlement timestamp `t <= deadline`), recomputes `flowId`, ties each proof to its source chain
+    /// `l1Timestamp <= deadline`), recomputes `flowId`, ties each proof to its source chain
     /// and the flow's settlement layer, and asserts the bundle being executed is a leg of the flow.
     /// @param _executingBundleHash The bundle hash the handler is about to execute.
     /// @param _finality The flow definition and per-leg inclusion proofs.

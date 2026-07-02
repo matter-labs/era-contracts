@@ -15,7 +15,7 @@ import {CommitmentTreeNotAppender} from "./AtomicInteropErrors.sol";
 ///
 /// On every insert (and the head seed) it publishes `abi.encode(root)` to L1. Consuming chains
 /// authenticate that message against the interop root they import for the settling batch (see
-/// {AtomicInteropProof}). Deadlines are checked against the settlement timestamp `t`, which the
+/// {AtomicInteropProof}). Deadlines are checked against the batch's `l1Timestamp`, which the
 /// settlement layer assigns and which is re-derived from the batch inclusion proof, so this tree
 /// publishes only the root and no operator-set timestamp.
 ///

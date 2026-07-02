@@ -34,10 +34,10 @@ enum LegState {
 ///   1. The origin {L2InteropCommitmentTree}'s `abi.encode(chainImtRoot)` L2->L1 message (sender pinned
 ///      to the canonical commitment-tree address) is proven included, authenticating the root.
 ///   2. `leaf` at `imtLeafIndex` with `imtProof` hashes up to `chainImtRoot`.
-/// The batch settlement timestamp `t` is not a struct field, since that would be spoofable. It is parsed
-/// in-module from `messageProof` via {MessageHashing._getProofData} and is bound to the verified interop
-/// root by being folded into the chain batch leaf. The proof library then enforces the `t` vs `deadline`
-/// bound (inclusion: `t <= deadline`; timeout adjacency).
+/// The batch's `l1Timestamp` is not a struct field, since that would be spoofable. It is parsed in-module
+/// from `messageProof` via {MessageHashing._getProofData} and is bound to the verified interop root by
+/// being folded into the chain batch leaf. The proof library then enforces the `l1Timestamp` vs `deadline`
+/// bound (inclusion: `l1Timestamp <= deadline`; timeout adjacency).
 /// @dev `batchNumber` is the source chain's top-level batch number passed to the message verifier and
 /// to `_getProofData`.
 struct ImtProof {
@@ -53,7 +53,7 @@ struct ImtProof {
 }
 
 /// @notice Adjacency timeout proof: two authenticated batches pinning the missing leg as absent from the
-/// last batch with settlement timestamp `t <= deadline`. Grouping both `ImtProof`s into one struct also
+/// last batch with `l1Timestamp <= deadline`. Grouping both `ImtProof`s into one struct also
 /// keeps {AtomicFlowManager.authorizeRefund}'s stack shallow.
 /// @param absence Non-inclusion proof of the missing leg's commit value at batch `N` (`t_N <= deadline`).
 /// @param successor Root-authentication proof of the consecutive batch `N+1` (same source chain and

@@ -307,8 +307,8 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
   it("happy path: atomic send -> executeAtomicBundle mints both legs and leaves source Committed", async () => {
     const user = chainA.user.address; // anvil acct #0, the depositor + recipient on both chains
     const now = Math.max(await chainNow(chainA.provider), await chainNow(chainB.provider));
-    // The deadline is an SL timestamp; the harness sets each leg's batch settlement timestamp
-    // `t == deadline` so every inclusion proof satisfies `t <= deadline`.
+    // The deadline is an SL timestamp; the harness sets each leg's batch `l1Timestamp == deadline`
+    // so every inclusion proof satisfies `l1Timestamp <= deadline`.
     const deadline = now + 3600;
 
     // ── Predict each leg's bundleHash (no state change), then derive flowId ──────────────────

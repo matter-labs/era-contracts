@@ -11,8 +11,8 @@ import {IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
 /// Every insert publishes `abi.encode(root)` to L1 through the L2->L1 messenger; consuming chains
 /// authenticate that message against the interop root imported for the settling batch (see
 /// {AtomicInteropProof}), which is what makes the root trustworthy. The tree publishes only the root,
-/// no timestamp: the deadline is checked against the batch's settlement timestamp `t`, which is folded
-/// into the chain batch leaf and re-derived from the same inclusion proof.
+/// no timestamp: the deadline is checked against the batch's `l1Timestamp`, which is folded into the
+/// chain batch leaf and re-derived from the same inclusion proof.
 ///
 /// Deployed in L2 userspace via CREATE2, so it has no constructor — wiring is done in `initialize`.
 interface IL2InteropCommitmentTree {

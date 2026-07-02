@@ -44,9 +44,9 @@ error ProofRootMessageInclusionFailed(uint256 chainId, uint256 batchNumber);
 /// @dev The proof is a single-level commit-based proof with no settlement-layer anchor. The atomic flow
 /// needs a multi-hop proof so the deadline can be checked against `pd.settlementLayerBatchNumber`.
 error ProofMissingSettlementLayerAnchor(uint256 chainId, uint256 batchNumber);
-/// @dev The batch's settlement timestamp is newer than the deadline (inclusion / absence-batch path).
+/// @dev The batch's `l1Timestamp` is newer than the deadline (inclusion / absence-batch path).
 error ProofDeadlineExceeded(uint256 batchTimestamp, uint64 deadline);
-/// @dev The batch's settlement timestamp is not strictly after the deadline (adjacency-successor path).
+/// @dev The batch's `l1Timestamp` is not strictly after the deadline (adjacency-successor path).
 error ProofDeadlineNotExceeded(uint256 batchTimestamp, uint64 deadline);
 /// @dev The commit value is not a member of the authenticated root.
 error ProofInclusionFailed(bytes32 root, uint256 value);
@@ -62,5 +62,5 @@ error ProofSourceChainMismatch(uint256 expectedSourceChainId, uint256 proofSourc
 error ProofSettlementLayerMismatch(uint256 expectedSlChainId, uint256 proofSlChainId);
 /// @dev The timeout's adjacency witness is not the consecutive successor of the absence batch
 /// (`successorBatchNumber != absenceBatchNumber + 1`). The witness must be batch N+1 so it pins N as the
-/// last batch with settlement timestamp `t <= deadline`.
+/// last batch with `l1Timestamp <= deadline`.
 error ProofAdjacencyNotConsecutive(uint256 absenceBatchNumber, uint256 successorBatchNumber);

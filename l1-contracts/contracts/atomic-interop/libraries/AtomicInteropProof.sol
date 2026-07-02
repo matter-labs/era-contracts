@@ -60,7 +60,7 @@ library AtomicInteropProof {
     }
 
     /// @notice Verifies `_commitValue` is present in `_proof.sourceChainId`'s IMT as of an authenticated
-    /// root whose batch settled on `_expectedSlChainId` with settlement timestamp `t <= _deadline`.
+    /// root whose batch settled on `_expectedSlChainId` with `l1Timestamp <= _deadline`.
     /// @dev The proof is bound to the correct chain by `_commitValue` itself: it bakes in the
     /// chain-specific `bundleHash`, so a leg's commit value can only be inserted into its own source
     /// chain's tree, and the membership check below can only pass against that chain. The authenticated

@@ -29,10 +29,10 @@
  * {L2_MESSAGE_VERIFICATION}.proveL2MessageInclusionShared. On the harness that address hosts
  * {MockL2MessageVerification}, which always returns true, so the root check is out of harness scope.
  * The deadline is a settlement-layer timestamp: {AtomicInteropProof} re-parses the same `messageProof`
- * bytes with the real {MessageHashing._getProofData} to derive the batch settlement timestamp `t` and the
- * SL chain id, so the harness builds format-valid multi-hop proof bytes carrying a chosen `t`
- * ({buildSlProofBytes}). The IMT membership / low-nullifier layer and the `t`-vs-deadline check
- * (inclusion `t <= deadline`; timeout adjacency) are the parts actually exercised.
+ * bytes with the real {MessageHashing._getProofData} to derive the batch's `l1Timestamp` and the SL
+ * chain id, so the harness builds format-valid multi-hop proof bytes carrying a chosen `l1Timestamp`
+ * ({buildSlProofBytes}). The IMT membership / low-nullifier layer and the `l1Timestamp`-vs-deadline check
+ * (inclusion `l1Timestamp <= deadline`; timeout adjacency) are the parts actually exercised.
  */
 
 import type { providers, Wallet } from "ethers";
@@ -61,7 +61,7 @@ export interface IMTLeaf {
  * Mirror of `ImtProof` in IAtomicInterop.sol, used for both inclusion and non-inclusion. The IMT part
  * (chainImtRoot/leaf/imtLeafIndex/imtProof) is built from the engine; the message-inclusion part
  * (batchNumber/messageIndex/messageProof/messageTxNumberInBatch) authenticates the `(root)` L2->L1
- * message and, via {MessageHashing._getProofData}, carries the settlement timestamp used for the
+ * message and, via {MessageHashing._getProofData}, carries the `l1Timestamp` used for the
  * deadline check. For inclusion `leaf` is the value's own leaf; for non-inclusion it is the
  * low-nullifier (predecessor) leaf.
  */
@@ -329,7 +329,7 @@ export const DEFAULT_SL_CHAIN_ID = 506;
 
 /**
  * Builds the minimal format-valid multi-hop L2-message inclusion proof bytes that
- * {MessageHashing._getProofData} parses into a chosen batch settlement timestamp `t` and settlement-layer
+ * {MessageHashing._getProofData} parses into a chosen `l1Timestamp` and settlement-layer
  * chain id (with `finalProofNode == false`). The deadline is compared against `t`; the SL snapshot block
  * is parsed but not used for acceptance, so it is an arbitrary placeholder.
  *
@@ -357,7 +357,7 @@ export function buildSlProofBytes(
 }
 
 /**
- * Well-formed message-inclusion proof carrying a chosen batch settlement timestamp `t` and batch number.
+ * Well-formed message-inclusion proof carrying a chosen `l1Timestamp` and batch number.
  * {MockL2MessageVerification} accepts any message, but {MessageHashing._getProofData} parses these bytes
  * to derive `t` and the SL chain id, which {AtomicInteropProof} compares against the deadline (inclusion:
  * `t <= deadline`; timeout adjacency: absence `t_N <= deadline`, successor `t_{N+1} > deadline`).
@@ -384,7 +384,7 @@ function messageProofForBatch(params: {
 
 /**
  * Build an inclusion {ImtProof} for `value` against `chainId`'s live IMT (`leaf` is the value's own leaf),
- * carrying settlement timestamp `t` (must be `<= deadline` for `requireFlowFinalized` to accept).
+ * carrying `l1Timestamp` (must be `<= deadline` for `requireFlowFinalized` to accept).
  */
 export async function buildInclusionProof(params: {
   l2Tree: Contract;
@@ -418,7 +418,7 @@ export async function buildInclusionProof(params: {
 /**
  * Build the absence {ImtProof} of the timeout adjacency pair: proves `value` is absent from `chainId`'s
  * live IMT (`leaf` is the low-nullifier / predecessor leaf), in the last in-time batch `N` whose
- * settlement timestamp `t` is `<= deadline`.
+ * `l1Timestamp` is `<= deadline`.
  */
 export async function buildNonInclusionProof(params: {
   l2Tree: Contract;
@@ -450,7 +450,7 @@ export async function buildNonInclusionProof(params: {
 
 /**
  * Build the successor {ImtProof} of the timeout adjacency pair: the consecutive batch `N+1`, same source
- * chain and settlement layer, with settlement timestamp `t > deadline`. Its only job is to pin `N` as the
+ * chain and settlement layer, with `l1Timestamp > deadline`. Its only job is to pin `N` as the
  * last in-time batch — {AtomicInteropProof.verifyTimeoutAdjacency} authenticates its root and reads
  * `t`/slChainId but does not check IMT membership, so the membership fields are placeholders (the current
  * head leaf and its path).

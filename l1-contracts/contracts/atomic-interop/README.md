@@ -38,8 +38,8 @@ bundle, so `bundleHash` does not depend on `flowId` (which would be circular).
 3. **Finalize** (destination). `InteropHandler.executeAtomicBundle(bundle, finalityProof)` calls
    `AtomicFlowManager.requireFlowFinalized`, which for **every** leg verifies an IMT **inclusion** proof
    (`AtomicInteropProof.verifyInclusion`): the leg's `commitValue` is present in its source chain's IMT
-   as of an authenticated interop root whose batch settled by the deadline (settlement timestamp
-   `t <= deadline`) on the flow's `settlementLayerChainId`, and the proof's `sourceChainId` matches the
+   as of an authenticated interop root whose batch settled by the deadline (`l1Timestamp <= deadline`)
+   on the flow's `settlementLayerChainId`, and the proof's `sourceChainId` matches the
    leg's declared `legSourceChainIds[i]`. If all legs are proven committed in time, the bundle's calls
    execute (the destination mint). A `commitValue` can only exist in its true source chain's tree, so
    inclusion is self-binding; non-inclusion is not, which is why the source chain is checked explicitly.

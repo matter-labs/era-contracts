@@ -40,9 +40,9 @@ import {
 /// Timeout: {authorizeRefund} + {claimRefund} return the burned source funds to the depositor by asking
 /// each call target to reverse itself via {IAtomicRecoverable.recoverAtomicCall}.
 ///
-/// No double-spend: executing a bundle requires every leg present in a batch whose settlement timestamp
-/// `t <= deadline`, while a refund requires some leg absent from the last such batch (pinned by the next
-/// batch with `t > deadline`). Since the per-chain trees are append-only and `t` is monotone, both cannot
+/// No double-spend: executing a bundle requires every leg present in a batch whose `l1Timestamp <=
+/// deadline`, while a refund requires some leg absent from the last such batch (pinned by the next batch
+/// with `l1Timestamp > deadline`). Since the per-chain trees are append-only and `l1Timestamp` is monotone, both cannot
 /// hold — but only when both proofs are checked against the leg's own source chain on the same settlement
 /// layer. Both bindings are committed in `flowId`. Without the source-chain binding a leg's commit value
 /// is trivially absent from any other chain's tree, re-opening a cross-chain force-refund double-mint.
