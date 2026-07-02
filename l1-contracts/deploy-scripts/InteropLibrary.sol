@@ -127,10 +127,11 @@ library InteropLibrary {
     ///                             there is intentionally no salt-less overload — callers cannot create a bundle without
     ///                             consciously choosing a salt. Provide a random value: it keeps the bundle hash
     ///                             unpredictable and thus preserves the bundle's privacy. Each salt must be unique per
-    ///                             sender (enforced by InteropCenter), so a sender that sends several otherwise-identical
-    ///                             bundles must pass a distinct salt for each. `bytes32(0)` is allowed but discouraged:
-    ///                             because used salts must be unique per sender, a sender can use `bytes32(0)` at most
-    ///                             once (when passed, the salt attribute is simply omitted).
+    ///                             sender (enforced by InteropCenter): a sender must pass a distinct salt for every
+    ///                             bundle it sends, regardless of whether the bundle contents differ — reusing a salt
+    ///                             reverts. `bytes32(0)` is allowed but discouraged: because used salts must be unique
+    ///                             per sender, a sender can use `bytes32(0)` at most once (when passed, the salt
+    ///                             attribute is simply omitted).
     function buildBundleAttributes(
         address executionAddress,
         address unbundlerAddress,

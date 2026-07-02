@@ -27,7 +27,8 @@ interface IERC7786Attributes {
     /// @param _salt Arbitrary 32-byte salt chosen by the sender.
     /// @dev The salt is mixed with `msg.sender` to derive the bundle's `interopBundleSalt`, which guarantees a unique
     ///      bundle hash. Senders should provide a random salt: it keeps the bundle hash unpredictable and thus preserves
-    ///      the bundle's privacy. A sender that wants to send two otherwise identical bundles MUST provide distinct salts.
+    ///      the bundle's privacy. Each salt must be unique per sender: a sender MUST provide a distinct salt for every
+    ///      bundle it sends, regardless of the bundle contents.
     /// @dev Omitting this attribute (or passing `bytes32(0)`) is allowed but discouraged: since each salt must be unique
     ///      per sender, a sender can send at most one bundle without a distinct, non-zero salt.
     function interopBundleSalt(bytes32 _salt) external pure;

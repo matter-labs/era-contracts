@@ -117,8 +117,8 @@ contract InteropCenter is
     /// @notice Tracks which salts a given sender has already used for an interop bundle.
     /// @dev Used to guarantee that each bundle has a unique hash: the bundle hash commits to `interopBundleSalt`,
     ///      which is derived from `msg.sender` and the user-provided salt. Enforcing that each (sender, salt) pair is
-    ///      used at most once therefore makes every emitted bundle hash unique. A sender that wants to send two
-    ///      otherwise identical bundles must provide a fresh salt; otherwise `_sendBundle` reverts with
+    ///      used at most once therefore makes every emitted bundle hash unique. A sender must provide a distinct salt
+    ///      for every bundle it sends, regardless of the bundle contents; reusing a salt makes `_sendBundle` revert with
     ///      `InteropBundleSaltAlreadyUsed`.
     mapping(address user => mapping(bytes32 salt => bool hasBeenUsed)) public isInteropBundleSaltUsed;
 

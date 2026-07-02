@@ -213,10 +213,12 @@ struct CallAttributes {
 ///                    (paid via ERC20 transfer), while useFixedFee=false accepts native ZK via msg.value. This is intentional behavior.
 ///                    IMPORTANT: useFixedFee=true requires ZK token to be bridged to the source chain. If ZK token is not yet available
 ///                    in the chain's NativeTokenVault, the transaction will revert with ZKTokenNotAvailable().
-/// @param salt User-provided salt used to derive the `interopBundleSalt` of the resulting `InteropBundle`.
-///             It defaults to `bytes32(0)` when the `interopBundleSalt` ERC-7786 attribute is not supplied.
-///             The final `interopBundleSalt` is `keccak256(abi.encodePacked(msg.sender, salt))`, so a sender that sends two
-///             otherwise identical bundles MUST provide distinct salts to avoid producing the same bundle hash.
+/// @param salt User-provided salt used to derive the `interopBundleSalt` of the resulting `InteropBundle`. Provide a
+///             random salt: it keeps the bundle hash unpredictable and thus preserves the bundle's privacy. The final
+///             `interopBundleSalt` is `keccak256(abi.encodePacked(msg.sender, salt))`, and each salt must be unique per
+///             sender: a sender MUST provide a distinct salt for every bundle it sends, regardless of the bundle
+///             contents. Passing `bytes32(0)` (or omitting the `interopBundleSalt` ERC-7786 attribute) is allowed but
+///             discouraged — since salts must be unique per sender, `bytes32(0)` can be used at most once per sender.
 struct BundleAttributes {
     bytes executionAddress;
     bytes unbundlerAddress;
@@ -260,8 +262,8 @@ enum CallStatus {
 ///                          It's equal to the keccak256(abi.encodePacked(senderOfTheBundle, userProvidedSalt)), where
 ///                          `userProvidedSalt` is supplied by the sender via the `interopBundleSalt` ERC-7786 bundle attribute.
 ///                          Mixing in the sender ensures bundles from different senders can never collide, while letting the
-///                          sender freely control uniqueness of their own bundles (e.g. to retry an identical bundle, a sender
-///                          must provide a fresh salt).
+///                          sender control uniqueness of their own bundles. Each salt must be unique per sender: a sender
+///                          must provide a distinct salt for every bundle it sends, regardless of the bundle contents.
 /// @param calls Array of InteropCall structs to execute.
 /// @param bundleAttributes Bundle execution and unbundling attributes.
 struct InteropBundle {

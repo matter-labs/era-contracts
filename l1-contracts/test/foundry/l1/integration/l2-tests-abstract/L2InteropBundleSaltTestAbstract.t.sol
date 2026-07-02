@@ -133,8 +133,8 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
     }
 
     /// @notice The contract records each (sender, salt) pair and rejects a reused salt, guaranteeing unique bundle hashes.
-    /// @dev Unlike the removed auto-incrementing nonce, the sender must now provide a fresh salt to re-send an otherwise
-    ///      identical bundle. Reusing the salt reverts with `InteropBundleSaltAlreadyUsed`.
+    /// @dev Unlike the removed auto-incrementing nonce, the sender must now provide a fresh salt for every bundle;
+    ///      reusing a salt reverts with `InteropBundleSaltAlreadyUsed`, even when the new bundle's content differs.
     function test_sendBundle_revertsWhenSaltReused() public {
         _setupGatewayMode();
         address sender = makeAddr("saltSender");
@@ -151,25 +151,7 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
         l2InteropCenter.sendBundle{value: 0}(InteroperableAddress.formatEvmV1(destinationChainId), calls, attrs);
     }
 
-    /// @notice The salt-usage guard is keyed per-sender: the `isInteropBundleSaltUsed` mapping records the same salt
-    ///         value independently for each sender, so one sender using a salt never blocks another from using it.
-    /// @dev Complements {test_sendBundle_differentSendersSameSaltProduceDifferentInteropSalts}: that test checks the
-    ///      derived on-chain `interopBundleSalt` (and thus the bundle hash) differs across senders, whereas this test
-    ///      checks the separate replay-protection bookkeeping mapping is scoped per sender.
-    function test_sendBundle_saltIsTrackedPerSender() public {
-        _setupGatewayMode();
-        address senderA = makeAddr("senderA");
-        address senderB = makeAddr("senderB");
-        bytes32 userSalt = keccak256("shared-salt");
-
-        _sendAndDecodeBundle(senderA, _buildBundleAttributesWithSalt(userSalt, true));
-        _sendAndDecodeBundle(senderB, _buildBundleAttributesWithSalt(userSalt, true));
-
-        assertTrue(l2InteropCenter.isInteropBundleSaltUsed(senderA, userSalt));
-        assertTrue(l2InteropCenter.isInteropBundleSaltUsed(senderB, userSalt));
-    }
-
-    /// @notice The same sender can re-send an otherwise identical bundle as long as it provides a fresh salt.
+    /// @notice The same sender can send another bundle (even an identical one) as long as it provides a fresh salt.
     function test_sendBundle_freshSaltAllowsResend() public {
         _setupGatewayMode();
         address sender = makeAddr("saltSender");
@@ -182,11 +164,12 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
         assertTrue(l2InteropCenter.isInteropBundleSaltUsed(sender, keccak256("salt-2")));
     }
 
-    /// @notice Different senders supplying the same user salt still produce distinct `interopBundleSalt` values.
-    /// @dev This is the cross-sender collision protection provided by mixing in `msg.sender`. Distinct from
-    ///      {test_sendBundle_saltIsTrackedPerSender}, which covers the per-sender replay-protection mapping rather than
-    ///      the derived salt value itself.
-    function test_sendBundle_differentSendersSameSaltProduceDifferentInteropSalts() public {
+    /// @notice The salt is scoped per-sender in two complementary ways when two different senders use the same salt:
+    ///         (1) the derived on-chain `interopBundleSalt` (and thus the bundle hash) differs across senders — the
+    ///         cross-sender collision protection from mixing in `msg.sender`; and (2) the `isInteropBundleSaltUsed`
+    ///         replay-protection mapping records the salt independently per sender, so one sender using a salt never
+    ///         blocks another from using the same value.
+    function test_sendBundle_sameSaltIsIsolatedPerSender() public {
         _setupGatewayMode();
         address senderA = makeAddr("senderA");
         address senderB = makeAddr("senderB");
@@ -201,12 +184,17 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
             _buildBundleAttributesWithSalt(userSalt, true)
         );
 
+        // (1) Derived interopBundleSalt differs across senders even though the user salt is identical.
         assertTrue(
             bundleA.interopBundleSalt != bundleB.interopBundleSalt,
             "different senders must derive different interopBundleSalt even with the same user salt"
         );
         assertEq(bundleA.interopBundleSalt, _expectedSalt(senderA, userSalt));
         assertEq(bundleB.interopBundleSalt, _expectedSalt(senderB, userSalt));
+
+        // (2) The replay-protection mapping is keyed per (sender, salt): both senders recorded the same salt value.
+        assertTrue(l2InteropCenter.isInteropBundleSaltUsed(senderA, userSalt));
+        assertTrue(l2InteropCenter.isInteropBundleSaltUsed(senderB, userSalt));
     }
 
     /*//////////////////////////////////////////////////////////////
