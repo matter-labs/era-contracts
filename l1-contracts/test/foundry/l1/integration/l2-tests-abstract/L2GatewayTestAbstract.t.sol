@@ -12,6 +12,7 @@ import {
     L2_ASSET_ROUTER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_INTEROP_CENTER_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
@@ -40,6 +41,9 @@ import {BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrack
 import {BalanceChange} from "contracts/common/Messaging.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {AssetIdMismatch} from "contracts/common/L1ContractErrors.sol";
+
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {InteropWithdrawalEncoding} from "deploy-scripts/utils/InteropWithdrawalEncoding.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
@@ -163,11 +167,78 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         vm.stopPrank();
     }
 
-    // TODO(interop-withdrawal): re-wire via InteropCenter.
-    // The L2->L1 withdrawal path used to go through `l2AssetRouter.withdraw(...)`, which has been
-    // removed. Once the InteropCenter withdrawal path is wired for tests, this test should be
-    // restored to exercise the chain-migration withdrawal (MigrationStarted event, migrationNumber
-    // increment, and preserved chain registration).
+    function test_withdrawFromGateway() public {
+        finalizeDeposit();
+
+        // Verify chain is registered before withdrawal
+        address diamondProxyBefore = l2Bridgehub.getZKChain(mintChainId);
+        assertTrue(diamondProxyBefore != address(0), "Diamond proxy should exist before withdrawal");
+
+        clearPriorityQueue(address(coreAddresses.bridgehub.proxies.bridgehub), mintChainId);
+        _pauseDeposits(mintChainId);
+        address newAdmin = makeAddr("newAdmin");
+        BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
+            chainId: mintChainId,
+            ctmData: abi.encode(newAdmin, config.contracts.diamondCutData),
+            chainData: abi.encode(chainTypeManager.protocolVersion())
+        });
+
+        // Snapshot migrationNumber so the post-call assert can verify it advances by exactly one.
+        uint256 migrationNumberBefore = IChainAssetHandlerBase(L2_CHAIN_ASSET_HANDLER_ADDR).migrationNumber(
+            mintChainId
+        );
+
+        vm.mockCall(
+            address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+            abi.encode(bytes32(uint256(1)))
+        );
+
+        // The CTM-asset chain-migration withdrawal now goes through the InteropCenter as an L2->L1
+        // withdrawal bundle: a single indirect call to the L2 AssetRouter destined for L1. The
+        // indirect call runs L2AssetRouter.initiateIndirectCall, whose burn is routed to the CTM
+        // asset handler (the chain-asset-handler), which starts the migration. The transferData for a
+        // CTM asset is the ABI-encoded BridgehubBurnCTMAssetData. The bundle sender (ownerWallet) is
+        // the chain admin whose authorization the migration burn checks.
+        vm.recordLogs();
+        vm.prank(ownerWallet);
+        l2InteropCenter.sendBundle(
+            InteroperableAddress.formatEvmV1(L1_CHAIN_ID),
+            InteropWithdrawalEncoding.withdrawalCallStarters(ctmAssetId, abi.encode(data)),
+            new bytes[](0)
+        );
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        // Verify the InteropCenter emitted the bundle for the withdrawal (the new L2->L1 withdrawal
+        // signal, replacing the removed WithdrawalInitiatedAssetRouter event). The InteropBundle
+        // tuple is (bytes1,uint256,uint256,bytes32,bytes32,InteropCall[],BundleAttributes), where
+        // InteropCall is (bytes1,bool,address,address,uint256,bytes) and BundleAttributes is
+        // (bytes,bytes,bool).
+        logs.requireOneFrom(
+            "InteropBundleSent(bytes32,bytes32,(bytes1,uint256,uint256,bytes32,bytes32,(bytes1,bool,address,address,uint256,bytes)[],(bytes,bytes,bool)))",
+            L2_INTEROP_CENTER_ADDR
+        );
+
+        // Verify the chain-asset-handler MigrationStarted event. 3 indexed params
+        // (chainId, assetId, settlementLayerChainId); migrationNumber lives in the data field.
+        Vm.Log memory migrationLog = logs.requireOneFrom(
+            "MigrationStarted(uint256,uint256,bytes32,uint256)",
+            L2_CHAIN_ASSET_HANDLER_ADDR
+        );
+        assertEq(uint256(migrationLog.topics[1]), mintChainId, "MigrationStarted: chainId mismatch");
+        assertEq(migrationLog.topics[2], ctmAssetId, "MigrationStarted: assetId mismatch");
+
+        // Verify migrationNumber on the chain-asset-handler advanced by exactly one.
+        uint256 migrationNumberAfter = IChainAssetHandlerBase(L2_CHAIN_ASSET_HANDLER_ADDR).migrationNumber(mintChainId);
+        assertEq(migrationNumberAfter, migrationNumberBefore + 1, "migrationNumber must increment by 1");
+
+        // Verify the chain registration is preserved on this settlement layer until the migration is finalized elsewhere.
+        assertEq(
+            l2Bridgehub.getZKChain(mintChainId),
+            diamondProxyBefore,
+            "Chain registration must be unchanged after withdraw"
+        );
+    }
 
     function test_finalizeDepositWithRealChainData() public {
         // This test verifies that finalizeDeposit works with explicitly encoded data
