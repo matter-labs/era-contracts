@@ -19,7 +19,6 @@ import {
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {InteropWithdrawalEncoding} from "../utils/InteropWithdrawalEncoding.sol";
 
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
@@ -155,7 +154,7 @@ contract DeployZKScript is Script {
         // slither-disable-next-line unused-return
         IInteropCenter(L2_INTEROP_CENTER_ADDR).sendBundle(
             InteroperableAddress.formatEvmV1(l1ChainId),
-            InteropWithdrawalEncoding.withdrawalCallStarters(zkTokenAssetId, zkTransferData),
+            DataEncoding.encodeInteropWithdrawalCallStarters(zkTokenAssetId, zkTransferData),
             new bytes[](0)
         );
         uint256 deployerBalanceAfterWithdraw = zkToken.balanceOf(deployer);

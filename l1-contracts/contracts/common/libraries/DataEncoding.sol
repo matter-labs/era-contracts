@@ -5,6 +5,8 @@ pragma solidity 0.8.28;
 import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_ROUTER_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
 import {NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
+import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
+import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 import {
     AssetIdMismatch,
     InvalidNTVBurnData,
@@ -27,7 +29,8 @@ import {
     GatewayToL1TokenBalanceMigrationData,
     L1ToGatewayTokenBalanceMigrationData,
     InteropBundle,
-    InteropCall
+    InteropCall,
+    InteropCallStarter
 } from "../../common/Messaging.sol";
 
 /**
@@ -301,6 +304,31 @@ library DataEncoding {
         (_messageSourceChainId, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset); // originChainId, not used for L2->L1 txs
         (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
         transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
+    }
+
+    /// @notice Builds the single indirect-call `InteropCallStarter` for an L2->L1 asset withdrawal.
+    /// @dev This is the encode counterpart of {parseInteropWithdrawalBundle}: an L2->L1 withdrawal is a
+    /// single-call interop bundle whose one call is an indirect call to the L2 AssetRouter carrying the
+    /// bridgehub-deposit payload for the withdrawn asset. Callers pass the resulting array to
+    /// `InteropCenter.sendBundle` (directly, or ABI-encoded for an admin L1->L2 transaction). No value
+    /// rides the bundle (`indirectCall` and `interopCallValue` are both zero); the withdrawn amount is
+    /// carried inside `_transferData`.
+    /// @param _assetId The asset being withdrawn (ERC20 assetId, base-token assetId, or CTM assetId).
+    /// @param _transferData The bridgehub-burn/transfer data for the asset.
+    function encodeInteropWithdrawalCallStarters(
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) internal pure returns (InteropCallStarter[] memory callStarters) {
+        bytes[] memory callAttributes = new bytes[](2);
+        callAttributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
+        callAttributes[1] = abi.encodeCall(IERC7786Attributes.interopCallValue, (0));
+
+        callStarters = new InteropCallStarter[](1);
+        callStarters[0] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(L2_ASSET_ROUTER_ADDR),
+            data: encodeAssetRouterBridgehubDepositData(_assetId, _transferData),
+            callAttributes: callAttributes
+        });
     }
 
     /// @notice Parses an interop-routed withdrawal: a single-call `InteropBundle` destined for this L1.

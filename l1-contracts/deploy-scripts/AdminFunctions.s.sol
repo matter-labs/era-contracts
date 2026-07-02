@@ -39,7 +39,9 @@ import {BridgehubBurnCTMAssetData, IBridgehubBase} from "contracts/core/bridgehu
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {InteropWithdrawalEncoding} from "./utils/InteropWithdrawalEncoding.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -1229,10 +1231,13 @@ contract AdminFunctions is Script, IAdminFunctions {
         // single-call bundle to the L1 asset router (the unified path that replaced L2AssetRouter.withdraw).
         // The admin L1->L2 transaction runs on the gateway and targets its InteropCenter; the bundle is
         // destined for L1 (this script runs on L1, so `block.chainid` is the L1 chain id).
-        bytes memory l2Calldata = InteropWithdrawalEncoding.encodeWithdrawalToL1Call(
-            block.chainid,
-            ctmAssetId,
-            bridgehubBurnData
+        bytes memory l2Calldata = abi.encodeCall(
+            IInteropCenter.sendBundle,
+            (
+                InteroperableAddress.formatEvmV1(block.chainid),
+                DataEncoding.encodeInteropWithdrawalCallStarters(ctmAssetId, bridgehubBurnData),
+                new bytes[](0)
+            )
         );
 
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(

@@ -30,7 +30,6 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
-import {InteropWithdrawalEncoding} from "deploy-scripts/utils/InteropWithdrawalEncoding.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
@@ -123,7 +122,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         // attributes are needed (the protocol fee defaults to 0, so msg.value stays 0).
         l2InteropCenter.sendBundle(
             InteroperableAddress.formatEvmV1(L1_CHAIN_ID),
-            InteropWithdrawalEncoding.withdrawalCallStarters(
+            DataEncoding.encodeInteropWithdrawalCallStarters(
                 assetId,
                 DataEncoding.encodeBridgeBurnData(mintAmount, address(1), address(l2NativeToken))
             ),

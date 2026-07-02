@@ -43,7 +43,7 @@ import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainA
 import {AssetIdMismatch} from "contracts/common/L1ContractErrors.sol";
 
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
-import {InteropWithdrawalEncoding} from "deploy-scripts/utils/InteropWithdrawalEncoding.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
@@ -204,7 +204,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         vm.prank(ownerWallet);
         l2InteropCenter.sendBundle(
             InteroperableAddress.formatEvmV1(L1_CHAIN_ID),
-            InteropWithdrawalEncoding.withdrawalCallStarters(ctmAssetId, abi.encode(data)),
+            DataEncoding.encodeInteropWithdrawalCallStarters(ctmAssetId, abi.encode(data)),
             new bytes[](0)
         );
         Vm.Log[] memory logs = vm.getRecordedLogs();

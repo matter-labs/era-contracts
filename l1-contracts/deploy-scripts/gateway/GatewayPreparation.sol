@@ -21,7 +21,8 @@ import {
     L2_ASSET_ROUTER_ADDR,
     L2_INTEROP_CENTER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {InteropWithdrawalEncoding} from "../utils/InteropWithdrawalEncoding.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {L2_BRIDGEHUB_ADDRESS, Utils} from "../utils/Utils.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -465,10 +466,13 @@ contract GatewayPreparation is Script {
             // Route the CTM asset withdrawal from the gateway back to L1 through the InteropCenter as a
             // single-call bundle to the L1 asset router (the unified path that replaced
             // L2AssetRouter.withdraw). The gateway-side ChainAdmin multicall invokes the InteropCenter.
-            bytes memory data = InteropWithdrawalEncoding.encodeWithdrawalToL1Call(
-                l1ChainId,
-                ctmAssetId,
-                bridgehubBurnData
+            bytes memory data = abi.encodeCall(
+                IInteropCenter.sendBundle,
+                (
+                    InteroperableAddress.formatEvmV1(l1ChainId),
+                    DataEncoding.encodeInteropWithdrawalCallStarters(ctmAssetId, bridgehubBurnData),
+                    new bytes[](0)
+                )
             );
 
             Call[] memory calls = new Call[](1);
