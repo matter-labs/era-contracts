@@ -4,15 +4,15 @@ pragma solidity ^0.8.21;
 import {LegState} from "./IAtomicInterop.sol";
 
 // ── L2InteropCommitmentTree errors ───────────────────────────────────────────────────
-// Value / low-nullifier validation lives in {IndexedMerkleTree} and raises its own `IMT*` errors;
-// only the appender access-control error remains here.
-/// @dev `insert` is restricted to the {AtomicFlowManager}.
+// Value / low-nullifier validation now lives in {IndexedMerkleTree} and surfaces
+// its own `IMT*` errors; only the shell's appender ACL error remains here.
+/// @dev `insert` is restricted to the canonical {AtomicFlowManager}.
 error CommitmentTreeNotAppender(address sender);
 
 // ── AtomicFlowManager errors ─────────────────────────────────────────────────────────
-/// @dev `append` is restricted to the {InteropCenter}.
+/// @dev `append` is restricted to the canonical {InteropCenter}.
 error ManagerNotInteropCenter(address sender);
-/// @dev `requireFlowFinalized` is restricted to the {InteropHandler}.
+/// @dev `requireFlowFinalized` is restricted to the canonical {InteropHandler}.
 error ManagerNotInteropHandler(address sender);
 /// @dev A `(flowId, bundleHash)` source leg was already committed on this chain.
 error ManagerLegAlreadyCommitted(bytes32 flowId, bytes32 bundleHash);
@@ -41,8 +41,9 @@ error ManagerCallNotRecovered(bytes32 flowId, bytes32 bundleHash, uint256 callIn
 /// @dev The commitment tree's `(root)` message could not be proven against the imported interop root
 /// for `(chainId, batchNumber)`.
 error ProofRootMessageInclusionFailed(uint256 chainId, uint256 batchNumber);
-/// @dev The proof is a single-level commit-based proof with no settlement-layer anchor. The atomic flow
-/// needs a multi-hop proof so the deadline can be checked against `pd.settlementLayerBatchNumber`.
+/// @dev The proof is a single-level / commit-based (final-node) proof, which carries no settlement-layer
+/// block anchor. The atomic flow requires a multi-hop / SL-global proof so the deadline can be checked
+/// against `pd.settlementLayerBatchNumber`.
 error ProofMissingSettlementLayerAnchor(uint256 chainId, uint256 batchNumber);
 /// @dev The batch's `l1Timestamp` is newer than the deadline (inclusion / absence-batch path).
 error ProofDeadlineExceeded(uint256 batchTimestamp, uint64 deadline);

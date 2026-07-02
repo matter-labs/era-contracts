@@ -30,15 +30,15 @@ import {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice See {IAtomicFlowManager}. Coordinator for the L1-free atomic interop flow; it never holds funds.
+/// @notice See {IAtomicFlowManager}. Fund-touchless coordinator for the L1-free atomic interop flow.
 ///
-/// Send: {InteropCenter.sendBundle} burns via the normal `initiateIndirectCall` path, then — when the
-/// bundle carries the `atomicBundle` attribute — calls {append} instead of publishing to L1. `append`
-/// records the leg's commit value in this chain's {L2InteropCommitmentTree}.
-/// Receive: {InteropHandler.executeAtomicBundle} calls {requireFlowFinalized} in place of the L1-message
-/// inclusion proof, then executes the bundle (and owns the replay guard).
-/// Timeout: {authorizeRefund} + {claimRefund} return the burned source funds to the depositor by asking
-/// each call target to reverse itself via {IAtomicRecoverable.recoverAtomicCall}.
+/// Send: {InteropCenter.sendBundle} burns through the normal `initiateIndirectCall` path, then — when
+/// the bundle carries the `atomicBundle` attribute — calls {append} instead of publishing the bundle
+/// to L1; `append` records the leg's commit value in this chain's {L2InteropCommitmentTree}.
+/// Receive: {InteropHandler.executeAtomicBundle} calls {requireFlowFinalized} (the atomicity gate) in
+/// place of the L1-message inclusion proof, then executes the bundle (and owns the replay guard).
+/// Timeout: {authorizeRefund} + {claimRefund} recover the burned source funds to the depositor by
+/// asking each of the bundle's call targets to reverse itself via {IAtomicRecoverable.recoverAtomicCall}.
 ///
 /// No double-spend: executing a bundle requires every leg present in a batch whose `l1Timestamp <=
 /// deadline`, while a refund requires some leg absent from the last such batch (pinned by the next batch
@@ -47,9 +47,9 @@ import {
 /// layer. Both bindings are committed in `flowId`. Without the source-chain binding a leg's commit value
 /// is trivially absent from any other chain's tree, re-opening a cross-chain force-refund double-mint.
 contract AtomicFlowManager is IAtomicFlowManager {
-    /// @dev (flowId, bundleHash) => source-leg state on this chain. The commitment tree, interop center
-    /// and interop handler are genesis-deployed built-ins at fixed addresses, so they are constants
-    /// rather than stored/initialized.
+    /// @dev (flowId, bundleHash) => source-leg state on this chain. All collaborators
+    /// (commitment tree, interop center, interop handler) are genesis-deployed built-ins
+    /// at canonical fixed addresses, so they are referenced as constants rather than stored/initialized.
     mapping(bytes32 flowId => mapping(bytes32 bundleHash => LegState)) internal _state;
 
     modifier onlyInteropCenter() {

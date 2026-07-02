@@ -95,20 +95,21 @@ enum LegState {
 }
 
 /**
- * Handles to the atomic-interop built-ins on one L2 chain. These are predeployed in genesis and the
- * commitment tree's IMT is seeded by the harness's v31 genesis upgrade, so we just bind contract
- * objects to their canonical addresses — no install/seed step needed.
+ * Handles to the atomic-interop built-ins on one L2 chain. These contracts are predeployed into the
+ * ZKsync OS genesis (see `src/core/predeploys.ts`) and the {L2InteropCommitmentTree}'s IMT is seeded
+ * by the harness's relayed v31 genesis upgrade (`_initializeV31Contracts` -> `tree.initialize()`), so
+ * no install/seed step is needed here — we just bind contract objects to their canonical addresses.
  */
 type AtomicStack = {
   chainId: number;
   provider: ethers.providers.JsonRpcProvider;
-  /** L2InteropCommitmentTree at 0x10012. */
+  /** {L2InteropCommitmentTree} at the canonical 0x10012. */
   tree: Contract;
-  /** AtomicFlowManager at 0x10014. */
+  /** {AtomicFlowManager} at the canonical 0x10014. */
   manager: Contract;
-  /** InteropCenter at 0x1000d (atomic SEND entry point). */
+  /** {InteropCenter} at the canonical 0x1000d (the atomic SEND entry point). */
   interopCenter: Contract;
-  /** InteropHandler at 0x1000e (atomic RECEIVE entry point). */
+  /** {InteropHandler} at the canonical 0x1000e (the atomic RECEIVE entry point). */
   interopHandler: Contract;
 };
 
@@ -226,8 +227,8 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
         const tokenAddress = state.testTokens![chainId];
         if (!tokenAddress) throw new Error(`No test token registered for chain ${chainId}`);
         const testToken = new Contract(tokenAddress, getAbi("TestnetERC20Token"), user);
-        // Built-ins are predeployed in genesis and the tree is genesis-seeded (leafCount=1), so just
-        // bind handles to their canonical addresses.
+        // Atomic-interop built-ins are predeployed in genesis and the tree is genesis-seeded
+        // (leafCount=1), so just bind handles to their canonical addresses — no install/initialize.
         const stack = atomicStack(chainId, provider, user);
         return { chainId, rpcUrl, provider, user, testToken, stack };
       })
@@ -397,9 +398,10 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     });
 
     // ── PHASE 3: execute each destination leg via executeAtomicBundle ─────────────────────────
-    // Snapshot recipient shim balances before execute. The coverage harness shares one chain set
-    // across specs, so `user` may already hold these shims; assert the delta this swap credits, not
-    // the absolute balance (the source-side checks above are delta-based for the same reason).
+    // Snapshot the recipient shim balances BEFORE execute. The coverage harness runs every spec on
+    // one shared chain set, so `user` may already hold these bridged shims from earlier specs — so we
+    // assert the DELTA credited by this swap, not the absolute balance (the source-side checks above
+    // are delta-based for the same reason).
     const abAssetId = ntvAssetId(chainA.chainId, chainA.testToken.address);
     const baAssetId = ntvAssetId(chainB.chainId, chainB.testToken.address);
     const ntvOnB = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, NTV_TOKEN_ADDRESS_ABI, chainB.provider);

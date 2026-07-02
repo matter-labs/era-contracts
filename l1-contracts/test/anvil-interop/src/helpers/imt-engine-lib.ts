@@ -112,7 +112,7 @@ export function computeFlowId(
   );
 }
 
-// ── Engine B: dynamic-height FullMerkle port (leaf hashing / root / path) ───────────────────
+// ── Dynamic-height FullMerkle port (leaf hashing / root / path) ───────────────────
 
 /** efficientHash(a, b) = keccak256(a ++ b) over the two 32-byte siblings — matches Merkle.sol. */
 function efficientHash(left: string, right: string): string {
@@ -120,17 +120,19 @@ function efficientHash(left: string, right: string): string {
 }
 
 /**
- * Off-chain port of {FullMerkle}+{IndexedMerkleTree}. It replays the on-chain build sequence
- * (`setup` -> `pushNewLeaf` per leaf, with `updateLeaf` mutating the populated path) so `root()` and
- * `merklePath(i)` match the on-chain `tree.root()` / `tree.merklePath(i)`.
+ * Dynamic-height Indexed Merkle Tree, a byte-for-byte off-chain port of
+ * {FullMerkle}+{IndexedMerkleTree}. It replays the EXACT on-chain build sequence
+ * (`setup` -> `pushNewLeaf` per leaf, with `updateLeaf` mutating the populated path) so that
+ * `root()` and `merklePath(i)` equal the on-chain `tree.root()` / `tree.merklePath(i)`.
  *
- * The constructor takes the index-ordered leaf set (index 0 = the {0,0,0} sentinel head). The leaves
- * are the live on-chain preimages, so their `nextIndex`/`nextValue` are already spliced; only the
- * FullMerkle node bookkeeping is replayed here.
+ * The constructor takes the index-ordered leaf set (index 0 = the {0,0,0} sentinel head, exactly
+ * what `setup` seeds). It does NOT re-derive the sorted linked list; the leaves passed in are the
+ * live on-chain leaf preimages (or the result of local `insert` calls), so their `nextIndex`/
+ * `nextValue` are already spliced. Only the FullMerkle node bookkeeping is replayed here.
  *
  * FullMerkle storage mirror:
  *   - `height`             : current tree height (0 for a single-leaf tree),
- *   - `nodes[level][index]`: written node hashes (matching `_nodes`),
+ *   - `nodes[level][index]`: written node hashes (dynamic arrays, matching `_nodes`),
  *   - `zeros[level]`       : zero-subtree hash at `level` (matching `_zeros`),
  *   - `leafNumber`         : number of leaves pushed so far.
  */
@@ -163,9 +165,9 @@ export class IndexedMerkleTree {
     this.setup(zeroLeafHash);
     this.pushNewLeaf(zeroLeafHash);
 
-    // setup/pushNewLeaf seed index 0 from a pristine {0,0,0} sentinel, but in a live tree the head leaf
-    // has been repointed to the smallest inserted value, so re-write index 0 with its actual preimage
-    // before pushing leaves 1..n-1 in order.
+    // The `setup`/`pushNewLeaf` above seed index 0 from a pristine {0,0,0} sentinel. In a live tree the
+    // head leaf has been repointed (its `nextIndex`/`nextValue` splice to the smallest inserted value),
+    // so re-write index 0 with its actual on-chain preimage before pushing leaves 1..n-1 in order.
     this.updateLeaf(0, indexedLeafHash(leaves[0]));
     for (let i = 1; i < leaves.length; i++) {
       this.pushNewLeaf(indexedLeafHash(leaves[i]));

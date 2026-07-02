@@ -5,16 +5,16 @@ import {IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Per-chain Indexed Merkle Tree of interop commit values. Whenever a participant does their
-/// part in a flow, the leg's commit value is inserted here. Each {IMTLeaf} points to the next-larger
-/// value, giving O(log n) proofs of both membership and non-membership (via a "low nullifier" leaf).
-/// Every insert publishes `abi.encode(root)` to L1 through the L2->L1 messenger; consuming chains
-/// authenticate that message against the interop root imported for the settling batch (see
-/// {AtomicInteropProof}), which is what makes the root trustworthy. The tree publishes only the root,
-/// no timestamp: the deadline is checked against the batch's `l1Timestamp`, which is folded into the
-/// chain batch leaf and re-derived from the same inclusion proof.
+/// @notice Per-chain **Indexed Merkle Tree** of interop commit values. Whenever a participant does
+/// their part in a flow, the leg's commit value is inserted here. Each {IMTLeaf} points to the
+/// next-larger value in the tree, so the structure supports O(log n) proofs of both membership and
+/// non-membership (via a "low nullifier" leaf). On every insert the tree publishes `abi.encode(root)`
+/// to L1 via the L2->L1 messenger; consuming chains authenticate that message against the interop root
+/// they imported for the settling batch (see {AtomicInteropProof}), which is what makes the root
+/// trustworthy. The tree publishes no timestamp: the deadline is checked against the batch's
+/// `l1Timestamp`, which is folded into the chain batch leaf and re-derived in-module from the inclusion proof.
 ///
-/// Deployed in L2 userspace via CREATE2, so it has no constructor — wiring is done in `initialize`.
+/// Deployed in L2 userspace (CREATE2), so it has no constructor — wiring is done in `initialize`.
 interface IL2InteropCommitmentTree {
     /// @notice Emitted after a new root is published to L1: the `{0,0,0}` head seed at `initialize`,
     /// then one per inserted value.

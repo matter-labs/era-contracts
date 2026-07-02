@@ -229,7 +229,7 @@ contract InteropCenter is
         bytes[][] memory originalCallAttributes = new bytes[][](1);
         originalCallAttributes[0] = attributes;
 
-        // The single-call send path is never atomic, so pass an empty AtomicSend (publishes to L1 as usual).
+        // This single-call send path is never atomic; pass an empty AtomicSend (publishes to L1 as usual).
         bytes32 bundleHash = _sendBundle({
             _destinationChainId: recipientChainId,
             _callStarters: callStartersInternal,
@@ -476,10 +476,10 @@ contract InteropCenter is
             _callCount: callStartersLength
         });
 
-        // Hash the bundle and dispatch it. Atomic bundles are appended to the interop IMT via the
-        // AtomicFlowManager and not published to L1; normal bundles are published to L1. The atomic send
-        // metadata travels out-of-band in `_atomicSend` rather than in the bundle, so `bundleHash` does not
-        // depend on `flowId` (which would be circular, since `flowId` is derived from bundle hashes).
+        // Hash the bundle and dispatch it: an atomic bundle (one carrying the `atomicBundle` attribute)
+        // is appended to the interop IMT via the AtomicFlowManager and is NOT published to L1; a normal
+        // bundle is published to L1. The atomic send metadata travels out-of-band (`_atomicSend`), not
+        // embedded in the bundle, so `bundleHash` does not depend on `flowId` (a circular dependency).
         bytes32 msgHash;
         (bundleHash, msgHash) = _dispatchBundle(bundle, _atomicSend);
 
@@ -536,14 +536,15 @@ contract InteropCenter is
         msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(BUNDLE_IDENTIFIER, _interopBundleBytes));
     }
 
-    /// @notice Hashes the bundle and dispatches it. An atomic bundle (`_atomicSend.isAtomic`) is appended
-    /// to the interop IMT via the {AtomicFlowManager} and is NOT published to L1 — the burn already
-    /// happened through `initiateIndirectCall`, and the destination executes it via
-    /// {InteropHandler.executeAtomicBundle}. A normal bundle is published to L1 via {_sendBundleToL1}.
-    /// @dev `_atomicSend` (flowId/deadline/lowNullifierIndex) is passed out-of-band and deliberately kept
-    /// out of `_bundle`, so `bundleHash` does not depend on `flowId`. Since `flowId` is derived from the
-    /// leg bundle hashes, embedding it in a bundle would be circular and would break computing `flowId`
-    /// off-chain before the send.
+    /// @notice Hashes the bundle and dispatches it. An atomic bundle (`_atomicSend.isAtomic`) has its
+    /// commit value appended to the interop IMT via the {AtomicFlowManager} and is NOT published to L1
+    /// — the burn already happened through the normal `initiateIndirectCall` path, and the destination
+    /// executes it via {InteropHandler.executeAtomicBundle}. A normal bundle is published to L1 via
+    /// {_sendBundleToL1}.
+    /// @dev `_atomicSend` (flowId/deadline/lowNullifierIndex) is passed out-of-band and is intentionally
+    /// NOT embedded in `_bundle`, so `bundleHash` is independent of `flowId`. This is required:
+    /// `flowId = keccak256(abi.encode(sortedBundleHashes, chainIds, deadline))` must be computable
+    /// off-chain before the send, which is impossible if a `bundleHash` (a flowId input) embedded `flowId`.
     function _dispatchBundle(
         InteropBundle memory _bundle,
         AtomicSend memory _atomicSend
@@ -789,9 +790,9 @@ contract InteropCenter is
                 );
                 attributeUsed[5] = true;
                 // The atomic send metadata (flowId/deadline/lowNullifierIndex) is parsed separately via
-                // `_parseAtomicSend`, not stored in `BundleAttributes`: it must stay out of the cross-chain
-                // bundle so `bundleHash` does not depend on `flowId` (which would be circular). Here we only
-                // validate it is a permitted, non-duplicate bundle attribute.
+                // `_parseAtomicSend` and NOT stored in `BundleAttributes` — it must stay out of the
+                // cross-chain bundle so `bundleHash` does not depend on `flowId` (a circular dependency).
+                // Here we only validate it is a permitted, non-duplicate bundle attribute.
             } else {
                 revert IERC7786GatewaySource.UnsupportedAttribute(selector);
             }
@@ -799,9 +800,9 @@ contract InteropCenter is
     }
 
     /// @notice Extracts the `atomicBundle` send metadata from the bundle attributes (already validated
-    /// by `parseAttributes`). Returns `isAtomic = false` when the attribute is absent. Kept separate from
-    /// `parseAttributes`/`BundleAttributes` so the metadata never enters the cross-chain bundle, which
-    /// would make `bundleHash` depend on `flowId` (circular).
+    /// by `parseAttributes`). Returns `isAtomic = false` when the attribute is absent. Kept separate
+    /// from `parseAttributes`/`BundleAttributes` so the metadata never enters the cross-chain bundle
+    /// (which would make `bundleHash` depend on `flowId` — a circular dependency).
     function _parseAtomicSend(bytes[] calldata _attributes) internal pure returns (AtomicSend memory atomicSend) {
         uint256 attributesLength = _attributes.length;
         for (uint256 i = 0; i < attributesLength; ++i) {

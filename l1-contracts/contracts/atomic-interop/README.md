@@ -6,7 +6,7 @@ central L1 coordinator**. It rides on the normal interop bundle path (`InteropCe
 Tree (IMT)** per chain that records each leg's commitment, plus per-leg **IMT proofs** authenticated
 against the regular **interop-root channel** (each chain's IMT root is published to L1 and re-imported
 on every chain). There is no extra L1 contract and no global-root registry — finality is proven, not
-dispatched by a coordinator.
+dispatched.
 
 ## Key values
 

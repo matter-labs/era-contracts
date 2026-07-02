@@ -128,8 +128,9 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
     /// @inheritdoc IInteropHandler
     function executeAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public {
         // No gateway-mode requirement here (unlike executeBundle): an atomic bundle's cross-chain
-        // binding comes from the per-leg IMT inclusion proofs against the interop root, which is built
-        // on both L1 and the gateway. So atomic execution is valid on any settlement layer, incl. L1.
+        // binding comes from the per-leg IMT inclusion proofs authenticated against the interop root,
+        // which is built on both L1 and the gateway. Atomic execution is therefore valid regardless of
+        // settlement layer, including L1-settled chains.
 
         // Decode the bundle, compute its hash, read its status.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
@@ -139,14 +140,15 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
         _validateBundleDestinationContext(bundleHash, interopBundle, interopBundle.sourceChainId);
         _requireExecutionAllowed(bundleHash, interopBundle);
 
-        // Atomic bundles have no verify path (never published to L1), so only a fresh bundle may run;
-        // replay is prevented by marking it FullyExecuted below. A non-atomic bundle cannot reach here:
-        // the gate requires its commit value in an IMT, which only an atomic send ever writes.
+        // Atomic bundles have no verify path (they were never published to L1), so only a fresh bundle
+        // may be executed; replay is then prevented by marking it FullyExecuted below. (A non-atomic
+        // bundle cannot reach here: the gate requires its commit value in an IMT, which only `append`
+        // — i.e. an atomic send — ever writes.)
         require(status == BundleStatus.Unreceived, BundleAlreadyProcessed(bundleHash));
 
-        // Atomicity gate (replaces executeBundle's L1-message inclusion proof): proves every leg of the
+        // Atomicity gate: replaces executeBundle's L1-message inclusion proof. Proves every leg of the
         // flow was committed in its source chain's IMT before the deadline, and that this bundle is one
-        // of those legs. Reverts otherwise. No explicit "block.chainid in flow" check is needed: the
+        // of the flow's legs. Reverts otherwise. No explicit "block.chainid in flow" check is needed: the
         // bundle self-binds its own destinationChainId (asserted == block.chainid above) and per-send
         // salts make each leg's bundleHash unique to its destination.
         IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).requireFlowFinalized(bundleHash, _finality);

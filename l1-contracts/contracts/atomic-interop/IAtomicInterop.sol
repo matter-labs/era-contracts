@@ -3,15 +3,17 @@ pragma solidity ^0.8.21;
 
 import {IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
 
-/// @notice Per-`(flowId, bundleHash)` source-leg lifecycle on each {AtomicFlowManager}.
+/// @notice Per-`(flowId, bundleHash)` source-leg lifecycle on each {AtomicFlowManager} in the
+/// L1-free atomic interop flow.
 ///
-///   Happy path: `Unset -> Committed`. The burn happens in `InteropCenter.sendBundle` and
-///   `AtomicFlowManager.append` records the leg as `Committed` (terminal on the happy path). The
-///   destination mint is driven by `InteropHandler.executeAtomicBundle`, which has its own replay guard.
-///   Timeout path: `Unset -> Committed -> Revertable -> Reverted`.
+///   Source happy path: `Unset -> Committed` (the burn happens during `InteropCenter.sendBundle` via
+///   the normal `initiateIndirectCall`; `AtomicFlowManager.append` records the leg as `Committed`,
+///   which is terminal on the happy path — the destination mint is driven by
+///   `InteropHandler.executeAtomicBundle`, which has its own bundle-level replay guard).
+///   Source timeout path: `Unset -> Committed -> Revertable -> Reverted`.
 ///
-/// Destination execution is not tracked here; {InteropHandler}'s `bundleStatus` is the double-execute
-/// guard, as for a normal interop bundle.
+/// Destination execution is NOT tracked here: the {InteropHandler}'s own `bundleStatus` set is the
+/// double-execute guard, exactly as for a normal interop bundle.
 enum LegState {
     Unset,
     Committed,
@@ -20,20 +22,24 @@ enum LegState {
 }
 
 /// @notice A single IMT proof against a source chain's interop commitment tree, used both ways:
-///   - inclusion ({AtomicInteropProof.verifyInclusion}): `leaf` holds the leg's commit value
-///     (`leaf.value == commitValue`), proven present as of a root that settled no later than the deadline;
+///   - inclusion ({AtomicInteropProof.verifyInclusion}): `leaf` is the leaf holding the leg's commit
+///     value (`leaf.value == commitValue`), proven present as of a root that settled no later than the
+///     flow deadline;
 ///   - non-inclusion ({AtomicInteropProof.verifyTimeoutAdjacency}, timeout/refund path): `leaf` is the
-///     predecessor leaf bracketing the absent commit value, proven against a root that settled strictly
-///     after the deadline. The IMT is append-only, so absence in a post-deadline snapshot implies absence
-///     at the deadline and the leg can no longer finalize.
-/// The two proof shapes are identical in layout and share this struct; the meaning of `leaf` is fixed by
-/// which verify function consumes the proof.
+///     low-nullifier (predecessor) leaf that brackets the absent commit value, proven against a root
+///     that settled strictly after the deadline. Because the IMT is append-only, absence in a
+///     post-deadline snapshot implies absence at the deadline, so the leg can no longer finalize.
+///
+/// The two structs were identical in layout, so they are unified; the meaning of `leaf` (the value's
+/// own leaf vs. its predecessor) is fixed by which verify function consumes the proof.
 ///
 /// Authentication has two layers, both resolved against the interop root the verifying chain imported
 /// for `(sourceChainId, batchNumber)`:
-///   1. The origin {L2InteropCommitmentTree}'s `abi.encode(chainImtRoot)` L2->L1 message (sender pinned
-///      to the canonical commitment-tree address) is proven included, authenticating the root.
-///   2. `leaf` at `imtLeafIndex` with `imtProof` hashes up to `chainImtRoot`.
+///   1. The origin {L2InteropCommitmentTree}'s `abi.encode(chainImtRoot)` L2->L1 message (sender
+///      pinned to the canonical commitment-tree address) is proven included; this authenticates the
+///      root.
+///   2. `leaf` at `imtLeafIndex` with `imtProof` hashes up to `chainImtRoot` (delegated to
+///      {IndexedMerkleTree.verifyInclusion} / `verifyNonInclusion`).
 /// The batch's `l1Timestamp` is not a struct field, since that would be spoofable. It is parsed in-module
 /// from `messageProof` via {MessageHashing._getProofData} and is bound to the verified interop root by
 /// being folded into the chain batch leaf. The proof library then enforces the `l1Timestamp` vs `deadline`

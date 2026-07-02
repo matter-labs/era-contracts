@@ -5,20 +5,22 @@ import {LegState, AtomicTimeoutProof, AtomicFinalityProof} from "./IAtomicIntero
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Per-chain coordinator for the L1-free atomic interop flow. It never custodies funds: the
-/// asset burn happens through the normal interop path ({InteropCenter.sendBundle} ->
-/// {L2AssetRouter.initiateIndirectCall}). This contract only coordinates cross-chain atomicity and
-/// timeout recovery, gated by IMT proofs against the interop root imported for a settled source batch.
+/// @notice Per-chain coordinator for the L1-free **atomic interop** flow. It is *not* an escrow: it
+/// never custodies funds. The asset burn happens through the normal interop path
+/// ({InteropCenter.sendBundle} -> {L2AssetRouter.initiateIndirectCall}); this contract only
+/// coordinates the cross-chain atomicity and the timeout recovery, gated by **IMT proofs** against
+/// the interop root the verifying chain imports for a settled source batch (see {AtomicInteropProof}).
 ///
-///   1. `append` — called by the {InteropCenter} for bundles with the `atomicBundle` attribute, instead
-///      of publishing to L1. Inserts the leg's `commitValue(flowId, bundleHash)` into this chain's
-///      interop IMT and marks the source leg `Committed`. The burn already happened during `sendBundle`.
-///   2. `requireFlowFinalized` — called by the {InteropHandler} in `executeAtomicBundle` instead of the
-///      L1-message inclusion proof. Verifies every leg of the flow was committed before the deadline;
-///      the handler then executes the bundle and owns the double-execute guard.
+///   1. `append` — called by the {InteropCenter} when a bundle carries the `atomicBundle` attribute,
+///      in place of publishing the bundle to L1. It inserts the leg's commit value
+///      (`commitValue(flowId, bundleHash)`) into this chain's indexed interop IMT and records the
+///      source leg as `Committed`. The burn already happened during `sendBundle`.
+///   2. `requireFlowFinalized` — called by the {InteropHandler} from `executeAtomicBundle` in place of
+///      the L1-message inclusion proof: it verifies that *every* leg of the flow was committed before
+///      the deadline. The handler then executes the bundle (and owns the double-execute guard).
 ///   3. `authorizeRefund` / `claimRefund` — the timeout path: prove (O(log n) non-inclusion) that a leg
-///      can no longer be committed in time, then recover the burned source funds to the depositor by
-///      asking each of the bundle's call targets to reverse itself via
+///      can no longer be committed in time, then **recover** the burned source funds to the depositor
+///      by asking each of the bundle's call targets to reverse itself via
 ///      {IAtomicRecoverable.recoverAtomicCall}.
 ///
 /// `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`,
@@ -27,7 +29,7 @@ import {LegState, AtomicTimeoutProof, AtomicFinalityProof} from "./IAtomicIntero
 /// need not be ascending). All legs settle on one `settlementLayerChainId`, so the deadline (a settlement-
 /// layer timestamp) is comparable to each batch's `l1Timestamp`.
 ///
-/// Deployed as an L2 predeploy (no constructor); wiring is done in `initialize`.
+/// Deployed as an L2 predeploy (no constructor) — wiring is done in `initialize`.
 interface IAtomicFlowManager {
     event FlowCommitted(bytes32 indexed flowId, bytes32 indexed bundleHash, uint64 deadline, uint256 leafIndex);
     event FlowRefundAuthorized(bytes32 indexed flowId, bytes32 indexed bundleHash);
@@ -35,7 +37,7 @@ interface IAtomicFlowManager {
 
     /// @notice Record an atomic source leg: insert its commit value into the interop IMT and mark it
     /// `Committed`. Callable only by the {InteropCenter}. State `Unset -> Committed`.
-    /// @param _flowId The flow identifier (binds every leg and the deadline).
+    /// @param _flowId The flow identifier (binds every leg + the deadline).
     /// @param _bundleHash `keccak256(abi.encode(sourceChainId, interopBundleBytes))` of this leg.
     /// @param _deadline The flow deadline (settlement-layer timestamp); emitted for indexers.
     /// @param _lowNullifierIndex The low-nullifier slot for the commit value (from the IMT engine).
@@ -46,7 +48,7 @@ interface IAtomicFlowManager {
     /// `l1Timestamp <= deadline`), recomputes `flowId`, ties each proof to its source chain
     /// and the flow's settlement layer, and asserts the bundle being executed is a leg of the flow.
     /// @param _executingBundleHash The bundle hash the handler is about to execute.
-    /// @param _finality The flow definition and per-leg inclusion proofs.
+    /// @param _finality The flow definition + per-leg inclusion proofs.
     function requireFlowFinalized(bytes32 _executingBundleHash, AtomicFinalityProof calldata _finality) external view;
 
     /// @notice Mark this chain's committed source legs `Revertable` for a flow that can no longer

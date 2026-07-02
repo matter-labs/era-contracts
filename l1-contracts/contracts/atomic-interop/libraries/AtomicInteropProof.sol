@@ -25,9 +25,9 @@ import {
 ///
 /// A flow leg's commit value lives in its origin chain's {L2InteropCommitmentTree} (an Indexed
 /// Merkle Tree). On every insert that tree publishes `abi.encode(root)` to L1 via the L2->L1
-/// messenger. The verifying chain authenticates that message against the interop root it imported
-/// for `(sourceChainId, batchNumber)`, which it only holds once the source batch has settled, so
-/// the root cannot be forged.
+/// messenger. The verifying chain authenticates that single message against the interop root it
+/// imported for `(sourceChainId, batchNumber)` — which it only holds once the source batch has
+/// settled, so the root cannot be forged.
 ///
 /// The flow `deadline` is a settlement-layer timestamp. It is not carried in the proof struct
 /// (that would be spoofable); instead each batch's `l1Timestamp` — the settlement-layer block
@@ -51,8 +51,8 @@ import {
 /// TODO: add a halt branch that restores refund liveness for a halted source with no successor
 /// batch; it needs a "highest-leaf" SL chain-tree proof not yet exposed by proveL2MessageInclusionShared.
 ///
-/// Inclusion and non-inclusion (low-nullifier) against the authenticated root are delegated to the
-/// shared {IndexedMerkleTree} engine.
+/// Membership (inclusion) and non-membership (low-nullifier) against the authenticated root are
+/// delegated to {IndexedMerkleTree}, the single shared IMT engine.
 library AtomicInteropProof {
     /// @notice The value inserted into a chain's IMT when a flow leg is committed.
     function commitValue(bytes32 _flowId, bytes32 _specHash) internal pure returns (uint256) {
@@ -154,10 +154,10 @@ library AtomicInteropProof {
     /// for `(_sourceChainId, _batchNumber)`, and derives the settlement-layer metadata (SL snapshot block,
     /// SL chain id, and the batch's `l1Timestamp`) from that same proof.
     ///
-    /// Step 1: build the {L2Message} (sender pinned to {L2_INTEROP_COMMITMENT_TREE_ADDR}, identical on
-    /// every chain, which binds the root to the real tree; the interop-root channel binds it to
-    /// `_sourceChainId`) and verify inclusion via `proveL2MessageInclusionShared`. The `abi.encode` here
-    /// must match what {L2InteropCommitmentTree} publishes.
+    /// Step 1 (auth, unchanged): build the {L2Message} (sender pinned to {L2_INTEROP_COMMITMENT_TREE_ADDR},
+    /// identical on every chain — this binds the root to the real tree; the interop-root channel binds
+    /// it to `_sourceChainId`) and verify inclusion via `proveL2MessageInclusionShared`. The `abi.encode`
+    /// here must match what {L2InteropCommitmentTree} publishes.
     ///
     /// Step 2: re-parse the same proof to read the SL metadata. We compute the same leaf the verifier
     /// hashes and run {MessageHashing._getProofData} over the same inputs. A single-level / commit-based
