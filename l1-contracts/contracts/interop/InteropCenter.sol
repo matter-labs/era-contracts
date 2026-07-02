@@ -437,7 +437,8 @@ contract InteropCenter is
             destinationBaseTokenAssetId: destinationBaseTokenAssetId,
             // The salt is derived from the sender and a user-provided salt (from the `interopBundleSalt` bundle attribute).
             // Mixing in `msg.sender` ensures bundles from different senders can never collide, while the user-provided salt
-            // lets the sender control uniqueness of their own bundles.
+            // lets the sender control uniqueness of their own bundles. A random user-provided salt additionally keeps the
+            // resulting bundle hash unpredictable, preserving the bundle's privacy.
             interopBundleSalt: keccak256(abi.encodePacked(msg.sender, _bundleAttributes.salt)),
             calls: new InteropCall[](_callStarters.length),
             bundleAttributes: _bundleAttributes

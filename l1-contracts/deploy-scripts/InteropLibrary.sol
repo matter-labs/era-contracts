@@ -53,7 +53,9 @@ library InteropLibrary {
     }
 
     /// @notice Build a single InteropCallStarter with provided attributes for sending a call.
-    /// @param salt User-provided salt mixed into the bundle's `interopBundleSalt`. Pass `bytes32(0)` to use the default.
+    /// @param salt Salt mixed into the bundle's `interopBundleSalt`. Provide a random value: it keeps the bundle hash
+    ///             unpredictable and thus preserves the bundle's privacy. `bytes32(0)` is allowed but discouraged —
+    ///             since each salt must be unique per sender (enforced by InteropCenter), a sender can use it at most once.
     function buildCall(
         uint256 destinationChainId,
         address target,
@@ -121,12 +123,14 @@ library InteropLibrary {
     /// @param executionAddress     Optional executor (EOA/contract) on destination chain
     /// @param unbundlerAddress     Unbundler address on destination chain
     /// @param useFixedFee          Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
-    /// @param salt                 User-provided salt mixed into the bundle's `interopBundleSalt`. Must be supplied
-    ///                             explicitly (pass `bytes32(0)` for the default); when `bytes32(0)` the attribute is
-    ///                             omitted (InteropCenter defaults it to `bytes32(0)`). A sender that sends several
-    ///                             otherwise-identical bundles must pass distinct salts so that each produces a unique
-    ///                             bundle hash (enforced by InteropCenter). There is intentionally no salt-less overload
-    ///                             so that callers cannot create a bundle without consciously choosing a salt.
+    /// @param salt                 Salt mixed into the bundle's `interopBundleSalt`. It must be supplied explicitly, as
+    ///                             there is intentionally no salt-less overload — callers cannot create a bundle without
+    ///                             consciously choosing a salt. Provide a random value: it keeps the bundle hash
+    ///                             unpredictable and thus preserves the bundle's privacy. Each salt must be unique per
+    ///                             sender (enforced by InteropCenter), so a sender that sends several otherwise-identical
+    ///                             bundles must pass a distinct salt for each. `bytes32(0)` is allowed but discouraged:
+    ///                             because used salts must be unique per sender, a sender can use `bytes32(0)` at most
+    ///                             once (when passed, the salt attribute is simply omitted).
     function buildBundleAttributes(
         address executionAddress,
         address unbundlerAddress,
@@ -196,7 +200,10 @@ library InteropLibrary {
     /// @param  recipient           Recipient on destination chain
     /// @param  unbundlerAddress     Address authorized to unbundle and execute the bundle on the  destination chain.
     /// @param  useFixedFee         Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
-    /// @param  salt                User-provided salt mixed into the bundle's `interopBundleSalt` (pass `bytes32(0)` for the default)
+    /// @param  salt                Salt mixed into the bundle's `interopBundleSalt`. Provide a random value to keep the
+    ///                             bundle hash unpredictable and preserve the bundle's privacy. `bytes32(0)` is allowed
+    ///                             but discouraged — each salt must be unique per sender (enforced by InteropCenter), so
+    ///                             a sender can use `bytes32(0)` at most once.
     /// @return bundleHash Hash of the sent bundle
     function sendToken(
         uint256 destinationChainId,
@@ -244,7 +251,10 @@ library InteropLibrary {
     /// @param executionAddress     Default executor used whenever a corresponding entry in `executionAddresses` is address(0).
     /// @param unbundlerAddress     Address authorized to unbundle and execute the bundle on the  destination chain.
     /// @param useFixedFee          Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
-    /// @param salt                 User-provided salt mixed into the bundle's `interopBundleSalt` (pass `bytes32(0)` for the default)
+    /// @param salt                 Salt mixed into the bundle's `interopBundleSalt`. Provide a random value to keep the
+    ///                             bundle hash unpredictable and preserve the bundle's privacy. `bytes32(0)` is allowed
+    ///                             but discouraged — each salt must be unique per sender (enforced by InteropCenter), so
+    ///                             a sender can use `bytes32(0)` at most once.
     /// @return bundleHash Hash of the sent bundle
     function sendDirectCallBundle(
         uint256 destination,
@@ -278,7 +288,10 @@ library InteropLibrary {
     /// @param  target            Address that will be called on destination chain
     /// @param  executionAddress  If necessary, custom execution address can be specified. If 0 address is passed, then default executor will be used
     /// @param  data              Data which will be passed to the target
-    /// @param  salt              User-provided salt mixed into the bundle's `interopBundleSalt` (pass `bytes32(0)` for the default)
+    /// @param  salt              Salt mixed into the bundle's `interopBundleSalt`. Provide a random value to keep the
+    ///                           bundle hash unpredictable and preserve the bundle's privacy. `bytes32(0)` is allowed
+    ///                           but discouraged — each salt must be unique per sender (enforced by InteropCenter), so
+    ///                           a sender can use `bytes32(0)` at most once.
     /// @return sendId Hash of the sent bundle containing a single call
     function sendDirectCall(
         uint256 destination,
@@ -315,7 +328,10 @@ library InteropLibrary {
     /// @param  unbundlerAddress        Address authorized to unbundle and execute the bundle on the  destination chain.
     /// @param  amount                  Amount to transfer
     /// @param  useFixedFee             Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
-    /// @param  salt                    User-provided salt mixed into the bundle's `interopBundleSalt` (pass `bytes32(0)` for the default)
+    /// @param  salt                    Salt mixed into the bundle's `interopBundleSalt`. Provide a random value to keep
+    ///                                 the bundle hash unpredictable and preserve the bundle's privacy. `bytes32(0)` is
+    ///                                 allowed but discouraged — each salt must be unique per sender (enforced by
+    ///                                 InteropCenter), so a sender can use `bytes32(0)` at most once.
     /// @return bundleHash Hash of the sent bundle
     function sendNative(
         uint256 destinationChainId,
