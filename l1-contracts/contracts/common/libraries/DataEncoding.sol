@@ -2,21 +2,33 @@
 
 pragma solidity 0.8.28;
 
-import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_ROUTER_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
 import {NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
 import {
     AssetIdMismatch,
     InvalidNTVBurnData,
+    InvalidSelector,
     UnsupportedEncodingVersion,
     BadTransferDataLength,
     EmptyData
 } from "../L1ContractErrors.sol";
 import {WrongMsgLength} from "../../bridge/L1BridgeContractErrors.sol";
+import {
+    InteropWithdrawalNotSingleCall,
+    InteropWithdrawalWrongDestination,
+    InteropWithdrawalWrongOrigin,
+    InteropWithdrawalWrongTarget
+} from "../../bridge/L1BridgeContractErrors.sol";
 import {InvalidFunctionSignature} from "../../bridge/asset-tracker/AssetTrackerErrors.sol";
 import {IAssetTrackerDataEncoding} from "../../bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 import {UnsafeBytes} from "./UnsafeBytes.sol";
-import {GatewayToL1TokenBalanceMigrationData, L1ToGatewayTokenBalanceMigrationData} from "../../common/Messaging.sol";
+import {
+    GatewayToL1TokenBalanceMigrationData,
+    L1ToGatewayTokenBalanceMigrationData,
+    InteropBundle,
+    InteropCall
+} from "../../common/Messaging.sol";
 
 /**
  * @author Matter Labs
@@ -289,6 +301,43 @@ library DataEncoding {
         (_messageSourceChainId, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset); // originChainId, not used for L2->L1 txs
         (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
         transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
+    }
+
+    /// @notice Parses an interop-routed withdrawal: a single-call `InteropBundle` destined for this L1.
+    /// @dev The bundle is emitted by the L2 InteropCenter (`BUNDLE_IDENTIFIER`-prefixed). It must contain
+    /// exactly one call, originated by the L2 asset router (`from`) and targeting this chain's L1 asset router
+    /// (`to`) via `finalizeDeposit`. The inner `finalizeDeposit` payload carries `(sourceChainId, assetId, transferData)`.
+    /// @param _chainId The source ZK chain ID (must match the chainId encoded in the inner call).
+    /// @param _l2ToL1message The `BUNDLE_IDENTIFIER`-prefixed `abi.encode(InteropBundle)` message.
+    /// @param _l1AssetRouter The L1 asset router that the bundle's single call must target.
+    /// @return assetId The ID of the bridged asset.
+    /// @return transferData The transfer data used to finalize the withdrawal.
+    function parseInteropWithdrawalBundle(
+        uint256 _chainId,
+        bytes memory _l2ToL1message,
+        address _l1AssetRouter
+    ) internal view returns (bytes32 assetId, bytes memory transferData) {
+        // Strip the 1-byte BUNDLE_IDENTIFIER prefix; the remainder is exactly `abi.encode(InteropBundle)`.
+        InteropBundle memory bundle = abi.decode(UnsafeBytes.readRemainingBytes(_l2ToL1message, 1), (InteropBundle));
+
+        require(bundle.destinationChainId == block.chainid, InteropWithdrawalWrongDestination());
+        require(bundle.calls.length == 1, InteropWithdrawalNotSingleCall());
+
+        InteropCall memory interopCall = bundle.calls[0];
+        require(interopCall.to == _l1AssetRouter, InteropWithdrawalWrongTarget());
+        require(interopCall.from == L2_ASSET_ROUTER_ADDR, InteropWithdrawalWrongOrigin());
+
+        // The inner call is `abi.encodeCall(IAssetRouterShared.finalizeDeposit, (sourceChainId, assetId, transferData))`.
+        require(
+            bytes4(interopCall.data) == IAssetRouterShared.finalizeDeposit.selector,
+            InvalidSelector(bytes4(interopCall.data))
+        );
+        uint256 sourceChainId;
+        (sourceChainId, assetId, transferData) = abi.decode(
+            UnsafeBytes.readRemainingBytes(interopCall.data, 4),
+            (uint256, bytes32, bytes)
+        );
+        require(sourceChainId == _chainId, InteropWithdrawalWrongDestination());
     }
 
     function decodeL1ToGatewayTokenBalanceMigrationData(
