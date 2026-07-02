@@ -43,7 +43,7 @@
  * settlement timestamp `t` (folded into the chain batch leaf) and the SL chain id, so the harness builds
  * format-valid multi-hop proof bytes carrying a CHOSEN `t` ({buildSlProofBytes}). The IMT membership /
  * low-nullifier layer and the `t`-vs-deadline check (inclusion `t <= deadline`; timeout adjacency) are
- * the parts actually exercised. This mirrors the Foundry AtomicFlowManager tests.
+ * the parts actually exercised, mirroring the on-chain {AtomicFlowManager} / {AtomicInteropProof} checks.
  */
 
 import type { providers, Wallet } from "ethers";
@@ -345,8 +345,8 @@ export const DEFAULT_SL_CHAIN_ID = 506;
 /**
  * Builds the minimal **format-valid multi-hop** L2-message inclusion proof bytes that the real
  * {MessageHashing._getProofData} parses to a chosen batch settlement timestamp `t` and settlement-layer
- * chain id (with `finalProofNode == false`). Mirrors `AtomicInteropTestUtils.slProofBytes` in the Foundry
- * suite. The deadline is now compared against `t` (folded into the chain batch leaf); the SL snapshot
+ * chain id (with `finalProofNode == false`). Mirrors the on-chain multi-hop proof layout that
+ * {MessageHashing._getProofData} parses. The deadline is now compared against `t` (folded into the chain batch leaf); the SL snapshot
  * block is parsed but not used for acceptance, so it is an arbitrary placeholder here.
  *
  * Byte layout (logLeafProofLen=0, batchLeafProofLen=0 -> no path nodes, so the mask words are 0):
