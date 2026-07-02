@@ -3,8 +3,6 @@ pragma solidity ^0.8.21;
 
 // 0x74882034
 error AtomicBundleCallCarriesValue(uint256 callIndex, uint256 value);
-// 0xb84a87f2
-error AtomicBundleCallNotRecoverable(uint256 callIndex, address callTarget);
 // 0x9031f751
 error AttributeAlreadySet(bytes4 selector);
 // 0xbcb41ec7

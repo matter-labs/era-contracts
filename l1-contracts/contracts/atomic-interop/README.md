@@ -51,9 +51,13 @@ bundle, so `bundleHash` does not depend on `flowId` (which would be circular).
    already-finalized leg. The proof is bound to the missing leg's source chain and settlement layer. It
    marks this chain's `Committed` legs `Revertable`; `claimRefund` then reverses each burn by asking the
    call's target to recover itself via `IAtomicRecoverable.recoverAtomicCall` (implemented by
-   `L2AssetRouter`), re-minting to the original depositor, and requires **every** call to recover. Atomic
-   bundles are gated at send (`InteropCenter`) to only recoverable, no-native-`value` calls, so every
-   committed leg is refundable.
+   `L2AssetRouter`), re-minting to the original depositor. Recovery is **best-effort**: each target
+   reverses the calls it recognises (an asset-router deposit re-mints the burned funds) and returns
+   `false` for calls that move no funds and have nothing to reverse (e.g. flipping a flag); the refund
+   succeeds as long as at least one call recovered. Consequently the protocol does not guarantee full
+   refundability of an arbitrary bundle — making a fund-moving leg recoverable (an asset-router deposit)
+   is the flow author's responsibility. Atomic sends reject only native-`value` legs (`InteropCenter`),
+   since those can never be reversed.
 
 Leg state machine (`LegState`): `Unset -> Committed` (send) `-> Revertable -> Reverted` (timeout path).
 

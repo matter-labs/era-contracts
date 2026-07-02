@@ -544,27 +544,6 @@
   },
   {
     "type": "error",
-    "name": "ManagerCallNotRecovered",
-    "inputs": [
-      {
-        "name": "flowId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "bundleHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "callIndex",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "ManagerExecutingBundleNotInFlow",
     "inputs": [
       {

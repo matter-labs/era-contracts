@@ -914,22 +914,6 @@
   },
   {
     "type": "error",
-    "name": "AtomicBundleCallNotRecoverable",
-    "inputs": [
-      {
-        "name": "callIndex",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "callTarget",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "AttributeAlreadySet",
     "inputs": [
       {

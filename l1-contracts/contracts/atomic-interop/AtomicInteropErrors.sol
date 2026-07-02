@@ -30,12 +30,8 @@ error ManagerLegSourceChainIdsLengthMismatch(uint256 legs, uint256 chainIds);
 error ManagerProofCountMismatch(uint256 legs, uint256 proofs);
 /// @dev The bundle being executed on the destination is not one of the flow's legs.
 error ManagerExecutingBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
-/// @dev The reverted bundle carries no calls at all (nothing to recover).
+/// @dev The reverted bundle has no recoverable calls, so there are no source funds to return.
 error ManagerNoRecoverableCalls(bytes32 flowId, bytes32 bundleHash);
-/// @dev A fund-moving bundle call could not be recovered on the timeout path. Every call must be
-/// recovered (send-time only commits recoverable asset-router calls); otherwise funds would be
-/// stranded while the leg becomes terminally `Reverted`.
-error ManagerCallNotRecovered(bytes32 flowId, bytes32 bundleHash, uint256 callIndex);
 
 // ── AtomicInteropProof library errors ────────────────────────────────────────────────
 /// @dev The commitment tree's `(root)` message could not be proven against the imported interop root

@@ -24,7 +24,6 @@ import {
     ManagerProofCountMismatch,
     ManagerExecutingBundleNotInFlow,
     ManagerNoRecoverableCalls,
-    ManagerCallNotRecovered,
     ProofSourceChainMismatch
 } from "./AtomicInteropErrors.sol";
 
@@ -203,23 +202,34 @@ contract AtomicFlowManager is IAtomicFlowManager {
         return L2_INTEROP_HANDLER_ADDR;
     }
 
-    /// @dev Reverses every call in `_bundle`, re-crediting the original depositor. Each call's target
-    /// (`InteropCall.to`) owns its reversal via {IAtomicRecoverable.recoverAtomicCall}; the manager is
-    /// agnostic to the encoding and just forwards `(destinationChainId, data)` to each target.
-    /// Every call must report a recovery, since one non-recovered call would strand funds while the leg
-    /// becomes terminally `Reverted`. The send-time gate ({InteropCenter._validateAtomicBundleRefundable})
-    /// only commits recoverable asset-router calls, so a genuine leg recovers in full; the all-recovered
-    /// check guards against any non-recoverable call slipping through.
+    /// @dev Reverses every recoverable call embedded in `_bundle`, re-crediting the original depositor.
+    /// Each call's target (`InteropCall.to`) owns its own reversal via {IAtomicRecoverable.recoverAtomicCall}:
+    /// the manager is agnostic to the call/encoding format and simply forwards `(destinationChainId, data)`
+    /// to every target, counting the ones that report a recovery. Targets must return `false` (not revert)
+    /// for calls they do not recognise.
+    ///
+    /// Recovery is best-effort by design. An atomic bundle may mix fund-moving calls (e.g. asset-router
+    /// deposits, which re-mint to the depositor) with calls that move no funds and have nothing to reverse
+    /// (e.g. flipping a flag on some contract). The latter legitimately return `false` and are skipped —
+    /// they burned nothing at the source, so nothing is stranded. We only require that *some* call recovered
+    /// (`recovered != 0`): a bundle where nothing is recoverable has no source funds to return, so a refund
+    /// would be a no-op and we reject it.
+    ///
+    /// Consequence: the protocol does not guarantee full refundability of an arbitrary bundle. A flow author
+    /// must make any fund-moving leg a recoverable (asset-router) call to have it returned on timeout; a
+    /// non-recoverable fund-moving call would strand its funds. Send-time ({InteropCenter}) only blocks
+    /// native-`value` legs, which no one can reverse.
     function _recoverBundle(bytes32 _flowId, bytes32 _bundleHash, InteropBundle memory _bundle) internal {
         uint256 destChainId = _bundle.destinationChainId;
         uint256 callsLen = _bundle.calls.length;
-        if (callsLen == 0) revert ManagerNoRecoverableCalls(_flowId, _bundleHash);
+        uint256 recovered = 0;
         for (uint256 i = 0; i < callsLen; ++i) {
             InteropCall memory c = _bundle.calls[i];
-            if (!IAtomicRecoverable(c.to).recoverAtomicCall(destChainId, c.data)) {
-                revert ManagerCallNotRecovered(_flowId, _bundleHash, i);
+            if (IAtomicRecoverable(c.to).recoverAtomicCall(destChainId, c.data)) {
+                ++recovered;
             }
         }
+        if (recovered == 0) revert ManagerNoRecoverableCalls(_flowId, _bundleHash);
     }
 
     /// @dev Recomputes `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline,
