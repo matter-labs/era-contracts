@@ -2,12 +2,8 @@
 pragma solidity ^0.8.21;
 
 // 0x74882034
-/// @dev An atomic bundle call carries native base-token `value`, which is bridged via the base-token
-/// holder rather than the recoverable asset-router path, so a timed-out leg couldn't be refunded.
 error AtomicBundleCallCarriesValue(uint256 callIndex, uint256 value);
 // 0xb84a87f2
-/// @dev An atomic bundle call isn't a recoverable asset-router `finalizeDeposit` (wrong target or
-/// selector), so a timed-out leg containing it couldn't be refunded.
 error AtomicBundleCallNotRecoverable(uint256 callIndex, address callTarget);
 // 0x9031f751
 error AttributeAlreadySet(bytes4 selector);
