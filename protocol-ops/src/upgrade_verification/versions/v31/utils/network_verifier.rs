@@ -118,6 +118,11 @@ sol! {
         function executionDelay() external view returns (uint32);
     }
 
+    #[sol(rpc)]
+    contract RollupDAManager {
+        function isAllowedDAConfiguration(address l1DAValidator, uint8 l2DACommitmentScheme) external view returns (bool);
+    }
+
     function create2AndTransferParams(bytes memory bytecode, bytes32 salt, address owner);
 
     function create2(

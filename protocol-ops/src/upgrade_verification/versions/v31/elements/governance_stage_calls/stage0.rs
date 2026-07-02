@@ -386,12 +386,27 @@ async fn collect_pre_governance_accept_ownership_targets(
     governance: Address,
     result: &mut VerificationResult,
 ) -> anyhow::Result<Vec<Address>> {
-    // Candidates: each CTM proxy plus its ValidatorTimelock and auxiliary
-    // ownership targets discovered from the generated artifact. v31's
-    // prepare flow transfers any still-stale Ownable2Step contracts to
-    // governance and defers the accept to stage 0; include only candidates
-    // whose live pendingOwner is governance at verify time.
+    // Candidates: the core ecosystem Ownable2Step contracts (AssetTracker,
+    // ChainRegistrationSender) plus each CTM proxy with its ValidatorTimelock and
+    // auxiliary ownership targets discovered from the generated artifact. v31's
+    // prepare flow transfers any still-stale Ownable2Step contract to governance
+    // and defers the accept to stage 0; include only candidates whose live
+    // pendingOwner is governance at verify time. Both the core accepts and the
+    // CTM-adjacent accepts flow through the same `ensureOwnable2StepTargets…` aux
+    // mechanism, so they all land in (and are verified from) one trailing block.
     let mut candidates: Vec<Address> = Vec::new();
+    for name in ["asset_tracker_proxy", "chain_registration_sender_proxy"] {
+        match verifiers.address_verifier.get_by_name(name) {
+            Some(addr) if addr != Address::ZERO => {
+                if !candidates.contains(&addr) {
+                    candidates.push(addr);
+                }
+            }
+            _ => result.report_error(&format!(
+                "{name} must be a known non-zero address while deriving stage-0 deferred acceptOwnership targets"
+            )),
+        }
+    }
     for ctm in &artifact.ctms {
         if let Some(ctm_proxy) = required_ctm_address(
             ctm,
@@ -448,16 +463,25 @@ async fn collect_pre_governance_accept_ownership_targets(
     let provider = verifiers.network_verifier.get_l1_provider();
     let mut targets = Vec::new();
     for candidate in candidates {
-        let pending_owner = Ownable2Step::new(candidate, provider.clone())
-            .pendingOwner()
-            .call()
-            .await
-            .with_context(|| {
-                format!(
-                    "read pendingOwner() for {candidate} while deriving stage-0 deferred acceptOwnership targets"
-                )
-            })?;
-        if pending_owner == governance {
+        let ownable = Ownable2Step::new(candidate, provider.clone());
+        // The prepare flow transfers every still-non-governance-owned Ownable2Step
+        // candidate to governance and emits a deferred `acceptOwnership()` for it,
+        // while contracts already owned by governance get neither. So the expected
+        // accept set is exactly the candidates whose live `owner()` is not
+        // governance — independent of whether the transfer has already been
+        // initiated (`pendingOwner == governance`, e.g. on a governance-replayed
+        // fork) or is still pending an out-of-band step (e.g. an Atlas CTM and its
+        // ValidatorTimelock / RollupDAManager owned by a legacy Governance, when
+        // verifying raw against live before that ceremony runs). The live ownership
+        // and transfer-progress state itself is verified separately in `rpc_state`
+        // (`verify_v31_validator_timelocks` / `verify_v31_rollup_da_managers` / …),
+        // so we deliberately do not re-flag it here.
+        let owner = ownable.owner().call().await.with_context(|| {
+            format!(
+                "read owner() for {candidate} while deriving stage-0 deferred acceptOwnership targets"
+            )
+        })?;
+        if owner != governance {
             targets.push(candidate);
         }
     }

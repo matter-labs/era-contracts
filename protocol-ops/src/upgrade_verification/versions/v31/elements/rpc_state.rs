@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+use crate::types::L2DACommitmentScheme;
 use crate::upgrade_verification::{
     artifacts::{
         required_address_in_value as required_address, CtmFlavor, EcosystemUpgradeArtifact,
@@ -12,7 +13,7 @@ use crate::upgrade_verification::{
             network_verifier::{
                 Bridgehub as BridgehubContract, ChainRegistrationSender, ChainTypeManager,
                 L1AssetRouter, L1AssetTracker, L1NativeTokenVault, Ownable, Ownable2Step,
-                ValidatorTimelock, ZKChainFeeParams,
+                RollupDAManager, ValidatorTimelock, ZKChainFeeParams,
             },
         },
         MAX_PRIORITY_TX_GAS_LIMIT, STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID,
@@ -711,6 +712,58 @@ async fn verify_v31_rollup_da_managers(
             (Err(err), _) => result.report_error(&format!(
                 "Failed to call {label}.RollupDAManager.owner(): {err}"
             )),
+        }
+
+        // When v31 deployed a fresh rollup L1 DA validator for this CTM (Era),
+        // verify the freshly deployed manager + validator bytecode and that the
+        // manager has the rollup DA pair registered at deploy time:
+        // (validator, BLOBS_AND_PUBDATA_KECCAK256) must be an allowed
+        // configuration. A zero validator address means the CTM reuses its
+        // existing manager (ZKsync OS) — its bytecode is a prior-version contract
+        // and its pairs were set up in a prior upgrade, both out of scope here, so
+        // skip these checks.
+        let rollup_l1_da_validator = required_address(
+            &ctm.value,
+            &scope,
+            &["deployed_addresses", "rollup_l1_da_validator_addr"],
+        )?;
+        if rollup_l1_da_validator != Address::ZERO {
+            // Neither contract has immutables, so their runtime bytecode is
+            // deterministic and must match the compiled artifact exactly.
+            result
+                .expect_deployed_bytecode(
+                    verifiers,
+                    &rollup_da_manager,
+                    "l1-contracts/RollupDAManager",
+                    false,
+                )
+                .await;
+            result
+                .expect_deployed_bytecode(
+                    verifiers,
+                    &rollup_l1_da_validator,
+                    "da-contracts/RollupL1DAValidator",
+                    false,
+                )
+                .await;
+
+            let scheme = L2DACommitmentScheme::BlobsAndPubdataKeccak256 as u8;
+            let manager = RollupDAManager::new(rollup_da_manager, provider.clone());
+            match manager
+                .isAllowedDAConfiguration(rollup_l1_da_validator, scheme)
+                .call()
+                .await
+            {
+                Ok(true) => result.report_ok(&format!(
+                    "{label}.RollupDAManager allows the rollup DA pair ({rollup_l1_da_validator}, BLOBS_AND_PUBDATA_KECCAK256)"
+                )),
+                Ok(false) => result.report_error(&format!(
+                    "{label}.RollupDAManager does not allow the rollup DA pair ({rollup_l1_da_validator}, BLOBS_AND_PUBDATA_KECCAK256); the v31 deploy-time updateDAPair did not take effect"
+                )),
+                Err(err) => result.report_error(&format!(
+                    "Failed to call {label}.RollupDAManager.isAllowedDAConfiguration(): {err}"
+                )),
+            }
         }
     }
 

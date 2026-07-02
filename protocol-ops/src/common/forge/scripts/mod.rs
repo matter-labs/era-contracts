@@ -236,6 +236,7 @@ script_calls! {
     AdminFunctionsAbi::governanceExecuteCallsCall                       => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::revokeGatewayWhitelistCall                       => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::adminScheduleUpgradeCall                         => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::setZKsyncOSPreV31TotalSupplyCall                 => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::governanceAcceptOwnerCall                        => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::chainAdminAcceptAdminCall                        => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::governanceAcceptOwnerAggregatedCall              => ADMIN_FUNCTIONS_INVOCATION,
@@ -243,6 +244,7 @@ script_calls! {
     AdminFunctionsAbi::ensureOwnable2StepTargetsOwnedByGovernanceWithWrapsCall => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::executeOwnableCallsWithWrapsCall                 => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::upgradeChainFromCTMCall                          => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::upgradeChainFromCTMAndSetDAValidatorPairCall     => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::updateValidatorCall                              => ADMIN_FUNCTIONS_INVOCATION,
     // GatewayUtils
     GatewayUtilsAbi::finishMigrateChainFromGatewayCall                 => GATEWAY_UTILS_INVOCATION,

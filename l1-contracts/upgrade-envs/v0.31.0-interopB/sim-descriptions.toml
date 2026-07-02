@@ -62,9 +62,9 @@ tn_ntv                              = "0xF8d4A5195737043f45F998539D5C62Eee02E342
 tn_l1_nullifier                     = "0x9e24E2c23933d30eF2DEB70A0D977Fb1Ca20AbEa"  # Testnet L1Nullifier proxy
 tn_ctm_deployment_tracker           = "0x6FCe8BB8480feBe1a8f3F5Ed083cF54703975477"  # Testnet CTMDeploymentTracker (L1CtmDeployer)
 tn_chain_asset_handler              = "0xDfA2193b161d7bd45FC81b4E80225eebDc3CF96C"  # Testnet ChainAssetHandler proxy
-tn_l1_asset_tracker                 = "0xeb2987671344263De1C03802CA31b7A00257E47A"  # Testnet L1AssetTracker proxy (v31)
+tn_l1_asset_tracker                 = "0x150D2F16c621DD7f0cF7C9bB0eC64ccf251655C9"  # Testnet L1AssetTracker proxy (v31)
 tn_message_root                     = "0xe7047cD9979D053ceb6dB637bc0383b87A3C7f58"  # Testnet L1MessageRoot proxy
-tn_chain_registration_sender        = "0xded97b2EBaA7FBfF213AD2c4a68bB0101AfBC0e8"  # Testnet ChainRegistrationSender proxy (v31)
+tn_chain_registration_sender        = "0xdFf4C5797B2522D8ed9b27b8993cE455e66D5D40"  # Testnet ChainRegistrationSender proxy (v31)
 tn_ecosystem_tpa                    = "0xE00456791Da489418355B0a6b27965A54c7C01d2"  # Testnet ecosystem TransparentProxyAdmin (PUH-owned; also Atlas CTM/VT PA)
 tn_puh                              = "0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D"  # Testnet PUH (ProtocolUpgradeHandler proxy)
 tn_puh_proxy_admin                  = "0xd9dc52a30713c48e6e15696d258489f16c8d9ee0"  # Testnet PUH's ProxyAdmin
@@ -73,13 +73,13 @@ tn_era_ctm                          = "0x3Cc81628a14C824057a97C1B4Ab17758E5D1886
 tn_atlas_ctm                        = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"  # Testnet Atlas (ZKsync OS) CTM proxy
 tn_era_validator_timelock           = "0x2d259801aC24143b1F01EBF576833B8f685ACc14"  # Testnet Era ValidatorTimelock (postV29)
 tn_atlas_validator_timelock         = "0x73B668d8374DDB42c9e2f46fd5B754Ac215495bc"  # Testnet Atlas ValidatorTimelock (postV29)
-tn_era_gov_upgrade_timer            = "0x7ACa96a96a0243A76c5F4a263A94CD8F0a32F735"  # Testnet Era GovernanceUpgradeTimer
-tn_atlas_gov_upgrade_timer          = "0x1EBcF35b6FDeA128248E0Fd825980171E2e635BA"  # Testnet Atlas (ZKsync OS) GovernanceUpgradeTimer
-tn_era_upgrade_stage_validator      = "0x235CD42116360C378e74E81F3D3356CE88aA496a"  # Testnet Era UpgradeStageValidator
-tn_atlas_upgrade_stage_validator    = "0xFF70697be4BfEB4aC27eb62AF83fC91294EFa35e"  # Testnet Atlas (ZKsync OS) UpgradeStageValidator
+tn_era_gov_upgrade_timer            = "0x254Bbc0198279a503ad400d90dD6b67F1573a9E4"  # Testnet Era GovernanceUpgradeTimer
+tn_atlas_gov_upgrade_timer          = "0x360C49a3E63469846B68F86dB256D8f25B9a54e4"  # Testnet Atlas (ZKsync OS) GovernanceUpgradeTimer
+tn_era_upgrade_stage_validator      = "0xE58470eb2C86CDf7457aEBc5e1182841b00c6fCC"  # Testnet Era UpgradeStageValidator
+tn_atlas_upgrade_stage_validator    = "0x9CB4f7166bF7AD144A658554D6Ea9db976154cB0"  # Testnet Atlas (ZKsync OS) UpgradeStageValidator
 tn_atlas_rollup_da_manager          = "0xC90E4E4897421E9380d734b72221f5485C3fd116"  # Testnet Atlas RollupDAManager
-tn_era_rollup_da_manager            = "0x82Ad20F138A46998265Ba75fdf1da4bB2E949934"  # Testnet Era RollupDAManager
-tn_atlas_verifier                   = "0xb32042d624cea1C401b854F6fc10aA3e0899d077"  # Testnet Atlas ZKsync OS verifier
+tn_era_rollup_da_manager            = "0x3B92E09A53573bE654a75Ec0C0e36aD8C803C25E"  # Testnet Era RollupDAManager (v31-redeployed; DA pair set at deploy time)
+tn_atlas_verifier                   = "0x36bdD4226c312d782c218c813129935028139fA1"  # Testnet Atlas ZKsync OS verifier
 tn_chain_admin                      = "0x7cbdDA00285de05a1353803db38770043e359B6d"  # Testnet ChainAdmin (owner 0x5555…643c)
 tn_era_test_chain                   = "0xd3bc4353957bc0f138318384aa207c708a9455c4"  # Testnet Era chain 301 diamond (test_upgrade target)
 tn_zkos_test_chain                  = "0x02b1ac1cf0a592aefd3c2246b2431388365db272"  # Testnet ZKsync OS chain diamond (test_upgrade target)
@@ -259,13 +259,13 @@ desc = "PUH stage 0: PUH ProxyAdmin.upgradeAndCall(PUH proxy 0x8f086275…, newI
 [[entries]]
 target = "chain_registration_sender"  # ChainRegistrationSender
 selector = "0x79ba5097"  # acceptOwnership
-desc = "PUH stage 1: ChainRegistrationSender.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns ChainRegistrationSender."
+desc = "PUH stage 0: ChainRegistrationSender.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns ChainRegistrationSender."
 
 # L1AssetTracker.acceptOwnership — PUH accepts ownership of L1AT that the deployer created+transferred in phase 2.
 [[entries]]
 target = "l1_asset_tracker"  # L1AssetTracker
 selector = "0x79ba5097"  # acceptOwnership
-desc = "PUH stage 1: L1AssetTracker.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns L1AT."
+desc = "PUH stage 0: L1AssetTracker.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns L1AT."
 
 [[entries]]
 target = "ntv"  # NTV
@@ -647,26 +647,28 @@ selector = "0x99a88ec4"
 arg0_address = "tn_era_validator_timelock"
 desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(Era ValidatorTimelock 0x2d259801…, newImpl) — swaps the Era ValidatorTimelock impl to v31."
 
-# ─── Stage 1: acceptOwnership / wiring / timer + validator checks / CTM version registration ───
+# ─── Stage 1: wiring / timer + validator checks / CTM version registration ───
+# (The ChainRegistrationSender / L1AssetTracker acceptOwnership() calls moved to
+#  stage 0 — see the stage-0 deferred-accept block above.)
 [[entries]]
 target = "tn_chain_registration_sender"
 selector = "0x79ba5097"  # acceptOwnership()
-desc = "Testnet PUH stage 1: ChainRegistrationSender.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns ChainRegistrationSender."
+desc = "Testnet PUH stage 0: ChainRegistrationSender.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns ChainRegistrationSender."
 
 [[entries]]
 target = "tn_l1_asset_tracker"
 selector = "0x79ba5097"  # acceptOwnership()
-desc = "Testnet PUH stage 1: L1AssetTracker.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns the L1AssetTracker."
+desc = "Testnet PUH stage 0: L1AssetTracker.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns the L1AssetTracker."
 
 [[entries]]
 target = "tn_ntv"
 selector = "0xe26daa7e"  # setAssetTracker(address)
-desc = "Testnet PUH stage 1: NTV.setAssetTracker(L1AssetTracker 0xeb298767…) — wires NTV to push balance updates to the L1AT."
+desc = "Testnet PUH stage 1: NTV.setAssetTracker(L1AssetTracker 0x150d2f16…) — wires NTV to push balance updates to the L1AT."
 
 [[entries]]
 target = "tn_bridgehub"
 selector = "0xa17223b0"  # setAddressesV31(address)
-desc = "Testnet PUH stage 1: Bridgehub.setAddressesV31(ChainRegistrationSender 0xded97b2E…) — wires Bridgehub to the v31 ChainRegistrationSender."
+desc = "Testnet PUH stage 1: Bridgehub.setAddressesV31(ChainRegistrationSender 0xdFf4C579…) — wires Bridgehub to the v31 ChainRegistrationSender."
 
 [[entries]]
 target = "tn_chain_asset_handler"
@@ -676,12 +678,7 @@ desc = "Testnet PUH stage 1: ChainAssetHandler.setAddresses(...) — post-upgrad
 [[entries]]
 target = "tn_era_rollup_da_manager"
 selector = "0x79ba5097"  # acceptOwnership()
-desc = "Testnet PUH stage 1: Era RollupDAManager.acceptOwnership() — completes the deployer-issued transfer to PUH before configuring the DA pair."
-
-[[entries]]
-target = "tn_era_rollup_da_manager"
-selector = "0x0e52323f"  # updateDAPair(address,uint8,bool)
-desc = "Testnet PUH stage 1: Era RollupDAManager.updateDAPair(0xcc46…, BLOBS_AND_PUBDATA_KECCAK256, true) — allows the permanent-rollup DA pair."
+desc = "Testnet PUH stage 0: Era RollupDAManager.acceptOwnership() — completes the deployer-issued transfer to PUH. The v31-redeployed manager already has the rollup DA pair registered at deploy time, so no governance updateDAPair() call is needed."
 
 [[entries]]
 target = "tn_atlas_gov_upgrade_timer"
