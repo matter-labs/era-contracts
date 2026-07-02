@@ -38,6 +38,8 @@ import {
 import {AssetIdMismatch, MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 import {
+    AtomicBundleCallCarriesValue,
+    AtomicBundleCallNotRecoverable,
     AttributeAlreadySet,
     AttributeViolatesRestriction,
     DestinationChainNotRegistered,
@@ -541,7 +543,7 @@ contract InteropCenter is
     /// {_sendBundleToL1}.
     /// @dev `_atomicSend` (flowId/deadline/lowNullifierIndex) is passed out-of-band and is intentionally
     /// NOT embedded in `_bundle`, so `bundleHash` is independent of `flowId`. This is required:
-    /// `flowId = keccak256(abi.encode(sortedBundleHashes, chainIds, deadline))` must be computable
+    /// `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))` must be computable
     /// off-chain before the send, which is impossible if a `bundleHash` (a flowId input) embedded `flowId`.
     function _dispatchBundle(
         InteropBundle memory _bundle,
@@ -551,6 +553,9 @@ contract InteropCenter is
         bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
 
         if (_atomicSend.isAtomic) {
+            // Gate the bundle to refundable-by-construction at SEND, so every committed leg
+            // can be reversed on timeout (P3). Done before `append` so a non-refundable leg never commits.
+            _validateAtomicBundleRefundable(_bundle);
             IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
                 _flowId: _atomicSend.flowId,
                 _bundleHash: bundleHash,
@@ -559,6 +564,47 @@ contract InteropCenter is
             });
         } else {
             msgHash = _sendBundleToL1(interopBundleBytes, _bundle.calls.length);
+        }
+    }
+
+    /// @notice Send-time refundability gate: an atomic bundle MUST be refundable by construction, so a
+    /// timed-out leg can always be reversed to its depositor (spec property P3). Every call MUST:
+    ///   - carry NO native base-token `value` — a base-token/native-value leg is bridged via the base-token
+    ///     holder, which the asset-router recovery path (`recoverAtomicCall`) cannot reverse (it would
+    ///     lock on timeout); and
+    ///   - be a recoverable asset-router call: a `finalizeDeposit(uint256,bytes32,bytes)` to the canonical
+    ///     {L2AssetRouter} — the only shape `recoverAtomicCall` recognises and reverses.
+    /// A non-base-token `finalizeDeposit` asset is implied: base-token transfers move as `value` (rejected
+    /// above), and a `finalizeDeposit` carrying the base-token assetId reverts at destination execution.
+    /// Rejecting non-recoverable calls here also removes the "mixed bundle silently strands an uncovered
+    /// call" hazard — every committed call is recoverable, complementing `_recoverBundle`'s
+    /// all-calls-recovered check on the timeout path.
+    /// @dev `pure`: it inspects only the bundle's own calls. Applies to ALL atomic bundles regardless of
+    /// entry path, since every atomic send funnels through {_dispatchBundle}.
+    function _validateAtomicBundleRefundable(InteropBundle memory _bundle) internal pure {
+        uint256 callsLength = _bundle.calls.length;
+        for (uint256 i = 0; i < callsLength; ++i) {
+            InteropCall memory c = _bundle.calls[i];
+            if (c.value != 0) {
+                revert AtomicBundleCallCarriesValue(i, c.value);
+            }
+            if (
+                c.to != L2_ASSET_ROUTER_ADDR ||
+                c.data.length < 4 ||
+                _leadingSelector(c.data) != IAssetRouterShared.finalizeDeposit.selector
+            ) {
+                revert AtomicBundleCallNotRecoverable(i, c.to);
+            }
+        }
+    }
+
+    /// @dev Reads the leading 4-byte selector of an in-memory call payload. Caller MUST ensure
+    /// `_data.length >= 4`. `bytes` are stored left-aligned, so the first word's top 4 bytes are the
+    /// selector.
+    function _leadingSelector(bytes memory _data) private pure returns (bytes4 selector) {
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            selector := mload(add(_data, 0x20))
         }
     }
 

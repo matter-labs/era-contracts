@@ -11,8 +11,10 @@ dispatched.
 ## Key values
 
 - `bundleHash = keccak256(abi.encode(sourceChainId, bundleBytes))` — a leg's bundle, chain-specific.
-- `flowId = keccak256(abi.encode(legBundleHashes, chainIds, deadline))` — binds all legs; both arrays
-  strictly ascending, `deadline` is a settlement-layer block number.
+- `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))` —
+  binds all legs, each leg's source chain, the deadline, and the settlement layer. `legBundleHashes` is
+  strictly ascending (canonical order + dedup); `legSourceChainIds` is positional (aligned 1:1, may
+  repeat); `deadline` is a settlement-layer timestamp.
 - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))` — the IMT
   leaf value for a leg. It bakes in `flowId` (hence all legs) and the chain-specific `bundleHash`, so a
   leg's commit value can only ever be inserted into its own source chain's IMT.
@@ -36,28 +38,34 @@ bundle, so `bundleHash` does not depend on `flowId` (which would be circular).
 3. **Finalize** (destination). `InteropHandler.executeAtomicBundle(bundle, finalityProof)` calls
    `AtomicFlowManager.requireFlowFinalized`, which for **every** leg verifies an IMT **inclusion** proof
    (`AtomicInteropProof.verifyInclusion`): the leg's `commitValue` is present in its source chain's IMT
-   as of an authenticated interop root whose settlement-layer block is `<= deadline`. If all legs are
-   proven committed in time, the bundle's calls execute (the destination mint). Inclusion is
-   self-binding: a `commitValue` only exists in its true source chain's tree, so a proof can only
-   succeed against the right chain.
+   as of an authenticated interop root whose batch's settlement timestamp `t <= deadline`, that batch
+   settled on the flow's `settlementLayerChainId` (BIND-SL), and the proof's `sourceChainId` equals the
+   leg's declared `legSourceChainIds[i]` (BIND-CHAIN). If all legs are proven committed in time, the
+   bundle's calls execute (the destination mint). Inclusion is self-binding — a `commitValue` only exists
+   in its true source chain's tree — but non-inclusion is not, which is why BIND-CHAIN is enforced.
 4. **Timeout / refund.** If a leg never commits in time, `AtomicFlowManager.authorizeRefund` takes an
-   O(log n) **non-inclusion** proof (`AtomicInteropProof.verifyNonInclusion`): the missing leg's
-   `commitValue` is absent from an authenticated root whose settlement-layer block is `> deadline`.
-   Since the IMT is append-only, absence after the deadline implies absence at the deadline, so the flow
-   can no longer finalize. It marks this chain's `Committed` legs `Revertable`; `claimRefund` then
-   reverses each burn by asking the call's target to recover itself via `IAtomicRecoverable.recoverAtomicCall`
-   (the `L2AssetRouter` implements it), re-minting to the original depositor.
+   **adjacency** proof (`AtomicInteropProof.verifyTimeoutAdjacency`): the missing leg's `commitValue` is
+   absent from the source chain's **last** batch `N` with settlement timestamp `t_N <= deadline`, pinned
+   by the consecutive successor batch `N+1` with `t_{N+1} > deadline`. Because the IMT is append-only and
+   `t` is monotone, a value committed by the deadline is present in `N`, so this cannot succeed for an
+   on-time (or already-finalized) leg — closing the stale/genesis-root force-refund. The proof is bound to
+   the missing leg's own source chain (BIND-CHAIN) and settlement layer (BIND-SL). It marks this chain's
+   `Committed` legs `Revertable`; `claimRefund` then reverses each burn by asking the call's target to
+   recover itself via `IAtomicRecoverable.recoverAtomicCall` (the `L2AssetRouter` implements it),
+   re-minting to the original depositor — and requires **every** call to recover. Atomic bundles are
+   gated at send (`InteropCenter`) to only recoverable, no-native-`value` calls, so every committed leg is
+   refundable by construction.
 
 Leg state machine (`LegState`): `Unset -> Committed` (send) `-> Revertable -> Reverted` (timeout path).
 
 ## Contracts
 
-| Contract                                                                                  | Layer | Role                                                                                                                                                                                                               |
-| ----------------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `L2InteropCommitmentTree`                                                                 | L2    | Per-chain append-only **Indexed** Merkle Tree (`{value, nextIndex, nextValue}` leaves). `append` is appender-gated (the flow manager); publishes `abi.encode(root)` to L1 on every insert. Built-in at `0x10012`.  |
-| `AtomicFlowManager`                                                                       | L2    | `append` (from `InteropCenter`), `requireFlowFinalized` (from `InteropHandler`), `authorizeRefund` / `claimRefund` (timeout). Holds per-leg `LegState`. Built-in at `0x10014`.                                     |
-| `libraries/AtomicInteropProof`                                                            | L2    | `verifyInclusion` / `verifyNonInclusion`, `commitValue`, and `_authenticateRoot` — authenticates a `chainImtRoot` against the imported interop root and derives the settlement-layer block for the deadline check. |
-| `IL2InteropCommitmentTree`, `IAtomicFlowManager`, `IAtomicInterop`, `AtomicInteropErrors` | L2    | Interfaces, shared structs (`ImtProof`, `AtomicFinalityProof`, `LegState`), and errors.                                                                                                                            |
+| Contract                                                                                  | Layer | Role                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `L2InteropCommitmentTree`                                                                 | L2    | Per-chain append-only **Indexed** Merkle Tree (`{value, nextIndex, nextValue}` leaves). `append` is appender-gated (the flow manager); publishes `abi.encode(root)` to L1 on every insert. Built-in at `0x10012`.                                                                    |
+| `AtomicFlowManager`                                                                       | L2    | `append` (from `InteropCenter`), `requireFlowFinalized` (from `InteropHandler`), `authorizeRefund` / `claimRefund` (timeout). Holds per-leg `LegState`. Built-in at `0x10014`.                                                                                                       |
+| `libraries/AtomicInteropProof`                                                            | L2    | `verifyInclusion` and `verifyTimeoutAdjacency` (for inclusion and timeout proofs respectively), `commitValue`, and the private `_authenticateRoot` — authenticates a `chainImtRoot` against the imported interop root and derives the settlement-layer block for the deadline check. |
+| `IL2InteropCommitmentTree`, `IAtomicFlowManager`, `IAtomicInterop`, `AtomicInteropErrors` | L2    | Interfaces, shared structs (`ImtProof`, `AtomicFinalityProof`, `LegState`), and errors.                                                                                                                                                                                              |
 
 The flow's entry points live outside this directory: `InteropCenter` (`interop/`, `0x1000d`) drives the
 send + `append`; `InteropHandler` (`interop/`, `0x1000e`) drives `executeAtomicBundle`; `L2AssetRouter`

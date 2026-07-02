@@ -305,7 +305,7 @@ contract MessageRoot_Extended_Test is Test {
 
         // Successfully add batch root
         vm.prank(chainSender);
-        messageRoot.addChainBatchRoot(chainId, 1, batchRoot);
+        messageRoot.addChainBatchRoot(chainId, 1, batchRoot, 0);
 
         // Verify batch root is stored
         assertEq(messageRoot.chainBatchRoots(chainId, 1), batchRoot);
@@ -336,11 +336,11 @@ contract MessageRoot_Extended_Test is Test {
 
         // Add first batch root
         vm.prank(chainSender);
-        messageRoot.addChainBatchRoot(chainId, 1, batchRoot1);
+        messageRoot.addChainBatchRoot(chainId, 1, batchRoot1, 0);
 
         // Add second batch root
         vm.prank(chainSender);
-        messageRoot.addChainBatchRoot(chainId, 2, batchRoot2);
+        messageRoot.addChainBatchRoot(chainId, 2, batchRoot2, 0);
 
         // Verify both batch roots are stored
         assertEq(messageRoot.chainBatchRoots(chainId, 1), batchRoot1);
@@ -378,7 +378,7 @@ contract MessageRoot_Extended_Test is Test {
 
         // Add a batch root
         vm.prank(GW_ASSET_TRACKER_ADDR);
-        l2MessageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
+        l2MessageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"), 0);
 
         // Verify interopRootLogId incremented once for the new block
         assertEq(

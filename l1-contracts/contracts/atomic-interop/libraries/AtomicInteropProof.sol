@@ -13,7 +13,10 @@ import {
     ProofDeadlineExceeded,
     ProofDeadlineNotExceeded,
     ProofInclusionFailed,
-    ProofNonInclusionFailed
+    ProofNonInclusionFailed,
+    ProofSettlementLayerMismatch,
+    ProofSourceChainMismatch,
+    ProofAdjacencyNotConsecutive
 } from "../AtomicInteropErrors.sol";
 
 /// @author Matter Labs
@@ -26,17 +29,30 @@ import {
 /// imported for `(sourceChainId, batchNumber)` — which it only holds once the source batch has
 /// settled, so the root cannot be forged.
 ///
-/// The flow `deadline` is a **settlement-layer (SL) block number**. It is NOT carried in the proof
-/// struct (that would be spoofable); instead it is **derived from the same multi-hop proof** the
-/// message verifier checks. We independently re-parse `messageProof` with {MessageHashing._getProofData}
-/// (computing the identical leaf the verifier uses) and read `pd.settlementLayerBatchNumber` — which is
-/// exactly the SL block the verifier resolved `interopRoots(SL, slBlock)` against, because both parse
-/// the same `(sourceChainId, batchNumber, messageIndex, leaf, messageProof)`. That binding is the whole
-/// point: the SL block is provably the one whose imported root authenticated the IMT root.
+/// The flow `deadline` is a **settlement-layer (SL) timestamp**. It is NOT carried in the proof
+/// struct (that would be spoofable); instead each batch's SL-assigned settlement timestamp `t` is
+/// **derived from the same multi-hop proof** the message verifier checks. We independently re-parse
+/// `messageProof` with {MessageHashing._getProofData} (computing the identical leaf the verifier uses)
+/// and read `pd.batchSettlementTimestamp` — `t` is authenticated because it is folded into the chain
+/// batch leaf ({MessageHashing.batchLeafHash}), so a prover cannot forge it without breaking the
+/// authenticated chainId / shared-tree path. The same parse also exposes `pd.settlementLayerChainId` and
+/// `pd.settlementLayerBatchNumber` (the SL snapshot block the root resolved `interopRoots` against).
 ///
-/// Single-settlement-layer assumption: a flow's `deadline` is comparable across legs only if all legs
-/// settle on the same SL, so their `settlementLayerBatchNumber`s share a scale. `slChainId`
-/// (`pd.settlementLayerChainId`) is returned so a caller may assert consistency across a flow's proofs.
+/// Single-settlement-layer enforcement (BIND-SL): a flow's `deadline`/`t` are comparable across
+/// legs only if all legs settle on the same SL. {verifyInclusion} / {verifyTimeoutAdjacency} therefore
+/// require the resolved `slChainId` to equal the flow's `settlementLayerChainId` (else
+/// {ProofSettlementLayerMismatch}).
+///
+/// Adjacency timeout (RULE-ADJACENCY): a leg times out iff its commit value is absent from the
+/// LAST batch `N` with `t_N <= deadline`. {verifyTimeoutAdjacency} proves absence at `N` (with
+/// `t_N <= deadline`) AND that the consecutive successor batch `N+1` (same source chain, same SL) has
+/// `t_{N+1} > deadline` — pinning `N` as the last in-time batch. This closes the stale/genesis-root
+/// force-refund (an old/empty root cannot be used, because its successor would still be `<= deadline`)
+/// while keeping a genuine no-show refundable. TODO(adjacency tip branch): the spec's halt branch — `N` is
+/// the highest batch of the chain aggregated in a post-`deadline` snapshot under `settlementLayerChainId`
+/// — additionally restores refund LIVENESS for a halted source with no successor batch. It needs an SL
+/// chain-tree "highest-leaf" proof primitive not yet exposed by `proveL2MessageInclusionShared`; it is
+/// documented as future work and is a LIVENESS (not safety) extension.
 ///
 /// Membership (inclusion) and non-membership (low-nullifier) against the authenticated root are
 /// delegated to {IndexedMerkleTree}, the single shared IMT engine.
@@ -46,23 +62,28 @@ library AtomicInteropProof {
         return uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, _flowId, _specHash)));
     }
 
-    /// @notice Verifies `_commitValue` is present in `_proof.sourceChainId`'s IMT as of an
-    /// authenticated root whose settlement-layer block number is `<= _deadline`.
+    /// @notice Verifies `_commitValue` is present in `_proof.sourceChainId`'s IMT as of an authenticated
+    /// root whose batch settled on `_expectedSlChainId` with settlement timestamp `t <= _deadline` (C4).
     /// @dev The proof is bound to the correct chain by `_commitValue` itself: it bakes in the
     /// chain-specific `bundleHash`, so a leg's commit value can only ever be inserted into its own
     /// source chain's tree — the membership check below therefore can only pass against that chain.
-    function verifyInclusion(ImtProof calldata _proof, uint256 _commitValue, uint64 _deadline) internal view {
-        // solhint-disable-next-line func-named-parameters
-        (uint256 slBlock, ) = _authenticateRoot(
-            _proof.sourceChainId,
-            _proof.batchNumber,
-            _proof.chainImtRoot,
-            _proof.messageTxNumberInBatch,
-            _proof.messageIndex,
-            _proof.messageProof
-        );
-        if (slBlock > _deadline) {
-            revert ProofDeadlineExceeded(slBlock, _deadline);
+    /// BIND-SL: the authenticated root's settlement layer MUST equal `_expectedSlChainId`, so a
+    /// flow's per-leg `t`/`deadline` comparisons all share one SL clock.
+    /// @param _expectedSlChainId The flow's `settlementLayerChainId` the proof's root must settle on.
+    function verifyInclusion(
+        ImtProof calldata _proof,
+        uint256 _commitValue,
+        uint64 _deadline,
+        uint256 _expectedSlChainId
+    ) internal view {
+        (, uint256 slChainId, uint256 batchTimestamp) = _authenticateRoot(_proof);
+        if (slChainId != _expectedSlChainId) {
+            revert ProofSettlementLayerMismatch(_expectedSlChainId, slChainId);
+        }
+        // C4: the value's batch must have settled no later than the deadline (an insert can never be
+        // back-dated — `t` only rises — so a commit cannot be made to look in-time after the fact).
+        if (batchTimestamp > _deadline) {
+            revert ProofDeadlineExceeded(batchTimestamp, _deadline);
         }
         bool included = IndexedMerkleTree.verifyInclusion({
             _root: _proof.chainImtRoot,
@@ -74,88 +95,121 @@ library AtomicInteropProof {
         if (!included) revert ProofInclusionFailed(_proof.chainImtRoot, _commitValue);
     }
 
-    /// @notice Verifies `_commitValue` is absent from `_proof.sourceChainId`'s IMT as of an
-    /// authenticated root whose settlement-layer block number is `> _deadline` — so the leg can no
-    /// longer be committed in time and the flow cannot finalize.
-    /// @dev As in {verifyInclusion}, `_commitValue` is chain-specific (it bakes in the chain-specific
-    /// `bundleHash`), so the non-inclusion check is meaningful only against the leg's own source chain.
-    function verifyNonInclusion(ImtProof calldata _proof, uint256 _commitValue, uint64 _deadline) internal view {
-        // solhint-disable-next-line func-named-parameters
-        (uint256 slBlock, ) = _authenticateRoot(
-            _proof.sourceChainId,
-            _proof.batchNumber,
-            _proof.chainImtRoot,
-            _proof.messageTxNumberInBatch,
-            _proof.messageIndex,
-            _proof.messageProof
-        );
-        if (slBlock <= _deadline) {
-            revert ProofDeadlineNotExceeded(slBlock, _deadline);
+    /// @notice RULE-ADJACENCY timeout: verifies `_commitValue` can no longer be committed in time
+    /// and the flow cannot finalize, by proving it absent from the LAST batch with `t <= _deadline` on
+    /// `_proof`'s source chain — pinned via the consecutive successor witness.
+    ///   - A1 (BIND-CHAIN + BIND-SL): BIND-CHAIN (proof.sourceChainId == legSourceChainIds[i]) is
+    ///     enforced by caller in authorizeRefund; BIND-SL (slChainId == settlementLayerChainId) is
+    ///     enforced here (lines 122-124). Both must hold for settlement-layer comparability.
+    ///   - A2: `_absence` authenticates batch `N` with `t_N <= _deadline`, and `_commitValue` is absent
+    ///     (low-nullifier non-membership) from `N`'s IMT root.
+    ///   - A3 (live branch): `_successor` authenticates the consecutive batch `N+1` of the SAME source
+    ///     chain and SAME settlement layer with `t_{N+1} > _deadline`, so `N` is the last in-time batch.
+    /// By per-chain append-only + monotone `t`, a value present in any batch with `t <= _deadline` is
+    /// present in `N` too — so this cannot succeed for an on-time, finalized leg (closing the stale-root
+    /// double-mint).
+    /// @param _absence Non-inclusion proof at batch `N` (gives `t_N`, `N = _absence.batchNumber`).
+    /// @param _successor Root-authentication proof of batch `N+1` (gives `t_{N+1}`; its IMT membership
+    /// fields are unused — only its existence and timestamp matter).
+    /// @param _expectedSlChainId The flow's `settlementLayerChainId` both proofs must settle on.
+    function verifyTimeoutAdjacency(
+        ImtProof calldata _absence,
+        ImtProof calldata _successor,
+        uint256 _commitValue,
+        uint64 _deadline,
+        uint256 _expectedSlChainId
+    ) internal view {
+        // ── A2: absence at batch N, with t_N <= deadline ──
+        (, uint256 slChainIdN, uint256 tN) = _authenticateRoot(_absence);
+        if (slChainIdN != _expectedSlChainId) {
+            revert ProofSettlementLayerMismatch(_expectedSlChainId, slChainIdN);
+        }
+        if (tN > _deadline) {
+            // Batch N is itself past the deadline -> it is not an in-time batch; reject (a stale absence
+            // batch must be at/before the deadline to bound the value's potential commit window).
+            revert ProofDeadlineExceeded(tN, _deadline);
         }
         bool absent = IndexedMerkleTree.verifyNonInclusion({
-            _root: _proof.chainImtRoot,
+            _root: _absence.chainImtRoot,
             _value: _commitValue,
-            _lowLeaf: _proof.leaf,
-            _lowLeafIndex: _proof.imtLeafIndex,
-            _lowLeafProof: _proof.imtProof
+            _lowLeaf: _absence.leaf,
+            _lowLeafIndex: _absence.imtLeafIndex,
+            _lowLeafProof: _absence.imtProof
         });
-        if (!absent) revert ProofNonInclusionFailed(_proof.chainImtRoot, _commitValue);
+        if (!absent) revert ProofNonInclusionFailed(_absence.chainImtRoot, _commitValue);
+
+        // ── A3 (live branch): consecutive successor N+1, same chain & SL, with t_{N+1} > deadline ──
+        (, uint256 slChainIdS, uint256 tS) = _authenticateRoot(_successor);
+        if (slChainIdS != _expectedSlChainId) {
+            revert ProofSettlementLayerMismatch(_expectedSlChainId, slChainIdS);
+        }
+        if (_successor.sourceChainId != _absence.sourceChainId) {
+            revert ProofSourceChainMismatch(_absence.sourceChainId, _successor.sourceChainId);
+        }
+        if (_successor.batchNumber != _absence.batchNumber + 1) {
+            revert ProofAdjacencyNotConsecutive(_absence.batchNumber, _successor.batchNumber);
+        }
+        if (tS <= _deadline) {
+            // Successor is still in time -> N is NOT the last in-time batch, so absence at N proves
+            // nothing (the value could still be committed in a batch between N and the deadline). This is
+            // exactly what defeats the stale/genesis-root force-refund.
+            revert ProofDeadlineNotExceeded(tS, _deadline);
+        }
     }
 
     /// @dev Reconstructs and authenticates the commitment tree's `(root)` L2->L1 message against the
     /// interop root imported for `(_sourceChainId, _batchNumber)`, AND derives the settlement-layer
-    /// block number the root settled at from the very same proof.
+    /// metadata — the SL snapshot block, the SL chain id, and the batch's settlement timestamp `t` — from
+    /// the very same proof.
     ///
     /// Step 1 (auth, unchanged): build the {L2Message} (sender pinned to {L2_INTEROP_COMMITMENT_TREE_ADDR},
     /// identical on every chain — this binds the root to the real tree; the interop-root channel binds
     /// it to `_sourceChainId`) and verify inclusion via `proveL2MessageInclusionShared`. The `abi.encode`
     /// here must match what {L2InteropCommitmentTree} publishes.
     ///
-    /// Step 2 (SL block): independently re-parse the same proof. We compute the identical leaf the
+    /// Step 2 (SL metadata): independently re-parse the same proof. We compute the identical leaf the
     /// verifier hashes (`getLeafHashFromLog(_l2MessageToLog(message))`) and run {MessageHashing._getProofData}
-    /// over the same `(_sourceChainId, _batchNumber, _messageIndex, leaf, _messageProof)`. A single-level /
-    /// commit-based proof (`finalProofNode == true`) carries no SL block, so we reject it; a multi-hop /
-    /// SL-global proof exposes `pd.settlementLayerBatchNumber` (the SL block) and `pd.settlementLayerChainId`.
+    /// over the same `(sourceChainId, batchNumber, messageIndex, leaf, messageProof)`. A single-level /
+    /// commit-based proof (`finalProofNode == true`) carries no SL anchor, so we reject it; a multi-hop /
+    /// SL-global proof exposes `pd.settlementLayerBatchNumber` (the SL snapshot block),
+    /// `pd.settlementLayerChainId`, and `pd.batchSettlementTimestamp` (the authenticated `t`).
     ///
-    /// @return slBlock The settlement-layer block number `interopRoots(slChainId, slBlock)` was resolved at.
-    /// @return slChainId The settlement-layer chain id (returned for cross-leg consistency checks).
+    /// @return slBlock The SL snapshot block `interopRoots(slChainId, slBlock)` was resolved at.
+    /// @return slChainId The settlement-layer chain id (enforced equal to the flow's SL by callers).
+    /// @return batchTimestamp The batch's SL-assigned settlement timestamp `t`, compared to the deadline.
     function _authenticateRoot(
-        uint256 _sourceChainId,
-        uint256 _batchNumber,
-        bytes32 _chainImtRoot,
-        uint16 _messageTxNumberInBatch,
-        uint256 _messageIndex,
-        bytes32[] calldata _messageProof
-    ) private view returns (uint256 slBlock, uint256 slChainId) {
+        ImtProof calldata _proof
+    ) private view returns (uint256 slBlock, uint256 slChainId, uint256 batchTimestamp) {
         L2Message memory message = L2Message({
-            txNumberInBatch: _messageTxNumberInBatch,
+            txNumberInBatch: _proof.messageTxNumberInBatch,
             sender: L2_INTEROP_COMMITMENT_TREE_ADDR,
-            data: abi.encode(_chainImtRoot)
+            data: abi.encode(_proof.chainImtRoot)
         });
         bool ok = L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared({
-            _chainId: _sourceChainId,
-            _blockOrBatchNumber: _batchNumber,
-            _index: _messageIndex,
+            _chainId: _proof.sourceChainId,
+            _blockOrBatchNumber: _proof.batchNumber,
+            _index: _proof.messageIndex,
             _message: message,
-            _proof: _messageProof
+            _proof: _proof.messageProof
         });
-        if (!ok) revert ProofRootMessageInclusionFailed(_sourceChainId, _batchNumber);
+        if (!ok) revert ProofRootMessageInclusionFailed(_proof.sourceChainId, _proof.batchNumber);
 
-        // Re-parse the SAME proof to extract the SL block. The leaf is computed exactly as the verifier
+        // Re-parse the SAME proof to extract the SL metadata. The leaf is computed exactly as the verifier
         // does, so the parse is bound to the verified root.
         bytes32 leaf = MessageHashing.getLeafHashFromLog(MessageHashing._l2MessageToLog(message));
         ProofData memory pd = MessageHashing._getProofData({
-            _chainId: _sourceChainId,
-            _batchNumber: _batchNumber,
-            _leafProofMask: _messageIndex,
+            _chainId: _proof.sourceChainId,
+            _batchNumber: _proof.batchNumber,
+            _leafProofMask: _proof.messageIndex,
             _leaf: leaf,
-            _proof: _messageProof
+            _proof: _proof.messageProof
         });
-        // A final-node (single-level / commit-based) proof has no settlement-layer anchor; the deadline
-        // cannot be expressed against it.
-        if (pd.finalProofNode) revert ProofMissingSettlementLayerAnchor(_sourceChainId, _batchNumber);
+        // A final-node (single-level / commit-based) proof has no settlement-layer anchor; neither the
+        // deadline nor `t` can be expressed against it.
+        if (pd.finalProofNode) revert ProofMissingSettlementLayerAnchor(_proof.sourceChainId, _proof.batchNumber);
 
         slBlock = pd.settlementLayerBatchNumber;
         slChainId = pd.settlementLayerChainId;
+        batchTimestamp = pd.batchSettlementTimestamp;
     }
 }

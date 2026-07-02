@@ -186,10 +186,15 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
     /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
     /// @param _chainBatchRoot The value of chainBatchRoot which is being added.
+    /// @param _settlementTimestamp The SL-assigned, monotone-non-decreasing settlement timestamp
+    /// `t` of this batch, bound into the chain batch leaf so it is authenticated and usable by the
+    /// atomic-interop adjacency timeout. TODO(STF): on ZKsync OS `StoredBatchInfo.timestamp` is 0 today —
+    /// the state-transition program / sequencer MUST emit a real monotone `t` for the timeout to be sound.
     function addChainBatchRoot(
         uint256 _chainId,
         uint256 _batchNumber,
-        bytes32 _chainBatchRoot
+        bytes32 _chainBatchRoot,
+        uint256 _settlementTimestamp
     ) public virtual addChainBatchRootRestriction(_chainId) {
         // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
@@ -207,9 +212,12 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         currentChainBatchNumber[_chainId] = expectedNewChainBatchNumber;
 
         // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.
+        // The leaf binds the batch's settlement timestamp `t` so it is authenticated downstream.
         bytes32 chainRoot;
         // slither-disable-next-line unused-return
-        (, chainRoot) = chainTree[_chainId].push(MessageHashing.batchLeafHash(_chainBatchRoot, _batchNumber));
+        (, chainRoot) = chainTree[_chainId].push(
+            MessageHashing.batchLeafHash(_chainBatchRoot, _batchNumber, _settlementTimestamp)
+        );
 
         emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
 

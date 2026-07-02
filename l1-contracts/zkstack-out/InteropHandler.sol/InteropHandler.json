@@ -84,12 +84,17 @@
             "internalType": "uint64"
           },
           {
+            "name": "settlementLayerChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
             "name": "legBundleHashes",
             "type": "bytes32[]",
             "internalType": "bytes32[]"
           },
           {
-            "name": "chainIds",
+            "name": "legSourceChainIds",
             "type": "uint256[]",
             "internalType": "uint256[]"
           },

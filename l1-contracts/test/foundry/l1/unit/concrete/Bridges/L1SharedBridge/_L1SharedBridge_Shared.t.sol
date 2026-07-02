@@ -335,6 +335,7 @@ contract L1AssetRouterTest is Test {
                     settlementLayerBatchRootMask: 0,
                     batchLeafProofLen: 0,
                     batchSettlementRoot: 0,
+                    batchSettlementTimestamp: 0,
                     chainIdLeaf: 0,
                     ptr: 0,
                     finalProofNode: false

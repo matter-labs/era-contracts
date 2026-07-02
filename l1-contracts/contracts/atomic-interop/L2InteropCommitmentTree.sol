@@ -16,9 +16,9 @@ import {CommitmentTreeNotAppender} from "./AtomicInteropErrors.sol";
 ///
 /// On every insert (and the head seed) it publishes `abi.encode(root)` to L1 via the L2->L1 messenger.
 /// Consuming chains authenticate that message against the interop root they import for the settling
-/// batch (see {AtomicInteropProof}); the snapshot time used for the deadline check is the
-/// settlement-layer block number, derived in-module from the same inclusion proof, so the tree itself
-/// no longer bundles any (operator-set) timestamp.
+/// batch (see {AtomicInteropProof}); the deadline is checked against the batch's SL-assigned settlement
+/// timestamp `t`, folded into the chain batch leaf and re-derived in-module from the same inclusion
+/// proof, so this tree itself publishes only the root and no (operator-set) timestamp.
 ///
 /// Deployed in L2 userspace (no constructor); wiring is done in `initialize`.
 contract L2InteropCommitmentTree is IL2InteropCommitmentTree {

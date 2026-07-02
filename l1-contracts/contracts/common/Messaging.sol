@@ -334,6 +334,11 @@ struct ProofData {
     uint256 settlementLayerBatchRootMask;
     uint256 batchLeafProofLen;
     bytes32 batchSettlementRoot;
+    /// @dev The source batch's SL-assigned, monotone-non-decreasing settlement timestamp `t`,
+    /// parsed from the proof and authenticated by being folded into the chain batch leaf
+    /// ({MessageHashing.batchLeafHash}). The atomic-interop adjacency timeout compares it to the flow
+    /// `deadline`. 0 for final-node proofs (no SL anchor) and for chains whose STF does not yet emit `t`.
+    uint256 batchSettlementTimestamp;
     bytes32 chainIdLeaf;
     uint256 ptr;
     bool finalProofNode;

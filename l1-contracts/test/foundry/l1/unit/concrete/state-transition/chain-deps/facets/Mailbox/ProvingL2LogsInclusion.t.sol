@@ -835,14 +835,26 @@ contract MailboxL2LogsProve is MailboxTest {
         RecursiveProofInfo memory info
     ) internal returns (bytes32[] memory proof, bytes32 chainBRoot) {
         uint256 ptr;
-        proof = new bytes32[](1 + info.logProof.length + 1 + info.batchProof.length + 2 + 1 + info.chainIdProof.length);
+        // +1 word for the settlement timestamp `t` inserted after the log-leaf proof nodes.
+        proof = new bytes32[](
+            1 + info.logProof.length + 1 + 1 + info.batchProof.length + 2 + 1 + info.chainIdProof.length
+        );
         proof[ptr++] = _composeMetadata(info.logProof.length, info.batchProof.length, false);
         copyBytes32(proof, info.logProof, ptr);
         ptr += info.logProof.length;
 
         bytes32 batchSettlementRoot = Merkle.calculateRootMemory(info.logProof, info.leafProofMask, info.leaf);
 
-        bytes32 batchLeafHash = MessageHashing.batchLeafHash(batchSettlementRoot, info.batchNumber);
+        // `_getProofData` reads the batch settlement timestamp `t` here (after the log-leaf proof
+        // nodes, before the batchLeafProofMask). `t == 0` on ZKsync OS today; it is folded into the leaf.
+        uint256 settlementTimestamp = 0;
+        proof[ptr++] = bytes32(settlementTimestamp);
+
+        bytes32 batchLeafHash = MessageHashing.batchLeafHash(
+            batchSettlementRoot,
+            info.batchNumber,
+            settlementTimestamp
+        );
 
         proof[ptr++] = bytes32(uint256(info.batchLeafProofMask));
         copyBytes32(proof, info.batchProof, ptr);

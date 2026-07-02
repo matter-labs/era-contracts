@@ -43,6 +43,11 @@
         "name": "_chainBatchRoot",
         "type": "bytes32",
         "internalType": "bytes32"
+      },
+      {
+        "name": "_settlementTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -326,6 +331,11 @@
             "name": "batchSettlementRoot",
             "type": "bytes32",
             "internalType": "bytes32"
+          },
+          {
+            "name": "batchSettlementTimestamp",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
             "name": "chainIdLeaf",

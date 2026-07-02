@@ -68,11 +68,23 @@ library MessageHashing {
         );
     }
 
-    /// @dev Returns the leaf hash for a chain with batch number and batch root.
+    /// @dev Returns the leaf hash for a chain batch: binds the batch root, its number, and its
+    /// SL-assigned settlement timestamp.
     /// @param batchRoot The root hash of the batch.
     /// @param batchNumber The number of the batch.
-    function batchLeafHash(bytes32 batchRoot, uint256 batchNumber) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber));
+    /// @param settlementTimestamp The settlement-layer-assigned, monotone-non-decreasing settlement
+    /// timestamp `t` of this batch. Carrying `t` in the leaf makes it authenticated by the SL aggregation
+    /// tree, which the atomic-interop adjacency timeout relies on (proving the last batch with
+    /// `t <= deadline`; see {AtomicInteropProof}). TODO(STF): on ZKsync OS `StoredBatchInfo.timestamp` is
+    /// currently 0 — the state-transition program / sequencer MUST emit a real monotone `t` for the
+    /// timeout to be sound; until then `t == 0` for every batch and the adjacency comparison degenerates.
+    function batchLeafHash(
+        bytes32 batchRoot,
+        uint256 batchNumber,
+        uint256 settlementTimestamp
+    ) internal pure returns (bytes32) {
+        // solhint-disable-next-line func-named-parameters
+        return keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber, settlementTimestamp));
     }
 
     /// @dev Returns the leaf hash for a chain with chain root and chain id.
@@ -176,8 +188,19 @@ library MessageHashing {
             if (proofMetadata.finalProofNode) {
                 return result;
             }
+            // Read the batch's SL-assigned settlement timestamp `t` and bind it into the chain
+            // batch leaf, exactly as {MessageRootBase.addChainBatchRoot} did when it pushed the leaf — so
+            // a prover cannot forge `t` without breaking the authenticated chainId/shared-tree path. Stored
+            // straight into `result` (rather than a local) to keep the stack shallow; read back below.
+            result.batchSettlementTimestamp = uint256(_proof[result.ptr]);
+            ++result.ptr;
+
             // Now, we'll have to check that the Gateway included the message.
-            bytes32 localBatchLeafHash = MessageHashing.batchLeafHash(batchSettlementRoot, _batchNumber);
+            bytes32 localBatchLeafHash = MessageHashing.batchLeafHash(
+                batchSettlementRoot,
+                _batchNumber,
+                result.batchSettlementTimestamp
+            );
 
             uint256 batchLeafProofMask = uint256(bytes32(_proof[result.ptr]));
             ++result.ptr;
@@ -206,16 +229,13 @@ library MessageHashing {
             ++result.ptr;
         }
 
-        result = ProofData({
-            settlementLayerChainId: settlementLayerChainId,
-            settlementLayerBatchNumber: settlementLayerBatchNumber,
-            settlementLayerBatchRootMask: settlementLayerBatchRootMask,
-            batchLeafProofLen: proofMetadata.batchLeafProofLen,
-            batchSettlementRoot: result.batchSettlementRoot,
-            chainIdLeaf: result.chainIdLeaf,
-            ptr: result.ptr,
-            finalProofNode: proofMetadata.finalProofNode
-        });
+        // Assign the remaining fields individually rather than rebuilding the whole struct literal:
+        // `result` already carries `batchSettlementRoot`, `batchSettlementTimestamp`, `chainIdLeaf`,
+        // `ptr`, and `finalProofNode` (set above), and a 9-field literal here overflows the stack.
+        result.settlementLayerChainId = settlementLayerChainId;
+        result.settlementLayerBatchNumber = settlementLayerBatchNumber;
+        result.settlementLayerBatchRootMask = settlementLayerBatchRootMask;
+        result.batchLeafProofLen = proofMetadata.batchLeafProofLen;
     }
 
     /// @notice Extracts slice from the proof.

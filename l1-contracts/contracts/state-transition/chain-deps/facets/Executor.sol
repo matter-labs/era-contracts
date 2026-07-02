@@ -146,13 +146,15 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @notice Appends the batch's chain batch root to the L1 MessageRoot.
     /// @param _batchNumber The number of the batch
     /// @param _messageRoot The root of the merkle tree of the messages to L1.
+    /// @param _settlementTimestamp The batch's SL-assigned settlement timestamp `t`, bound into the
+    /// chain batch leaf so it is authenticated and usable by the atomic-interop adjacency timeout.
     /// @dev We only call this function on L1. `addChainBatchRoot` records the root (used for L2->L1
     /// message verification), pushes it to the chain's interop tree, and emits the interop root — so
     /// chains settling on L1 participate in interop, the same as on Gateway.
-    function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
+    function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot, uint256 _settlementTimestamp) internal {
         // Once the batch is executed, we include its message to the message root.
         IMessageRootBase messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
-        messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
+        messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot, _settlementTimestamp);
     }
 
     /// @inheritdoc IExecutor
@@ -208,14 +210,20 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     batchNumber: batchesData[i].batchNumber,
                     chainBatchRoot: batchesData[i].l2LogsTreeRoot,
                     multichainBatchRoot: multichainBatchRoots[i],
-                    settlementFeePayer: settlementFeePayer
+                    settlementFeePayer: settlementFeePayer,
+                    // SL-assigned settlement timestamp `t`. TODO(STF): 0 on ZKsync OS today.
+                    settlementTimestamp: batchesData[i].timestamp
                 });
                 GW_ASSET_TRACKER.processLogsAndMessages(processLogsInput);
             }
         } else {
             uint256 batchesDataLength = batchesData.length;
             for (uint256 i = 0; i < batchesDataLength; ++i) {
-                _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
+                // `batchesData[i].timestamp` is the SL-assigned settlement timestamp `t` bound into
+                // the chain batch leaf. TODO(STF): on ZKsync OS this field is currently always 0 (see
+                // `StoredBatchInfo.timestamp`); the state-transition program / sequencer MUST emit a real
+                // monotone-non-decreasing `t` per batch for the atomic-interop adjacency timeout to be sound.
+                _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot, batchesData[i].timestamp);
             }
         }
 

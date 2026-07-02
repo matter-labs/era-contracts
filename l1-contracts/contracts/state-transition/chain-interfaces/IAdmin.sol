@@ -121,6 +121,17 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @dev DANGEROUS: once activated, there is no way back!
     function makePermanentRollup() external;
 
+    /// @notice Enrolls the chain as an atomic-interop SOURCE.
+    /// @dev Requires the chain to be ZKsync OS and its DA commitment scheme to already be an
+    /// interop-source scheme (`L2_TO_L1_ONLY`) — an interop source MUST publish its full L2->L1 region as
+    /// permanent calldata so consumers can rebuild its IMT for non-inclusion/timeout proofs. After
+    /// enrollment, {setDAValidatorPair} forbids downgrading away from an interop-source scheme.
+    /// @dev DANGEROUS: once enrolled, there is no way back (one-way latch).
+    function enrollAsInteropSource() external;
+
+    /// @notice Emitted when the chain is enrolled as an atomic-interop source.
+    event InteropSourceEnrolled();
+
     /// @notice Porter availability status changes
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
 

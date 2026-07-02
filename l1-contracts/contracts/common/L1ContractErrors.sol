@@ -206,6 +206,14 @@ error InvalidDelay();
 error InvalidInteropCalldata(bytes4);
 // 0x3f98a77e
 error InvalidL2DACommitmentScheme(L2DACommitmentScheme);
+// 0x410cb0cb
+/// @dev The DA commitment scheme is not allowed for an atomic-interop source. A source MUST
+/// publish its full L2->L1 region as permanent calldata so consumers can rebuild its IMT for
+/// non-inclusion/timeout proofs, so its scheme is gated to `L2_TO_L1_ONLY`.
+error InvalidDAForInteropSource(L2DACommitmentScheme scheme);
+// 0x820df4f9
+/// @dev The chain is already enrolled as an atomic-interop source (one-way latch).
+error AlreadyInteropSource();
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
 // 0x6eca2e4b

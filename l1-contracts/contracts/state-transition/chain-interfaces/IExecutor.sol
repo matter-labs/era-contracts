@@ -53,6 +53,10 @@ struct ProcessLogsInput {
     bytes32 chainBatchRoot;
     bytes32 multichainBatchRoot;
     address settlementFeePayer;
+    /// @dev The batch's SL-assigned settlement timestamp `t`, threaded to
+    /// {MessageRootBase.addChainBatchRoot} on the Gateway path so the chain batch leaf binds `t` exactly
+    /// as on L1. TODO(STF): currently sourced from `StoredBatchInfo.timestamp`, which is 0 on ZKsync OS.
+    uint256 settlementTimestamp;
 }
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch)

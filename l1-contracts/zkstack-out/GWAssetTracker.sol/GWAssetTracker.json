@@ -453,6 +453,11 @@
             "name": "settlementFeePayer",
             "type": "address",
             "internalType": "address"
+          },
+          {
+            "name": "settlementTimestamp",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }

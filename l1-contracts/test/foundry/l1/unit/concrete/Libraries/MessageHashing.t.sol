@@ -93,15 +93,17 @@ contract MessageHashingTest is Test {
         bytes32 batchRoot = keccak256("batchRoot");
         uint256 batchNumber = 100;
 
-        bytes32 leafHash = MessageHashing.batchLeafHash(batchRoot, batchNumber);
+        // Batch leaf now binds the SL settlement timestamp `t` (0 on ZKsync OS today).
+        uint256 settlementTimestamp = 0;
+        bytes32 leafHash = MessageHashing.batchLeafHash(batchRoot, batchNumber, settlementTimestamp);
 
-        bytes32 expected = keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber));
+        bytes32 expected = keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber, settlementTimestamp));
         assertEq(leafHash, expected);
     }
 
     function testFuzz_batchLeafHash_deterministicOutput(bytes32 batchRoot, uint256 batchNumber) public pure {
-        bytes32 leafHash1 = MessageHashing.batchLeafHash(batchRoot, batchNumber);
-        bytes32 leafHash2 = MessageHashing.batchLeafHash(batchRoot, batchNumber);
+        bytes32 leafHash1 = MessageHashing.batchLeafHash(batchRoot, batchNumber, 0);
+        bytes32 leafHash2 = MessageHashing.batchLeafHash(batchRoot, batchNumber, 0);
         assertEq(leafHash1, leafHash2);
     }
 

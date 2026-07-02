@@ -386,7 +386,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _messageRoot().addChainBatchRoot(
             _processLogsInputs.chainId,
             _processLogsInputs.batchNumber,
-            chainBatchRootHash
+            chainBatchRootHash,
+            _processLogsInputs.settlementTimestamp
         );
 
         _collectInteropSettlementFee(

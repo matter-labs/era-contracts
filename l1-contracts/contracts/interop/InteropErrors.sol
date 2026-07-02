@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
+// 0x74882034
+/// @dev An atomic bundle's call carries native base-token `value`. Such a leg is bridged via the
+/// base-token holder, not the recoverable asset-router path, so it could not be refunded on timeout.
+error AtomicBundleCallCarriesValue(uint256 callIndex, uint256 value);
+// 0xb84a87f2
+/// @dev An atomic bundle's call is not a recoverable asset-router `finalizeDeposit` call
+/// (wrong target or wrong selector), so a timed-out leg containing it could not be refunded.
+error AtomicBundleCallNotRecoverable(uint256 callIndex, address callTarget);
 // 0x9031f751
 error AttributeAlreadySet(bytes4 selector);
 // 0xbcb41ec7

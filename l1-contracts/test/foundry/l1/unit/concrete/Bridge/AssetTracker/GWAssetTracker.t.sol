@@ -159,7 +159,7 @@ contract GWAssetTrackerTest is Test {
         // Wildcard mock for addChainBatchRoot (any batch)
         vm.mockCall(
             L2_MESSAGE_ROOT_ADDR,
-            abi.encodeWithSignature("addChainBatchRoot(uint256,uint256,bytes32)"),
+            abi.encodeWithSignature("addChainBatchRoot(uint256,uint256,bytes32,uint256)"),
             abi.encode()
         );
     }

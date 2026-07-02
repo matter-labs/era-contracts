@@ -153,6 +153,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
                     settlementLayerBatchRootMask: 0,
                     batchLeafProofLen: 0,
                     batchSettlementRoot: 0,
+                    batchSettlementTimestamp: 0,
                     chainIdLeaf: 0,
                     ptr: 0,
                     finalProofNode: false
