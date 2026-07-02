@@ -6,7 +6,6 @@ import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   ETH_TOKEN_ADDRESS,
   L2_ASSET_ROUTER_ADDR,
-  L2_BASE_TOKEN_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
   FINALIZE_DEPOSIT_SIG,
 } from "../core/const";
@@ -244,10 +243,10 @@ export async function finalizeWithdrawalOnL1(
   let l2Sender: string;
 
   if (isBaseToken) {
-    // Base-token (ETH) withdrawals now use the asset-router `finalizeDeposit` format,
-    // emitted by `L2BaseToken.withdraw` (see `L2BaseTokenBase._getBaseTokenWithdrawMessage`).
-    // The plain `withdraw` path sets the original caller and additional data to empty,
-    // and the origin token to `address(0)`.
+    // Base-token (ETH) withdrawals go through the InteropCenter like ERC20s. On L1 the finalization
+    // message is the asset-router `finalizeDeposit` format; under the mock proof we reconstruct it with
+    // the L2 asset router as the sender (the L1Nullifier no longer has a base-token-specific sender
+    // branch). The base-token burn data carries an empty original caller / origin token / metadata.
     const transferData = encodeBridgeMintData(
       ethers.constants.AddressZero,
       pending.l1Recipient,
@@ -260,7 +259,7 @@ export async function finalizeWithdrawalOnL1(
       ["bytes4", "uint256", "bytes32", "bytes"],
       [selector, pending.chainId, pending.assetId, transferData]
     );
-    l2Sender = L2_BASE_TOKEN_ADDR;
+    l2Sender = L2_ASSET_ROUTER_ADDR;
   } else {
     const transferData = encodeBridgeMintData(
       pending.originalCaller,

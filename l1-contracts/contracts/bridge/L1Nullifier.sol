@@ -19,11 +19,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
-import {
-    L2_ASSET_ROUTER_ADDR,
-    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-    L2_INTEROP_CENTER_ADDR
-} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_INTEROP_CENTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {
     AddressAlreadySet,
     DepositDoesNotExist,
@@ -328,9 +324,11 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 // call in a single-call bundle). The bundle itself additionally authenticates that the inner
                 // call originated from the L2 asset router (see `DataEncoding.parseInteropWithdrawalBundle`).
                 require(l2Sender == L2_INTEROP_CENTER_ADDR, WrongL2Sender(l2Sender));
-            } else if (assetId == BRIDGE_HUB.baseTokenAssetId(_finalizeWithdrawalParams.chainId)) {
-                require(l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, WrongL2Sender(l2Sender));
             } else {
+                // Raw asset-router `finalizeDeposit` message (base token or ERC20). Base-token
+                // withdrawals no longer come from `L2_BASE_TOKEN_SYSTEM_CONTRACT` — they are emitted as
+                // interop bundles (handled above), so the raw path only accepts the L2 asset router
+                // (or the deprecated legacy bridge).
                 bool isL2SenderCorrect = l2Sender == L2_ASSET_ROUTER_ADDR ||
                     l2Sender == __DEPRECATED_l2BridgeAddress[_finalizeWithdrawalParams.chainId];
                 require(isL2SenderCorrect, WrongL2Sender(l2Sender));

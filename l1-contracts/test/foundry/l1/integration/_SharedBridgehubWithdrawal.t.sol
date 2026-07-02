@@ -15,7 +15,7 @@ import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
@@ -78,8 +78,9 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
     /// @param _amountToWithdraw The base-token amount to withdraw.
     /// @param _isEth Whether the chain's base token is native ETH (vs an ERC20).
     function _finalizeBaseTokenWithdrawal(uint256 _amountToWithdraw, bool _isEth) internal {
-        // The base-token assetId is exactly what the nullifier compares the message assetId against; using
-        // it guarantees the base-token branch (and its `L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR` sender check).
+        // The withdrawal message carries the chain's base-token assetId. It is finalized via the
+        // asset-router `finalizeDeposit` path, so the L2 sender is the L2 asset router (the nullifier no
+        // longer has a base-token-specific sender branch).
         bytes32 assetId = addresses.bridgehub.baseTokenAssetId(currentChainId);
         IAssetTrackerBase assetTracker = IAssetTrackerBase(address(addresses.l1NativeTokenVault.l1AssetTracker()));
 
@@ -164,7 +165,7 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
             chainId: currentChainId,
             l2BatchNumber: uint256(uint160(makeAddr("l2BatchNumber"))),
             l2MessageIndex: uint256(uint160(makeAddr("l2MessageIndex"))),
-            l2Sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            l2Sender: L2_ASSET_ROUTER_ADDR,
             l2TxNumberInBatch: uint16(uint160(makeAddr("l2TxNumberInBatch"))),
             message: DataEncoding.encodeAssetRouterFinalizeDepositData(currentChainId, _assetId, transferData),
             merkleProof: merkleProof
