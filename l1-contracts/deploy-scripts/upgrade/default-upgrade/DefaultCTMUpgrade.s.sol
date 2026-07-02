@@ -191,14 +191,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(
             ctmAddresses.stateTransition.proxies.validatorTimelock
         ).executionDelay();
-        // `testnetVerifier` cannot be introspected from the on-chain verifier
-        // here: the previous version is v29, whose verifier predates the
-        // `IS_TESTNET_VERIFIER()` getter (and staticcall probing is forbidden
-        // in this codebase). It is instead read from the per-env upgrade input
-        // TOML (`testnet_verifier`) in `initializeConfigFromArgs`. On mainnet
-        // this MUST be false; testnet/stage use the testnet verifier. Default
-        // to `true` here for envs whose input omits the key.
-        config.testnetVerifier = true;
+        // `testnetVerifier` is not set here: it cannot be introspected from the
+        // on-chain verifier (the previous version is v29, whose verifier predates
+        // the `IS_TESTNET_VERIFIER()` getter, and staticcall probing is forbidden
+        // in this codebase). It is read from the per-env upgrade input TOML
+        // (`testnet_verifier`) in `initializeConfigFromArgs`.
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
@@ -239,13 +236,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
         initializeConfig(chainCreationParams, permanentConfig, governance);
 
-        // Select the verifier flavor from the per-env upgrade input. `initializeConfig`
-        // defaults `testnetVerifier` to true (it can't introspect the pre-v29 verifier);
-        // override it from config so mainnet (`testnet_verifier = false`) deploys the real
-        // DualVerifier while testnet/stage keep the *TestnetVerifier.
-        if (toml.keyExists("$.testnet_verifier")) {
-            config.testnetVerifier = toml.readBool("$.testnet_verifier");
-        }
+        // Select the verifier flavor from the per-env upgrade input (see the note
+        // in `initializeConfig` on why this can't be introspected on-chain).
+        // Mainnet (`testnet_verifier = false`) deploys the real DualVerifier;
+        // testnet/stage/local keep the *TestnetVerifier.
+        config.testnetVerifier = toml.readBool("$.testnet_verifier");
 
         // Read governance upgrade timer initial delay from config
         if (toml.keyExists("$.governance_upgrade_timer_initial_delay")) {

@@ -51,11 +51,6 @@ protocol_upgrade_handler_implementation_address = "0x36625Bd3dDB469377C6e9893712
 [tokens]
 token_weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
 
-# Legacy Era gateway chain id. Read as `$.legacy_gateway.chain_id` by
-# `DefaultCoreUpgrade` and baked into L1MessageRoot's immutable
-# `ERA_GATEWAY_CHAIN_ID`. Must use the `[legacy_gateway]` key (matching stage) —
-# the old `[gateway]` key is not read by the v31 core upgrade, so the constructor
-# would otherwise get 0.
 [legacy_gateway]
 chain_id = 9075
 
