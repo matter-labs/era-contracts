@@ -68,6 +68,30 @@
   },
   {
     "type": "function",
+    "name": "chainBatchRootTimestamp",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "batchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "l1Timestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "chainBatchRoots",
     "inputs": [
       {
@@ -350,6 +374,11 @@
             "name": "chainIdLeaf",
             "type": "bytes32",
             "internalType": "bytes32"
+          },
+          {
+            "name": "l1BatchTimestamp",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
             "name": "ptr",
@@ -828,6 +857,12 @@
         "type": "bytes32",
         "indexed": false,
         "internalType": "bytes32"
+      },
+      {
+        "name": "l1Timestamp",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
