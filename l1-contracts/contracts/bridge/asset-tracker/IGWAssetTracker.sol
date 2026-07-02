@@ -111,18 +111,8 @@ interface IGWAssetTracker {
     /// @param _migrationConfirmationData The migration confirmation data containing chain ID, asset ID, and migration number.
     function confirmMigrationOnGateway(MigrationConfirmationData calldata _migrationConfirmationData) external;
 
-    /// @notice Sets a legacy shared bridge address for a specific chain.
-    /// @param _chainId The chain ID for which to set the legacy bridge address.
-    /// @param _legacySharedBridgeAddress The address of the legacy shared bridge contract.
-    function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external;
-
     /// @notice Returns the L1 chain ID.
     function L1_CHAIN_ID() external view returns (uint256);
-
-    /// @notice Sets legacy shared bridge addresses for chains that used the old bridging system.
-    /// @dev Called during upgrades to maintain backwards compatibility with pre-V31 chains.
-    /// @dev Legacy bridges are needed to process withdrawal messages from chains that haven't upgraded yet.
-    function setLegacySharedBridgeAddress() external;
 
     /// @notice Parses interop call data to extract transfer information.
     /// @param _callData The encoded call data containing transfer information.

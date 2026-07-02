@@ -366,31 +366,6 @@
   },
   {
     "type": "function",
-    "name": "setLegacySharedBridgeAddress",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setLegacySharedBridgeAddress",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_legacySharedBridgeAddress",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "setSettlementFeePayerAgreement",
     "inputs": [
       {

@@ -48,7 +48,6 @@ const REQUIRED_CONTRACTS = [
   "IL2AssetTracker.sol",
   "IGWAssetTracker.sol",
   "IChainAdmin.sol",
-  "ISetupLegacyBridge.sol",
   "DefaultUpgrade.sol",
   // Used by anvil-interop test suite (contracts.ts)
   "DummyInteropRecipient.sol",

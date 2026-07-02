@@ -197,26 +197,6 @@ contract L1NativeTokenVaultExtendedTest is Test {
         assertEq(balance, 0);
     }
 
-    function test_MigrateTokenBalanceToAssetTracker() public {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
-
-        // Only asset tracker can call this
-        vm.prank(assetTracker);
-        uint256 migratedAmount = l1NTV.migrateTokenBalanceToAssetTracker(CHAIN_ID, assetId);
-
-        // Since we didn't set a balance, it should be 0
-        assertEq(migratedAmount, 0);
-    }
-
-    function test_MigrateTokenBalanceToAssetTracker_RevertWhen_NotAssetTracker() public {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
-        address notAssetTracker = makeAddr("notAssetTracker");
-
-        vm.prank(notAssetTracker);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notAssetTracker));
-        l1NTV.migrateTokenBalanceToAssetTracker(CHAIN_ID, assetId);
-    }
-
     function test_BridgeConfirmTransferResult_RevertWhen_NotFailure() public {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
         bytes memory data = abi.encode(uint256(1000), address(0), address(0));

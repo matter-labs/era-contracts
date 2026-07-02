@@ -14,8 +14,6 @@ import {IZKChainBase} from "contracts/state-transition/chain-interfaces/IZKChain
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IBaseTokenAssetHandler} from "contracts/bridge/interfaces/IBaseTokenAssetHandler.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
-import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
@@ -38,7 +36,6 @@ import {
     BridgehubAddresses,
     BridgehubContracts,
     ZkChainAddresses,
-    L2ERC20BridgeAddresses,
     StateTransitionDeployedAddresses,
     StateTransitionContracts,
     Verifiers,
@@ -150,7 +147,6 @@ library AddressIntrospector {
     ) private view returns (BridgesDeployedAddresses memory info) {
         L1AssetRouter assetRouter = L1AssetRouter(_assetRouter);
 
-        address erc20BridgeProxy = address(assetRouter.legacyBridge());
         address l1NullifierProxy = address(assetRouter.L1_NULLIFIER());
         address l1NativeTokenVaultProxy = address(assetRouter.nativeTokenVault());
 
@@ -162,13 +158,11 @@ library AddressIntrospector {
             : address(0);
 
         BridgeContracts memory proxies = BridgeContracts({
-            erc20Bridge: erc20BridgeProxy,
             l1AssetRouter: _assetRouter,
             l1Nullifier: l1NullifierProxy,
             l1NativeTokenVault: l1NativeTokenVaultProxy
         });
         BridgeContracts memory implementations = BridgeContracts({
-            erc20Bridge: Utils.getImplementation(erc20BridgeProxy),
             l1AssetRouter: Utils.getImplementation(_assetRouter),
             l1Nullifier: Utils.getImplementation(l1NullifierProxy),
             l1NativeTokenVault: Utils.getImplementation(l1NativeTokenVaultProxy)
@@ -360,27 +354,6 @@ library AddressIntrospector {
         revert NoUptoDateZkChainFound();
     }
 
-    // ============ Legacy Bridge Addresses ============
-
-    function getLegacyBridgeAddress(address _assetRouter) public view returns (address legacyBridge) {
-        IL1Nullifier nullifier = IL1AssetRouter(_assetRouter).L1_NULLIFIER();
-        legacyBridge = address(nullifier.legacyBridge());
-    }
-
-    function getLegacyBridgeAddresses(address _assetRouter) public view returns (L2ERC20BridgeAddresses memory info) {
-        address legacyBridge = getLegacyBridgeAddress(_assetRouter);
-        if (legacyBridge == address(0)) {
-            return info;
-        }
-
-        IL1ERC20Bridge bridge = IL1ERC20Bridge(legacyBridge);
-        info = L2ERC20BridgeAddresses({
-            l2TokenBeacon: bridge.l2TokenBeacon(),
-            l2Bridge: bridge.l2Bridge(),
-            l2TokenProxyBytecodeHash: bridge.l2TokenProxyBytecodeHash()
-        });
-    }
-
     function getEraChainId(address _assetRouter) public view returns (uint256 eraChainId) {
         return IL1AssetRouter(_assetRouter).ERA_CHAIN_ID();
     }
@@ -414,7 +387,6 @@ library AddressIntrospector {
             StateTransitionDeployedAddresses memory ctm,
             ZkChainAddresses memory zk,
             address[] memory zkFacets,
-            L2ERC20BridgeAddresses memory legacyBridge,
             BridgesDeployedAddresses memory bridges
         )
     {
@@ -429,11 +401,6 @@ library AddressIntrospector {
 
         address assetRouter = address(_bridgehub.assetRouter());
         bridges = getBridgesDeployedAddresses(assetRouter);
-
-        address legacyBridgeAddress = getLegacyBridgeAddress(assetRouter);
-        if (legacyBridgeAddress != address(0)) {
-            legacyBridge = getLegacyBridgeAddresses(assetRouter);
-        }
     }
 
     // ============ Private Helpers ============

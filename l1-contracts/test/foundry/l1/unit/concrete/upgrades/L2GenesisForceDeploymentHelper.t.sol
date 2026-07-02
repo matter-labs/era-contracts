@@ -441,14 +441,13 @@ contract MockContract {
     function initL2(uint256, address) external {}
 
     // L2AssetRouter.updateL2
-    function updateL2(uint256, uint256, address, address, bytes32, address) external {}
+    function updateL2(uint256, uint256, address, bytes32, address) external {}
 
     // L2NativeTokenVault.updateL2
     function updateL2(
         uint256,
         address,
         bytes32,
-        address,
         address,
         TokenBridgingData calldata,
         TokenMetadata calldata
@@ -465,10 +464,6 @@ contract MockContract {
     }
 
     function setAddresses(address, address, address, address) external {}
-
-    function L2_LEGACY_SHARED_BRIDGE() external view returns (address) {
-        return address(0);
-    }
 
     function WETH_TOKEN() external view returns (address) {
         return makeAddr("wethToken");

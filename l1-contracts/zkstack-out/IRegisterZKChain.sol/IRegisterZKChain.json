@@ -110,11 +110,6 @@
             "internalType": "bool"
           },
           {
-            "name": "l1Erc20Bridge",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
             "name": "l1SharedBridgeProxy",
             "type": "address",
             "internalType": "address"

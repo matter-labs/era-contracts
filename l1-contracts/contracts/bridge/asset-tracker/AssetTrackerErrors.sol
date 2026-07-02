@@ -37,8 +37,6 @@ error InvalidFeeRecipient();
 error InvalidFunctionSignature(bytes4 functionSignature);
 // 0x203d8be5
 error InvalidInteropChainId(uint256 fromChainId, uint256 toChainId);
-// 0xeaa867a8
-error InvalidL1AssetRouter(address l1AssetRouter);
 // 0xe1fe041e
 error InvalidL2ShardId();
 // 0x37be5e51
