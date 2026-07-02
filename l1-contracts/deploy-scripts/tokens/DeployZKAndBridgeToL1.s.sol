@@ -11,7 +11,15 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 // solhint-disable no-unused-import
 
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_INTEROP_CENTER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {InteropWithdrawalEncoding} from "../utils/InteropWithdrawalEncoding.sol";
 
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
@@ -138,11 +146,18 @@ contract DeployZKScript is Script {
         zkToken.approve(L2_NATIVE_TOKEN_VAULT_ADDR, someBigAmount);
         vm.stopBroadcast();
 
-        // TODO(interop-withdrawal): the ZK-token L2->L1 withdrawal now goes through the InteropCenter
-        // (a single-call bundle to the L1 asset router) instead of the removed L2AssetRouter.withdraw.
-        // Build that bundle calldata here. Placeholder keeps the inputs referenced so the script compiles.
-        bytes memory withdrawData = abi.encode(address(l2AR), zkTokenAssetId, someBigAmount, deployer);
-        console.logBytes(withdrawData);
+        // The ZK-token L2->L1 withdrawal now goes through the InteropCenter as a single-call bundle to
+        // the L1 asset router (the unified path that replaced L2AssetRouter.withdraw). The deployer
+        // approved the NTV above; the withdrawn amount rides in the bridge-burn transfer data.
+        uint256 l1ChainId = l2AR.L1_CHAIN_ID();
+        bytes memory zkTransferData = DataEncoding.encodeBridgeBurnData(someBigAmount, deployer, zkTokenAddress);
+        vm.broadcast();
+        // slither-disable-next-line unused-return
+        IInteropCenter(L2_INTEROP_CENTER_ADDR).sendBundle(
+            InteroperableAddress.formatEvmV1(l1ChainId),
+            InteropWithdrawalEncoding.withdrawalCallStarters(zkTokenAssetId, zkTransferData),
+            new bytes[](0)
+        );
         uint256 deployerBalanceAfterWithdraw = zkToken.balanceOf(deployer);
         console.log("Deployed balance after withdraw:", deployerBalanceAfterWithdraw);
     }

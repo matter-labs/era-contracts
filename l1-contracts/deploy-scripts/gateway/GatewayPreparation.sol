@@ -16,7 +16,12 @@ import {BridgehubBurnCTMAssetData, IBridgehubBase} from "contracts/core/bridgehu
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "contracts/common/Config.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BRIDGEHUB_ADDR,
+    L2_ASSET_ROUTER_ADDR,
+    L2_INTEROP_CENTER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {InteropWithdrawalEncoding} from "../utils/InteropWithdrawalEncoding.sol";
 import {L2_BRIDGEHUB_ADDRESS, Utils} from "../utils/Utils.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -457,14 +462,17 @@ contract GatewayPreparation is Script {
         bytes memory l2Calldata;
 
         {
-            // TODO(interop-withdrawal): the L2->L1 withdrawal of the CTM asset now goes through the
-            // InteropCenter (a single-call bundle to the L1 asset router) instead of the removed
-            // L2AssetRouter.withdraw. Build that bundle calldata here. Placeholder keeps the inputs
-            // referenced so the script compiles.
-            bytes memory data = abi.encode(ctmAssetId, bridgehubBurnData);
+            // Route the CTM asset withdrawal from the gateway back to L1 through the InteropCenter as a
+            // single-call bundle to the L1 asset router (the unified path that replaced
+            // L2AssetRouter.withdraw). The gateway-side ChainAdmin multicall invokes the InteropCenter.
+            bytes memory data = InteropWithdrawalEncoding.encodeWithdrawalToL1Call(
+                l1ChainId,
+                ctmAssetId,
+                bridgehubBurnData
+            );
 
             Call[] memory calls = new Call[](1);
-            calls[0] = Call({target: L2_ASSET_ROUTER_ADDR, value: 0, data: data});
+            calls[0] = Call({target: L2_INTEROP_CENTER_ADDR, value: 0, data: data});
 
             l2Calldata = abi.encodeCall(ChainAdmin.multicall, (calls, true));
         }
