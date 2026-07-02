@@ -22,7 +22,8 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 
-import {SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_INTEROP_ATTRIBUTES} from "../common/Config.sol";
+import {SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_INTEROP_ATTRIBUTES, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {L2_BOOTLOADER_ADDRESS} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {
     BUNDLE_IDENTIFIER,
@@ -437,13 +438,13 @@ contract InteropCenter is
 
         // Form an InteropBundle.
         // For an L2->L1 withdrawal the L1 chain is not registered as an interop destination in the
-        // L2 Bridgehub, so `baseTokenAssetId(L1_CHAIN_ID)` is unset. The destination base token asset
-        // id is not consumed by L1 withdrawal finalization (see
-        // `L1Nullifier._parseInteropWithdrawalBundle`), so we use this chain's base token asset id,
-        // which routes value handling through the same-base-token branch of `_ensureCorrectTotalValue`.
+        // L2 Bridgehub, so `baseTokenAssetId(L1_CHAIN_ID)` is unset. L1's base token is ETH, so the
+        // destination base token asset id is the L1-native ETH asset id (which is NOT necessarily this
+        // L2's base token — they only coincide on ETH-based chains). This value drives the
+        // same/cross-base-token branch of `_ensureCorrectTotalValue`.
         bytes32 destinationBaseTokenAssetId;
         if (_destinationChainId == L1_CHAIN_ID) {
-            destinationBaseTokenAssetId = L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID();
+            destinationBaseTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
         } else {
             destinationBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
             require(destinationBaseTokenAssetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
