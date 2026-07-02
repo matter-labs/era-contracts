@@ -38,7 +38,7 @@ contract L2MessageVerificationDepthRegressionTest is Test {
         });
 
         // Double proof (requires one level of recursion)
-        bytes32[] memory proof = new bytes32[](27);
+        bytes32[] memory proof = new bytes32[](28);
         proof[0] = bytes32(0x010f060000000000000000000000000000000000000000000000000000000000);
         proof[1] = bytes32(0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba);
         proof[2] = bytes32(0xc3d03eebfd83049991ea3d3e358b6712e7aa2e2e63dc2d4b438987cec28ac8d0);
@@ -55,22 +55,23 @@ contract L2MessageVerificationDepthRegressionTest is Test {
         proof[13] = bytes32(0xa707d1c62d8be699d34cb74804fdd7b4c568b6c1a821066f126c680d4b83e00b);
         proof[14] = bytes32(0xf6e093070e0389d2e529d60fadb855fdded54976ec50ac709e3a36ceaa64c291);
         proof[15] = bytes32(0xe4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf75944);
-        proof[16] = bytes32(0x0000000000000000000000000000000000000000000000000000000000000034);
-        proof[17] = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
-        proof[18] = bytes32(0xcc4c41edb0c2031348b292b768e9bac1ee8c92c09ef8a3277c2ece409c12d86a);
-        proof[19] = bytes32(0x665220c0a39a5c4886626c93dfe3f253324bd0fd48bf037156b977d2da1c2a80);
-        proof[20] = bytes32(0x4cd95f8962e2e3b5f525a0f4fdfbbf0667990c7159528a008057f3592bcb2c06);
-        proof[21] = bytes32(0x73374357c2721f1e18426e45490035daf9a01b4fd064b9fc6bf85acf888bbc42);
-        proof[22] = bytes32(0x9b63d72e0483741f19d143751f22f965461f0a98897b8ffffedd086935f6bc26);
-        proof[23] = bytes32(0x000000000000000000000000000000f300000000000000000000000000000001);
-        proof[24] = bytes32(0x00000000000000000000000000000000000000000000000000000000000001fa);
-        proof[25] = bytes32(0x0101000100000000000000000000000000000000000000000000000000000000);
-        proof[26] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
+        proof[16] = bytes32(uint256(0)); // l1Timestamp bound into the batch leaf
+        proof[17] = bytes32(0x0000000000000000000000000000000000000000000000000000000000000034);
+        proof[18] = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
+        proof[19] = bytes32(0xcc4c41edb0c2031348b292b768e9bac1ee8c92c09ef8a3277c2ece409c12d86a);
+        proof[20] = bytes32(0x665220c0a39a5c4886626c93dfe3f253324bd0fd48bf037156b977d2da1c2a80);
+        proof[21] = bytes32(0x4cd95f8962e2e3b5f525a0f4fdfbbf0667990c7159528a008057f3592bcb2c06);
+        proof[22] = bytes32(0x73374357c2721f1e18426e45490035daf9a01b4fd064b9fc6bf85acf888bbc42);
+        proof[23] = bytes32(0x9b63d72e0483741f19d143751f22f965461f0a98897b8ffffedd086935f6bc26);
+        proof[24] = bytes32(0x000000000000000000000000000000f300000000000000000000000000000001);
+        proof[25] = bytes32(0x00000000000000000000000000000000000000000000000000000000000001fa);
+        proof[26] = bytes32(0x0101000100000000000000000000000000000000000000000000000000000000);
+        proof[27] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
 
         vm.mockCall(
             address(L2_INTEROP_ROOT_STORAGE),
             abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
-            abi.encode(bytes32(0x9df9ccdcc86232686d57ea501eadb14888fd7c9fe1fd72a74c91208f11e864d5))
+            abi.encode(bytes32(0xf2ed765ea90479defa99f4853559bec02617067e736f70475cc64a8e571f509a))
         );
 
         bool isIncluded = l2MessageVerification.proveL2LogInclusionShared(
@@ -104,7 +105,7 @@ contract L2MessageVerificationDepthRegressionTest is Test {
         );
 
         // Double proof (requires one level of recursion) - this proof is NOT final in its first part
-        bytes32[] memory proof = new bytes32[](27);
+        bytes32[] memory proof = new bytes32[](28);
         proof[0] = bytes32(0x010f060000000000000000000000000000000000000000000000000000000000);
         proof[1] = bytes32(0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba);
         proof[2] = bytes32(0xc3d03eebfd83049991ea3d3e358b6712e7aa2e2e63dc2d4b438987cec28ac8d0);
@@ -121,17 +122,18 @@ contract L2MessageVerificationDepthRegressionTest is Test {
         proof[13] = bytes32(0xa707d1c62d8be699d34cb74804fdd7b4c568b6c1a821066f126c680d4b83e00b);
         proof[14] = bytes32(0xf6e093070e0389d2e529d60fadb855fdded54976ec50ac709e3a36ceaa64c291);
         proof[15] = bytes32(0xe4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf75944);
-        proof[16] = bytes32(0x0000000000000000000000000000000000000000000000000000000000000034);
-        proof[17] = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
-        proof[18] = bytes32(0xcc4c41edb0c2031348b292b768e9bac1ee8c92c09ef8a3277c2ece409c12d86a);
-        proof[19] = bytes32(0x665220c0a39a5c4886626c93dfe3f253324bd0fd48bf037156b977d2da1c2a80);
-        proof[20] = bytes32(0x4cd95f8962e2e3b5f525a0f4fdfbbf0667990c7159528a008057f3592bcb2c06);
-        proof[21] = bytes32(0x73374357c2721f1e18426e45490035daf9a01b4fd064b9fc6bf85acf888bbc42);
-        proof[22] = bytes32(0x9b63d72e0483741f19d143751f22f965461f0a98897b8ffffedd086935f6bc26);
-        proof[23] = bytes32(0x000000000000000000000000000000f300000000000000000000000000000001);
-        proof[24] = bytes32(0x00000000000000000000000000000000000000000000000000000000000001fa);
-        proof[25] = bytes32(0x0101000100000000000000000000000000000000000000000000000000000000);
-        proof[26] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
+        proof[16] = bytes32(uint256(0)); // l1Timestamp bound into the batch leaf
+        proof[17] = bytes32(0x0000000000000000000000000000000000000000000000000000000000000034);
+        proof[18] = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
+        proof[19] = bytes32(0xcc4c41edb0c2031348b292b768e9bac1ee8c92c09ef8a3277c2ece409c12d86a);
+        proof[20] = bytes32(0x665220c0a39a5c4886626c93dfe3f253324bd0fd48bf037156b977d2da1c2a80);
+        proof[21] = bytes32(0x4cd95f8962e2e3b5f525a0f4fdfbbf0667990c7159528a008057f3592bcb2c06);
+        proof[22] = bytes32(0x73374357c2721f1e18426e45490035daf9a01b4fd064b9fc6bf85acf888bbc42);
+        proof[23] = bytes32(0x9b63d72e0483741f19d143751f22f965461f0a98897b8ffffedd086935f6bc26);
+        proof[24] = bytes32(0x000000000000000000000000000000f300000000000000000000000000000001);
+        proof[25] = bytes32(0x00000000000000000000000000000000000000000000000000000000000001fa);
+        proof[26] = bytes32(0x0101000100000000000000000000000000000000000000000000000000000000);
+        proof[27] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
 
         // When calling with depth=1 and the proof requires recursion, it should revert
         // The proof's first part is not final (metadata byte 4 is 0x00), so it needs recursion
@@ -216,7 +218,7 @@ contract L2MessageVerificationDepthRegressionTest is Test {
         // Double proof - first part is NOT final (requires recursion), second part IS final
         // This validates that depth is properly incremented: 0 -> 1 in recursive call
         // The second call succeeds because it's final (doesn't need another recursion)
-        bytes32[] memory proof = new bytes32[](27);
+        bytes32[] memory proof = new bytes32[](28);
         proof[0] = bytes32(0x010f060000000000000000000000000000000000000000000000000000000000);
         proof[1] = bytes32(0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba);
         proof[2] = bytes32(0xc3d03eebfd83049991ea3d3e358b6712e7aa2e2e63dc2d4b438987cec28ac8d0);
@@ -233,23 +235,24 @@ contract L2MessageVerificationDepthRegressionTest is Test {
         proof[13] = bytes32(0xa707d1c62d8be699d34cb74804fdd7b4c568b6c1a821066f126c680d4b83e00b);
         proof[14] = bytes32(0xf6e093070e0389d2e529d60fadb855fdded54976ec50ac709e3a36ceaa64c291);
         proof[15] = bytes32(0xe4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf75944);
-        proof[16] = bytes32(0x0000000000000000000000000000000000000000000000000000000000000034);
-        proof[17] = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
-        proof[18] = bytes32(0xcc4c41edb0c2031348b292b768e9bac1ee8c92c09ef8a3277c2ece409c12d86a);
-        proof[19] = bytes32(0x665220c0a39a5c4886626c93dfe3f253324bd0fd48bf037156b977d2da1c2a80);
-        proof[20] = bytes32(0x4cd95f8962e2e3b5f525a0f4fdfbbf0667990c7159528a008057f3592bcb2c06);
-        proof[21] = bytes32(0x73374357c2721f1e18426e45490035daf9a01b4fd064b9fc6bf85acf888bbc42);
-        proof[22] = bytes32(0x9b63d72e0483741f19d143751f22f965461f0a98897b8ffffedd086935f6bc26);
-        proof[23] = bytes32(0x000000000000000000000000000000f300000000000000000000000000000001);
-        proof[24] = bytes32(0x00000000000000000000000000000000000000000000000000000000000001fa);
+        proof[16] = bytes32(uint256(0)); // l1Timestamp bound into the batch leaf
+        proof[17] = bytes32(0x0000000000000000000000000000000000000000000000000000000000000034);
+        proof[18] = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
+        proof[19] = bytes32(0xcc4c41edb0c2031348b292b768e9bac1ee8c92c09ef8a3277c2ece409c12d86a);
+        proof[20] = bytes32(0x665220c0a39a5c4886626c93dfe3f253324bd0fd48bf037156b977d2da1c2a80);
+        proof[21] = bytes32(0x4cd95f8962e2e3b5f525a0f4fdfbbf0667990c7159528a008057f3592bcb2c06);
+        proof[22] = bytes32(0x73374357c2721f1e18426e45490035daf9a01b4fd064b9fc6bf85acf888bbc42);
+        proof[23] = bytes32(0x9b63d72e0483741f19d143751f22f965461f0a98897b8ffffedd086935f6bc26);
+        proof[24] = bytes32(0x000000000000000000000000000000f300000000000000000000000000000001);
+        proof[25] = bytes32(0x00000000000000000000000000000000000000000000000000000000000001fa);
         // Second part metadata: 0x01 (version) 0x01 (logLeafProofLen) 0x00 (batchLeafProofLen) 0x01 (IS final)
-        proof[25] = bytes32(0x0101000100000000000000000000000000000000000000000000000000000000);
-        proof[26] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
+        proof[26] = bytes32(0x0101000100000000000000000000000000000000000000000000000000000000);
+        proof[27] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
 
         vm.mockCall(
             address(L2_INTEROP_ROOT_STORAGE),
             abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
-            abi.encode(bytes32(0x9df9ccdcc86232686d57ea501eadb14888fd7c9fe1fd72a74c91208f11e864d5))
+            abi.encode(bytes32(0xf2ed765ea90479defa99f4853559bec02617067e736f70475cc64a8e571f509a))
         );
 
         // This works: depth 0 -> recursion with depth 1 -> second part is final, so no more recursion needed
