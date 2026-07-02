@@ -219,7 +219,7 @@ abstract contract NativeTokenVaultBase is
         bytes calldata _data
     ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused {
         // slither-disable-next-line unused-return
-        (address originalCaller, , address originToken, uint256 amount, bytes memory erc20Data) = DataEncoding
+        (address originalCaller, , address originTokenAddress, uint256 amount, bytes memory erc20Data) = DataEncoding
             .decodeBridgeMintData(_data);
         bool isNative = originChainId[_assetId] == block.chainid;
         _disburseFailedTransfer({
@@ -228,7 +228,7 @@ abstract contract NativeTokenVaultBase is
             _receiver: originalCaller,
             _amount: amount,
             _isNative: isNative,
-            _originToken: originToken,
+            _originToken: originTokenAddress,
             _erc20Data: erc20Data
         });
         // solhint-disable-next-line func-named-parameters

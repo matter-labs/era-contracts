@@ -6,6 +6,7 @@ import {IL2AssetRouter} from "./IL2AssetRouter.sol";
 import {IL2CrossChainSender} from "../interfaces/IL2CrossChainSender.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
+import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
 
 import {IL2Bridgehub} from "../../core/bridgehub/IL2Bridgehub.sol";
 
