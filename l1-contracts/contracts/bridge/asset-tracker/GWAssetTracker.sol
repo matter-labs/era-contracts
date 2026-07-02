@@ -321,9 +321,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 } else if (log.key == bytes32(uint256(uint160(address(L2_INTEROP_HANDLER_ADDR))))) {
                     _handleInteropHandlerMessage(_processLogsInputs.chainId, message);
                 } else if (log.key == bytes32(uint256(uint160(L2_INTEROP_COMMITMENT_TREE_ADDR)))) {
-                    // The interop commitment tree publishes the root on every insert. No action needed
-                    // here: consuming chains authenticate it against the interop root they import, and it
-                    // is already folded into the reconstructed logs tree above.
+                    // The atomic-interop commitment tree publishes `abi.encode(root)` on every insert
+                    // (and the genesis seed). The settlement layer needs no action: the message is
+                    // authenticated downstream by consuming chains against the interop root they import
+                    // for this chain. It is already folded into the reconstructed logs tree above.
                 } else if (uint256(log.key) <= MAX_BUILT_IN_CONTRACT_ADDR) {
                     // This Log is not supported
                     revert InvalidBuiltInContractMessage(logCount, msgCount - 1, log.key);
@@ -353,8 +354,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _messageRoot().addChainBatchRoot(
             _processLogsInputs.chainId,
             _processLogsInputs.batchNumber,
-            chainBatchRootHash,
-            _processLogsInputs.settlementTimestamp
+            chainBatchRootHash
         );
 
         _collectInteropSettlementFee(
@@ -364,11 +364,20 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         );
     }
 
-    /// @notice Collects interop settlement fees from the fee payer using Wrapped ZK token.
-    /// @dev The fee payer must opt in via `setSettlementFeePayerAgreement` and approve wrapped ZK for this
-    /// contract. Opt-in prevents an operator from naming another chain's fee payer to make them pay. If
-    /// collection fails (not agreed, insufficient balance, or no approval), batch execution reverts, so
-    /// fees are always paid atomically with settlement.
+    /// @notice Collects interop settlement fees from the designated fee payer using Wrapped ZK token.
+    /// @dev Fee Collection Security Model:
+    /// - Fee payers must explicitly opt-in via `setSettlementFeePayerAgreement(chainId, true)` before they can be charged
+    /// - This prevents front-running attacks where a malicious operator could specify another chain's
+    ///   fee payer address to make them pay for unrelated settlements
+    /// - Fee payers must also approve wrapped ZK tokens for this contract
+    ///
+    /// Failure Behavior:
+    /// - If fee collection fails (payer not agreed, insufficient balance, or no approval), batch execution reverts
+    /// - This ensures fees are always paid atomically with settlement
+    /// - Operators must ensure their fee payer has agreed and maintains sufficient balance/approval
+    /// @param _chainId The chain ID for which fees are being collected
+    /// @param _settlementFeePayer The address paying the settlement fees
+    /// @param _chargeableInteropCount The number of chargeable interop messages
     function _collectInteropSettlementFee(
         uint256 _chainId,
         address _settlementFeePayer,

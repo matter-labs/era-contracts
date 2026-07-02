@@ -334,12 +334,11 @@ struct ProofData {
     uint256 settlementLayerBatchRootMask;
     uint256 batchLeafProofLen;
     bytes32 batchSettlementRoot;
-    /// @dev The source batch's settlement timestamp `t`, assigned by the settlement layer and never
-    /// decreasing. Parsed from the proof and authenticated by being part of the chain batch leaf hash.
-    /// Compared against a flow's deadline for atomic interop. It is 0 for final-node proofs and for
-    /// chains whose STF does not yet emit `t`.
-    uint256 batchSettlementTimestamp;
     bytes32 chainIdLeaf;
+    /// @dev Settlement-layer block timestamp at which the batch root was aggregated into the message
+    /// root (bound into the batch leaf, so it is proven by the inclusion proof). Zero for final-node
+    /// proofs, which carry no aggregation hop.
+    uint256 l1BatchTimestamp;
     uint256 ptr;
     bool finalProofNode;
 }

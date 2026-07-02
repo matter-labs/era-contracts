@@ -93,8 +93,7 @@ contract MessageRootTest is Test {
         proof[13] = bytes32(0xa707d1c62d8be699d34cb74804fdd7b4c568b6c1a821066f126c680d4b83e00b);
         proof[14] = bytes32(0xf6e093070e0389d2e529d60fadb855fdded54976ec50ac709e3a36ceaa64c291);
         proof[15] = bytes32(0xe4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf75944);
-        // Settlement timestamp `t` word, parsed after the log-leaf proof nodes (0 on ZKsync OS).
-        proof[16] = bytes32(0);
+        proof[16] = bytes32(uint256(0)); // l1Timestamp bound into the batch leaf
         proof[17] = bytes32(0x0000000000000000000000000000000000000000000000000000000000000034);
         proof[18] = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
         proof[19] = bytes32(0xcc4c41edb0c2031348b292b768e9bac1ee8c92c09ef8a3277c2ece409c12d86a);
@@ -107,11 +106,10 @@ contract MessageRootTest is Test {
         proof[26] = bytes32(0x0101000100000000000000000000000000000000000000000000000000000000);
         proof[27] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
 
+        // Root the proof hashes to after the l1Timestamp is bound into the batch leaf.
         vm.mockCall(
             address(L2_INTEROP_ROOT_STORAGE),
             abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
-            // Root recomputed after folding settlement timestamp `t == 0` into the batch leaf
-            // (old: 0x9df9ccdcc86232686d57ea501eadb14888fd7c9fe1fd72a74c91208f11e864d5).
             abi.encode(bytes32(0xf2ed765ea90479defa99f4853559bec02617067e736f70475cc64a8e571f509a))
         );
         bool isIncluded = l2MessageVerification.proveL2LogInclusionShared(
@@ -158,8 +156,7 @@ contract MessageRootTest is Test {
         proof[13] = bytes32(0xa707d1c62d8be699d34cb74804fdd7b4c568b6c1a821066f126c680d4b83e00b);
         proof[14] = bytes32(0xf6e093070e0389d2e529d60fadb855fdded54976ec50ac709e3a36ceaa64c291);
         proof[15] = bytes32(0xe4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf75944);
-        // Settlement timestamp `t` word, parsed after the log-leaf proof nodes (0 on ZKsync OS).
-        proof[16] = bytes32(0);
+        proof[16] = bytes32(uint256(0)); // l1Timestamp bound into the batch leaf
         proof[17] = bytes32(0x000000000000000000000000000000000000000000000000000000000000000d);
         proof[18] = bytes32(0x9f1e2c2b6905cf8b500791372e28c263d27c424a98d0ebf7d6ebc7447e2c3290);
         proof[19] = bytes32(0x865aaa19e2efebb6065ca211221bcd7837a35d4a33b26706f8176241587488fa);
@@ -170,11 +167,10 @@ contract MessageRootTest is Test {
         proof[24] = bytes32(0x0102000100000000000000000000000000000000000000000000000000000000);
         proof[25] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
         proof[26] = bytes32(0x666f22468f106684d5ba1fb17ff37ea4b72a05341328aa2f06a4e6361e1759bc);
+        // Root the proof hashes to after the l1Timestamp is bound into the batch leaf.
         vm.mockCall(
             address(L2_INTEROP_ROOT_STORAGE),
             abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
-            // Root recomputed after folding settlement timestamp `t == 0` into the batch leaf
-            // (old: 0x99fdc93ca122f259319be992fcd55b51c2bb5a100efb780ce2677b779ee7fec3).
             abi.encode(bytes32(0xe63ec2d2ec32cbe198cf5fcafe5a375aab6b6ca4e3b66abd50c6648b539ef5ed))
         );
         // --- Execution ---

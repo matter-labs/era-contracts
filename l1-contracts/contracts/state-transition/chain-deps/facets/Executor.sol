@@ -146,15 +146,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @notice Appends the batch's chain batch root to the L1 MessageRoot.
     /// @param _batchNumber The number of the batch
     /// @param _messageRoot The root of the merkle tree of the messages to L1.
-    /// @param _settlementTimestamp The batch's settlement timestamp `t`, assigned by the SL and bound
-    /// into the chain batch leaf so it is authenticated and usable by the interop timeout check.
-    /// @dev Only called on L1. `addChainBatchRoot` records the root (used for L2->L1 message
-    /// verification), pushes it to the chain's interop tree, and emits the interop root, so chains
-    /// settling on L1 participate in interop just like on Gateway.
-    function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot, uint256 _settlementTimestamp) internal {
+    /// @dev We only call this function on L1. `addChainBatchRoot` records the root (used for L2->L1
+    /// message verification), pushes it to the chain's interop tree, and emits the interop root — so
+    /// chains settling on L1 participate in interop, the same as on Gateway.
+    function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
         // Once the batch is executed, we include its message to the message root.
         IMessageRootBase messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
-        messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot, _settlementTimestamp);
+        messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
     }
 
     /// @inheritdoc IExecutor
@@ -194,12 +192,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             );
         }
 
-        // On Gateway we route through the Asset Tracker, which appends the chain batch root and
-        // processes the interop logs/messages (asset tracking and settlement-fee accounting). On L1 we
-        // append the chain batch root directly to the MessageRoot, which builds the chain's interop tree
-        // and emits the interop root (so L1-settled chains participate in interop); the stored roots are
-        // used for L2->L1 message verification. L1 doesn't run asset-tracker processing, so no
-        // logs/messages are passed on L1 (enforced above).
+        // On Gateway we route through the Asset Tracker, which appends the chain batch root AND
+        // processes the interop logs/messages (asset-tracking / settlement-fee accounting). On L1 we
+        // append the chain batch root directly to the MessageRoot: this builds the chain's interop tree
+        // and emits the interop root (so L1-settled chains participate in interop), and the stored
+        // chain batch roots are used for L2->L1 message verification. L1 does not run the asset-tracker
+        // message processing, hence no logs/messages are passed on L1 (enforced above).
         if (block.chainid != L1_CHAIN_ID) {
             uint256 messagesLength = messages.length;
             for (uint256 i = 0; i < messagesLength; ++i) {
@@ -210,20 +208,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     batchNumber: batchesData[i].batchNumber,
                     chainBatchRoot: batchesData[i].l2LogsTreeRoot,
                     multichainBatchRoot: multichainBatchRoots[i],
-                    settlementFeePayer: settlementFeePayer,
-                    // Settlement timestamp `t` assigned by the SL. TODO(STF): 0 on ZKsync OS today.
-                    settlementTimestamp: batchesData[i].timestamp
+                    settlementFeePayer: settlementFeePayer
                 });
                 GW_ASSET_TRACKER.processLogsAndMessages(processLogsInput);
             }
         } else {
             uint256 batchesDataLength = batchesData.length;
             for (uint256 i = 0; i < batchesDataLength; ++i) {
-                // `batchesData[i].timestamp` is the settlement timestamp `t` (assigned by the SL) bound
-                // into the chain batch leaf. TODO(STF): on ZKsync OS this is currently always 0; the
-                // sequencer must emit a real, non-decreasing `t` per batch for the interop timeout check
-                // to be sound.
-                _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot, batchesData[i].timestamp);
+                _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
             }
         }
 

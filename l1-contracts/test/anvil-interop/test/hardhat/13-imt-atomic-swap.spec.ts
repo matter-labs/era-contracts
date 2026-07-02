@@ -378,13 +378,13 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       l2Tree: chainA.stack.tree,
       chainId: chainA.chainId,
       value: abValue,
-      t: deadline,
+      l1Timestamp: deadline,
     });
     const baProof = await buildInclusionProof({
       l2Tree: chainB.stack.tree,
       chainId: chainB.chainId,
       value: baValue,
-      t: deadline,
+      l1Timestamp: deadline,
     });
     // proofs must be in legBundleHashes (ascending) order.
     const proofsAsc = BigNumber.from(hAB).lt(BigNumber.from(hBA)) ? [abProof, baProof] : [baProof, abProof];
@@ -497,13 +497,13 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       l2Tree: chainB.stack.tree,
       chainId: chainB.chainId,
       value: baValue,
-      t: deadline, // t_N <= deadline
+      l1Timestamp: deadline, // t_N <= deadline
       batchNumber: 1, // batch N
     });
     const successor = await buildSuccessorProof({
       l2Tree: chainB.stack.tree,
       chainId: chainB.chainId,
-      t: deadline + 1, // t_{N+1} > deadline
+      l1Timestamp: deadline + 1, // t_{N+1} > deadline
       batchNumber: 2, // batch N+1 (consecutive)
     });
     const missingIdx = legHashesAsc[0] === hBA ? 0 : 1;

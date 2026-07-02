@@ -93,11 +93,9 @@ contract MessageHashingTest is Test {
         bytes32 batchRoot = keccak256("batchRoot");
         uint256 batchNumber = 100;
 
-        // Batch leaf now binds the SL settlement timestamp `t` (0 on ZKsync OS today).
-        uint256 settlementTimestamp = 0;
-        bytes32 leafHash = MessageHashing.batchLeafHash(batchRoot, batchNumber, settlementTimestamp);
+        bytes32 leafHash = MessageHashing.batchLeafHash(batchRoot, batchNumber, 0);
 
-        bytes32 expected = keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber, settlementTimestamp));
+        bytes32 expected = keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber, uint256(0)));
         assertEq(leafHash, expected);
     }
 

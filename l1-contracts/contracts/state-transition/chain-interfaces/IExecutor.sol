@@ -34,11 +34,17 @@ uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max);
 /// @param multichainBatchRoot The multichain batch root for chain for verification.
 /// @param settlementFeePayer Address that pays gateway settlement fees for interop calls in this batch.
 ///
-/// @dev The fee payer must have called `setSettlementFeePayerAgreement(chainId, true)` on GWAssetTracker,
-///      hold enough wrapped ZK tokens to cover `gatewaySettlementFee * chargeableInteropCount`, and have
-///      approved GWAssetTracker to spend them. The opt-in agreement stops a malicious operator from naming
-///      someone else as the payer for their chain's settlements.
-/// @dev If fee collection fails, batch execution reverts, so fees are always paid together with settlement.
+/// @dev Settlement Fee Payer Requirements:
+///      1. Must have called `setSettlementFeePayerAgreement(chainId, true)` on GWAssetTracker to opt-in for this specific chain
+///      2. Must have sufficient wrapped ZK token balance to cover: gatewaySettlementFee * chargeableInteropCount
+///      3. Must have approved GWAssetTracker to spend wrapped ZK tokens
+///      The opt-in mechanism prevents front-running attacks where a malicious operator could
+///      make another address pay for their chain's settlements by specifying it as settlementFeePayer.
+///
+/// @dev Failure Behavior:
+///      - If fee collection fails (payer not agreed, insufficient balance, or no approval), batch execution reverts
+///      - This ensures fees are always paid atomically with settlement
+///      - Operators must ensure their fee payer has agreed and maintains sufficient balance/approval
 struct ProcessLogsInput {
     L2Log[] logs;
     bytes[] messages;
@@ -47,10 +53,6 @@ struct ProcessLogsInput {
     bytes32 chainBatchRoot;
     bytes32 multichainBatchRoot;
     address settlementFeePayer;
-    /// @dev The batch's SL-assigned settlement timestamp `t`, passed to {MessageRootBase.addChainBatchRoot}
-    /// on the Gateway path so the chain batch leaf binds `t` the same way it does on L1.
-    /// TODO(STF): currently sourced from `StoredBatchInfo.timestamp`, which is 0 on ZKsync OS.
-    uint256 settlementTimestamp;
 }
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch)

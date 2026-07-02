@@ -55,8 +55,7 @@ contract L2MessageVerificationDepthRegressionTest is Test {
         proof[13] = bytes32(0xa707d1c62d8be699d34cb74804fdd7b4c568b6c1a821066f126c680d4b83e00b);
         proof[14] = bytes32(0xf6e093070e0389d2e529d60fadb855fdded54976ec50ac709e3a36ceaa64c291);
         proof[15] = bytes32(0xe4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf75944);
-        // Settlement timestamp `t` word, parsed after the log-leaf proof nodes (0 on ZKsync OS).
-        proof[16] = bytes32(0);
+        proof[16] = bytes32(uint256(0)); // l1Timestamp bound into the batch leaf
         proof[17] = bytes32(0x0000000000000000000000000000000000000000000000000000000000000034);
         proof[18] = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
         proof[19] = bytes32(0xcc4c41edb0c2031348b292b768e9bac1ee8c92c09ef8a3277c2ece409c12d86a);
@@ -72,8 +71,6 @@ contract L2MessageVerificationDepthRegressionTest is Test {
         vm.mockCall(
             address(L2_INTEROP_ROOT_STORAGE),
             abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
-            // Root recomputed after folding settlement timestamp `t == 0` into the batch leaf
-            // (old: 0x9df9ccdcc86232686d57ea501eadb14888fd7c9fe1fd72a74c91208f11e864d5).
             abi.encode(bytes32(0xf2ed765ea90479defa99f4853559bec02617067e736f70475cc64a8e571f509a))
         );
 
@@ -125,8 +122,7 @@ contract L2MessageVerificationDepthRegressionTest is Test {
         proof[13] = bytes32(0xa707d1c62d8be699d34cb74804fdd7b4c568b6c1a821066f126c680d4b83e00b);
         proof[14] = bytes32(0xf6e093070e0389d2e529d60fadb855fdded54976ec50ac709e3a36ceaa64c291);
         proof[15] = bytes32(0xe4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf75944);
-        // Settlement timestamp `t` word, parsed after the log-leaf proof nodes (0 on ZKsync OS).
-        proof[16] = bytes32(0);
+        proof[16] = bytes32(uint256(0)); // l1Timestamp bound into the batch leaf
         proof[17] = bytes32(0x0000000000000000000000000000000000000000000000000000000000000034);
         proof[18] = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
         proof[19] = bytes32(0xcc4c41edb0c2031348b292b768e9bac1ee8c92c09ef8a3277c2ece409c12d86a);
@@ -239,8 +235,7 @@ contract L2MessageVerificationDepthRegressionTest is Test {
         proof[13] = bytes32(0xa707d1c62d8be699d34cb74804fdd7b4c568b6c1a821066f126c680d4b83e00b);
         proof[14] = bytes32(0xf6e093070e0389d2e529d60fadb855fdded54976ec50ac709e3a36ceaa64c291);
         proof[15] = bytes32(0xe4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf75944);
-        // Settlement timestamp `t` word, parsed after the log-leaf proof nodes (0 on ZKsync OS).
-        proof[16] = bytes32(0);
+        proof[16] = bytes32(uint256(0)); // l1Timestamp bound into the batch leaf
         proof[17] = bytes32(0x0000000000000000000000000000000000000000000000000000000000000034);
         proof[18] = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
         proof[19] = bytes32(0xcc4c41edb0c2031348b292b768e9bac1ee8c92c09ef8a3277c2ece409c12d86a);
@@ -257,8 +252,6 @@ contract L2MessageVerificationDepthRegressionTest is Test {
         vm.mockCall(
             address(L2_INTEROP_ROOT_STORAGE),
             abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
-            // Root recomputed after folding settlement timestamp `t == 0` into the batch leaf
-            // (old: 0x9df9ccdcc86232686d57ea501eadb14888fd7c9fe1fd72a74c91208f11e864d5).
             abi.encode(bytes32(0xf2ed765ea90479defa99f4853559bec02617067e736f70475cc64a8e571f509a))
         );
 

@@ -30,11 +30,12 @@ import {
 /// the root cannot be forged.
 ///
 /// The flow `deadline` is a settlement-layer timestamp. It is not carried in the proof struct
-/// (that would be spoofable); instead each batch's settlement timestamp `t` is derived from the
-/// same proof the message verifier checks. We re-parse `messageProof` with
+/// (that would be spoofable); instead each batch's `l1Timestamp` — the settlement-layer block
+/// timestamp at which the batch root was aggregated (`t` in the inequalities below) — is derived
+/// from the same proof the message verifier checks. We re-parse `messageProof` with
 /// {MessageHashing._getProofData} (computing the same leaf the verifier uses) and read
-/// `pd.batchSettlementTimestamp`. `t` is authenticated because it is folded into the chain batch
-/// leaf ({MessageHashing.batchLeafHash}), so it cannot be forged without breaking the chainId /
+/// `pd.l1BatchTimestamp`. It is authenticated because it is folded into the chain batch leaf
+/// ({MessageHashing.batchLeafHash}), so it cannot be forged without breaking the chainId /
 /// shared-tree path. The same parse also gives `pd.settlementLayerChainId` and
 /// `pd.settlementLayerBatchNumber` (the SL snapshot block the root resolved `interopRoots` against).
 ///
@@ -151,7 +152,7 @@ library AtomicInteropProof {
 
     /// @dev Authenticates the commitment tree's `(root)` L2->L1 message against the interop root imported
     /// for `(_sourceChainId, _batchNumber)`, and derives the settlement-layer metadata (SL snapshot block,
-    /// SL chain id, and the batch's settlement timestamp `t`) from that same proof.
+    /// SL chain id, and the batch's `l1Timestamp`) from that same proof.
     ///
     /// Step 1: build the {L2Message} (sender pinned to {L2_INTEROP_COMMITMENT_TREE_ADDR}, identical on
     /// every chain, which binds the root to the real tree; the interop-root channel binds it to
@@ -161,11 +162,11 @@ library AtomicInteropProof {
     /// Step 2: re-parse the same proof to read the SL metadata. We compute the same leaf the verifier
     /// hashes and run {MessageHashing._getProofData} over the same inputs. A single-level / commit-based
     /// proof (`finalProofNode == true`) carries no SL anchor, so we reject it; a multi-hop proof exposes
-    /// `pd.settlementLayerBatchNumber`, `pd.settlementLayerChainId`, and `pd.batchSettlementTimestamp`.
+    /// `pd.settlementLayerBatchNumber`, `pd.settlementLayerChainId`, and `pd.l1BatchTimestamp`.
     ///
     /// @return slBlock The SL snapshot block `interopRoots(slChainId, slBlock)` was resolved at.
     /// @return slChainId The settlement-layer chain id (callers require it to equal the flow's SL).
-    /// @return batchTimestamp The batch's settlement timestamp `t`, compared to the deadline.
+    /// @return batchTimestamp The batch's `l1Timestamp`, compared to the deadline.
     function _authenticateRoot(
         ImtProof calldata _proof
     ) private view returns (uint256 slBlock, uint256 slChainId, uint256 batchTimestamp) {
@@ -199,6 +200,6 @@ library AtomicInteropProof {
 
         slBlock = pd.settlementLayerBatchNumber;
         slChainId = pd.settlementLayerChainId;
-        batchTimestamp = pd.batchSettlementTimestamp;
+        batchTimestamp = pd.l1BatchTimestamp;
     }
 }

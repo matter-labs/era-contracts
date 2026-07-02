@@ -152,7 +152,7 @@ contract MessageRootTest is Test {
 
         vm.prank(alphaChainSender);
         vm.expectRevert(MessageRootNotRegistered.selector);
-        messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId), 0);
+        messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
     }
 
     function test_addChainBatchRoot_1() public {
@@ -175,7 +175,7 @@ contract MessageRootTest is Test {
         vm.chainId(L1_CHAIN_ID);
         vm.prank(alphaChainSender);
         vm.expectRevert();
-        l2MessageRoot.addChainBatchRoot(L1_CHAIN_ID, 1, bytes32(L1_CHAIN_ID), 0);
+        l2MessageRoot.addChainBatchRoot(L1_CHAIN_ID, 1, bytes32(L1_CHAIN_ID));
 
         vm.prank(L2_BRIDGEHUB_ADDR);
         l2MessageRoot.addNewChain(alphaChainId, 0);
@@ -190,10 +190,10 @@ contract MessageRootTest is Test {
 
         vm.prank(alphaChainSender);
         vm.expectEmit(true, false, false, false);
-        emit IMessageRootBase.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
+        emit IMessageRootBase.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId), block.timestamp);
         vm.expectEmit(true, false, false, false);
         emit IMessageRootBase.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
-        l2MessageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId), 0);
+        l2MessageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
 
         // Verify interopRootLogId incremented once for the new block
         assertEq(
@@ -233,8 +233,7 @@ contract MessageRootTest is Test {
         messageRoot.addChainBatchRoot(
             alphaChainId,
             1,
-            bytes32(hex"63c4d39ce8f2410a1e65b0ad1209fe8b368928a7124bfa6e10e0d4f0786129dd"),
-            0
+            bytes32(hex"63c4d39ce8f2410a1e65b0ad1209fe8b368928a7124bfa6e10e0d4f0786129dd")
         );
 
         // Verify batch number incremented after adding first batch
@@ -245,8 +244,7 @@ contract MessageRootTest is Test {
         messageRoot.addChainBatchRoot(
             alphaChainId,
             2,
-            bytes32(hex"bcc3a5584fe0f85e968c0bae082172061e3f3a8a47ff9915adae4a3e6174fc12"),
-            0
+            bytes32(hex"bcc3a5584fe0f85e968c0bae082172061e3f3a8a47ff9915adae4a3e6174fc12")
         );
 
         // Verify batch number incremented after adding second batch
@@ -257,8 +255,7 @@ contract MessageRootTest is Test {
         messageRoot.addChainBatchRoot(
             alphaChainId,
             3,
-            bytes32(hex"8d1ced168691d5e8a2dc778350a2c40a2714cc7d64bff5b8da40a96c47dc5f3e"),
-            0
+            bytes32(hex"8d1ced168691d5e8a2dc778350a2c40a2714cc7d64bff5b8da40a96c47dc5f3e")
         );
 
         // Verify batch number incremented after adding third batch

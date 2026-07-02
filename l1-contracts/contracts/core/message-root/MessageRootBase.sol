@@ -91,6 +91,13 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// @dev An expected invariant is that for all batches starting from currentChainBatchNumber + 1, the `chainBatchRoots` is 0.
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
+    /// @notice The settlement-layer block timestamp at which each `(chainId, batchNumber)` chainBatchRoot
+    /// was aggregated (i.e. when the chain settled on this layer).
+    /// @dev This is the same `l1Timestamp` that is bound into the batch leaf (`MessageHashing.batchLeafHash`),
+    /// so it is provable via the aggregated-root inclusion proof. Stored so that off-chain proof builders
+    /// can retrieve the exact timestamp they must feed into a proof.
+    mapping(uint256 chainId => mapping(uint256 batchNumber => uint256 l1Timestamp)) public chainBatchRootTimestamp;
+
     /// @notice The current logId value emitted in `NewInteropRoot` events.
     /// @dev Increments at most once per block: all emissions within the same block share the same
     /// logId, and the counter only advances when `block.number` changes.
@@ -186,16 +193,10 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
     /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
     /// @param _chainBatchRoot The value of chainBatchRoot which is being added.
-    /// @param _settlementTimestamp The settlement timestamp `t` assigned by the settlement layer. It is
-    /// non-decreasing across batches and gets bound into the chain batch leaf so it is authenticated and
-    /// usable by the interop timeout.
-    /// TODO(STF): on ZKsync OS `StoredBatchInfo.timestamp` is currently 0; the sequencer must emit a real
-    /// monotone `t` for the timeout to be sound.
     function addChainBatchRoot(
         uint256 _chainId,
         uint256 _batchNumber,
-        bytes32 _chainBatchRoot,
-        uint256 _settlementTimestamp
+        bytes32 _chainBatchRoot
     ) public virtual addChainBatchRootRestriction(_chainId) {
         // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
@@ -212,15 +213,20 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         chainBatchRoots[_chainId][_batchNumber] = _chainBatchRoot;
         currentChainBatchNumber[_chainId] = expectedNewChainBatchNumber;
 
+        // Record the settlement-layer timestamp at which this batch root was aggregated. It is bound into
+        // the batch leaf below, so a later inclusion proof against the aggregated root also proves the
+        // timestamp — a single aggregated root can prove many chain batch roots, each with its own time.
+        uint256 l1Timestamp = block.timestamp;
+        chainBatchRootTimestamp[_chainId][_batchNumber] = l1Timestamp;
+
         // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.
-        // The leaf includes the batch's settlement timestamp `t` so it is authenticated downstream.
         bytes32 chainRoot;
         // slither-disable-next-line unused-return
         (, chainRoot) = chainTree[_chainId].push(
-            MessageHashing.batchLeafHash(_chainBatchRoot, _batchNumber, _settlementTimestamp)
+            MessageHashing.batchLeafHash(_chainBatchRoot, _batchNumber, l1Timestamp)
         );
 
-        emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
+        emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot, l1Timestamp);
 
         // Update leaf corresponding to the specified chainId with newly acquired value of the chainRoot.
         bytes32 cachedChainIdLeafHash = MessageHashing.chainIdLeafHash(chainRoot, _chainId);

@@ -389,8 +389,7 @@ library ProcessLogsTestHelper {
                 messages: _messages,
                 chainBatchRoot: chainBatchRoot,
                 multichainBatchRoot: emptyMultichainBatchRoot,
-                settlementFeePayer: _settlementFeePayer,
-                settlementTimestamp: 0
+                settlementFeePayer: _settlementFeePayer
             });
     }
 }

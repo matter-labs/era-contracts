@@ -387,6 +387,7 @@ contract MailboxL2LogsProve is MailboxTest {
                 leafProofMask: proofInfo.leafProofMask,
                 // We override it since it is only known here
                 batchNumber: batchNumber,
+                l1Timestamp: 0,
                 batchProof: proofInfo.batchProof,
                 batchLeafProofMask: proofInfo.batchLeafProofMask,
                 // We override it since it is only known here
@@ -433,6 +434,7 @@ contract MailboxL2LogsProve is MailboxTest {
                     leafProofMask: 2,
                     // We override it since it is only known here
                     batchNumber: 0,
+                    l1Timestamp: 0,
                     batchProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(1))),
                     batchLeafProofMask: 1,
                     // We override it since it is only known here
@@ -455,6 +457,7 @@ contract MailboxL2LogsProve is MailboxTest {
                     leafProofMask: 2,
                     // We override it since it is only known here
                     batchNumber: 0,
+                    l1Timestamp: 0,
                     batchProof: bytes32Arr(0, bytes32(0), bytes32(0)),
                     batchLeafProofMask: 0,
                     // We override it since it is only known here
@@ -475,6 +478,7 @@ contract MailboxL2LogsProve is MailboxTest {
             leafProofMask: 2,
             // We override it since it is only known here
             batchNumber: 0,
+            l1Timestamp: 0,
             batchProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(1))),
             batchLeafProofMask: 1,
             // We override it since it is only known here
@@ -507,6 +511,7 @@ contract MailboxL2LogsProve is MailboxTest {
             logProof: bytes32Arr(2, bytes32(0), bytes32(uint256(1))),
             leafProofMask: 2,
             batchNumber: 0,
+            l1Timestamp: 0,
             batchProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(1))),
             batchLeafProofMask: 1,
             settlementLayerBatchNumber: 0,
@@ -530,6 +535,7 @@ contract MailboxL2LogsProve is MailboxTest {
                 logProof: proofInfo.logProof,
                 leafProofMask: proofInfo.leafProofMask,
                 batchNumber: batchNumber,
+                l1Timestamp: 0,
                 batchProof: proofInfo.batchProof,
                 batchLeafProofMask: proofInfo.batchLeafProofMask,
                 settlementLayerBatchNumber: secondBatchNumber,
@@ -578,6 +584,7 @@ contract MailboxL2LogsProve is MailboxTest {
             logProof: bytes32Arr(2, bytes32(0), bytes32(uint256(1))),
             leafProofMask: 2,
             batchNumber: 0,
+            l1Timestamp: 0,
             batchProof: bytes32Arr(2, bytes32(uint256(1)), bytes32(uint256(1))),
             batchLeafProofMask: 1,
             settlementLayerBatchNumber: 0,
@@ -600,6 +607,7 @@ contract MailboxL2LogsProve is MailboxTest {
                 logProof: proofInfo.logProof,
                 leafProofMask: proofInfo.leafProofMask,
                 batchNumber: batchNumber,
+                l1Timestamp: 0,
                 batchProof: proofInfo.batchProof,
                 batchLeafProofMask: proofInfo.batchLeafProofMask,
                 settlementLayerBatchNumber: secondBatchNumber,
@@ -823,6 +831,7 @@ contract MailboxL2LogsProve is MailboxTest {
         bytes32[] logProof;
         uint256 leafProofMask;
         uint256 batchNumber;
+        uint256 l1Timestamp;
         bytes32[] batchProof;
         uint256 batchLeafProofMask;
         uint256 settlementLayerBatchNumber;
@@ -835,7 +844,6 @@ contract MailboxL2LogsProve is MailboxTest {
         RecursiveProofInfo memory info
     ) internal returns (bytes32[] memory proof, bytes32 chainBRoot) {
         uint256 ptr;
-        // +1 word for the settlement timestamp `t` inserted after the log-leaf proof nodes.
         proof = new bytes32[](
             1 + info.logProof.length + 1 + 1 + info.batchProof.length + 2 + 1 + info.chainIdProof.length
         );
@@ -845,16 +853,10 @@ contract MailboxL2LogsProve is MailboxTest {
 
         bytes32 batchSettlementRoot = Merkle.calculateRootMemory(info.logProof, info.leafProofMask, info.leaf);
 
-        // `_getProofData` reads the batch settlement timestamp `t` here (after the log-leaf proof
-        // nodes, before the batchLeafProofMask). `t == 0` on ZKsync OS today; it is folded into the leaf.
-        uint256 settlementTimestamp = 0;
-        proof[ptr++] = bytes32(settlementTimestamp);
+        // The l1 timestamp word is read right after the log-leaf proof and bound into the batch leaf.
+        proof[ptr++] = bytes32(info.l1Timestamp);
 
-        bytes32 batchLeafHash = MessageHashing.batchLeafHash(
-            batchSettlementRoot,
-            info.batchNumber,
-            settlementTimestamp
-        );
+        bytes32 batchLeafHash = MessageHashing.batchLeafHash(batchSettlementRoot, info.batchNumber, info.l1Timestamp);
 
         proof[ptr++] = bytes32(uint256(info.batchLeafProofMask));
         copyBytes32(proof, info.batchProof, ptr);

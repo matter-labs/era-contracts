@@ -335,24 +335,25 @@ export const DEFAULT_SL_CHAIN_ID = 506;
  *
  * Byte layout (logLeafProofLen=0, batchLeafProofLen=0 -> no path nodes, so the mask words are 0):
  *   [0] metadata header = version(0x01) << 248 | logLeafProofLen(0) | batchLeafProofLen(0) |
- *       finalProofNode(0); the low 28 bytes must be zero.
- *   [1] batchSettlementTimestamp `t`, read back as `pd.batchSettlementTimestamp` and compared to the deadline.
+ *       finalProofNode(0); the low 28 bytes MUST be zero (new versioned format).
+ *   [1] l1Timestamp = the settlement-layer timestamp bound into the batch leaf (read right after the
+ *       log-leaf proof). Format-only on the harness (the mock accepts any message), so a chosen value.
  *   [2] batchLeafProofMask = 0.
  *   [3] settlementLayerPackedBatchInfo = (slBlock << 128) | mask(0).
  *   [4] settlementLayerChainId.
- * `messageIndex` must be 0, since logLeafProofLen==0 requires index < 1.
+ * `messageIndex` (the leaf-proof mask) must be 0, since logLeafProofLen==0 requires index < 1.
  */
 export function buildSlProofBytes(
-  t: BigNumber | number | string,
+  slBlock: number,
   slChainId: number = DEFAULT_SL_CHAIN_ID,
-  slBlock = 1
+  l1Timestamp: BigNumber | number | string = 0
 ): string[] {
   const metadata = utils.hexZeroPad(BigNumber.from(0x01).shl(248).toHexString(), 32);
-  const batchSettlementTimestamp = utils.hexZeroPad(BigNumber.from(t).toHexString(), 32);
+  const l1TimestampWord = utils.hexZeroPad(BigNumber.from(l1Timestamp).toHexString(), 32);
   const batchLeafProofMask = utils.hexZeroPad("0x00", 32);
   const packedBatchInfo = utils.hexZeroPad(BigNumber.from(slBlock).shl(128).toHexString(), 32);
   const settlementLayerChainId = utils.hexZeroPad(BigNumber.from(slChainId).toHexString(), 32);
-  return [metadata, batchSettlementTimestamp, batchLeafProofMask, packedBatchInfo, settlementLayerChainId];
+  return [metadata, l1TimestampWord, batchLeafProofMask, packedBatchInfo, settlementLayerChainId];
 }
 
 /**
@@ -362,7 +363,7 @@ export function buildSlProofBytes(
  * `t <= deadline`; timeout adjacency: absence `t_N <= deadline`, successor `t_{N+1} > deadline`).
  */
 function messageProofForBatch(params: {
-  t: BigNumber | number | string;
+  l1Timestamp: BigNumber | number | string;
   batchNumber?: number | string;
   slChainId?: number;
 }): {
@@ -371,12 +372,13 @@ function messageProofForBatch(params: {
   messageTxNumberInBatch: number;
   messageProof: string[];
 } {
-  const { t, batchNumber = "1", slChainId = DEFAULT_SL_CHAIN_ID } = params;
+  const { l1Timestamp, batchNumber = "1", slChainId = DEFAULT_SL_CHAIN_ID } = params;
   return {
     batchNumber: batchNumber.toString(),
     messageIndex: "0",
     messageTxNumberInBatch: 0,
-    messageProof: buildSlProofBytes(t, slChainId),
+    // slBlock is an arbitrary placeholder (parsed but not used for acceptance on the harness).
+    messageProof: buildSlProofBytes(1, slChainId, l1Timestamp),
   };
 }
 
@@ -388,11 +390,11 @@ export async function buildInclusionProof(params: {
   l2Tree: Contract;
   chainId: BigNumber | number | string;
   value: string;
-  t: BigNumber | number | string;
+  l1Timestamp: BigNumber | number | string;
   slChainId?: number;
   l2BlockTag?: number;
 }): Promise<ImtProof> {
-  const { l2Tree, chainId, value, t, slChainId, l2BlockTag } = params;
+  const { l2Tree, chainId, value, l1Timestamp, slChainId, l2BlockTag } = params;
   const imt = await reconstructChainImt(l2Tree, l2BlockTag);
   const idx = findValueIndex(imt.leaves, value);
   if (idx < 0) throw new Error(`value ${value} not found in chain ${chainId.toString()} IMT`);
@@ -409,7 +411,7 @@ export async function buildInclusionProof(params: {
     leaf: imt.leaves[idx],
     imtLeafIndex: idx,
     imtProof: imt.engine.merklePath(idx),
-    ...messageProofForBatch({ t, slChainId }),
+    ...messageProofForBatch({ l1Timestamp, slChainId }),
   };
 }
 
@@ -422,12 +424,12 @@ export async function buildNonInclusionProof(params: {
   l2Tree: Contract;
   chainId: BigNumber | number | string;
   value: string;
-  t: BigNumber | number | string;
+  l1Timestamp: BigNumber | number | string;
   batchNumber?: number | string;
   slChainId?: number;
   l2BlockTag?: number;
 }): Promise<ImtProof> {
-  const { l2Tree, chainId, value, t, batchNumber = 1, slChainId, l2BlockTag } = params;
+  const { l2Tree, chainId, value, l1Timestamp, batchNumber = 1, slChainId, l2BlockTag } = params;
   const imt = await reconstructChainImt(l2Tree, l2BlockTag);
   const lowIndex = findLowNullifierIndex(imt.leaves, value); // throws if value present
 
@@ -442,7 +444,7 @@ export async function buildNonInclusionProof(params: {
     leaf: imt.leaves[lowIndex],
     imtLeafIndex: lowIndex,
     imtProof: imt.engine.merklePath(lowIndex),
-    ...messageProofForBatch({ t, batchNumber, slChainId }),
+    ...messageProofForBatch({ l1Timestamp, batchNumber, slChainId }),
   };
 }
 
@@ -456,12 +458,12 @@ export async function buildNonInclusionProof(params: {
 export async function buildSuccessorProof(params: {
   l2Tree: Contract;
   chainId: BigNumber | number | string;
-  t: BigNumber | number | string;
+  l1Timestamp: BigNumber | number | string;
   batchNumber: number | string;
   slChainId?: number;
   l2BlockTag?: number;
 }): Promise<ImtProof> {
-  const { l2Tree, chainId, t, batchNumber, slChainId, l2BlockTag } = params;
+  const { l2Tree, chainId, l1Timestamp, batchNumber, slChainId, l2BlockTag } = params;
   const imt = await reconstructChainImt(l2Tree, l2BlockTag);
   return {
     sourceChainId: BigNumber.from(chainId).toString(),
@@ -469,7 +471,7 @@ export async function buildSuccessorProof(params: {
     leaf: imt.leaves[0],
     imtLeafIndex: 0,
     imtProof: imt.engine.merklePath(0),
-    ...messageProofForBatch({ t, batchNumber, slChainId }),
+    ...messageProofForBatch({ l1Timestamp, batchNumber, slChainId }),
   };
 }
 

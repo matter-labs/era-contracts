@@ -136,8 +136,7 @@ contract GWAssetTrackerExtendedTest is Test {
             messages: new bytes[](0),
             chainBatchRoot: bytes32(0),
             multichainBatchRoot: bytes32(0),
-            settlementFeePayer: address(0),
-            settlementTimestamp: 0
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain to return a different address
@@ -180,8 +179,7 @@ contract GWAssetTrackerExtendedTest is Test {
             messages: messages,
             chainBatchRoot: chainBatchRoot,
             multichainBatchRoot: emptyMultichainBatchRoot,
-            settlementFeePayer: address(0),
-            settlementTimestamp: 0
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -233,8 +231,7 @@ contract GWAssetTrackerExtendedTest is Test {
             messages: messages,
             chainBatchRoot: chainBatchRoot,
             multichainBatchRoot: emptyMultichainBatchRoot,
-            settlementFeePayer: address(0),
-            settlementTimestamp: 0
+            settlementFeePayer: address(0)
         });
 
         vm.mockCall(
@@ -282,8 +279,7 @@ contract GWAssetTrackerExtendedTest is Test {
             messages: messages,
             chainBatchRoot: chainBatchRoot,
             multichainBatchRoot: emptyMultichainBatchRoot,
-            settlementFeePayer: address(0),
-            settlementTimestamp: 0
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -333,8 +329,7 @@ contract GWAssetTrackerExtendedTest is Test {
             messages: messages,
             chainBatchRoot: chainBatchRoot,
             multichainBatchRoot: emptyMultichainBatchRoot,
-            settlementFeePayer: address(0),
-            settlementTimestamp: 0
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -386,8 +381,7 @@ contract GWAssetTrackerExtendedTest is Test {
             messages: messages,
             chainBatchRoot: chainBatchRoot,
             multichainBatchRoot: emptyMultichainBatchRoot,
-            settlementFeePayer: address(0),
-            settlementTimestamp: 0
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -407,13 +401,7 @@ contract GWAssetTrackerExtendedTest is Test {
         // Mock message root addChainBatchRoot
         vm.mockCall(
             L2_MESSAGE_ROOT_ADDR,
-            abi.encodeWithSignature(
-                "addChainBatchRoot(uint256,uint256,bytes32,uint256)",
-                CHAIN_ID,
-                1,
-                chainBatchRoot,
-                0
-            ),
+            abi.encodeWithSignature("addChainBatchRoot(uint256,uint256,bytes32)", CHAIN_ID, 1, chainBatchRoot),
             abi.encode()
         );
 
@@ -423,6 +411,8 @@ contract GWAssetTrackerExtendedTest is Test {
         );
         gwAssetTracker.processLogsAndMessages(input);
     }
+
+    // Test processLogsAndMessages with base token system contract message (lines 233, 510, 516-517, 521)
 
     // Test processLogsAndMessages with compressor message (line 240)
     function test_ProcessLogsAndMessages_Compressor() public {
@@ -452,8 +442,7 @@ contract GWAssetTrackerExtendedTest is Test {
             messages: messages,
             chainBatchRoot: chainBatchRoot,
             multichainBatchRoot: emptyMultichainBatchRoot,
-            settlementFeePayer: address(0),
-            settlementTimestamp: 0
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -473,13 +462,7 @@ contract GWAssetTrackerExtendedTest is Test {
         // Mock message root addChainBatchRoot
         vm.mockCall(
             L2_MESSAGE_ROOT_ADDR,
-            abi.encodeWithSignature(
-                "addChainBatchRoot(uint256,uint256,bytes32,uint256)",
-                CHAIN_ID,
-                1,
-                chainBatchRoot,
-                0
-            ),
+            abi.encodeWithSignature("addChainBatchRoot(uint256,uint256,bytes32)", CHAIN_ID, 1, chainBatchRoot),
             abi.encode()
         );
 
@@ -515,8 +498,7 @@ contract GWAssetTrackerExtendedTest is Test {
             messages: messages,
             chainBatchRoot: chainBatchRoot,
             multichainBatchRoot: emptyMultichainBatchRoot,
-            settlementFeePayer: address(0),
-            settlementTimestamp: 0
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -536,13 +518,7 @@ contract GWAssetTrackerExtendedTest is Test {
         // Mock message root addChainBatchRoot
         vm.mockCall(
             L2_MESSAGE_ROOT_ADDR,
-            abi.encodeWithSignature(
-                "addChainBatchRoot(uint256,uint256,bytes32,uint256)",
-                CHAIN_ID,
-                1,
-                chainBatchRoot,
-                0
-            ),
+            abi.encodeWithSignature("addChainBatchRoot(uint256,uint256,bytes32)", CHAIN_ID, 1, chainBatchRoot),
             abi.encode()
         );
 
@@ -579,8 +555,7 @@ contract GWAssetTrackerExtendedTest is Test {
             messages: messages,
             chainBatchRoot: chainBatchRoot,
             multichainBatchRoot: emptyMultichainBatchRoot,
-            settlementFeePayer: address(0),
-            settlementTimestamp: 0
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -639,8 +614,7 @@ contract GWAssetTrackerExtendedTest is Test {
             messages: new bytes[](0),
             chainBatchRoot: chainBatchRoot,
             multichainBatchRoot: emptyMultichainBatchRoot,
-            settlementFeePayer: address(0),
-            settlementTimestamp: 0
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -660,13 +634,7 @@ contract GWAssetTrackerExtendedTest is Test {
         // Mock message root addChainBatchRoot
         vm.mockCall(
             L2_MESSAGE_ROOT_ADDR,
-            abi.encodeWithSignature(
-                "addChainBatchRoot(uint256,uint256,bytes32,uint256)",
-                CHAIN_ID,
-                1,
-                chainBatchRoot,
-                0
-            ),
+            abi.encodeWithSignature("addChainBatchRoot(uint256,uint256,bytes32)", CHAIN_ID, 1, chainBatchRoot),
             abi.encode()
         );
 

@@ -68,20 +68,19 @@ library MessageHashing {
         );
     }
 
-    /// @dev Returns the leaf hash for a chain batch, binding the batch root, its number and its
-    /// settlement timestamp.
-    /// @param settlementTimestamp The settlement-layer-assigned, monotone-non-decreasing timestamp `t`
-    /// of this batch. Including `t` in the leaf makes it authenticated by the SL aggregation tree, which
-    /// the atomic-interop timeout relies on to prove the last batch with `t <= deadline`.
-    /// TODO(STF): on ZKsync OS `StoredBatchInfo.timestamp` is currently always 0, so the state-transition
-    /// program must emit a real monotone `t` before the timeout is sound.
+    /// @dev Returns the leaf hash for a chain with batch number and batch root.
+    /// @param batchRoot The root hash of the batch.
+    /// @param batchNumber The number of the batch.
+    /// @param l1Timestamp The settlement-layer block timestamp at which the batch root was aggregated into
+    /// the message root (i.e. when the chain settled). Binding it into the leaf makes the timestamp
+    /// provable via the same inclusion proof: a single aggregated (multi-chain) root can prove many
+    /// chain batch roots, and each carries its own settlement timestamp.
     function batchLeafHash(
         bytes32 batchRoot,
         uint256 batchNumber,
-        uint256 settlementTimestamp
+        uint256 l1Timestamp
     ) internal pure returns (bytes32) {
-        // solhint-disable-next-line func-named-parameters
-        return keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber, settlementTimestamp));
+        return keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber, l1Timestamp));
     }
 
     /// @dev Returns the leaf hash for a chain with chain root and chain id.
@@ -172,6 +171,7 @@ library MessageHashing {
         ProofMetadata memory proofMetadata = MessageHashing.parseProofMetadata(_proof);
         result.ptr = proofMetadata.proofStartIndex;
 
+        uint256 l1BatchTimestamp;
         {
             bytes32 batchSettlementRoot = Merkle.calculateRootMemory(
                 extractSlice(_proof, result.ptr, result.ptr + proofMetadata.logLeafProofLen),
@@ -185,17 +185,17 @@ library MessageHashing {
             if (proofMetadata.finalProofNode) {
                 return result;
             }
-            // Read the batch's settlement timestamp `t` and bind it into the batch leaf, the same way
-            // MessageRootBase.addChainBatchRoot did when it pushed the leaf, so a prover cannot forge `t`
-            // without breaking the authenticated path. Stored into `result` (not a local) to save stack.
-            result.batchSettlementTimestamp = uint256(_proof[result.ptr]);
+            // The settlement-layer block timestamp at which the batch root was aggregated. It is bound
+            // into the batch leaf below, so an inclusion proof against the aggregated root also proves
+            // this timestamp — a wrong value makes the reconstructed leaf mismatch the tree.
+            l1BatchTimestamp = uint256(_proof[result.ptr]);
             ++result.ptr;
 
             // Now, we'll have to check that the Gateway included the message.
             bytes32 localBatchLeafHash = MessageHashing.batchLeafHash(
                 batchSettlementRoot,
                 _batchNumber,
-                result.batchSettlementTimestamp
+                l1BatchTimestamp
             );
 
             uint256 batchLeafProofMask = uint256(bytes32(_proof[result.ptr]));
@@ -225,12 +225,17 @@ library MessageHashing {
             ++result.ptr;
         }
 
-        // Assign the remaining fields individually rather than rebuilding the whole struct literal,
-        // since `result` already carries the fields set above and a full literal overflows the stack.
-        result.settlementLayerChainId = settlementLayerChainId;
-        result.settlementLayerBatchNumber = settlementLayerBatchNumber;
-        result.settlementLayerBatchRootMask = settlementLayerBatchRootMask;
-        result.batchLeafProofLen = proofMetadata.batchLeafProofLen;
+        result = ProofData({
+            settlementLayerChainId: settlementLayerChainId,
+            settlementLayerBatchNumber: settlementLayerBatchNumber,
+            settlementLayerBatchRootMask: settlementLayerBatchRootMask,
+            batchLeafProofLen: proofMetadata.batchLeafProofLen,
+            batchSettlementRoot: result.batchSettlementRoot,
+            chainIdLeaf: result.chainIdLeaf,
+            l1BatchTimestamp: l1BatchTimestamp,
+            ptr: result.ptr,
+            finalProofNode: proofMetadata.finalProofNode
+        });
     }
 
     /// @notice Extracts slice from the proof.

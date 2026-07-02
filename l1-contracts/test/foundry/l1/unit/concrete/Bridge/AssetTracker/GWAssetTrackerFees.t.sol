@@ -129,7 +129,7 @@ contract GWAssetTrackerFeesTest is Test {
         // Mock message root addChainBatchRoot (accept any arguments)
         vm.mockCall(
             L2_MESSAGE_ROOT_ADDR,
-            abi.encodeWithSignature("addChainBatchRoot(uint256,uint256,bytes32,uint256)"),
+            abi.encodeWithSignature("addChainBatchRoot(uint256,uint256,bytes32)"),
             abi.encode()
         );
     }

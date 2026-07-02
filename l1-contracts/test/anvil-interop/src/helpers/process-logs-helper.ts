@@ -415,8 +415,6 @@ export async function callProcessLogsAndMessages(params: {
       multichainBatchRoot: messageRoot,
       // TODO(EVM-1300): Interop fees are currently zero. Add non-zero fee testing when fee logic is implemented.
       settlementFeePayer: ethers.constants.AddressZero,
-      // Batch settlement timestamp, taken from StoredBatchInfo.timestamp, which is 0 on ZKsync OS.
-      settlementTimestamp: 0,
     };
 
     const tx = await trackerAsSigner.processLogsAndMessages(processLogsInput, {

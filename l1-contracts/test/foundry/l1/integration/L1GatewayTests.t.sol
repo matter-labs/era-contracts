@@ -130,8 +130,8 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
                     settlementLayerBatchRootMask: 0,
                     batchLeafProofLen: 0,
                     batchSettlementRoot: 0,
-                    batchSettlementTimestamp: 0,
                     chainIdLeaf: 0,
+                    l1BatchTimestamp: 0,
                     ptr: 0,
                     finalProofNode: false
                 })
