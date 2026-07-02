@@ -154,11 +154,6 @@
         "internalType": "uint256"
       },
       {
-        "name": "_newProtocolVersion",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
         "name": "_timestamp",
         "type": "uint256",
         "internalType": "uint256"
