@@ -92,11 +92,13 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
 
     /// @inheritdoc IInteropHandler
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
-        // Interop claiming requires the chain to settle on Gateway so that GWAssetTracker can move
-        // balances from pendingInteropBalance to chainBalance. We read the current settlement layer
-        // from `SystemContext` rather than `L2_BRIDGEHUB`: the Bridgehub mapping is only written for
-        // chains settling on it (L1's Bridgehub, or a Gateway's for the chains it hosts), never on a
-        // chain's own L2Bridgehub for itself.
+        // Interop claiming requires the chain to settle on Gateway so that GWAssetTracker can process
+        // the execution confirmation and move balances from pendingInteropBalance to chainBalance.
+        // We read the chain's current settlement layer from `SystemContext` (kept in sync with each
+        // batch's bootloader-driven `setSettlementLayerChainId` call); the analogous mapping on the
+        // chain's own `L2Bridgehub` is only written for chains that *settle on this Bridgehub*
+        // (i.e. populated on L1's L1Bridgehub and on a Gateway's L2Bridgehub for the chains it
+        // hosts), and is never written on a chain's own L2Bridgehub for itself.
         require(
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
             CannotClaimInteropOnL1Settlement()
@@ -216,9 +218,9 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
 
     /// @inheritdoc IInteropHandler
     function unbundleBundle(bytes memory _bundle, CallStatus[] calldata _providedCallStatus) public {
-        // Interop claiming requires the chain to settle on Gateway so that GWAssetTracker can move
-        // balances from pendingInteropBalance to chainBalance. See `executeBundle` for why this reads
-        // `SystemContext` rather than `L2_BRIDGEHUB`.
+        // Interop claiming requires the chain to settle on Gateway so that GWAssetTracker can process
+        // the execution confirmation and move balances from pendingInteropBalance to chainBalance.
+        // See `executeBundle` for why this reads `SystemContext` rather than `L2_BRIDGEHUB`.
         require(
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
             CannotClaimInteropOnL1Settlement()

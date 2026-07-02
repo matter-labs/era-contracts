@@ -499,8 +499,8 @@ export function proofTuple(p: ImtProof): unknown[] {
 
 /**
  * Build the `AtomicFinalityProof` tuple {InteropHandler.executeAtomicBundle} consumes: the flow
- * definition (flowId, deadline, settlementLayerChainId, ascending legBundleHashes + chainIds) plus one
- * inclusion proof per leg, in `legBundleHashes` order. Tuple field order:
+ * definition (flowId, deadline, settlementLayerChainId, ascending legBundleHashes + positionally-aligned
+ * chainIds) plus one inclusion proof per leg, in `legBundleHashes` order. Tuple field order:
  *   (flowId, deadline, settlementLayerChainId, legBundleHashes, legSourceChainIds, proofs).
  */
 export function atomicFinalityProofTuple(params: {
