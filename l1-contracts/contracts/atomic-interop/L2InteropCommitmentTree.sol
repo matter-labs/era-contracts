@@ -9,16 +9,15 @@ import {CommitmentTreeNotAppender} from "./AtomicInteropErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice See {IL2InteropCommitmentTree}. A thin shell over the shared dynamic-height Indexed Merkle
-/// Tree engine ({IndexedMerkleTree}): it owns the `_appender` ACL, the `initialize` wiring, and
-/// the L2->L1 root publication, while the engine owns the tree storage, insert/update logic, leaf
-/// hashing, and Merkle paths.
+/// @notice See {IL2InteropCommitmentTree}. A thin shell over the shared Indexed Merkle Tree engine
+/// ({IndexedMerkleTree}): it owns the appender ACL, the `initialize` wiring, and the L2->L1 root
+/// publication. The engine owns the tree storage, insert logic, leaf hashing, and Merkle paths.
 ///
-/// On every insert (and the head seed) it publishes `abi.encode(root)` to L1 via the L2->L1 messenger.
-/// Consuming chains authenticate that message against the interop root they import for the settling
-/// batch (see {AtomicInteropProof}); the deadline is checked against the batch's SL-assigned settlement
-/// timestamp `t`, folded into the chain batch leaf and re-derived in-module from the same inclusion
-/// proof, so this tree itself publishes only the root and no (operator-set) timestamp.
+/// On every insert (and the head seed) it publishes `abi.encode(root)` to L1. Consuming chains
+/// authenticate that message against the interop root they import for the settling batch (see
+/// {AtomicInteropProof}). Deadlines are checked against the settlement timestamp `t`, which the
+/// settlement layer assigns and which is re-derived from the batch inclusion proof, so this tree
+/// publishes only the root and no operator-set timestamp.
 ///
 /// Deployed in L2 userspace (no constructor); wiring is done in `initialize`.
 contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
@@ -28,8 +27,8 @@ contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
     IMT internal _imt;
 
     /// @notice One-shot initializer: seeds the IMT (the `{0,0,0}` head leaf at index 0) and publishes
-    /// the seed root. The appender is the canonical {AtomicFlowManager} (a fixed built-in address), so
-    /// there is no wiring parameter; `_imt.setup()` reverts if the tree was already seeded.
+    /// the seed root. The appender is the fixed built-in {AtomicFlowManager} address, so there is no
+    /// wiring parameter. Reverts if the tree was already seeded.
     function initialize() external {
         _imt.setup();
         bytes32 seedRoot = _imt.root();

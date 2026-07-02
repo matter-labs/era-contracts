@@ -15,10 +15,9 @@ import {
 /// @custom:security-contact security@matterlabs.dev
 interface IInteropCenter {
     /// @notice Send-side metadata for an atomic bundle, parsed from the `atomicBundle` attribute. It is
-    /// deliberately NOT part of the cross-chain {InteropBundle}: keeping it out of `bundleHash` avoids a
-    /// circular dependency (`flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))` would otherwise have to be
-    /// known before computing a `bundleHash` that itself embeds `flowId`). Consumed by `_dispatchBundle`
-    /// to drive `AtomicFlowManager.append`.
+    /// kept out of the cross-chain {InteropBundle} (and thus out of `bundleHash`) to avoid a circular
+    /// dependency: `flowId` depends on the leg bundle hashes, so it can't be embedded in a `bundleHash`
+    /// that a leg's `flowId` in turn depends on. Consumed by `_dispatchBundle` to drive `AtomicFlowManager.append`.
     struct AtomicSend {
         bytes32 flowId;
         uint256 lowNullifierIndex;

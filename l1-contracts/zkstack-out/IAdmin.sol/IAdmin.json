@@ -80,13 +80,6 @@
   },
   {
     "type": "function",
-    "name": "enrollAsInteropSource",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "executeUpgrade",
     "inputs": [
       {
@@ -512,12 +505,6 @@
   {
     "type": "event",
     "name": "Freeze",
-    "inputs": [],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "InteropSourceEnrolled",
     "inputs": [],
     "anonymous": false
   },

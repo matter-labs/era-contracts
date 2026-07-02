@@ -260,10 +260,4 @@ struct ZKChainStorage {
     /// except for ZKsync OS chains that have existed before the v31 upgrade.
     /// @dev STORAGE SLOT: 68
     bool baseTokenHasTotalSupply;
-    /// @dev Whether the chain is enrolled as an atomic-interop SOURCE. Once set it cannot be
-    /// unset (one-way latch, mirroring `isPermanentRollup`): an interop source MUST publish its full
-    /// L2->L1 region so consumers can rebuild its IMT for non-inclusion/timeout proofs, so after
-    /// enrollment its DA commitment scheme is latched to `L2_TO_L1_ONLY` and cannot be downgraded.
-    /// @dev STORAGE SLOT: 68 (packed with `baseTokenHasTotalSupply`)
-    bool isInteropSource;
 }

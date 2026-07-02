@@ -92,13 +92,11 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
 
     /// @inheritdoc IInteropHandler
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
-        // Interop claiming requires the chain to settle on Gateway so that GWAssetTracker can process
-        // the execution confirmation and move balances from pendingInteropBalance to chainBalance.
-        // We read the chain's current settlement layer from `SystemContext` (kept in sync with each
-        // batch's bootloader-driven `setSettlementLayerChainId` call); the analogous mapping on the
-        // chain's own `L2Bridgehub` is only written for chains that *settle on this Bridgehub*
-        // (i.e. populated on L1's L1Bridgehub and on a Gateway's L2Bridgehub for the chains it
-        // hosts), and is never written on a chain's own L2Bridgehub for itself.
+        // Interop claiming requires the chain to settle on Gateway so that GWAssetTracker can move
+        // balances from pendingInteropBalance to chainBalance. We read the current settlement layer
+        // from `SystemContext` rather than `L2_BRIDGEHUB`: the Bridgehub mapping is only written for
+        // chains settling on it (L1's Bridgehub, or a Gateway's for the chains it hosts), never on a
+        // chain's own L2Bridgehub for itself.
         require(
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
             CannotClaimInteropOnL1Settlement()
@@ -128,9 +126,8 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
     /// @inheritdoc IInteropHandler
     function executeAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public {
         // No gateway-mode requirement here (unlike executeBundle): an atomic bundle's cross-chain
-        // binding comes from the per-leg IMT inclusion proofs authenticated against the interop root,
-        // which is built on both L1 and the gateway. Atomic execution is therefore valid regardless of
-        // settlement layer, including L1-settled chains.
+        // binding comes from the per-leg IMT inclusion proofs against the interop root, which is built
+        // on both L1 and the gateway. So atomic execution is valid on any settlement layer, incl. L1.
 
         // Decode the bundle, compute its hash, read its status.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
@@ -140,28 +137,22 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
         _validateBundleDestinationContext(bundleHash, interopBundle, interopBundle.sourceChainId);
         _requireExecutionAllowed(bundleHash, interopBundle);
 
-        // Atomic bundles have no verify path (they were never published to L1), so only a fresh bundle
-        // may be executed; replay is then prevented by marking it FullyExecuted below. (A non-atomic
-        // bundle cannot reach here: the gate requires its commit value in an IMT, which only `append`
-        // — i.e. an atomic send — ever writes.)
+        // Atomic bundles have no verify path (never published to L1), so only a fresh bundle may run;
+        // replay is prevented by marking it FullyExecuted below. A non-atomic bundle cannot reach here:
+        // the gate requires its commit value in an IMT, which only an atomic send ever writes.
         require(status == BundleStatus.Unreceived, BundleAlreadyProcessed(bundleHash));
 
-        // Atomicity gate: replaces executeBundle's L1-message inclusion proof. Proves every leg of the
+        // Atomicity gate (replaces executeBundle's L1-message inclusion proof): proves every leg of the
         // flow was committed in its source chain's IMT before the deadline, and that this bundle is one
-        // of the flow's legs. Reverts otherwise.
-        // Destination binding: no explicit `block.chainid in flow` check is added — the executing
-        // bundle self-binds its own `destinationChainId` (asserted `== block.chainid` in
-        // `_validateBundleDestinationContext` above), and per-send salts make each leg's `bundleHash`
-        // unique to its intended destination. An extra check is optional hardening, not required (spec
-        // section 9, rationale table).
+        // of those legs. Reverts otherwise. No explicit "block.chainid in flow" check is needed: the
+        // bundle self-binds its own destinationChainId (asserted == block.chainid above) and per-send
+        // salts make each leg's bundleHash unique to its destination.
         IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).requireFlowFinalized(bundleHash, _finality);
 
-        // Reentrancy: no `nonReentrant` guard, consistent with `executeBundle`. Replay/atomicity
-        // safety is by CEI — `_markFullyExecutedAndRun` sets `bundleStatus = FullyExecuted` (and every
-        // `callStatus = Executed`) BEFORE running any call, so a reentrant `executeAtomicBundle` for THIS
-        // bundle hits the `Unreceived` check and reverts; a reentry for a DIFFERENT bundle is an
-        // independent, identically guarded execution. A global lock would also block legitimate nested
-        // interop and diverge from `executeBundle`.
+        // No nonReentrant guard, matching executeBundle. Replay safety is by CEI: _markFullyExecutedAndRun
+        // sets bundleStatus = FullyExecuted before running any call, so a reentrant call for THIS bundle
+        // hits the Unreceived check and reverts; a reentry for a different bundle is independently guarded.
+        // A global lock would also block legitimate nested interop.
         _markFullyExecutedAndRun(bundleHash, interopBundle);
     }
 
@@ -225,9 +216,9 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
 
     /// @inheritdoc IInteropHandler
     function unbundleBundle(bytes memory _bundle, CallStatus[] calldata _providedCallStatus) public {
-        // Interop claiming requires the chain to settle on Gateway so that GWAssetTracker can process
-        // the execution confirmation and move balances from pendingInteropBalance to chainBalance.
-        // See `executeBundle` for why this reads `SystemContext` rather than `L2_BRIDGEHUB`.
+        // Interop claiming requires the chain to settle on Gateway so that GWAssetTracker can move
+        // balances from pendingInteropBalance to chainBalance. See `executeBundle` for why this reads
+        // `SystemContext` rather than `L2_BRIDGEHUB`.
         require(
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
             CannotClaimInteropOnL1Settlement()

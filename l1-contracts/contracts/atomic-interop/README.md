@@ -6,7 +6,7 @@ central L1 coordinator**. It rides on the normal interop bundle path (`InteropCe
 Tree (IMT)** per chain that records each leg's commitment, plus per-leg **IMT proofs** authenticated
 against the regular **interop-root channel** (each chain's IMT root is published to L1 and re-imported
 on every chain). There is no extra L1 contract and no global-root registry — finality is proven, not
-dispatched.
+dispatched by a coordinator.
 
 ## Key values
 
@@ -38,23 +38,22 @@ bundle, so `bundleHash` does not depend on `flowId` (which would be circular).
 3. **Finalize** (destination). `InteropHandler.executeAtomicBundle(bundle, finalityProof)` calls
    `AtomicFlowManager.requireFlowFinalized`, which for **every** leg verifies an IMT **inclusion** proof
    (`AtomicInteropProof.verifyInclusion`): the leg's `commitValue` is present in its source chain's IMT
-   as of an authenticated interop root whose batch's settlement timestamp `t <= deadline`, that batch
-   settled on the flow's `settlementLayerChainId` (BIND-SL), and the proof's `sourceChainId` equals the
-   leg's declared `legSourceChainIds[i]` (BIND-CHAIN). If all legs are proven committed in time, the
-   bundle's calls execute (the destination mint). Inclusion is self-binding — a `commitValue` only exists
-   in its true source chain's tree — but non-inclusion is not, which is why BIND-CHAIN is enforced.
+   as of an authenticated interop root whose batch settled by the deadline (settlement timestamp
+   `t <= deadline`) on the flow's `settlementLayerChainId`, and the proof's `sourceChainId` matches the
+   leg's declared `legSourceChainIds[i]`. If all legs are proven committed in time, the bundle's calls
+   execute (the destination mint). A `commitValue` can only exist in its true source chain's tree, so
+   inclusion is self-binding; non-inclusion is not, which is why the source chain is checked explicitly.
 4. **Timeout / refund.** If a leg never commits in time, `AtomicFlowManager.authorizeRefund` takes an
-   **adjacency** proof (`AtomicInteropProof.verifyTimeoutAdjacency`): the missing leg's `commitValue` is
-   absent from the source chain's **last** batch `N` with settlement timestamp `t_N <= deadline`, pinned
-   by the consecutive successor batch `N+1` with `t_{N+1} > deadline`. Because the IMT is append-only and
-   `t` is monotone, a value committed by the deadline is present in `N`, so this cannot succeed for an
-   on-time (or already-finalized) leg — closing the stale/genesis-root force-refund. The proof is bound to
-   the missing leg's own source chain (BIND-CHAIN) and settlement layer (BIND-SL). It marks this chain's
-   `Committed` legs `Revertable`; `claimRefund` then reverses each burn by asking the call's target to
-   recover itself via `IAtomicRecoverable.recoverAtomicCall` (the `L2AssetRouter` implements it),
-   re-minting to the original depositor — and requires **every** call to recover. Atomic bundles are
-   gated at send (`InteropCenter`) to only recoverable, no-native-`value` calls, so every committed leg is
-   refundable by construction.
+   adjacency proof (`AtomicInteropProof.verifyTimeoutAdjacency`): the missing leg's `commitValue` is
+   absent from the source chain's **last** batch `N` with `t_N <= deadline`, pinned by its successor
+   batch `N+1` with `t_{N+1} > deadline`. Since the IMT is append-only and `t` is monotone, a value
+   committed by the deadline must be present in `N`, so this cannot succeed for an on-time or
+   already-finalized leg. The proof is bound to the missing leg's source chain and settlement layer. It
+   marks this chain's `Committed` legs `Revertable`; `claimRefund` then reverses each burn by asking the
+   call's target to recover itself via `IAtomicRecoverable.recoverAtomicCall` (implemented by
+   `L2AssetRouter`), re-minting to the original depositor, and requires **every** call to recover. Atomic
+   bundles are gated at send (`InteropCenter`) to only recoverable, no-native-`value` calls, so every
+   committed leg is refundable.
 
 Leg state machine (`LegState`): `Unset -> Committed` (send) `-> Revertable -> Reverted` (timeout path).
 

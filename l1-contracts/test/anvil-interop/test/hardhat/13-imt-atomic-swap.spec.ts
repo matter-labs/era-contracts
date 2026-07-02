@@ -5,45 +5,44 @@
  *   Chain A: depositor (anvil acct #0) sends aAmount of testTokenA -> recipient on B.
  *   Chain B: depositor (anvil acct #0) sends bAmount of testTokenB -> recipient on A.
  *
- * The flow is L1-free and runs through the production interop contracts:
+ * The flow runs through the production interop contracts:
  *   SEND    `InteropCenter.sendBundle(dstChainId, [indirect AR call starter], [atomicBundle attr])`.
- *           The bridge transfer burns via the normal `initiateIndirectCall`; because the bundle carries
- *           the `atomicBundle(flowId, deadline, lowNullifierIndex)` attribute the InteropCenter does NOT
- *           publish it to L1 — it appends the leg's commit value to this chain's
- *           {L2InteropCommitmentTree} via {AtomicFlowManager.append}.
- *   RECEIVE `InteropHandler.executeAtomicBundle(bundleBytes, AtomicFinalityProof)`. The handler asks the
- *           {AtomicFlowManager} to prove EVERY leg of the flow was committed in its source chain's IMT
- *           before the deadline (one IMT inclusion proof per leg), then executes the bundle's calls
- *           (the destination mint), owning the double-execute guard via `bundleStatus`.
- *   TIMEOUT `AtomicFlowManager.authorizeRefund(...)` (single-root non-inclusion proof for the missing
- *           leg, settled past the deadline) then `claimRefund(flowId, bundleBytes)` recovers the burned
- *           source funds to the depositor via `IAtomicRecoverable.recoverAtomicCall` (implemented by L2AssetRouter).
+ *           The bridge transfer burns via `initiateIndirectCall`; the `atomicBundle` attribute makes
+ *           the InteropCenter append the leg's commit value to the L2InteropCommitmentTree instead of
+ *           publishing to L1.
+ *   RECEIVE `InteropHandler.executeAtomicBundle(bundleBytes, AtomicFinalityProof)`. Proves every leg
+ *           was committed in its source chain's IMT before the deadline (one inclusion proof per leg),
+ *           then executes the bundle's calls (the destination mint). `bundleStatus` guards double-execute.
+ *   TIMEOUT `AtomicFlowManager.authorizeRefund(...)` (proves the missing leg absent from the last batch
+ *           with `t <= deadline`, pinned by a successor batch with `t > deadline`) then
+ *           `claimRefund(flowId, bundleBytes)` recovers the burned source funds
+ *           to the depositor via L2AssetRouter's recoverAtomicCall.
  *
- * Ids (see contracts/atomic-interop + contracts/interop):
+ * Ids:
  *   - `bundleHash = keccak256(abi.encode(sourceChainId, abi.encode(InteropBundle)))`. The atomic send
- *     params (flowId, deadline, lowNullifierIndex) travel via the `atomicBundle` ERC-7786 attribute and
- *     are NOT part of the InteropBundle, so `bundleHash` is independent of `flowId`. We PREDICT each
- *     leg's bundleHash off-chain with a non-atomic `callStatic.sendBundle` (which returns the same
- *     bundleHash without needing a low-nullifier), then cross-check it against the `InteropBundleSent`
- *     event of the real atomic send and fail loudly on mismatch.
- *   - `flowId = keccak256(abi.encode(sortedBundleHashes, sortedChainIds, deadline))` (both ascending).
+ *     params (flowId, deadline, lowNullifierIndex) ride in the `atomicBundle` attribute and are not part
+ *     of the InteropBundle, so `bundleHash` is independent of `flowId`. We predict each leg's bundleHash
+ *     off-chain with a non-atomic `callStatic.sendBundle`, then cross-check it against the real send's
+ *     `InteropBundleSent` event and fail loudly on mismatch.
+ *   - `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`
+ *     (bundle hashes ascending, source chain ids positionally aligned).
  *   - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
  *
- * The deadline is a settlement-layer (SL) block number; {AtomicInteropProof} derives the leg's SL block
- * from the (real, not mocked) `MessageHashing._getProofData` parse of `messageProof`, so the off-chain
- * builders embed a CHOSEN SL block in format-valid multi-hop proof bytes ({buildSlProofBytes}). The
- * root-message authentication itself is mocked to `true` on the anvil harness by
- * {MockL2MessageVerification}. The off-chain IMT engine reproduces the on-chain root / Merkle paths from
- * the live leaf set and asserts the reconstructed root equals `tree.root()` before emitting a proof, so
- * a passing test also confirms the off-chain engine matches the on-chain one.
+ * The deadline is a settlement-layer timestamp, compared on-chain against each batch's settlement
+ * timestamp `t` from the real `MessageHashing._getProofData` parse of `messageProof`, so the off-chain
+ * builders embed a chosen `t` in format-valid multi-hop proof bytes. Root-message authentication is mocked to `true` on the
+ * anvil harness. The off-chain IMT engine reconstructs the root / Merkle paths from the live leaf set
+ * and asserts it matches `tree.root()` before emitting a proof, so a passing test also confirms the
+ * off-chain engine agrees with the on-chain one.
  *
  * Verifies:
  *   - HAPPY PATH: atomic send (source burn + IMT insert) on both legs -> executeAtomicBundle (every-leg
- *     inclusion proof, SL block <= deadline) on each destination. Recipients receive the bridged token;
+ *     inclusion proof, `t <= deadline`) on each destination. Recipients receive the bridged token;
  *     source legs stay terminal at Committed; both destination bundles end FullyExecuted.
- *   - TIMEOUT PATH: one leg commits, the other never does -> after the deadline, a single-root
- *     non-inclusion proof (SL block > deadline) authorizes a refund -> claimRefund recovers the
- *     depositor's tokens; the source leg ends Reverted.
+ *   - TIMEOUT PATH: one leg commits, the other never does -> after the deadline, an adjacency proof
+ *     (missing leg absent from the last batch with `t <= deadline`, pinned by a successor with
+ *     `t > deadline`) authorizes a refund -> claimRefund recovers the depositor's tokens; the
+ *     source leg ends Reverted.
  */
 
 import { expect } from "chai";
@@ -96,21 +95,20 @@ enum LegState {
 }
 
 /**
- * Handles to the atomic-interop built-ins on one L2 chain. These contracts are predeployed into the
- * ZKsync OS genesis (see `src/core/predeploys.ts`) and the {L2InteropCommitmentTree}'s IMT is seeded
- * by the harness's relayed v31 genesis upgrade (`_initializeV31Contracts` -> `tree.initialize()`), so
- * no install/seed step is needed here — we just bind contract objects to their canonical addresses.
+ * Handles to the atomic-interop built-ins on one L2 chain. These are predeployed in genesis and the
+ * commitment tree's IMT is seeded by the harness's v31 genesis upgrade, so we just bind contract
+ * objects to their canonical addresses — no install/seed step needed.
  */
 type AtomicStack = {
   chainId: number;
   provider: ethers.providers.JsonRpcProvider;
-  /** {L2InteropCommitmentTree} at the canonical 0x10012. */
+  /** L2InteropCommitmentTree at 0x10012. */
   tree: Contract;
-  /** {AtomicFlowManager} at the canonical 0x10014. */
+  /** AtomicFlowManager at 0x10014. */
   manager: Contract;
-  /** {InteropCenter} at the canonical 0x1000d (the atomic SEND entry point). */
+  /** InteropCenter at 0x1000d (atomic SEND entry point). */
   interopCenter: Contract;
-  /** {InteropHandler} at the canonical 0x1000e (the atomic RECEIVE entry point). */
+  /** InteropHandler at 0x1000e (atomic RECEIVE entry point). */
   interopHandler: Contract;
 };
 
@@ -228,8 +226,8 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
         const tokenAddress = state.testTokens![chainId];
         if (!tokenAddress) throw new Error(`No test token registered for chain ${chainId}`);
         const testToken = new Contract(tokenAddress, getAbi("TestnetERC20Token"), user);
-        // Atomic-interop built-ins are predeployed in genesis and the tree is genesis-seeded
-        // (leafCount=1), so just bind handles to their canonical addresses — no install/initialize.
+        // Built-ins are predeployed in genesis and the tree is genesis-seeded (leafCount=1), so just
+        // bind handles to their canonical addresses.
         const stack = atomicStack(chainId, provider, user);
         return { chainId, rpcUrl, provider, user, testToken, stack };
       })
@@ -317,9 +315,9 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     const hAB = await predictLegBundleHash(chainA, chainB, aAmount, user);
     const hBA = await predictLegBundleHash(chainB, chainA, bAmount, user);
 
-    // Legs sorted by ascending bundleHash; each leg's source chain id stays positionally aligned
-    // (BIND-CHAIN): chainIdsAsc[i] is the source chain of legHashesAsc[i]. Sorting the chain ids
-    // independently would misalign them, which the source-chain binding now rejects.
+    // Legs sorted by ascending bundleHash; each leg's source chain id stays positionally aligned:
+    // chainIdsAsc[i] is the source chain of legHashesAsc[i]. Sorting the chain ids independently
+    // would misalign them, which the on-chain source-chain binding rejects.
     const legs = [
       { hash: hAB, chainId: chainA.chainId },
       { hash: hBA, chainId: chainB.chainId },
@@ -399,10 +397,9 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     });
 
     // ── PHASE 3: execute each destination leg via executeAtomicBundle ─────────────────────────
-    // Snapshot the recipient shim balances BEFORE execute. The coverage harness runs every spec on
-    // one shared chain set, so `user` may already hold these bridged shims from earlier specs — so we
-    // assert the DELTA credited by this swap, not the absolute balance (the source-side checks above
-    // are delta-based for the same reason).
+    // Snapshot recipient shim balances before execute. The coverage harness shares one chain set
+    // across specs, so `user` may already hold these shims; assert the delta this swap credits, not
+    // the absolute balance (the source-side checks above are delta-based for the same reason).
     const abAssetId = ntvAssetId(chainA.chainId, chainA.testToken.address);
     const baAssetId = ntvAssetId(chainB.chainId, chainB.testToken.address);
     const ntvOnB = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, NTV_TOKEN_ADDRESS_ABI, chainB.provider);
@@ -451,9 +448,9 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
 
   it("timeout path: one leg commits, peer never does -> authorizeRefund + claimRefund recovers depositor", async () => {
     const user = chainA.user.address;
-    // The deadline is an SL timestamp. The adjacency proof pins the missing leg absent from the last
-    // batch with `t <= deadline`, using a successor batch with `t = deadline + 1`. Both `t`s are
-    // fabricated on the harness — only the deadline/adjacency checks are exercised.
+    // The deadline is an SL timestamp. The timeout proof pins the missing leg absent from the last
+    // in-time batch (`t <= deadline`), using a consecutive successor batch with `t = deadline + 1`.
+    // Both `t`s are fabricated on the harness — only the deadline/adjacency checks are exercised.
     const deadline = 1_000;
 
     const refundRecipient = chainB.user.address; // irrelevant for refund; distinct dest recipient
@@ -464,9 +461,9 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     const hAB = await predictLegBundleHash(chainA, chainB, aTimeoutAmount, refundRecipient);
     const hBA = await predictLegBundleHash(chainB, chainA, bTimeoutAmount, refundRecipient);
 
-    // Legs sorted by ascending bundleHash; each leg's source chain id stays positionally aligned
-    // (BIND-CHAIN): chainIdsAsc[i] is the source chain of legHashesAsc[i]. Sorting the chain ids
-    // independently would misalign them, which the source-chain binding now rejects.
+    // Legs sorted by ascending bundleHash; each leg's source chain id stays positionally aligned:
+    // chainIdsAsc[i] is the source chain of legHashesAsc[i]. Sorting the chain ids independently
+    // would misalign them, which the on-chain source-chain binding rejects.
     const legs = [
       { hash: hAB, chainId: chainA.chainId },
       { hash: hBA, chainId: chainB.chainId },
@@ -493,8 +490,8 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       "AB depositor burned tokens at commit"
     );
 
-    // ── Build the adjacency timeout proof for the missing BA leg against B's IMT: absence at the last
-    //    in-time batch N (`t_N <= deadline`) pinned by the consecutive successor N+1 (`t_{N+1} > deadline`).
+    // ── Build the timeout proof for the missing BA leg against B's IMT: absence at the last in-time
+    //    batch N (`t_N <= deadline`) pinned by the consecutive successor N+1 (`t_{N+1} > deadline`).
     const baValue = commitValue(flowId, hBA);
     const absence = await buildNonInclusionProof({
       l2Tree: chainB.stack.tree,

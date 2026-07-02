@@ -229,7 +229,7 @@ contract InteropCenter is
         bytes[][] memory originalCallAttributes = new bytes[][](1);
         originalCallAttributes[0] = attributes;
 
-        // This single-call send path is never atomic; pass an empty AtomicSend (publishes to L1 as usual).
+        // The single-call send path is never atomic, so pass an empty AtomicSend (publishes to L1 as usual).
         bytes32 bundleHash = _sendBundle({
             _destinationChainId: recipientChainId,
             _callStarters: callStartersInternal,
@@ -476,10 +476,10 @@ contract InteropCenter is
             _callCount: callStartersLength
         });
 
-        // Hash the bundle and dispatch it: an atomic bundle (one carrying the `atomicBundle` attribute)
-        // is appended to the interop IMT via the AtomicFlowManager and is NOT published to L1; a normal
-        // bundle is published to L1. The atomic send metadata travels out-of-band (`_atomicSend`), not
-        // embedded in the bundle, so `bundleHash` does not depend on `flowId` (a circular dependency).
+        // Hash the bundle and dispatch it. Atomic bundles are appended to the interop IMT via the
+        // AtomicFlowManager and not published to L1; normal bundles are published to L1. The atomic send
+        // metadata travels out-of-band in `_atomicSend` rather than in the bundle, so `bundleHash` does not
+        // depend on `flowId` (which would be circular, since `flowId` is derived from bundle hashes).
         bytes32 msgHash;
         (bundleHash, msgHash) = _dispatchBundle(bundle, _atomicSend);
 
@@ -536,15 +536,14 @@ contract InteropCenter is
         msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(BUNDLE_IDENTIFIER, _interopBundleBytes));
     }
 
-    /// @notice Hashes the bundle and dispatches it. An atomic bundle (`_atomicSend.isAtomic`) has its
-    /// commit value appended to the interop IMT via the {AtomicFlowManager} and is NOT published to L1
-    /// — the burn already happened through the normal `initiateIndirectCall` path, and the destination
-    /// executes it via {InteropHandler.executeAtomicBundle}. A normal bundle is published to L1 via
-    /// {_sendBundleToL1}.
-    /// @dev `_atomicSend` (flowId/deadline/lowNullifierIndex) is passed out-of-band and is intentionally
-    /// NOT embedded in `_bundle`, so `bundleHash` is independent of `flowId`. This is required:
-    /// `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))` must be computable
-    /// off-chain before the send, which is impossible if a `bundleHash` (a flowId input) embedded `flowId`.
+    /// @notice Hashes the bundle and dispatches it. An atomic bundle (`_atomicSend.isAtomic`) is appended
+    /// to the interop IMT via the {AtomicFlowManager} and is NOT published to L1 — the burn already
+    /// happened through `initiateIndirectCall`, and the destination executes it via
+    /// {InteropHandler.executeAtomicBundle}. A normal bundle is published to L1 via {_sendBundleToL1}.
+    /// @dev `_atomicSend` (flowId/deadline/lowNullifierIndex) is passed out-of-band and deliberately kept
+    /// out of `_bundle`, so `bundleHash` does not depend on `flowId`. Since `flowId` is derived from the
+    /// leg bundle hashes, embedding it in a bundle would be circular and would break computing `flowId`
+    /// off-chain before the send.
     function _dispatchBundle(
         InteropBundle memory _bundle,
         AtomicSend memory _atomicSend
@@ -553,8 +552,8 @@ contract InteropCenter is
         bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
 
         if (_atomicSend.isAtomic) {
-            // Gate the bundle to refundable-by-construction at SEND, so every committed leg
-            // can be reversed on timeout (P3). Done before `append` so a non-refundable leg never commits.
+            // Check the bundle is refundable by construction before committing, so every leg can be
+            // reversed on timeout. Done before `append` so a non-refundable leg never commits.
             _validateAtomicBundleRefundable(_bundle);
             IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
                 _flowId: _atomicSend.flowId,
@@ -567,20 +566,18 @@ contract InteropCenter is
         }
     }
 
-    /// @notice Send-time refundability gate: an atomic bundle MUST be refundable by construction, so a
-    /// timed-out leg can always be reversed to its depositor (spec property P3). Every call MUST:
-    ///   - carry NO native base-token `value` — a base-token/native-value leg is bridged via the base-token
-    ///     holder, which the asset-router recovery path (`recoverAtomicCall`) cannot reverse (it would
-    ///     lock on timeout); and
-    ///   - be a recoverable asset-router call: a `finalizeDeposit(uint256,bytes32,bytes)` to the canonical
-    ///     {L2AssetRouter} — the only shape `recoverAtomicCall` recognises and reverses.
-    /// A non-base-token `finalizeDeposit` asset is implied: base-token transfers move as `value` (rejected
-    /// above), and a `finalizeDeposit` carrying the base-token assetId reverts at destination execution.
-    /// Rejecting non-recoverable calls here also removes the "mixed bundle silently strands an uncovered
-    /// call" hazard — every committed call is recoverable, complementing `_recoverBundle`'s
-    /// all-calls-recovered check on the timeout path.
-    /// @dev `pure`: it inspects only the bundle's own calls. Applies to ALL atomic bundles regardless of
-    /// entry path, since every atomic send funnels through {_dispatchBundle}.
+    /// @notice Requires that an atomic bundle is refundable by construction, so a timed-out leg can always
+    /// be reversed to its depositor. Every call MUST:
+    ///   - carry no native base-token `value` — such legs are bridged via the base-token holder, which
+    ///     `recoverAtomicCall` cannot reverse (they would lock on timeout); and
+    ///   - be a `finalizeDeposit(uint256,bytes32,bytes)` to the canonical {L2AssetRouter} — the only call
+    ///     shape `recoverAtomicCall` recognises and reverses.
+    /// The asset can't be the base token: base-token transfers move as `value` (rejected above), and a
+    /// `finalizeDeposit` carrying the base-token assetId reverts at destination execution. Rejecting
+    /// non-recoverable calls here means every committed call is recoverable, so a mixed bundle can't
+    /// silently strand an uncovered call.
+    /// @dev `pure`, since it inspects only the bundle's own calls. Every atomic send passes through
+    /// {_dispatchBundle}, so this covers all atomic bundles regardless of entry path.
     function _validateAtomicBundleRefundable(InteropBundle memory _bundle) internal pure {
         uint256 callsLength = _bundle.calls.length;
         for (uint256 i = 0; i < callsLength; ++i) {
@@ -792,9 +789,9 @@ contract InteropCenter is
                 );
                 attributeUsed[5] = true;
                 // The atomic send metadata (flowId/deadline/lowNullifierIndex) is parsed separately via
-                // `_parseAtomicSend` and NOT stored in `BundleAttributes` — it must stay out of the
-                // cross-chain bundle so `bundleHash` does not depend on `flowId` (a circular dependency).
-                // Here we only validate it is a permitted, non-duplicate bundle attribute.
+                // `_parseAtomicSend`, not stored in `BundleAttributes`: it must stay out of the cross-chain
+                // bundle so `bundleHash` does not depend on `flowId` (which would be circular). Here we only
+                // validate it is a permitted, non-duplicate bundle attribute.
             } else {
                 revert IERC7786GatewaySource.UnsupportedAttribute(selector);
             }
@@ -802,9 +799,9 @@ contract InteropCenter is
     }
 
     /// @notice Extracts the `atomicBundle` send metadata from the bundle attributes (already validated
-    /// by `parseAttributes`). Returns `isAtomic = false` when the attribute is absent. Kept separate
-    /// from `parseAttributes`/`BundleAttributes` so the metadata never enters the cross-chain bundle
-    /// (which would make `bundleHash` depend on `flowId` — a circular dependency).
+    /// by `parseAttributes`). Returns `isAtomic = false` when the attribute is absent. Kept separate from
+    /// `parseAttributes`/`BundleAttributes` so the metadata never enters the cross-chain bundle, which
+    /// would make `bundleHash` depend on `flowId` (circular).
     function _parseAtomicSend(bytes[] calldata _attributes) internal pure returns (AtomicSend memory atomicSend) {
         uint256 attributesLength = _attributes.length;
         for (uint256 i = 0; i < attributesLength; ++i) {

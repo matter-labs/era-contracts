@@ -30,29 +30,26 @@ import {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice See {IAtomicFlowManager}. Fund-touchless coordinator for the L1-free atomic interop flow.
+/// @notice See {IAtomicFlowManager}. Coordinator for the L1-free atomic interop flow; it never holds funds.
 ///
-/// Send: {InteropCenter.sendBundle} burns through the normal `initiateIndirectCall` path, then — when
-/// the bundle carries the `atomicBundle` attribute — calls {append} instead of publishing the bundle
-/// to L1; `append` records the leg's commit value in this chain's {L2InteropCommitmentTree}.
-/// Receive: {InteropHandler.executeAtomicBundle} calls {requireFlowFinalized} (the atomicity gate) in
-/// place of the L1-message inclusion proof, then executes the bundle (and owns the replay guard).
-/// Timeout: {authorizeRefund} + {claimRefund} recover the burned source funds to the depositor by
-/// asking each of the bundle's call targets to reverse itself via {IAtomicRecoverable.recoverAtomicCall}.
+/// Send: {InteropCenter.sendBundle} burns via the normal `initiateIndirectCall` path, then — when the
+/// bundle carries the `atomicBundle` attribute — calls {append} instead of publishing to L1. `append`
+/// records the leg's commit value in this chain's {L2InteropCommitmentTree}.
+/// Receive: {InteropHandler.executeAtomicBundle} calls {requireFlowFinalized} in place of the L1-message
+/// inclusion proof, then executes the bundle (and owns the replay guard).
+/// Timeout: {authorizeRefund} + {claimRefund} return the burned source funds to the depositor by asking
+/// each call target to reverse itself via {IAtomicRecoverable.recoverAtomicCall}.
 ///
-/// Mutual exclusivity (no double-spend): an `executeAtomicBundle` requires every leg present in a batch
-/// whose settlement timestamp `t <= deadline`, while a `claimRefund` requires some leg absent from the
-/// LAST batch with `t <= deadline` (pinned by the consecutive successor batch with `t > deadline`).
-/// Because the per-chain IMTs are append-only and `t` is monotone, those cannot both hold — but
-/// only when both proofs are evaluated against the leg's OWN source chain on the SAME settlement layer.
-/// That is what BIND-CHAIN (each proof's `sourceChainId == legSourceChainIds[i]`, positional) and
-/// BIND-SL (each proof's `slChainId == settlementLayerChainId`) enforce; both are committed in
-/// `flowId`. Without BIND-CHAIN a leg's commit value is trivially absent from every other chain's tree,
-/// re-opening a cross-chain force-refund double-mint.
+/// No double-spend: executing a bundle requires every leg present in a batch whose settlement timestamp
+/// `t <= deadline`, while a refund requires some leg absent from the last such batch (pinned by the next
+/// batch with `t > deadline`). Since the per-chain trees are append-only and `t` is monotone, both cannot
+/// hold — but only when both proofs are checked against the leg's own source chain on the same settlement
+/// layer. Both bindings are committed in `flowId`. Without the source-chain binding a leg's commit value
+/// is trivially absent from any other chain's tree, re-opening a cross-chain force-refund double-mint.
 contract AtomicFlowManager is IAtomicFlowManager {
-    /// @dev (flowId, bundleHash) => source-leg state on this chain. All collaborators
-    /// (commitment tree, interop center, interop handler) are genesis-deployed built-ins
-    /// at canonical fixed addresses, so they are referenced as constants rather than stored/initialized.
+    /// @dev (flowId, bundleHash) => source-leg state on this chain. The commitment tree, interop center
+    /// and interop handler are genesis-deployed built-ins at fixed addresses, so they are constants
+    /// rather than stored/initialized.
     mapping(bytes32 flowId => mapping(bytes32 bundleHash => LegState)) internal _state;
 
     modifier onlyInteropCenter() {
@@ -100,12 +97,11 @@ contract AtomicFlowManager is IAtomicFlowManager {
         uint256 n = _finality.legBundleHashes.length;
         if (_finality.proofs.length != n) revert ManagerProofCountMismatch(n, _finality.proofs.length);
 
-        // Every leg must be present in its source chain's IMT as of a root settled no later than the
-        // deadline. C1 (BIND-CHAIN): each proof's `sourceChainId` MUST equal the leg's declared
-        // `legSourceChainIds[i]` — defense-in-depth for inclusion (membership already self-binds via the
-        // chain-specific `commitValue`) and the load-bearing check for the symmetric refund path. C2
-        // (BIND-SL): the resolved `slChainId` MUST equal the flow's `settlementLayerChainId`
-        // (enforced inside {AtomicInteropProof.verifyInclusion}).
+        // Every leg must be present in its source chain's tree as of a root settled no later than the
+        // deadline. Each proof's `sourceChainId` must equal the leg's declared `legSourceChainIds[i]`:
+        // defense-in-depth here (membership already self-binds via the chain-specific `commitValue`) but
+        // load-bearing for the symmetric refund path. The proof's settlement layer must match the flow's
+        // `settlementLayerChainId`, checked inside {AtomicInteropProof.verifyInclusion}.
         bool executingIsLeg = false;
         for (uint256 i = 0; i < n; ++i) {
             if (_finality.legBundleHashes[i] == _executingBundleHash) executingIsLeg = true;
@@ -136,19 +132,18 @@ contract AtomicFlowManager is IAtomicFlowManager {
         // solhint-disable-next-line func-named-parameters
         _checkFlowId(_flowId, _legBundleHashes, _legSourceChainIds, _deadline, _settlementLayerChainId);
 
-        // 1. Bind the absence proof to the missing leg's declared source chain (A1, BIND-CHAIN).
-        //    Without this, the leg's commit value — which exists only in its own source chain's tree — is
-        //    trivially absent from any OTHER chain's tree, so an on-time, finalized leg could be
-        //    force-refunded against an unrelated chain (double-mint).
+        // 1. Bind the absence proof to the missing leg's declared source chain. Without this, the leg's
+        //    commit value — which exists only in its own source chain's tree — is trivially absent from
+        //    any other chain's tree, so an on-time, finalized leg could be force-refunded against an
+        //    unrelated chain (double-mint).
         if (_timeout.absence.sourceChainId != _legSourceChainIds[_missingLegIndex]) {
             revert ProofSourceChainMismatch(_legSourceChainIds[_missingLegIndex], _timeout.absence.sourceChainId);
         }
 
-        // 2. Adjacency timeout (A1 BIND-SL + A2 + A3, RULE-ADJACENCY): the leg's commit value is absent from the
-        //    LAST batch with settlement timestamp `t <= deadline` (the absence proof), pinned by the
-        //    consecutive successor batch with `t > deadline` (the successor witness). This is sound and
-        //    closes the stale/genesis-root force-refund: an old/empty root can't be used because its
-        //    successor would still be `<= deadline`.
+        // 2. Adjacency timeout: the leg's commit value is absent from the last batch with settlement
+        //    timestamp `t <= deadline` (the absence proof), pinned by the next batch with `t > deadline`
+        //    (the successor witness). This closes the stale/genesis-root force-refund: an old/empty root
+        //    can't be used because its successor would still be `<= deadline`.
         uint256 value = AtomicInteropProof.commitValue(_flowId, _legBundleHashes[_missingLegIndex]);
         // solhint-disable-next-line func-named-parameters
         AtomicInteropProof.verifyTimeoutAdjacency(
@@ -177,12 +172,10 @@ contract AtomicFlowManager is IAtomicFlowManager {
 
         LegState s = _state[_flowId][bundleHash];
         if (s != LegState.Revertable) revert ManagerLegNotRevertable(_flowId, bundleHash, s);
-        // Reentrancy: no global `nonReentrant` guard is used here; safety rests on CEI plus the
-        // per-leg state machine. The leg is flipped to `Reverted` (effects) BEFORE `_recoverBundle`'s
-        // external calls (interactions), so a reentrant `claimRefund` for THIS leg hits the `Revertable`
-        // check above and reverts; a reentrant claim for a DIFFERENT leg is an independent, identically
-        // guarded operation (no shared mutable state). The canonical asset router's `recoverAtomicCall`
-        // is itself `nonReentrant`. The manager never custodies funds.
+        // No `nonReentrant` guard: safety rests on CEI plus the per-leg state machine. The leg is flipped
+        // to `Reverted` before `_recoverBundle`'s external calls, so a reentrant claim for this leg hits
+        // the `Revertable` check above and reverts; a claim for a different leg is independent and equally
+        // guarded (no shared mutable state). The manager never holds funds.
         _state[_flowId][bundleHash] = LegState.Reverted;
 
         _recoverBundle(_flowId, bundleHash, bundle);
@@ -210,15 +203,13 @@ contract AtomicFlowManager is IAtomicFlowManager {
         return L2_INTEROP_HANDLER_ADDR;
     }
 
-    /// @dev Reverses EVERY call embedded in `_bundle`, re-crediting the original depositor. Each call's
-    /// target (`InteropCall.to`) owns its own reversal via {IAtomicRecoverable.recoverAtomicCall}: the
-    /// manager is agnostic to the call/encoding format and simply forwards `(destinationChainId, data)`
-    /// to every target.
-    /// Every call MUST report a recovery — a single non-recovered call would silently strand funds
-    /// while the leg becomes terminally `Reverted`. This is sound because the send-time gate
-    /// ({InteropCenter._validateAtomicBundleRefundable}) only ever commits recoverable asset-router calls,
-    /// so a genuine atomic leg recovers in full; the all-recovered check is the matching invariant on the
-    /// refund side (and defense-in-depth against any non-recoverable call slipping through).
+    /// @dev Reverses every call in `_bundle`, re-crediting the original depositor. Each call's target
+    /// (`InteropCall.to`) owns its reversal via {IAtomicRecoverable.recoverAtomicCall}; the manager is
+    /// agnostic to the encoding and just forwards `(destinationChainId, data)` to each target.
+    /// Every call must report a recovery, since one non-recovered call would strand funds while the leg
+    /// becomes terminally `Reverted`. The send-time gate ({InteropCenter._validateAtomicBundleRefundable})
+    /// only commits recoverable asset-router calls, so a genuine leg recovers in full; the all-recovered
+    /// check guards against any non-recoverable call slipping through.
     function _recoverBundle(bytes32 _flowId, bytes32 _bundleHash, InteropBundle memory _bundle) internal {
         uint256 destChainId = _bundle.destinationChainId;
         uint256 callsLen = _bundle.calls.length;
@@ -232,11 +223,10 @@ contract AtomicFlowManager is IAtomicFlowManager {
     }
 
     /// @dev Recomputes `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline,
-    /// settlementLayerChainId))` and asserts it matches. `_legBundleHashes` MUST be strictly ascending
-    /// (canonical order + dedup). `_legSourceChainIds` is POSITIONAL — aligned 1:1 with
-    /// `_legBundleHashes`; it may repeat and need not be ascending, so only its length is
-    /// constrained (an independent ascending-set check would let a sibling chain in the set still enable
-    /// the wrong-chain refund — §9 of the spec).
+    /// settlementLayerChainId))` and asserts it matches. `_legBundleHashes` must be strictly ascending
+    /// (canonical order + dedup). `_legSourceChainIds` is positional, aligned 1:1 with `_legBundleHashes`;
+    /// it may repeat and need not be ascending, so only its length is checked. Treating it as an
+    /// ascending set instead would let a sibling chain in the set still enable a wrong-chain refund.
     function _checkFlowId(
         bytes32 _flowId,
         bytes32[] calldata _legBundleHashes,

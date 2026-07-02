@@ -68,16 +68,13 @@ library MessageHashing {
         );
     }
 
-    /// @dev Returns the leaf hash for a chain batch: binds the batch root, its number, and its
-    /// SL-assigned settlement timestamp.
-    /// @param batchRoot The root hash of the batch.
-    /// @param batchNumber The number of the batch.
-    /// @param settlementTimestamp The settlement-layer-assigned, monotone-non-decreasing settlement
-    /// timestamp `t` of this batch. Carrying `t` in the leaf makes it authenticated by the SL aggregation
-    /// tree, which the atomic-interop adjacency timeout relies on (proving the last batch with
-    /// `t <= deadline`; see {AtomicInteropProof}). TODO(STF): on ZKsync OS `StoredBatchInfo.timestamp` is
-    /// currently 0 — the state-transition program / sequencer MUST emit a real monotone `t` for the
-    /// timeout to be sound; until then `t == 0` for every batch and the adjacency comparison degenerates.
+    /// @dev Returns the leaf hash for a chain batch, binding the batch root, its number and its
+    /// settlement timestamp.
+    /// @param settlementTimestamp The settlement-layer-assigned, monotone-non-decreasing timestamp `t`
+    /// of this batch. Including `t` in the leaf makes it authenticated by the SL aggregation tree, which
+    /// the atomic-interop timeout relies on to prove the last batch with `t <= deadline`.
+    /// TODO(STF): on ZKsync OS `StoredBatchInfo.timestamp` is currently always 0, so the state-transition
+    /// program must emit a real monotone `t` before the timeout is sound.
     function batchLeafHash(
         bytes32 batchRoot,
         uint256 batchNumber,
@@ -188,10 +185,9 @@ library MessageHashing {
             if (proofMetadata.finalProofNode) {
                 return result;
             }
-            // Read the batch's SL-assigned settlement timestamp `t` and bind it into the chain
-            // batch leaf, exactly as {MessageRootBase.addChainBatchRoot} did when it pushed the leaf — so
-            // a prover cannot forge `t` without breaking the authenticated chainId/shared-tree path. Stored
-            // straight into `result` (rather than a local) to keep the stack shallow; read back below.
+            // Read the batch's settlement timestamp `t` and bind it into the batch leaf, the same way
+            // MessageRootBase.addChainBatchRoot did when it pushed the leaf, so a prover cannot forge `t`
+            // without breaking the authenticated path. Stored into `result` (not a local) to save stack.
             result.batchSettlementTimestamp = uint256(_proof[result.ptr]);
             ++result.ptr;
 
@@ -229,9 +225,8 @@ library MessageHashing {
             ++result.ptr;
         }
 
-        // Assign the remaining fields individually rather than rebuilding the whole struct literal:
-        // `result` already carries `batchSettlementRoot`, `batchSettlementTimestamp`, `chainIdLeaf`,
-        // `ptr`, and `finalProofNode` (set above), and a 9-field literal here overflows the stack.
+        // Assign the remaining fields individually rather than rebuilding the whole struct literal,
+        // since `result` already carries the fields set above and a full literal overflows the stack.
         result.settlementLayerChainId = settlementLayerChainId;
         result.settlementLayerBatchNumber = settlementLayerBatchNumber;
         result.settlementLayerBatchRootMask = settlementLayerBatchRootMask;

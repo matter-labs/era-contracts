@@ -29,11 +29,9 @@ import {
     NotMigrated
 } from "../../L1StateTransitionErrors.sol";
 import {
-    AlreadyInteropSource,
     AlreadyPermanentRollup,
     BaseTokenPreV31TotalSupplyAlreadySet,
     DenominatorIsZero,
-    InvalidDAForInteropSource,
     DiamondAlreadyFrozen,
     DiamondNotFrozen,
     FeeParamsChangeTooLarge,
@@ -361,13 +359,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert NotZKsyncOS();
         }
 
-        // An enrolled interop source MUST keep an interop-source DA scheme — it cannot
-        // downgrade to a withholding/Validium mode that would stop publishing its L2->L1 region, which
-        // would break non-inclusion/timeout proofs for its consumers (one-way latch).
-        if (s.isInteropSource && !_isInteropSourceDaScheme(_l2DACommitmentScheme)) {
-            revert InvalidDAForInteropSource(_l2DACommitmentScheme);
-        }
-
         if (s.isPermanentRollup && !ROLLUP_DA_MANAGER.isPairAllowed(_l1DAValidator, _l2DACommitmentScheme)) {
             revert InvalidDAForPermanentRollup();
         }
@@ -387,37 +378,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
         }
 
         s.isPermanentRollup = true;
-    }
-
-    /// @inheritdoc IAdmin
-    function enrollAsInteropSource() external onlyAdmin onlySettlementLayer {
-        // One-way latch (mirrors `makePermanentRollup`): once a chain is an atomic-interop source it must
-        // keep publishing its full L2->L1 region so consumers can rebuild its IMT for timeout proofs
-        // (spec section 5). The DA pair must be set to an interop-source scheme beforehand.
-        if (s.isInteropSource) {
-            revert AlreadyInteropSource();
-        }
-        // Atomic interop is a ZKsync-OS-only feature; an Era VM chain cannot be an interop source.
-        if (!s.zksyncOS) {
-            revert NotZKsyncOS();
-        }
-        if (!_isInteropSourceDaScheme(s.l2DACommitmentScheme)) {
-            revert InvalidDAForInteropSource(s.l2DACommitmentScheme);
-        }
-
-        s.isInteropSource = true;
-        emit InteropSourceEnrolled();
-    }
-
-    /// @dev The set of DA commitment schemes acceptable for an atomic-interop source — those
-    /// that publish the chain's full L2->L1 region as PERMANENT L1 calldata, so any consumer can rebuild
-    /// the source's IMT and construct non-inclusion (timeout) proofs even long after a batch settled.
-    /// Currently only `L2_TO_L1_ONLY`. Blob-based schemes (e.g. `BLOBS_ZKSYNC_OS`) are intentionally
-    /// excluded: EIP-4844 blobs expire after a few weeks, but timeout proofs may be exercised far later
-    /// (spec section 5). A future full-DA calldata scheme that also publishes the complete L2->L1
-    /// region permanently could be added here.
-    function _isInteropSourceDaScheme(L2DACommitmentScheme _scheme) internal pure returns (bool) {
-        return _scheme == L2DACommitmentScheme.L2_TO_L1_ONLY;
     }
 
     /// @inheritdoc IAdmin

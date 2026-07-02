@@ -236,9 +236,8 @@ export function buildWithdrawalMerkleProof(settlementLayerChainId: number): stri
   if (settlementLayerChainId > 0) {
     // New format: metadata + logLeafSibling + batchSettlementTimestamp + batchLeafProofMask +
     // packedBatchInfo + slChainId. Metadata: version=0x01, logLeafProofLen=1, batchLeafProofLen=0,
-    // finalProofNode=0. Non-final proofs now carry the batch settlement timestamp `t` word (folded into
-    // the chain batch leaf by addChainBatchRoot) right after the log-leaf proof nodes, which
-    // getProofData() parses before batchLeafProofMask.
+    // finalProofNode=0. Non-final proofs carry the batch settlement timestamp `t` word right after the
+    // log-leaf proof nodes, which getProofData() parses before batchLeafProofMask.
     return [
       "0x0101000000000000000000000000000000000000000000000000000000000000",
       ethers.constants.HashZero, // log leaf merkle sibling (dummy)
