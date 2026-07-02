@@ -26,7 +26,6 @@ import {TxStatus} from "../../common/Messaging.sol";
 
 import {
     AssetIdAlreadyRegistered,
-    BaseTokenTransferFailed,
     NoFundsTransferred,
     OriginChainIdNotFound,
     WithdrawFailed,
