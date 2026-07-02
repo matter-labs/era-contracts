@@ -27,6 +27,8 @@
 
 import { ethers } from "ethers";
 import { Command } from "commander";
+import * as fs from "fs";
+import * as path from "path";
 
 const DEFAULT_BLOCK_STEP = 10_000;
 const DEFAULT_RECEIPT_CONCURRENCY = 20;
@@ -52,6 +54,9 @@ interface ScanInput {
   address: string;
   topics: (string | null)[];
   label: string;
+  cache?: SupplyCache;
+  cachePath?: string;
+  scanId?: string;
 }
 
 interface DepositCandidate {
@@ -64,6 +69,82 @@ interface ReceiptStats {
   failedReceipt: number;
   afterBoundary: number;
   successfulBeforeBoundary: number;
+}
+
+interface CacheInput {
+  chainId: number;
+  bridgehub: string;
+  upgradeL1Tx: string | null;
+  explicitFromL1Block: number | null;
+  explicitToL1Block: number | null;
+  explicitToL2Block: number | null;
+}
+
+interface CachedPlan {
+  diamondProxy: string;
+  fromL1Block: number;
+  toL1Block: number;
+  toL2Block: number;
+  firstV31L2Block: number | null;
+  cutoffL2BlockTimestamp: number;
+}
+
+interface CachedWithdrawals {
+  total: string;
+  withdrawalLogs: number;
+  withdrawalWithMessageLogs: number;
+}
+
+interface CachedDepositCandidate {
+  txHash: string;
+  mintValue: string;
+}
+
+interface CachedDepositCandidates {
+  deposits: CachedDepositCandidate[];
+  logs: number;
+  zeroMintValue: number;
+}
+
+interface CachedSuccessfulDeposits {
+  total: string;
+  stats: ReceiptStats;
+}
+
+interface CachedLog {
+  blockNumber: number;
+  blockHash: string;
+  transactionIndex: number;
+  removed: boolean;
+  address: string;
+  data: string;
+  topics: string[];
+  transactionHash: string;
+  logIndex: number;
+}
+
+interface CachedLogChunk {
+  fromBlock: number;
+  toBlock: number;
+  logs: CachedLog[];
+}
+
+interface CachedLogQuery {
+  address: string;
+  topics: (string | null)[];
+  fromBlock: number;
+  toBlock: number;
+  blockStep: number;
+  chunks: CachedLogChunk[];
+}
+
+interface SupplyCache {
+  input: CacheInput;
+  plan?: CachedPlan;
+  logQueries?: Record<string, CachedLogQuery>;
+  withdrawals?: CachedWithdrawals;
+  candidates?: CachedDepositCandidates;
+  deposits?: CachedSuccessfulDeposits;
 }
 
 function parseNonNegativeInt(value: string): number {
@@ -82,16 +163,143 @@ function parsePositiveInt(value: string): number {
   return parsed;
 }
 
-function hexBlock(block: number): string {
-  return `0x${block.toString(16)}`;
-}
-
 function formatAmount(value: ethers.BigNumber): string {
   return `${value.toString()} (${ethers.utils.formatEther(value)} assuming 18 decimals)`;
 }
 
 function formatUtcDate(timestamp: number): string {
   return new Date(timestamp * 1000).toISOString().replace("T", " ").replace(".000Z", " UTC");
+}
+
+function cacheFilePath(chainId: number): string {
+  return path.join(__dirname, "pre-v31-total-supply-cache", `${chainId}.json`);
+}
+
+function bn(value: string): ethers.BigNumber {
+  return ethers.BigNumber.from(value);
+}
+
+function normalizeOptionalNumber(value: number | undefined): number | null {
+  return value ?? null;
+}
+
+function normalizeOptionalString(value: string | undefined): string | null {
+  return value ?? null;
+}
+
+function getCacheInput({
+  chainId,
+  bridgehub,
+  upgradeL1Tx,
+  fromL1Block,
+  toL1Block,
+  toL2Block,
+}: {
+  chainId: number;
+  bridgehub: string;
+  upgradeL1Tx: string | undefined;
+  fromL1Block: number | undefined;
+  toL1Block: number | undefined;
+  toL2Block: number | undefined;
+}): CacheInput {
+  return {
+    chainId,
+    bridgehub,
+    upgradeL1Tx: normalizeOptionalString(upgradeL1Tx),
+    explicitFromL1Block: normalizeOptionalNumber(fromL1Block),
+    explicitToL1Block: normalizeOptionalNumber(toL1Block),
+    explicitToL2Block: normalizeOptionalNumber(toL2Block),
+  };
+}
+
+function assertMatchingCacheInput(cached: CacheInput, current: CacheInput, filePath: string): void {
+  const cachedJson = JSON.stringify(cached);
+  const currentJson = JSON.stringify(current);
+  if (cachedJson !== currentJson) {
+    throw new Error(
+      `Cache file ${filePath} was created with different result-affecting inputs.\n` +
+        `Cached:  ${cachedJson}\n` +
+        `Current: ${currentJson}\n` +
+        "Remove the cache file if you want to recompute for the current inputs."
+    );
+  }
+}
+
+function loadCache(input: CacheInput, filePath: string): SupplyCache {
+  if (!fs.existsSync(filePath)) {
+    return { input };
+  }
+
+  const cache = JSON.parse(fs.readFileSync(filePath, "utf-8")) as SupplyCache;
+  assertMatchingCacheInput(cache.input, input, filePath);
+  return cache;
+}
+
+function saveCache(cache: SupplyCache, filePath: string): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const tmpPath = `${filePath}.${process.pid}.tmp`;
+  fs.writeFileSync(tmpPath, `${JSON.stringify(cache, null, 2)}\n`, "utf-8");
+  fs.renameSync(tmpPath, filePath);
+}
+
+function getCachedLogQuery({
+  cache,
+  scanId,
+  address,
+  topics,
+  fromBlock,
+  toBlock,
+  blockStep,
+}: {
+  cache: SupplyCache;
+  scanId: string;
+  address: string;
+  topics: (string | null)[];
+  fromBlock: number;
+  toBlock: number;
+  blockStep: number;
+}): CachedLogQuery {
+  cache.logQueries ??= {};
+  const existing = cache.logQueries[scanId];
+  const expected = {
+    address,
+    topics,
+    fromBlock,
+    toBlock,
+    blockStep,
+  };
+
+  if (
+    existing &&
+    existing.address === expected.address &&
+    JSON.stringify(existing.topics) === JSON.stringify(expected.topics) &&
+    existing.fromBlock === expected.fromBlock &&
+    existing.toBlock === expected.toBlock &&
+    existing.blockStep === expected.blockStep
+  ) {
+    return existing;
+  }
+
+  const query = {
+    ...expected,
+    chunks: [],
+  };
+  cache.logQueries[scanId] = query;
+  return query;
+}
+
+function logToCache(log: ethers.providers.Log): CachedLog {
+  return {
+    blockNumber: log.blockNumber,
+    blockHash: log.blockHash,
+    transactionIndex: log.transactionIndex,
+    removed: log.removed,
+    address: log.address,
+    data: log.data,
+    topics: [...log.topics],
+    transactionHash: log.transactionHash,
+    logIndex: log.logIndex,
+  };
 }
 
 async function binarySearchFirstCodeBlock(
@@ -130,24 +338,60 @@ async function getLogsPaginated({
   address,
   topics,
   label,
+  cache,
+  cachePath,
+  scanId,
 }: ScanInput): Promise<ethers.providers.Log[]> {
   const logs: ethers.providers.Log[] = [];
+  const cachedQuery =
+    cache && cachePath && scanId
+      ? getCachedLogQuery({
+          cache,
+          scanId,
+          address,
+          topics,
+          fromBlock,
+          toBlock,
+          blockStep,
+        })
+      : undefined;
   let cursor = fromBlock;
   let chunks = 0;
+  let cachedChunks = 0;
 
   while (cursor <= toBlock) {
     const end = Math.min(cursor + blockStep - 1, toBlock);
-    const chunk = await provider.getLogs({
-      address,
-      topics,
-      fromBlock: cursor,
-      toBlock: end,
-    });
+    let chunk = cachedQuery?.chunks.find(
+      (cachedChunk) => cachedChunk.fromBlock === cursor && cachedChunk.toBlock === end
+    )?.logs;
+
+    if (chunk) {
+      cachedChunks += 1;
+    } else {
+      const fetchedChunk = await provider.getLogs({
+        address,
+        topics,
+        fromBlock: cursor,
+        toBlock: end,
+      });
+      chunk = fetchedChunk.map(logToCache);
+
+      if (cachedQuery && cache && cachePath) {
+        cachedQuery.chunks.push({
+          fromBlock: cursor,
+          toBlock: end,
+          logs: chunk,
+        });
+        saveCache(cache, cachePath);
+      }
+    }
+
     logs.push(...chunk);
 
     chunks += 1;
     if (chunks % 25 === 0) {
-      console.log(`  ${label}: scanned through block ${end}, logs=${logs.length}`);
+      const cached = cachedQuery ? `, cached chunks=${cachedChunks}` : "";
+      console.log(`  ${label}: scanned through block ${end}, logs=${logs.length}${cached}`);
     }
 
     cursor = end + 1;
@@ -211,11 +455,15 @@ async function sumWithdrawalEvent({
   toL2Block,
   blockStep,
   eventName,
+  cache,
+  cachePath,
 }: {
   provider: ethers.providers.JsonRpcProvider;
   toL2Block: number;
   blockStep: number;
   eventName: "Withdrawal" | "WithdrawalWithMessage";
+  cache: SupplyCache;
+  cachePath: string;
 }): Promise<{ total: ethers.BigNumber; logs: number }> {
   const iface = new ethers.utils.Interface(L2_BASE_TOKEN_EVENTS_ABI);
   const topic = iface.getEventTopic(eventName);
@@ -228,6 +476,9 @@ async function sumWithdrawalEvent({
     address: L2_BASE_TOKEN_SYSTEM_CONTRACT,
     topics: [topic],
     label: `L2 ${eventName}`,
+    cache,
+    cachePath,
+    scanId: `l2-${eventName}`,
   });
 
   let total = ethers.constants.Zero;
@@ -243,22 +494,30 @@ async function sumWithdrawals({
   provider,
   toL2Block,
   blockStep,
+  cache,
+  cachePath,
 }: {
   provider: ethers.providers.JsonRpcProvider;
   toL2Block: number;
   blockStep: number;
+  cache: SupplyCache;
+  cachePath: string;
 }): Promise<{ total: ethers.BigNumber; withdrawalLogs: number; withdrawalWithMessageLogs: number }> {
   const withdrawal = await sumWithdrawalEvent({
     provider,
     toL2Block,
     blockStep,
     eventName: "Withdrawal",
+    cache,
+    cachePath,
   });
   const withdrawalWithMessage = await sumWithdrawalEvent({
     provider,
     toL2Block,
     blockStep,
     eventName: "WithdrawalWithMessage",
+    cache,
+    cachePath,
   });
 
   return {
@@ -274,12 +533,16 @@ async function collectDepositCandidates({
   fromL1Block,
   toL1Block,
   blockStep,
+  cache,
+  cachePath,
 }: {
   provider: ethers.providers.JsonRpcProvider;
   diamondProxy: string;
   fromL1Block: number;
   toL1Block: number;
   blockStep: number;
+  cache: SupplyCache;
+  cachePath: string;
 }): Promise<{ deposits: DepositCandidate[]; logs: number; zeroMintValue: number }> {
   const iface = new ethers.utils.Interface(MAILBOX_EVENTS_ABI);
   const topic = iface.getEventTopic("NewPriorityRequest");
@@ -292,6 +555,9 @@ async function collectDepositCandidates({
     address: diamondProxy,
     topics: [topic],
     label: "L1 NewPriorityRequest",
+    cache,
+    cachePath,
+    scanId: "l1-NewPriorityRequest",
   });
 
   const deposits: DepositCandidate[] = [];
@@ -319,12 +585,9 @@ async function mapLimit<T, U>(items: T[], concurrency: number, fn: (item: T) => 
   let nextIndex = 0;
 
   async function worker(): Promise<void> {
-    while (true) {
+    while (nextIndex < items.length) {
       const index = nextIndex;
       nextIndex += 1;
-      if (index >= items.length) {
-        return;
-      }
       results[index] = await fn(items[index]);
     }
   }
@@ -448,15 +711,41 @@ async function main(): Promise<void> {
   const l1Provider = new ethers.providers.JsonRpcProvider(opts.l1Rpc);
   const l2Provider = new ethers.providers.JsonRpcProvider(opts.l2Rpc);
   const bridgehub = ethers.utils.getAddress(opts.bridgehub);
+  const input = getCacheInput({
+    chainId: opts.chainId,
+    bridgehub,
+    upgradeL1Tx: opts.upgradeL1Tx,
+    fromL1Block: opts.fromL1Block,
+    toL1Block: opts.toL1Block,
+    toL2Block: opts.toL2Block,
+  });
+  const cachePath = cacheFilePath(opts.chainId);
+  const cache = loadCache(input, cachePath);
 
-  const diamondProxy = await getZkChainAddress(l1Provider, bridgehub, opts.chainId);
-  const toL1Block = await resolveToL1Block(l1Provider, opts.toL1Block, opts.upgradeL1Tx);
-  const fromL1Block = opts.fromL1Block ?? (await binarySearchFirstCodeBlock(l1Provider, diamondProxy, 0, toL1Block));
-  const { toL2Block, firstV31L2Block } = await resolveToL2Block(l2Provider, opts.toL2Block);
-  const cutoffL2Block = await l2Provider.getBlock(toL2Block);
-  if (!cutoffL2Block) {
-    throw new Error(`No L2 block found for cutoff block ${toL2Block}`);
+  if (!cache.plan) {
+    const diamondProxy = await getZkChainAddress(l1Provider, bridgehub, opts.chainId);
+    const toL1Block = await resolveToL1Block(l1Provider, opts.toL1Block, opts.upgradeL1Tx);
+    const fromL1Block = opts.fromL1Block ?? (await binarySearchFirstCodeBlock(l1Provider, diamondProxy, 0, toL1Block));
+    const { toL2Block, firstV31L2Block } = await resolveToL2Block(l2Provider, opts.toL2Block);
+    const cutoffL2Block = await l2Provider.getBlock(toL2Block);
+    if (!cutoffL2Block) {
+      throw new Error(`No L2 block found for cutoff block ${toL2Block}`);
+    }
+
+    cache.plan = {
+      diamondProxy,
+      fromL1Block,
+      toL1Block,
+      toL2Block,
+      firstV31L2Block,
+      cutoffL2BlockTimestamp: cutoffL2Block.timestamp,
+    };
+    saveCache(cache, cachePath);
+  } else {
+    console.log(`Loaded calculation plan from cache: ${cachePath}`);
   }
+
+  const { diamondProxy, fromL1Block, toL1Block, toL2Block, firstV31L2Block, cutoffL2BlockTimestamp } = cache.plan;
 
   if (fromL1Block > toL1Block) {
     throw new Error(`Invalid L1 block range: ${fromL1Block} > ${toL1Block}`);
@@ -471,39 +760,93 @@ async function main(): Promise<void> {
     `  L2 pre-v31 range:         [0, ${toL2Block}]` +
       (firstV31L2Block === null ? "" : ` (first v31 block: ${firstV31L2Block})`)
   );
-  console.log(`  cutoff date:              ${formatUtcDate(cutoffL2Block.timestamp)} (L2 block ${toL2Block})`);
+  console.log(`  cutoff date:              ${formatUtcDate(cutoffL2BlockTimestamp)} (L2 block ${toL2Block})`);
   console.log(`  getLogs block step:       ${opts.blockStep}`);
   console.log(`  receipt concurrency:      ${opts.receiptConcurrency}`);
+  console.log(`  cache file:               ${cachePath}`);
 
   console.log("\n[1/3] Summing L2 withdrawals...");
-  const withdrawals = await sumWithdrawals({
-    provider: l2Provider,
-    toL2Block,
-    blockStep: opts.blockStep,
-  });
+  if (!cache.withdrawals) {
+    const withdrawals = await sumWithdrawals({
+      provider: l2Provider,
+      toL2Block,
+      blockStep: opts.blockStep,
+      cache,
+      cachePath,
+    });
+    cache.withdrawals = {
+      total: withdrawals.total.toString(),
+      withdrawalLogs: withdrawals.withdrawalLogs,
+      withdrawalWithMessageLogs: withdrawals.withdrawalWithMessageLogs,
+    };
+    saveCache(cache, cachePath);
+  } else {
+    console.log("  loaded from cache");
+  }
+  const withdrawals = {
+    total: bn(cache.withdrawals.total),
+    withdrawalLogs: cache.withdrawals.withdrawalLogs,
+    withdrawalWithMessageLogs: cache.withdrawals.withdrawalWithMessageLogs,
+  };
   console.log(`  Withdrawal logs:          ${withdrawals.withdrawalLogs}`);
   console.log(`  WithdrawalWithMessage:    ${withdrawals.withdrawalWithMessageLogs}`);
   console.log(`  totalWithdrawalsToL1:     ${formatAmount(withdrawals.total)}`);
 
   console.log("\n[2/3] Reading L1 priority requests...");
-  const candidates = await collectDepositCandidates({
-    provider: l1Provider,
-    diamondProxy,
-    fromL1Block,
-    toL1Block,
-    blockStep: opts.blockStep,
-  });
+  if (!cache.candidates) {
+    const candidates = await collectDepositCandidates({
+      provider: l1Provider,
+      diamondProxy,
+      fromL1Block,
+      toL1Block,
+      blockStep: opts.blockStep,
+      cache,
+      cachePath,
+    });
+    cache.candidates = {
+      deposits: candidates.deposits.map((deposit) => ({
+        txHash: deposit.txHash,
+        mintValue: deposit.mintValue.toString(),
+      })),
+      logs: candidates.logs,
+      zeroMintValue: candidates.zeroMintValue,
+    };
+    saveCache(cache, cachePath);
+  } else {
+    console.log("  loaded from cache");
+  }
+  const candidates = {
+    deposits: cache.candidates.deposits.map((deposit) => ({
+      txHash: deposit.txHash,
+      mintValue: bn(deposit.mintValue),
+    })),
+    logs: cache.candidates.logs,
+    zeroMintValue: cache.candidates.zeroMintValue,
+  };
   console.log(`  NewPriorityRequest logs:  ${candidates.logs}`);
   console.log(`  non-zero mintValue logs:  ${candidates.deposits.length}`);
   console.log(`  zero mintValue logs:      ${candidates.zeroMintValue}`);
 
   console.log("\n[3/3] Checking L2 priority transaction receipts...");
-  const deposits = await sumSuccessfulDeposits({
-    provider: l2Provider,
-    deposits: candidates.deposits,
-    toL2Block,
-    receiptConcurrency: opts.receiptConcurrency,
-  });
+  if (!cache.deposits) {
+    const deposits = await sumSuccessfulDeposits({
+      provider: l2Provider,
+      deposits: candidates.deposits,
+      toL2Block,
+      receiptConcurrency: opts.receiptConcurrency,
+    });
+    cache.deposits = {
+      total: deposits.total.toString(),
+      stats: deposits.stats,
+    };
+    saveCache(cache, cachePath);
+  } else {
+    console.log("  loaded from cache");
+  }
+  const deposits = {
+    total: bn(cache.deposits.total),
+    stats: cache.deposits.stats,
+  };
   console.log(`  successful before v31:    ${deposits.stats.successfulBeforeBoundary}`);
   console.log(`  failed before v31:        ${deposits.stats.failedReceipt}`);
   console.log(`  landed after boundary:    ${deposits.stats.afterBoundary}`);
@@ -518,7 +861,7 @@ async function main(): Promise<void> {
 
   const preV31TotalSupply = deposits.total.sub(withdrawals.total);
   console.log("\nResult:");
-  console.log(`  cutoff date:              ${formatUtcDate(cutoffL2Block.timestamp)} (L2 block ${toL2Block})`);
+  console.log(`  cutoff date:              ${formatUtcDate(cutoffL2BlockTimestamp)} (L2 block ${toL2Block})`);
   console.log(`  total deposited:          ${formatAmount(deposits.total)}`);
   console.log(`  total withdrawn:          ${formatAmount(withdrawals.total)}`);
   console.log(`  preV31TotalSupply:        ${formatAmount(preV31TotalSupply)}`);
