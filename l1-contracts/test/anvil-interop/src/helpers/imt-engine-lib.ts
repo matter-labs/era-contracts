@@ -353,11 +353,7 @@ export const DEFAULT_SL_CHAIN_ID = 506;
  *   [4] settlementLayerChainId.
  * `messageIndex` (the leaf-proof mask) must be 0, since logLeafProofLen==0 requires index < 1.
  */
-export function buildSlProofBytes(
-  slBlock: number,
-  slChainId: number = DEFAULT_SL_CHAIN_ID,
-  l1Timestamp = 0
-): string[] {
+export function buildSlProofBytes(slBlock: number, slChainId: number = DEFAULT_SL_CHAIN_ID, l1Timestamp = 0): string[] {
   const metadata = utils.hexZeroPad(BigNumber.from(0x01).shl(248).toHexString(), 32);
   const l1TimestampWord = utils.hexZeroPad(BigNumber.from(l1Timestamp).toHexString(), 32);
   const batchLeafProofMask = utils.hexZeroPad("0x00", 32);

@@ -222,7 +222,9 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.
         bytes32 chainRoot;
         // slither-disable-next-line unused-return
-        (, chainRoot) = chainTree[_chainId].push(MessageHashing.batchLeafHash(_chainBatchRoot, _batchNumber, l1Timestamp));
+        (, chainRoot) = chainTree[_chainId].push(
+            MessageHashing.batchLeafHash(_chainBatchRoot, _batchNumber, l1Timestamp)
+        );
 
         emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot, l1Timestamp);
 

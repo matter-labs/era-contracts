@@ -75,7 +75,11 @@ library MessageHashing {
     /// the message root (i.e. when the chain settled). Binding it into the leaf makes the timestamp
     /// provable via the same inclusion proof: a single aggregated (multi-chain) root can prove many
     /// chain batch roots, and each carries its own settlement timestamp.
-    function batchLeafHash(bytes32 batchRoot, uint256 batchNumber, uint256 l1Timestamp) internal pure returns (bytes32) {
+    function batchLeafHash(
+        bytes32 batchRoot,
+        uint256 batchNumber,
+        uint256 l1Timestamp
+    ) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber, l1Timestamp));
     }
 
@@ -188,7 +192,11 @@ library MessageHashing {
             ++result.ptr;
 
             // Now, we'll have to check that the Gateway included the message.
-            bytes32 localBatchLeafHash = MessageHashing.batchLeafHash(batchSettlementRoot, _batchNumber, l1BatchTimestamp);
+            bytes32 localBatchLeafHash = MessageHashing.batchLeafHash(
+                batchSettlementRoot,
+                _batchNumber,
+                l1BatchTimestamp
+            );
 
             uint256 batchLeafProofMask = uint256(bytes32(_proof[result.ptr]));
             ++result.ptr;
