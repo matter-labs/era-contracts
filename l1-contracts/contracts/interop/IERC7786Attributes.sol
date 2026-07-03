@@ -28,8 +28,8 @@ interface IERC7786Attributes {
     ///      via the AtomicFlowManager (the burn still flows through the normal `initiateIndirectCall`
     ///      path). The destination executes it via `InteropHandler.executeAtomicBundle` once every leg
     ///      of the flow is proven committed before the deadline. Bundle-level attribute.
-    /// @param _flowId The flow identifier (`keccak256(abi.encode(sortedBundleHashes, sortedChainIds, deadline))`).
-    /// @param _deadline The flow deadline, a settlement-layer block number.
+    /// @param _flowId The flow identifier, keccak256 over the legs' bundle hashes and source chain ids, the deadline, and the settlement layer chain id.
+    /// @param _deadline The flow deadline, as a settlement-layer timestamp.
     /// @param _lowNullifierIndex The low-nullifier slot for this leg's commit value in the IMT.
     function atomicBundle(bytes32 _flowId, uint64 _deadline, uint256 _lowNullifierIndex) external pure;
 }

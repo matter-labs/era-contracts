@@ -25,7 +25,7 @@ enum LegState {
 ///   - inclusion ({AtomicInteropProof.verifyInclusion}): `leaf` is the leaf holding the leg's commit
 ///     value (`leaf.value == commitValue`), proven present as of a root that settled no later than the
 ///     flow deadline;
-///   - non-inclusion ({AtomicInteropProof.verifyNonInclusion}, timeout/refund path): `leaf` is the
+///   - non-inclusion ({AtomicInteropProof.verifyTimeoutAdjacency}, timeout/refund path): `leaf` is the
 ///     low-nullifier (predecessor) leaf that brackets the absent commit value, proven against a root
 ///     that settled strictly after the deadline. Because the IMT is append-only, absence in a
 ///     post-deadline snapshot implies absence at the deadline, so the leg can no longer finalize.
@@ -33,17 +33,18 @@ enum LegState {
 /// The two structs were identical in layout, so they are unified; the meaning of `leaf` (the value's
 /// own leaf vs. its predecessor) is fixed by which verify function consumes the proof.
 ///
-/// Authentication has two layers, both resolved against the interop root the verifying chain imported
-/// for `(sourceChainId, batchNumber)`:
+/// Authentication has two layers, both resolved against an SL aggregation root the verifying chain
+/// imported (`interopRoots[slChainId][slBlock]`; the claimed `(sourceChainId, batchNumber)` binds via
+/// the source chain's chain-id leaf inside that root):
 ///   1. The origin {L2InteropCommitmentTree}'s `abi.encode(chainImtRoot)` L2->L1 message (sender
 ///      pinned to the canonical commitment-tree address) is proven included; this authenticates the
 ///      root.
 ///   2. `leaf` at `imtLeafIndex` with `imtProof` hashes up to `chainImtRoot` (delegated to
 ///      {IndexedMerkleTree.verifyInclusion} / `verifyNonInclusion`).
-/// The settlement-layer (SL) block number the root settled at is NOT carried as a struct field — that
-/// would be spoofable. It is parsed in-module from `messageProof` (the same multi-hop proof the
-/// verifier checks) via {MessageHashing._getProofData}, so it is bound to the verified
-/// `interopRoots(SL, slBlock)`. The manager then enforces the appropriate `slBlock` vs `deadline` bound.
+/// The batch's `l1Timestamp` is not a struct field, since that would be spoofable. It is parsed in-module
+/// from `messageProof` via {MessageHashing._getProofData} and is bound to the verified interop root by
+/// being folded into the chain batch leaf. The proof library then enforces the `l1Timestamp` vs `deadline`
+/// bound (inclusion: `l1Timestamp <= deadline`; timeout adjacency).
 /// @dev `batchNumber` is the source chain's top-level batch number passed to the message verifier and
 /// to `_getProofData`.
 struct ImtProof {
@@ -58,20 +59,43 @@ struct ImtProof {
     bytes32[] imtProof;
 }
 
-/// @notice The full atomicity proof a destination needs to execute an atomic bundle: the flow
-/// definition (`flowId`, every leg, `deadline`) plus one IMT inclusion proof per leg. Bundled into a
-/// single calldata struct so `InteropHandler.executeAtomicBundle` / `AtomicFlowManager.requireFlowFinalized`
-/// pass it as one reference.
-/// @param flowId `keccak256(abi.encode(legBundleHashes, chainIds, deadline))` (both arrays ascending).
-/// @param deadline The flow deadline (a settlement-layer block number).
-/// @param legBundleHashes All legs' bundle hashes, strictly ascending.
-/// @param chainIds The flow's participant chain ids, strictly ascending.
-/// @param proofs One inclusion proof per leg, in `legBundleHashes` order.
-struct AtomicFinalityProof {
+/// @notice Adjacency timeout proof: two authenticated batches pinning the missing leg as absent from the
+/// last batch with `l1Timestamp <= deadline`. Grouping both `ImtProof`s into one struct also
+/// keeps {AtomicFlowManager.authorizeRefund}'s stack shallow.
+/// @param absence Non-inclusion proof of the missing leg's commit value at batch `N` (`t_N <= deadline`).
+/// @param successor Root-authentication proof of the consecutive batch `N+1` (same source chain and
+/// settlement layer) with `t_{N+1} > deadline`, pinning `N` as the last in-time batch. Its IMT membership
+/// fields are unused.
+struct AtomicTimeoutProof {
+    ImtProof absence;
+    ImtProof successor;
+}
+
+/// @notice The definition of an atomic flow: `flowId` plus the exact fields it hashes over. Grouping them
+/// keeps the finalize path ({AtomicFlowManager.requireFlowFinalized}) and the refund path
+/// ({AtomicFlowManager.authorizeRefund}) on one shape, so the `flowId` preimage cannot drift between them.
+/// @param flowId `keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`.
+/// @param deadline The flow deadline (a settlement-layer timestamp).
+/// @param settlementLayerChainId The single settlement layer every leg must settle on; committed in
+/// `flowId` and asserted equal to each proof's resolved `slChainId`.
+/// @param legBundleHashes All legs' bundle hashes, strictly ascending (canonical order + dedup).
+/// @param legSourceChainIds Each leg's source chain id, aligned 1:1 with `legBundleHashes`. May repeat
+/// and need not be ascending.
+struct AtomicFlow {
     bytes32 flowId;
     uint64 deadline;
+    uint256 settlementLayerChainId;
     bytes32[] legBundleHashes;
-    uint256[] chainIds;
+    uint256[] legSourceChainIds;
+}
+
+/// @notice The full atomicity proof a destination needs to execute an atomic bundle: the flow definition
+/// plus one IMT inclusion proof per leg. Passed as one calldata reference to
+/// `InteropHandler.executeAtomicBundle` / `AtomicFlowManager.requireFlowFinalized`.
+/// @param flow The flow definition (see {AtomicFlow}).
+/// @param proofs One inclusion proof per leg, in `flow.legBundleHashes` order.
+struct AtomicFinalityProof {
+    AtomicFlow flow;
     ImtProof[] proofs;
 }
 

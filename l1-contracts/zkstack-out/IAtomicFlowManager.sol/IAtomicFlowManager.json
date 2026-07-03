@@ -32,24 +32,36 @@
     "name": "authorizeRefund",
     "inputs": [
       {
-        "name": "_flowId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "_legBundleHashes",
-        "type": "bytes32[]",
-        "internalType": "bytes32[]"
-      },
-      {
-        "name": "_chainIds",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      },
-      {
-        "name": "_deadline",
-        "type": "uint64",
-        "internalType": "uint64"
+        "name": "_flow",
+        "type": "tuple",
+        "internalType": "struct AtomicFlow",
+        "components": [
+          {
+            "name": "flowId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "deadline",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "settlementLayerChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "legBundleHashes",
+            "type": "bytes32[]",
+            "internalType": "bytes32[]"
+          },
+          {
+            "name": "legSourceChainIds",
+            "type": "uint256[]",
+            "internalType": "uint256[]"
+          }
+        ]
       },
       {
         "name": "_missingLegIndex",
@@ -57,71 +69,147 @@
         "internalType": "uint256"
       },
       {
-        "name": "_proof",
+        "name": "_timeout",
         "type": "tuple",
-        "internalType": "struct ImtProof",
+        "internalType": "struct AtomicTimeoutProof",
         "components": [
           {
-            "name": "sourceChainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "batchNumber",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "chainImtRoot",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "messageTxNumberInBatch",
-            "type": "uint16",
-            "internalType": "uint16"
-          },
-          {
-            "name": "messageIndex",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "messageProof",
-            "type": "bytes32[]",
-            "internalType": "bytes32[]"
-          },
-          {
-            "name": "leaf",
+            "name": "absence",
             "type": "tuple",
-            "internalType": "struct IMTLeaf",
+            "internalType": "struct ImtProof",
             "components": [
               {
-                "name": "value",
+                "name": "sourceChainId",
                 "type": "uint256",
                 "internalType": "uint256"
               },
               {
-                "name": "nextIndex",
+                "name": "batchNumber",
                 "type": "uint256",
                 "internalType": "uint256"
               },
               {
-                "name": "nextValue",
+                "name": "chainImtRoot",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "messageTxNumberInBatch",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "messageIndex",
                 "type": "uint256",
                 "internalType": "uint256"
+              },
+              {
+                "name": "messageProof",
+                "type": "bytes32[]",
+                "internalType": "bytes32[]"
+              },
+              {
+                "name": "leaf",
+                "type": "tuple",
+                "internalType": "struct IMTLeaf",
+                "components": [
+                  {
+                    "name": "value",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                  },
+                  {
+                    "name": "nextIndex",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                  },
+                  {
+                    "name": "nextValue",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                  }
+                ]
+              },
+              {
+                "name": "imtLeafIndex",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "imtProof",
+                "type": "bytes32[]",
+                "internalType": "bytes32[]"
               }
             ]
           },
           {
-            "name": "imtLeafIndex",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "imtProof",
-            "type": "bytes32[]",
-            "internalType": "bytes32[]"
+            "name": "successor",
+            "type": "tuple",
+            "internalType": "struct ImtProof",
+            "components": [
+              {
+                "name": "sourceChainId",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "batchNumber",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "chainImtRoot",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "messageTxNumberInBatch",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "messageIndex",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "messageProof",
+                "type": "bytes32[]",
+                "internalType": "bytes32[]"
+              },
+              {
+                "name": "leaf",
+                "type": "tuple",
+                "internalType": "struct IMTLeaf",
+                "components": [
+                  {
+                    "name": "value",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                  },
+                  {
+                    "name": "nextIndex",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                  },
+                  {
+                    "name": "nextValue",
+                    "type": "uint256",
+                    "internalType": "uint256"
+                  }
+                ]
+              },
+              {
+                "name": "imtLeafIndex",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "imtProof",
+                "type": "bytes32[]",
+                "internalType": "bytes32[]"
+              }
+            ]
           }
         ]
       }
@@ -225,24 +313,36 @@
         "internalType": "struct AtomicFinalityProof",
         "components": [
           {
-            "name": "flowId",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "deadline",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "legBundleHashes",
-            "type": "bytes32[]",
-            "internalType": "bytes32[]"
-          },
-          {
-            "name": "chainIds",
-            "type": "uint256[]",
-            "internalType": "uint256[]"
+            "name": "flow",
+            "type": "tuple",
+            "internalType": "struct AtomicFlow",
+            "components": [
+              {
+                "name": "flowId",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "deadline",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "settlementLayerChainId",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "legBundleHashes",
+                "type": "bytes32[]",
+                "internalType": "bytes32[]"
+              },
+              {
+                "name": "legSourceChainIds",
+                "type": "uint256[]",
+                "internalType": "uint256[]"
+              }
+            ]
           },
           {
             "name": "proofs",

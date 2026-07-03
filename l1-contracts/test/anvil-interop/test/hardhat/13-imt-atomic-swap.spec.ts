@@ -5,45 +5,44 @@
  *   Chain A: depositor (anvil acct #0) sends aAmount of testTokenA -> recipient on B.
  *   Chain B: depositor (anvil acct #0) sends bAmount of testTokenB -> recipient on A.
  *
- * The flow is L1-free and runs through the production interop contracts:
+ * The flow runs through the production interop contracts:
  *   SEND    `InteropCenter.sendBundle(dstChainId, [indirect AR call starter], [atomicBundle attr])`.
- *           The bridge transfer burns via the normal `initiateIndirectCall`; because the bundle carries
- *           the `atomicBundle(flowId, deadline, lowNullifierIndex)` attribute the InteropCenter does NOT
- *           publish it to L1 — it appends the leg's commit value to this chain's
- *           {L2InteropCommitmentTree} via {AtomicFlowManager.append}.
- *   RECEIVE `InteropHandler.executeAtomicBundle(bundleBytes, AtomicFinalityProof)`. The handler asks the
- *           {AtomicFlowManager} to prove EVERY leg of the flow was committed in its source chain's IMT
- *           before the deadline (one IMT inclusion proof per leg), then executes the bundle's calls
- *           (the destination mint), owning the double-execute guard via `bundleStatus`.
- *   TIMEOUT `AtomicFlowManager.authorizeRefund(...)` (single-root non-inclusion proof for the missing
- *           leg, settled past the deadline) then `claimRefund(flowId, bundleBytes)` recovers the burned
- *           source funds to the depositor via `IAtomicRecoverable.recoverAtomicCall` (implemented by L2AssetRouter).
+ *           The bridge transfer burns via `initiateIndirectCall`; the `atomicBundle` attribute makes
+ *           the InteropCenter append the leg's commit value to the L2InteropCommitmentTree instead of
+ *           publishing to L1.
+ *   RECEIVE `InteropHandler.executeAtomicBundle(bundleBytes, AtomicFinalityProof)`. Proves every leg
+ *           was committed in its source chain's IMT before the deadline (one inclusion proof per leg),
+ *           then executes the bundle's calls (the destination mint). `bundleStatus` guards double-execute.
+ *   TIMEOUT `AtomicFlowManager.authorizeRefund(...)` (proves the missing leg absent from the last batch
+ *           with `t <= deadline`, pinned by a successor batch with `t > deadline`) then
+ *           `claimRefund(flowId, bundleBytes)` recovers the burned source funds
+ *           to the depositor via L2AssetRouter's recoverAtomicCall.
  *
- * Ids (see contracts/atomic-interop + contracts/interop):
+ * Ids:
  *   - `bundleHash = keccak256(abi.encode(sourceChainId, abi.encode(InteropBundle)))`. The atomic send
- *     params (flowId, deadline, lowNullifierIndex) travel via the `atomicBundle` ERC-7786 attribute and
- *     are NOT part of the InteropBundle, so `bundleHash` is independent of `flowId`. We PREDICT each
- *     leg's bundleHash off-chain with a non-atomic `callStatic.sendBundle` (which returns the same
- *     bundleHash without needing a low-nullifier), then cross-check it against the `InteropBundleSent`
- *     event of the real atomic send and fail loudly on mismatch.
- *   - `flowId = keccak256(abi.encode(sortedBundleHashes, sortedChainIds, deadline))` (both ascending).
+ *     params (flowId, deadline, lowNullifierIndex) ride in the `atomicBundle` attribute and are not part
+ *     of the InteropBundle, so `bundleHash` is independent of `flowId`. We predict each leg's bundleHash
+ *     off-chain with a non-atomic `callStatic.sendBundle`, then cross-check it against the real send's
+ *     `InteropBundleSent` event and fail loudly on mismatch.
+ *   - `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`
+ *     (bundle hashes ascending, source chain ids positionally aligned).
  *   - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
  *
- * The deadline is a settlement-layer (SL) block number; {AtomicInteropProof} derives the leg's SL block
- * from the (real, not mocked) `MessageHashing._getProofData` parse of `messageProof`, so the off-chain
- * builders embed a CHOSEN SL block in format-valid multi-hop proof bytes ({buildSlProofBytes}). The
- * root-message authentication itself is mocked to `true` on the anvil harness by
- * {MockL2MessageVerification}. The off-chain IMT engine reproduces the on-chain root / Merkle paths from
- * the live leaf set and asserts the reconstructed root equals `tree.root()` before emitting a proof, so
- * a passing test also confirms the off-chain engine matches the on-chain one.
+ * The deadline is a settlement-layer timestamp, compared on-chain against each batch's settlement
+ * timestamp `t` from the real `MessageHashing._getProofData` parse of `messageProof`, so the off-chain
+ * builders embed a chosen `t` in format-valid multi-hop proof bytes. Root-message authentication is mocked to `true` on the
+ * anvil harness. The off-chain IMT engine reconstructs the root / Merkle paths from the live leaf set
+ * and asserts it matches `tree.root()` before emitting a proof, so a passing test also confirms the
+ * off-chain engine agrees with the on-chain one.
  *
  * Verifies:
  *   - HAPPY PATH: atomic send (source burn + IMT insert) on both legs -> executeAtomicBundle (every-leg
- *     inclusion proof, SL block <= deadline) on each destination. Recipients receive the bridged token;
+ *     inclusion proof, `t <= deadline`) on each destination. Recipients receive the bridged token;
  *     source legs stay terminal at Committed; both destination bundles end FullyExecuted.
- *   - TIMEOUT PATH: one leg commits, the other never does -> after the deadline, a single-root
- *     non-inclusion proof (SL block > deadline) authorizes a refund -> claimRefund recovers the
- *     depositor's tokens; the source leg ends Reverted.
+ *   - TIMEOUT PATH: one leg commits, the other never does -> after the deadline, an adjacency proof
+ *     (missing leg absent from the last batch with `t <= deadline`, pinned by a successor with
+ *     `t > deadline`) authorizes a refund -> claimRefund recovers the depositor's tokens; the
+ *     source leg ends Reverted.
  */
 
 import { expect } from "chai";
@@ -74,12 +73,14 @@ import {
 } from "../../src/helpers/interop-helpers";
 import {
   atomicFinalityProofTuple,
+  atomicFlowTuple,
+  atomicTimeoutProofTuple,
   buildInclusionProof,
   buildNonInclusionProof,
+  buildSuccessorProof,
   commitValue,
   computeFlowId,
   lowNullifierIndexFor,
-  proofTuple,
   reconstructChainImt,
 } from "../../src/helpers/imt-engine-lib";
 
@@ -307,15 +308,23 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
   it("happy path: atomic send -> executeAtomicBundle mints both legs and leaves source Committed", async () => {
     const user = chainA.user.address; // anvil acct #0, the depositor + recipient on both chains
     const now = Math.max(await chainNow(chainA.provider), await chainNow(chainB.provider));
-    // The deadline is an SL block number; the harness picks SL block == deadline for inclusion proofs.
+    // The deadline is an SL timestamp; the harness sets each leg's batch `l1Timestamp == deadline`
+    // so every inclusion proof satisfies `l1Timestamp <= deadline`.
     const deadline = now + 3600;
 
     // ── Predict each leg's bundleHash (no state change), then derive flowId ──────────────────
     const hAB = await predictLegBundleHash(chainA, chainB, aAmount, user);
     const hBA = await predictLegBundleHash(chainB, chainA, bAmount, user);
 
-    const legHashesAsc = BigNumber.from(hAB).lt(BigNumber.from(hBA)) ? [hAB, hBA] : [hBA, hAB];
-    const chainIdsAsc = [chainA.chainId, chainB.chainId].sort((x, y) => x - y);
+    // Legs sorted by ascending bundleHash; each leg's source chain id stays positionally aligned:
+    // chainIdsAsc[i] is the source chain of legHashesAsc[i]. Sorting the chain ids independently
+    // would misalign them, which the on-chain source-chain binding rejects.
+    const legs = [
+      { hash: hAB, chainId: chainA.chainId },
+      { hash: hBA, chainId: chainB.chainId },
+    ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
+    const legHashesAsc = legs.map((l) => l.hash);
+    const chainIdsAsc = legs.map((l) => l.chainId);
     const flowId = computeFlowId(legHashesAsc, chainIdsAsc, deadline);
 
     // ── PHASE 1: atomic send on each source (burn + IMT insert) ──────────────────────────────
@@ -370,13 +379,13 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       l2Tree: chainA.stack.tree,
       chainId: chainA.chainId,
       value: abValue,
-      slBlock: deadline,
+      l1Timestamp: deadline,
     });
     const baProof = await buildInclusionProof({
       l2Tree: chainB.stack.tree,
       chainId: chainB.chainId,
       value: baValue,
-      slBlock: deadline,
+      l1Timestamp: deadline,
     });
     // proofs must be in legBundleHashes (ascending) order.
     const proofsAsc = BigNumber.from(hAB).lt(BigNumber.from(hBA)) ? [abProof, baProof] : [baProof, abProof];
@@ -441,8 +450,9 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
 
   it("timeout path: one leg commits, peer never does -> authorizeRefund + claimRefund recovers depositor", async () => {
     const user = chainA.user.address;
-    // The deadline is an SL block number; the missing leg's non-inclusion proof carries a post-deadline
-    // SL block (deadline + 1). Both are arbitrary on the harness — only the deadline check is exercised.
+    // The deadline is an SL timestamp. The timeout proof pins the missing leg absent from the last
+    // in-time batch (`t <= deadline`), using a consecutive successor batch with `t = deadline + 1`.
+    // Both `t`s are fabricated on the harness — only the deadline/adjacency checks are exercised.
     const deadline = 1_000;
 
     const refundRecipient = chainB.user.address; // irrelevant for refund; distinct dest recipient
@@ -453,8 +463,15 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     const hAB = await predictLegBundleHash(chainA, chainB, aTimeoutAmount, refundRecipient);
     const hBA = await predictLegBundleHash(chainB, chainA, bTimeoutAmount, refundRecipient);
 
-    const legHashesAsc = BigNumber.from(hAB).lt(BigNumber.from(hBA)) ? [hAB, hBA] : [hBA, hAB];
-    const chainIdsAsc = [chainA.chainId, chainB.chainId].sort((x, y) => x - y);
+    // Legs sorted by ascending bundleHash; each leg's source chain id stays positionally aligned:
+    // chainIdsAsc[i] is the source chain of legHashesAsc[i]. Sorting the chain ids independently
+    // would misalign them, which the on-chain source-chain binding rejects.
+    const legs = [
+      { hash: hAB, chainId: chainA.chainId },
+      { hash: hBA, chainId: chainB.chainId },
+    ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
+    const legHashesAsc = legs.map((l) => l.hash);
+    const chainIdsAsc = legs.map((l) => l.chainId);
     const flowId = computeFlowId(legHashesAsc, chainIdsAsc, deadline);
 
     // ── Commit only the AB leg on A. B never commits BA. ─────────────────────────────────────
@@ -475,23 +492,33 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       "AB depositor burned tokens at commit"
     );
 
-    // ── Build a single-root non-inclusion proof for the missing BA leg against B's IMT, with an
-    //    SL block strictly past the deadline. ──────────────────────────────────────────────────
+    // ── Build the timeout proof for the missing BA leg against B's IMT: absence at the last in-time
+    //    batch N (`t_N <= deadline`) pinned by the consecutive successor N+1 (`t_{N+1} > deadline`).
     const baValue = commitValue(flowId, hBA);
-    const nonIncl = await buildNonInclusionProof({
+    const absence = await buildNonInclusionProof({
       l2Tree: chainB.stack.tree,
       chainId: chainB.chainId,
       value: baValue,
-      slBlock: deadline + 1,
+      l1Timestamp: deadline, // t_N <= deadline
+      batchNumber: 1, // batch N
+    });
+    const successor = await buildSuccessorProof({
+      l2Tree: chainB.stack.tree,
+      chainId: chainB.chainId,
+      l1Timestamp: deadline + 1, // t_{N+1} > deadline
+      batchNumber: 2, // batch N+1 (consecutive)
     });
     const missingIdx = legHashesAsc[0] === hBA ? 0 : 1;
 
     // ── authorizeRefund on A (A is AB's source) -> AB becomes Revertable. ────────────────────
     const managerA = chainA.stack.manager.connect(chainA.user);
     const refundAuth = await (
-      await managerA.authorizeRefund(flowId, legHashesAsc, chainIdsAsc, deadline, missingIdx, proofTuple(nonIncl), {
-        gasLimit: DEFAULT_TX_GAS_LIMIT,
-      })
+      await managerA.authorizeRefund(
+        atomicFlowTuple({ flowId, deadline, legBundleHashes: legHashesAsc, chainIds: chainIdsAsc }),
+        missingIdx,
+        atomicTimeoutProofTuple(absence, successor),
+        { gasLimit: DEFAULT_TX_GAS_LIMIT }
+      )
     ).wait();
     expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Revertable, "AB revertable on A");
     expect(

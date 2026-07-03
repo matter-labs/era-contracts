@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
-import {LegState, ImtProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
+import {LegState, AtomicFlow, AtomicTimeoutProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -23,9 +23,11 @@ import {LegState, ImtProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
 ///      by asking each of the bundle's call targets to reverse itself via
 ///      {IAtomicRecoverable.recoverAtomicCall}.
 ///
-/// `flowId = keccak256(abi.encode(sortedBundleHashes, sortedChainIds, deadline))`,
-/// `bundleHash = keccak256(abi.encode(sourceChainId, interopBundleBytes))`; both arrays strictly
-/// ascending. The deadline is a settlement-layer block number.
+/// `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`,
+/// `bundleHash = keccak256(abi.encode(sourceChainId, interopBundleBytes))`. `legBundleHashes` is strictly
+/// ascending (canonical order + dedup); `legSourceChainIds` is positionally aligned with it (may repeat,
+/// need not be ascending). All legs settle on one `settlementLayerChainId`, so the deadline (a settlement-
+/// layer timestamp) is comparable to each batch's `l1Timestamp`.
 ///
 /// Deployed as an L2 predeploy (no constructor) — wiring is done in `initialize`.
 interface IAtomicFlowManager {
@@ -37,28 +39,30 @@ interface IAtomicFlowManager {
     /// `Committed`. Callable only by the {InteropCenter}. State `Unset -> Committed`.
     /// @param _flowId The flow identifier (binds every leg + the deadline).
     /// @param _bundleHash `keccak256(abi.encode(sourceChainId, interopBundleBytes))` of this leg.
-    /// @param _deadline The flow deadline (settlement-layer block number); emitted for indexers.
+    /// @param _deadline The flow deadline (settlement-layer timestamp); emitted for indexers.
     /// @param _lowNullifierIndex The low-nullifier slot for the commit value (from the IMT engine).
     function append(bytes32 _flowId, bytes32 _bundleHash, uint64 _deadline, uint256 _lowNullifierIndex) external;
 
     /// @notice Revert if the flow is not fully committed in time. Callable only by the {InteropHandler}.
-    /// Verifies an inclusion proof for every leg against its source chain's IMT (each root settled at
-    /// SL block `<= deadline`), recomputes `flowId`, and asserts the bundle being executed is a leg of
-    /// the flow.
+    /// Verifies an inclusion proof for every leg against its source chain's IMT (each in a batch whose
+    /// `l1Timestamp <= deadline`), recomputes `flowId`, ties each proof to its source chain
+    /// and the flow's settlement layer, and asserts the bundle being executed is a leg of the flow.
     /// @param _executingBundleHash The bundle hash the handler is about to execute.
     /// @param _finality The flow definition + per-leg inclusion proofs.
     function requireFlowFinalized(bytes32 _executingBundleHash, AtomicFinalityProof calldata _finality) external view;
 
     /// @notice Mark this chain's committed source legs `Revertable` for a flow that can no longer
-    /// finalize, proven by a non-inclusion proof for one leg past the deadline. Permissionless.
-    /// @param _missingLegIndex Index into `_legBundleHashes` of the leg proven absent.
+    /// finalize, proven by a timeout for one leg. Permissionless.
+    /// @param _flow The flow definition ({AtomicFlow}); its `flowId` is recomputed from the other fields
+    /// and matched. The timeout proofs for the missing leg must target
+    /// `_flow.legSourceChainIds[_missingLegIndex]`.
+    /// @param _missingLegIndex Index into `_flow.legBundleHashes` of the leg proven absent.
+    /// @param _timeout Timeout proof: absence at the last batch `N` with `t_N <= deadline`, plus its
+    /// consecutive successor `N+1` with `t_{N+1} > deadline`.
     function authorizeRefund(
-        bytes32 _flowId,
-        bytes32[] calldata _legBundleHashes,
-        uint256[] calldata _chainIds,
-        uint64 _deadline,
+        AtomicFlow calldata _flow,
         uint256 _missingLegIndex,
-        ImtProof calldata _proof
+        AtomicTimeoutProof calldata _timeout
     ) external;
 
     /// @notice Recover the burned source funds for a `Revertable` leg by reversing the bundle's

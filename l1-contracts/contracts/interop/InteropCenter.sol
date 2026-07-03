@@ -38,6 +38,7 @@ import {
 import {AssetIdMismatch, MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 import {
+    AtomicBundleCallCarriesValue,
     AttributeAlreadySet,
     AttributeViolatesRestriction,
     DestinationChainNotRegistered,
@@ -541,8 +542,9 @@ contract InteropCenter is
     /// {_sendBundleToL1}.
     /// @dev `_atomicSend` (flowId/deadline/lowNullifierIndex) is passed out-of-band and is intentionally
     /// NOT embedded in `_bundle`, so `bundleHash` is independent of `flowId`. This is required:
-    /// `flowId = keccak256(abi.encode(sortedBundleHashes, chainIds, deadline))` must be computable
-    /// off-chain before the send, which is impossible if a `bundleHash` (a flowId input) embedded `flowId`.
+    /// `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`
+    /// must be computable off-chain before the send, which is impossible if a `bundleHash` (a flowId
+    /// input) embedded `flowId`.
     function _dispatchBundle(
         InteropBundle memory _bundle,
         AtomicSend memory _atomicSend
@@ -551,6 +553,9 @@ contract InteropCenter is
         bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
 
         if (_atomicSend.isAtomic) {
+            // Reject legs carrying irreversible native `value` before committing; timeout recovery is
+            // otherwise best-effort (see {AtomicFlowManager._recoverBundle}).
+            _validateAtomicBundle(_bundle);
             IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
                 _flowId: _atomicSend.flowId,
                 _bundleHash: bundleHash,
@@ -559,6 +564,24 @@ contract InteropCenter is
             });
         } else {
             msgHash = _sendBundleToL1(interopBundleBytes, _bundle.calls.length);
+        }
+    }
+
+    /// @notice Rejects atomic-bundle calls that carry native base-token `value`. Such a leg is bridged via
+    /// the base-token holder, which {IAtomicRecoverable.recoverAtomicCall} cannot reverse, so it would lock
+    /// on timeout with no way to return the funds. Everything else is allowed: an atomic bundle may mix
+    /// recoverable fund calls (asset-router deposits) with calls that move no funds (e.g. flipping a flag),
+    /// and timeout recovery is best-effort (see {AtomicFlowManager._recoverBundle}). Refund safety for a
+    /// fund-moving leg is therefore the flow author's responsibility; only native-`value` legs — which no
+    /// one can reverse — are blocked here.
+    /// @dev `pure`, since it inspects only the bundle's own calls. Every atomic send passes through
+    /// {_dispatchBundle}, so this covers all atomic bundles regardless of entry path.
+    function _validateAtomicBundle(InteropBundle memory _bundle) internal pure {
+        uint256 callsLength = _bundle.calls.length;
+        for (uint256 i = 0; i < callsLength; ++i) {
+            if (_bundle.calls[i].value != 0) {
+                revert AtomicBundleCallCarriesValue(i, _bundle.calls[i].value);
+            }
         }
     }
 

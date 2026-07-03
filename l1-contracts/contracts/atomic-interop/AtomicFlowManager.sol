@@ -5,7 +5,7 @@ import {IAtomicFlowManager} from "./IAtomicFlowManager.sol";
 import {IL2InteropCommitmentTree} from "./IL2InteropCommitmentTree.sol";
 import {IAtomicRecoverable} from "./IAtomicRecoverable.sol";
 import {AtomicInteropProof} from "./libraries/AtomicInteropProof.sol";
-import {LegState, ImtProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
+import {LegState, AtomicFlow, AtomicTimeoutProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
 import {InteropDataEncoding} from "../interop/InteropDataEncoding.sol";
 import {
@@ -20,10 +20,11 @@ import {
     ManagerLegNotRevertable,
     ManagerFlowIdMismatch,
     ManagerBundleHashesNotSorted,
-    ManagerChainsNotSorted,
+    ManagerLegSourceChainIdsLengthMismatch,
     ManagerProofCountMismatch,
     ManagerExecutingBundleNotInFlow,
-    ManagerNoRecoverableCalls
+    ManagerNoRecoverableCalls,
+    ProofSourceChainMismatch
 } from "./AtomicInteropErrors.sol";
 
 /// @author Matter Labs
@@ -38,9 +39,12 @@ import {
 /// Timeout: {authorizeRefund} + {claimRefund} recover the burned source funds to the depositor by
 /// asking each of the bundle's call targets to reverse itself via {IAtomicRecoverable.recoverAtomicCall}.
 ///
-/// Mutual exclusivity (no double-spend): an `executeAtomicBundle` requires every leg present in a root
-/// settled at SL block `<= deadline`, while a `claimRefund` requires some leg absent in a root settled
-/// at SL block `> deadline`. Because the per-chain IMTs are append-only, those cannot both hold.
+/// No double-spend: executing a bundle requires every leg present in a batch whose `l1Timestamp <=
+/// deadline`, while a refund requires some leg absent from the last such batch (pinned by the next batch
+/// with `l1Timestamp > deadline`). Since the per-chain trees are append-only and `l1Timestamp` is monotone, both cannot
+/// hold — but only when both proofs are checked against the leg's own source chain on the same settlement
+/// layer. Both bindings are committed in `flowId`. Without the source-chain binding a leg's commit value
+/// is trivially absent from any other chain's tree, re-opening a cross-chain force-refund double-mint.
 contract AtomicFlowManager is IAtomicFlowManager {
     /// @dev (flowId, bundleHash) => source-leg state on this chain. All collaborators
     /// (commitment tree, interop center, interop handler) are genesis-deployed built-ins
@@ -80,47 +84,68 @@ contract AtomicFlowManager is IAtomicFlowManager {
         bytes32 _executingBundleHash,
         AtomicFinalityProof calldata _finality
     ) external view onlyInteropHandler {
-        _checkFlowId(_finality.flowId, _finality.legBundleHashes, _finality.chainIds, _finality.deadline);
+        AtomicFlow calldata flow = _finality.flow;
+        _checkFlowId(flow);
 
-        uint256 n = _finality.legBundleHashes.length;
+        uint256 n = flow.legBundleHashes.length;
         if (_finality.proofs.length != n) revert ManagerProofCountMismatch(n, _finality.proofs.length);
 
-        // Every leg must be present in its source chain's IMT as of a root settled no later than the
-        // deadline. The membership check binds each leg to the chain whose imported interop root
-        // authenticated it — a leg's `bundleHash` bakes in its `sourceChainId`, so it can only be
-        // included in that chain's tree.
+        // Every leg must be present in its source chain's tree as of a root settled no later than the
+        // deadline. Each proof's `sourceChainId` must equal the leg's declared `legSourceChainIds[i]`:
+        // defense-in-depth here (membership already self-binds via the chain-specific `commitValue`) but
+        // load-bearing for the symmetric refund path. The proof's settlement layer must match the flow's
+        // `settlementLayerChainId`, checked inside {AtomicInteropProof.verifyInclusion}.
         bool executingIsLeg = false;
         for (uint256 i = 0; i < n; ++i) {
-            if (_finality.legBundleHashes[i] == _executingBundleHash) executingIsLeg = true;
-            uint256 value = AtomicInteropProof.commitValue(_finality.flowId, _finality.legBundleHashes[i]);
-            AtomicInteropProof.verifyInclusion(_finality.proofs[i], value, _finality.deadline);
+            if (flow.legBundleHashes[i] == _executingBundleHash) executingIsLeg = true;
+            if (_finality.proofs[i].sourceChainId != flow.legSourceChainIds[i]) {
+                revert ProofSourceChainMismatch(flow.legSourceChainIds[i], _finality.proofs[i].sourceChainId);
+            }
+            uint256 value = AtomicInteropProof.commitValue(flow.flowId, flow.legBundleHashes[i]);
+            AtomicInteropProof.verifyInclusion(_finality.proofs[i], value, flow.deadline, flow.settlementLayerChainId);
         }
-        if (!executingIsLeg) revert ManagerExecutingBundleNotInFlow(_finality.flowId, _executingBundleHash);
+        if (!executingIsLeg) revert ManagerExecutingBundleNotInFlow(flow.flowId, _executingBundleHash);
     }
 
     /// @inheritdoc IAtomicFlowManager
     function authorizeRefund(
-        bytes32 _flowId,
-        bytes32[] calldata _legBundleHashes,
-        uint256[] calldata _chainIds,
-        uint64 _deadline,
+        AtomicFlow calldata _flow,
         uint256 _missingLegIndex,
-        ImtProof calldata _proof
+        AtomicTimeoutProof calldata _timeout
     ) external {
-        _checkFlowId(_flowId, _legBundleHashes, _chainIds, _deadline);
+        _checkFlowId(_flow);
 
-        // 1. Prove a leg is absent past the deadline -> the flow can no longer finalize.
-        uint256 value = AtomicInteropProof.commitValue(_flowId, _legBundleHashes[_missingLegIndex]);
-        AtomicInteropProof.verifyNonInclusion(_proof, value, _deadline);
+        // 1. Bind the absence proof to the missing leg's declared source chain. Without this, the leg's
+        //    commit value — which exists only in its own source chain's tree — is trivially absent from
+        //    any other chain's tree, so an on-time, finalized leg could be force-refunded against an
+        //    unrelated chain (double-mint).
+        uint256 missingLegChainId = _flow.legSourceChainIds[_missingLegIndex];
+        if (_timeout.absence.sourceChainId != missingLegChainId) {
+            revert ProofSourceChainMismatch(missingLegChainId, _timeout.absence.sourceChainId);
+        }
 
-        // 2. Mark this chain's committed source legs Revertable (legs committed on other chains are not
+        // 2. Adjacency timeout: the leg's commit value is absent from the last batch with settlement
+        //    timestamp `t <= deadline` (the absence proof), pinned by the next batch with `t > deadline`
+        //    (the successor witness). This closes the stale/genesis-root force-refund: an old/empty root
+        //    can't be used because its successor would still be `<= deadline`.
+        uint256 value = AtomicInteropProof.commitValue(_flow.flowId, _flow.legBundleHashes[_missingLegIndex]);
+        // solhint-disable-next-line func-named-parameters
+        AtomicInteropProof.verifyTimeoutAdjacency(
+            _timeout.absence,
+            _timeout.successor,
+            value,
+            _flow.deadline,
+            _flow.settlementLayerChainId
+        );
+
+        // 3. Mark this chain's committed source legs Revertable (legs committed on other chains are not
         //    in this manager's state, so they are skipped).
-        uint256 n = _legBundleHashes.length;
+        uint256 n = _flow.legBundleHashes.length;
         for (uint256 i = 0; i < n; ++i) {
-            bytes32 h = _legBundleHashes[i];
-            if (_state[_flowId][h] != LegState.Committed) continue;
-            _state[_flowId][h] = LegState.Revertable;
-            emit FlowRefundAuthorized(_flowId, h);
+            bytes32 h = _flow.legBundleHashes[i];
+            if (_state[_flow.flowId][h] != LegState.Committed) continue;
+            _state[_flow.flowId][h] = LegState.Revertable;
+            emit FlowRefundAuthorized(_flow.flowId, h);
         }
     }
 
@@ -131,7 +156,10 @@ contract AtomicFlowManager is IAtomicFlowManager {
 
         LegState s = _state[_flowId][bundleHash];
         if (s != LegState.Revertable) revert ManagerLegNotRevertable(_flowId, bundleHash, s);
-        // Effects before interactions.
+        // No `nonReentrant` guard: safety rests on CEI plus the per-leg state machine. The leg is flipped
+        // to `Reverted` before `_recoverBundle`'s external calls, so a reentrant claim for this leg hits
+        // the `Revertable` check above and reverts; a claim for a different leg is independent and equally
+        // guarded (no shared mutable state). The manager never holds funds.
         _state[_flowId][bundleHash] = LegState.Reverted;
 
         _recoverBundle(_flowId, bundleHash, bundle);
@@ -162,8 +190,20 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// @dev Reverses every recoverable call embedded in `_bundle`, re-crediting the original depositor.
     /// Each call's target (`InteropCall.to`) owns its own reversal via {IAtomicRecoverable.recoverAtomicCall}:
     /// the manager is agnostic to the call/encoding format and simply forwards `(destinationChainId, data)`
-    /// to every target, counting the ones that report a recovery. Reverts if the bundle carries no
-    /// recoverable call. Targets must return `false` (not revert) for calls they do not recognise.
+    /// to every target, counting the ones that report a recovery. Targets must return `false` (not revert)
+    /// for calls they do not recognise.
+    ///
+    /// Recovery is best-effort by design. An atomic bundle may mix fund-moving calls (e.g. asset-router
+    /// deposits, which re-mint to the depositor) with calls that move no funds and have nothing to reverse
+    /// (e.g. flipping a flag on some contract). The latter legitimately return `false` and are skipped —
+    /// they burned nothing at the source, so nothing is stranded. We only require that *some* call recovered
+    /// (`recovered != 0`): a bundle where nothing is recoverable has no source funds to return, so a refund
+    /// would be a no-op and we reject it.
+    ///
+    /// Consequence: the protocol does not guarantee full refundability of an arbitrary bundle. A flow author
+    /// must make any fund-moving leg a recoverable (asset-router) call to have it returned on timeout; a
+    /// non-recoverable fund-moving call would strand its funds. Send-time ({InteropCenter}) only blocks
+    /// native-`value` legs, which no one can reverse.
     function _recoverBundle(bytes32 _flowId, bytes32 _bundleHash, InteropBundle memory _bundle) internal {
         uint256 destChainId = _bundle.destinationChainId;
         uint256 callsLen = _bundle.calls.length;
@@ -177,23 +217,22 @@ contract AtomicFlowManager is IAtomicFlowManager {
         if (recovered == 0) revert ManagerNoRecoverableCalls(_flowId, _bundleHash);
     }
 
-    /// @dev Recomputes `flowId` and asserts it matches, enforcing strictly-ascending `_legBundleHashes`
-    /// and `_chainIds`.
-    function _checkFlowId(
-        bytes32 _flowId,
-        bytes32[] calldata _legBundleHashes,
-        uint256[] calldata _chainIds,
-        uint64 _deadline
-    ) internal pure {
-        uint256 n = _legBundleHashes.length;
+    /// @dev Recomputes `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline,
+    /// settlementLayerChainId))` and asserts it matches `_flow.flowId`. `legBundleHashes` must be strictly
+    /// ascending (canonical order + dedup). `legSourceChainIds` is positional, aligned 1:1 with
+    /// `legBundleHashes`; it may repeat and need not be ascending, so only its length is checked. Treating
+    /// it as an ascending set instead would let a sibling chain in the set still enable a wrong-chain refund.
+    function _checkFlowId(AtomicFlow calldata _flow) internal pure {
+        uint256 n = _flow.legBundleHashes.length;
         for (uint256 i = 1; i < n; ++i) {
-            if (_legBundleHashes[i] <= _legBundleHashes[i - 1]) revert ManagerBundleHashesNotSorted();
+            if (_flow.legBundleHashes[i] <= _flow.legBundleHashes[i - 1]) revert ManagerBundleHashesNotSorted();
         }
-        uint256 m = _chainIds.length;
-        for (uint256 i = 1; i < m; ++i) {
-            if (_chainIds[i] <= _chainIds[i - 1]) revert ManagerChainsNotSorted();
+        if (_flow.legSourceChainIds.length != n) {
+            revert ManagerLegSourceChainIdsLengthMismatch(n, _flow.legSourceChainIds.length);
         }
-        bytes32 computed = keccak256(abi.encode(_legBundleHashes, _chainIds, _deadline));
-        if (computed != _flowId) revert ManagerFlowIdMismatch(_flowId, computed);
+        bytes32 computed = keccak256(
+            abi.encode(_flow.legBundleHashes, _flow.legSourceChainIds, _flow.deadline, _flow.settlementLayerChainId)
+        );
+        if (computed != _flow.flowId) revert ManagerFlowIdMismatch(_flow.flowId, computed);
     }
 }

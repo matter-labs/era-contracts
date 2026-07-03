@@ -148,9 +148,15 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
 
         // Atomicity gate: replaces executeBundle's L1-message inclusion proof. Proves every leg of the
         // flow was committed in its source chain's IMT before the deadline, and that this bundle is one
-        // of the flow's legs. Reverts otherwise.
+        // of the flow's legs. Reverts otherwise. No explicit "block.chainid in flow" check is needed: the
+        // bundle self-binds its own destinationChainId (asserted == block.chainid above) and per-send
+        // salts make each leg's bundleHash unique to its destination.
         IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).requireFlowFinalized(bundleHash, _finality);
 
+        // No nonReentrant guard, matching executeBundle. Replay safety is by CEI: _markFullyExecutedAndRun
+        // sets bundleStatus = FullyExecuted before running any call, so a reentrant call for THIS bundle
+        // hits the Unreceived check and reverts; a reentry for a different bundle is independently guarded.
+        // A global lock would also block legitimate nested interop.
         _markFullyExecutedAndRun(bundleHash, interopBundle);
     }
 
