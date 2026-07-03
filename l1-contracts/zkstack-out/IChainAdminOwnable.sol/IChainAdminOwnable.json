@@ -71,24 +71,6 @@
     "stateMutability": "nonpayable"
   },
   {
-    "type": "function",
-    "name": "setUpgradeTimestamp",
-    "inputs": [
-      {
-        "name": "_protocolVersion",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_upgradeTimestamp",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
     "type": "event",
     "name": "CallExecuted",
     "inputs": [
@@ -145,25 +127,6 @@
         "type": "address",
         "indexed": false,
         "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "UpdateUpgradeTimestamp",
-    "inputs": [
-      {
-        "name": "_protocolVersion",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "_upgradeTimestamp",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
       }
     ],
     "anonymous": false

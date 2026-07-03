@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {NoCallsProvided, Unauthorized, ZeroAddress, ZeroUpgradeTimestamp} from "contracts/common/L1ContractErrors.sol";
+import {NoCallsProvided, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Mock contract to test setTokenMultiplier functionality
 contract MockChainContract {
@@ -40,7 +40,6 @@ contract ChainAdminOwnableTest is Test {
     address internal tokenMultiplierSetter;
     address internal randomUser;
 
-    event UpdateUpgradeTimestamp(uint256 indexed _protocolVersion, uint256 _upgradeTimestamp);
     event CallExecuted(IChainAdminOwnable.Call _call, bool _success, bytes _returnData);
     event NewTokenMultiplierSetter(address _oldTokenMultiplierSetter, address _newTokenMultiplierSetter);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
@@ -115,51 +114,6 @@ contract ChainAdminOwnableTest is Test {
         chainAdminOwnable.setTokenMultiplierSetter(address(0));
 
         assertEq(chainAdminOwnable.tokenMultiplierSetter(), address(0));
-    }
-
-    // ============ setUpgradeTimestamp Tests ============
-
-    function test_setUpgradeTimestamp_updatesMapping(uint256 protocolVersion, uint256 timestamp) public {
-        vm.assume(timestamp != 0);
-        vm.prank(owner);
-        chainAdminOwnable.setUpgradeTimestamp(protocolVersion, timestamp);
-
-        assertEq(chainAdminOwnable.protocolVersionToUpgradeTimestamp(protocolVersion), timestamp);
-    }
-
-    function test_setUpgradeTimestamp_emitsEvent(uint256 protocolVersion, uint256 timestamp) public {
-        vm.assume(timestamp != 0);
-        vm.expectEmit(true, false, false, true);
-        emit UpdateUpgradeTimestamp(protocolVersion, timestamp);
-
-        vm.prank(owner);
-        chainAdminOwnable.setUpgradeTimestamp(protocolVersion, timestamp);
-    }
-
-    function test_setUpgradeTimestamp_revertsIfNotOwner(uint256 protocolVersion, uint256 timestamp) public {
-        vm.assume(timestamp != 0);
-        vm.prank(randomUser);
-        vm.expectRevert("Ownable: caller is not the owner");
-        chainAdminOwnable.setUpgradeTimestamp(protocolVersion, timestamp);
-    }
-
-    function test_setUpgradeTimestamp_revertsOnZeroTimestamp(uint256 protocolVersion) public {
-        vm.prank(owner);
-        vm.expectRevert(ZeroUpgradeTimestamp.selector);
-        chainAdminOwnable.setUpgradeTimestamp(protocolVersion, 0);
-    }
-
-    function test_setUpgradeTimestamp_canOverwrite(uint256 protocolVersion) public {
-        uint256 firstTimestamp = 1000;
-        uint256 secondTimestamp = 2000;
-
-        vm.startPrank(owner);
-        chainAdminOwnable.setUpgradeTimestamp(protocolVersion, firstTimestamp);
-        assertEq(chainAdminOwnable.protocolVersionToUpgradeTimestamp(protocolVersion), firstTimestamp);
-
-        chainAdminOwnable.setUpgradeTimestamp(protocolVersion, secondTimestamp);
-        assertEq(chainAdminOwnable.protocolVersionToUpgradeTimestamp(protocolVersion), secondTimestamp);
-        vm.stopPrank();
     }
 
     // ============ multicall Tests ============
