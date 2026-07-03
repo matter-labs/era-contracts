@@ -18,7 +18,6 @@ import {
     L2_BRIDGEHUB,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_NATIVE_TOKEN_VAULT,
-    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 
@@ -38,7 +37,6 @@ import {
     InteropCallStarterInternal
 } from "../common/Messaging.sol";
 import {AssetIdMismatch, MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
-import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
 import {
     AttributeAlreadySet,
@@ -425,17 +423,6 @@ contract InteropCenter is
         BundleAttributes memory _bundleAttributes,
         bytes[][] memory _originalCallAttributes
     ) internal returns (bytes32 bundleHash) {
-        // L2->L2 interop bundles must be routed through a gateway, so the source chain must not be
-        // settling directly on L1. An L2->L1 withdrawal, however, is a direct L2->L1 message (sent via
-        // the L2->L1 messenger below) and is valid regardless of the settlement layer, so the
-        // gateway-mode requirement only applies to non-L1 destinations.
-        if (_destinationChainId != L1_CHAIN_ID) {
-            require(
-                L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
-                NotInGatewayMode()
-            );
-        }
-
         // Form an InteropBundle.
         // For an L2->L1 withdrawal the L1 chain is not registered as an interop destination in the
         // L2 Bridgehub, so `baseTokenAssetId(L1_CHAIN_ID)` is unset. L1's base token is ETH, so the

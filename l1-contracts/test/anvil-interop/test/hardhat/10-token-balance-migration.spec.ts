@@ -335,23 +335,6 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       expect(migNum, `L1AT assetMigrationNumber[${l1SettledChainId}][ETH]`).to.equal(0);
     });
 
-    it("cannot send an interop bundle from an L1-settled chain (NotInGatewayMode)", async () => {
-      const wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1SettledProvider);
-      const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
-      // Chain-less ERC-7930 encoding of a dummy destination — the function reverts
-      // before decoding because the caller's settlement layer is L1. We use
-      // `callStatic` rather than sending a tx so the custom-error selector is
-      // exposed in the error data (Anvil does not surface it on tx receipts).
-      const destinationBytes = "0x00010000010d00";
-
-      await expectRevert(
-        () => interopCenter.callStatic.sendBundle(destinationBytes, [], [], { gasLimit: 500_000, value: 0 }),
-        "sendBundle from L1-settled chain",
-        customError("InteropCenter", "NotInGatewayMode()"),
-        l1SettledProvider
-      );
-    });
-
     it("cannot execute an interop bundle on an L1-settled chain (CannotClaimInteropOnL1Settlement)", async () => {
       const wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1SettledProvider);
       const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
