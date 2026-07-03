@@ -8,8 +8,6 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {
-    GW_ASSET_TRACKER,
-    GW_ASSET_TRACKER_ADDR,
     L2_ASSET_TRACKER,
     L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
@@ -23,7 +21,6 @@ import {
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {MAX_TOKEN_BALANCE} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
@@ -34,7 +31,6 @@ import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {L2AssetTrackerData} from "./L2AssetTrackerData.sol";
 import {L2UtilsBase} from "../l2-tests-in-l1-context/L2UtilsBase.sol";
 
 import {Unauthorized, BaseTokenPreV31TotalSupplyNotSet} from "contracts/common/L1ContractErrors.sol";
@@ -45,179 +41,6 @@ import {LogFinder} from "../utils/LogFinder.sol";
 abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
     using LogFinder for Vm.Log[];
-
-    function test_processLogsAndMessages() public {
-        finalizeDepositWithChainId(271);
-        finalizeDepositWithChainId(260);
-
-        vm.chainId(GATEWAY_CHAIN_ID);
-
-        // Set up token balances for chain operators to pay settlement fees
-        uint256[] memory chainIds = new uint256[](2);
-        chainIds[0] = 271;
-        chainIds[1] = 260;
-        L2UtilsBase.setupTokenBalancesForChainOperators(chainIds);
-
-        ProcessLogsInput[] memory testData = L2AssetTrackerData.getData();
-
-        // Add the required previous batch roots for batches 1-4
-        // The test is trying to add batch 5, so we need batches 1-4 to exist first
-        bytes32 dummyBatchRoot = keccak256("dummy_batch_root");
-        for (uint256 i = 1; i <= 4; i++) {
-            stdstore
-                .target(address(L2_MESSAGE_ROOT_ADDR))
-                .sig("chainBatchRoots(uint256,uint256)")
-                .with_key(271)
-                .with_key(i)
-                .checked_write(bytes32(uint256(dummyBatchRoot) + i));
-        }
-
-        // Snapshot fee-token balance before the loop to verify cross-iteration fee accounting.
-        IERC20 zkToken = GW_ASSET_TRACKER.wrappedZKToken();
-        uint256 feeBalanceBefore = zkToken.balanceOf(GW_ASSET_TRACKER_ADDR);
-        uint256 expectedFeeTotal;
-
-        for (uint256 i = 0; i < testData.length; i++) {
-            // Set the current batch number to 4 so that batch 5 can be added next
-            if (testData[i].batchNumber > 0) {
-                stdstore
-                    .target(address(L2_MESSAGE_ROOT_ADDR))
-                    .sig("currentChainBatchNumber(uint256)")
-                    .with_key(testData[i].chainId)
-                    .checked_write(testData[i].batchNumber - 1);
-            }
-
-            storeChainBalance(
-                testData[i].chainId,
-                0x444c07697a6b15219c574dcc0ee09b479f6171009a6afd65b93e6f028cfa031b,
-                100
-            );
-            storeChainBalance(
-                testData[i].chainId,
-                0xa6203e30497f83b9f5f056745b6ff94f7e22d88bacea03d4dd4393d66217a86f,
-                100
-            );
-            storeChainBalance(
-                testData[i].chainId,
-                0x8592bf3100a24d737aba8ba9895f6801b9ec30200dc016dd8369f3171cbd1921,
-                100
-            );
-            storeChainBalance(
-                testData[i].chainId,
-                0xb615cd4917043452e354e4797dc23e4d6106663f7a37249d54f5996dd2347710,
-                100
-            );
-            storeChainBalance(
-                testData[i].chainId,
-                0xb1f317b7effffcd4e3cf53784ae442ecc4e835c532aaf0e60a046fa8efb96e85,
-                100
-            );
-            storeChainBalance(
-                testData[i].chainId,
-                0xb5eab7cc8c9114c3115a034b49b3d87b0b352aa88c2a9d5ff7339cde105aa44c,
-                100
-            );
-
-            stdstore
-                .target(address(L2_CHAIN_ASSET_HANDLER))
-                .sig("migrationNumber(uint256)")
-                .with_key(271)
-                .checked_write(uint256(1));
-
-            bytes32[] memory txHashes = getTxHashes(testData[i]);
-
-            // Loop over l1TxHashes in testData[i] and for each mark balanceChange version number as 1
-            // Note: balanceChange is internal, so we calculate storage slot manually
-            // balanceChange is at slot 205 in GWAssetTracker
-            for (uint256 j = 0; j < txHashes.length; j++) {
-                // Calculate storage slot: keccak256(txHash, keccak256(chainId, 205))
-                bytes32 innerSlot = keccak256(abi.encode(testData[i].chainId, uint256(205)));
-                bytes32 structSlot = keccak256(abi.encode(txHashes[j], innerSlot));
-                // Write 1 to the version field (first byte of the struct)
-                vm.store(address(GW_ASSET_TRACKER), structSlot, bytes32(uint256(1)));
-            }
-
-            // Get the ZKChain address for this chain - this will be the caller and the settlement fee payer
-            address zkChainAddr = L2_BRIDGEHUB.getZKChain(testData[i].chainId);
-
-            // Update settlementFeePayer to be the ZKChain address (which has tokens and approval)
-            testData[i].settlementFeePayer = zkChainAddr;
-
-            // Re-arm log capture so event assertions are scoped to this iteration's call.
-            vm.recordLogs();
-
-            vm.prank(zkChainAddr);
-            (bool success, bytes memory data) = GW_ASSET_TRACKER_ADDR.call(
-                abi.encodeCall(GW_ASSET_TRACKER.processLogsAndMessages, testData[i])
-            );
-
-            if (!success) {
-                assembly {
-                    revert(add(data, 0x20), mload(data))
-                }
-            }
-            assertTrue(success, string.concat("processLogsAndMessages should succeed for iteration ", vm.toString(i)));
-
-            // ---- Outcome assertions ----
-            Vm.Log[] memory iterLogs = vm.getRecordedLogs();
-
-            // Verify the chain batch root for this batch is now stored.
-            assertEq(
-                L2_MESSAGE_ROOT.chainBatchRoots(testData[i].chainId, testData[i].batchNumber),
-                testData[i].chainBatchRoot,
-                "chainBatchRoot not persisted"
-            );
-
-            // Settlement-fee event: when emitted for this chain, decode and check internal
-            // consistency (amount == fee * callCount) and accumulate the expected total
-            // for the cross-iteration balance check below.
-            Vm.Log[] memory feeLogs = iterLogs.findAllFrom(
-                "GatewaySettlementFeesCollected(uint256,address,uint256,uint256)",
-                GW_ASSET_TRACKER_ADDR
-            );
-            for (uint256 k = 0; k < feeLogs.length; k++) {
-                if (uint256(feeLogs[k].topics[1]) != testData[i].chainId) continue;
-                assertEq(address(uint160(uint256(feeLogs[k].topics[2]))), zkChainAddr, "fee event payer mismatch");
-                (uint256 amount, uint256 callCount) = abi.decode(feeLogs[k].data, (uint256, uint256));
-                assertEq(amount, GW_ASSET_TRACKER.gatewaySettlementFee() * callCount, "fee amount != fee * callCount");
-                expectedFeeTotal += amount;
-            }
-        }
-
-        // Cross-iteration invariant: wrappedZKToken held by the asset tracker must have grown
-        // by exactly the sum of fees reported in GatewaySettlementFeesCollected events.
-        assertEq(
-            zkToken.balanceOf(GW_ASSET_TRACKER_ADDR) - feeBalanceBefore,
-            expectedFeeTotal,
-            "wrappedZKToken delta != sum of fee events"
-        );
-    }
-
-    function getTxHashes(ProcessLogsInput memory input) public returns (bytes32[] memory) {
-        bytes32[] memory txHashes = new bytes32[](input.logs.length);
-        uint256 length = 0;
-        for (uint256 i = 0; i < input.logs.length; i++) {
-            if (input.logs[i].sender == L2_BOOTLOADER_ADDRESS) {
-                length++;
-            }
-        }
-        uint256 j;
-        for (uint256 i = 0; i < input.logs.length; i++) {
-            if (input.logs[i].sender == L2_BOOTLOADER_ADDRESS) {
-                txHashes[j++] = input.logs[i].key;
-            }
-        }
-        return txHashes;
-    }
-
-    function storeChainBalance(uint256 chainId, bytes32 assetId, uint256 balance) public {
-        stdstore
-            .target(address(GW_ASSET_TRACKER))
-            .sig("chainBalance(uint256,bytes32)")
-            .with_key(chainId)
-            .with_key(assetId)
-            .checked_write(balance);
-    }
 
     function test_handleInitiateBridgingOnL2_requiresTokenRegistration() public {
         TestnetERC20Token token = new TestnetERC20Token("NativeToken", "NTV", 18);
@@ -449,118 +272,6 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         L2_ASSET_TRACKER.registerBaseTokenDuringUpgrade();
     }
 
-    function test_initiateL1ToGatewayMigrationOnL2() public {
-        // Test initiating L1 to Gateway migration on L2
-        bytes32 assetId = keccak256("migration_asset_id");
-        uint256 originChainId = 1;
-        address tokenAddress = address(0x5678);
-        address originalToken = address(0x9ABC);
-        uint256 totalSupply = 10000;
-
-        // Mock settlement layer chain ID (not L1)
-        vm.mockCall(
-            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
-            abi.encodeWithSelector(bytes4(keccak256("currentSettlementLayerChainId()"))),
-            abi.encode(270) // Gateway chain ID
-        );
-
-        // Mock token address
-        stdstore
-            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
-            .sig("tokenAddress(bytes32)")
-            .with_key(assetId)
-            .checked_write(uint256(uint160(tokenAddress)));
-
-        // Mock origin chain ID
-        stdstore
-            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
-            .sig("originChainId(bytes32)")
-            .with_key(assetId)
-            .checked_write(originChainId);
-
-        // Mock origin token (using mockCall since originToken is a function with logic)
-        vm.mockCall(
-            address(L2_NATIVE_TOKEN_VAULT_ADDR),
-            abi.encodeWithSignature("originToken(bytes32)", assetId),
-            abi.encode(originalToken)
-        );
-
-        // Mock chain migration number
-        stdstore
-            .target(address(L2_CHAIN_ASSET_HANDLER))
-            .sig("migrationNumber(uint256)")
-            .with_key(block.chainid)
-            .checked_write(uint256(2));
-
-        // Set asset migration number to 0 (not yet migrated). chainMigrationNumber (2) !=
-        // savedAssetMigrationNumber (0), so the early-return in L2AssetTracker.initiateL1ToGatewayMigrationOnL2
-        // does not fire and the event will be emitted.
-        stdstore
-            .target(L2_ASSET_TRACKER_ADDR)
-            .sig("assetMigrationNumber(uint256,bytes32)")
-            .with_key(block.chainid)
-            .with_key(assetId)
-            .checked_write(uint256(0));
-
-        // Mock total supply
-        vm.mockCall(tokenAddress, abi.encodeWithSelector(IERC20.totalSupply.selector), abi.encode(totalSupply));
-
-        // Mock sendMessageToL1 to avoid revert
-        vm.mockCall(address(L2_BRIDGEHUB), abi.encodeWithSignature("sendMessageToL1(bytes)"), abi.encode(bytes32(0)));
-
-        // Snapshot pre-call state
-        uint256 assetMigrationNumBefore = L2AssetTracker(L2_ASSET_TRACKER_ADDR).assetMigrationNumber(
-            block.chainid,
-            assetId
-        );
-        assertEq(assetMigrationNumBefore, 0, "Asset migration number should be 0 before migration");
-
-        // Record logs to capture the event
-        vm.recordLogs();
-
-        // Call the migration function
-        L2_ASSET_TRACKER.initiateL1ToGatewayMigrationOnL2(assetId);
-
-        // ---- Outcome assertions ----
-
-        // L1ToGatewayMigrationInitiated: only assetId is indexed; chainId is in data.
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        Vm.Log memory migrationLog = logs.requireOneFrom(
-            "L1ToGatewayMigrationInitiated(bytes32,uint256)",
-            L2_ASSET_TRACKER_ADDR
-        );
-        assertEq(migrationLog.topics[1], assetId, "Event assetId mismatch");
-        assertEq(abi.decode(migrationLog.data, (uint256)), block.chainid, "Event chainId mismatch");
-
-        // initiateL1ToGatewayMigrationOnL2 does NOT itself update assetMigrationNumber
-        // (that happens later via confirmMigrationOnL2 from L1). Verify it stays at the pre-call value.
-        assertEq(
-            L2AssetTracker(L2_ASSET_TRACKER_ADDR).assetMigrationNumber(block.chainid, assetId),
-            assetMigrationNumBefore,
-            "assetMigrationNumber must not change on L2-initiation"
-        );
-
-        // _registerLegacyTokenIfNeeded was triggered: isAssetRegistered + totalPreV31TotalSupply set.
-        assertTrue(
-            L2AssetTracker(L2_ASSET_TRACKER_ADDR).isAssetRegistered(assetId),
-            "Asset should be registered after migration init"
-        );
-        (bool isSaved, uint256 amount) = L2AssetTracker(L2_ASSET_TRACKER_ADDR).totalPreV31TotalSupply(assetId);
-        assertTrue(isSaved, "totalPreV31TotalSupply.isSaved should be true");
-        assertEq(amount, totalSupply, "totalPreV31TotalSupply.amount should match token totalSupply");
-    }
-
-    // ════════════════════════════════════════════════════════════════════════════════
-    //  Regression: `handleFinalizeBaseTokenBridgingOnL2` must not read the base-token
-    //  `totalSupply()` while the pre-V31 supply is still pending backfill.
-    //
-    //  `_needToForceSetAssetMigrationOnL2` reads `totalSupply()` as a proxy for "no deposit
-    //  finalized yet". On a ZKsync OS chain upgraded from a pre-v31 version, the base token's
-    //  `totalSupply()` reverts with `BaseTokenPreV31TotalSupplyNotSet` until it is backfilled,
-    //  so before the fix the first base-token deposit finalization reverted. With a real
-    //  `L2BaseTokenZKOS` at the base-token address (whose `totalSupply()` genuinely reverts
-    //  while the backfill is pending) the finalization must still succeed.
-    // ════════════════════════════════════════════════════════════════════════════════
     function test_handleFinalizeBaseTokenBridgingOnL2_succeedsWhileBackfillPending() public {
         bytes32 baseTokenAssetId = keccak256("zkos_base_token_pending_backfill");
         uint256 l1ChainId = 1;

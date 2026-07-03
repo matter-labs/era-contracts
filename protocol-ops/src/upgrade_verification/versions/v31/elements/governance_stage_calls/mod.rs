@@ -56,7 +56,6 @@ sol! {
     function upgrade(address proxy, address implementation);
     function upgradeAndCall(address proxy, address implementation, bytes data);
     function initializeL1V31Upgrade();
-    function setAssetTracker(address _l1AssetTracker);
     function setAddresses();
     function updateSecurityCouncil(address _newSecurityCouncil);
     function updateGuardians(address _newGuardians);

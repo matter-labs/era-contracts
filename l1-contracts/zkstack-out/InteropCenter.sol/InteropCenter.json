@@ -111,7 +111,7 @@
   },
   {
     "type": "function",
-    "name": "forwardTransactionOnGatewayWithBalanceChange",
+    "name": "forwardTransactionOnGateway",
     "inputs": [
       {
         "name": "_chainId",
@@ -127,48 +127,6 @@
         "name": "_expirationTimestamp",
         "type": "uint64",
         "internalType": "uint64"
-      },
-      {
-        "name": "_balanceChange",
-        "type": "tuple",
-        "internalType": "struct BalanceChange",
-        "components": [
-          {
-            "name": "version",
-            "type": "bytes1",
-            "internalType": "bytes1"
-          },
-          {
-            "name": "originToken",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "baseTokenAssetId",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "baseTokenAmount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "assetId",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "tokenOriginChainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
       }
     ],
     "outputs": [],
@@ -730,25 +688,6 @@
   },
   {
     "type": "event",
-    "name": "NewAssetTracker",
-    "inputs": [
-      {
-        "name": "oldAssetTracker",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "newAssetTracker",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "OwnershipTransferStarted",
     "inputs": [
       {
@@ -879,22 +818,6 @@
       }
     ],
     "anonymous": false
-  },
-  {
-    "type": "error",
-    "name": "AssetIdMismatch",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "supplied",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ]
   },
   {
     "type": "error",

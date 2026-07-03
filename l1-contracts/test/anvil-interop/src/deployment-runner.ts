@@ -16,7 +16,6 @@ import type {
   DeploymentState,
   L2ChainInfo,
   PriorityRequestData,
-  TbmAccountingSnapshot,
 } from "./core/types";
 import { getChainIdsByRole, timeIt } from "./core/utils";
 import { getAbi, getCreationBytecode } from "./core/contracts";
@@ -25,7 +24,6 @@ import { getInteropSourcePrivateKey, isLiveInteropMode } from "./core/accounts";
 import { encodeNtvAssetId } from "./core/data-encoding";
 import { deployTestTokens } from "./helpers/deploy-test-token";
 import { depositERC20ToL2 } from "./helpers/l1-deposit-helper";
-import { registerAndMigrateTestTokens, tbmAccountingSnapshotKey } from "./helpers/token-balance-migration-helper";
 import { asViemAddress, createLiveZksyncSdk } from "./helpers/temp-sdk";
 
 const ZERO_ADDRESS = ethers.constants.AddressZero;
@@ -139,7 +137,6 @@ export class DeploymentRunner {
       l1SharedBridge: params.l1AssetRouter,
       l1NullifierProxy: params.l1Nullifier ?? ZERO_ADDRESS,
       l1NativeTokenVault: params.l1NativeTokenVault ?? ZERO_ADDRESS,
-      l1AssetTracker: ZERO_ADDRESS,
       governance: ZERO_ADDRESS,
       transparentProxyAdmin: ZERO_ADDRESS,
       blobVersionedHashRetriever: ZERO_ADDRESS,
@@ -719,7 +716,7 @@ export class DeploymentRunner {
       throw new Error(`addresses.json not found in ${stateDir}`);
     }
     const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf-8"));
-    const { l1Addresses, ctmAddresses, chainAddresses, testTokens, customBaseTokens, tbmAccountingSnapshots, zkToken } =
+    const { l1Addresses, ctmAddresses, chainAddresses, testTokens, customBaseTokens, zkToken } =
       addresses;
 
     // Decompress hex-gzip state files to native JSON for --load-state CLI.
@@ -777,9 +774,6 @@ export class DeploymentRunner {
     }
     if (customBaseTokens) {
       state.customBaseTokens = customBaseTokens;
-    }
-    if (tbmAccountingSnapshots) {
-      state.tbmAccountingSnapshots = tbmAccountingSnapshots;
     }
     if (zkToken) {
       state.zkToken = zkToken;
@@ -933,7 +927,6 @@ export class DeploymentRunner {
       gwSettledChainIds,
       l2ChainRpcUrls
     );
-    this.saveTbmAccountingSnapshots(gatewaySetupResult.tbmAccountingSnapshots);
     const gatewayCTMAddr = gatewaySetupResult.gatewayCTMAddr;
 
     console.log(`  Gateway CTM: ${gatewayCTMAddr}`);
@@ -968,63 +961,7 @@ export class DeploymentRunner {
     return result;
   }
 
-  /**
-   * Full setup: deploy + test tokens + Token Balance Migration (TBM).
-   *
-   * Used by both `setup-and-dump-state.ts` and `run-hardhat-interop-test.ts` (fresh deploy path).
-   * TBM registers and migrates test tokens on GW-settled chains so that
-   * assetMigrationNumber matches migrationNumber (required for interop transfers).
-   */
-  async deployAndSetupWithTBM(
-    anvilManager: AnvilManager,
-    options?: DeployAndSetupOptions
-  ): Promise<FullDeploymentResult> {
-    const result = await this.deployAndSetup(anvilManager, options);
 
-    const config = this.getConfig();
-    const gwSettledChainIds = getChainIdsByRole(config.chains, "gwSettled");
-    const gatewayConfig = config.chains.find((c) => c.role === "gateway");
-
-    if (gwSettledChainIds.length > 0 && gatewayConfig) {
-      const state = this.loadState();
-      if (state.testTokens && Object.keys(state.testTokens).length > 0) {
-        const gwChain = state.chains!.l2.find((c) => c.chainId === gatewayConfig.chainId)!;
-        const gwDiamondProxy = state.chainAddresses!.find((c) => c.chainId === gatewayConfig.chainId)!.diamondProxy;
-        const l2ChainRpcUrls = new Map(state.chains!.l2.map((c) => [c.chainId, c.rpcUrl]));
-
-        const tbmAccountingSnapshots = await registerAndMigrateTestTokens({
-          gwSettledChainIds,
-          l2ChainRpcUrls,
-          testTokens: state.testTokens,
-          l1RpcUrl: state.chains!.l1!.rpcUrl,
-          gwRpcUrl: gwChain.rpcUrl,
-          l1AssetTrackerAddr: result.l1Addresses.l1AssetTracker,
-          gwDiamondProxyAddr: gwDiamondProxy,
-          chainAddresses: state.chainAddresses!,
-          logger: (line) => console.log(line),
-        });
-        this.saveTbmAccountingSnapshots(tbmAccountingSnapshots);
-      }
-    }
-
-    const stateAfterTbm = this.loadState();
-    await this.seedWrappedZkOnEthChains(stateAfterTbm);
-
-    return result;
-  }
-
-  private saveTbmAccountingSnapshots(snapshots: TbmAccountingSnapshot[] | undefined): void {
-    if (!snapshots || snapshots.length === 0) {
-      return;
-    }
-
-    const state = this.loadState();
-    state.tbmAccountingSnapshots = state.tbmAccountingSnapshots || {};
-    for (const snapshot of snapshots) {
-      state.tbmAccountingSnapshots[tbmAccountingSnapshotKey(snapshot.chainId, snapshot.assetId)] = snapshot;
-    }
-    this.saveState(state);
-  }
 }
 
 export interface DeployAndSetupOptions {

@@ -33,7 +33,6 @@ const REQUIRED_CONTRACTS = [
   "GatewayUtils.s.sol",
   "IRegisterCTM.sol",
   "IRegisterOnAllChains.sol",
-  "IGatewayMigrateTokenBalances.sol",
   "IFinalizeChainInit.sol",
   "IUpgradeV31.sol",
   "IFinalizeUpgrade.sol",

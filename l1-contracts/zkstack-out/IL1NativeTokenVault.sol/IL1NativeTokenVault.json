@@ -173,19 +173,6 @@
   },
   {
     "type": "function",
-    "name": "l1AssetTracker",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IL1AssetTracker"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "originChainId",
     "inputs": [
       {

@@ -27,37 +27,6 @@
   },
   {
     "type": "function",
-    "name": "acceptOwnership",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "assetMigrationNumber",
-    "inputs": [
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "migrationNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "backFillZKSyncOSBaseTokenV31MigrationData",
     "inputs": [
       {
@@ -92,56 +61,6 @@
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "confirmMigrationOnL2",
-    "inputs": [
-      {
-        "name": "_data",
-        "type": "tuple",
-        "internalType": "struct MigrationConfirmationData",
-        "components": [
-          {
-            "name": "chainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "assetId",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "tokenOriginChainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "originToken",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "assetMigrationNumber",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "isL1ToGateway",
-            "type": "bool",
-            "internalType": "bool"
-          }
-        ]
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -265,19 +184,6 @@
   },
   {
     "type": "function",
-    "name": "initiateL1ToGatewayMigrationOnL2",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "interopInfo",
     "inputs": [
       {
@@ -334,52 +240,6 @@
   },
   {
     "type": "function",
-    "name": "owner",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "pause",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "paused",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "pendingOwner",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "registerBaseTokenDuringUpgrade",
     "inputs": [],
     "outputs": [],
@@ -418,56 +278,6 @@
   },
   {
     "type": "function",
-    "name": "renounceOwnership",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "tokenMigrated",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "tokenMigratedThisChain",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "totalPreV31TotalSupply",
     "inputs": [
       {
@@ -491,26 +301,6 @@
     "stateMutability": "view"
   },
   {
-    "type": "function",
-    "name": "transferOwnership",
-    "inputs": [
-      {
-        "name": "newOwner",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "unpause",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
     "type": "event",
     "name": "BaseTokenRegisteredDuringUpgrade",
     "inputs": [
@@ -519,102 +309,6 @@
         "type": "bytes32",
         "indexed": true,
         "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "Initialized",
-    "inputs": [
-      {
-        "name": "version",
-        "type": "uint8",
-        "indexed": false,
-        "internalType": "uint8"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "L1ToGatewayMigrationInitiated",
-    "inputs": [
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "OwnershipTransferStarted",
-    "inputs": [
-      {
-        "name": "previousOwner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "newOwner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "OwnershipTransferred",
-    "inputs": [
-      {
-        "name": "previousOwner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "newOwner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "Paused",
-    "inputs": [
-      {
-        "name": "account",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "Unpaused",
-    "inputs": [
-      {
-        "name": "account",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
       }
     ],
     "anonymous": false
@@ -644,11 +338,6 @@
   {
     "type": "error",
     "name": "BaseTokenTotalSupplyBackfillNotNeeded",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "BaseTokenTotalSupplyBackfillRequired",
     "inputs": []
   },
   {
@@ -700,34 +389,8 @@
   },
   {
     "type": "error",
-    "name": "OnlyGatewaySettlementLayer",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "SlotOccupied",
     "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "TokenBalanceNotMigratedToGateway",
-    "inputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
   },
   {
     "type": "error",

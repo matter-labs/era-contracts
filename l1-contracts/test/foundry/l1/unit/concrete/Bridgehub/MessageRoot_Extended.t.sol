@@ -21,7 +21,6 @@ import {
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 import {
-    GW_ASSET_TRACKER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_COMPLEX_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -376,8 +375,8 @@ contract MessageRoot_Extended_Test is Test {
         // Roll to a new block so the next emission increments the counter.
         vm.roll(block.number + 1);
 
-        // Add a batch root
-        vm.prank(GW_ASSET_TRACKER_ADDR);
+        // Add a batch root (the chain itself appends its batch root on Gateway now)
+        vm.prank(chainSender);
         l2MessageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
 
         // Verify interopRootLogId incremented once for the new block

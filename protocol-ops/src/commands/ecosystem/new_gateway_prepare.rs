@@ -184,20 +184,6 @@ pub async fn prepare_new_gateway(
         .await
         .context("replay gov stages 0+1 on prepare fork")?;
 
-    // Register the new GW's base-token assetId in the freshly-deployed
-    // L1AssetTracker. GatewayVotePreparation's first L1→L2 priority tx
-    // charges the base token (ZK on a ZKsyncOS GW), which routes through
-    // `L1AssetRouter.bridgehubDepositBaseToken` → `NTV.bridgeBurn` →
-    // `L1AssetTracker.handleChainBalanceIncreaseOnL1` → `_requireRegistered`.
-    // In production this registration happens in stage3 (post-governance),
-    // but our prepare-time replay needs it earlier. The function is public
-    // (anyone can call), so a direct RPC tx is enough.
-    let asset_tracker = read_asset_tracker_proxy(core_toml)
-        .with_context(|| format!("read asset_tracker_proxy_addr from {}", core_toml.display()))?;
-    prime_zk_token_registration(&runner.rpc_url, asset_tracker, zk_token_asset_id)
-        .await
-        .context("prime ZK-token registration in L1AssetTracker")?;
-
     // Fund the deployer EOA with ZK tokens so the L1→L2 priority txs in
     // GatewayVotePreparation (which charge ZK as base token) can succeed
     // when forge --broadcast simulates them against the fork. Uses the
@@ -364,25 +350,6 @@ async fn replay_gov_stages_0_and_1(
 /// without making block.timestamp wildly diverge from real wall time.
 const GOV_DEADLINE_BUMP_SECONDS: u64 = 24 * 60 * 60;
 
-/// Pull `asset_tracker_proxy_addr` out of `CoreUpgrade_v31`'s output TOML.
-/// Set by `saveOutputVersionSpecific` (see CoreUpgrade_v31.s.sol:240).
-fn read_asset_tracker_proxy(core_toml: &Path) -> anyhow::Result<Address> {
-    #[derive(serde::Deserialize)]
-    struct Top {
-        asset_tracker_proxy_addr: String,
-    }
-    let raw = std::fs::read_to_string(core_toml)
-        .with_context(|| format!("read {}", core_toml.display()))?;
-    let top: Top =
-        toml::from_str(&raw).with_context(|| format!("parse {}", core_toml.display()))?;
-    top.asset_tracker_proxy_addr.parse().with_context(|| {
-        format!(
-            "asset_tracker_proxy_addr is not a valid address: {}",
-            top.asset_tracker_proxy_addr
-        )
-    })
-}
-
 /// 1e30 wei (1B tokens for an 18-decimal token) — comfortably above the
 /// ~580 ZK each GatewayVotePreparation priority tx charges. Kept as a
 /// constant so the harness-side TypeScript funding uses the same amount.
@@ -471,50 +438,6 @@ async fn fund_zk_via_bridge_mint(
         bal >= amount,
         "bridgeMint didn't credit the expected amount — balanceOf returned {bal}, expected ≥ {amount}"
     );
-    Ok(())
-}
-
-/// Call `L1AssetTracker.registerLegacyToken(zkTokenAssetId)` so the GW's
-/// first L1→L2 priority tx (which charges ZK as the base token) can pass
-/// the `_requireRegistered` gate. The function is public — anyone can call
-/// it — so a single direct RPC tx from an anvil-default EOA is enough.
-/// We send outside forge so it doesn't land in any Safe bundle; the
-/// production stage-3 phase later re-applies this registration cleanly
-/// through the standard flow against the fresh real-L1 state.
-async fn prime_zk_token_registration(
-    rpc_url: &str,
-    asset_tracker: Address,
-    zk_token_asset_id: B256,
-) -> anyhow::Result<()> {
-    let selector = &keccak256(b"registerLegacyToken(bytes32)")[..4];
-    let mut calldata = Vec::with_capacity(36);
-    calldata.extend_from_slice(selector);
-    calldata.extend_from_slice(zk_token_asset_id.as_slice());
-
-    // Any EOA works; default-anvil account 0 has known unlimited funding
-    // via `set_balance`. We don't use the deployer EOA here because
-    // (i) we want this to NOT count as a deployer broadcast, and
-    // (ii) anvil's auto-impersonate accepts any `from` without holding
-    //      its key.
-    let caller: Address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
-        .parse()
-        .unwrap();
-    set_balance(rpc_url, caller)
-        .await
-        .context("anvil_setBalance(default-anvil-caller)")?;
-
-    logger::info(format!(
-        "Priming L1AssetTracker.registerLegacyToken({zk_token_asset_id:#x}) on {asset_tracker:#x}"
-    ));
-    send_impersonated_tx(
-        rpc_url,
-        caller,
-        asset_tracker,
-        Bytes::from(calldata),
-        GOV_REPLAY_GAS_LIMIT,
-    )
-    .await
-    .context("registerLegacyToken(zkTokenAssetId)")?;
     Ok(())
 }
 

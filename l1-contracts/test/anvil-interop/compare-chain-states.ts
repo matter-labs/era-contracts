@@ -79,14 +79,13 @@ function collectSkipStorageAccounts(versionDir: string): Set<string> {
   const p = path.join(versionDir, "addresses.json");
   if (!fs.existsSync(p)) return skip;
   const a = JSON.parse(fs.readFileSync(p, "utf-8")) as {
-    l1Addresses?: { messageRoot?: string; l1AssetTracker?: string };
+    l1Addresses?: { messageRoot?: string };
     chainAddresses?: Array<{ diamondProxy?: string }>;
   };
   const add = (v: unknown) => {
     if (typeof v === "string" && /^0x[0-9a-fA-F]{40}$/.test(v)) skip.add(v.toLowerCase());
   };
   add(a.l1Addresses?.messageRoot);
-  add(a.l1Addresses?.l1AssetTracker);
   for (const c of a.chainAddresses ?? []) add(c.diamondProxy);
   return skip;
 }

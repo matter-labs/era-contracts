@@ -16,7 +16,7 @@ use crate::upgrade_verification::{
     constants::{
         literal_addr, CODE_ORACLE_SYSTEM_CONTRACT, ECADD_SYSTEM_CONTRACT, ECMUL_SYSTEM_CONTRACT,
         ECPAIRING_SYSTEM_CONTRACT, ECRECOVER_SYSTEM_CONTRACT, EVENT_WRITER_CONTRACT,
-        EVM_GAS_MANAGER, EVM_PREDEPLOYS_MANAGER, GW_ASSET_TRACKER_ADDR, IDENTITY_SYSTEM_CONTRACT,
+        EVM_GAS_MANAGER, EVM_PREDEPLOYS_MANAGER, IDENTITY_SYSTEM_CONTRACT,
         KECCAK256_SYSTEM_CONTRACT, L2_ACCOUNT_CODE_STORAGE_ADDR, L2_ASSET_ROUTER_ADDR,
         L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
         L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPRESSOR_ADDR,
@@ -166,7 +166,6 @@ fn expected_v31_era_force_deployments() -> Vec<EraExpectedFd> {
         simple!("l1-contracts/L2AssetTracker", L2_ASSET_TRACKER_ADDR),
         simple!("l1-contracts/InteropCenter", L2_INTEROP_CENTER_ADDR),
         simple!("l1-contracts/InteropHandler", L2_INTEROP_HANDLER_ADDR),
-        simple!("l1-contracts/GWAssetTracker", GW_ASSET_TRACKER_ADDR),
         // ── Additional: L2V31Upgrade (the delegate target for this upgrade) ──
         simple!(L2_V31_UPGRADE_CONTRACT, L2_VERSION_SPECIFIC_UPGRADER_ADDR),
     ]

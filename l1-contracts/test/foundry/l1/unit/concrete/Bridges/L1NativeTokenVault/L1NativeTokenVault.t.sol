@@ -14,7 +14,6 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
-import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 
 import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
@@ -61,7 +60,6 @@ contract L1NativeTokenVaultTest is Test {
     L1NativeTokenVaultTestHelper public nativeTokenVault;
     L1AssetRouter public assetRouter;
     L1Nullifier public l1Nullifier;
-    L1AssetTracker public l1AssetTracker;
     TestnetERC20Token public testToken;
 
     address public owner;
@@ -147,13 +145,6 @@ contract L1NativeTokenVaultTest is Test {
             abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
             abi.encode(0)
         );
-
-        // Deploy L1AssetTracker
-        l1AssetTracker = new L1AssetTracker(bridgehubAddress, address(nativeTokenVault), messageRootAddress);
-
-        // Set asset tracker
-        vm.prank(owner);
-        nativeTokenVault.setAssetTracker(address(l1AssetTracker));
 
         // Setup L1Nullifier
         vm.prank(owner);
@@ -266,13 +257,6 @@ contract L1NativeTokenVaultTest is Test {
         // Create bridge burn data
         bytes memory data = DataEncoding.encodeBridgeBurnData(100, owner, address(0));
 
-        // Mock the asset tracker call
-        vm.mockCall(
-            address(l1AssetTracker),
-            abi.encodeWithSelector(L1AssetTracker.handleChainBalanceDecreaseOnL1.selector),
-            abi.encode()
-        );
-
         vm.prank(address(assetRouter));
         vm.expectRevert(OriginChainIdNotFound.selector);
         nativeTokenVault.bridgeConfirmTransferResult(chainId, TxStatus.Failure, unknownAssetId, owner, data);
@@ -293,13 +277,6 @@ contract L1NativeTokenVaultTest is Test {
 
         uint256 amount = 100;
         bytes memory data = DataEncoding.encodeBridgeBurnData(amount, owner, address(0));
-
-        // Mock the asset tracker call
-        vm.mockCall(
-            address(l1AssetTracker),
-            abi.encodeWithSelector(L1AssetTracker.handleChainBalanceDecreaseOnL1.selector),
-            abi.encode()
-        );
 
         // Mock the bridgeMint call
         vm.mockCall(

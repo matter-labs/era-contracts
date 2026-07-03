@@ -55,10 +55,6 @@ contract DummySettlementLayerV31Upgrade is EraSettlementLayerV31Upgrade, BaseUpg
         return s.nativeTokenVault;
     }
 
-    function getAssetTracker() public view returns (address) {
-        return s.assetTracker;
-    }
-
     function getL2SystemContractsUpgradeTxHash() public view returns (bytes32) {
         return s.l2SystemContractsUpgradeTxHash;
     }
@@ -90,7 +86,6 @@ abstract contract SettlementLayerV31UpgradeTestBase is BaseUpgrade {
     address internal mockBridgehub;
     address internal mockAssetRouter;
     address internal mockNativeTokenVault;
-    address internal mockAssetTracker;
     address internal mockMessageRoot;
     address internal mockChainAssetHandler;
     address internal mockGWChain;
@@ -117,7 +112,6 @@ abstract contract SettlementLayerV31UpgradeTestBase is BaseUpgrade {
         mockBridgehub = makeAddr("bridgehub");
         mockAssetRouter = makeAddr("assetRouter");
         mockNativeTokenVault = makeAddr("nativeTokenVault");
-        mockAssetTracker = makeAddr("assetTracker");
         mockMessageRoot = makeAddr("messageRoot");
         mockChainAssetHandler = makeAddr("chainAssetHandler");
         mockGWChain = makeAddr("gwChain");
@@ -154,12 +148,6 @@ abstract contract SettlementLayerV31UpgradeTestBase is BaseUpgrade {
             abi.encode(mockNativeTokenVault)
         );
 
-        // Mock nativeTokenVault.l1AssetTracker
-        vm.mockCall(
-            mockNativeTokenVault,
-            abi.encodeWithSelector(IL1NativeTokenVault.l1AssetTracker.selector),
-            abi.encode(mockAssetTracker)
-        );
 
         // Mock bridgehub.baseTokenAssetId
         vm.mockCall(
@@ -328,7 +316,6 @@ contract SettlementLayerV31UpgradeSharedTest is SettlementLayerV31UpgradeTestBas
 
         assertEq(result, Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
         assertEq(upgrade.getNativeTokenVault(), mockNativeTokenVault);
-        assertEq(upgrade.getAssetTracker(), mockAssetTracker);
     }
 
     function test_SuccessfulUpgrade_WhitelistedSettlementLayerWithEmptyQueue() public {
@@ -546,7 +533,6 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
     address internal mockBridgehub;
     address internal mockAssetRouter;
     address internal mockNativeTokenVault;
-    address internal mockAssetTracker;
     address internal mockMessageRoot;
     address internal mockChainTypeManager;
     address internal mockVerifier = makeAddr("mockVerifier");
@@ -557,7 +543,6 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
         mockBridgehub = makeAddr("bridgehub");
         mockAssetRouter = makeAddr("assetRouter");
         mockNativeTokenVault = makeAddr("nativeTokenVault");
-        mockAssetTracker = makeAddr("assetTracker");
         mockMessageRoot = makeAddr("messageRoot");
         mockChainTypeManager = makeAddr("chainTypeManager");
 
@@ -585,11 +570,6 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
             mockAssetRouter,
             abi.encodeWithSelector(IL1AssetRouter.nativeTokenVault.selector),
             abi.encode(mockNativeTokenVault)
-        );
-        vm.mockCall(
-            mockNativeTokenVault,
-            abi.encodeWithSelector(IL1NativeTokenVault.l1AssetTracker.selector),
-            abi.encode(mockAssetTracker)
         );
         vm.mockCall(
             mockBridgehub,

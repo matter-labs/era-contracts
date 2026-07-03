@@ -22,7 +22,7 @@ import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {GatewayDeployer} from "./_SharedGatewayDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {GW_ASSET_TRACKER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {
     L2CanonicalTransaction,
     L2Message,
@@ -35,7 +35,6 @@ import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
-import {IGWAssetTracker} from "contracts/bridge/asset-tracker/IGWAssetTracker.sol";
 
 import {IGetters, IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -432,16 +431,6 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             originToken: makeAddr("baseTokenOrigin"),
             originChainId: currentChainId
         });
-
-        vm.expectCall(
-            GW_ASSET_TRACKER_ADDR,
-            abi.encodeCall(IGWAssetTracker.registerBaseTokenOnGateway, (baseTokenBridgingData))
-        );
-        vm.mockCall(
-            GW_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(IGWAssetTracker.registerBaseTokenOnGateway.selector),
-            abi.encode()
-        );
 
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(migratingChainId);
 

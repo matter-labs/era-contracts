@@ -13,12 +13,12 @@ use std::collections::HashMap;
 
 use crate::upgrade_verification::{
     constants::{
-        GW_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR,
-        L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR,
-        L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR,
-        L2_INTEROP_ROOT_STORAGE_ADDR, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION_ADDR,
-        L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_V31_UPGRADE_CONTRACT,
+        L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_HOLDER_ADDR,
+        L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR,
+        L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE_ADDR,
+        L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR,
+        L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+        L2_V31_UPGRADE_CONTRACT,
     },
     verifiers::{VerificationResult, Verifiers},
 };
@@ -80,7 +80,6 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
         proxy!("l1-contracts/L2AssetTracker", L2_ASSET_TRACKER_ADDR),
         proxy!("l1-contracts/InteropCenter", L2_INTEROP_CENTER_ADDR),
         proxy!("l1-contracts/InteropHandler", L2_INTEROP_HANDLER_ADDR),
-        proxy!("l1-contracts/GWAssetTracker", GW_ASSET_TRACKER_ADDR),
         // ── ZKsync-OS system contracts (getZKsyncOSExtraSystemContracts, 3 entries) ──
         proxy!(
             "l1-contracts/L2BaseTokenZKOS",

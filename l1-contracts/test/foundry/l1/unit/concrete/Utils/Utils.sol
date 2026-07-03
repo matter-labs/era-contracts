@@ -440,13 +440,13 @@ library Utils {
         selectors[i++] = MailboxFacet.bridgehubRequestL2TransactionOnGateway.selector;
         selectors[i++] = MailboxFacet.l2TransactionBaseCost.selector;
         selectors[i++] = MailboxFacet.proveL2LeafInclusion.selector;
-        selectors[i++] = MailboxFacet.requestL2TransactionToGatewayMailboxWithBalanceChange.selector;
+        selectors[i++] = MailboxFacet.requestL2TransactionToGatewayMailbox.selector;
         selectors[i++] = MailboxFacet.requestL2ServiceTransaction.selector;
         return selectors;
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](73);
+        bytes4[] memory selectors = new bytes4[](72);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
@@ -507,7 +507,6 @@ library Utils {
         selectors[i++] = UtilsFacet.util_getSettlementLayer.selector;
         selectors[i++] = UtilsFacet.util_setPausedDepositsTimestamp.selector;
         selectors[i++] = UtilsFacet.util_getPausedDepositsTimestamp.selector;
-        selectors[i++] = UtilsFacet.util_setAssetTracker.selector;
         selectors[i++] = UtilsFacet.util_setNativeTokenVault.selector;
         selectors[i++] = UtilsFacet.util_setIsPermanentRollup.selector;
         selectors[i++] = UtilsFacet.util_setTotalBatchesVerified.selector;

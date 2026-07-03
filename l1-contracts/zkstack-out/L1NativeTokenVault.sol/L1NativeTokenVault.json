@@ -403,19 +403,6 @@
   },
   {
     "type": "function",
-    "name": "l1AssetTracker",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IL1AssetTracker"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "originChainId",
     "inputs": [
       {
@@ -522,19 +509,6 @@
     "type": "function",
     "name": "renounceOwnership",
     "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setAssetTracker",
-    "inputs": [
-      {
-        "name": "_l1AssetTracker",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },

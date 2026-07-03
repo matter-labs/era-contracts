@@ -17,7 +17,6 @@ import {
 
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 import {
-    GW_ASSET_TRACKER_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR
