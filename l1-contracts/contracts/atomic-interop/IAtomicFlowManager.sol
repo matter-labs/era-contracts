@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
-import {LegState, AtomicTimeoutProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
+import {LegState, AtomicFlow, AtomicTimeoutProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -53,22 +53,14 @@ interface IAtomicFlowManager {
 
     /// @notice Mark this chain's committed source legs `Revertable` for a flow that can no longer
     /// finalize, proven by a timeout for one leg. Permissionless.
-    /// @param _flowId The flow identifier; recomputed and matched against the supplied fields.
-    /// @param _legBundleHashes All legs' bundle hashes, strictly ascending.
-    /// @param _legSourceChainIds Each leg's source chain id, positionally aligned with `_legBundleHashes`.
-    /// The proofs for the missing leg must target `_legSourceChainIds[_missingLegIndex]`.
-    /// @param _deadline The flow deadline (a settlement-layer timestamp), compared to each batch's `t`.
-    /// @param _settlementLayerChainId The flow's single settlement layer; both proofs' resolved
-    /// `slChainId` must equal it.
-    /// @param _missingLegIndex Index into `_legBundleHashes` of the leg proven absent.
+    /// @param _flow The flow definition ({AtomicFlow}); its `flowId` is recomputed from the other fields
+    /// and matched. The timeout proofs for the missing leg must target
+    /// `_flow.legSourceChainIds[_missingLegIndex]`.
+    /// @param _missingLegIndex Index into `_flow.legBundleHashes` of the leg proven absent.
     /// @param _timeout Timeout proof: absence at the last batch `N` with `t_N <= deadline`, plus its
     /// consecutive successor `N+1` with `t_{N+1} > deadline`.
     function authorizeRefund(
-        bytes32 _flowId,
-        bytes32[] calldata _legBundleHashes,
-        uint256[] calldata _legSourceChainIds,
-        uint64 _deadline,
-        uint256 _settlementLayerChainId,
+        AtomicFlow calldata _flow,
         uint256 _missingLegIndex,
         AtomicTimeoutProof calldata _timeout
     ) external;

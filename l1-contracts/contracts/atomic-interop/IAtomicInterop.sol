@@ -71,10 +71,9 @@ struct AtomicTimeoutProof {
     ImtProof successor;
 }
 
-/// @notice The full atomicity proof a destination needs to execute an atomic bundle: the flow definition
-/// (`flowId`, every leg, each leg's source chain, `deadline`, the settlement layer) plus one IMT
-/// inclusion proof per leg. Passed as one calldata reference to `InteropHandler.executeAtomicBundle` /
-/// `AtomicFlowManager.requireFlowFinalized`.
+/// @notice The definition of an atomic flow: `flowId` plus the exact fields it hashes over. Grouping them
+/// keeps the finalize path ({AtomicFlowManager.requireFlowFinalized}) and the refund path
+/// ({AtomicFlowManager.authorizeRefund}) on one shape, so the `flowId` preimage cannot drift between them.
 /// @param flowId `keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`.
 /// @param deadline The flow deadline (a settlement-layer timestamp).
 /// @param settlementLayerChainId The single settlement layer every leg must settle on; committed in
@@ -82,13 +81,21 @@ struct AtomicTimeoutProof {
 /// @param legBundleHashes All legs' bundle hashes, strictly ascending (canonical order + dedup).
 /// @param legSourceChainIds Each leg's source chain id, aligned 1:1 with `legBundleHashes`. May repeat
 /// and need not be ascending.
-/// @param proofs One inclusion proof per leg, in `legBundleHashes` order.
-struct AtomicFinalityProof {
+struct AtomicFlow {
     bytes32 flowId;
     uint64 deadline;
     uint256 settlementLayerChainId;
     bytes32[] legBundleHashes;
     uint256[] legSourceChainIds;
+}
+
+/// @notice The full atomicity proof a destination needs to execute an atomic bundle: the flow definition
+/// plus one IMT inclusion proof per leg. Passed as one calldata reference to
+/// `InteropHandler.executeAtomicBundle` / `AtomicFlowManager.requireFlowFinalized`.
+/// @param flow The flow definition (see {AtomicFlow}).
+/// @param proofs One inclusion proof per leg, in `flow.legBundleHashes` order.
+struct AtomicFinalityProof {
+    AtomicFlow flow;
     ImtProof[] proofs;
 }
 

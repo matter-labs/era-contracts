@@ -5,7 +5,7 @@ import {IAtomicFlowManager} from "./IAtomicFlowManager.sol";
 import {IL2InteropCommitmentTree} from "./IL2InteropCommitmentTree.sol";
 import {IAtomicRecoverable} from "./IAtomicRecoverable.sol";
 import {AtomicInteropProof} from "./libraries/AtomicInteropProof.sol";
-import {LegState, AtomicTimeoutProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
+import {LegState, AtomicFlow, AtomicTimeoutProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
 import {InteropDataEncoding} from "../interop/InteropDataEncoding.sol";
 import {
@@ -84,16 +84,10 @@ contract AtomicFlowManager is IAtomicFlowManager {
         bytes32 _executingBundleHash,
         AtomicFinalityProof calldata _finality
     ) external view onlyInteropHandler {
-        // solhint-disable-next-line func-named-parameters
-        _checkFlowId(
-            _finality.flowId,
-            _finality.legBundleHashes,
-            _finality.legSourceChainIds,
-            _finality.deadline,
-            _finality.settlementLayerChainId
-        );
+        AtomicFlow calldata flow = _finality.flow;
+        _checkFlowId(flow);
 
-        uint256 n = _finality.legBundleHashes.length;
+        uint256 n = flow.legBundleHashes.length;
         if (_finality.proofs.length != n) revert ManagerProofCountMismatch(n, _finality.proofs.length);
 
         // Every leg must be present in its source chain's tree as of a root settled no later than the
@@ -103,64 +97,55 @@ contract AtomicFlowManager is IAtomicFlowManager {
         // `settlementLayerChainId`, checked inside {AtomicInteropProof.verifyInclusion}.
         bool executingIsLeg = false;
         for (uint256 i = 0; i < n; ++i) {
-            if (_finality.legBundleHashes[i] == _executingBundleHash) executingIsLeg = true;
-            if (_finality.proofs[i].sourceChainId != _finality.legSourceChainIds[i]) {
-                revert ProofSourceChainMismatch(_finality.legSourceChainIds[i], _finality.proofs[i].sourceChainId);
+            if (flow.legBundleHashes[i] == _executingBundleHash) executingIsLeg = true;
+            if (_finality.proofs[i].sourceChainId != flow.legSourceChainIds[i]) {
+                revert ProofSourceChainMismatch(flow.legSourceChainIds[i], _finality.proofs[i].sourceChainId);
             }
-            uint256 value = AtomicInteropProof.commitValue(_finality.flowId, _finality.legBundleHashes[i]);
-            AtomicInteropProof.verifyInclusion(
-                _finality.proofs[i],
-                value,
-                _finality.deadline,
-                _finality.settlementLayerChainId
-            );
+            uint256 value = AtomicInteropProof.commitValue(flow.flowId, flow.legBundleHashes[i]);
+            AtomicInteropProof.verifyInclusion(_finality.proofs[i], value, flow.deadline, flow.settlementLayerChainId);
         }
-        if (!executingIsLeg) revert ManagerExecutingBundleNotInFlow(_finality.flowId, _executingBundleHash);
+        if (!executingIsLeg) revert ManagerExecutingBundleNotInFlow(flow.flowId, _executingBundleHash);
     }
 
     /// @inheritdoc IAtomicFlowManager
     function authorizeRefund(
-        bytes32 _flowId,
-        bytes32[] calldata _legBundleHashes,
-        uint256[] calldata _legSourceChainIds,
-        uint64 _deadline,
-        uint256 _settlementLayerChainId,
+        AtomicFlow calldata _flow,
         uint256 _missingLegIndex,
         AtomicTimeoutProof calldata _timeout
     ) external {
-        // solhint-disable-next-line func-named-parameters
-        _checkFlowId(_flowId, _legBundleHashes, _legSourceChainIds, _deadline, _settlementLayerChainId);
+        _checkFlowId(_flow);
 
         // 1. Bind the absence proof to the missing leg's declared source chain. Without this, the leg's
         //    commit value — which exists only in its own source chain's tree — is trivially absent from
         //    any other chain's tree, so an on-time, finalized leg could be force-refunded against an
         //    unrelated chain (double-mint).
-        if (_timeout.absence.sourceChainId != _legSourceChainIds[_missingLegIndex]) {
-            revert ProofSourceChainMismatch(_legSourceChainIds[_missingLegIndex], _timeout.absence.sourceChainId);
+        uint256 missingLegChainId = _flow.legSourceChainIds[_missingLegIndex];
+        if (_timeout.absence.sourceChainId != missingLegChainId) {
+            revert ProofSourceChainMismatch(missingLegChainId, _timeout.absence.sourceChainId);
         }
 
         // 2. Adjacency timeout: the leg's commit value is absent from the last batch with settlement
         //    timestamp `t <= deadline` (the absence proof), pinned by the next batch with `t > deadline`
         //    (the successor witness). This closes the stale/genesis-root force-refund: an old/empty root
         //    can't be used because its successor would still be `<= deadline`.
-        uint256 value = AtomicInteropProof.commitValue(_flowId, _legBundleHashes[_missingLegIndex]);
+        uint256 value = AtomicInteropProof.commitValue(_flow.flowId, _flow.legBundleHashes[_missingLegIndex]);
         // solhint-disable-next-line func-named-parameters
         AtomicInteropProof.verifyTimeoutAdjacency(
             _timeout.absence,
             _timeout.successor,
             value,
-            _deadline,
-            _settlementLayerChainId
+            _flow.deadline,
+            _flow.settlementLayerChainId
         );
 
         // 3. Mark this chain's committed source legs Revertable (legs committed on other chains are not
         //    in this manager's state, so they are skipped).
-        uint256 n = _legBundleHashes.length;
+        uint256 n = _flow.legBundleHashes.length;
         for (uint256 i = 0; i < n; ++i) {
-            bytes32 h = _legBundleHashes[i];
-            if (_state[_flowId][h] != LegState.Committed) continue;
-            _state[_flowId][h] = LegState.Revertable;
-            emit FlowRefundAuthorized(_flowId, h);
+            bytes32 h = _flow.legBundleHashes[i];
+            if (_state[_flow.flowId][h] != LegState.Committed) continue;
+            _state[_flow.flowId][h] = LegState.Revertable;
+            emit FlowRefundAuthorized(_flow.flowId, h);
         }
     }
 
@@ -233,27 +218,21 @@ contract AtomicFlowManager is IAtomicFlowManager {
     }
 
     /// @dev Recomputes `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline,
-    /// settlementLayerChainId))` and asserts it matches. `_legBundleHashes` must be strictly ascending
-    /// (canonical order + dedup). `_legSourceChainIds` is positional, aligned 1:1 with `_legBundleHashes`;
-    /// it may repeat and need not be ascending, so only its length is checked. Treating it as an
-    /// ascending set instead would let a sibling chain in the set still enable a wrong-chain refund.
-    function _checkFlowId(
-        bytes32 _flowId,
-        bytes32[] calldata _legBundleHashes,
-        uint256[] calldata _legSourceChainIds,
-        uint64 _deadline,
-        uint256 _settlementLayerChainId
-    ) internal pure {
-        uint256 n = _legBundleHashes.length;
+    /// settlementLayerChainId))` and asserts it matches `_flow.flowId`. `legBundleHashes` must be strictly
+    /// ascending (canonical order + dedup). `legSourceChainIds` is positional, aligned 1:1 with
+    /// `legBundleHashes`; it may repeat and need not be ascending, so only its length is checked. Treating
+    /// it as an ascending set instead would let a sibling chain in the set still enable a wrong-chain refund.
+    function _checkFlowId(AtomicFlow calldata _flow) internal pure {
+        uint256 n = _flow.legBundleHashes.length;
         for (uint256 i = 1; i < n; ++i) {
-            if (_legBundleHashes[i] <= _legBundleHashes[i - 1]) revert ManagerBundleHashesNotSorted();
+            if (_flow.legBundleHashes[i] <= _flow.legBundleHashes[i - 1]) revert ManagerBundleHashesNotSorted();
         }
-        if (_legSourceChainIds.length != n) {
-            revert ManagerLegSourceChainIdsLengthMismatch(n, _legSourceChainIds.length);
+        if (_flow.legSourceChainIds.length != n) {
+            revert ManagerLegSourceChainIdsLengthMismatch(n, _flow.legSourceChainIds.length);
         }
         bytes32 computed = keccak256(
-            abi.encode(_legBundleHashes, _legSourceChainIds, _deadline, _settlementLayerChainId)
+            abi.encode(_flow.legBundleHashes, _flow.legSourceChainIds, _flow.deadline, _flow.settlementLayerChainId)
         );
-        if (computed != _flowId) revert ManagerFlowIdMismatch(_flowId, computed);
+        if (computed != _flow.flowId) revert ManagerFlowIdMismatch(_flow.flowId, computed);
     }
 }

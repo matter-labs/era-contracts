@@ -73,13 +73,13 @@ import {
 } from "../../src/helpers/interop-helpers";
 import {
   atomicFinalityProofTuple,
+  atomicFlowTuple,
   atomicTimeoutProofTuple,
   buildInclusionProof,
   buildNonInclusionProof,
   buildSuccessorProof,
   commitValue,
   computeFlowId,
-  DEFAULT_SL_CHAIN_ID,
   lowNullifierIndexFor,
   reconstructChainImt,
 } from "../../src/helpers/imt-engine-lib";
@@ -514,11 +514,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     const managerA = chainA.stack.manager.connect(chainA.user);
     const refundAuth = await (
       await managerA.authorizeRefund(
-        flowId,
-        legHashesAsc,
-        chainIdsAsc,
-        deadline,
-        DEFAULT_SL_CHAIN_ID,
+        atomicFlowTuple({ flowId, deadline, legBundleHashes: legHashesAsc, chainIds: chainIdsAsc }),
         missingIdx,
         atomicTimeoutProofTuple(absence, successor),
         { gasLimit: DEFAULT_TX_GAS_LIMIT }

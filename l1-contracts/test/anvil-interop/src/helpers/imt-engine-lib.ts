@@ -500,10 +500,31 @@ export function proofTuple(p: ImtProof): unknown[] {
 }
 
 /**
+ * Build the `AtomicFlow` tuple {AtomicFlowManager} consumes (the flow definition). Tuple field order
+ * matches the struct: (flowId, deadline, settlementLayerChainId, legBundleHashes, legSourceChainIds).
+ * `legBundleHashes` is ascending; `chainIds` is positionally aligned; `settlementLayerChainId` defaults
+ * to {DEFAULT_SL_CHAIN_ID}.
+ */
+export function atomicFlowTuple(params: {
+  flowId: string;
+  deadline: number;
+  settlementLayerChainId?: BigNumber | number | string;
+  legBundleHashes: string[];
+  chainIds: (BigNumber | number | string)[];
+}): unknown[] {
+  return [
+    params.flowId,
+    params.deadline,
+    BigNumber.from(params.settlementLayerChainId ?? DEFAULT_SL_CHAIN_ID),
+    params.legBundleHashes,
+    params.chainIds.map((c) => BigNumber.from(c)),
+  ];
+}
+
+/**
  * Build the `AtomicFinalityProof` tuple {InteropHandler.executeAtomicBundle} consumes: the flow
- * definition (flowId, deadline, settlementLayerChainId, ascending legBundleHashes + positionally-aligned
- * chainIds) plus one inclusion proof per leg, in `legBundleHashes` order. Tuple field order:
- *   (flowId, deadline, settlementLayerChainId, legBundleHashes, legSourceChainIds, proofs).
+ * definition ({AtomicFlow}) plus one inclusion proof per leg, in `legBundleHashes` order. Tuple field
+ * order matches the struct: (flow, proofs).
  */
 export function atomicFinalityProofTuple(params: {
   flowId: string;
@@ -513,14 +534,7 @@ export function atomicFinalityProofTuple(params: {
   chainIds: (BigNumber | number | string)[];
   proofs: ImtProof[];
 }): unknown[] {
-  return [
-    params.flowId,
-    params.deadline,
-    BigNumber.from(params.settlementLayerChainId ?? DEFAULT_SL_CHAIN_ID),
-    params.legBundleHashes,
-    params.chainIds.map((c) => BigNumber.from(c)),
-    params.proofs.map(proofTuple),
-  ];
+  return [atomicFlowTuple(params), params.proofs.map(proofTuple)];
 }
 
 /**
