@@ -23,13 +23,11 @@ import {
     L2_BRIDGEHUB_ADDR,
     L2_ASSET_ROUTER_ADDR,
     L2_MESSAGE_ROOT_ADDR,
-    L2_CHAIN_ASSET_HANDLER_ADDR,
-    L2_ASSET_TRACKER_ADDR
+    L2_CHAIN_ASSET_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {
     CoreDeployedAddresses,
@@ -77,16 +75,10 @@ library AddressIntrospector {
         address ctmDeploymentTrackerProxy = address(_bridgehub.l1CtmDeployer());
         address chainAssetHandler = _bridgehub.chainAssetHandler();
 
-        // chainRegistrationSender and assetTracker only available post-V29
+        // chainRegistrationSender is only available post-V29
         address chainRegistrationSenderAddr = address(0);
-        address assetTrackerAddr = address(0);
         if (!isV29) {
             chainRegistrationSenderAddr = IBridgehubBase(bridgehubProxy).chainRegistrationSender();
-
-            // Get assetTracker from NTV via assetRouter
-            address assetRouter = address(_bridgehub.assetRouter());
-            address ntvProxy = address(IL1AssetRouter(assetRouter).nativeTokenVault());
-            assetTrackerAddr = address(IL1NativeTokenVault(ntvProxy).l1AssetTracker());
         }
 
         BridgehubContracts memory proxies = BridgehubContracts({
@@ -94,16 +86,14 @@ library AddressIntrospector {
             messageRoot: messageRoot,
             ctmDeploymentTracker: ctmDeploymentTrackerProxy,
             chainAssetHandler: chainAssetHandler,
-            chainRegistrationSender: chainRegistrationSenderAddr,
-            assetTracker: assetTrackerAddr
+            chainRegistrationSender: chainRegistrationSenderAddr
         });
         BridgehubContracts memory implementations = BridgehubContracts({
             bridgehub: Utils.getImplementation(bridgehubProxy),
             messageRoot: Utils.getImplementation(messageRoot),
             ctmDeploymentTracker: Utils.getImplementation(ctmDeploymentTrackerProxy),
             chainAssetHandler: Utils.getImplementation(chainAssetHandler),
-            chainRegistrationSender: address(0),
-            assetTracker: isV29 ? address(0) : Utils.getImplementation(assetTrackerAddr)
+            chainRegistrationSender: address(0)
         });
         info = BridgehubAddresses({proxies: proxies, implementations: implementations});
     }
@@ -117,8 +107,7 @@ library AddressIntrospector {
             messageRoot: L2_MESSAGE_ROOT_ADDR,
             ctmDeploymentTracker: ctmDeploymentTrackerProxy,
             chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
-            chainRegistrationSender: address(0),
-            assetTracker: L2_ASSET_TRACKER_ADDR
+            chainRegistrationSender: address(0)
         });
         BridgehubContracts memory implementations;
         info = BridgehubAddresses({proxies: proxies, implementations: implementations});

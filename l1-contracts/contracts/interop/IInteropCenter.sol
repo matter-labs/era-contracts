@@ -3,13 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {
-    BalanceChange,
-    BundleAttributes,
-    CallAttributes,
-    InteropBundle,
-    InteropCallStarter
-} from "../common/Messaging.sol";
+import {BundleAttributes, CallAttributes, InteropBundle, InteropCallStarter} from "../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -17,7 +11,6 @@ interface IInteropCenter {
     event InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle interopBundle);
 
     event NewAssetRouter(address indexed oldAssetRouter, address indexed newAssetRouter);
-    event NewAssetTracker(address indexed oldAssetTracker, address indexed newAssetTracker);
 
     /// @notice Emitted when the interop protocol fee is updated.
     event InteropFeeUpdated(uint256 indexed oldFee, uint256 indexed newFee);
@@ -129,12 +122,10 @@ interface IInteropCenter {
     /// @param _chainId Target chain ID.
     /// @param _canonicalTxHash Canonical L1 transaction hash.
     /// @param _expirationTimestamp Deprecated, always 0.
-    /// @param _balanceChange Balance change for the transaction.
-    function forwardTransactionOnGatewayWithBalanceChange(
+    function forwardTransactionOnGateway(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp,
-        BalanceChange calldata _balanceChange
+        uint64 _expirationTimestamp
     ) external;
 
     /// @notice Sends an interop bundle.

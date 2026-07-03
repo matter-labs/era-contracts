@@ -82,7 +82,6 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
     uint256 internal gatewayChainId;
     bytes internal forceDeploymentsData;
-    uint256 internal gatewaySettlementFee;
 
     address internal serverNotifier;
     address internal refundRecipient;
@@ -102,7 +101,6 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
         gatewayChainId = toml.readUint("$.gateway_chain_id");
         forceDeploymentsData = toml.readBytes(".force_deployments_data");
-        gatewaySettlementFee = toml.readUint("$.gateway_settlement_fee");
 
         setAddressesBasedOnBridgehub(ctmRepresentativeChainId, bridgehubProxy);
         // Get eraChainId from AssetRouter
@@ -340,8 +338,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 _gatewayRollupDAManager: output.rollupDAManager,
                 _gatewayValidatorTimelock: output.gatewayStateTransition.proxies.validatorTimelock,
                 _gatewayServerNotifier: output.gatewayStateTransition.proxies.serverNotifier,
-                _refundRecipient: refundRecipient,
-                _gatewaySettlementFee: gatewaySettlementFee
+                _refundRecipient: refundRecipient
             })
         );
 

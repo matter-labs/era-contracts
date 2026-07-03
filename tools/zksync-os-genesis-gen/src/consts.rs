@@ -72,10 +72,6 @@ pub const L2_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal:
     "000000000000000000000000000000000001000f"
 )));
 
-pub const GW_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
-    "0000000000000000000000000000000000010010"
-)));
-
 pub const L2_BASE_TOKEN_HOLDER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000010011"
 )));
@@ -180,10 +176,6 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 22] = [
     (
         L2_ASSET_TRACKER_ADDR,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2AssetTracker")),
-    ),
-    (
-        GW_ASSET_TRACKER_ADDR,
-        ContractDeployment::SystemProxy(ContractSource::L1ContractName("GWAssetTracker")),
     ),
     (
         L2_INTEROP_CENTER_ADDR,

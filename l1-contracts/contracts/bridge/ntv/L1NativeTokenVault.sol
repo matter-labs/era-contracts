@@ -15,8 +15,6 @@ import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
-import {IL1AssetTracker} from "../asset-tracker/IL1AssetTracker.sol";
-import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {IWETH9} from "../interfaces/IWETH9.sol";
 
@@ -57,16 +55,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev L1 nullifier contract that handles finalize withdrawal and confirm l2 tx mappings
     IL1Nullifier public immutable L1_NULLIFIER;
 
-    /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
-    ///      This mapping was deprecated in favor of AssetTracker component, now it will be responsible for tracking chain balances.
+    /// @dev Maps token balances for each chain. Deprecated: per-chain balance accounting was removed;
+    ///      correctness of transfers is guaranteed by ZK proofs (plus 2FA on ZKsync OS chains).
     ///      We have a `chainBalance` function now, which returns the values in this mapping, for backwards compatibility.
     // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) internal DEPRECATED_chainBalance;
-
-    /// @notice AssetTracker component address on L1. On L2 the address is L2_ASSET_TRACKER_ADDR.
-    ///         It adds one more layer of security on top of cross chain communication.
-    ///         Refer to its documentation for more details.
-    IL1AssetTracker public l1AssetTracker;
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
@@ -100,11 +93,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return DEPRECATED_chainBalance[_chainId][_assetId];
     }
 
-    /// @dev Returns the AssetTracker component address on L1.
-    function _assetTracker() internal view override returns (IAssetTrackerBase) {
-        return IAssetTrackerBase(address(l1AssetTracker));
-    }
-
     /*//////////////////////////////////////////////////////////////
                             Initialization
     //////////////////////////////////////////////////////////////*/
@@ -136,13 +124,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     function registerEthToken() external {
         require(assetId[ETH_TOKEN_ADDRESS] == bytes32(0), AssetIdAlreadyRegistered());
         _unsafeRegisterNativeToken(ETH_TOKEN_ADDRESS);
-    }
-
-    /// @dev Function used to set AssetTracker component address.
-    ///      Only callable by owner.
-    /// @param _l1AssetTracker The address of the AssetTracker component.
-    function setAssetTracker(address _l1AssetTracker) external onlyOwner {
-        l1AssetTracker = IL1AssetTracker(_l1AssetTracker);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -199,11 +180,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         (uint256 _amount, , ) = DataEncoding.decodeBridgeBurnData(_data);
         address l1Token = tokenAddress[_assetId];
         require(_amount != 0, NoFundsTransferred());
-
-        // IMPORTANT: We must handle chain balance decrease before giving out funds to the user,
-        // because otherwise the latter operation (via a malicious token or ETH recipient)
-        // could've overwritten the transient values from L1Nullifier.
-        _handleBridgeFromChain({_chainId: _chainId, _assetId: _assetId, _amount: _amount});
 
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
@@ -267,13 +243,5 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(bridgedTokenBeacon, ""))
         );
         return BeaconProxy(payable(proxyAddress));
-    }
-
-    function _handleBridgeToChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
-        l1AssetTracker.handleChainBalanceIncreaseOnL1(_chainId, _assetId, _amount, _getOriginChainId(_assetId));
-    }
-
-    function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
-        l1AssetTracker.handleChainBalanceDecreaseOnL1({_chainId: _chainId, _assetId: _assetId, _amount: _amount});
     }
 }

@@ -13,7 +13,6 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {
-    GW_ASSET_TRACKER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -35,7 +34,6 @@ import {Call} from "contracts/governance/Common.sol";
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
-import {IGWAssetTracker} from "contracts/bridge/asset-tracker/IGWAssetTracker.sol";
 
 abstract contract GatewayGovernanceUtils is Script {
     struct GatewayGovernanceConfig {
@@ -53,7 +51,6 @@ abstract contract GatewayGovernanceUtils is Script {
         address _gatewayValidatorTimelock;
         address _gatewayServerNotifier;
         address _refundRecipient;
-        uint256 _gatewaySettlementFee;
     }
 
     GatewayGovernanceConfig internal _gatewayGovernanceConfig;
@@ -241,26 +238,5 @@ abstract contract GatewayGovernanceUtils is Script {
             );
         }
 
-        {
-            bytes memory data = abi.encodeCall(
-                IGWAssetTracker.setGatewaySettlementFee,
-                (prepareGWGovCallsStruct._gatewaySettlementFee)
-            );
-
-            calls = Utils.mergeCalls(
-                calls,
-                Utils.prepareGovernanceL1L2DirectTransaction(
-                    prepareGWGovCallsStruct._l1GasPrice,
-                    data,
-                    Utils.MAX_PRIORITY_TX_GAS,
-                    new bytes[](0),
-                    GW_ASSET_TRACKER_ADDR,
-                    _gatewayGovernanceConfig.gatewayChainId,
-                    _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    prepareGWGovCallsStruct._refundRecipient
-                )
-            );
-        }
     }
 }

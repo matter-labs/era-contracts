@@ -39,7 +39,6 @@ import {
 } from "../../common/L1ContractErrors.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
-import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -109,8 +108,6 @@ abstract contract NativeTokenVaultBase is
         require(msg.sender == address(_assetRouter()), Unauthorized(msg.sender));
         _;
     }
-
-    function _assetTracker() internal view virtual returns (IAssetTrackerBase);
 
     function originToken(bytes32 _assetId) public view virtual returns (address) {
         address token = tokenAddress[_assetId];
@@ -191,8 +188,8 @@ abstract contract NativeTokenVaultBase is
     /// - metadata not being verified is a known issue and will be addressed in the future releases. In the short term, we only expect
     /// chains with decently trusted chain type managers. This issue might affect the user experience, but never lead
     /// to loss of funds.
-    /// - To ensure no loss of funds, L1NativeTokenVault should track the balances using L1AssetTracker, while the L2NativeTokenVault trusts
-    /// the GWAssetTracker to track balances in case of interops and its L1 implementation to provide the valid data for `bridgeMint` in case of deposits.
+    /// - Correctness of the minted amounts is guaranteed by the ZK proofs of the sending chain
+    /// (plus 2FA on ZKsync OS chains); there is no on-chain per-chain balance enforcement.
     function bridgeMint(
         uint256 _chainId,
         bytes32 _assetId,
@@ -459,9 +456,17 @@ abstract contract NativeTokenVaultBase is
         );
     }
 
-    function _handleBridgeToChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual;
+    /// @dev Chain-local asset tracker hook invoked when funds are bridged out towards `_chainId`.
+    /// @dev On L2 this records outbound amounts in the L2AssetTracker. On L1 there is no asset
+    /// tracker, so the default implementation is a no-op.
+    // solhint-disable-next-line no-empty-blocks
+    function _handleBridgeToChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual {}
 
-    function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual;
+    /// @dev Chain-local asset tracker hook invoked when funds bridged from `_chainId` are finalized here.
+    /// @dev On L2 this records inbound amounts in the L2AssetTracker. On L1 there is no asset
+    /// tracker, so the default implementation is a no-op.
+    // solhint-disable-next-line no-empty-blocks
+    function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual {}
 
     /*//////////////////////////////////////////////////////////////
                             TOKEN DEPLOYER FUNCTIONS
@@ -524,10 +529,16 @@ abstract contract NativeTokenVaultBase is
         _addTokenToTokensList(_assetId);
         // Note, that it might be possible that the token is registered on the asset tracker, but not on the
         // native token vault. An example is when a token is automatically registered for a token that is native to L2
-        // and moves its balance to ZK Gateway in order to use it for interop (i.e. registration got triggered, but the native
-        // token vault was never called since there was no actual withdrawal of the asset).
-        _assetTracker().registerNewTokenIfNeeded(_assetId, _originChainId);
+        // (i.e. registration got triggered, but the native token vault was never called since there was no actual
+        // withdrawal of the asset).
+        _registerTokenInAssetTracker(_assetId, _originChainId);
     }
+
+    /// @dev Registers the token in the chain-local asset tracker, if one exists.
+    /// @dev On L2 this records the token in the L2AssetTracker (total-supply / outbound bookkeeping).
+    /// On L1 there is no asset tracker, so the default implementation is a no-op.
+    // solhint-disable-next-line no-empty-blocks
+    function _registerTokenInAssetTracker(bytes32 _assetId, uint256 _originChainId) internal virtual {}
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.
     /// @param _tokenOriginChainId The chain id of the origin token.
@@ -581,7 +592,6 @@ abstract contract NativeTokenVaultBase is
 
     /// @dev This pausability is inherited by both L1 and L2 vaults through the shared base.
     /// @dev On L1 it is part of the emergency controls for asset movement.
-    /// Interop-specific emergency handling is expected to happen at the Gateway layer in GWAssetTracker.
     /// On L2 it is kept only for legacy/shared-code reasons and should not be used as an emergency mechanism.
     /// Future L2 logic should rely on the L1/GW freeze flow instead of local pausability.
     /// @notice Pauses all functions marked with the `whenNotPaused` modifier.

@@ -133,9 +133,6 @@ address payable constant L2_INTEROP_HANDLER_ADDR = payable(address(BUILT_IN_CONT
 /// @dev the address of the L2 asset tracker
 address constant L2_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0f);
 
-/// @dev the address of the GW asset tracker
-address constant GW_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x10);
-
 /// @dev The address of the base token holder contract that holds chain's base token reserves.
 address constant L2_BASE_TOKEN_HOLDER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x11);
 

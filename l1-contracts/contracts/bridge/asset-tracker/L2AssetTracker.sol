@@ -4,18 +4,14 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
-import {L1ToGatewayTokenBalanceMigrationData, MigrationConfirmationData} from "../../common/Messaging.sol";
+import {IAssetTrackerBase, SavedTotalSupply, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
 import {
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
-    L2_BRIDGEHUB,
-    L2_CHAIN_ASSET_HANDLER,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_NATIVE_TOKEN_VAULT,
     L2_NATIVE_TOKEN_VAULT_ADDR,
-    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
-    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
+    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
@@ -24,16 +20,12 @@ import {
     AssetAlreadyRegistered,
     AssetIdNotRegistered,
     BaseTokenTotalSupplyBackfillNotNeeded,
-    BaseTokenTotalSupplyBackfillRequired,
     ChainBalanceMustBeZeroBeforeMigration,
     MissingBaseTokenAssetId,
-    OnlyGatewaySettlementLayer,
-    TokenBalanceNotMigratedToGateway,
     TotalPreV31SupplyNotSaved,
     TotalPreV31SupplyShouldBeZero
 } from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
-import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 
 contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
@@ -96,13 +88,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _;
     }
 
-    modifier onlyChain(uint256 _chainId) {
-        if (msg.sender != L2_BRIDGEHUB.getZKChain(_chainId)) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
     /// @notice Backfills the base token's pre-V31 total supply for ZKOS chains.
     /// @dev Called by L2BaseTokenZKOS.setZKsyncOSPreV31TotalSupply() after setting the total supply.
     /// @param _amount The pre-V31 total supply amount.
@@ -151,7 +136,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     }
 
     /// @inheritdoc AssetTrackerBase
-    function registerNewTokenIfNeeded(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
+    function registerNewTokenIfNeeded(
+        bytes32 _assetId,
+        uint256 _originChainId
+    ) public override(AssetTrackerBase, IAssetTrackerBase) onlyNativeTokenVault {
         if (isAssetRegistered[_assetId]) {
             return;
         }
@@ -233,7 +221,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         address tokenAddress = _tryGetTokenAddress(_assetId);
         _registerLegacyTokenIfNeeded(_assetId, tokenAddress);
 
-        _checkAssetMigrationNumber(_assetId);
         if (_tokenOriginChainId == block.chainid) {
             /// On the L2 we only save chainBalance for native tokens.
             _decreaseChainBalance(block.chainid, _assetId, _amount);
@@ -245,21 +232,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         ) {
             interopInfo[_assetId].totalWithdrawalsToL1 += _amount;
         }
-    }
-
-    /// @notice This function is used to check the asset migration number.
-    /// @dev This is used to pause outgoing withdrawals and interop transactions after the chain migrates to Gateway.
-    function _checkAssetMigrationNumber(bytes32 _assetId) internal view {
-        uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
-        uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
-        /// Note we always allow bridging when settling on L1.
-        /// On Gateway we require that the tokenBalance be migrated to Gateway from L1,
-        /// otherwise withdrawals might fail in the GWAssetTracker when the chain settles.
-        require(
-            savedAssetMigrationNumber == migrationNumber ||
-                L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == _l1ChainId(),
-            TokenBalanceNotMigratedToGateway(_assetId, savedAssetMigrationNumber, migrationNumber)
-        );
     }
 
     /// @notice Handles the initiation of base token bridging operations on L2.
@@ -303,10 +275,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         address _tokenAddress
     ) internal {
         _registerLegacyTokenIfNeeded(_assetId, _tokenAddress);
-
-        if (_needToForceSetAssetMigrationOnL2(_assetId, _isNativeToThisChain, _tokenAddress)) {
-            _forceSetAssetMigrationNumber(block.chainid, _assetId);
-        }
 
         /// On the L2 we only save chainBalance for native tokens.
         if (_isNativeToThisChain) {
@@ -399,106 +367,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    Gateway related token balance migration
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Migrates the token balance from L1 to Gateway.
-    /// @dev This function can be called multiple times on the chain it does not have a direct effect.
-    /// @dev This function is permissionless, it does not affect the state of the contract substantially, and can be called multiple times.
-    /// @dev The value to migrate is read from the L2, but the tracking is done on L1/GW.
-    function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external {
-        require(
-            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
-            OnlyGatewaySettlementLayer()
-        );
-
-        address tokenAddress = _tryGetTokenAddress(_assetId);
-        uint256 readTotalPreV31TotalSupply = _registerLegacyTokenIfNeeded(_assetId, tokenAddress);
-        // Formally we could forbid the migration only for the base token in such case,
-        // but for the ease we'll just forbid any migration until the chain has backfilled the token.
-        if (needBaseTokenTotalSupplyBackfill) {
-            revert BaseTokenTotalSupplyBackfillRequired();
-        }
-
-        uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);
-        address originalToken = L2_NATIVE_TOKEN_VAULT.originToken(_assetId);
-
-        uint256 chainMigrationNumber = _getChainMigrationNumber(block.chainid);
-        uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
-        if (chainMigrationNumber == savedAssetMigrationNumber) {
-            /// In this case the token was either already migrated, or the migration number was set using _forceSetAssetMigrationNumber.
-            return;
-        }
-
-        L1ToGatewayTokenBalanceMigrationData memory tokenBalanceMigrationData = L1ToGatewayTokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
-            originToken: originalToken,
-            chainId: block.chainid,
-            assetId: _assetId,
-            tokenOriginChainId: originChainId,
-            chainMigrationNumber: chainMigrationNumber,
-            assetMigrationNumber: savedAssetMigrationNumber,
-            totalWithdrawalsToL1: interopInfo[_assetId].totalWithdrawalsToL1,
-            totalSuccessfulDepositsFromL1: interopInfo[_assetId].totalSuccessfulDepositsFromL1,
-            totalPreV31TotalSupply: readTotalPreV31TotalSupply
-        });
-        _sendL1ToGatewayMigrationDataToL1(tokenBalanceMigrationData);
-
-        emit IL2AssetTracker.L1ToGatewayMigrationInitiated(_assetId, block.chainid);
-    }
-
-    /// @notice Confirms a migration operation has been completed and updates the asset migration number.
-    /// @dev This function is called by L1 after a migration has been processed to update local state.
-    /// @param _data The migration confirmation data containing the asset ID and migration number.
-    function confirmMigrationOnL2(MigrationConfirmationData calldata _data) external onlyServiceTransactionSender {
-        assetMigrationNumber[block.chainid][_data.assetId] = _data.assetMigrationNumber;
-    }
-
-    /// @notice Sends L1 -> Gateway migration data to L1 through the L2->L1 messenger.
-    /// @param _data The migration payload.
-    function _sendL1ToGatewayMigrationDataToL1(L1ToGatewayTokenBalanceMigrationData memory _data) internal {
-        // slither-disable-next-line unused-return,reentrancy-no-eth
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
-            abi.encodeCall(IAssetTrackerDataEncoding.receiveL1ToGatewayMigrationOnL1, _data)
-        );
-    }
-
-    /*//////////////////////////////////////////////////////////////
                             Helper Functions
     //////////////////////////////////////////////////////////////*/
-
-    /// @notice Determines if a token's migration number should be force-set during bridging operations.
-    /// @dev IMPORTANT: All callers of handleFinalizeBaseTokenBridgingOnL2 MUST invoke the asset tracker
-    /// @dev BEFORE changing totalSupply/balances. This ensures totalSupply() == 0 is a reliable proxy
-    /// @dev for "no deposits have been finalized yet", giving uniform behavior for both base tokens and
-    /// @dev ERC20 tokens. The same ordering must be enforced in zksync-os.
-    /// @param _assetId The asset ID of the token to check.
-    /// @param _isNativeToThisChain Whether the asset should be accounted as native to this chain.
-    /// @param _tokenAddress The contract address of the token on this chain.
-    /// @return bool True if the migration number should be force-set, false otherwise.
-    function _needToForceSetAssetMigrationOnL2(
-        bytes32 _assetId,
-        bool _isNativeToThisChain,
-        address _tokenAddress
-    ) internal view returns (bool) {
-        // We never force set the migration number for tokens native to the chain
-        if (_isNativeToThisChain) {
-            return false;
-        }
-        // We never force set the migration number for the base token the total supply of which needs backfilling,
-        // since then the `totalSupply` would revert.
-        if (needBaseTokenTotalSupplyBackfill && _tokenAddress == address(L2_BASE_TOKEN_SYSTEM_CONTRACT)) {
-            return false;
-        }
-        uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
-        if (savedAssetMigrationNumber != 0) {
-            return false;
-        }
-
-        // This works uniformly for both base tokens and ERC20 tokens because the asset tracker
-        // is always notified before totalSupply changes.
-        return IERC20(_tokenAddress).totalSupply() == 0;
-    }
 
     /// @notice Retrieves the token contract address for a given asset ID.
     /// @param _assetId The asset ID to look up.
@@ -506,9 +376,5 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     function _tryGetTokenAddress(bytes32 _assetId) internal view returns (address tokenAddress) {
         tokenAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
         require(tokenAddress != address(0), AssetIdNotRegistered(_assetId));
-    }
-
-    function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
-        return L2_CHAIN_ASSET_HANDLER.migrationNumber(_chainId);
     }
 }

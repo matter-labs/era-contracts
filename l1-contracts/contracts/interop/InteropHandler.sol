@@ -10,7 +10,6 @@ import {
     L2_NATIVE_TOKEN_VAULT,
     L2_MESSAGE_VERIFICATION,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
-    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
     L2_COMPLEX_UPGRADER_ADDR
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
@@ -22,7 +21,6 @@ import {
     CallStatus,
     InteropBundle,
     InteropCall,
-    InteropCallExecutedMessage,
     MessageInclusionProof
 } from "../common/Messaging.sol";
 import {IERC7786Recipient} from "./IERC7786Recipient.sol";
@@ -46,7 +44,6 @@ import {
     InvalidInteropCallVersion
 } from "./InteropErrors.sol";
 import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
-import {IAssetTrackerDataEncoding} from "../bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 
 /// @title InteropHandler
 /// @author Matter Labs
@@ -78,8 +75,7 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
 
     /// @inheritdoc IInteropHandler
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
-        // Interop claiming requires the chain to settle on Gateway so that GWAssetTracker can process
-        // the execution confirmation and move balances from pendingInteropBalance to chainBalance.
+        // Interop is only supported while the chain settles on Gateway (not on L1).
         // We read the chain's current settlement layer from `SystemContext` (kept in sync with each
         // batch's bootloader-driven `setSettlementLayerChainId` call); the analogous mapping on the
         // chain's own `L2Bridgehub` is only written for chains that *settle on this Bridgehub*
@@ -166,8 +162,7 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
 
     /// @inheritdoc IInteropHandler
     function unbundleBundle(bytes memory _bundle, CallStatus[] calldata _providedCallStatus) public {
-        // Interop claiming requires the chain to settle on Gateway so that GWAssetTracker can process
-        // the execution confirmation and move balances from pendingInteropBalance to chainBalance.
+        // Interop is only supported while the chain settles on Gateway (not on L1).
         // See `executeBundle` for why this reads `SystemContext` rather than `L2_BRIDGEHUB`.
         require(
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
@@ -244,26 +239,6 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
                             Internal functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Sends an L2→L1 message for a single successfully executed interop call.
-    /// @dev Called inside _executeCalls for each executed call so GWAssetTracker can move the call's
-    /// balances from pendingInteropBalance to chainBalance during the next settlement.
-    /// @param _destinationBaseTokenAssetId Asset ID of the destination chain's base token.
-    /// @param _interopCall The interop call that was executed.
-    function _sendCallExecutedMessage(bytes32 _destinationBaseTokenAssetId, InteropCall memory _interopCall) internal {
-        // slither-disable-next-line unused-return
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
-            abi.encodeCall(
-                IAssetTrackerDataEncoding.receiveInteropCallExecuted,
-                (
-                    InteropCallExecutedMessage({
-                        destinationBaseTokenAssetId: _destinationBaseTokenAssetId,
-                        interopCall: _interopCall
-                    })
-                )
-            )
-        );
-    }
-
     /// @notice Decode an ABI-encoded bundle, compute its hash, and fetch its current status.
     /// @param _bundle ABI-encoded InteropBundle.
     /// @return interopBundle The decoded InteropBundle struct.
@@ -314,10 +289,6 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
                 payload: interopCall.data
             }); // attributes are not supported yet
             require(selector == IERC7786Recipient.receiveMessage.selector, InvalidSelector(selector));
-
-            // Notify GWAssetTracker of this successfully executed call so it can move the call's balances
-            // from pendingInteropBalance to chainBalance during the next settlement.
-            _sendCallExecutedMessage(_interopBundle.destinationBaseTokenAssetId, interopCall);
         }
     }
 
@@ -328,9 +299,10 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
     /// That message gets sent to L1 by origin chain in InteropCenter contract, and is picked up and included in receiving chain by sequencer.
     function _verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bytes32 _bundleHash) internal {
         // Verify that the message came from the legitimate InteropCenter.
-        // It is expected that all allowed messages have gone through the GWAssetTracker which
-        // ensured that if the `L2_INTEROP_CENTER_ADDR` is the sender of the message, then the message
-        // corresponds to a bundle with the valid balance changes.
+        // The bundle is authenticated solely by message inclusion plus the sender being the
+        // canonical `L2_INTEROP_CENTER_ADDR`. Asset correctness across chains is guaranteed by ZK
+        // proofs (assuming proofs are correct and chains are not malicious), so no on-chain
+        // per-chain balance reconciliation is performed here.
         require(
             _proof.message.sender == L2_INTEROP_CENTER_ADDR,
             UnauthorizedMessageSender(L2_INTEROP_CENTER_ADDR, _proof.message.sender)
