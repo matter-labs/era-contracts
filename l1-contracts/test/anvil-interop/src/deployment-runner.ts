@@ -716,8 +716,7 @@ export class DeploymentRunner {
       throw new Error(`addresses.json not found in ${stateDir}`);
     }
     const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf-8"));
-    const { l1Addresses, ctmAddresses, chainAddresses, testTokens, customBaseTokens, zkToken } =
-      addresses;
+    const { l1Addresses, ctmAddresses, chainAddresses, testTokens, customBaseTokens, zkToken } = addresses;
 
     // Decompress hex-gzip state files to native JSON for --load-state CLI.
     // This is more portable than anvil_loadState RPC across anvil versions.
@@ -960,8 +959,6 @@ export class DeploymentRunner {
 
     return result;
   }
-
-
 }
 
 export interface DeployAndSetupOptions {

@@ -12,10 +12,7 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
-import {
-    L2_BRIDGEHUB_ADDR,
-    L2_CHAIN_ASSET_HANDLER_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "../utils/Utils.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -237,6 +234,5 @@ abstract contract GatewayGovernanceUtils is Script {
                 )
             );
         }
-
     }
 }

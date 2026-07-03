@@ -68,7 +68,6 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
 

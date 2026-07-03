@@ -148,7 +148,6 @@ abstract contract SettlementLayerV31UpgradeTestBase is BaseUpgrade {
             abi.encode(mockNativeTokenVault)
         );
 
-
         // Mock bridgehub.baseTokenAssetId
         vm.mockCall(
             mockBridgehub,

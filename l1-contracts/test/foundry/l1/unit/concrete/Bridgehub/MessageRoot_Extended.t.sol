@@ -20,10 +20,7 @@ import {
     TotalBatchesExecutedZero
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
-import {
-    L2_BRIDGEHUB_ADDR,
-    L2_COMPLEX_UPGRADER_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {ProofData} from "contracts/common/Messaging.sol";
 

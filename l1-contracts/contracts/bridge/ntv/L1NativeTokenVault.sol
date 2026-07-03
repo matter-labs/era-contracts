@@ -169,7 +169,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     ///  @inheritdoc IL1AssetHandler
     function bridgeConfirmTransferResult(
-        uint256 _chainId,
+        uint256, // _chainId
         TxStatus _txStatus,
         bytes32 _assetId,
         address _depositSender,

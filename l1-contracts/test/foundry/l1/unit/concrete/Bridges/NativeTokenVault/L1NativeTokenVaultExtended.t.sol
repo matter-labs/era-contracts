@@ -130,7 +130,6 @@ contract L1NativeTokenVaultExtendedTest is Test {
             abi.encode()
         );
 
-
         l1NTV.registerEthToken();
 
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
@@ -176,8 +175,6 @@ contract L1NativeTokenVaultExtendedTest is Test {
     function test_BridgeConfirmTransferResult_RevertWhen_NoFundsTransferred() public {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
         bytes memory data = abi.encode(uint256(0), address(0), address(0)); // 0 amount
-
-
 
         vm.mockCall(
             assetRouter,
