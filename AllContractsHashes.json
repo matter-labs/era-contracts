@@ -861,23 +861,23 @@
   },
   {
     "contractName": "l1-contracts/ChainAdmin",
-    "zkBytecodeHash": "0x0100019d704733510d6c6801ddd78c7e77826af355d3da99f30cad5849b84a15",
+    "zkBytecodeHash": "0x0100017f50b3c8f40e0da79ea4fc1fecbd00563b0a2105f532c2d17f4ea0b6e7",
     "zkBytecodePath": "/l1-contracts/zkout/ChainAdmin.sol/ChainAdmin.json",
-    "evmBytecodeHash": "0xd3ef50ebbc197c147d2dbd4c77f4db6508876500880e71fb1b282ecb41faaf90",
+    "evmBytecodeHash": "0x1fe4ad4218b5cd92deb42f2df973b0ad90d4b03cfdfaa7cb95364021b58faf14",
     "evmBytecodePath": "/l1-contracts/out/ChainAdmin.sol/ChainAdmin.json",
-    "evmDeployedBytecodeHash": "0x06350d5ca1b9b58577d90da66734204ad01de09914355404e9297bbffdb05ed8",
-    "evmDeployedBytecodeBlakeHash": "0xf4fd81d207b54f695bf74b1f9f450babcefaed6e8a9916d3bed847a77f2ce64f",
-    "evmDeployedBytecodeLength": 3805
+    "evmDeployedBytecodeHash": "0x73efb2b95aceb044d9fd717a7cb63f7103afc64b2fb3a0a8706efeb28fc050f4",
+    "evmDeployedBytecodeBlakeHash": "0xae5c939b02ce32440d7e32ea2c42f8a80547ffbc08d9ec5695fa64be3240f198",
+    "evmDeployedBytecodeLength": 3453
   },
   {
     "contractName": "l1-contracts/ChainAdminOwnable",
-    "zkBytecodeHash": "0x010001236483a1f3dd83cdad4782f0897e1ba3816dd28ea34c4259662ea45456",
+    "zkBytecodeHash": "0x010001094c5e24cc8e4d857cf3b5ad341186537035109802a5479a263d22272d",
     "zkBytecodePath": "/l1-contracts/zkout/ChainAdminOwnable.sol/ChainAdminOwnable.json",
-    "evmBytecodeHash": "0x71e56229c69a00801d31626bdd7440713570822afb65af2e9e25cc947b8b2e1d",
+    "evmBytecodeHash": "0x49f6fd1702cc26f4fb6991e7ac0195e0fd32263297ba8622f2731b5fed653454",
     "evmBytecodePath": "/l1-contracts/out/ChainAdminOwnable.sol/ChainAdminOwnable.json",
-    "evmDeployedBytecodeHash": "0x900211146d507cc99ace6edc7f4e2639a72a7db64a8842e5d5b86e99d6d8b218",
-    "evmDeployedBytecodeBlakeHash": "0xefcfe5806c9eb0844d13f8d755b668f88df9830cb7a53da2618892dcb25d5bce",
-    "evmDeployedBytecodeLength": 3274
+    "evmDeployedBytecodeHash": "0x25e11a485e2357790cf3eaf95a0338139c1f72ce7fdb26007f39345c26c2aa91",
+    "evmDeployedBytecodeBlakeHash": "0x94b470091a4f40a65d2bc68698a30870b83345f5508d4bf3b1bff2609a1f83e4",
+    "evmDeployedBytecodeLength": 2948
   },
   {
     "contractName": "l1-contracts/ChainRegistrationSender",
@@ -1461,13 +1461,13 @@
   },
   {
     "contractName": "l1-contracts/L2AdminFactory",
-    "zkBytecodeHash": "0x010000bb22989ac433c907cb8095a0120b07d2b47739707c6f41c821ed737f67",
+    "zkBytecodeHash": "0x010000bb4a18c96e37c8870260ecc374ee4e46c3591c262af1bf33919761538d",
     "zkBytecodePath": "/l1-contracts/zkout/L2AdminFactory.sol/L2AdminFactory.json",
-    "evmBytecodeHash": "0x2f85ed77868d44d7e7eeeebe910959838a9375d8b4e7890b13debea12dbfa07a",
+    "evmBytecodeHash": "0xc4ab727122682e78f2f802ca89b3acf73fbb8fe9e5b3785dcd22a180ff133788",
     "evmBytecodePath": "/l1-contracts/out/L2AdminFactory.sol/L2AdminFactory.json",
-    "evmDeployedBytecodeHash": "0x7fd3b5a05b818198e93b488a12bcb1408aea4b3ddc9d6a23be5ae96482fe62de",
-    "evmDeployedBytecodeBlakeHash": "0x0984f1ef048132fe54c5be1ba3d8d7824d8e82aeced507bfbc7cb58a9df4a7f2",
-    "evmDeployedBytecodeLength": 6251
+    "evmDeployedBytecodeHash": "0x506c743060bcbf5aa62896b26454dd4ba53e4efa8d2bb81735cefb875b519038",
+    "evmDeployedBytecodeBlakeHash": "0x2f51001bfe51a99947caa931b628106fb42c3a381ad59528d3ddf3ce08f216d2",
+    "evmDeployedBytecodeLength": 5898
   },
   {
     "contractName": "l1-contracts/L2AssetRouter",
@@ -1761,12 +1761,12 @@
   },
   {
     "contractName": "l1-contracts/PermanentRestriction",
-    "zkBytecodeHash": "0x010003119e330ad449a7104bc15a25c21b9b62a8a1118e77a56dfcb056ebb982",
+    "zkBytecodeHash": "0x01000311304537c7080dd39d1d2efe3880756bfe1a8cb1459aecb87d43e4b26d",
     "zkBytecodePath": "/l1-contracts/zkout/PermanentRestriction.sol/PermanentRestriction.json",
-    "evmBytecodeHash": "0xa07cd345cb2988fd19543a7c65f2c1acd7bd0d2a97ca9fc7e6451b905af30f84",
+    "evmBytecodeHash": "0x1cb5dbd05e1166dfc7c7b391a2ca9fc7034bcb7289932104bd2e97a0aea43562",
     "evmBytecodePath": "/l1-contracts/out/PermanentRestriction.sol/PermanentRestriction.json",
-    "evmDeployedBytecodeHash": "0x44739d16e3569721e4eede1f6da831edf28a3b0ac721ac2664661bb8bd1ec584",
-    "evmDeployedBytecodeBlakeHash": "0x719af669f6b65e8d426c9cfd33f8585fdb465a92cbababfa719e4a74a040d7f0",
+    "evmDeployedBytecodeHash": "0xbed89fb6db232ec2af3371e0df67fc37429c9d4ee7bf6bf4c96274c31b63b354",
+    "evmDeployedBytecodeBlakeHash": "0xc169a18dccc5fad79aa2278f8d281cc5f40d24e909061cab647f91205c9272fe",
     "evmDeployedBytecodeLength": 7907
   },
   {
