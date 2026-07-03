@@ -1017,11 +1017,6 @@
   },
   {
     "type": "error",
-    "name": "NotInGatewayMode",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "NotInitializedReentrancyGuard",
     "inputs": []
   },

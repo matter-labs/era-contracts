@@ -19,9 +19,6 @@ import {CoreDeployedAddresses} from "../../../../deploy-scripts/ecosystem/Deploy
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {CTMDeployedAddresses, Config} from "../../../../deploy-scripts/ctm/DeployCTMUtils.s.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
-import {BUNDLE_IDENTIFIER, BundleAttributes, InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 contract L1ContractDeployer is UtilsCallMockerTest {
     using stdStorage for StdStorage;
@@ -149,25 +146,13 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         bytes32 _assetId,
         bytes memory _transferData
     ) internal view returns (bytes memory) {
-        InteropCall[] memory calls = new InteropCall[](1);
-        calls[0] = InteropCall({
-            version: bytes1(0x01),
-            shadowAccount: false,
-            to: address(addresses.sharedBridge),
-            from: L2_ASSET_ROUTER_ADDR,
-            value: 0,
-            data: abi.encodeCall(AssetRouterBase.finalizeDeposit, (_sourceChainId, _assetId, _transferData))
-        });
-        InteropBundle memory bundle = InteropBundle({
-            version: bytes1(0x01),
-            sourceChainId: _sourceChainId,
-            destinationChainId: block.chainid,
-            destinationBaseTokenAssetId: bytes32(0),
-            interopBundleSalt: bytes32(0),
-            calls: calls,
-            bundleAttributes: BundleAttributes({executionAddress: hex"", unbundlerAddress: hex"", useFixedFee: false})
-        });
-        return abi.encodePacked(BUNDLE_IDENTIFIER, abi.encode(bundle));
+        return
+            DataEncoding.encodeInteropWithdrawalBundleMessage(
+                _sourceChainId,
+                address(addresses.sharedBridge),
+                _assetId,
+                _transferData
+            );
     }
 
     // add this to be excluded from coverage report

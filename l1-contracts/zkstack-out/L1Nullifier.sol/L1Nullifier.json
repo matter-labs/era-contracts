@@ -764,22 +764,6 @@
   },
   {
     "type": "error",
-    "name": "WrongMsgLength",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "length",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "ZeroAddress",
     "inputs": []
   }
