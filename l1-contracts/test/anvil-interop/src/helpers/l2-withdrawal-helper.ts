@@ -5,6 +5,8 @@ import { getAbi } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   ETH_TOKEN_ADDRESS,
+  INTEROP_BUNDLE_TUPLE_TYPE,
+  INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
   FINALIZE_DEPOSIT_SIG,
@@ -239,42 +241,53 @@ export async function finalizeWithdrawalOnL1(
   const settlementLayerChainId = await getSettlementLayerChainId(l1Provider, l1Addresses.bridgehub, pending.chainId);
 
   const isBaseToken = pending.tokenAddress === ETH_TOKEN_ADDRESS;
-  let message: string;
-  let l2Sender: string;
 
-  if (isBaseToken) {
-    // Base-token (ETH) withdrawals go through the InteropCenter like ERC20s. On L1 the finalization
-    // message is the asset-router `finalizeDeposit` format; under the mock proof we reconstruct it with
-    // the L2 asset router as the sender (the L1Nullifier no longer has a base-token-specific sender
-    // branch). The base-token burn data carries an empty original caller / origin token / metadata.
-    const transferData = encodeBridgeMintData(
-      ethers.constants.AddressZero,
-      pending.l1Recipient,
-      ethers.constants.AddressZero,
-      pending.amount,
-      "0x"
-    );
-    const selector = ethers.utils.id(FINALIZE_DEPOSIT_SIG).slice(0, 10);
-    message = ethers.utils.solidityPack(
-      ["bytes4", "uint256", "bytes32", "bytes"],
-      [selector, pending.chainId, pending.assetId, transferData]
-    );
-    l2Sender = L2_ASSET_ROUTER_ADDR;
-  } else {
-    const transferData = encodeBridgeMintData(
-      pending.originalCaller,
-      pending.l1Recipient,
-      pending.tokenAddress,
-      pending.amount,
-      pending.erc20Metadata
-    );
-    const selector = ethers.utils.id(FINALIZE_DEPOSIT_SIG).slice(0, 10);
-    message = ethers.utils.solidityPack(
-      ["bytes4", "uint256", "bytes32", "bytes"],
-      [selector, pending.chainId, pending.assetId, transferData]
-    );
-    l2Sender = L2_ASSET_ROUTER_ADDR;
-  }
+  // Both base-token (ETH) and ERC20 withdrawals go through the InteropCenter: the L1 finalization
+  // message is a single-call InteropBundle emitted by the L2 InteropCenter, wrapping the asset-router
+  // `finalizeDeposit` call targeting the L1 AssetRouter (raw asset-router messages are no longer
+  // accepted by the L1Nullifier). Under the mock proof we reconstruct that bundle here. The base-token
+  // burn data carries an empty original caller / origin token / metadata.
+  const transferData = isBaseToken
+    ? encodeBridgeMintData(
+        ethers.constants.AddressZero,
+        pending.l1Recipient,
+        ethers.constants.AddressZero,
+        pending.amount,
+        "0x"
+      )
+    : encodeBridgeMintData(
+        pending.originalCaller,
+        pending.l1Recipient,
+        pending.tokenAddress,
+        pending.amount,
+        pending.erc20Metadata
+      );
+  const selector = ethers.utils.id(FINALIZE_DEPOSIT_SIG).slice(0, 10);
+  const finalizeCalldata = ethers.utils.hexConcat([
+    selector,
+    ethers.utils.defaultAbiCoder.encode(
+      ["uint256", "bytes32", "bytes"],
+      [pending.chainId, pending.assetId, transferData]
+    ),
+  ]);
+  const l1ChainId = (await l1Provider.getNetwork()).chainId;
+  // Field order mirrors `InteropBundle` / `InteropCall` in contracts/common/Messaging.sol. Only the
+  // fields checked by `DataEncoding.parseInteropWithdrawalBundle` matter (destinationChainId, the
+  // single call's to/from/data); the rest are placeholder values.
+  const interopBundle = [
+    "0x01", // version
+    pending.chainId, // sourceChainId
+    l1ChainId, // destinationChainId
+    ethers.constants.HashZero, // destinationBaseTokenAssetId
+    ethers.constants.HashZero, // interopBundleSalt
+    [["0x01", false, l1Addresses.l1SharedBridge, L2_ASSET_ROUTER_ADDR, 0, finalizeCalldata]], // calls
+    ["0x", "0x", false], // bundleAttributes (executionAddress, unbundlerAddress, useFixedFee)
+  ];
+  const message = ethers.utils.hexConcat([
+    "0x01", // BUNDLE_IDENTIFIER
+    ethers.utils.defaultAbiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]),
+  ]);
+  const l2Sender = INTEROP_CENTER_ADDR;
 
   const merkleProof = buildWithdrawalMerkleProof(settlementLayerChainId);
 

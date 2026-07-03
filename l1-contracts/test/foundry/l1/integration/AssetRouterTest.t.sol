@@ -23,7 +23,7 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/co
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 
@@ -178,14 +178,9 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
                 chainId: chainId,
                 l2BatchNumber: 1,
                 l2MessageIndex: 1,
-                l2Sender: L2_ASSET_ROUTER_ADDR,
+                l2Sender: L2_INTEROP_CENTER_ADDR,
                 l2TxNumberInBatch: 1,
-                message: abi.encodePacked(
-                    AssetRouterBase.finalizeDeposit.selector,
-                    chainId,
-                    l2TokenAssetId,
-                    transferData
-                ),
+                message: _encodeWithdrawalBundleMessage(chainId, l2TokenAssetId, transferData),
                 merkleProof: new bytes32[](0)
             })
         );

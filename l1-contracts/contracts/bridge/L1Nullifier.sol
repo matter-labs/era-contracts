@@ -19,7 +19,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_INTEROP_CENTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_CENTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {
     AddressAlreadySet,
     DepositDoesNotExist,
@@ -319,20 +319,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         L2Message memory l2ToL1Message;
         {
             address l2Sender = _finalizeWithdrawalParams.l2Sender;
-            if (_finalizeWithdrawalParams.message[0] == BUNDLE_IDENTIFIER) {
-                // Interop-routed withdrawals are emitted by the L2 InteropCenter (which wraps the asset-router
-                // call in a single-call bundle). The bundle itself additionally authenticates that the inner
-                // call originated from the L2 asset router (see `DataEncoding.parseInteropWithdrawalBundle`).
-                require(l2Sender == L2_INTEROP_CENTER_ADDR, WrongL2Sender(l2Sender));
-            } else {
-                // Raw asset-router `finalizeDeposit` message (base token or ERC20). Base-token
-                // withdrawals no longer come from `L2_BASE_TOKEN_SYSTEM_CONTRACT` — they are emitted as
-                // interop bundles (handled above), so the raw path only accepts the L2 asset router
-                // (or the deprecated legacy bridge).
-                bool isL2SenderCorrect = l2Sender == L2_ASSET_ROUTER_ADDR ||
-                    l2Sender == __DEPRECATED_l2BridgeAddress[_finalizeWithdrawalParams.chainId];
-                require(isL2SenderCorrect, WrongL2Sender(l2Sender));
-            }
+            // All withdrawals are emitted by the L2 InteropCenter (which wraps the asset-router
+            // call in a single-call bundle). The bundle itself additionally authenticates that the inner
+            // call originated from the L2 asset router (see `DataEncoding.parseInteropWithdrawalBundle`).
+            require(l2Sender == L2_INTEROP_CENTER_ADDR, WrongL2Sender(l2Sender));
 
             l2ToL1Message = L2Message({
                 txNumberInBatch: _finalizeWithdrawalParams.l2TxNumberInBatch,
@@ -373,8 +363,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     /// @notice Parses the withdrawal message and returns withdrawal details.
-    /// @dev Two message forms are supported: an interop bundle emitted by the L2 InteropCenter (the unified
-    /// @dev path for all withdrawals), and a raw L2-asset-router `finalizeDeposit` message.
+    /// @dev All withdrawals are routed through the L2 InteropCenter: the message is a single-call
+    /// @dev interop bundle wrapping an L2-asset-router `finalizeDeposit` call destined for L1.
     /// @param _chainId The ZK chain ID.
     /// @param _l2ToL1message The encoded L2 -> L1 message.
     /// @return assetId The ID of the bridged asset.
@@ -385,26 +375,12 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     function _parseL2WithdrawalMessage(
         uint256 _chainId,
         bytes memory _l2ToL1message
-    ) internal returns (bytes32 assetId, bytes memory transferData) {
-        // A withdrawal message is one of two forms:
-        // 1. An interop bundle (`BUNDLE_IDENTIFIER`-prefixed) emitted by the L2 InteropCenter — the unified
-        //    path for all withdrawals (base token and ERC20), wrapping a single L2-asset-router
-        //    `finalizeDeposit` call destined for L1.
-        // 2. A raw L2-asset-router `finalizeDeposit` message (base token or ERC20).
-
-        // Interop-routed withdrawals arrive as a single-call InteropBundle prefixed with BUNDLE_IDENTIFIER.
-        if (_l2ToL1message[0] == BUNDLE_IDENTIFIER) {
-            return DataEncoding.parseInteropWithdrawalBundle(_chainId, _l2ToL1message, address(l1AssetRouter));
-        }
-
-        // Base-token (ETH) and ERC20 withdrawals both arrive in the asset-router finalizeDeposit format.
-        bytes4 functionSignature = DataEncoding.getSelector(_l2ToL1message);
-        if (functionSignature == AssetRouterBase.finalizeDeposit.selector) {
-            // slither-disable-next-line unused-return
-            (, , assetId, transferData) = DataEncoding.decodeAssetRouterFinalizeDepositData(_l2ToL1message);
-        } else {
-            revert InvalidSelector(bytes4(functionSignature));
-        }
+    ) internal view returns (bytes32 assetId, bytes memory transferData) {
+        // All withdrawals (base token and ERC20) arrive as a single-call InteropBundle prefixed with
+        // BUNDLE_IDENTIFIER, emitted by the L2 InteropCenter; raw asset-router messages are not accepted.
+        require(_l2ToL1message[0] == BUNDLE_IDENTIFIER, InvalidSelector(DataEncoding.getSelector(_l2ToL1message)));
+        // slither-disable-next-line unused-return
+        return DataEncoding.parseInteropWithdrawalBundle(_chainId, _l2ToL1message, address(l1AssetRouter));
     }
 
     /*//////////////////////////////////////////////////////////////

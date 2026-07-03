@@ -22,7 +22,7 @@ import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "../utils/Utils.sol";
 
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -113,7 +113,7 @@ contract GatewayUtils is Script, IGatewayUtils {
                 chainId: gatewayChainId,
                 l2BatchNumber: l2BatchNumber,
                 l2MessageIndex: l2MessageIndex,
-                l2Sender: L2_ASSET_ROUTER_ADDR,
+                l2Sender: L2_INTEROP_CENTER_ADDR,
                 l2TxNumberInBatch: l2TxNumberInBatch,
                 message: message,
                 merkleProof: merkleProof

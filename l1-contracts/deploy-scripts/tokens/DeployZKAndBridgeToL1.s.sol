@@ -197,7 +197,7 @@ contract DeployZKScript is Script {
                 chainId: _chainId,
                 l2BatchNumber: _l2BatchNumber,
                 l2MessageIndex: _l2MessageIndex,
-                l2Sender: L2_ASSET_ROUTER_ADDR,
+                l2Sender: L2_INTEROP_CENTER_ADDR,
                 l2TxNumberInBatch: _l2TxNumberInBatch,
                 message: _message,
                 merkleProof: _merkleProof

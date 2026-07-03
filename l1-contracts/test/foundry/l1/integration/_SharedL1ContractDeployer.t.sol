@@ -19,6 +19,9 @@ import {CoreDeployedAddresses} from "../../../../deploy-scripts/ecosystem/Deploy
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {CTMDeployedAddresses, Config} from "../../../../deploy-scripts/ctm/DeployCTMUtils.s.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
+import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
+import {BUNDLE_IDENTIFIER, BundleAttributes, InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 contract L1ContractDeployer is UtilsCallMockerTest {
     using stdStorage for StdStorage;
@@ -136,6 +139,35 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         for (uint256 i = 0; i < _tokens.length; i++) {
             _registerNewToken(_tokens[i]);
         }
+    }
+
+    /// @notice Wraps an asset-router `finalizeDeposit` payload in the single-call InteropBundle message
+    /// form emitted by the L2 InteropCenter — the only withdrawal message form `L1Nullifier` accepts
+    /// (see `L1Nullifier._parseL2WithdrawalMessage` / `DataEncoding.parseInteropWithdrawalBundle`).
+    function _encodeWithdrawalBundleMessage(
+        uint256 _sourceChainId,
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) internal view returns (bytes memory) {
+        InteropCall[] memory calls = new InteropCall[](1);
+        calls[0] = InteropCall({
+            version: bytes1(0x01),
+            shadowAccount: false,
+            to: address(addresses.sharedBridge),
+            from: L2_ASSET_ROUTER_ADDR,
+            value: 0,
+            data: abi.encodeCall(AssetRouterBase.finalizeDeposit, (_sourceChainId, _assetId, _transferData))
+        });
+        InteropBundle memory bundle = InteropBundle({
+            version: bytes1(0x01),
+            sourceChainId: _sourceChainId,
+            destinationChainId: block.chainid,
+            destinationBaseTokenAssetId: bytes32(0),
+            interopBundleSalt: bytes32(0),
+            calls: calls,
+            bundleAttributes: BundleAttributes({executionAddress: hex"", unbundlerAddress: hex"", useFixedFee: false})
+        });
+        return abi.encodePacked(BUNDLE_IDENTIFIER, abi.encode(bundle));
     }
 
     // add this to be excluded from coverage report

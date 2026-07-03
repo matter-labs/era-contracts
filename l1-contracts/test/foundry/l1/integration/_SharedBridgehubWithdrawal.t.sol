@@ -15,7 +15,7 @@ import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
@@ -62,10 +62,10 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
     /// @notice Drives a real `L1Nullifier.finalizeDeposit` for the current chain's base-token withdrawal
     /// and asserts the balance outcomes.
     /// @dev Replaces the removed legacy `L1AssetRouter.finalizeWithdrawal` flow. The withdrawal message is
-    /// reconstructed in the asset-router `finalizeDeposit` format (see
+    /// reconstructed as the single-call interop bundle emitted by the L2 InteropCenter (see
     /// `L1Nullifier._parseL2WithdrawalMessage`): the base-token assetId plus `encodeBridgeMintData`
-    /// transfer data, sent by the L2 base-token system contract (the sender the nullifier validates for a
-    /// base-token withdrawal in `_verifyWithdrawal`).
+    /// transfer data, wrapped via `_encodeWithdrawalBundleMessage` and sent by the L2 InteropCenter (the
+    /// only sender the nullifier accepts in `_verifyWithdrawal`).
     ///
     /// Mock justification: L2 batch commitments and merkle trees are unavailable in this L1-only
     /// integration environment, so the two message-root proof calls that `_verifyWithdrawal` makes are
@@ -79,8 +79,8 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
     /// @param _isEth Whether the chain's base token is native ETH (vs an ERC20).
     function _finalizeBaseTokenWithdrawal(uint256 _amountToWithdraw, bool _isEth) internal {
         // The withdrawal message carries the chain's base-token assetId. It is finalized via the
-        // asset-router `finalizeDeposit` path, so the L2 sender is the L2 asset router (the nullifier no
-        // longer has a base-token-specific sender branch).
+        // interop-bundle path, so the L2 sender is the L2 InteropCenter (the only sender the
+        // nullifier accepts).
         bytes32 assetId = addresses.bridgehub.baseTokenAssetId(currentChainId);
         IAssetTrackerBase assetTracker = IAssetTrackerBase(address(addresses.l1NativeTokenVault.l1AssetTracker()));
 
@@ -146,8 +146,8 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
     }
 
     /// @notice Builds the `FinalizeL1DepositParams` for a base-token withdrawal of `_amount` to `currentUser`.
-    /// @dev Reconstructs the asset-router `finalizeDeposit` withdrawal message. For a base-token withdrawal
-    /// emitted by `L2BaseToken.withdraw`, the original caller and origin token are empty and the metadata is
+    /// @dev Reconstructs the interop-bundle withdrawal message emitted by the L2 InteropCenter. For a
+    /// base-token withdrawal, the original caller and origin token are empty and the metadata is
     /// empty (see `l2-withdrawal-helper.ts::finalizeWithdrawalOnL1`).
     function _buildWithdrawalParams(
         bytes32 _assetId,
@@ -165,9 +165,9 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
             chainId: currentChainId,
             l2BatchNumber: uint256(uint160(makeAddr("l2BatchNumber"))),
             l2MessageIndex: uint256(uint160(makeAddr("l2MessageIndex"))),
-            l2Sender: L2_ASSET_ROUTER_ADDR,
+            l2Sender: L2_INTEROP_CENTER_ADDR,
             l2TxNumberInBatch: uint16(uint160(makeAddr("l2TxNumberInBatch"))),
-            message: DataEncoding.encodeAssetRouterFinalizeDepositData(currentChainId, _assetId, transferData),
+            message: _encodeWithdrawalBundleMessage(currentChainId, _assetId, transferData),
             merkleProof: merkleProof
         });
     }

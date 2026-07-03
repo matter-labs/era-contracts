@@ -16,11 +16,7 @@ import {BridgehubBurnCTMAssetData, IBridgehubBase} from "contracts/core/bridgehu
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "contracts/common/Config.sol";
 
-import {
-    L2_BRIDGEHUB_ADDR,
-    L2_ASSET_ROUTER_ADDR,
-    L2_INTEROP_CENTER_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {L2_BRIDGEHUB_ADDRESS, Utils} from "../utils/Utils.sol";
@@ -518,7 +514,7 @@ contract GatewayPreparation is Script {
                 chainId: gatewayChainId,
                 l2BatchNumber: l2BatchNumber,
                 l2MessageIndex: l2MessageIndex,
-                l2Sender: L2_ASSET_ROUTER_ADDR,
+                l2Sender: L2_INTEROP_CENTER_ADDR,
                 l2TxNumberInBatch: l2TxNumberInBatch,
                 message: message,
                 merkleProof: merkleProof
