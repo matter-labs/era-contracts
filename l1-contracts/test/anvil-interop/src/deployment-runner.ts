@@ -959,6 +959,26 @@ export class DeploymentRunner {
 
     return result;
   }
+
+  /**
+   * Full setup: deploy + test tokens + wrapped-ZK seeding.
+   *
+   * Used by both `setup-and-dump-state.ts` and `run-hardhat-interop-test.ts` (fresh deploy path).
+   * Thin wrapper over {@link deployAndSetup} that additionally seeds wrapped ZK
+   * balances on ETH-base-token L2 chains. Cross-chain asset correctness is
+   * guaranteed by ZK proofs, so no on-chain balance migration step is needed.
+   */
+  async deployAndSetupWithTBM(
+    anvilManager: AnvilManager,
+    options?: DeployAndSetupOptions
+  ): Promise<FullDeploymentResult> {
+    const result = await this.deployAndSetup(anvilManager, options);
+
+    const state = this.loadState();
+    await this.seedWrappedZkOnEthChains(state);
+
+    return result;
+  }
 }
 
 export interface DeployAndSetupOptions {
