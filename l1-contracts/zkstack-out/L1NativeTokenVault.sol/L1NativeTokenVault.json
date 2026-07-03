@@ -196,7 +196,7 @@
     "name": "bridgeConfirmTransferResult",
     "inputs": [
       {
-        "name": "_chainId",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       },
