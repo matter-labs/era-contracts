@@ -8,9 +8,6 @@ import {Call} from "./Common.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IChainAdmin {
-    /// @notice Emitted when the expected upgrade timestamp for a specific protocol version is set.
-    event UpdateUpgradeTimestamp(uint256 indexed protocolVersion, uint256 upgradeTimestamp);
-
     /// @notice Emitted when the call is executed from the contract.
     event CallExecuted(Call call, bool success, bytes returnData);
 
@@ -22,11 +19,6 @@ interface IChainAdmin {
 
     /// @notice The EVM emulator has been enabled
     event EnableEvmEmulator();
-
-    /// @notice Returns the upgrade timestamp for a specific protocol version.
-    /// @param _protocolVersion The protocol version to query.
-    /// @return The timestamp at which the upgrade is expected.
-    function protocolVersionToUpgradeTimestamp(uint256 _protocolVersion) external view returns (uint256);
 
     /// @notice Returns the list of active restrictions.
     function getRestrictions() external view returns (address[] memory);
