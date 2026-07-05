@@ -80,6 +80,12 @@ interface ILegacyGovernance {
     }
     function scheduleTransparent(LegacyOperation calldata op, uint256 delay) external;
     function executeInstant(LegacyOperation calldata op) external payable;
+    /// `execute` is `onlyOwnerOrSecurityCouncil` and only requires the op to be
+    /// ready (scheduled + delay elapsed). With `delay = 0` it is ready in the
+    /// same block, so the EOA owner can `scheduleTransparent(op, 0)` then
+    /// `execute(op)` without needing the security council (whose address is 0x0
+    /// on the mainnet Atlas Governance).
+    function execute(LegacyOperation calldata op) external payable;
     function securityCouncil() external view returns (address);
 }
 
@@ -494,15 +500,19 @@ contract AdminFunctions is Script, IAdminFunctions {
             predecessor: bytes32(0),
             salt: keccak256(abi.encodePacked(Utils.currentLegacyGovSalt(), _legacyGovSaltCounter++))
         });
+        // Normal `scheduleTransparent(op, 0)` + `execute(op)` path, both from the
+        // EOA owner. `delay = 0` makes the op ready in the same block, and
+        // `execute` is `onlyOwnerOrSecurityCouncil`, so we don't route through
+        // `executeInstant` (which is `onlySecurityCouncil`, and the mainnet Atlas
+        // Governance's `securityCouncil()` is 0x0 — that produced a `from = 0x0`
+        // execute tx that only works under simulator impersonation).
         address eoaOwner = IOwnableSingleStep(_gov).owner();
-        address sc = ILegacyGovernance(_gov).securityCouncil();
         _anvilFund(eoaOwner);
         vm.startBroadcast(eoaOwner);
         ILegacyGovernance(_gov).scheduleTransparent(op, 0);
         vm.stopBroadcast();
-        _anvilFund(sc);
-        vm.startBroadcast(sc);
-        ILegacyGovernance(_gov).executeInstant(op);
+        vm.startBroadcast(eoaOwner);
+        ILegacyGovernance(_gov).execute(op);
         vm.stopBroadcast();
     }
 

@@ -832,10 +832,10 @@ desc = "Mainnet legacy Gov: scheduleTransparent — queues Atlas (ZKsync OS) CTM
 
 [[entries]]
 target = "mn_legacy_gov"
-selector = "0x95218ecd"  # executeInstant
+selector = "0x74da756b"  # execute (onlyOwnerOrSecurityCouncil; op ready at delay 0)
 inner_target = "mn_atlas_ctm"
 inner_selector = "0xf2fde38b"
-desc = "Mainnet legacy Gov: executeInstant — flushes the queued Atlas CTM.transferOwnership(PUH) now (legacy Gov minDelay = 0). PUH accepts in stage 0."
+desc = "Mainnet legacy Gov: execute — runs the scheduled Atlas CTM.transferOwnership(PUH) now, called by the EOA owner (delay 0 → op ready in-block; no security council needed). PUH accepts in stage 0."
 
 [[entries]]
 target = "mn_legacy_gov"
@@ -846,10 +846,10 @@ desc = "Mainnet legacy Gov: scheduleTransparent — queues Atlas ValidatorTimelo
 
 [[entries]]
 target = "mn_legacy_gov"
-selector = "0x95218ecd"
+selector = "0x74da756b"  # execute (onlyOwnerOrSecurityCouncil; op ready at delay 0)
 inner_target = "mn_atlas_validator_timelock"
 inner_selector = "0xf2fde38b"
-desc = "Mainnet legacy Gov: executeInstant — flushes Atlas ValidatorTimelock.transferOwnership(PUH). PUH accepts in stage 0."
+desc = "Mainnet legacy Gov: execute — runs the scheduled Atlas ValidatorTimelock.transferOwnership(PUH) now, called by the EOA owner (delay 0). PUH accepts in stage 0."
 
 [[entries]]
 target = "mn_legacy_gov"
@@ -860,10 +860,10 @@ desc = "Mainnet legacy Gov: scheduleTransparent — queues Atlas CTM ProxyAdmin.
 
 [[entries]]
 target = "mn_legacy_gov"
-selector = "0x95218ecd"
+selector = "0x74da756b"  # execute (onlyOwnerOrSecurityCouncil; op ready at delay 0)
 inner_target = "mn_atlas_ctm_proxy_admin"
 inner_selector = "0xf2fde38b"
-desc = "Mainnet legacy Gov: executeInstant — flushes Atlas CTM ProxyAdmin.transferOwnership(PUH). The Atlas PA is now owned by PUH."
+desc = "Mainnet legacy Gov: execute — runs the scheduled Atlas CTM ProxyAdmin.transferOwnership(PUH) now, called by the EOA owner (delay 0). The Atlas PA is now owned by PUH."
 
 [[entries]]
 target = "mn_legacy_gov"
@@ -874,10 +874,10 @@ desc = "Mainnet legacy Gov: scheduleTransparent — queues Atlas GovernanceUpgra
 
 [[entries]]
 target = "mn_legacy_gov"
-selector = "0x95218ecd"
+selector = "0x74da756b"  # execute (onlyOwnerOrSecurityCouncil; op ready at delay 0)
 inner_target = "mn_atlas_gov_timer"
 inner_selector = "0xf2fde38b"
-desc = "Mainnet legacy Gov: executeInstant — flushes Atlas GovernanceUpgradeTimer.transferOwnership(PUH). PUH accepts in stage 0."
+desc = "Mainnet legacy Gov: execute — runs the scheduled Atlas GovernanceUpgradeTimer.transferOwnership(PUH) now, called by the EOA owner (delay 0). PUH accepts in stage 0."
 
 [[entries]]
 target = "mn_legacy_gov"
@@ -888,10 +888,10 @@ desc = "Mainnet legacy Gov: scheduleTransparent — queues Atlas RollupDAManager
 
 [[entries]]
 target = "mn_legacy_gov"
-selector = "0x95218ecd"
+selector = "0x74da756b"  # execute (onlyOwnerOrSecurityCouncil; op ready at delay 0)
 inner_target = "mn_atlas_rollup_da_manager"
 inner_selector = "0xf2fde38b"
-desc = "Mainnet legacy Gov: executeInstant — flushes Atlas RollupDAManager.transferOwnership(PUH). PUH accepts in stage 0."
+desc = "Mainnet legacy Gov: execute — runs the scheduled Atlas RollupDAManager.transferOwnership(PUH) now, called by the EOA owner (delay 0). PUH accepts in stage 0."
 
 # ─── ChainAdmin multicalls — in-place ServerNotifier upgrades (signed by 0x4e4943…) ───
 [[entries]]

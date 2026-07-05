@@ -206,7 +206,7 @@ impl SimDescriptionRegistry {
 }
 
 /// For wrapper calls — `ChainAdmin.multicall`, `Governance.scheduleTransparent`,
-/// `Governance.executeInstant` — return the first inner `Call`'s target and
+/// `Governance.executeInstant` / `Governance.execute` — return the first inner `Call`'s target and
 /// 4-byte selector. Returns `None` for unrecognised wrappers (the registry
 /// then falls back to plain `(target, selector)` matching).
 fn parse_first_inner_call(data_hex: &str) -> Option<(Address, String)> {
@@ -249,8 +249,10 @@ fn parse_first_inner_call(data_hex: &str) -> Option<(Address, String)> {
                 .into_iter()
                 .next()?
         }
-        // executeInstant((Call[], bytes32, bytes32))
-        0x95218ecd => {
+        // executeInstant((Call[], bytes32, bytes32)) / execute((Call[], bytes32, bytes32))
+        // Same ABI (a single `Operation` tuple param) — only the selector differs
+        // (executeInstant = onlySecurityCouncil, execute = onlyOwnerOrSecurityCouncil).
+        0x95218ecd | 0x74da756b => {
             let params = DynSolType::Tuple(vec![operation_type])
                 .abi_decode_params(body)
                 .ok()?;
