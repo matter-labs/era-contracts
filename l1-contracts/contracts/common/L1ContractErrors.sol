@@ -11,6 +11,8 @@ error AddressAlreadySet(address addr);
 error AddressHasNoCode(address);
 // 0x1f73225f
 error AddressMismatch(address expected, address supplied);
+// 0x066dd7c3
+error AirbenderBinaryCommitmentNotSet();
 // 0x2a5989a0
 error AlreadyPermanentRollup();
 // 0x0bfcef28

@@ -177,4 +177,10 @@ struct ZKChainStorage {
     /// @dev Whenever the `totalBatchesCommitted` changes, this variable is reset to `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`
     /// (the value of the constant can be found in Config.sol).
     bytes32 precommitmentForTheLatestBatch;
+    /// @notice Commitment to the airbender verifier guest binary, in the byte order the SNARK wrapper
+    /// hashes it: the guest's `[u32; 8]` binary commitment serialized as 32 little-endian bytes.
+    /// @dev Consulted only for airbender-typed proofs to reconstruct the SNARK public input on-chain as
+    /// `keccak(keccak(prevCommitment ‖ currentCommitment) ‖ airbenderBinaryCommitment) >> PUBLIC_INPUT_SHIFT`.
+    /// Set by the chain admin via `setAirbenderBinaryCommitment`; zero until then.
+    bytes32 airbenderBinaryCommitment;
 }

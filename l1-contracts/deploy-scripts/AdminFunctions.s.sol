@@ -455,6 +455,26 @@ contract AdminFunctions is Script {
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
 
+    /// We use explicit `_shouldSend` instead of the standard `--broadcast` to ensure stable output
+    /// for the calldata
+    function setAirbenderBinaryCommitment(
+        address _bridgehub,
+        uint256 _chainId,
+        bytes32 _airbenderBinaryCommitment,
+        bool _shouldSend
+    ) external {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IAdmin.setAirbenderBinaryCommitment, (_airbenderBinaryCommitment))
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
+    }
+
     function setDAValidatorPair(
         address _bridgehub,
         uint256 _chainId,

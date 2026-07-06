@@ -16,6 +16,17 @@ contract ExecutorProvingTest is ExecutorFacet {
         return _getBatchProofPublicInput(_prevBatchCommitment, _currentBatchCommitment);
     }
 
+    function setAirbenderBinaryCommitmentForTest(bytes32 _airbenderBinaryCommitment) external {
+        s.airbenderBinaryCommitment = _airbenderBinaryCommitment;
+    }
+
+    function getAirbenderBatchProofPublicInput(
+        bytes32 _prevBatchCommitment,
+        bytes32 _currentBatchCommitment
+    ) external view returns (uint256) {
+        return _getAirbenderBatchProofPublicInput(_prevBatchCommitment, _currentBatchCommitment);
+    }
+
     function createBatchCommitment(
         CommitBatchInfo calldata _newBatchData,
         bytes32 _stateDiffHash,

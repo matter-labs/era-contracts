@@ -14,7 +14,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {BatchHashMismatch, BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, HashMismatch, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches, InvalidBatchNumber, EmptyPrecommitData, PrecommitmentMismatch, InvalidPackedPrecommitmentLength} from "../../../common/L1ContractErrors.sol";
+import {AirbenderBinaryCommitmentNotSet, BatchHashMismatch, BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, HashMismatch, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches, InvalidBatchNumber, EmptyPrecommitData, PrecommitmentMismatch, InvalidPackedPrecommitmentLength} from "../../../common/L1ContractErrors.sol";
 import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchL2DAValidator, MismatchNumberOfLayer1Txs} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -24,6 +24,10 @@ import {InteropRoot} from "../../../common/Messaging.sol";
 /// @dev The version that is used for the `Executor` calldata used for relaying the
 /// stored batch info.
 uint8 constant RELAYED_EXECUTOR_VERSION = 0;
+
+/// @dev The proof-type differentiator (`_proof[0]`) that `DualVerifier` uses to route a proof to the
+/// airbender PLONK verifier. Kept in sync with `DualVerifier.AIRBENDER_PLONK_VERIFICATION_TYPE`.
+uint256 constant AIRBENDER_PLONK_VERIFICATION_TYPE = 2;
 
 /// @title ZK chain Executor contract capable of processing events emitted in the ZK chain protocol.
 /// @author Matter Labs
@@ -666,6 +670,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(prevBatch));
         }
 
+        // `DualVerifier` reads `proof[0]` to route the proof. The airbender PLONK verifier expects a
+        // public input that also binds the audited guest binary, so it is reconstructed differently
+        // from the Boojum path.
+        bool isAirbenderProof = proof.length != 0 && proof[0] == AIRBENDER_PLONK_VERIFICATION_TYPE;
+
         bytes32 prevBatchCommitment = prevBatch.commitment;
         for (uint256 i = 0; i < committedBatchesLength; i = i.uncheckedInc()) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
@@ -677,7 +686,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             }
 
             bytes32 currentBatchCommitment = committedBatches[i].commitment;
-            proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
+            proofPublicInput[i] = isAirbenderProof
+                ? _getAirbenderBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment)
+                : _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
 
             prevBatchCommitment = currentBatchCommitment;
         }
@@ -710,6 +721,27 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     ) internal pure returns (uint256) {
         return
             uint256(keccak256(abi.encodePacked(_prevBatchCommitment, _currentBatchCommitment))) >> PUBLIC_INPUT_SHIFT;
+    }
+
+    /// @dev Reconstructs the public input an airbender PLONK SNARK proof was generated against.
+    /// @notice The airbender verifier guest emits `program_output = keccak(prevCommitment ‖ currentCommitment)`
+    /// — the same batch-commitment hash the Boojum path hashes, but unshifted. The SNARK wrapper then binds
+    /// that program output together with the commitment to the audited guest binary and shifts, so the public
+    /// input the PLONK proof was produced against is
+    /// `keccak(program_output ‖ airbenderBinaryCommitment) >> PUBLIC_INPUT_SHIFT`.
+    function _getAirbenderBatchProofPublicInput(
+        bytes32 _prevBatchCommitment,
+        bytes32 _currentBatchCommitment
+    ) internal view returns (uint256) {
+        bytes32 airbenderBinaryCommitment = s.airbenderBinaryCommitment;
+        // A zero commitment means the chain admin has not configured the audited guest binary yet; a
+        // derivation against it would silently produce a wrong public input, so fail loudly instead.
+        if (airbenderBinaryCommitment == bytes32(0)) {
+            revert AirbenderBinaryCommitmentNotSet();
+        }
+        bytes32 programOutput = keccak256(abi.encodePacked(_prevBatchCommitment, _currentBatchCommitment));
+        return
+            uint256(keccak256(abi.encodePacked(programOutput, airbenderBinaryCommitment))) >> PUBLIC_INPUT_SHIFT;
     }
 
     /// @inheritdoc IExecutor

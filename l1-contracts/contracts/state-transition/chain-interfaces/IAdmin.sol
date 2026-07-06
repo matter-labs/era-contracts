@@ -47,6 +47,13 @@ interface IAdmin is IZKChainBase {
     /// @notice Set the transaction filterer
     function setTransactionFilterer(address _transactionFilterer) external;
 
+    /// @notice Set the commitment to the airbender verifier guest binary.
+    /// @dev Used to reconstruct the airbender SNARK public input on-chain when proving airbender-typed
+    /// batches. Must be provided in the byte order the SNARK wrapper hashes it (the guest's `[u32; 8]`
+    /// commitment serialized as 32 little-endian bytes).
+    /// @param _airbenderBinaryCommitment The commitment to the audited airbender verifier guest binary.
+    function setAirbenderBinaryCommitment(bytes32 _airbenderBinaryCommitment) external;
+
     /// @notice Allow EVM emulation on chain
     function allowEvmEmulation() external returns (bytes32 canonicalTxHash);
 
@@ -117,6 +124,9 @@ interface IAdmin is IZKChainBase {
 
     /// @notice The transaction filterer has been updated
     event NewTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);
+
+    /// @notice Emitted when the airbender guest binary commitment is changed.
+    event NewAirbenderBinaryCommitment(bytes32 oldAirbenderBinaryCommitment, bytes32 newAirbenderBinaryCommitment);
 
     /// @notice BaseToken multiplier for L1->L2 transactions changed
     event NewBaseTokenMultiplier(

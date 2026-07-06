@@ -150,6 +150,13 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
+    function setAirbenderBinaryCommitment(bytes32 _airbenderBinaryCommitment) external onlyAdmin {
+        bytes32 oldAirbenderBinaryCommitment = s.airbenderBinaryCommitment;
+        s.airbenderBinaryCommitment = _airbenderBinaryCommitment;
+        emit NewAirbenderBinaryCommitment(oldAirbenderBinaryCommitment, _airbenderBinaryCommitment);
+    }
+
+    /// @inheritdoc IAdmin
     function getRollupDAManager() external view returns (address) {
         return address(ROLLUP_DA_MANAGER);
     }
