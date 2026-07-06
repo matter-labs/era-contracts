@@ -681,6 +681,17 @@
   },
   {
     "type": "error",
+    "name": "InteropWithdrawalNonZeroValue",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InteropWithdrawalNotSingleCall",
     "inputs": []
   },
@@ -692,6 +703,11 @@
   {
     "type": "error",
     "name": "InteropWithdrawalWrongOrigin",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InteropWithdrawalWrongSource",
     "inputs": []
   },
   {
@@ -759,6 +775,22 @@
         "name": "providedL2Sender",
         "type": "address",
         "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "WrongMsgLength",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "length",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },

@@ -17,6 +17,8 @@ error CannotClaimInteropOnL1Settlement();
 error CanNotUnbundle(bytes32 bundleHash);
 // 0x2d159f39
 error DestinationChainNotRegistered(uint256 destinationChainId);
+// 0x43f0659c
+error DirectCallToL1NotSupported();
 // 0xe845be4c
 error ExecutingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes executionAddress);
 // 0x16b0fa00
@@ -37,6 +39,8 @@ error InvalidInteropCallVersion();
 error MessageNotIncluded();
 // 0x6a430157
 error MultiCallToL1NotSupported(uint256 callCount);
+// 0xd72e81d8
+error NonZeroValueToL1NotSupported(uint256 value);
 // 0x2f59bd0d
 error SidesLengthNotOne();
 // 0x89fd2c76

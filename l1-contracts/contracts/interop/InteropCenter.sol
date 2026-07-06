@@ -42,11 +42,13 @@ import {
     AttributeAlreadySet,
     AttributeViolatesRestriction,
     DestinationChainNotRegistered,
+    DirectCallToL1NotSupported,
     IndirectCallValueMismatch,
     InteroperableAddressChainReferenceNotEmpty,
     InteroperableAddressNotEmpty,
     FeeWithdrawalFailed,
     MultiCallToL1NotSupported,
+    NonZeroValueToL1NotSupported,
     ZKTokenNotAvailable
 } from "./InteropErrors.sol";
 
@@ -335,6 +337,10 @@ contract InteropCenter is
     ///      - another L2 (the classic L2->L2 interop), or
     ///      - L1, but only for a single-call bundle (an L2->L1 asset withdrawal). Multi-call bundles to L1
     ///        are not supported, since an L1 withdrawal corresponds to exactly one finalizeDeposit call.
+    /// @dev Only the call count is validated here; the per-call requirements for an L1 destination
+    ///      (indirect call, zero interopCallValue) are enforced in `_sendBundle` once the call
+    ///      attributes have been parsed, and non-L1 destinations are additionally checked against the
+    ///      Bridgehub registry (`DestinationChainNotRegistered`) there.
     /// @param _destinationChainId Destination chain ID.
     /// @param _callCount Number of calls in the bundle.
     function _ensureValidDestination(uint256 _destinationChainId, uint256 _callCount) internal view {
@@ -357,6 +363,7 @@ contract InteropCenter is
     /// @notice Ensures the received base token value matches expected for the destination chain
     /// @dev Handles fee collection based on useFixedFee flag. When useFixedFee is true, no base token fee is charged.
     /// @dev When useFixedFee is false, interopProtocolFee is charged in base tokens.
+    /// @dev L2->L1 withdrawals (destination is L1) are not interop and are free: no protocol fee is charged.
     /// @param _destinationChainId Destination chain ID.
     /// @param _totalBurnedCallsValue Sum of requested interop call values.
     /// @param _totalIndirectCallsValue Sum of requested indirect call values.
@@ -373,8 +380,10 @@ contract InteropCenter is
         bytes32 thisChainBaseTokenAssetId = L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID();
 
         // Calculate protocol fee - only charge base token fee if not using fixed ZK fees.
-        // Fee is charged per-call.
-        uint256 protocolFee = _useFixedFee ? 0 : interopProtocolFee * _callCount;
+        // Fee is charged per-call. L2->L1 withdrawals are free (they are not interop).
+        uint256 protocolFee = (_useFixedFee || _destinationChainId == L1_CHAIN_ID)
+            ? 0
+            : interopProtocolFee * _callCount;
 
         // We burn the value that is passed along the bundle here, on source chain.
         if (_destinationBaseTokenAssetId == thisChainBaseTokenAssetId) {
@@ -456,6 +465,17 @@ contract InteropCenter is
         // Fill the formed InteropBundle with calls.
         uint256 callStartersLength = _callStarters.length;
         for (uint256 i = 0; i < callStartersLength; ++i) {
+            if (_destinationChainId == L1_CHAIN_ID) {
+                // An L2->L1 withdrawal is finalized by the L1Nullifier, which only accepts a single
+                // indirect asset-router `finalizeDeposit` call with no destination-side value (see
+                // `DataEncoding.parseInteropWithdrawalBundle`). Reject anything else at send time —
+                // otherwise the burned funds would end up in an unfinalizable bundle.
+                require(_callStarters[i].callAttributes.indirectCall, DirectCallToL1NotSupported());
+                require(
+                    _callStarters[i].callAttributes.interopCallValue == 0,
+                    NonZeroValueToL1NotSupported(_callStarters[i].callAttributes.interopCallValue)
+                );
+            }
             InteropCall memory interopCall = _processCallStarter(_callStarters[i], _destinationChainId, msg.sender);
             bundle.calls[i] = interopCall;
             totalBurnedCallsValue += _callStarters[i].callAttributes.interopCallValue;
@@ -468,7 +488,8 @@ contract InteropCenter is
         // If using fixed fees, collect ZK tokens per-call and accumulate for coinbase.
         // Coinbase can later claim via claimZKFees().
         // This is handled to not allow malicious operator to fail sending bundles by providing malicious coinbase.
-        if (_bundleAttributes.useFixedFee) {
+        // L2->L1 withdrawals are not interop and are free: no fixed ZK fee is collected for them.
+        if (_bundleAttributes.useFixedFee && _destinationChainId != L1_CHAIN_ID) {
             uint256 totalZKFee = ZK_INTEROP_FEE * callStartersLength;
             _getZKToken().safeTransferFrom(msg.sender, address(this), totalZKFee);
             accumulatedZKFees[block.coinbase] += totalZKFee;

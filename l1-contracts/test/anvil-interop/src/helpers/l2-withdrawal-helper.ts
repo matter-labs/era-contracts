@@ -18,7 +18,7 @@ import {
   encodeNtvAssetId,
 } from "../core/data-encoding";
 import type { CoreDeployedAddresses } from "../core/types";
-import { indirectCallAttr, interopCallValueAttr, sendInteropBundle, getInteropProtocolFee } from "./interop-helpers";
+import { indirectCallAttr, interopCallValueAttr, sendInteropBundle } from "./interop-helpers";
 import { encodeEvmAddress } from "./erc7930";
 
 export interface WithdrawETHParams {
@@ -117,16 +117,16 @@ export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): P
   };
 
   const l1ChainId = (await l1Provider.getNetwork()).chainId;
-  const interopFee = await getInteropProtocolFee(l2Provider);
 
   console.log(
     `   Initiating ETH withdrawal from chain ${chainId} via InteropCenter.sendBundle (destination L1 chain ${l1ChainId})...`
   );
+  // L2->L1 withdrawals are free (no interop protocol fee); only the withdrawn ETH rides as value.
   const sendResult = await sendInteropBundle({
     sourceProvider: l2Provider,
     destinationChainId: l1ChainId,
     callStarters: [callStarter],
-    value: amount.add(interopFee),
+    value: amount,
   });
   console.log(`   L2 withdraw tx: cast run ${sendResult.txHash} -r ${l2RpcUrl}`);
 
@@ -197,16 +197,16 @@ export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalPar
   // Destination is the L1 chain: `L2AssetRouter.initiateIndirectCall` targets the
   // L1 AssetRouter's `finalizeDeposit` when the destination chain is L1.
   const l1ChainId = (await l1Provider.getNetwork()).chainId;
-  const interopFee = await getInteropProtocolFee(l2Provider);
 
   console.log(
     `   Initiating ERC20 withdrawal from chain ${chainId} via InteropCenter.sendBundle (destination L1 chain ${l1ChainId})...`
   );
+  // L2->L1 withdrawals are free (no interop protocol fee), so no value rides along.
   const sendResult = await sendInteropBundle({
     sourceProvider: l2Provider,
     destinationChainId: l1ChainId,
     callStarters: [callStarter],
-    value: interopFee,
+    value: ethers.constants.Zero,
   });
   console.log(`   L2 withdraw tx: cast run ${sendResult.txHash} -r ${l2RpcUrl}`);
 

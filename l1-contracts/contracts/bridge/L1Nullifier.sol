@@ -30,7 +30,7 @@ import {
     WithdrawalAlreadyFinalized,
     ZeroAddress
 } from "../common/L1ContractErrors.sol";
-import {NativeTokenVaultAlreadySet, WrongL2Sender} from "./L1BridgeContractErrors.sol";
+import {NativeTokenVaultAlreadySet, WrongL2Sender, WrongMsgLength} from "./L1BridgeContractErrors.sol";
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 import {TransientPrimitivesLib} from "../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
@@ -378,6 +378,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     ) internal view returns (bytes32 assetId, bytes memory transferData) {
         // All withdrawals (base token and ERC20) arrive as a single-call InteropBundle prefixed with
         // BUNDLE_IDENTIFIER, emitted by the L2 InteropCenter; raw asset-router messages are not accepted.
+        require(_l2ToL1message.length > 0, WrongMsgLength(1, 0));
         require(_l2ToL1message[0] == BUNDLE_IDENTIFIER, InvalidSelector(DataEncoding.getSelector(_l2ToL1message)));
         // slither-disable-next-line unused-return
         return DataEncoding.parseInteropWithdrawalBundle(_chainId, _l2ToL1message, address(l1AssetRouter));

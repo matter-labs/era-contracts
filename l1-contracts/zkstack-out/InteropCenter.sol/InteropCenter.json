@@ -936,6 +936,11 @@
   },
   {
     "type": "error",
+    "name": "DirectCallToL1NotSupported",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "FeeWithdrawalFailed",
     "inputs": []
   },
@@ -1010,6 +1015,17 @@
     "inputs": [
       {
         "name": "callCount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NonZeroValueToL1NotSupported",
+    "inputs": [
+      {
+        "name": "value",
         "type": "uint256",
         "internalType": "uint256"
       }

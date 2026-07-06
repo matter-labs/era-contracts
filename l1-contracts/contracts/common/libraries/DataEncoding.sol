@@ -17,9 +17,11 @@ import {
 } from "../L1ContractErrors.sol";
 import {WrongMsgLength} from "../../bridge/L1BridgeContractErrors.sol";
 import {
+    InteropWithdrawalNonZeroValue,
     InteropWithdrawalNotSingleCall,
     InteropWithdrawalWrongDestination,
     InteropWithdrawalWrongOrigin,
+    InteropWithdrawalWrongSource,
     InteropWithdrawalWrongTarget
 } from "../../bridge/L1BridgeContractErrors.sol";
 import {InvalidFunctionSignature} from "../../bridge/asset-tracker/AssetTrackerErrors.sol";
@@ -391,12 +393,16 @@ library DataEncoding {
         // Strip the 1-byte BUNDLE_IDENTIFIER prefix; the remainder is exactly `abi.encode(InteropBundle)`.
         InteropBundle memory bundle = abi.decode(UnsafeBytes.readRemainingBytes(_l2ToL1message, 1), (InteropBundle));
 
+        require(bundle.sourceChainId == _chainId, InteropWithdrawalWrongSource());
         require(bundle.destinationChainId == block.chainid, InteropWithdrawalWrongDestination());
         require(bundle.calls.length == 1, InteropWithdrawalNotSingleCall());
 
         InteropCall memory interopCall = bundle.calls[0];
         require(interopCall.to == _l1AssetRouter, InteropWithdrawalWrongTarget());
         require(interopCall.from == L2_ASSET_ROUTER_ADDR, InteropWithdrawalWrongOrigin());
+        // No value can ride an L2->L1 withdrawal call: the withdrawn amount is carried inside the
+        // `finalizeDeposit` transfer data, and L1 finalization never forwards value.
+        require(interopCall.value == 0, InteropWithdrawalNonZeroValue(interopCall.value));
 
         // The inner call is `abi.encodeCall(IAssetRouterShared.finalizeDeposit, (sourceChainId, assetId, transferData))`.
         require(
@@ -408,7 +414,7 @@ library DataEncoding {
             UnsafeBytes.readRemainingBytes(interopCall.data, 4),
             (uint256, bytes32, bytes)
         );
-        require(sourceChainId == _chainId, InteropWithdrawalWrongDestination());
+        require(sourceChainId == _chainId, InteropWithdrawalWrongSource());
     }
 
     function decodeL1ToGatewayTokenBalanceMigrationData(
