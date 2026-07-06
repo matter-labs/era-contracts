@@ -962,6 +962,11 @@
   },
   {
     "type": "error",
+    "name": "InteropToSelfNotSupported",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InteroperableAddressChainReferenceNotEmpty",
     "inputs": [
       {

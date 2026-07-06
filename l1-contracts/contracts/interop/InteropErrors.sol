@@ -29,6 +29,8 @@ error IndirectCallValueMismatch(uint256 expected, uint256 actual);
 error InteroperableAddressChainReferenceNotEmpty(bytes interoperableAddress);
 // 0x884f49ba
 error InteroperableAddressNotEmpty(bytes interoperableAddress);
+// 0x9b021130
+error InteropToSelfNotSupported();
 // 0x2d48e8cf
 error InteropRootAlreadyExists();
 // 0xeae192ef

@@ -47,6 +47,7 @@ import {
     InteroperableAddressChainReferenceNotEmpty,
     InteroperableAddressNotEmpty,
     FeeWithdrawalFailed,
+    InteropToSelfNotSupported,
     MultiCallToL1NotSupported,
     NonZeroValueToL1NotSupported,
     ZKTokenNotAvailable
@@ -337,14 +338,18 @@ contract InteropCenter is
     ///      - another L2 (the classic L2->L2 interop), or
     ///      - L1, but only for a single-call bundle (an L2->L1 asset withdrawal). Multi-call bundles to L1
     ///        are not supported, since an L1 withdrawal corresponds to exactly one finalizeDeposit call.
-    /// @dev Only the call count is validated here; the per-call requirements for an L1 destination
-    ///      (indirect call, zero interopCallValue) are enforced in `_sendBundle` once the call
-    ///      attributes have been parsed, and non-L1 destinations are additionally checked against the
-    ///      Bridgehub registry (`DestinationChainNotRegistered`) there.
+    /// @dev The destination must not be this chain itself: a chain can end up registered for interop on
+    ///      its own Bridgehub, and a self-destination bundle would burn value into a self-bridging
+    ///      accounting path that is not supported.
+    /// @dev The remaining destination-dependent requirements are enforced in `_sendBundle` once the call
+    ///      attributes have been parsed: for an L1 destination each call must be an indirect call with
+    ///      zero interopCallValue, and non-L1 destinations are checked against the Bridgehub registry
+    ///      (`DestinationChainNotRegistered`).
     /// @param _destinationChainId Destination chain ID.
     /// @param _callCount Number of calls in the bundle.
     function _ensureValidDestination(uint256 _destinationChainId, uint256 _callCount) internal view {
         require(L1_CHAIN_ID != block.chainid, NotL2ToL2(block.chainid, _destinationChainId));
+        require(_destinationChainId != block.chainid, InteropToSelfNotSupported());
         if (_destinationChainId == L1_CHAIN_ID) {
             require(_callCount == 1, MultiCallToL1NotSupported(_callCount));
         }
@@ -358,6 +363,7 @@ contract InteropCenter is
             L1_CHAIN_ID != block.chainid && _destinationChainId != L1_CHAIN_ID,
             NotL2ToL2(block.chainid, _destinationChainId)
         );
+        require(_destinationChainId != block.chainid, InteropToSelfNotSupported());
     }
 
     /// @notice Ensures the received base token value matches expected for the destination chain
