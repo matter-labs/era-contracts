@@ -97,7 +97,9 @@ async function copyContractAbi(src: string, dest: string): Promise<void> {
       const json = JSON.parse(content);
 
       if (json.abi) {
-        await fs.writeFile(destPath, JSON.stringify(json.abi, null, 2));
+        // Trailing newline to match the committed formatting convention
+        // (`zkstack-out` is excluded from prettier, so it must be added here).
+        await fs.writeFile(destPath, JSON.stringify(json.abi, null, 2) + "\n");
       } else {
         console.warn(`Warning: No ABI found in ${srcPath}`);
       }
