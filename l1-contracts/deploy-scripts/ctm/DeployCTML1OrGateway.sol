@@ -7,6 +7,10 @@ import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifier
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IEraDualVerifier} from "contracts/state-transition/chain-interfaces/IEraDualVerifier.sol";
 import {IZKsyncOSDualVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSDualVerifier.sol";
+// The canonical definition of `CTMContract` lives in the production contracts tree (it keys the
+// per-CTM upgrade registries); it is re-exported here so that all deploy-script importers keep
+// working unchanged.
+import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 
 struct CTMCoreDeploymentConfig {
     bool isZKsyncOS;
@@ -23,32 +27,6 @@ struct CTMCoreDeploymentConfig {
     address verifierPlonk;
     address verifierOwner;
     address permissionlessValidator;
-}
-
-/// @notice Canonical identifier for CTM / state-transition contracts.
-///         The enum value is VM-neutral; `DeployCTML1OrGateway.resolve` maps it to
-///         the correct Era or ZKsyncOS contract / artifact name.
-enum CTMContract {
-    // ---- Diamond facets ----
-    AdminFacet,
-    MailboxFacet,
-    ExecutorFacet,
-    MigratorFacet,
-    CommitterFacet,
-    DiamondInit,
-    // ---- Infrastructure ----
-    ValidatorTimelock,
-    ChainTypeManager,
-    // ---- Verifiers ----
-    VerifierFflonk,
-    VerifierPlonk,
-    DualVerifier,
-    TestnetVerifier,
-    // ---- Gateway CTM deployers ----
-    GatewayCTMDeployerCTM,
-    GatewayCTMDeployerVerifiers,
-    // ---- DA ----
-    BlobsL1DAValidatorZKsyncOS
 }
 
 library DeployCTML1OrGateway {

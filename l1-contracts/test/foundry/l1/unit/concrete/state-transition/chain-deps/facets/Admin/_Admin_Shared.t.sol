@@ -23,7 +23,7 @@ contract AdminTest is UtilsCallMockerTest {
     DummyBridgehub internal dummyBridgehub;
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](21);
+        bytes4[] memory selectors = new bytes4[](22);
         uint256 i = 0;
         selectors[i++] = IAdmin.setPendingAdmin.selector;
         selectors[i++] = IAdmin.acceptAdmin.selector;
@@ -34,6 +34,7 @@ contract AdminTest is UtilsCallMockerTest {
         selectors[i++] = IAdmin.setTokenMultiplier.selector;
         selectors[i++] = IAdmin.upgradeChainFromVersion.selector;
         selectors[i++] = IAdmin.executeUpgrade.selector;
+        selectors[i++] = IAdmin.executeUpgradeBySwaps.selector;
         selectors[i++] = IAdmin.freezeDiamond.selector;
         selectors[i++] = IAdmin.unfreezeDiamond.selector;
         selectors[i++] = IAdmin.setTransactionFilterer.selector;

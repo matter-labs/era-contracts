@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: MIT
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
+
+import {EcosystemContract} from "./ContractIdentifiers.sol";
+
+/// @title Core (ecosystem-wide) upgrade registry.
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
+/// @notice The lookup surface of a generated, constants-in-bytecode registry that pins every
+///         ecosystem-wide L1 contract address for one protocol upgrade (old version -> new version).
+/// @dev Implementations hold all values as compile-time constants: every getter is `pure` and the
+///      deployed bytecode itself is the commitment to the upgrade manifest (its `EXTCODEHASH`
+///      commits to every pinned value). Implementations are generated from the audited manifest,
+///      never hand-written, and are redeployed to a new address for every upgrade.
+/// @dev Getters revert for unknown `(contract, version)` combinations.
+interface ICoreRegistry {
+    /// @notice The packed SemVer (see `SemVer.sol`) protocol version this registry upgrades from.
+    function oldProtocolVersion() external pure returns (uint256);
+
+    /// @notice The packed SemVer protocol version this registry upgrades to.
+    function newProtocolVersion() external pure returns (uint256);
+
+    /// @notice Proxy address of an ecosystem contract. Version-independent: proxies survive upgrades.
+    function proxyAddress(EcosystemContract _contract) external pure returns (address);
+
+    /// @notice Implementation address of an ecosystem contract at a given protocol version.
+    /// @param _contract The ecosystem contract identifier.
+    /// @param _protocolVersion Packed SemVer protocol version; only the versions pinned by this
+    ///        registry (old and new) are answerable.
+    function implAddress(EcosystemContract _contract, uint256 _protocolVersion) external pure returns (address);
+
+    /// @notice The per-CTM registry holding CTM-scoped addresses, facet selector lists,
+    ///         L2 bytecode hashes and genesis parameters.
+    /// @param _isZKsyncOS False for the Era (EraVM) CTM registry, true for the ZKsyncOS one.
+    function ctmRegistry(bool _isZKsyncOS) external pure returns (address);
+}

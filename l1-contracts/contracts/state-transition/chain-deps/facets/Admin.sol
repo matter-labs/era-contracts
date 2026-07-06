@@ -4,7 +4,9 @@ pragma solidity 0.8.28;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
+import {ISelfDescribingFacet} from "../../chain-interfaces/ISelfDescribingFacet.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
+import {DiamondCutBuilder} from "../../libraries/DiamondCutBuilder.sol";
 import {
     L2DACommitmentScheme,
     MAX_GAS_PER_TRANSACTION,
@@ -34,6 +36,9 @@ import {
     DenominatorIsZero,
     DiamondAlreadyFrozen,
     DiamondNotFrozen,
+    FacetSwapEmptySelectors,
+    FacetSwapSameFacet,
+    FacetSwapUnknownOldFacet,
     FeeParamsChangeTooLarge,
     HashMismatch,
     InvalidDAForPermanentRollup,
@@ -527,6 +532,50 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @inheritdoc IAdmin
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external onlyChainTypeManager {
         _executeDiamondCut(_diamondCut);
+    }
+
+    /// @inheritdoc IAdmin
+    function executeUpgradeBySwaps(
+        DiamondCutBuilder.FacetSwap[] calldata _swaps,
+        address _initAddress,
+        bytes calldata _initCalldata
+    ) external onlyChainTypeManager {
+        uint256 swapsLength = _swaps.length;
+        bytes4[][] memory oldSelectors = new bytes4[][](swapsLength);
+        bytes4[][] memory newSelectors = new bytes4[][](swapsLength);
+
+        // All selector reads happen before any cut is applied, so old selector sets are
+        // consistent even when a swap touches the facet serving this very function.
+        Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
+        for (uint256 i = 0; i < swapsLength; ++i) {
+            DiamondCutBuilder.FacetSwap calldata swap = _swaps[i];
+            // Also rejects the both-zero swap.
+            if (swap.oldFacet == swap.newFacet) {
+                revert FacetSwapSameFacet(swap.oldFacet);
+            }
+            if (swap.oldFacet != address(0)) {
+                oldSelectors[i] = ds.facetToSelectors[swap.oldFacet].selectors;
+                // A facet with no selectors is not installed in this diamond; swapping it out is
+                // a composition mistake, not a no-op.
+                if (oldSelectors[i].length == 0) {
+                    revert FacetSwapUnknownOldFacet(swap.oldFacet);
+                }
+            }
+            if (swap.newFacet != address(0)) {
+                newSelectors[i] = ISelfDescribingFacet(swap.newFacet).selectors();
+                if (newSelectors[i].length == 0) {
+                    revert FacetSwapEmptySelectors(swap.newFacet);
+                }
+            }
+        }
+
+        _executeDiamondCut(
+            Diamond.DiamondCutData({
+                facetCuts: DiamondCutBuilder.buildCuts(_swaps, oldSelectors, newSelectors),
+                initAddress: _initAddress,
+                initCalldata: _initCalldata
+            })
+        );
     }
 
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId

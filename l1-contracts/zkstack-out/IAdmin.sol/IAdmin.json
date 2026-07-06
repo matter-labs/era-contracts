@@ -132,6 +132,46 @@
   },
   {
     "type": "function",
+    "name": "executeUpgradeBySwaps",
+    "inputs": [
+      {
+        "name": "_swaps",
+        "type": "tuple[]",
+        "internalType": "struct DiamondCutBuilder.FacetSwap[]",
+        "components": [
+          {
+            "name": "oldFacet",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "newFacet",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "isFreezable",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ]
+      },
+      {
+        "name": "_initAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_initCalldata",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "freezeDiamond",
     "inputs": [],
     "outputs": [],

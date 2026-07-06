@@ -2,22 +2,15 @@
 
 pragma solidity ^0.8.24;
 
+// The canonical definitions of `CoreContract` and `ZKsyncOSUpgradeType` live in the production
+// contracts tree (they key the upgrade registries); they are re-exported here so that all
+// deploy-script importers keep working unchanged.
+import {CoreContract, ZKsyncOSUpgradeType} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+
 /// @notice Programming language of a system contract.
 enum Language {
     Solidity,
     Yul
-}
-
-/// @notice Canonical identifier for core L2 contracts that participate in
-///         force-deployments and factory-dependency publishing.
-///         The enum value is VM-neutral; `CoreOnGatewayHelper.resolve` maps it to
-///         the correct Era or ZKsyncOS contract / artifact name.
-/// @notice How a built-in contract is deployed in ZKsyncOS upgrades.
-/// SystemProxy: deployed via conductContractUpgrade (behind a system proxy).
-/// Unsafe: force-deployed directly (no proxy upgrade flow).
-enum ZKsyncOSUpgradeType {
-    SystemProxy,
-    Unsafe
 }
 
 /// @notice Identifier for every system contract that lives inside the
@@ -57,30 +50,6 @@ enum EraVmSystemContract {
     Create2Factory,
     SloadContract,
     SystemContractProxyAdmin
-}
-
-enum CoreContract {
-    L2Bridgehub,
-    L2AssetRouter,
-    L2NativeTokenVault,
-    L2MessageRoot,
-    UpgradeableBeaconDeployer,
-    BaseTokenHolder,
-    L2ChainAssetHandler,
-    InteropCenter,
-    InteropHandler,
-    L2AssetTracker,
-    L2WrappedBaseToken,
-    L2MessageVerification,
-    L2InteropRootStorage,
-    GWAssetTracker,
-    BeaconProxy,
-    L2V31Upgrade,
-    L2SharedBridgeLegacy,
-    BridgedStandardERC20,
-    DiamondProxy,
-    ProxyAdmin,
-    TransparentUpgradeableProxy
 }
 
 /// @notice System contracts that have ZKsyncOS-specific implementations in l1-contracts.
