@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {CoreContract, CTMContract, EcosystemContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
-import {UpgradeComposer} from "contracts/upgrades/registry/UpgradeComposer.sol";
+import {CTMUpgradeComposer} from "contracts/upgrades/registry/CTMUpgradeComposer.sol";
 import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
@@ -94,7 +94,9 @@ contract GeneratedRegistriesTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_buildFacetSwaps_skipsUnchangedFacet() public view {
-        UpgradeComposer.SwapSet memory swapSet = UpgradeComposer.buildFacetSwaps(ICTMRegistry(address(ctmRegistry)));
+        CTMUpgradeComposer.SwapSet memory swapSet = CTMUpgradeComposer.buildFacetSwaps(
+            ICTMRegistry(address(ctmRegistry))
+        );
 
         // AdminFacet changes address (swap), GettersFacet is unchanged (skipped),
         // ExecutorFacet is new (pure addition).
@@ -108,7 +110,7 @@ contract GeneratedRegistriesTest is Test {
     }
 
     function test_buildUpgradeCutData_diffsSelectors() public view {
-        Diamond.DiamondCutData memory cut = UpgradeComposer.buildUpgradeCutData(
+        Diamond.DiamondCutData memory cut = CTMUpgradeComposer.buildUpgradeCutData(
             ICTMRegistry(address(ctmRegistry)),
             address(0xF205),
             hex"1234"
@@ -132,7 +134,7 @@ contract GeneratedRegistriesTest is Test {
     }
 
     function test_buildL2UpgradeTx_matchesProtocolRequirements() public view {
-        L2CanonicalTransaction memory transaction = UpgradeComposer.buildL2UpgradeTx(
+        L2CanonicalTransaction memory transaction = CTMUpgradeComposer.buildL2UpgradeTx(
             ICTMRegistry(address(ctmRegistry))
         );
 
@@ -169,7 +171,7 @@ contract GeneratedRegistriesTest is Test {
     }
 
     function test_buildProposedUpgrade_pinsHashesAndVersion() public view {
-        ProposedUpgrade memory proposedUpgrade = UpgradeComposer.buildProposedUpgrade(
+        ProposedUpgrade memory proposedUpgrade = CTMUpgradeComposer.buildProposedUpgrade(
             ICTMRegistry(address(ctmRegistry)),
             1234567
         );
@@ -188,7 +190,7 @@ contract GeneratedRegistriesTest is Test {
     }
 
     function test_buildChainCreationParams_installsFullNewFacetSet() public view {
-        ChainCreationParams memory params = UpgradeComposer.buildChainCreationParams(
+        ChainCreationParams memory params = CTMUpgradeComposer.buildChainCreationParams(
             ICTMRegistry(address(ctmRegistry))
         );
 

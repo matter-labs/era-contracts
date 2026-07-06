@@ -2,20 +2,15 @@
 
 pragma solidity 0.8.28;
 
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-
 import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
-import {TestCoreRegistry, TestCTMRegistry} from "./TestRegistries.sol";
+import {TestCTMRegistry} from "./TestRegistries.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {UpgradeExecutor} from "contracts/governance/UpgradeExecutor.sol";
-import {RegistryUpgradeModule} from "contracts/upgrades/registry/RegistryUpgradeModule.sol";
-import {UpgradeComposer} from "contracts/upgrades/registry/UpgradeComposer.sol";
-import {CoreContract, CTMContract, EcosystemContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+import {CTMUpgradeModule} from "contracts/upgrades/registry/CTMUpgradeModule.sol";
+import {CTMUpgradeComposer} from "contracts/upgrades/registry/CTMUpgradeComposer.sol";
+import {CoreContract, CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
-import {ICoreRegistry} from "contracts/upgrades/registry/ICoreRegistry.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
@@ -23,31 +18,17 @@ import {ProposedUpgrade} from "contracts/state-transition/libraries/ProposedUpgr
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {HashMismatch} from "contracts/common/L1ContractErrors.sol";
 
-/// @dev Minimal implementation contracts for proxy-upgrade tests.
-contract DummyImplA {
-    function version() external pure returns (uint256) {
-        return 1;
-    }
-}
-
-contract DummyImplB {
-    function version() external pure returns (uint256) {
-        return 2;
-    }
-}
-
-/// @notice Tests the orchestrator module end-to-end against a real EraChainTypeManager: the
-///         UpgradeExecutor takes over CTM ownership and delegatecalls the module, which composes
-///         everything from registry values.
-/// @dev The registries here are storage-backed test doubles (see TestRegistries.sol) because the
-///      fixture deploys at dynamic addresses; production registries are generated
+/// @notice Tests the CTM-scoped orchestrator module end-to-end against a real
+///         EraChainTypeManager: a CTM-scoped UpgradeExecutor takes over CTM ownership and
+///         delegatecalls the module, which composes everything from the per-CTM registry.
+/// @dev CTM authority is intentionally separate from ecosystem authority — see
+///      EcosystemUpgradeModule.t.sol, where a differently-owned executor drives the ecosystem
+///      scope. The registry here is a storage-backed test double (see TestRegistries.sol)
+///      because the fixture deploys at dynamic addresses; production registries are generated
 ///      constants-in-bytecode contracts with the identical interface.
-contract RegistryUpgradeModuleTest is ChainTypeManagerTest {
-    bytes32 internal constant EIP1967_IMPL_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
-
-    UpgradeExecutor internal executor;
-    RegistryUpgradeModule internal module;
-    TestCoreRegistry internal coreRegistry;
+contract CTMUpgradeModuleTest is ChainTypeManagerTest {
+    UpgradeExecutor internal ctmExecutor;
+    CTMUpgradeModule internal module;
     TestCTMRegistry internal ctmRegistry;
 
     uint256 internal newVersion;
@@ -59,13 +40,13 @@ contract RegistryUpgradeModuleTest is ChainTypeManagerTest {
         _mockGetZKChainFromBridgehub(chainAddress);
         _mockMigrationPausedFromBridgehub();
 
-        module = new RegistryUpgradeModule();
-        executor = new UpgradeExecutor(governor);
+        module = new CTMUpgradeModule();
+        ctmExecutor = new UpgradeExecutor(governor);
 
-        // Hand CTM ownership to the executor; the acceptOwnership leg exercises the raw-call
-        // escape hatch, which is exactly how the real handover would run.
+        // Hand CTM ownership to the CTM-scoped executor; the acceptOwnership leg exercises the
+        // raw-call escape hatch, which is exactly how the real handover would run.
         vm.prank(governor);
-        chainContractAddress.transferOwnership(address(executor));
+        chainContractAddress.transferOwnership(address(ctmExecutor));
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: address(chainContractAddress),
@@ -73,19 +54,15 @@ contract RegistryUpgradeModuleTest is ChainTypeManagerTest {
             data: abi.encodeCall(chainContractAddress.acceptOwnership, ())
         });
         vm.prank(governor);
-        executor.forward(calls);
-        assertEq(chainContractAddress.owner(), address(executor));
+        ctmExecutor.forward(calls);
+        assertEq(chainContractAddress.owner(), address(ctmExecutor));
 
         newVersion = SemVer.packSemVer(0, 1, 0);
-        _setUpRegistries();
+        _setUpRegistry();
     }
 
-    function _setUpRegistries() internal {
-        coreRegistry = new TestCoreRegistry();
+    function _setUpRegistry() internal {
         ctmRegistry = new TestCTMRegistry();
-        coreRegistry.setVersions(0, newVersion);
-        coreRegistry.setCTMRegistry(false, address(ctmRegistry));
-
         ctmRegistry.setBase(false, 0, newVersion, address(chainContractAddress));
         ctmRegistry.setVerifier(newVersion, testnetVerifier);
         ctmRegistry.setCtmAddress(CTMContract.DefaultUpgrade, newVersion, makeAddr("defaultUpgrade"));
@@ -129,12 +106,12 @@ contract RegistryUpgradeModuleTest is ChainTypeManagerTest {
 
     /// @dev Recomposes the cut exactly as the module does, for hash assertions.
     function _expectedUpgradeCut(uint256 _upgradeTimestamp) internal view returns (Diamond.DiamondCutData memory) {
-        ProposedUpgrade memory proposedUpgrade = UpgradeComposer.buildProposedUpgrade(
+        ProposedUpgrade memory proposedUpgrade = CTMUpgradeComposer.buildProposedUpgrade(
             ICTMRegistry(address(ctmRegistry)),
             _upgradeTimestamp
         );
         return
-            UpgradeComposer.buildUpgradeCutData(
+            CTMUpgradeComposer.buildUpgradeCutData(
                 ICTMRegistry(address(ctmRegistry)),
                 ctmRegistry.ctmAddress(CTMContract.DefaultUpgrade, newVersion),
                 abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade))
@@ -143,11 +120,11 @@ contract RegistryUpgradeModuleTest is ChainTypeManagerTest {
 
     function _applyCTMUpgrade(uint256 _deadline, uint256 _timestamp) internal {
         vm.prank(governor);
-        executor.execute(
+        ctmExecutor.execute(
             address(module),
             abi.encodeCall(
-                RegistryUpgradeModule.applyCTMUpgrade,
-                (ICoreRegistry(address(coreRegistry)), false, _deadline, _timestamp)
+                CTMUpgradeModule.applyCTMUpgrade,
+                (ICTMRegistry(address(ctmRegistry)), _deadline, _timestamp)
             )
         );
     }
@@ -172,7 +149,7 @@ contract RegistryUpgradeModuleTest is ChainTypeManagerTest {
         // Chain creation params were set from the same registry constants.
         assertEq(chainContractAddress.l1GenesisUpgrade(), makeAddr("genesisUpgrade"));
         bytes32 expectedInitialCutHash = keccak256(
-            abi.encode(UpgradeComposer.buildChainCreationParams(ICTMRegistry(address(ctmRegistry))).diamondCut)
+            abi.encode(CTMUpgradeComposer.buildChainCreationParams(ICTMRegistry(address(ctmRegistry))).diamondCut)
         );
         assertEq(chainContractAddress.initialCutHash(), expectedInitialCutHash);
     }
@@ -180,18 +157,15 @@ contract RegistryUpgradeModuleTest is ChainTypeManagerTest {
     function test_revertWhen_moduleCalledDirectly() public {
         // Without the executor's identity the module has no authority over the CTM.
         vm.expectRevert("Ownable: caller is not the owner");
-        module.applyCTMUpgrade(ICoreRegistry(address(coreRegistry)), false, 1000, 777);
+        module.applyCTMUpgrade(ICTMRegistry(address(ctmRegistry)), 1000, 777);
     }
 
     function test_revertWhen_executorCalledByNonGovernance() public {
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(makeAddr("stranger"));
-        executor.execute(
+        ctmExecutor.execute(
             address(module),
-            abi.encodeCall(
-                RegistryUpgradeModule.applyCTMUpgrade,
-                (ICoreRegistry(address(coreRegistry)), false, 1000, 777)
-            )
+            abi.encodeCall(CTMUpgradeModule.applyCTMUpgrade, (ICTMRegistry(address(ctmRegistry)), 1000, 777))
         );
     }
 
@@ -218,67 +192,9 @@ contract RegistryUpgradeModuleTest is ChainTypeManagerTest {
             )
         );
         vm.prank(governor);
-        executor.execute(
+        ctmExecutor.execute(
             address(module),
-            abi.encodeCall(
-                RegistryUpgradeModule.upgradeChain,
-                (ICoreRegistry(address(coreRegistry)), false, chainId, 778)
-            )
-        );
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            applyL1Upgrade
-    //////////////////////////////////////////////////////////////*/
-
-    function test_applyL1Upgrade_upgradesChangedProxiesOnly() public {
-        DummyImplA implOld = new DummyImplA();
-        DummyImplB implNew = new DummyImplB();
-
-        // The executor owns the ecosystem ProxyAdmin, mirroring the production ownership chain.
-        ProxyAdmin proxyAdmin = new ProxyAdmin();
-        proxyAdmin.transferOwnership(address(executor));
-        TransparentUpgradeableProxy bridgehubProxy = new TransparentUpgradeableProxy(
-            address(implOld),
-            address(proxyAdmin),
-            hex""
-        );
-        TransparentUpgradeableProxy messageRootProxy = new TransparentUpgradeableProxy(
-            address(implOld),
-            address(proxyAdmin),
-            hex""
-        );
-
-        coreRegistry.setProxyAdmin(address(proxyAdmin));
-        // Bridgehub gets a new implementation; MessageRoot's is unchanged and must be skipped.
-        coreRegistry.addContract(
-            EcosystemContract.Bridgehub,
-            address(bridgehubProxy),
-            address(implOld),
-            address(implNew)
-        );
-        coreRegistry.addContract(
-            EcosystemContract.MessageRoot,
-            address(messageRootProxy),
-            address(implOld),
-            address(implOld)
-        );
-
-        vm.prank(governor);
-        executor.execute(
-            address(module),
-            abi.encodeCall(RegistryUpgradeModule.applyL1Upgrade, (ICoreRegistry(address(coreRegistry))))
-        );
-
-        assertEq(
-            address(uint160(uint256(vm.load(address(bridgehubProxy), EIP1967_IMPL_SLOT)))),
-            address(implNew),
-            "changed implementation must be swapped"
-        );
-        assertEq(
-            address(uint160(uint256(vm.load(address(messageRootProxy), EIP1967_IMPL_SLOT)))),
-            address(implOld),
-            "unchanged implementation must be skipped"
+            abi.encodeCall(CTMUpgradeModule.upgradeChain, (ICTMRegistry(address(ctmRegistry)), chainId, 778))
         );
     }
 }
