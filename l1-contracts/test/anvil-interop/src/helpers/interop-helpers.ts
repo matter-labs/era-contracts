@@ -126,7 +126,10 @@ export async function sendAndExecuteTokenInterop(params: SendAndExecuteTokenInte
 }
 
 /** Registers a chain-native token in the L2NativeTokenVault if it is not already registered. */
-export async function registerL2NativeTokenIfNeeded(provider: providers.JsonRpcProvider, tokenAddress: string): Promise<void> {
+export async function registerL2NativeTokenIfNeeded(
+  provider: providers.JsonRpcProvider,
+  tokenAddress: string
+): Promise<void> {
   const wallet = new Wallet(getInteropSourcePrivateKey(), provider);
   const ntv = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), wallet);
   const registeredAssetId: string = await ntv.assetId(tokenAddress);
