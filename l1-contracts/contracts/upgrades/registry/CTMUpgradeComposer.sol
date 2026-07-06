@@ -158,6 +158,12 @@ library CTMUpgradeComposer {
 
         CoreContract[] memory deployList = _registry.l2ForceDeployList(newVersion);
         uint256 deployListLength = deployList.length;
+        if (deployListLength == 0) {
+            // The upgrade has no L2 side (patch upgrades, or L1-only minor upgrades): an all-zero
+            // transaction (txType == 0) makes `BaseZkSyncUpgrade` skip the L2 protocol upgrade
+            // transaction entirely.
+            return ProposedUpgradeLib.emptyL2CanonicalTransaction();
+        }
         IComplexUpgrader.UniversalContractUpgradeInfo[]
             memory deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](deployListLength);
         for (uint256 i = 0; i < deployListLength; ++i) {
