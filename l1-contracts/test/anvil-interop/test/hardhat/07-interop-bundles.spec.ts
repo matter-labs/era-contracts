@@ -32,6 +32,7 @@ import {
   getZkTokenAddress,
   deployDummyInteropRecipient,
   sendAndExecuteTokenInterop,
+  registerL2NativeTokenIfNeeded,
 } from "../../src/helpers/interop-helpers";
 import type { CallStarter } from "../../src/helpers/interop-helpers";
 import {
@@ -141,6 +142,9 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     }
 
     sourceTokenAddress = state.testTokens![sourceChainId];
+    // The pre-generated states carry no NTV registrations (the balance-migration setup
+    // that used to register test tokens was removed), so register on demand.
+    await registerL2NativeTokenIfNeeded(sourceProvider, sourceTokenAddress);
     sourceAssetId = await getAssetIdForToken(sourceProvider, sourceTokenAddress);
 
     // Query the per-call interop protocol fee
