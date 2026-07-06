@@ -6,10 +6,10 @@ import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/console2.sol";
 
 import {
-    IL1Bridgehub,
     L2TransactionRequestDirect,
     L2TransactionRequestTwoBridgesOuter
 } from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
 
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
@@ -23,6 +23,7 @@ import {
 import {BridgehubInvariantTests} from "test/foundry/l1/integration/BridgehubTests.t.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
+import {L1InteropRequests} from "foundry-test/l1/utils/L1InteropRequests.sol";
 
 contract Bridgehub_7702 is BridgehubInvariantTests {
     using LogFinder for Vm.Log[];
@@ -81,15 +82,18 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
             _l2CallData: callData
         });
 
-        bytes memory calldataForExecutor = abi.encodeWithSelector(
-            IL1Bridgehub.requestL2TransactionDirect.selector,
+        (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = L1InteropRequests.encodeDirect(
             txRequest
+        );
+        bytes memory calldataForExecutor = abi.encodeCall(
+            IERC7786GatewaySource.sendMessage,
+            (recipient, payload, attributes)
         );
 
         vm.signAndAttachDelegation(address(simpleExecutor), randomCallerPk);
         vm.recordLogs();
         vm.prank(randomCaller);
-        SimpleExecutor(randomCaller).execute(address(addresses.bridgehub), mintValue, calldataForExecutor);
+        SimpleExecutor(randomCaller).execute(address(addresses.l1InteropCenter), mintValue, calldataForExecutor);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Verify ETH balance

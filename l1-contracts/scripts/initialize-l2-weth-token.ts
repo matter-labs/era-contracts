@@ -6,7 +6,7 @@ import { ethers, Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { Deployer } from "../src.ts/deploy";
 import { GAS_MULTIPLIER, SYSTEM_CONFIG, web3Provider } from "./utils";
-import { getNumberFromEnv } from "../src.ts/utils";
+import { encodeDirectInteropRequest, getNumberFromEnv, l1InteropCenterInterface } from "../src.ts/utils";
 import { getTokens } from "../src.ts/deploy-token";
 
 import * as fs from "fs";
@@ -51,19 +51,21 @@ async function getL1TxInfo(
   gasPrice: ethers.BigNumber
 ) {
   const bridgehub = deployer.bridgehubContract(ethers.Wallet.createRandom().connect(provider));
-  const l1Calldata = bridgehub.interface.encodeFunctionData("requestL2TransactionDirect", [
-    {
-      chainId,
-      l2Contract: to,
-      mintValue: 0,
-      l2Value: 0,
-      l2Calldata,
-      l2GasLimit: DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-      l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
-      factoryDeps: [], // It is assumed that the target has already been deployed
-      refundRecipient,
-    },
-  ]);
+  // L1->L2 transactions are requested through the L1InteropCenter ERC-7786 `sendMessage`
+  // entry point (the former `L1Bridgehub.requestL2TransactionDirect`).
+  const interopCenterAddress = await bridgehub.interopCenter();
+  const { recipient, payload, attributes } = encodeDirectInteropRequest({
+    chainId,
+    l2Contract: to,
+    mintValue: 0,
+    l2Value: 0,
+    l2Calldata,
+    l2GasLimit: DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
+    l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
+    factoryDeps: [], // It is assumed that the target has already been deployed
+    refundRecipient,
+  });
+  const l1Calldata = l1InteropCenterInterface().encodeFunctionData("sendMessage", [recipient, payload, attributes]);
 
   const neededValue = await bridgehub.l2TransactionBaseCost(
     chainId,
@@ -73,7 +75,7 @@ async function getL1TxInfo(
   );
 
   return {
-    to: bridgehub.address,
+    to: interopCenterAddress,
     data: l1Calldata,
     value: neededValue.toString(),
     gasPrice: gasPrice.toString(),
@@ -177,23 +179,26 @@ async function main() {
       );
       const calldata = getL2Calldata(l2SharedBridgeAddress, l1WethTokenAddress, l2WethTokenImplAddress);
 
-      const tx = await bridgehub.requestL2TransactionDirect(
-        {
-          chainId,
-          l2Contract: l2WethTokenProxyAddress,
-          mintValue: requiredValueToInitializeBridge,
-          l2Value: 0,
-          l2Calldata: calldata,
-          l2GasLimit: DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-          l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
-          factoryDeps: [],
-          refundRecipient: deployWallet.address,
-        },
-        {
-          gasPrice,
-          value: requiredValueToInitializeBridge,
-        }
-      );
+      // L1->L2 transactions are requested through the L1InteropCenter ERC-7786 `sendMessage`
+      // entry point (the former `L1Bridgehub.requestL2TransactionDirect`).
+      const interopCenterAddress = await bridgehub.interopCenter();
+      const interopCenter = new ethers.Contract(interopCenterAddress, l1InteropCenterInterface(), deployWallet);
+      const { recipient, payload, attributes } = encodeDirectInteropRequest({
+        chainId,
+        l2Contract: l2WethTokenProxyAddress,
+        mintValue: requiredValueToInitializeBridge,
+        l2Value: 0,
+        l2Calldata: calldata,
+        l2GasLimit: DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
+        l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
+        factoryDeps: [],
+        refundRecipient: deployWallet.address,
+      });
+
+      const tx = await interopCenter.sendMessage(recipient, payload, attributes, {
+        gasPrice,
+        value: requiredValueToInitializeBridge,
+      });
 
       console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}. Waiting for receipt...`);
 

@@ -28,6 +28,8 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
+import {L1InteropRequests} from "foundry-test/l1/utils/L1InteropRequests.sol";
+
 contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     //@check Why is this file practically the same as BridgehubTests.t.sol???
     uint256 constant TEST_USERS_COUNT = 10;
@@ -278,7 +280,7 @@ contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, Token
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: mintValue}(requestTx);
+        bytes32 resultantHash = L1InteropRequests.requestTwoBridges(addresses.l1InteropCenter, mintValue, requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -328,7 +330,7 @@ contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, Token
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: l2Value}(requestTx);
+        bytes32 resultantHash = L1InteropRequests.requestTwoBridges(addresses.l1InteropCenter, l2Value, requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -383,7 +385,7 @@ contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, Token
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges(requestTx);
+        bytes32 resultantHash = L1InteropRequests.requestTwoBridges(addresses.l1InteropCenter, 0, requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -428,7 +430,7 @@ contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, Token
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionDirect{value: mintValue}(txRequest);
+        bytes32 resultantHash = L1InteropRequests.requestDirect(addresses.l1InteropCenter, mintValue, txRequest);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
@@ -472,7 +474,7 @@ contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, Token
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionDirect(txRequest);
+        bytes32 resultantHash = L1InteropRequests.requestDirect(addresses.l1InteropCenter, 0, txRequest);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);

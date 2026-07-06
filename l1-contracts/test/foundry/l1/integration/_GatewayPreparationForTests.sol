@@ -25,6 +25,8 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {ConfirmTransferResultData, TxStatus} from "contracts/common/Messaging.sol";
+import {IL1InteropCenter} from "contracts/interop/IL1InteropCenter.sol";
+import {L1InteropRequests} from "foundry-test/l1/utils/L1InteropRequests.sol";
 
 contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
     using stdToml for string;
@@ -208,11 +210,16 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
             REQUIRED_L2_GAS_PRICE_PER_PUBDATA
         ) * 2;
 
-        // Call requestL2TransactionTwoBridges directly from chain admin.
+        // Resolve the interop center before the broadcast window (the view call must not consume it).
+        IL1InteropCenter interopCenter = IL1InteropCenter(bridgehub.interopCenter());
+
+        // Send the two-bridges request via the L1InteropCenter `sendMessage` directly from chain admin.
         // This sets isMigrationInProgress[chainId] = true and pausedDepositsTimestamp on the diamond proxy.
         // Capture the canonical L2 tx hash returned by the function.
         vm.startBroadcast(chainAdmin);
-        bytes32 canonicalTxHash = bridgehub.requestL2TransactionTwoBridges{value: requiredValue}(
+        bytes32 canonicalTxHash = L1InteropRequests.requestTwoBridges(
+            interopCenter,
+            requiredValue,
             L2TransactionRequestTwoBridgesOuter({
                 chainId: _gatewayGovernanceConfig.gatewayChainId,
                 mintValue: requiredValue,

@@ -38,6 +38,10 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
+import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
+import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
+import {IL1InteropCenter} from "contracts/interop/IL1InteropCenter.sol";
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 
 /// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the guardians.
 bytes32 constant EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH = keccak256(
@@ -548,6 +552,50 @@ library Utils {
         });
     }
 
+    /// @dev Builds the (target, calldata) pair that initiates the given direct L1->L2 transaction
+    /// request through the L1InteropCenter ERC-7786 `sendMessage` entry point.
+    function buildDirectSendMessageCall(
+        address bridgehubAddress,
+        L2TransactionRequestDirect memory request
+    ) internal view returns (address interopCenter, bytes memory data) {
+        interopCenter = IL1Bridgehub(bridgehubAddress).interopCenter();
+        bytes[] memory attributes = new bytes[](3);
+        attributes[0] = abi.encodeCall(
+            IERC7786Attributes.l1ToL2TransactionParams,
+            (request.mintValue, request.l2GasLimit, request.l2GasPerPubdataByteLimit, request.refundRecipient)
+        );
+        attributes[1] = abi.encodeCall(IERC7786Attributes.interopCallValue, (request.l2Value));
+        attributes[2] = abi.encodeCall(IERC7786Attributes.factoryDeps, (request.factoryDeps));
+        data = abi.encodeCall(
+            IERC7786GatewaySource.sendMessage,
+            (InteroperableAddress.formatEvmV1(request.chainId, request.l2Contract), request.l2Calldata, attributes)
+        );
+    }
+
+    /// @dev Builds the (target, calldata) pair that initiates the given two-bridges L1->L2 transaction
+    /// request through the L1InteropCenter ERC-7786 `sendMessage` entry point (indirect call).
+    function buildTwoBridgesSendMessageCall(
+        address bridgehubAddress,
+        L2TransactionRequestTwoBridgesOuter memory request
+    ) internal view returns (address interopCenter, bytes memory data) {
+        interopCenter = IL1Bridgehub(bridgehubAddress).interopCenter();
+        bytes[] memory attributes = new bytes[](3);
+        attributes[0] = abi.encodeCall(
+            IERC7786Attributes.l1ToL2TransactionParams,
+            (request.mintValue, request.l2GasLimit, request.l2GasPerPubdataByteLimit, request.refundRecipient)
+        );
+        attributes[1] = abi.encodeCall(IERC7786Attributes.interopCallValue, (request.l2Value));
+        attributes[2] = abi.encodeCall(IERC7786Attributes.indirectCall, (request.secondBridgeValue));
+        data = abi.encodeCall(
+            IERC7786GatewaySource.sendMessage,
+            (
+                InteroperableAddress.formatEvmV1(request.chainId, request.secondBridgeAddress),
+                request.secondBridgeCalldata,
+                attributes
+            )
+        );
+    }
+
     /**
      * @dev Run the l2 l1 transaction
      */
@@ -590,10 +638,36 @@ library Utils {
             requiredValueToDeploy = 0;
         }
 
+        bytes[] memory sendMessageAttributes = new bytes[](3);
+        sendMessageAttributes[0] = abi.encodeCall(
+            IERC7786Attributes.l1ToL2TransactionParams,
+            (
+                l2TransactionRequestDirect.mintValue,
+                l2TransactionRequestDirect.l2GasLimit,
+                l2TransactionRequestDirect.l2GasPerPubdataByteLimit,
+                l2TransactionRequestDirect.refundRecipient
+            )
+        );
+        sendMessageAttributes[1] = abi.encodeCall(
+            IERC7786Attributes.interopCallValue,
+            (l2TransactionRequestDirect.l2Value)
+        );
+        sendMessageAttributes[2] = abi.encodeCall(
+            IERC7786Attributes.factoryDeps,
+            (l2TransactionRequestDirect.factoryDeps)
+        );
+
+        // The interop center must be resolved before arming the broadcast: no static calls are
+        // allowed between `vm.broadcast` and the broadcast transaction itself.
+        IL1InteropCenter interopCenter = IL1InteropCenter(bridgehub.interopCenter());
+
         vm.broadcast(getBroadcasterAddress());
         vm.recordLogs();
-        bytes32 canonicalTxHash = bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(
-            l2TransactionRequestDirect
+        // solhint-disable-next-line no-unused-vars
+        interopCenter.sendMessage{value: requiredValueToDeploy}(
+            InteroperableAddress.formatEvmV1(l2TransactionRequestDirect.chainId, l2TransactionRequestDirect.l2Contract),
+            l2TransactionRequestDirect.l2Calldata,
+            sendMessageAttributes
         );
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
@@ -668,15 +742,12 @@ library Utils {
 
         calls = mergeCalls(calls, newCalls);
 
-        bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            IL1Bridgehub.requestL2TransactionDirect,
-            (l2TransactionRequestDirect)
+        (address interopCenter, bytes memory sendMessageCalldata) = buildDirectSendMessageCall(
+            bridgehubAddress,
+            l2TransactionRequestDirect
         );
 
-        calls = appendCall(
-            calls,
-            Call({target: bridgehubAddress, value: ethAmountToPass, data: l2TransactionRequestDirectCalldata})
-        );
+        calls = appendCall(calls, Call({target: interopCenter, value: ethAmountToPass, data: sendMessageCalldata}));
     }
 
     function prepareGovernanceL1L2TwoBridgesTransaction(
@@ -713,15 +784,12 @@ library Utils {
 
         calls = mergeCalls(calls, newCalls);
 
-        bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            IL1Bridgehub.requestL2TransactionTwoBridges,
-            (l2TransactionRequest)
+        (address interopCenter, bytes memory sendMessageCalldata) = buildTwoBridgesSendMessageCall(
+            bridgehubAddress,
+            l2TransactionRequest
         );
 
-        calls = appendCall(
-            calls,
-            Call({target: bridgehubAddress, value: ethAmountToPass, data: l2TransactionRequestCalldata})
-        );
+        calls = appendCall(calls, Call({target: interopCenter, value: ethAmountToPass, data: sendMessageCalldata}));
     }
 
     function prepareApproveBaseTokenGovernanceCalls(
@@ -789,16 +857,13 @@ library Utils {
         // 3) Start building up the final calls array
         calls = mergeCalls(calls, approvalCalls);
 
-        // 4) Add the actual requestL2TransactionDirect call to the Bridgehub
-        bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            IL1Bridgehub.requestL2TransactionDirect,
-            (l2TransactionRequestDirect)
+        // 4) Add the actual `sendMessage` call to the L1InteropCenter
+        (address interopCenter, bytes memory sendMessageCalldata) = buildDirectSendMessageCall(
+            bridgehubAddress,
+            l2TransactionRequestDirect
         );
 
-        calls = appendCall(
-            calls,
-            Call({target: bridgehubAddress, value: ethAmountToPass, data: l2TransactionRequestDirectCalldata})
-        );
+        calls = appendCall(calls, Call({target: interopCenter, value: ethAmountToPass, data: sendMessageCalldata}));
 
         return calls;
     }
@@ -840,16 +905,13 @@ library Utils {
         // 3) Merge in the approval calls
         calls = mergeCalls(calls, approvalCalls);
 
-        // 4) Add the actual requestL2TransactionTwoBridges call to the Bridgehub
-        bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            IL1Bridgehub.requestL2TransactionTwoBridges,
-            (l2TransactionRequest)
+        // 4) Add the actual `sendMessage` call to the L1InteropCenter
+        (address interopCenter, bytes memory sendMessageCalldata) = buildTwoBridgesSendMessageCall(
+            bridgehubAddress,
+            l2TransactionRequest
         );
 
-        calls = appendCall(
-            calls,
-            Call({target: bridgehubAddress, value: ethAmountToPass, data: l2TransactionRequestCalldata})
-        );
+        calls = appendCall(calls, Call({target: interopCenter, value: ethAmountToPass, data: sendMessageCalldata}));
 
         return calls;
     }
@@ -982,14 +1044,14 @@ library Utils {
             requiredValueToDeploy
         );
 
-        bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            IL1Bridgehub.requestL2TransactionDirect,
-            (l2TransactionRequestDirect)
+        (address interopCenter, bytes memory sendMessageCalldata) = buildDirectSendMessageCall(
+            bridgehubAddress,
+            l2TransactionRequestDirect
         );
 
         console.log("Executing transaction");
         vm.recordLogs();
-        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequestDirectCalldata, requiredValueToDeploy, 0);
+        executeUpgrade(governor, salt, interopCenter, sendMessageCalldata, requiredValueToDeploy, 0);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed successfully! Extracting logs...");
 
@@ -1036,14 +1098,14 @@ library Utils {
             requiredValueToDeploy
         );
 
-        bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            IL1Bridgehub.requestL2TransactionTwoBridges,
-            (l2TransactionRequest)
+        (address interopCenter, bytes memory sendMessageCalldata) = buildTwoBridgesSendMessageCall(
+            bridgehubAddress,
+            l2TransactionRequest
         );
 
         console.log("Executing transaction");
         vm.recordLogs();
-        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequestCalldata, requiredValueToDeploy, 0);
+        executeUpgrade(governor, salt, interopCenter, sendMessageCalldata, requiredValueToDeploy, 0);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed successfully! Extracting logs...");
 

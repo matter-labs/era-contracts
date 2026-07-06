@@ -41,6 +41,8 @@ import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
+import {L1InteropRequests} from "foundry-test/l1/utils/L1InteropRequests.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
@@ -62,6 +64,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     ChainAdmin internal chainAdmin;
     AccessControlRestriction internal restriction;
     TestPermanentRestriction internal permRestriction;
+    address internal l1InteropCenter;
 
     address constant L2_FACTORY_ADDR = address(0);
 
@@ -81,6 +84,12 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         restrictions[0] = address(restriction);
         chainAdmin = new ChainAdmin(restrictions);
         L1_CHAIN_ID = 5;
+
+        // The restriction inspects `sendMessage` calls targeted at the L1InteropCenter; the restriction
+        // itself only decodes calldata, so a lightweight address stands in for the real contract.
+        l1InteropCenter = makeAddr("l1InteropCenter");
+        vm.prank(governor);
+        bridgehub.setInteropCenter(l1InteropCenter);
     }
 
     function _deployPermRestriction(
@@ -269,7 +278,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             call.target = address(0);
             return call;
         }
-        call.target = address(bridgehub);
+        call.target = l1InteropCenter;
 
         if (!correctSelector) {
             call.data = hex"00000000";
@@ -288,8 +297,8 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             secondBridgeCalldata: hex""
         });
         if (!correctSecondBridge) {
-            call.data = abi.encodeCall(IL1Bridgehub.requestL2TransactionTwoBridges, (outer));
             // 0 is not correct second bridge
+            call.data = _encodeSendMessage(outer);
             return call;
         }
         outer.secondBridgeAddress = sharedBridge;
@@ -308,7 +317,15 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         );
         outer.secondBridgeCalldata = abi.encodePacked(bytes1(encoding), abi.encode(chainAssetId, bridgehubData));
 
-        call.data = abi.encodeCall(IL1Bridgehub.requestL2TransactionTwoBridges, (outer));
+        call.data = _encodeSendMessage(outer);
+    }
+
+    /// @dev Encodes the L1InteropCenter `sendMessage` calldata corresponding to the given two-bridges request.
+    function _encodeSendMessage(L2TransactionRequestTwoBridgesOuter memory outer) internal pure returns (bytes memory) {
+        (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = L1InteropRequests.encodeTwoBridges(
+            outer
+        );
+        return abi.encodeCall(IERC7786GatewaySource.sendMessage, (recipient, payload, attributes));
     }
 
     function assertInvalidMigrationCall(Call memory call) public {
@@ -556,11 +573,16 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             secondBridgeCalldata: hex"" // Empty calldata
         });
 
-        Call memory call = Call({
-            target: address(bridgehub),
-            value: 0,
-            data: abi.encodeCall(IL1Bridgehub.requestL2TransactionTwoBridges, (outer))
-        });
+        Call memory call = Call({target: l1InteropCenter, value: 0, data: _encodeSendMessage(outer)});
+
+        assertInvalidMigrationCall(call);
+    }
+
+    function test_tryGetNewAdminFromMigration_BridgehubTargetIsNotMigration() public {
+        // Calls targeting the Bridgehub itself are no longer migrations: migrations are initiated
+        // through the L1InteropCenter `sendMessage` entry point.
+        Call memory call = _encodeMigraationCall(true, true, true, true, true, address(0));
+        call.target = address(bridgehub);
 
         assertInvalidMigrationCall(call);
     }

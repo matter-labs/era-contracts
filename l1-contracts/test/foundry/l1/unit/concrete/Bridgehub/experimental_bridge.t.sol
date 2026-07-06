@@ -23,6 +23,17 @@ import {DummyBridgehubSetter} from "contracts/dev-contracts/test/DummyBridgehubS
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
 import {IL1CrossChainSender} from "contracts/bridge/interfaces/IL1CrossChainSender.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
+import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
+import {L1InteropCenter} from "contracts/interop/L1InteropCenter.sol";
+import {
+    AttributeAlreadySet,
+    FactoryDepsNotAllowedForIndirectCall,
+    L1ToL2TransactionParamsMissing
+} from "contracts/interop/InteropErrors.sol";
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {L1InteropRequests} from "foundry-test/l1/utils/L1InteropRequests.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -64,6 +75,7 @@ import {
     SlotOccupied,
     Unauthorized,
     WrongMagicValue,
+    ZeroAddress,
     ZeroChainId
 } from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -76,6 +88,7 @@ contract ExperimentalBridgeTest is Test {
     address weth;
     L1Bridgehub bridgehub;
     IInteropCenter interopCenter;
+    L1InteropCenter l1InteropCenter;
     DummyBridgehubSetter dummyBridgehub;
     address public bridgeOwner;
     address public testTokenAddress;
@@ -324,6 +337,8 @@ contract ExperimentalBridgeTest is Test {
             address(0)
         );
         // interopCenter.setAddresses(sharedBridgeAddress, address(assetTracker));
+        l1InteropCenter = new L1InteropCenter(IL1Bridgehub(address(bridgehub)));
+        bridgehub.setInteropCenter(address(l1InteropCenter));
         vm.stopPrank();
 
         vm.prank(l1Nullifier.owner());
@@ -1043,7 +1058,7 @@ contract ExperimentalBridgeTest is Test {
         vm.deal(randomCaller, msgValue);
         vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, mockMintValue, msgValue));
         vm.prank(randomCaller);
-        bridgehub.requestL2TransactionDirect{value: msgValue}(l2TxnReqDirect);
+        L1InteropRequests.requestDirect(l1InteropCenter, msgValue, l2TxnReqDirect);
     }
 
     function test_requestL2TransactionDirect_ETHCase(
@@ -1080,8 +1095,9 @@ contract ExperimentalBridgeTest is Test {
         vm.deal(randomCaller, l2TxnReqDirect.mintValue);
         gasPrice = bound(gasPrice, 1_000, 50_000_000);
         vm.txGasPrice(gasPrice * 1 gwei);
+        uint256 sentValue = randomCaller.balance;
         vm.prank(randomCaller);
-        bytes32 resultantHash = bridgehub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
+        bytes32 resultantHash = L1InteropRequests.requestDirect(l1InteropCenter, sentValue, l2TxnReqDirect);
 
         assertTrue(resultantHash == hash);
     }
@@ -1148,10 +1164,13 @@ contract ExperimentalBridgeTest is Test {
         testToken.mint(randomCaller, l2TxnReqDirect.mintValue);
         assertEq(testToken.balanceOf(randomCaller), l2TxnReqDirect.mintValue);
 
-        bytes memory calldataForExecutor = abi.encodeWithSelector(
-            bridgehub.requestL2TransactionDirect.selector,
-            l2TxnReqDirect
-        );
+        bytes memory calldataForExecutor;
+        {
+            (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = L1InteropRequests.encodeDirect(
+                l2TxnReqDirect
+            );
+            calldataForExecutor = abi.encodeCall(IERC7786GatewaySource.sendMessage, (recipient, payload, attributes));
+        }
 
         vm.recordLogs(); // start recording all logs
 
@@ -1159,7 +1178,7 @@ contract ExperimentalBridgeTest is Test {
         testToken.approve(sharedBridgeAddress, l2TxnReqDirect.mintValue);
         assertEq(testToken.allowance(randomCaller, sharedBridgeAddress), l2TxnReqDirect.mintValue);
         vm.signAndAttachDelegation(address(simpleExecutor), randomCallerPk);
-        SimpleExecutor(randomCaller).execute(address(bridgehub), 0, calldataForExecutor);
+        SimpleExecutor(randomCaller).execute(address(l1InteropCenter), 0, calldataForExecutor);
     }
 
     function test_requestTransactionTwoBridgesChecksMagicValue(
@@ -1218,9 +1237,10 @@ contract ExperimentalBridgeTest is Test {
             abi.encode(request)
         );
 
+        uint256 sentValue = randomCaller.balance;
         vm.expectRevert(abi.encodeWithSelector(WrongMagicValue.selector, TWO_BRIDGES_MAGIC_VALUE, magicValue));
         vm.prank(randomCaller);
-        bridgehub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
+        L1InteropRequests.requestTwoBridges(l1InteropCenter, sentValue, l2TxnReq2BridgeOut);
     }
 
     function test_requestL2TransactionTwoBridgesWrongBridgeAddress(
@@ -1296,6 +1316,7 @@ contract ExperimentalBridgeTest is Test {
         );
 
         l2TxnReq2BridgeOut.secondBridgeAddress = address(secondBridgeAddressValue);
+        uint256 sentValue = randomCaller.balance;
         vm.expectRevert(
             abi.encodeWithSelector(
                 SecondBridgeAddressTooLow.selector,
@@ -1304,7 +1325,181 @@ contract ExperimentalBridgeTest is Test {
             )
         );
         vm.prank(randomCaller);
-        bridgehub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
+        L1InteropRequests.requestTwoBridges(l1InteropCenter, sentValue, l2TxnReq2BridgeOut);
+    }
+
+    /////////////////////////////////////////////////////////
+    // L1InteropCenter entry point
+    /////////////////////////////////////////////////////////
+
+    function test_interopCenterRequestL2TransactionDirect_RevertWhen_notInteropCenter(address randomCaller) public {
+        _useMockSharedBridge();
+        _initializeBridgehub();
+        vm.assume(randomCaller != address(l1InteropCenter));
+
+        L2TransactionRequestDirect memory l2TxnReqDirect;
+
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
+        vm.prank(randomCaller);
+        bridgehub.interopCenterRequestL2TransactionDirect(l2TxnReqDirect, randomCaller);
+    }
+
+    function test_interopCenterRequestL2TransactionTwoBridges_RevertWhen_notInteropCenter(address randomCaller) public {
+        _useMockSharedBridge();
+        _initializeBridgehub();
+        vm.assume(randomCaller != address(l1InteropCenter));
+
+        L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut;
+
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
+        vm.prank(randomCaller);
+        bridgehub.interopCenterRequestL2TransactionTwoBridges(l2TxnReq2BridgeOut, randomCaller);
+    }
+
+    function test_setInteropCenter(address randomCaller, address newInteropCenter) public {
+        _useMockSharedBridge();
+        _initializeBridgehub();
+        vm.assume(randomCaller != bridgeOwner && randomCaller != L2_COMPLEX_UPGRADER_ADDR);
+        vm.assume(newInteropCenter != address(0));
+
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
+        vm.prank(randomCaller);
+        bridgehub.setInteropCenter(newInteropCenter);
+
+        vm.expectRevert(ZeroAddress.selector);
+        vm.prank(bridgeOwner);
+        bridgehub.setInteropCenter(address(0));
+
+        vm.expectEmit(true, false, false, true, address(bridgehub));
+        emit IL1Bridgehub.InteropCenterSet(newInteropCenter);
+        vm.prank(bridgeOwner);
+        bridgehub.setInteropCenter(newInteropCenter);
+        assertEq(bridgehub.interopCenter(), newInteropCenter);
+    }
+
+    function test_sendMessage_RevertWhen_l1ToL2TransactionParamsMissing(uint256 mockL2Value) public {
+        _useMockSharedBridge();
+        _initializeBridgehub();
+
+        bytes[] memory attributes = new bytes[](1);
+        attributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (mockL2Value));
+
+        vm.expectRevert(L1ToL2TransactionParamsMissing.selector);
+        l1InteropCenter.sendMessage(InteroperableAddress.formatEvmV1(eraChainId, mockL2Contract), hex"", attributes);
+    }
+
+    function test_sendMessage_RevertWhen_factoryDepsForIndirectCall() public {
+        _useMockSharedBridge();
+        _initializeBridgehub();
+
+        bytes[] memory attributes = new bytes[](3);
+        attributes[0] = abi.encodeCall(IERC7786Attributes.l1ToL2TransactionParams, (0, 0, 0, address(0)));
+        attributes[1] = abi.encodeCall(IERC7786Attributes.indirectCall, (uint256(0)));
+        attributes[2] = abi.encodeCall(IERC7786Attributes.factoryDeps, (new bytes[](1)));
+
+        vm.expectRevert(FactoryDepsNotAllowedForIndirectCall.selector);
+        l1InteropCenter.sendMessage(
+            InteroperableAddress.formatEvmV1(eraChainId, secondBridgeAddress),
+            hex"",
+            attributes
+        );
+    }
+
+    function test_sendMessage_RevertWhen_unsupportedAttribute() public {
+        _useMockSharedBridge();
+        _initializeBridgehub();
+
+        // `useFixedFee` is an L2-only attribute and must be rejected by the L1InteropCenter.
+        bytes[] memory attributes = new bytes[](2);
+        attributes[0] = abi.encodeCall(IERC7786Attributes.l1ToL2TransactionParams, (0, 0, 0, address(0)));
+        attributes[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (true));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IERC7786GatewaySource.UnsupportedAttribute.selector,
+                IERC7786Attributes.useFixedFee.selector
+            )
+        );
+        l1InteropCenter.sendMessage(InteroperableAddress.formatEvmV1(eraChainId, mockL2Contract), hex"", attributes);
+    }
+
+    function test_sendMessage_RevertWhen_duplicateAttribute() public {
+        _useMockSharedBridge();
+        _initializeBridgehub();
+
+        bytes[] memory attributes = new bytes[](2);
+        attributes[0] = abi.encodeCall(IERC7786Attributes.l1ToL2TransactionParams, (0, 0, 0, address(0)));
+        attributes[1] = abi.encodeCall(IERC7786Attributes.l1ToL2TransactionParams, (0, 0, 0, address(0)));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(AttributeAlreadySet.selector, IERC7786Attributes.l1ToL2TransactionParams.selector)
+        );
+        l1InteropCenter.sendMessage(InteroperableAddress.formatEvmV1(eraChainId, mockL2Contract), hex"", attributes);
+    }
+
+    function test_sendMessage_direct_emitsMessageSent(
+        uint256 mockChainId,
+        uint256 mockMintValue,
+        address mockL2Contract,
+        uint256 mockL2Value,
+        bytes memory mockL2Calldata,
+        uint256 mockL2GasLimit,
+        uint256 mockL2GasPerPubdataByteLimit,
+        bytes[] memory mockFactoryDeps
+    ) public {
+        _useMockSharedBridge();
+        _initializeBridgehub();
+
+        address randomCaller = makeAddr("RANDOM_CALLER");
+        mockChainId = bound(mockChainId, 1, type(uint48).max);
+        // Base-token burns require a non-zero amount, so the mint value must be positive for a successful request.
+        mockMintValue = bound(mockMintValue, 1, type(uint128).max);
+
+        (L2TransactionRequestDirect memory l2TxnReqDirect, bytes32 hash) = _prepareETHL2TransactionDirectRequest({
+            mockChainId: mockChainId,
+            mockMintValue: mockMintValue,
+            mockL2Contract: mockL2Contract,
+            mockL2Value: mockL2Value,
+            mockL2Calldata: mockL2Calldata,
+            mockL2GasLimit: mockL2GasLimit,
+            mockL2GasPerPubdataByteLimit: mockL2GasPerPubdataByteLimit,
+            mockFactoryDeps: mockFactoryDeps,
+            randomCaller: randomCaller
+        });
+
+        (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = L1InteropRequests.encodeDirect(
+            l2TxnReqDirect
+        );
+
+        vm.deal(randomCaller, l2TxnReqDirect.mintValue);
+        vm.expectEmit(true, false, false, true, address(l1InteropCenter));
+        emit IERC7786GatewaySource.MessageSent({
+            sendId: hash,
+            sender: InteroperableAddress.formatEvmV1(block.chainid, randomCaller),
+            recipient: InteroperableAddress.formatEvmV1(l2TxnReqDirect.chainId, l2TxnReqDirect.l2Contract),
+            payload: l2TxnReqDirect.l2Calldata,
+            value: l2TxnReqDirect.l2Value,
+            attributes: attributes
+        });
+        vm.prank(randomCaller);
+        bytes32 sendId = l1InteropCenter.sendMessage{value: l2TxnReqDirect.mintValue}(recipient, payload, attributes);
+
+        // The sendId of an L1->L2 message is the canonical hash of the priority transaction that delivers it.
+        assertEq(sendId, hash);
+    }
+
+    function test_supportsAttribute() public {
+        _useMockSharedBridge();
+        _initializeBridgehub();
+
+        assertTrue(l1InteropCenter.supportsAttribute(IERC7786Attributes.interopCallValue.selector));
+        assertTrue(l1InteropCenter.supportsAttribute(IERC7786Attributes.indirectCall.selector));
+        assertTrue(l1InteropCenter.supportsAttribute(IERC7786Attributes.l1ToL2TransactionParams.selector));
+        assertTrue(l1InteropCenter.supportsAttribute(IERC7786Attributes.factoryDeps.selector));
+
+        assertFalse(l1InteropCenter.supportsAttribute(IERC7786Attributes.executionAddress.selector));
+        assertFalse(l1InteropCenter.supportsAttribute(IERC7786Attributes.unbundlerAddress.selector));
+        assertFalse(l1InteropCenter.supportsAttribute(IERC7786Attributes.useFixedFee.selector));
     }
 
     /////////////////////////////////////////////////////////

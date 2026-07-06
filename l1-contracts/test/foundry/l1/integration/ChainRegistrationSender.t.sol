@@ -33,6 +33,8 @@ import {LogFinder} from "test-utils/LogFinder.sol";
 
 import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
 
+import {L1InteropRequests} from "foundry-test/l1/utils/L1InteropRequests.sol";
+
 contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
     using LogFinder for Vm.Log[];
@@ -159,7 +161,7 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
 
         vm.recordLogs();
         vm.prank(currentUser);
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: mintValue}(requestTx);
+        bytes32 resultantHash = L1InteropRequests.requestTwoBridges(addresses.l1InteropCenter, mintValue, requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Balance assertion

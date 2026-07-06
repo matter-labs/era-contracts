@@ -68,7 +68,8 @@ uint256 constant DEFAULT_ZK_INTEROP_FEE = 10e18;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev This contract serves as the primary entry point for communication between chains connected to the interop, facilitating interactions between end user and bridges.
-/// @dev as of V31 only deployed on the L2s, not on L1.
+/// @dev Only deployed on the L2s. On L1 its counterpart is the `L1InteropCenter`, which shares the ERC-7786
+/// `sendMessage` entry point but delivers messages to the ZK chains via the priority queue.
 contract InteropCenter is
     IInteropCenter,
     IERC7786GatewaySource,

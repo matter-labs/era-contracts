@@ -77,11 +77,13 @@ library AddressIntrospector {
         address ctmDeploymentTrackerProxy = address(_bridgehub.l1CtmDeployer());
         address chainAssetHandler = _bridgehub.chainAssetHandler();
 
-        // chainRegistrationSender and assetTracker only available post-V29
+        // chainRegistrationSender, assetTracker and interopCenter only available post-V29
         address chainRegistrationSenderAddr = address(0);
         address assetTrackerAddr = address(0);
+        address interopCenterAddr = address(0);
         if (!isV29) {
             chainRegistrationSenderAddr = IBridgehubBase(bridgehubProxy).chainRegistrationSender();
+            interopCenterAddr = _bridgehub.interopCenter();
 
             // Get assetTracker from NTV via assetRouter
             address assetRouter = address(_bridgehub.assetRouter());
@@ -91,6 +93,7 @@ library AddressIntrospector {
 
         BridgehubContracts memory proxies = BridgehubContracts({
             bridgehub: bridgehubProxy,
+            interopCenter: interopCenterAddr,
             messageRoot: messageRoot,
             ctmDeploymentTracker: ctmDeploymentTrackerProxy,
             chainAssetHandler: chainAssetHandler,
@@ -99,6 +102,7 @@ library AddressIntrospector {
         });
         BridgehubContracts memory implementations = BridgehubContracts({
             bridgehub: Utils.getImplementation(bridgehubProxy),
+            interopCenter: isV29 ? address(0) : Utils.getImplementation(interopCenterAddr),
             messageRoot: Utils.getImplementation(messageRoot),
             ctmDeploymentTracker: Utils.getImplementation(ctmDeploymentTrackerProxy),
             chainAssetHandler: Utils.getImplementation(chainAssetHandler),
@@ -114,6 +118,8 @@ library AddressIntrospector {
 
         BridgehubContracts memory proxies = BridgehubContracts({
             bridgehub: L2_BRIDGEHUB_ADDR,
+            // The L2 InteropCenter is a system contract with a fixed address, not tracked here.
+            interopCenter: address(0),
             messageRoot: L2_MESSAGE_ROOT_ADDR,
             ctmDeploymentTracker: ctmDeploymentTrackerProxy,
             chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,

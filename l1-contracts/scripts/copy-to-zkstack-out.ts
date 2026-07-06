@@ -67,6 +67,7 @@ const REQUIRED_CONTRACTS = [
   "L1AssetRouter.sol",
   "InteropHandler.sol",
   "IERC7786Attributes.sol",
+  "L1InteropCenter.sol",
   "L2ComplexUpgrader.sol",
   "L2GenesisUpgrade.sol",
   "L2MessageRoot.sol",

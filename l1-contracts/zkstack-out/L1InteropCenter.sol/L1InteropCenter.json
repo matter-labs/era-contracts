@@ -1,0 +1,248 @@
+[
+  {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_bridgehub",
+        "type": "address",
+        "internalType": "contract IL1Bridgehub"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "BRIDGE_HUB",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IL1Bridgehub"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "initialize",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "parseL1Attributes",
+    "inputs": [
+      {
+        "name": "_attributes",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "l1MessageAttributes",
+        "type": "tuple",
+        "internalType": "struct L1MessageAttributes",
+        "components": [
+          {
+            "name": "interopCallValue",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "indirectCallMessageValue",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "mintValue",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "l2GasLimit",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "l2GasPerPubdataByteLimit",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "refundRecipient",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "indirectCall",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "factoryDeps",
+            "type": "bytes[]",
+            "internalType": "bytes[]"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "sendMessage",
+    "inputs": [
+      {
+        "name": "_recipient",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_payload",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_attributes",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "sendId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "supportsAttribute",
+    "inputs": [
+      {
+        "name": "_attributeSelector",
+        "type": "bytes4",
+        "internalType": "bytes4"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "event",
+    "name": "MessageSent",
+    "inputs": [
+      {
+        "name": "sendId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "sender",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
+      },
+      {
+        "name": "recipient",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
+      },
+      {
+        "name": "payload",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
+      },
+      {
+        "name": "value",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "attributes",
+        "type": "bytes[]",
+        "indexed": false,
+        "internalType": "bytes[]"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "AttributeAlreadySet",
+    "inputs": [
+      {
+        "name": "selector",
+        "type": "bytes4",
+        "internalType": "bytes4"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "FactoryDepsNotAllowedForIndirectCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InteroperableAddressParsingError",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "L1ToL2TransactionParamsMissing",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotInitializedReentrancyGuard",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Reentrancy",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SlotOccupied",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "UnsupportedAttribute",
+    "inputs": [
+      {
+        "name": "selector",
+        "type": "bytes4",
+        "internalType": "bytes4"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ZeroAddress",
+    "inputs": []
+  }
+]

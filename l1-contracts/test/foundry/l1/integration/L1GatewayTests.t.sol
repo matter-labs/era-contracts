@@ -61,6 +61,7 @@ import {IMessageRootBase, IMessageVerification} from "contracts/core/message-roo
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
+import {L1InteropRequests} from "foundry-test/l1/utils/L1InteropRequests.sol";
 
 import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
 
@@ -278,7 +279,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         uint256 senderBalanceBefore = address(this).balance;
 
         vm.recordLogs();
-        bytes32 canonicalTxHash = addresses.bridgehub.requestL2TransactionDirect{value: expectedValue}(request);
+        bytes32 canonicalTxHash = L1InteropRequests.requestDirect(addresses.l1InteropCenter, expectedValue, request);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Verify transaction was created

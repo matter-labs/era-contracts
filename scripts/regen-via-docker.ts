@@ -216,7 +216,7 @@ function cmdRegen(pk: string, rpc: string, binMount: string[]): number {
  *
  *   1. **Filter** — read every prepare bundle signed by our EOA, merge them,
  *      drop CREATE2 deploys whose target already has code on chain. Funded
- *      calls (`approve` + `requestL2TransactionDirect/TwoBridges`) are kept
+ *      calls (`approve` + `L1InteropCenter.sendMessage` L1→L2 requests) are kept
  *      so the deployer's bundle-05 L1→L2 GW-CTM deploys actually broadcast;
  *      this requires pre-funding the deployer EOA with the chain-2708 base
  *      token (ZK) for the approve amounts to clear.
@@ -364,7 +364,7 @@ async function cmdBroadcast(pk: string, rpc: string, binMount: string[]): Promis
   for (const b of sourceBundles) console.log(`  ${b}`);
 
   // 1) Merge bundles into one tx list. Funded calls (`approve` +
-  //    `requestL2TransactionDirect/TwoBridges`) used to be dropped here
+  //    `L1InteropCenter.sendMessage` L1→L2 requests) used to be dropped here
   //    because the deployer EOA had no ZK base-token balance to pay for
   //    them. Now that the deployer is pre-funded with ZK on Sepolia, the
   //    L1→L2 GW-CTM deploys in bundle 05 broadcast through unchanged.

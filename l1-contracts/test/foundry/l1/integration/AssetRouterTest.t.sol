@@ -10,6 +10,8 @@ import {
 import {Vm} from "forge-std/Vm.sol";
 
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
+import {L1InteropRequests} from "foundry-test/l1/utils/L1InteropRequests.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
@@ -284,7 +286,9 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         IERC20(tokenL1Address).approve(address(addresses.l1NativeTokenVault), 100);
 
         vm.recordLogs();
-        addresses.bridgehub.requestL2TransactionTwoBridges{value: 250000000000100}(
+        L1InteropRequests.requestTwoBridges(
+            addresses.l1InteropCenter,
+            250000000000100,
             L2TransactionRequestTwoBridgesOuter({
                 chainId: eraZKChainId,
                 mintValue: 250000000000100,
@@ -324,7 +328,9 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         IERC20(tokenL1Address).approve(address(addresses.l1NativeTokenVault), 100);
 
         vm.recordLogs();
-        addresses.bridgehub.requestL2TransactionDirect{value: 250000000000100}(
+        L1InteropRequests.requestDirect(
+            addresses.l1InteropCenter,
+            250000000000100,
             L2TransactionRequestDirect({
                 chainId: eraZKChainId,
                 mintValue: 250000000000100,
@@ -402,16 +408,22 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
                 secondBridgeCalldata: secondBridgeCalldata
             });
 
-            bytes memory calldataForExecutor = abi.encodeWithSelector(
-                IL1Bridgehub.requestL2TransactionTwoBridges.selector,
-                l2TxnReqTwoBridges
+            (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = L1InteropRequests
+                .encodeTwoBridges(l2TxnReqTwoBridges);
+            bytes memory calldataForExecutor = abi.encodeCall(
+                IERC7786GatewaySource.sendMessage,
+                (recipient, payload, attributes)
             );
 
             vm.signAndAttachDelegation(address(simpleExecutor), randomCallerPk);
 
             vm.recordLogs();
             vm.prank(randomCaller);
-            SimpleExecutor(randomCaller).execute(address(addresses.bridgehub), 250000000000100, calldataForExecutor);
+            SimpleExecutor(randomCaller).execute(
+                address(addresses.l1InteropCenter),
+                250000000000100,
+                calldataForExecutor
+            );
         }
 
         Vm.Log[] memory logs = vm.getRecordedLogs();

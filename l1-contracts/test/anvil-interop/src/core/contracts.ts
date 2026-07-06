@@ -38,6 +38,7 @@ const ARTIFACTS = {
   L1MessengerZKOS: "L1MessengerZKOS.sol/L1MessengerZKOS.json",
   L1AssetTracker: "L1AssetTracker.sol/L1AssetTracker.json",
   L1Bridgehub: "L1Bridgehub.sol/L1Bridgehub.json",
+  L1InteropCenter: "L1InteropCenter.sol/L1InteropCenter.json",
   L1NativeTokenVault: "L1NativeTokenVault.sol/L1NativeTokenVault.json",
   L1Nullifier: "L1Nullifier.sol/L1Nullifier.json",
   L2AssetRouter: "L2AssetRouter.sol/L2AssetRouter.json",

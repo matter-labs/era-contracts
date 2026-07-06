@@ -28,6 +28,7 @@ import {
     ChainIdMismatch,
     IncorrectBridgeHubAddress,
     MsgValueMismatch,
+    Unauthorized,
     WrongMagicValue,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
@@ -35,8 +36,8 @@ import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.s
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev The Bridgehub contract serves as the primary entry point for L1->L2 communication,
-/// facilitating interactions between end user and bridges.
+/// @dev The Bridgehub contract performs the L1->L2 transaction requests on behalf of the L1InteropCenter,
+/// which serves as the user-facing entry point for L1->L2 communication (via ERC-7786 `sendMessage`).
 /// It also manages state transition managers, base tokens, and chain registrations.
 contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
@@ -50,6 +51,17 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     /// @notice The total number of ZK chains can be created/connected to this CTM.
     /// This is a temporary security measure.
     uint256 public immutable MAX_NUMBER_OF_ZK_CHAINS;
+
+    /// @notice The L1InteropCenter contract, the user-facing entry point for L1->L2 messaging.
+    /// @dev L1->L2 transaction requests can only be initiated through it.
+    address public interopCenter;
+
+    modifier onlyInteropCenter() {
+        if (msg.sender != interopCenter) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
 
     /// @notice to avoid parity hack
     constructor(address _owner, uint256 _maxNumberOfZKChains) reentrancyGuardInitializer {
@@ -144,14 +156,19 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         return _chainId;
     }
 
-    /// @notice The mailbox is called directly after the assetRouter received the deposit
-    /// this assumes that either ether is the base token or
-    /// the msg.sender has approved mintValue allowance for the nativeTokenVault.
+    /// @notice The mailbox is called directly after the assetRouter received the deposit.
+    /// This assumes that either ether is the base token or
+    /// the original caller has approved mintValue allowance for the nativeTokenVault.
     /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token.
     /// In case allowance is provided to the Asset Router, then it will be transferred to NTV.
-    function requestL2TransactionDirect(
-        L2TransactionRequestDirect calldata _request
-    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
+    /// @dev Formerly the user-facing `requestL2TransactionDirect`; now L1->L2 transactions are initiated
+    /// through the L1InteropCenter `sendMessage` entry point, which calls this function.
+    /// @param _request the request for the L2 transaction
+    /// @param _originalCaller the account that initiated the message on the L1InteropCenter
+    function interopCenterRequestL2TransactionDirect(
+        L2TransactionRequestDirect calldata _request,
+        address _originalCaller
+    ) external payable override onlyInteropCenter nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
         // Note: If the ZK chain with corresponding `chainId` is not yet created,
         // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
         {
@@ -170,7 +187,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             IAssetRouterShared(address(assetRouter)).bridgehubDepositBaseToken{value: msg.value}(
                 _request.chainId,
                 tokenAssetId,
-                msg.sender,
+                _originalCaller,
                 _request.mintValue
             );
         }
@@ -178,8 +195,9 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         canonicalTxHash = _sendRequest(
             _request.chainId,
             _request.refundRecipient,
+            _originalCaller,
             BridgehubL2TransactionRequest({
-                sender: msg.sender,
+                sender: _originalCaller,
                 contractL2: _request.l2Contract,
                 mintValue: _request.mintValue,
                 l2Value: _request.l2Value,
@@ -195,17 +213,32 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     /// @notice After depositing funds to the assetRouter, the secondBridge is called
     ///  to return the actual L2 message which is sent to the Mailbox.
     ///  This assumes that either ether is the base token or
-    ///  the msg.sender has approved the nativeTokenVault with the mintValue,
+    ///  the original caller has approved the nativeTokenVault with the mintValue,
     ///  and also the necessary approvals are given for the second bridge.
     ///  In case allowance is provided to the Shared Bridge, then it will be transferred to NTV.
     /// @notice The logic of this bridge is to allow easy depositing for bridges.
     /// Each contract that handles the users ERC20 tokens needs approvals from the user, this contract allows
     /// the user to approve for each token only its respective bridge
-    /// @notice This function is great for contract calls to L2, the secondBridge can be any contract.
+    /// @notice This flow is great for contract calls to L2, the secondBridge can be any contract.
+    /// @dev Formerly the user-facing `requestL2TransactionTwoBridges`; now L1->L2 transactions are initiated
+    /// through the L1InteropCenter `sendMessage` entry point (with the `indirectCall` attribute set), which
+    /// calls this function.
     /// @param _request the request for the L2 transaction
-    function requestL2TransactionTwoBridges(
-        L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
+    /// @param _originalCaller the account that initiated the message on the L1InteropCenter
+    /// @return canonicalTxHash the canonical hash of the requested L1->L2 transaction
+    /// @return l2Contract the destination-side contract of the L2 transaction constructed by the second bridge
+    function interopCenterRequestL2TransactionTwoBridges(
+        L2TransactionRequestTwoBridgesOuter calldata _request,
+        address _originalCaller
+    )
+        external
+        payable
+        override
+        onlyInteropCenter
+        nonReentrant
+        whenNotPaused
+        returns (bytes32 canonicalTxHash, address l2Contract)
+    {
         if (_request.secondBridgeAddress <= BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS) {
             revert SecondBridgeAddressTooLow(_request.secondBridgeAddress, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS);
         }
@@ -229,7 +262,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             IAssetRouterShared(address(assetRouter)).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
                 _request.chainId,
                 tokenAssetId,
-                msg.sender,
+                _originalCaller,
                 _request.mintValue
             );
         }
@@ -238,7 +271,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         L2TransactionRequestTwoBridgesInner memory outputRequest = IL1CrossChainSender(_request.secondBridgeAddress)
             .bridgehubDeposit{value: _request.secondBridgeValue}(
             _request.chainId,
-            msg.sender,
+            _originalCaller,
             _request.l2Value,
             _request.secondBridgeCalldata
         );
@@ -247,9 +280,12 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             revert WrongMagicValue(uint256(TWO_BRIDGES_MAGIC_VALUE), uint256(outputRequest.magicValue));
         }
 
+        l2Contract = outputRequest.l2Contract;
+
         canonicalTxHash = _sendRequest(
             _request.chainId,
             _request.refundRecipient,
+            _originalCaller,
             BridgehubL2TransactionRequest({
                 sender: _request.secondBridgeAddress,
                 contractL2: outputRequest.l2Contract,
@@ -268,6 +304,16 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             outputRequest.txDataHash,
             canonicalTxHash
         );
+    }
+
+    /// @notice Sets the L1InteropCenter contract, the only address allowed to initiate L1->L2 transaction requests.
+    /// @param _interopCenter the address of the L1InteropCenter
+    function setInteropCenter(address _interopCenter) external onlyOwnerOrUpgrader {
+        if (_interopCenter == address(0)) {
+            revert ZeroAddress();
+        }
+        interopCenter = _interopCenter;
+        emit InteropCenterSet(_interopCenter);
     }
 
     /// @notice Sets contract addresses

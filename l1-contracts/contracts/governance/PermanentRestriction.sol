@@ -13,10 +13,12 @@ import {
 } from "../common/L1ContractErrors.sol";
 
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
-import {BridgehubBurnCTMAssetData, L2TransactionRequestTwoBridgesOuter} from "../core/bridgehub/IBridgehubBase.sol";
+import {BridgehubBurnCTMAssetData} from "../core/bridgehub/IBridgehubBase.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {IAssetRouterBase, NEW_ENCODING_VERSION} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {IERC7786GatewaySource} from "../interop/IERC7786GatewaySource.sol";
+import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 
 import {Call} from "./Common.sol";
 import {Restriction} from "./restriction/Restriction.sol";
@@ -288,7 +290,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @dev If any other error is returned, it is assumed to be out of gas or some other unexpected
     /// error that should be bubbled up by the caller.
     function _getNewAdminFromMigration(Call calldata _call) internal view returns (address, bool) {
-        if (_call.target != address(BRIDGE_HUB)) {
+        if (_call.target != BRIDGE_HUB.interopCenter()) {
             return (address(0), false);
         }
 
@@ -296,7 +298,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return (address(0), false);
         }
 
-        if (bytes4(_call.data[:4]) != IL1Bridgehub.requestL2TransactionTwoBridges.selector) {
+        if (bytes4(_call.data[:4]) != IERC7786GatewaySource.sendMessage.selector) {
             return (address(0), false);
         }
 
@@ -304,16 +306,17 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
 
         // Assuming that correctly encoded calldata is provided, the following line must never fail,
         // since the correct selector was checked before.
-        L2TransactionRequestTwoBridgesOuter memory request = abi.decode(
-            _call.data[4:],
-            (L2TransactionRequestTwoBridgesOuter)
-        );
+        (bytes memory recipient, bytes memory payload, ) = abi.decode(_call.data[4:], (bytes, bytes, bytes[]));
 
-        if (request.secondBridgeAddress != sharedBridge) {
+        // A chain migration is an indirect call ("two bridges" flow) whose ERC-7930 recipient is the
+        // shared bridge (the asset router), with the payload being the second bridge calldata.
+        // slither-disable-next-line unused-return
+        (, address recipientAddress) = InteroperableAddress.parseEvmV1(recipient);
+        if (recipientAddress != sharedBridge) {
             return (address(0), false);
         }
 
-        bytes memory secondBridgeData = request.secondBridgeCalldata;
+        bytes memory secondBridgeData = payload;
         if (secondBridgeData.length == 0) {
             return (address(0), false);
         }

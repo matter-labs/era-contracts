@@ -93,8 +93,15 @@ contract InitializeL2WethTokenScript is Script {
             refundRecipient: config.deployerAddress
         });
 
+        (address interopCenter, bytes memory sendMessageCalldata) = Utils.buildDirectSendMessageCall(
+            config.bridgehubProxyAddr,
+            l2TransactionRequestDirect
+        );
+
         vm.broadcast();
-        bridgehub.requestL2TransactionDirect{value: requiredValueToInitializeBridge}(l2TransactionRequestDirect);
+        // slither-disable-next-line low-level-calls
+        (bool success, ) = interopCenter.call{value: requiredValueToInitializeBridge}(sendMessageCalldata);
+        require(success, "L1InteropCenter sendMessage failed");
 
         console.log("L2 WETH token initialized");
     }

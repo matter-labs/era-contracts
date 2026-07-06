@@ -95,6 +95,10 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridgehub.proxies.bridgehub
         ) = deployTuppWithContract("L1Bridgehub", false);
         (
+            coreAddresses.bridgehub.implementations.interopCenter,
+            coreAddresses.bridgehub.proxies.interopCenter
+        ) = deployTuppWithContract("L1InteropCenter", false);
+        (
             coreAddresses.bridgehub.implementations.chainAssetHandler,
             coreAddresses.bridgehub.proxies.chainAssetHandler
         ) = deployTuppWithContract("L1ChainAssetHandler", false);
@@ -165,6 +169,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             coreAddresses.bridgehub.proxies.chainRegistrationSender
         );
+        bridgehub.setInteropCenter(coreAddresses.bridgehub.proxies.interopCenter);
         assetTracker.setAddresses();
         chainAssetHandler.setAddresses();
         vm.stopBroadcast();
@@ -231,6 +236,12 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             "bridgehub",
             "bridgehub_implementation_addr",
             coreAddresses.bridgehub.implementations.bridgehub
+        );
+        vm.serializeAddress("bridgehub", "interop_center_proxy_addr", coreAddresses.bridgehub.proxies.interopCenter);
+        vm.serializeAddress(
+            "bridgehub",
+            "interop_center_implementation_addr",
+            coreAddresses.bridgehub.implementations.interopCenter
         );
         vm.serializeAddress(
             "bridgehub",

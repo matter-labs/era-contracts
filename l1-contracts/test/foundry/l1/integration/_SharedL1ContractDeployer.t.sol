@@ -8,6 +8,7 @@ import {DeployCTMIntegrationScript} from "./deploy-scripts/DeployCTMIntegration.
 import {RegisterCTM} from "../../../../deploy-scripts/ecosystem/RegisterCTM.s.sol";
 import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+import {IL1InteropCenter} from "contracts/interop/IL1InteropCenter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -32,6 +33,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         address bridgehubOwnerAddress;
         L1Bridgehub bridgehub;
         IInteropCenter interopCenter;
+        IL1InteropCenter l1InteropCenter;
         CTMDeploymentTracker ctmDeploymentTracker;
         L1AssetRouter sharedBridge;
         L1AssetTracker l1AssetTracker;
@@ -92,6 +94,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
 
         // Get bridgehub from the CTM script's discovered addresses
         addresses.bridgehub = L1Bridgehub(ecosystemAddresses.bridgehub.proxies.bridgehub);
+        addresses.l1InteropCenter = IL1InteropCenter(ecosystemAddresses.bridgehub.proxies.interopCenter);
         addresses.chainTypeManager = IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager);
         addresses.ctmDeploymentTracker = CTMDeploymentTracker(address(addresses.bridgehub.l1CtmDeployer()));
 

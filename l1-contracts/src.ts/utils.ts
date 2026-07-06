@@ -49,6 +49,127 @@ export function readContract(path: string, fileName: string) {
   return JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${fileName}.json`, { encoding: "utf-8" }));
 }
 
+// ── L1InteropCenter (ERC-7786) request encoding ─────────────────────────────
+// TypeScript mirror of test/foundry/l1/utils/L1InteropRequests.sol: translates the former
+// `L1Bridgehub.requestL2TransactionDirect` / `requestL2TransactionTwoBridges` request structs
+// into the arguments of `L1InteropCenter.sendMessage(recipient, payload, attributes)`.
+//
+// The ABIs are loaded from the committed `zkstack-out` artifacts so these helpers work from any
+// workspace (e.g. `l2-contracts` scripts) without requiring a hardhat/forge build of `l1-contracts`.
+
+function readZkstackOutInterface(fileName: string): ethers.utils.Interface {
+  const artifact = JSON.parse(
+    fs.readFileSync(`${__dirname}/../zkstack-out/${fileName}.sol/${fileName}.json`, { encoding: "utf-8" })
+  );
+  // zkstack-out files are ABI-only arrays; full artifacts keep the ABI under `.abi`.
+  return new ethers.utils.Interface(Array.isArray(artifact) ? artifact : artifact.abi);
+}
+
+/** Interface of the L1InteropCenter, the ERC-7786 entry point for L1->L2 transactions. */
+export function l1InteropCenterInterface(): ethers.utils.Interface {
+  return readZkstackOutInterface("L1InteropCenter");
+}
+
+/** ERC-7786 attributes are encoded as calls to IERC7786Attributes functions. */
+function ierc7786AttributesInterface(): ethers.utils.Interface {
+  return readZkstackOutInterface("IERC7786Attributes");
+}
+
+/** Mirror of the `L2TransactionRequestDirect` struct from IBridgehubBase.sol. */
+export interface L2TransactionRequestDirect {
+  chainId: BigNumberish;
+  mintValue: BigNumberish;
+  l2Contract: string;
+  l2Value: BigNumberish;
+  l2Calldata: BytesLike;
+  l2GasLimit: BigNumberish;
+  l2GasPerPubdataByteLimit: BigNumberish;
+  factoryDeps: BytesLike[];
+  refundRecipient: string;
+}
+
+/** Mirror of the `L2TransactionRequestTwoBridgesOuter` struct from IBridgehubBase.sol. */
+export interface L2TransactionRequestTwoBridgesOuter {
+  chainId: BigNumberish;
+  mintValue: BigNumberish;
+  l2Value: BigNumberish;
+  l2GasLimit: BigNumberish;
+  l2GasPerPubdataByteLimit: BigNumberish;
+  refundRecipient: string;
+  secondBridgeAddress: string;
+  secondBridgeValue: BigNumberish;
+  secondBridgeCalldata: BytesLike;
+}
+
+/** Arguments for `L1InteropCenter.sendMessage(recipient, payload, attributes)`. */
+export interface InteropSendMessageArgs {
+  recipient: string;
+  payload: string;
+  attributes: string[];
+}
+
+/**
+ * Matches `InteroperableAddress.formatEvmV1(chainId, addr)`
+ * (contracts/vendor/draft-InteroperableAddress.sol): the ERC-7930 EVM v1
+ * interoperable address of (chainId, addr).
+ */
+export function formatEvmV1(chainId: BigNumberish, addr: string): string {
+  // Minimal big-endian chain reference; ethers BigNumber hex is already minimal
+  // even-length bytes (e.g. 256 -> 0x0100, 0 -> 0x00), matching `_toChainReference`.
+  const chainReference = ethers.BigNumber.from(chainId).toHexString();
+  return ethers.utils.hexConcat([
+    "0x00010000", // ERC-7930 version 0x0001 + EVM (eip-155) chain type 0x0000
+    ethers.utils.hexlify(ethers.utils.hexDataLength(chainReference)),
+    chainReference,
+    "0x14", // address length: 20 bytes
+    addr,
+  ]);
+}
+
+/**
+ * Matches `L1InteropRequests.encodeDirect`: the `sendMessage` arguments for a
+ * direct (former `requestL2TransactionDirect`) request.
+ */
+export function encodeDirectInteropRequest(request: L2TransactionRequestDirect): InteropSendMessageArgs {
+  const iface = ierc7786AttributesInterface();
+  return {
+    recipient: formatEvmV1(request.chainId, request.l2Contract),
+    payload: ethers.utils.hexlify(request.l2Calldata),
+    attributes: [
+      iface.encodeFunctionData("l1ToL2TransactionParams", [
+        request.mintValue,
+        request.l2GasLimit,
+        request.l2GasPerPubdataByteLimit,
+        request.refundRecipient,
+      ]),
+      iface.encodeFunctionData("interopCallValue", [request.l2Value]),
+      iface.encodeFunctionData("factoryDeps", [request.factoryDeps]),
+    ],
+  };
+}
+
+/**
+ * Matches `L1InteropRequests.encodeTwoBridges`: the `sendMessage` arguments for
+ * an indirect (former `requestL2TransactionTwoBridges`) request.
+ */
+export function encodeTwoBridgesInteropRequest(request: L2TransactionRequestTwoBridgesOuter): InteropSendMessageArgs {
+  const iface = ierc7786AttributesInterface();
+  return {
+    recipient: formatEvmV1(request.chainId, request.secondBridgeAddress),
+    payload: ethers.utils.hexlify(request.secondBridgeCalldata),
+    attributes: [
+      iface.encodeFunctionData("l1ToL2TransactionParams", [
+        request.mintValue,
+        request.l2GasLimit,
+        request.l2GasPerPubdataByteLimit,
+        request.refundRecipient,
+      ]),
+      iface.encodeFunctionData("interopCallValue", [request.l2Value]),
+      iface.encodeFunctionData("indirectCall", [request.secondBridgeValue]),
+    ],
+  };
+}
+
 export function hashL2Bytecode(bytecode: ethers.BytesLike): Uint8Array {
   // For getting the consistent length we first convert the bytecode to UInt8Array
   const bytecodeAsArray = ethers.utils.arrayify(bytecode);
