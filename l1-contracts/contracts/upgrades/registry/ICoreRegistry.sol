@@ -16,22 +16,34 @@ import {EcosystemContract} from "./ContractIdentifiers.sol";
 /// @dev Getters revert for unknown `(contract, version)` combinations.
 interface ICoreRegistry {
     /// @notice The packed SemVer (see `SemVer.sol`) protocol version this registry upgrades from.
-    function oldProtocolVersion() external pure returns (uint256);
+    function oldProtocolVersion() external view returns (uint256);
 
     /// @notice The packed SemVer protocol version this registry upgrades to.
-    function newProtocolVersion() external pure returns (uint256);
+    function newProtocolVersion() external view returns (uint256);
 
     /// @notice Proxy address of an ecosystem contract. Version-independent: proxies survive upgrades.
-    function proxyAddress(EcosystemContract _contract) external pure returns (address);
+    function proxyAddress(EcosystemContract _contract) external view returns (address);
 
     /// @notice Implementation address of an ecosystem contract at a given protocol version.
     /// @param _contract The ecosystem contract identifier.
     /// @param _protocolVersion Packed SemVer protocol version; only the versions pinned by this
     ///        registry (old and new) are answerable.
-    function implAddress(EcosystemContract _contract, uint256 _protocolVersion) external pure returns (address);
+    function implAddress(EcosystemContract _contract, uint256 _protocolVersion) external view returns (address);
+
+    /// @notice The ecosystem contracts that participate in this upgrade (i.e. that have a proxy
+    ///         and per-version implementations pinned in this registry).
+    function ecosystemContractList() external view returns (EcosystemContract[] memory);
+
+    /// @notice The ecosystem `ProxyAdmin` that administers every ecosystem proxy.
+    function proxyAdmin() external view returns (address);
 
     /// @notice The per-CTM registry holding CTM-scoped addresses, facet selector lists,
     ///         L2 bytecode hashes and genesis parameters.
     /// @param _isZKsyncOS False for the Era (EraVM) CTM registry, true for the ZKsyncOS one.
-    function ctmRegistry(bool _isZKsyncOS) external pure returns (address);
+    function ctmRegistry(bool _isZKsyncOS) external view returns (address);
+
+    /// @notice Walks every pinned L1 address (including the CTM registries, recursively) and
+    ///         compares its `EXTCODEHASH` against the hash pinned at generation time. Anyone can
+    ///         call this to check that deployed bytecode matches what was audited.
+    function verifyAll() external view returns (bool);
 }

@@ -77,8 +77,10 @@ enum CTMContract {
     GatewayCTMDeployerVerifiers,
     // ---- DA ----
     BlobsL1DAValidatorZKsyncOS,
-    // ---- Diamond facets (appended; the enum is append-only) ----
-    GettersFacet
+    // ---- Appended variants (the enum is append-only) ----
+    GettersFacet,
+    DefaultUpgrade,
+    L1GenesisUpgrade
 }
 
 /// @notice How a built-in contract is deployed in ZKsyncOS upgrades.

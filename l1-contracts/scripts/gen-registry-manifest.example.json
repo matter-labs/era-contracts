@@ -1,0 +1,111 @@
+{
+  "tag": "V99",
+  "oldVersion": "0.98.0",
+  "newVersion": "0.99.0",
+  "core": {
+    "proxyAdmin": "0x000000000000000000000000000000000000a001",
+    "ctmRegistries": {
+      "era": "0x000000000000000000000000000000000000c001",
+      "zksyncOS": "0x000000000000000000000000000000000000c002"
+    },
+    "contracts": {
+      "Bridgehub": {
+        "proxy": "0x000000000000000000000000000000000000b001",
+        "implOld": "0x000000000000000000000000000000000000b101",
+        "implNew": "0x000000000000000000000000000000000000b201",
+        "implNewCodehash": "0xf8b07b083341d3a7667e38718918d301f47d62f82d8186f4ccd7ed7424a64ef3"
+      },
+      "L1AssetRouter": {
+        "proxy": "0x000000000000000000000000000000000000b002",
+        "implOld": "0x000000000000000000000000000000000000b102",
+        "implNew": "0x000000000000000000000000000000000000b202"
+      },
+      "MessageRoot": {
+        "proxy": "0x000000000000000000000000000000000000b003",
+        "implOld": "0x000000000000000000000000000000000000b103",
+        "implNew": "0x000000000000000000000000000000000000b103"
+      }
+    }
+  },
+  "ctms": [
+    {
+      "name": "Era",
+      "isZKsyncOS": false,
+      "ctmProxy": "0x000000000000000000000000000000000000d001",
+      "verifierOld": "0x000000000000000000000000000000000000e001",
+      "verifierNew": "0x000000000000000000000000000000000000e002",
+      "contracts": {
+        "AdminFacet": {
+          "old": "0x000000000000000000000000000000000000f101",
+          "new": "0x000000000000000000000000000000000000f201"
+        },
+        "GettersFacet": {
+          "old": "0x000000000000000000000000000000000000f102",
+          "new": "0x000000000000000000000000000000000000f102"
+        },
+        "ExecutorFacet": {
+          "new": "0x000000000000000000000000000000000000f203"
+        },
+        "DiamondInit": {
+          "new": "0x000000000000000000000000000000000000f204"
+        },
+        "DefaultUpgrade": {
+          "new": "0x000000000000000000000000000000000000f205"
+        }
+      },
+      "facets": {
+        "old": [
+          { "name": "AdminFacet", "selectors": ["0x00000001", "0x00000002"] },
+          { "name": "GettersFacet", "selectors": ["0x00000010", "0x00000011"] }
+        ],
+        "new": [
+          { "name": "AdminFacet", "selectors": ["0x00000002", "0x00000003"] },
+          { "name": "GettersFacet", "selectors": ["0x00000010", "0x00000011"] },
+          { "name": "ExecutorFacet", "selectors": ["0x00000020"] }
+        ]
+      },
+      "facetFreezability": {
+        "AdminFacet": false,
+        "GettersFacet": false,
+        "ExecutorFacet": true
+      },
+      "l2": {
+        "forceDeployments": [
+          {
+            "contract": "L2Bridgehub",
+            "upgradeType": "EraForceDeployment",
+            "deployedBytecodeInfo": "0xaa01",
+            "newAddress": "0x0000000000000000000000000000000000010002",
+            "bytecodeHash": "0x0100000000000000000000000000000000000000000000000000000000000001"
+          },
+          {
+            "contract": "L2AssetRouter",
+            "upgradeType": "EraForceDeployment",
+            "deployedBytecodeInfo": "0xaa02",
+            "newAddress": "0x0000000000000000000000000000000000010003",
+            "bytecodeHash": "0x0100000000000000000000000000000000000000000000000000000000000002"
+          }
+        ],
+        "delegateTo": "0x0000000000000000000000000000000000010004",
+        "delegateCalldata": "0xbeef",
+        "factoryDepHashes": [
+          "0x0100000000000000000000000000000000000000000000000000000000000001",
+          "0x0100000000000000000000000000000000000000000000000000000000000002"
+        ],
+        "baseSystemContracts": {
+          "bootloader": "0x0100000000000000000000000000000000000000000000000000000000000b00",
+          "defaultAccount": "0x0100000000000000000000000000000000000000000000000000000000000da0",
+          "evmEmulator": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "fixedForceDeploymentsData": "0xf1f2",
+        "chainCreationInitCalldata": "0xc1c2c3"
+      },
+      "genesis": {
+        "genesisUpgrade": "0x0000000000000000000000000000000000010005",
+        "batchHash": "0x0200000000000000000000000000000000000000000000000000000000000001",
+        "batchCommitment": "0x0200000000000000000000000000000000000000000000000000000000000002",
+        "indexRepeatedStorageChanges": 54
+      }
+    }
+  ]
+}
