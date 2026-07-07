@@ -306,4 +306,3 @@ git status
 - **Don't add `try-catch` / `staticcall` to make a script "robust"** to a missing precondition. The CI failure points at a real ordering / initialization bug; fix the precondition.
 - **Don't `anvil_setStorageAt`** to skip a flow that's reverting. The reverting flow is the bug.
 - **Don't `--no-verify`, `--no-gpg-sign`, `--force-push`, or `--amend` published commits.** All of these turn a CI failure into something worse later. Add a new commit.
-- **Don't run a full `cargo update` in `system-contracts/bootloader/test_infra/`.** Use the selective update recipe in `AGENTS.md` — full updates pull in `crc-fast` / `zerocopy` versions that need post-1.89 nightly intrinsics and break the toolchain.
