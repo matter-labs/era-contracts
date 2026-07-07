@@ -1381,13 +1381,13 @@
   },
   {
     "contractName": "l1-contracts/L1InteropHandler",
-    "zkBytecodeHash": "0x01000485e1683474650f023b843202915527e1ce5ad9fdc2f360e0be1bacec5c",
+    "zkBytecodeHash": "0x0100043fc6f86291466934089cb55289b5414bb6ce1557146a3fa6bf64333963",
     "zkBytecodePath": "/l1-contracts/zkout/L1InteropHandler.sol/L1InteropHandler.json",
-    "evmBytecodeHash": "0x3e01dda26f93a6e3992a5ddbf6ad89bfb6b9c7e11fd3e33c38780a2294fcc040",
+    "evmBytecodeHash": "0xd1bdb7f0b62bfb16b873a1e2ad4e355cafb290a9117c620e29d38b16a5092518",
     "evmBytecodePath": "/l1-contracts/out/L1InteropHandler.sol/L1InteropHandler.json",
-    "evmDeployedBytecodeHash": "0x96459a8f357d9541c1684c7b99e35873d79ba95f083ae17c611e428acd3d895a",
-    "evmDeployedBytecodeBlakeHash": "0x5592d36961305a862ee2cf653fb2ad8c40eb77ebaa1638b74ed82d52a834b9db",
-    "evmDeployedBytecodeLength": 9122
+    "evmDeployedBytecodeHash": "0x89e8ce7c8118744898b5b5c8ec18fc216e1ac3eaf2551a3895fff8d5d485401e",
+    "evmDeployedBytecodeBlakeHash": "0xc99c5cb5095f2a1c3ba861d2d45ceb4969c47bd176ad7d9ad0c0403296b3d3f5",
+    "evmDeployedBytecodeLength": 11032
   },
   {
     "contractName": "l1-contracts/L1MessageGasLib",
