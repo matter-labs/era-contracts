@@ -21,6 +21,10 @@ struct CTMCoreDeploymentConfig {
     address eip7702Checker;
     address verifierFflonk;
     address verifierPlonk;
+    /// @notice Address of the Airbender PLONK verifier wired into the third slot of the Era dual
+    ///         verifier. `address(0)` when Airbender support is not requested (or for ZKsyncOS,
+    ///         which registers sub-verifiers differently).
+    address airbenderVerifierPlonk;
     address verifierOwner;
     address permissionlessValidator;
 }
@@ -103,7 +107,13 @@ library DeployCTML1OrGateway {
             return abi.encode(_isZKsyncOS);
         } else if (_contractName == CTMContract.DualVerifier || _contractName == CTMContract.TestnetVerifier) {
             return
-                verifierCreationArgs(_isZKsyncOS, _config.verifierFflonk, _config.verifierPlonk, _config.verifierOwner);
+                verifierCreationArgs(
+                    _isZKsyncOS,
+                    _config.verifierFflonk,
+                    _config.verifierPlonk,
+                    _config.verifierOwner,
+                    _config.airbenderVerifierPlonk
+                );
         } else if (_contractName == CTMContract.ChainTypeManager) {
             return
                 abi.encode(
@@ -163,19 +173,22 @@ library DeployCTML1OrGateway {
     uint32 internal constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 6;
 
     /// @notice Encode constructor arguments for the main verifier.
-    ///         ZKsyncOS verifiers require an extra `_owner` argument.
+    ///         ZKsyncOS verifiers require an extra `_owner` argument, while the Era dual verifier
+    ///         accepts the Airbender PLONK verifier in its third slot.
+    /// @param _airbenderPlonk Address of the Airbender PLONK verifier for the Era dual verifier's
+    ///        third slot. Pass `address(0)` to leave the slot empty (the default when Airbender
+    ///        support is not requested). Ignored for ZKsyncOS.
     function verifierCreationArgs(
         bool _isZKsyncOS,
         address _fflonk,
         address _plonk,
-        address _owner
+        address _owner,
+        address _airbenderPlonk
     ) internal pure returns (bytes memory) {
         if (_isZKsyncOS) {
             return abi.encode(_fflonk, _plonk, _owner);
         }
-        // The Airbender PLONK verifier slot is left empty (address(0)) by the default deploy flow;
-        // chains that want Airbender support must deploy their own EraDualVerifier.
-        return abi.encode(_fflonk, _plonk, address(0));
+        return abi.encode(_fflonk, _plonk, _airbenderPlonk);
     }
 
     /// @notice Perform any post-deploy steps required for the verifier.
@@ -225,12 +238,17 @@ library DeployCTML1OrGateway {
     }
 
     /// @notice Retrieve sub-verifier addresses from a deployed dual verifier.
+    /// @return fflonk The Boojum FFLONK sub-verifier.
+    /// @return plonk The Boojum PLONK sub-verifier.
+    /// @return airbenderPlonk The Airbender PLONK sub-verifier. Always `address(0)` for ZKsyncOS
+    ///         (which has no dedicated Airbender slot) and may be `address(0)` for an Era dual
+    ///         verifier deployed without Airbender support.
     function getSubVerifiers(
         address _verifier,
         bool _isZKsyncOS
-    ) internal view returns (address fflonk, address plonk) {
+    ) internal view returns (address fflonk, address plonk, address airbenderPlonk) {
         if (_verifier == address(0)) {
-            return (address(0), address(0));
+            return (address(0), address(0), address(0));
         }
 
         if (_isZKsyncOS) {
@@ -241,6 +259,7 @@ library DeployCTML1OrGateway {
             IEraDualVerifier verifier = IEraDualVerifier(_verifier);
             fflonk = address(verifier.FFLONK_VERIFIER());
             plonk = address(verifier.PLONK_VERIFIER());
+            airbenderPlonk = address(verifier.AIRBENDER_PLONK_VERIFIER());
         }
     }
 

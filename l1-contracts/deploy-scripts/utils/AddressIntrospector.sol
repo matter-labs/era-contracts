@@ -241,11 +241,8 @@ library AddressIntrospector {
         address validatorTimelock = ctm.validatorTimelockPostV29();
 
         Facets memory facets = _getFacetsFromUptoDateZkChain(ctm);
-        address verifier = _getVerifierFromUptoDateZkChain(ctm);
-        // V29 verifier is a dual verifier, but the sub-verifier getters were added in V31
-        (address verifierFflonk, address verifierPlonk) = isV29
-            ? (address(0), address(0))
-            : _getSubVerifiers(verifier, isZKsyncOS);
+        // Sub-verifiers are gathered in a helper to keep this function's stack small.
+        Verifiers memory verifiers = _getVerifiers(_getVerifierFromUptoDateZkChain(ctm), isV29, isZKsyncOS);
 
         // bytecodesSupplier only available in newer versions
         address bytecodesSupplier = isV29 ? address(0) : ctm.L1_BYTECODES_SUPPLIER();
@@ -267,7 +264,7 @@ library AddressIntrospector {
                 bytecodesSupplier: address(0),
                 permissionlessValidator: address(0)
             }),
-            verifiers: Verifiers({verifier: verifier, verifierFflonk: verifierFflonk, verifierPlonk: verifierPlonk}),
+            verifiers: verifiers,
             facets: facets,
             genesisUpgrade: ctm.l1GenesisUpgrade(),
             defaultUpgrade: address(0),
@@ -504,13 +501,35 @@ library AddressIntrospector {
         return address(0);
     }
 
-    /// @notice Get fflonk and plonk sub-verifiers from a dual verifier
+    /// @notice Get fflonk, plonk and Airbender PLONK sub-verifiers from a dual verifier
     /// @param _verifier The verifier address
     /// @param _isZKsyncOS If true, uses ZKsyncOSDualVerifier interface; otherwise EraDualVerifier
     function _getSubVerifiers(
         address _verifier,
         bool _isZKsyncOS
-    ) private view returns (address fflonk, address plonk) {
+    ) private view returns (address fflonk, address plonk, address airbenderPlonk) {
         return DeployCTML1OrGateway.getSubVerifiers(_verifier, _isZKsyncOS);
+    }
+
+    /// @notice Build the `Verifiers` struct for a dual verifier, introspecting its sub-verifiers.
+    /// @param _verifier The main (dual) verifier address.
+    /// @param _isV29 The V29 verifier is a dual verifier, but the sub-verifier getters were only
+    ///        added in V31, so they cannot be introspected and are reported as `address(0)`.
+    /// @param _isZKsyncOS If true, uses the ZKsyncOSDualVerifier interface; otherwise EraDualVerifier.
+    function _getVerifiers(
+        address _verifier,
+        bool _isV29,
+        bool _isZKsyncOS
+    ) private view returns (Verifiers memory) {
+        (address verifierFflonk, address verifierPlonk, address airbenderVerifierPlonk) = _isV29
+            ? (address(0), address(0), address(0))
+            : _getSubVerifiers(_verifier, _isZKsyncOS);
+        return
+            Verifiers({
+                verifier: _verifier,
+                verifierFflonk: verifierFflonk,
+                verifierPlonk: verifierPlonk,
+                airbenderVerifierPlonk: airbenderVerifierPlonk
+            });
     }
 }
