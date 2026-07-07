@@ -2,10 +2,7 @@
 
 pragma solidity ^0.8.24;
 
-import {
-    L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestIndirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {IL1InteropCenter} from "contracts/interop/IL1InteropCenter.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
@@ -32,8 +29,8 @@ library L1InteropRequests {
     }
 
     /// @dev Encodes the `sendMessage` arguments for an indirect (former `requestL2TransactionTwoBridges`) request.
-    function encodeTwoBridges(
-        L2TransactionRequestTwoBridgesOuter memory _request
+    function encodeIndirect(
+        L2TransactionRequestIndirect memory _request
     ) internal pure returns (bytes memory recipient, bytes memory payload, bytes[] memory attributes) {
         recipient = InteroperableAddress.formatEvmV1(_request.chainId, _request.secondBridgeAddress);
         payload = _request.secondBridgeCalldata;
@@ -57,12 +54,12 @@ library L1InteropRequests {
     }
 
     /// @dev The `sendMessage` equivalent of the former `L1Bridgehub.requestL2TransactionTwoBridges`.
-    function requestTwoBridges(
+    function requestIndirect(
         IL1InteropCenter _interopCenter,
         uint256 _value,
-        L2TransactionRequestTwoBridgesOuter memory _request
+        L2TransactionRequestIndirect memory _request
     ) internal returns (bytes32 canonicalTxHash) {
-        (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = encodeTwoBridges(_request);
+        (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = encodeIndirect(_request);
         canonicalTxHash = _interopCenter.sendMessage{value: _value}(recipient, payload, attributes);
     }
 }

@@ -966,7 +966,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             secondBridgeData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
         }
 
-        calls = Utils.prepareAdminL1L2TwoBridgesTransaction(
+        calls = Utils.prepareAdminL1L2IndirectTransaction(
             data.l1GasPrice,
             Utils.MAX_PRIORITY_TX_GAS,
             data.gatewayChainId,

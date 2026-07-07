@@ -655,9 +655,9 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     }
 
     function _setDepositHappened(uint256 _chainId, bytes32 _txHash, bytes32 _txDataHash) internal {
-        // `bridgehubConfirmL2Transaction` is gated to the L1InteropCenter.
+        // `confirmL2Transaction` is gated to the L1InteropCenter.
         vm.startBroadcast(address(addresses.l1InteropCenter));
-        IL1AssetRouter(address(addresses.bridgehub.assetRouter())).bridgehubConfirmL2Transaction({
+        IL1AssetRouter(address(addresses.bridgehub.assetRouter())).confirmL2Transaction({
             _chainId: _chainId,
             _txDataHash: _txDataHash,
             _txHash: _txHash

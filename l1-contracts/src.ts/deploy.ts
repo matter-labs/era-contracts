@@ -50,7 +50,7 @@ import {
   priorityTxMaxGasLimit,
   isCurrentNetworkLocal,
   encodeDirectInteropRequest,
-  encodeTwoBridgesInteropRequest,
+  encodeIndirectInteropRequest,
   l1InteropCenterInterface,
 } from "./utils";
 import {
@@ -1351,7 +1351,7 @@ export class Deployer {
     // and then create on SyncLayer). The request goes through the L1InteropCenter ERC-7786 `sendMessage`
     // indirect flow (the former `L1Bridgehub.requestL2TransactionTwoBridges`).
     const interopCenterAddress = await bridgehub.interopCenter();
-    const { recipient, payload, attributes } = encodeTwoBridgesInteropRequest({
+    const { recipient, payload, attributes } = encodeIndirectInteropRequest({
       chainId: gatewayChainId,
       mintValue: expectedCost,
       l2Value: 0,

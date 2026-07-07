@@ -6,7 +6,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {
     BridgehubBurnCTMAssetData,
     IBridgehubBase,
-    L2TransactionRequestTwoBridgesOuter
+    L2TransactionRequestIndirect
 } from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
@@ -285,7 +285,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             return call;
         }
 
-        L2TransactionRequestTwoBridgesOuter memory outer = L2TransactionRequestTwoBridgesOuter({
+        L2TransactionRequestIndirect memory outer = L2TransactionRequestIndirect({
             chainId: chainId,
             mintValue: 0,
             l2Value: 0,
@@ -321,8 +321,8 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     /// @dev Encodes the L1InteropCenter `sendMessage` calldata corresponding to the given two-bridges request.
-    function _encodeSendMessage(L2TransactionRequestTwoBridgesOuter memory outer) internal pure returns (bytes memory) {
-        (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = L1InteropRequests.encodeTwoBridges(
+    function _encodeSendMessage(L2TransactionRequestIndirect memory outer) internal pure returns (bytes memory) {
+        (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = L1InteropRequests.encodeIndirect(
             outer
         );
         return abi.encodeCall(IERC7786GatewaySource.sendMessage, (recipient, payload, attributes));
@@ -561,7 +561,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
     function test_tryGetNewAdminFromMigration_EmptySecondBridgeCalldata() public {
         // Create a call with empty secondBridgeCalldata
-        L2TransactionRequestTwoBridgesOuter memory outer = L2TransactionRequestTwoBridgesOuter({
+        L2TransactionRequestIndirect memory outer = L2TransactionRequestIndirect({
             chainId: chainId,
             mintValue: 0,
             l2Value: 0,

@@ -247,7 +247,7 @@
   },
   {
     "type": "function",
-    "name": "bridgehubConfirmL2TransactionForwarded",
+    "name": "confirmL2TransactionForwarded",
     "inputs": [
       {
         "name": "_chainId",

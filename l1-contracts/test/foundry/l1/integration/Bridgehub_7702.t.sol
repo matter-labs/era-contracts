@@ -5,10 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/console2.sol";
 
-import {
-    L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestIndirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
 
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";

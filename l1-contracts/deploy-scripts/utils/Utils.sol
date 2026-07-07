@@ -13,10 +13,7 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IAccessControlDefaultAdminRules} from "@openzeppelin/contracts-v4/access/IAccessControlDefaultAdminRules.sol";
 
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {
-    L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestIndirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -511,7 +508,7 @@ library Utils {
         });
     }
 
-    function prepareL1L2TransactionTwoBridges(
+    function prepareL1L2TransactionIndirect(
         uint256 l1GasPrice,
         uint256 l2GasLimit,
         uint256 chainId,
@@ -520,11 +517,7 @@ library Utils {
         uint256 secondBridgeValue,
         bytes memory secondBridgeCalldata,
         address refundRecipient
-    )
-        internal
-        view
-        returns (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy)
-    {
+    ) internal view returns (L2TransactionRequestIndirect memory l2TransactionRequest, uint256 requiredValueToDeploy) {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddress);
 
         // 10x headroom — see `prepareL1L2Transaction` comment for rationale.
@@ -539,7 +532,7 @@ library Utils {
                 REQUIRED_L2_GAS_PRICE_PER_PUBDATA
             ) * 10;
 
-        l2TransactionRequest = L2TransactionRequestTwoBridgesOuter({
+        l2TransactionRequest = L2TransactionRequestIndirect({
             chainId: chainId,
             mintValue: requiredValueToDeploy,
             l2Value: 0,
@@ -574,9 +567,9 @@ library Utils {
 
     /// @dev Builds the (target, calldata) pair that initiates the given two-bridges L1->L2 transaction
     /// request through the L1InteropCenter ERC-7786 `sendMessage` entry point (indirect call).
-    function buildTwoBridgesSendMessageCall(
+    function buildIndirectSendMessageCall(
         address bridgehubAddress,
-        L2TransactionRequestTwoBridgesOuter memory request
+        L2TransactionRequestIndirect memory request
     ) internal view returns (address interopCenter, bytes memory data) {
         interopCenter = IL1Bridgehub(bridgehubAddress).interopCenter();
         bytes[] memory attributes = new bytes[](3);
@@ -750,7 +743,7 @@ library Utils {
         calls = appendCall(calls, Call({target: interopCenter, value: ethAmountToPass, data: sendMessageCalldata}));
     }
 
-    function prepareGovernanceL1L2TwoBridgesTransaction(
+    function prepareGovernanceL1L2IndirectTransaction(
         uint256 l1GasPrice,
         uint256 l2GasLimit,
         uint256 chainId,
@@ -762,9 +755,9 @@ library Utils {
         address refundRecipient
     ) internal view returns (Call[] memory calls) {
         (
-            L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
+            L2TransactionRequestIndirect memory l2TransactionRequest,
             uint256 requiredValueToDeploy
-        ) = prepareL1L2TransactionTwoBridges(
+        ) = prepareL1L2TransactionIndirect(
                 l1GasPrice,
                 l2GasLimit,
                 chainId,
@@ -784,7 +777,7 @@ library Utils {
 
         calls = mergeCalls(calls, newCalls);
 
-        (address interopCenter, bytes memory sendMessageCalldata) = buildTwoBridgesSendMessageCall(
+        (address interopCenter, bytes memory sendMessageCalldata) = buildIndirectSendMessageCall(
             bridgehubAddress,
             l2TransactionRequest
         );
@@ -868,7 +861,7 @@ library Utils {
         return calls;
     }
 
-    function prepareAdminL1L2TwoBridgesTransaction(
+    function prepareAdminL1L2IndirectTransaction(
         uint256 l1GasPrice,
         uint256 l2GasLimit,
         uint256 chainId,
@@ -879,11 +872,11 @@ library Utils {
         bytes memory secondBridgeCalldata,
         address refundRecipient
     ) internal view returns (Call[] memory calls) {
-        // 1) Prepare the L2TransactionRequestTwoBridges (same logic as before)
+        // 1) Prepare the L2TransactionRequestIndirect (same logic as before)
         (
-            L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
+            L2TransactionRequestIndirect memory l2TransactionRequest,
             uint256 requiredValueToDeploy
-        ) = prepareL1L2TransactionTwoBridges(
+        ) = prepareL1L2TransactionIndirect(
                 l1GasPrice,
                 l2GasLimit,
                 chainId,
@@ -906,7 +899,7 @@ library Utils {
         calls = mergeCalls(calls, approvalCalls);
 
         // 4) Add the actual `sendMessage` call to the L1InteropCenter
-        (address interopCenter, bytes memory sendMessageCalldata) = buildTwoBridgesSendMessageCall(
+        (address interopCenter, bytes memory sendMessageCalldata) = buildIndirectSendMessageCall(
             bridgehubAddress,
             l2TransactionRequest
         );
@@ -961,7 +954,7 @@ library Utils {
         console.logBytes32(txHash);
     }
 
-    function runAdminL1L2TwoBridgesTransaction(
+    function runAdminL1L2IndirectTransaction(
         uint256 l1GasPrice,
         address admin,
         address accessControlRestriction,
@@ -975,7 +968,7 @@ library Utils {
         address refundRecipient
     ) internal returns (bytes32 txHash) {
         // 1) Prepare the calls
-        Call[] memory calls = prepareAdminL1L2TwoBridgesTransaction(
+        Call[] memory calls = prepareAdminL1L2IndirectTransaction(
             l1GasPrice,
             l2GasLimit,
             chainId,
@@ -1063,7 +1056,7 @@ library Utils {
         console.logBytes32(txHash);
     }
 
-    function runGovernanceL1L2TwoBridgesTransaction(
+    function runGovernanceL1L2IndirectTransaction(
         uint256 l1GasPrice,
         address governor,
         bytes32 salt,
@@ -1076,9 +1069,9 @@ library Utils {
         bytes memory secondBridgeCalldata
     ) internal returns (bytes32 txHash) {
         (
-            L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
+            L2TransactionRequestIndirect memory l2TransactionRequest,
             uint256 requiredValueToDeploy
-        ) = prepareL1L2TransactionTwoBridges(
+        ) = prepareL1L2TransactionIndirect(
                 l1GasPrice,
                 l2GasLimit,
                 chainId,
@@ -1098,7 +1091,7 @@ library Utils {
             requiredValueToDeploy
         );
 
-        (address interopCenter, bytes memory sendMessageCalldata) = buildTwoBridgesSendMessageCall(
+        (address interopCenter, bytes memory sendMessageCalldata) = buildIndirectSendMessageCall(
             bridgehubAddress,
             l2TransactionRequest
         );

@@ -50,9 +50,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         _disableInitializers();
         MAX_NUMBER_OF_ZK_CHAINS = _maxNumberOfZKChains;
 
-        // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
-        // This is indeed true, since the only methods where this immutable is used are the ones on L1Bridgehub.
-        // We will change this with interop.
+        // The asset id of ETH, registered as a supported base token asset id during initialization.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
         _initializeInner();

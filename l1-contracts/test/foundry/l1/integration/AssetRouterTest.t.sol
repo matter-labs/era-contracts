@@ -5,7 +5,7 @@ import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {
     IBridgehubBase,
     L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
+    L2TransactionRequestIndirect
 } from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {Vm} from "forge-std/Vm.sol";
 
@@ -286,10 +286,10 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         IERC20(tokenL1Address).approve(address(addresses.l1NativeTokenVault), 100);
 
         vm.recordLogs();
-        L1InteropRequests.requestTwoBridges(
+        L1InteropRequests.requestIndirect(
             addresses.l1InteropCenter,
             250000000000100,
-            L2TransactionRequestTwoBridgesOuter({
+            L2TransactionRequestIndirect({
                 chainId: eraZKChainId,
                 mintValue: 250000000000100,
                 l2Value: 0,
@@ -396,7 +396,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         assertEq(IERC20(tokenL1Address).allowance(randomCaller, address(addresses.l1NativeTokenVault)), 100);
 
         {
-            L2TransactionRequestTwoBridgesOuter memory l2TxnReqTwoBridges = L2TransactionRequestTwoBridgesOuter({
+            L2TransactionRequestIndirect memory l2TxnReqIndirect = L2TransactionRequestIndirect({
                 chainId: eraZKChainId,
                 mintValue: 250000000000100,
                 l2Value: 0,
@@ -409,7 +409,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             });
 
             (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = L1InteropRequests
-                .encodeTwoBridges(l2TxnReqTwoBridges);
+                .encodeIndirect(l2TxnReqIndirect);
             bytes memory calldataForExecutor = abi.encodeCall(
                 IERC7786GatewaySource.sendMessage,
                 (recipient, payload, attributes)

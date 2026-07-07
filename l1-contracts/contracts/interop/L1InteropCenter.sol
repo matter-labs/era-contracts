@@ -7,19 +7,19 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {
-    BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS,
+    MIN_CROSS_CHAIN_SENDER_ADDRESS,
     ETH_TOKEN_ADDRESS,
     SUPPORTED_L1_INTEROP_ATTRIBUTES,
-    TWO_BRIDGES_MAGIC_VALUE
+    INDIRECT_CALL_MAGIC_VALUE
 } from "../common/Config.sol";
 import {ChainIdNotRegistered, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
-import {SecondBridgeAddressTooLow} from "../core/bridgehub/L1BridgehubErrors.sol";
+import {CrossChainSenderAddressTooLow} from "../core/bridgehub/L1BridgehubErrors.sol";
 import {BridgehubL2TransactionRequest} from "../common/Messaging.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 
-import {L2TransactionRequestTwoBridgesInner} from "../core/bridgehub/IBridgehubBase.sol";
+import {IndirectCallRequest} from "../core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
@@ -105,7 +105,7 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
         address actualRecipient;
         if (attributes.indirectCall) {
             require(attributes.factoryDeps.length == 0, FactoryDepsNotAllowedForIndirectCall());
-            (sendId, actualRecipient) = _requestL2TransactionTwoBridges(
+            (sendId, actualRecipient) = _requestL2TransactionIndirect(
                 destinationChainId,
                 recipientAddress,
                 _payload,
@@ -182,14 +182,14 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
     /// actual destination-side transaction, requests it, and lets the second bridge confirm the request.
     /// @return canonicalTxHash The canonical hash of the requested L1->L2 transaction.
     /// @return l2Contract The destination-side contract of the L2 transaction constructed by the second bridge.
-    function _requestL2TransactionTwoBridges(
+    function _requestL2TransactionIndirect(
         uint256 _destinationChainId,
         address _secondBridgeAddress,
         bytes calldata _payload,
         L1MessageAttributes memory _attributes
     ) private returns (bytes32 canonicalTxHash, address l2Contract) {
-        if (_secondBridgeAddress <= BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS) {
-            revert SecondBridgeAddressTooLow(_secondBridgeAddress, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS);
+        if (_secondBridgeAddress <= MIN_CROSS_CHAIN_SENDER_ADDRESS) {
+            revert CrossChainSenderAddressTooLow(_secondBridgeAddress, MIN_CROSS_CHAIN_SENDER_ADDRESS);
         }
 
         {
@@ -218,16 +218,12 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
         }
 
         // slither-disable-next-line arbitrary-send-eth
-        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1CrossChainSender(_secondBridgeAddress)
-            .bridgehubDeposit{value: _attributes.indirectCallMessageValue}(
-            _destinationChainId,
-            msg.sender,
-            _attributes.interopCallValue,
-            _payload
-        );
+        IndirectCallRequest memory outputRequest = IL1CrossChainSender(_secondBridgeAddress).initiateIndirectCall{
+            value: _attributes.indirectCallMessageValue
+        }(_destinationChainId, msg.sender, _attributes.interopCallValue, _payload);
 
-        if (outputRequest.magicValue != TWO_BRIDGES_MAGIC_VALUE) {
-            revert WrongMagicValue(uint256(TWO_BRIDGES_MAGIC_VALUE), uint256(outputRequest.magicValue));
+        if (outputRequest.magicValue != INDIRECT_CALL_MAGIC_VALUE) {
+            revert WrongMagicValue(uint256(INDIRECT_CALL_MAGIC_VALUE), uint256(outputRequest.magicValue));
         }
 
         l2Contract = outputRequest.l2Contract;
@@ -247,11 +243,31 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
             })
         );
 
-        IL1AssetRouter(_secondBridgeAddress).bridgehubConfirmL2Transaction(
+        IL1AssetRouter(_secondBridgeAddress).confirmL2Transaction(
             _destinationChainId,
             outputRequest.txDataHash,
             canonicalTxHash
         );
+    }
+
+    /// @notice Estimates the base cost (in the destination chain's base token) of an L1->L2 transaction.
+    /// @dev Forwards to the destination chain's Mailbox, so that integrators of the send flow never
+    /// need to interact with any contract other than the L1InteropCenter.
+    /// @param _chainId the chainId of the destination chain
+    /// @param _gasPrice the L1 gas price to estimate with
+    /// @param _l2GasLimit the gas limit of the L2 transaction
+    /// @param _l2GasPerPubdataByteLimit the maximum amount of L2 gas charged per pubdata byte
+    function l2TransactionBaseCost(
+        uint256 _chainId,
+        uint256 _gasPrice,
+        uint256 _l2GasLimit,
+        uint256 _l2GasPerPubdataByteLimit
+    ) external view returns (uint256) {
+        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
+        if (zkChain == address(0)) {
+            revert ChainIdNotRegistered(_chainId);
+        }
+        return IZKChain(zkChain).l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
     }
 
     /// @notice Sends the request to the destination ZK chain's Mailbox.

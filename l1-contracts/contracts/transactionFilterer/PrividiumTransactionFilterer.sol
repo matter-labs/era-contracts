@@ -117,7 +117,7 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
                 return false;
             }
         } else {
-            // Base token deposit via `requestL2TransactionDirect`
+            // Base token deposit via the L1InteropCenter `sendMessage` direct-call flow
             return _contractL2 == _sender && _l2Value > 0 && _l2Calldata.length == 0 && depositsAllowed;
         }
     }

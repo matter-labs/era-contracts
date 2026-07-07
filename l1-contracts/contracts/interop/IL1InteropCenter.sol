@@ -44,6 +44,14 @@ interface IL1InteropCenter is IERC7786GatewaySource {
         bytes[] calldata _attributes
     ) external pure returns (L1MessageAttributes memory l1MessageAttributes);
 
+    /// @notice Estimates the base cost (in the destination chain's base token) of an L1->L2 transaction.
+    function l2TransactionBaseCost(
+        uint256 _chainId,
+        uint256 _gasPrice,
+        uint256 _l2GasLimit,
+        uint256 _l2GasPerPubdataByteLimit
+    ) external view returns (uint256);
+
     /// @notice Pauses `sendMessage`. Used for incident response.
     function pause() external;
 

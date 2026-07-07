@@ -484,7 +484,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         if (block.chainid == L1_CHAIN_ID) {
             is7702AccountRefundRecipient = EIP_7702_CHECKER.isEIP7702Account(request.refundRecipient);
-            is7702AccountSender = EIP_7702_CHECKER.isEIP7702Account(request.sender); // This is not the same as refundRecipient, as it appears to be the AR during TwoBridges.
+            is7702AccountSender = EIP_7702_CHECKER.isEIP7702Account(request.sender); // This is not the same as refundRecipient, as it appears to be the AR during Indirect.
         }
 
         request.refundRecipient = AddressAliasHelper.actualRefundRecipientMailbox(

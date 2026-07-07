@@ -298,7 +298,7 @@ contract GatewayPreparation is Script {
             abi.encode(assetId, L2_BRIDGEHUB_ADDRESS)
         );
 
-        bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction(
+        bytes32 l2TxHash = Utils.runGovernanceL1L2IndirectTransaction(
             _getL1GasPrice(),
             config.governance,
             governanoceOperationSalt,
@@ -322,7 +322,7 @@ contract GatewayPreparation is Script {
             abi.encode(config.chainTypeManagerProxy, gatewayCTMAddress)
         );
 
-        bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction(
+        bytes32 l2TxHash = Utils.runGovernanceL1L2IndirectTransaction(
             _getL1GasPrice(),
             config.governance,
             governanoceOperationSalt,
@@ -411,7 +411,7 @@ contract GatewayPreparation is Script {
 
         bytes memory secondBridgeData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
 
-        bytes32 l2TxHash = Utils.runAdminL1L2TwoBridgesTransaction(
+        bytes32 l2TxHash = Utils.runAdminL1L2IndirectTransaction(
             _getL1GasPrice(),
             chainAdmin,
             accessControlRestriction,

@@ -8,7 +8,7 @@ import {
     CTMDeploymentTracker,
     CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION
 } from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
-import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase, IndirectCallRequest} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -16,7 +16,7 @@ import {
     NoEthAllowed,
     NotOwner,
     NotOwnerViaRouter,
-    OnlyBridgehub,
+    OnlyInteropCenter,
     WrongCounterPart
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {CTMNotRegistered, UnsupportedEncodingVersion} from "contracts/common/L1ContractErrors.sol";
@@ -79,8 +79,8 @@ contract CTMDeploymentTrackerExtendedTest is Test {
         );
 
         vm.prank(notBridgehub);
-        vm.expectRevert(abi.encodeWithSelector(OnlyBridgehub.selector, notBridgehub, l1InteropCenter));
-        ctmDeploymentTracker.bridgehubDeposit(chainId, owner, 0, data);
+        vm.expectRevert(abi.encodeWithSelector(OnlyInteropCenter.selector, notBridgehub, l1InteropCenter));
+        ctmDeploymentTracker.initiateIndirectCall(chainId, owner, 0, data);
     }
 
     function test_BridgehubDeposit_RevertWhen_EthSent() public {
@@ -93,7 +93,7 @@ contract CTMDeploymentTrackerExtendedTest is Test {
         vm.deal(l1InteropCenter, 1 ether);
         vm.prank(l1InteropCenter);
         vm.expectRevert(NoEthAllowed.selector);
-        ctmDeploymentTracker.bridgehubDeposit{value: 1 ether}(chainId, owner, 0, data);
+        ctmDeploymentTracker.initiateIndirectCall{value: 1 ether}(chainId, owner, 0, data);
     }
 
     function test_BridgehubDeposit_RevertWhen_NotOwner() public {
@@ -106,7 +106,7 @@ contract CTMDeploymentTrackerExtendedTest is Test {
 
         vm.prank(l1InteropCenter);
         vm.expectRevert(abi.encodeWithSelector(NotOwner.selector, notOwner, owner));
-        ctmDeploymentTracker.bridgehubDeposit(chainId, notOwner, 0, data);
+        ctmDeploymentTracker.initiateIndirectCall(chainId, notOwner, 0, data);
     }
 
     function test_BridgehubDeposit_RevertWhen_UnsupportedEncodingVersion() public {
@@ -115,7 +115,7 @@ contract CTMDeploymentTrackerExtendedTest is Test {
 
         vm.prank(l1InteropCenter);
         vm.expectRevert(UnsupportedEncodingVersion.selector);
-        ctmDeploymentTracker.bridgehubDeposit(chainId, owner, 0, data);
+        ctmDeploymentTracker.initiateIndirectCall(chainId, owner, 0, data);
     }
 
     function test_BridgehubDeposit_Success() public {
@@ -128,12 +128,7 @@ contract CTMDeploymentTrackerExtendedTest is Test {
         );
 
         vm.prank(l1InteropCenter);
-        L2TransactionRequestTwoBridgesInner memory request = ctmDeploymentTracker.bridgehubDeposit(
-            chainId,
-            owner,
-            0,
-            data
-        );
+        IndirectCallRequest memory request = ctmDeploymentTracker.initiateIndirectCall(chainId, owner, 0, data);
 
         // Verify the request
         assertTrue(request.magicValue != bytes32(0));
@@ -146,7 +141,7 @@ contract CTMDeploymentTrackerExtendedTest is Test {
 
         // This function is a no-op but should not revert
         vm.prank(l1InteropCenter);
-        ctmDeploymentTracker.bridgehubConfirmL2Transaction(chainId, txDataHash, txHash);
+        ctmDeploymentTracker.confirmL2Transaction(chainId, txDataHash, txHash);
     }
 
     function test_BridgehubConfirmL2Transaction_RevertWhen_NotBridgehub() public {
@@ -156,8 +151,8 @@ contract CTMDeploymentTrackerExtendedTest is Test {
         bytes32 txHash = keccak256("txHash");
 
         vm.prank(notBridgehub);
-        vm.expectRevert(abi.encodeWithSelector(OnlyBridgehub.selector, notBridgehub, l1InteropCenter));
-        ctmDeploymentTracker.bridgehubConfirmL2Transaction(chainId, txDataHash, txHash);
+        vm.expectRevert(abi.encodeWithSelector(OnlyInteropCenter.selector, notBridgehub, l1InteropCenter));
+        ctmDeploymentTracker.confirmL2Transaction(chainId, txDataHash, txHash);
     }
 
     function test_BridgeCheckCounterpartAddress_RevertWhen_NotOwnerViaRouter() public {
@@ -294,12 +289,7 @@ contract CTMDeploymentTrackerExtendedTest is Test {
         );
 
         vm.prank(l1InteropCenter);
-        L2TransactionRequestTwoBridgesInner memory request = ctmDeploymentTracker.bridgehubDeposit(
-            chainId,
-            owner,
-            0,
-            data
-        );
+        IndirectCallRequest memory request = ctmDeploymentTracker.initiateIndirectCall(chainId, owner, 0, data);
 
         // Just verify it doesn't revert
         assertTrue(request.l2Calldata.length > 0);

@@ -12,7 +12,7 @@ import {
 } from "../core/const";
 import { runtimeConfig } from "../core/runtime-config";
 import { encodeAssetRouterBridgehubDepositData, encodeBridgeBurnData, encodeNtvAssetId } from "../core/data-encoding";
-import { encodeDirectInteropRequest, encodeTwoBridgesInteropRequest } from "../core/interop-requests";
+import { encodeDirectInteropRequest, encodeIndirectInteropRequest } from "../core/interop-requests";
 
 export interface DepositETHParams {
   l1RpcUrl: string;
@@ -167,7 +167,7 @@ export async function depositERC20ToL2(params: DepositERC20Params): Promise<Depo
   }
 
   // The NativeTokenVault pulls the tokens directly via `safeTransferFrom` during
-  // `bridgehubDeposit` (see `NativeTokenVaultBase._depositFunds`), so the caller
+  // `initiateIndirectCall` (see `NativeTokenVaultBase._depositFunds`), so the caller
   // must approve the NTV — not the asset router. (Legacy removal deleted the
   // shared-bridge token-pull path that used to require an asset-router approval.)
   const currentAllowance = await token.allowance(l1Wallet.address, l1Addresses.l1NativeTokenVault);
@@ -192,7 +192,7 @@ export async function depositERC20ToL2(params: DepositERC20Params): Promise<Depo
     recipient: messageRecipient,
     payload,
     attributes,
-  } = encodeTwoBridgesInteropRequest({
+  } = encodeIndirectInteropRequest({
     chainId,
     mintValue,
     l2Value: 0,

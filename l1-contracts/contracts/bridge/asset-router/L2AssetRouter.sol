@@ -9,7 +9,7 @@ import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 
 import {IL2Bridgehub} from "../../core/bridgehub/IL2Bridgehub.sol";
 
-import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase, IndirectCallRequest} from "../../core/bridgehub/IBridgehubBase.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
@@ -293,7 +293,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         // - L2B AssetRouter receives via executeMessage() with sender=address(this)
         //   (L2AssetRouter address is equal on all ZKsync chains)
 
-        L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit({
+        IndirectCallRequest memory request = _bridgehubDeposit({
             _chainId: _chainId,
             _originalCaller: _originalCaller,
             _value: _value,

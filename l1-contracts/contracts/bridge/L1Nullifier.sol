@@ -167,11 +167,11 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
-    /// This function is utilized by `requestL2TransactionTwoBridges` to validate the execution of a transaction.
+    /// This function is utilized by the L1InteropCenter indirect-call flow to validate the execution of a transaction.
     /// @param _chainId The chain ID of the ZK chain to which confirm the deposit.
     /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
     /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit.
-    function bridgehubConfirmL2TransactionForwarded(
+    function confirmL2TransactionForwarded(
         uint256 _chainId,
         bytes32 _txDataHash,
         bytes32 _txHash

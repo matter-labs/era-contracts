@@ -154,7 +154,7 @@ abstract contract GatewayGovernanceUtils is Script {
 
             calls = Utils.mergeCalls(
                 calls,
-                Utils.prepareGovernanceL1L2TwoBridgesTransaction(
+                Utils.prepareGovernanceL1L2IndirectTransaction(
                     prepareGWGovCallsStruct._l1GasPrice,
                     Utils.MAX_PRIORITY_TX_GAS,
                     _gatewayGovernanceConfig.gatewayChainId,
@@ -178,7 +178,7 @@ abstract contract GatewayGovernanceUtils is Script {
 
             calls = Utils.mergeCalls(
                 calls,
-                Utils.prepareGovernanceL1L2TwoBridgesTransaction(
+                Utils.prepareGovernanceL1L2IndirectTransaction(
                     prepareGWGovCallsStruct._l1GasPrice,
                     Utils.MAX_PRIORITY_TX_GAS,
                     _gatewayGovernanceConfig.gatewayChainId,

@@ -50,6 +50,40 @@
   },
   {
     "type": "function",
+    "name": "l2TransactionBaseCost",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_gasPrice",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2GasLimit",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2GasPerPubdataByteLimit",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "owner",
     "inputs": [],
     "outputs": [
@@ -374,6 +408,22 @@
   },
   {
     "type": "error",
+    "name": "CrossChainSenderAddressTooLow",
+    "inputs": [
+      {
+        "name": "secondBridgeAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "minSecondBridgeAddress",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "FactoryDepsNotAllowedForIndirectCall",
     "inputs": []
   },
@@ -418,22 +468,6 @@
     "type": "error",
     "name": "Reentrancy",
     "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "SecondBridgeAddressTooLow",
-    "inputs": [
-      {
-        "name": "secondBridgeAddress",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "minSecondBridgeAddress",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
   },
   {
     "type": "error",

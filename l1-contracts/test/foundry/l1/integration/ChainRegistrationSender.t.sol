@@ -6,7 +6,7 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
-import {L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L2TransactionRequestIndirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {
     CHAIN_REGISTRATION_SENDER_ENCODING_VERSION,
     ChainRegistrationSender
@@ -121,7 +121,7 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
     }
 
-    /// This function use requestL2TransactionTwoBridges function through ChainRegistrationSender.
+    /// This function use requestL2TransactionIndirect function through ChainRegistrationSender.
     /// No ERC20 tokens are involved — only ETH for base token gas.
     function _chainRegistrationSenderDeposit() private returns (bytes32, Vm.Log[] memory) {
         uint256 currentChainId = zkChainIds[0];
@@ -148,7 +148,7 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
             CHAIN_REGISTRATION_SENDER_ENCODING_VERSION,
             abi.encode(currentChainId)
         );
-        L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
+        L2TransactionRequestIndirect memory requestTx = _createL2TransactionRequestIndirect({
             _chainId: currentChainId,
             _mintValue: mintValue,
             _secondBridgeValue: 0,
@@ -161,7 +161,7 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
 
         vm.recordLogs();
         vm.prank(currentUser);
-        bytes32 resultantHash = L1InteropRequests.requestTwoBridges(addresses.l1InteropCenter, mintValue, requestTx);
+        bytes32 resultantHash = L1InteropRequests.requestIndirect(addresses.l1InteropCenter, mintValue, requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Balance assertion
@@ -192,11 +192,11 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         );
         assertEq(uint256(baseTokenLog.topics[1]), zkChainIds[0], "Base token deposit event chainId mismatch");
 
-        // The TwoBridges path through ChainRegistrationSender does NOT update
+        // The Indirect path through ChainRegistrationSender does NOT update
         // chainRegisteredOnChain. Verify it remains unchanged.
         assertFalse(
             addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
-            "chainRegisteredOnChain should remain false after TwoBridges deposit"
+            "chainRegisteredOnChain should remain false after Indirect deposit"
         );
     }
 

@@ -17,14 +17,14 @@ import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, INDIRECT_CALL_MAGIC_VALUE} from "../../common/Config.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
 import {NonEmptyMsgValue, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
-import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase, IndirectCallRequest} from "../../core/bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
 import {TxStatus} from "../../common/Messaging.sol";
@@ -170,7 +170,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         address _originalCaller,
         bytes32 _assetId,
         address _assetHandlerAddressOnCounterpart
-    ) internal view returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal view returns (IndirectCallRequest memory request) {
         IL1AssetDeploymentTracker(assetDeploymentTracker[_assetId]).bridgeCheckCounterpartAddress(
             _chainId,
             _assetId,
@@ -182,8 +182,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             IL2AssetRouter.setAssetHandlerAddress,
             (block.chainid, _assetId, _assetHandlerAddressOnCounterpart)
         );
-        request = L2TransactionRequestTwoBridgesInner({
-            magicValue: TWO_BRIDGES_MAGIC_VALUE,
+        request = IndirectCallRequest({
+            magicValue: INDIRECT_CALL_MAGIC_VALUE,
             l2Contract: L2_ASSET_ROUTER_ADDR,
             l2Calldata: l2Calldata,
             factoryDeps: new bytes[](0),
@@ -205,20 +205,12 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @inheritdoc IL1CrossChainSender
-    function bridgehubDeposit(
+    function initiateIndirectCall(
         uint256 _chainId,
         address _originalCaller,
         uint256 _value,
         bytes calldata _data
-    )
-        external
-        payable
-        virtual
-        override
-        onlyInteropCenter
-        whenNotPaused
-        returns (L2TransactionRequestTwoBridgesInner memory request)
-    {
+    ) external payable virtual override onlyInteropCenter whenNotPaused returns (IndirectCallRequest memory request) {
         bytes1 encodingVersion = _data[0];
         if (encodingVersion == SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION) {
             require(msg.value == 0 && _value == 0, NonEmptyMsgValue());
@@ -243,12 +235,12 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @inheritdoc IL1CrossChainSender
-    function bridgehubConfirmL2Transaction(
+    function confirmL2Transaction(
         uint256 _chainId,
         bytes32 _txDataHash,
         bytes32 _txHash
     ) external override onlyInteropCenter whenNotPaused {
-        L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(_chainId, _txDataHash, _txHash);
+        L1_NULLIFIER.confirmL2TransactionForwarded(_chainId, _txDataHash, _txHash);
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -73,7 +73,7 @@ error NotSystemContext(address _sender);
 // 0x3db511f4
 error OnlyAssetTracker(address, address);
 // 0x527b87c7
-error OnlyBridgehub(address msgSender, address bridgehub);
+error OnlyInteropCenter(address msgSender, address bridgehub);
 // 0x2d396674
 error OnlyBridgehubOrChainAssetHandler(address sender, address bridgehub, address chainAssetHandler);
 // 0x73fe6c1b
@@ -87,7 +87,7 @@ error OnlyL1();
 // 0x6b75db8c
 error OnlyOnSettlementLayer();
 // 0xb78dbaa7
-error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
+error CrossChainSenderAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 // 0xefb272e2
 error SettlementLayerMustNotBeL1();
 // 0x36917565

@@ -24,8 +24,8 @@ export interface L2TransactionRequestDirect {
   refundRecipient: string;
 }
 
-/** Mirror of the `L2TransactionRequestTwoBridgesOuter` struct from IBridgehubBase.sol. */
-export interface L2TransactionRequestTwoBridgesOuter {
+/** Mirror of the `L2TransactionRequestIndirect` struct from IBridgehubBase.sol. */
+export interface L2TransactionRequestIndirect {
   chainId: BigNumberish;
   mintValue: BigNumberish;
   l2Value: BigNumberish;
@@ -95,10 +95,10 @@ export function encodeDirectInteropRequest(request: L2TransactionRequestDirect):
 }
 
 /**
- * Matches `L1InteropRequests.encodeTwoBridges`: the `sendMessage` arguments for
+ * Matches `L1InteropRequests.encodeIndirect`: the `sendMessage` arguments for
  * an indirect (former `requestL2TransactionTwoBridges`) request.
  */
-export function encodeTwoBridgesInteropRequest(request: L2TransactionRequestTwoBridgesOuter): InteropSendMessageArgs {
+export function encodeIndirectInteropRequest(request: L2TransactionRequestIndirect): InteropSendMessageArgs {
   const iface = attributesInterface();
   return {
     recipient: formatEvmV1(request.chainId, request.secondBridgeAddress),
