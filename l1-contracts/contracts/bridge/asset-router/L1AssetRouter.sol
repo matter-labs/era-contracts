@@ -69,6 +69,13 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         _;
     }
 
+    /// @notice Checks that the message sender is the L1 interop handler that finalizes L2 -> L1 withdrawals.
+    /// @dev The handler is configured on the nullifier, which is the immutable anchor known at construction time.
+    modifier onlyInteropHandler() {
+        require(msg.sender == L1_NULLIFIER.l1InteropHandler(), Unauthorized(msg.sender));
+        _;
+    }
+
     /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         require(
@@ -255,7 +262,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) public payable override onlyNullifier {
+    ) public payable override onlyInteropHandler {
         _finalizeDeposit(_chainId, _assetId, _transferData, address(nativeTokenVault));
         emit DepositFinalizedAssetRouter(_chainId, _assetId, _transferData);
     }

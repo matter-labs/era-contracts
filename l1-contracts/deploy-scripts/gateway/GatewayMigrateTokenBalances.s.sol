@@ -14,14 +14,13 @@ import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.so
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {
     GatewayToL1TokenBalanceMigrationData,
-    L1ToGatewayTokenBalanceMigrationData
+    L1ToGatewayTokenBalanceMigrationData,
+    FinalizeL1DepositParams
 } from "contracts/common/Messaging.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IAssetTrackerDataEncoding} from "contracts/bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-
 import {
     GW_ASSET_TRACKER,
     L2_ASSET_ROUTER,

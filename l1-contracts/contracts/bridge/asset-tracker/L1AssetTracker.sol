@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {
+    FinalizeL1DepositParams,
     GatewayToL1TokenBalanceMigrationData,
     L1ToGatewayTokenBalanceMigrationData,
     MigrationConfirmationData
@@ -19,7 +20,8 @@ import {
     V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE
 } from "../../core/message-root/IMessageRoot.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
-import {FinalizeL1DepositParams, IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
+import {IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
+import {IL1InteropHandler} from "../../bridge/interfaces/IL1InteropHandler.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
@@ -217,7 +219,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @param _chainId The ID of the chain from which the withdrawal is being processed.
     /// @return chainToUpdate The chain ID whose balance should be decremented for this withdrawal.
     function _getWithdrawalChain(uint256 _chainId) internal view returns (uint256 chainToUpdate) {
-        (uint256 settlementLayer, uint256 l2BatchNumber) = L1_NULLIFIER.getTransientSettlementLayer();
+        // The L1 interop handler owns the transient settlement-layer slot for both withdrawal finalization and the
+        // nullifier's failed-deposit recovery flow, so it is the single source we read here.
+        (uint256 settlementLayer, uint256 l2BatchNumber) = IL1InteropHandler(L1_NULLIFIER.l1InteropHandler())
+            .getTransientSettlementLayer();
         // This is the batch starting from which it is the responsibility of all the settlement layers to ensure that
         // all withdrawals coming from the chain are backed by the balance of this settlement layer.
         // Note, that since this method is used for claiming failed deposits, it implies that any failed deposit that has been processed

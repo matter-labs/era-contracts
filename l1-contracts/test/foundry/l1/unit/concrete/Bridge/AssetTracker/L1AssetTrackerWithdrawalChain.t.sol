@@ -7,6 +7,7 @@ import {Test} from "forge-std/Test.sol";
 import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {IL1InteropHandler} from "contracts/bridge/interfaces/IL1InteropHandler.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "contracts/core/message-root/IMessageRoot.sol";
 
@@ -39,6 +40,7 @@ contract L1AssetTrackerWithdrawalChainTest is Test {
     address internal nativeTokenVault = makeAddr("nativeTokenVault");
     address internal messageRoot = makeAddr("messageRoot");
     address internal nullifier = makeAddr("nullifier");
+    address internal interopHandler = makeAddr("interopHandler");
 
     uint256 internal constant CHAIN_ID = 271;
     // The chain in this test flipped to v31 at batch 100, so batch 101 is the first v31 batch.
@@ -53,6 +55,13 @@ contract L1AssetTrackerWithdrawalChainTest is Test {
             abi.encodeWithSelector(IL1NativeTokenVault.L1_NULLIFIER.selector),
             abi.encode(nullifier)
         );
+        // `_getWithdrawalChain` reads the transient settlement layer from the interop handler, which it resolves
+        // from the nullifier.
+        vm.mockCall(
+            nullifier,
+            abi.encodeWithSelector(IL1Nullifier.l1InteropHandler.selector),
+            abi.encode(interopHandler)
+        );
         assetTracker = new L1AssetTrackerWithdrawalChainHarness(bridgehub, nativeTokenVault, messageRoot);
     }
 
@@ -65,11 +74,11 @@ contract L1AssetTrackerWithdrawalChainTest is Test {
         );
     }
 
-    /// @dev Mocks the transient settlement layer + batch number recorded by the nullifier during withdrawal proving.
+    /// @dev Mocks the transient settlement layer + batch number recorded by the interop handler during withdrawal proving.
     function _mockTransientSettlementLayer(uint256 _settlementLayer, uint256 _l2BatchNumber) internal {
         vm.mockCall(
-            nullifier,
-            abi.encodeWithSelector(IL1Nullifier.getTransientSettlementLayer.selector),
+            interopHandler,
+            abi.encodeWithSelector(IL1InteropHandler.getTransientSettlementLayer.selector),
             abi.encode(_settlementLayer, _l2BatchNumber)
         );
     }

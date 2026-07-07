@@ -23,6 +23,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {IL1InteropHandler} from "contracts/bridge/interfaces/IL1InteropHandler.sol";
 import {IGetters} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 
@@ -44,7 +45,7 @@ contract ZKSProvider is Script {
 
         // Send the transaction
         vm.startBroadcast();
-        nullifier.finalizeDeposit(params);
+        IL1InteropHandler(nullifier.l1InteropHandler()).finalizeDeposit(params);
         vm.stopBroadcast();
     }
 

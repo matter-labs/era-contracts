@@ -20,7 +20,8 @@ import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {FinalizeL1DepositParams} from "contracts/common/Messaging.sol";
+import {IL1InteropHandler} from "contracts/bridge/interfaces/IL1InteropHandler.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -190,9 +191,10 @@ contract DeployZKScript is Script {
         initializeConfig(_bridgehub, _chainId);
 
         L1Nullifier l1Nullifier = L1Nullifier(config.l1Nullifier);
+        IL1InteropHandler l1InteropHandler = IL1InteropHandler(l1Nullifier.l1InteropHandler());
 
         vm.broadcast();
-        l1Nullifier.finalizeDeposit(
+        l1InteropHandler.finalizeDeposit(
             FinalizeL1DepositParams({
                 chainId: _chainId,
                 l2BatchNumber: _l2BatchNumber,

@@ -293,11 +293,14 @@ export async function finalizeWithdrawalOnL1(
 
   const l2BatchNumber = ++finalizationCounter;
   const l1Wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
-  const l1Nullifier = new Contract(l1Addresses.l1NullifierProxy, getAbi("L1Nullifier"), l1Wallet);
+  // Withdrawal finalization now lives on the L1 interop handler, which the nullifier points to.
+  const l1Nullifier = new Contract(l1Addresses.l1NullifierProxy, getAbi("L1Nullifier"), l1Provider);
+  const interopHandlerAddress = await l1Nullifier.l1InteropHandler();
+  const l1InteropHandler = new Contract(interopHandlerAddress, getAbi("L1InteropHandler"), l1Wallet);
   const finalizeArgs = [pending.chainId, l2BatchNumber, 0, l2Sender, 0, message, merkleProof];
 
   console.log(
-    `   Finalizing withdrawal on L1 via L1Nullifier (settlement layer: ${settlementLayerChainId || "direct"})...`
+    `   Finalizing withdrawal on L1 via L1InteropHandler (settlement layer: ${settlementLayerChainId || "direct"})...`
   );
 
   // Simulate via `callStatic` first so we can surface revert data (the exact
@@ -305,14 +308,14 @@ export async function finalizeWithdrawalOnL1(
   // Anvil tx receipts strip revert data, so this is the only way to expose it
   // to the caller.
   try {
-    await l1Nullifier.callStatic.finalizeDeposit(finalizeArgs, { gasLimit: 5_000_000 });
+    await l1InteropHandler.callStatic.finalizeDeposit(finalizeArgs, { gasLimit: 5_000_000 });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const revertData = extractRevertDataFromError(error);
     return { success: false, errorMessage, revertData };
   }
 
-  const tx = await l1Nullifier.finalizeDeposit(finalizeArgs, { gasLimit: 5_000_000 });
+  const tx = await l1InteropHandler.finalizeDeposit(finalizeArgs, { gasLimit: 5_000_000 });
   const receipt = await tx.wait();
   console.log(`   L1 finalize tx: cast run ${receipt.transactionHash} -r ${l1RpcUrl}`);
   return { success: true, txHash: receipt.transactionHash };

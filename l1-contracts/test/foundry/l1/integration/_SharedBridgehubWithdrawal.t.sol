@@ -96,13 +96,13 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
         if (beforeChainBalance < _amountToWithdraw) {
             // Not enough escrowed balance for this chain/asset -> the asset tracker reverts.
             vm.expectRevert();
-            addresses.l1Nullifier.finalizeDeposit(params);
+            addresses.l1InteropHandler.finalizeDeposit(params);
             return;
         }
         tokenSumWithdrawal[currentTokenAddress] += _amountToWithdraw;
 
         vm.recordLogs();
-        addresses.l1Nullifier.finalizeDeposit(params);
+        addresses.l1InteropHandler.finalizeDeposit(params);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Chain balance for the base-token asset decreased by the withdrawal amount.
@@ -136,7 +136,11 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
 
         // Withdrawal marked as finalized (replay protection).
         assertTrue(
-            addresses.l1Nullifier.isWithdrawalFinalized(currentChainId, params.l2BatchNumber, params.l2MessageIndex),
+            addresses.l1InteropHandler.isWithdrawalFinalized(
+                currentChainId,
+                params.l2BatchNumber,
+                params.l2MessageIndex
+            ),
             "Withdrawal should be marked as finalized"
         );
 

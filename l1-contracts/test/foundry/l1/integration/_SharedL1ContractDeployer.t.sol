@@ -11,6 +11,7 @@ import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L1InteropHandler} from "contracts/bridge/L1InteropHandler.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
@@ -36,6 +37,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         L1AssetRouter sharedBridge;
         L1AssetTracker l1AssetTracker;
         L1Nullifier l1Nullifier;
+        L1InteropHandler l1InteropHandler;
         L1NativeTokenVault l1NativeTokenVault;
         IChainTypeManager chainTypeManager;
         ChainRegistrationSender chainRegistrationSender;
@@ -97,6 +99,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
 
         addresses.sharedBridge = L1AssetRouter(ecosystemAddresses.bridges.proxies.l1AssetRouter);
         addresses.l1Nullifier = L1Nullifier(ecosystemAddresses.bridges.proxies.l1Nullifier);
+        addresses.l1InteropHandler = L1InteropHandler(ecosystemAddresses.bridges.proxies.l1InteropHandler);
         addresses.l1NativeTokenVault = L1NativeTokenVault(payable(address(addresses.l1Nullifier.l1NativeTokenVault())));
 
         addresses.chainRegistrationSender = ChainRegistrationSender(

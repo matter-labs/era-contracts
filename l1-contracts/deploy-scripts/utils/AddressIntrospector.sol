@@ -149,6 +149,8 @@ library AddressIntrospector {
 
         address l1NullifierProxy = address(assetRouter.L1_NULLIFIER());
         address l1NativeTokenVaultProxy = address(assetRouter.nativeTokenVault());
+        // The interop handler did not exist on v29; the nullifier exposes it only post-upgrade.
+        address l1InteropHandlerProxy = isV29 ? address(0) : assetRouter.L1_NULLIFIER().l1InteropHandler();
 
         require(l1NativeTokenVaultProxy != address(0), "NativeTokenVault address is zero");
         NativeTokenVaultBase ntv = NativeTokenVaultBase(l1NativeTokenVaultProxy);
@@ -160,12 +162,16 @@ library AddressIntrospector {
         BridgeContracts memory proxies = BridgeContracts({
             l1AssetRouter: _assetRouter,
             l1Nullifier: l1NullifierProxy,
-            l1NativeTokenVault: l1NativeTokenVaultProxy
+            l1NativeTokenVault: l1NativeTokenVaultProxy,
+            l1InteropHandler: l1InteropHandlerProxy
         });
         BridgeContracts memory implementations = BridgeContracts({
             l1AssetRouter: Utils.getImplementation(_assetRouter),
             l1Nullifier: Utils.getImplementation(l1NullifierProxy),
-            l1NativeTokenVault: Utils.getImplementation(l1NativeTokenVaultProxy)
+            l1NativeTokenVault: Utils.getImplementation(l1NativeTokenVaultProxy),
+            l1InteropHandler: l1InteropHandlerProxy == address(0)
+                ? address(0)
+                : Utils.getImplementation(l1InteropHandlerProxy)
         });
 
         info = BridgesDeployedAddresses({
