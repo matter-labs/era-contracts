@@ -22,7 +22,7 @@ abstract contract L2InteropExecuteBundleTestAbstract is L2InteropTestUtils {
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
 
-        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100, false);
+        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100, false, bytes32(0));
         Vm.Log[] memory logs1 = vm.getRecordedLogs();
 
         // Verify the first bundle emission
@@ -46,12 +46,16 @@ abstract contract L2InteropExecuteBundleTestAbstract is L2InteropTestUtils {
 
         vm.recordLogs();
 
+        // Send the wrapper bundle with a distinct salt. Both sends originate from `address(this)`, and InteropCenter
+        // enforces a unique (sender, salt) pair, so the wrapper must use a different salt than the first bundle (which
+        // used the default salt 0) to avoid reverting with `InteropBundleSaltAlreadyUsed`.
         InteropLibrary.sendDirectCall(
             destinationChainId,
             L2_INTEROP_HANDLER_ADDR,
             abi.encodeCall(L2_INTEROP_HANDLER.executeBundle, (bundle, proof)),
             EXECUTION_ADDRESS,
-            UNBUNDLER_ADDRESS
+            UNBUNDLER_ADDRESS,
+            bytes32(uint256(1))
         );
         Vm.Log[] memory logs2 = vm.getRecordedLogs();
 

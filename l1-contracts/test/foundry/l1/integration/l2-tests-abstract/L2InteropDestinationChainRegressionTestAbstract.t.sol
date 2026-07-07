@@ -144,15 +144,19 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
         );
         assertNotEq(bundleHash1, bytes32(0), "First bundle to registered chain should succeed");
 
-        // Now try to send to unregistered chain - should fail
+        // Now try to send to unregistered chain - should fail.
+        // Use a fresh salt so the call reaches the destination check rather than the unique-salt guard.
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
             abi.encodeCall(IBridgehubBase.baseTokenAssetId, (UNREGISTERED_CHAIN_ID)),
             abi.encode(bytes32(0))
         );
+        bytes[] memory bundleAttributes2 = new bytes[](2);
+        bundleAttributes2[0] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
+        bundleAttributes2[1] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (bytes32(uint256(1))));
 
         vm.expectRevert(abi.encodeWithSelector(DestinationChainNotRegistered.selector, UNREGISTERED_CHAIN_ID));
-        L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(UNREGISTERED_CHAIN_ID), calls, bundleAttributes);
+        L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(UNREGISTERED_CHAIN_ID), calls, bundleAttributes2);
     }
 
     /// @notice Fuzz test with various unregistered chain IDs
