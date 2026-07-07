@@ -46,6 +46,15 @@ const IGNORED_BLOCK_FIELDS = new Set([
 // Maximum allowed balance difference in wei (0.01 ETH) — covers gas cost variations
 const BALANCE_TOLERANCE_WEI = BigInt("10000000000000000"); // 10^16
 
+// Accounts whose ETH balance is skipped from the balance check because it is
+// gas-cost-variance-dependent, not meaningful state. 0xf39F…2266 is the anvil
+// default account (ANVIL_DEFAULT_ACCOUNT_ADDR) — the harness's sole deployer/tx
+// sender, so it pays for every deploy/setup tx. With interval mining the basefee
+// (and thus total gas spent) is non-deterministic, so its remaining balance
+// drifts run-to-run by more than the small BALANCE_TOLERANCE_WEI. It's a funded
+// EOA, not contract state, so this is safe to ignore.
+const GAS_PAYER_BALANCE_ACCOUNTS = new Set(["0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"]);
+
 // The interop harness runs Anvil with interval mining (`--block-time 1`, needed
 // so the relayers/TBM keep progressing), so the number of L2 blocks produced is
 // wall-clock-dependent. Two identical runs therefore differ ONLY in state that
@@ -227,7 +236,7 @@ function compareChainState(
 
     const b1Str: string = a1.balance || "0x0";
     const b2Str: string = a2.balance || "0x0";
-    if (b1Str !== b2Str) {
+    if (b1Str !== b2Str && !GAS_PAYER_BALANCE_ACCOUNTS.has(addr.toLowerCase())) {
       try {
         const b1 = BigInt(b1Str);
         const b2 = BigInt(b2Str);
