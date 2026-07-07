@@ -8,7 +8,9 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
+import {L2_GENESIS_UPGRADE_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {IL2GenesisUpgrade} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {Utils} from "../../utils/Utils.sol";
 
 import {Call} from "contracts/governance/Common.sol";
@@ -20,9 +22,11 @@ import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.
 /// @notice Script used for the v32 (atomic interop) upgrade flow, upgrading from v31.
 /// @dev v32 is storage-compatible but NOT function-preserving: in-flight flows (e.g. withdrawals)
 ///      may break across the upgrade. Consequences for this script compared to v31:
-///      - no version-specific L1 upgrade contract — the plain `DefaultUpgrade` is used;
-///      - no L2 delegate (`L2V31Upgrade`-style migration contract) — the L2 side of the upgrade
-///        only force-deploys the new (atomic-interop) L2 bytecode set;
+///      - the version upgrade contract (`SettlementLayerV32Upgrade`) performs NO L1 storage
+///        migration — it only injects per-chain arguments into the L2 upgrade transaction;
+///      - no `L2V31Upgrade`-style migration contract on L2 — the upgrade delegates to the
+///        `L2GenesisUpgrade` built-in, the same contract that initializes the L2 system-contract
+///        set at chain genesis, which (re)initializes the contracts introduced by v32;
 ///      - no new proxies — every proxy already exists on the v31 baseline and is discovered by
 ///        `AddressIntrospector`; only implementations are deployed (via CREATE2, so unchanged
 ///        contracts land on their existing implementation address and the swap is a no-op).
@@ -61,7 +65,6 @@ contract CTMUpgrade_v32 is Script, DefaultCTMUpgrade {
     ///         proxies are discovered from the live CTM, and unchanged contracts re-deploy to
     ///         their existing CREATE2 address.
     function deployNewCTMContracts() public virtual override {
-        // v32 needs no version-specific L1 upgrade logic — the base deploys `DefaultUpgrade`.
         ctmAddresses.stateTransition.defaultUpgrade = deployUsedUpgradeContract();
         ctmAddresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", false);
 
@@ -124,14 +127,41 @@ contract CTMUpgrade_v32 is Script, DefaultCTMUpgrade {
         });
     }
 
-    /// @notice From v32 onwards both VMs use the universal ComplexUpgrader path. v32 has no L2
-    ///         delegate: the upgrade transaction only force-deploys the new L2 bytecode set
-    ///         (storage-compatible, no L2 state migration).
+    /// @notice Deploy the v32 upgrade contract: one contract serves both VMs (both use the
+    ///         universal ComplexUpgrader path from v32 onwards).
+    function deployUsedUpgradeContract() internal virtual override returns (address) {
+        console.log("Deploying SettlementLayerV32Upgrade");
+        return deploySimpleContract("SettlementLayerV32Upgrade", false);
+    }
+
+    /// @notice The committed (ecosystem-wide) L2 genesis-upgrade calldata. The chainId and
+    ///         additionalForceDeploymentsData are placeholders rewritten per chain by
+    ///         `SettlementLayerV32Upgrade.getL2UpgradeTxData` at upgrade time.
+    function getV32L2UpgradeCalldata() internal view returns (bytes memory) {
+        return
+            abi.encodeCall(
+                IL2GenesisUpgrade.genesisUpgrade,
+                (
+                    config.isZKsyncOS,
+                    0,
+                    coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
+                    generatedData.forceDeploymentsData,
+                    ""
+                )
+            );
+    }
+
+    /// @notice From v32 onwards both VMs use the universal ComplexUpgrader path, delegating to
+    ///         the `L2GenesisUpgrade` built-in for L2-side initialization.
     function getEraL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal virtual override returns (address, bytes memory) {
-        return getComplexUpgraderTargetAndData(_deployments, address(0), "");
+        return getComplexUpgraderTargetAndData(_deployments, L2_GENESIS_UPGRADE_ADDR, getV32L2UpgradeCalldata());
     }
 
-    // ZKsyncOS keeps the base behavior (universal path, no delegate).
+    function getZKsyncOSL2UpgradeTargetAndData(
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
+    ) internal virtual override returns (address, bytes memory) {
+        return getComplexUpgraderTargetAndData(_deployments, L2_GENESIS_UPGRADE_ADDR, getV32L2UpgradeCalldata());
+    }
 }
