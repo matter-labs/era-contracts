@@ -12,6 +12,14 @@ const ANVIL_INTEROP_DEV_ARTIFACTS: DevArtifact[] = [
     reason: "deployed at test runtime via ContractFactory to receive cross-chain interop bundles",
   },
   {
+    contractPath: "contracts/interop/L1InteropHandler.sol",
+    reason: "ABI used by the withdrawal finalization helper to execute L2->L1 withdrawal bundles on L1",
+  },
+  {
+    contractPath: "contracts/bridge/asset-router/L1AssetRouter.sol",
+    reason: "ABI used by the withdrawal finalization helper to resolve the L1InteropHandler address",
+  },
+  {
     contractPath: "contracts/dev-contracts/L2ChainAssetHandlerDev.sol",
     reason:
       "installed at the Gateway ChainAssetHandler address so reverse-TBM setup can bump migrationNumber through onlyUpgrader",

@@ -10,7 +10,6 @@ import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol"
 import {
     AssetIdMismatch,
     InvalidNTVBurnData,
-    InvalidSelector,
     UnsupportedEncodingVersion,
     BadTransferDataLength,
     EmptyData
