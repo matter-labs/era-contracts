@@ -262,15 +262,6 @@ pub mod il2_asset_router {
 }
 pub use il2_asset_router::IL2AssetRouterAbi;
 
-pub mod i_asset_tracker_base {
-    alloy::sol!(
-        #[sol(rpc)]
-        IAssetTrackerBaseAbi,
-        "../l1-contracts/zkstack-out/IAssetTrackerBase.sol/IAssetTrackerBase.json"
-    );
-}
-pub use i_asset_tracker_base::IAssetTrackerBaseAbi;
-
 pub mod il2_asset_tracker {
     alloy::sol!(
         #[sol(rpc)]

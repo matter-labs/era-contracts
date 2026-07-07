@@ -2,9 +2,17 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IAssetTrackerBase} from "./IAssetTrackerBase.sol";
+/// @dev By convention, tokens native to a chain are treated as if an infinite amount was deposited
+/// at the chain's inception, so their tracked balances start at this value and decrease as tokens
+/// are bridged out.
+uint256 constant MAX_TOKEN_BALANCE = type(uint256).max;
 
-interface IL2AssetTracker is IAssetTrackerBase {
+struct SavedTotalSupply {
+    bool isSaved;
+    uint256 amount;
+}
+
+interface IL2AssetTracker {
     struct InteropL2Info {
         // Amount withdrawn to L1 while the chain settled on L1.
         uint256 totalWithdrawalsToL1;
@@ -20,6 +28,12 @@ interface IL2AssetTracker is IAssetTrackerBase {
     event BaseTokenRegisteredDuringUpgrade(bytes32 indexed assetId);
 
     function L1_CHAIN_ID() external view returns (uint256);
+
+    function chainBalance(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
+
+    function isAssetRegistered(bytes32 _assetId) external view returns (bool);
+
+    function registerNewTokenIfNeeded(bytes32 _assetId, uint256 _originChainId) external;
 
     function initL2(uint256 _l1ChainId, bytes32 _baseTokenAssetId, bool _needBaseTokenTotalSupplyBackfill) external;
 

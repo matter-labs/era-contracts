@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {IAssetTrackerBase, SavedTotalSupply, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
 import {
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
@@ -13,7 +12,6 @@ import {
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "../../common/l2-helpers/L2ContractInterfaces.sol";
-import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 
 import {
@@ -21,14 +19,30 @@ import {
     AssetIdNotRegistered,
     BaseTokenTotalSupplyBackfillNotNeeded,
     ChainBalanceMustBeZeroBeforeMigration,
+    InsufficientChainBalance,
     MissingBaseTokenAssetId,
     TotalPreV31SupplyNotSaved,
     TotalPreV31SupplyShouldBeZero
 } from "./AssetTrackerErrors.sol";
-import {AssetTrackerBase} from "./AssetTrackerBase.sol";
-import {IL2AssetTracker} from "./IL2AssetTracker.sol";
+import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
+import {IL2AssetTracker, SavedTotalSupply, MAX_TOKEN_BALANCE} from "./IL2AssetTracker.sol";
 
-contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
+contract L2AssetTracker is IL2AssetTracker, ReentrancyGuard {
+    /// @notice Maps token balances for each chain.
+    /// NOTE: this mapping may be removed in the future, don't rely on it!
+    /// @dev This is write-only bookkeeping kept for future use; it is not consulted by any
+    /// bridging decision. Correctness of transfers is guaranteed by ZK proofs (plus 2FA on
+    /// ZKsync OS chains) rather than by on-chain balance enforcement.
+    /// @dev The `chainBalance` is only used to track the balance of native tokens on the L2.
+    /// For all the other tokens it is expected to be 0.
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public override chainBalance;
+
+    /// @notice Denotes whether a token is registered or not: the token's chainBalance is set
+    /// correctly and its `totalPreV31TotalSupply` is tracked correctly.
+    /// @dev Once we know that all legacy tokens have been registered (and all new ones have the
+    /// corresponding logic performed automatically), we can remove the mapping. So DONT RELY ON IT!
+    mapping(bytes32 assetId => bool isAssetRegistered) public override isAssetRegistered;
+
     uint256 public L1_CHAIN_ID;
 
     bytes32 public BASE_TOKEN_ASSET_ID;
@@ -131,15 +145,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         return L1_CHAIN_ID;
     }
 
-    function _nativeTokenVault() internal view override returns (INativeTokenVaultBase) {
-        return L2_NATIVE_TOKEN_VAULT;
-    }
-
-    /// @inheritdoc AssetTrackerBase
-    function registerNewTokenIfNeeded(
-        bytes32 _assetId,
-        uint256 _originChainId
-    ) public override(AssetTrackerBase, IAssetTrackerBase) onlyNativeTokenVault {
+    /// @inheritdoc IL2AssetTracker
+    function registerNewTokenIfNeeded(bytes32 _assetId, uint256 _originChainId) public override onlyL2NativeTokenVault {
         if (isAssetRegistered[_assetId]) {
             return;
         }
@@ -292,10 +299,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @notice Populates the totalPreV31TotalSupply.
     /// @dev Assumes that the token is not yet registered.
     function _registerLegacyToken(bytes32 _assetId, address _tokenAddress) internal returns (uint256 totalSupply) {
-        INativeTokenVaultBase ntv = _nativeTokenVault();
-
         // Legacy tokens are all expected to have the origin chain id set on the L2NativeTokenVault.
-        uint256 originChainId = ntv.originChainId(_assetId);
+        uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);
         require(originChainId != 0, AssetIdNotRegistered(_assetId));
         if (originChainId == block.chainid) {
             // Invariant check: the chain balance of the origin chain should be 0 until the balance migration
@@ -311,7 +316,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             // We need to account for tokens currently locked in the NTV from previous bridge operations.
             // Note, that this logic treats "tokens sent directly to L2NTV" and tokens bridged to L1 through NTV the same
             // way. It is okay, since the tokens that have been sent to the L2NTV are basically frozen anyway.
-            uint256 ntvBalance = IERC20(_tokenAddress).balanceOf(address(ntv));
+            uint256 ntvBalance = IERC20(_tokenAddress).balanceOf(L2_NATIVE_TOKEN_VAULT_ADDR);
             uint256 chainTotalSupply = MAX_TOKEN_BALANCE - ntvBalance;
             chainBalance[originChainId][_assetId] = chainTotalSupply;
             totalSupply = chainTotalSupply;
@@ -369,6 +374,15 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /*//////////////////////////////////////////////////////////////
                             Helper Functions
     //////////////////////////////////////////////////////////////*/
+
+    /// @dev This function is used to decrease the chain balance of a token on a chain.
+    /// @dev It makes debugging issues easier. Overflows don't usually happen, so there is no similar function to increase the chain balance.
+    function _decreaseChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
+        if (chainBalance[_chainId][_assetId] < _amount) {
+            revert InsufficientChainBalance(_chainId, _assetId, _amount);
+        }
+        chainBalance[_chainId][_assetId] -= _amount;
+    }
 
     /// @notice Retrieves the token contract address for a given asset ID.
     /// @param _assetId The asset ID to look up.

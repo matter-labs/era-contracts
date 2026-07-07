@@ -41,7 +41,6 @@ const REQUIRED_CONTRACTS = [
   "IL2NativeTokenVault.sol",
   "IL1AssetRouter.sol",
   "IL2AssetRouter.sol",
-  "IAssetTrackerBase.sol",
   "IL2AssetTracker.sol",
   "IChainAdmin.sol",
   "DefaultUpgrade.sol",
