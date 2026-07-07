@@ -12,7 +12,7 @@ import {Utils} from "../libraries/Utils.sol";
 
 address constant REAL_MSG_VALUE_SYSTEM_CONTRACT = address(0x8009);
 
-// Proxy that sets system call, can be called with callee abi, which is convenient.
+// Proxy that sets system call, does the same thing as `ExtraAbiCaller.zasm`, but can be called with callee abi, which is more convenient.
 // Also updates the real balance of the callee.
 contract SystemCaller {
     address immutable to;
