@@ -159,7 +159,9 @@ jobs:
 
       - name: Run anvil
         run: |
-          anvil --silent &
+          # 100M block gas limit: the ZKsyncOS chain-creation params carry full EVM
+          # bytecodes, so the CTM genesis-upgrade transaction exceeds the 30M default.
+          anvil --silent --gas-limit 100000000 &
 
           ANVIL_READY=0
           for i in {1..10}; do
