@@ -30,6 +30,7 @@ import {
     ConfirmTransferResultData,
     TokenBridgingData
 } from "contracts/common/Messaging.sol";
+import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -819,7 +820,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         uint256 claimedFailedDepositIndex = type(uint256).max;
 
         for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == IL1Nullifier.TransientSettlementLayerSet.selector) {
+            if (logs[i].topics[0] == IL1AssetTracker.TransientSettlementLayerSet.selector) {
                 transientSettlementLayerSetIndex = i;
             }
             if (logs[i].topics[0] == IMigrator.DepositsUnpaused.selector) {

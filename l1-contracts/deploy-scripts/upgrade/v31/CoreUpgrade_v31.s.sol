@@ -17,6 +17,7 @@ import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
@@ -108,6 +109,10 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
             coreAddresses.bridgehub.implementations.chainRegistrationSender,
             coreAddresses.bridgehub.proxies.chainRegistrationSender
         ) = deployTuppWithContract("ChainRegistrationSender", false);
+        (
+            coreAddresses.bridges.implementations.l1InteropHandler,
+            coreAddresses.bridges.proxies.l1InteropHandler
+        ) = deployTuppWithContract("L1InteropHandler", false);
     }
 
     /// @notice Configure contract connections after deployment
@@ -157,6 +162,23 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         vm.broadcast(getBroadcasterAddress());
         Ownable2StepUpgradeable(chainRegistrationSenderProxy).transferOwnership(properOwner);
         console.log("ChainRegistrationSender ownership transfer initiated (pending acceptance by governance)");
+
+        /////// L1InteropHandler
+        address l1InteropHandlerProxy = coreAddresses.bridges.proxies.l1InteropHandler;
+        require(l1InteropHandlerProxy != address(0), "L1InteropHandler proxy not deployed");
+        // On test-harness re-runs the create2 deployment resolves to an existing, already
+        // governance-owned handler — only transfer while the broadcaster still owns it.
+        if (Ownable2StepUpgradeable(l1InteropHandlerProxy).owner() == getBroadcasterAddress()) {
+            console.log("Transferring L1InteropHandler ownership from deployer to governance:", properOwner);
+            vm.broadcast(getBroadcasterAddress());
+            Ownable2StepUpgradeable(l1InteropHandlerProxy).transferOwnership(properOwner);
+            console.log("L1InteropHandler ownership transfer initiated (pending acceptance by governance)");
+        } else {
+            console.log(
+                "L1InteropHandler ownership transfer skipped, current owner:",
+                Ownable2StepUpgradeable(l1InteropHandlerProxy).owner()
+            );
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -209,6 +231,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     ///      2. AssetTracker.acceptOwnership (completes 2-step transfer started during deploy)
     ///      3. NTV.setAssetTracker (wires AssetTracker into NTV)
     ///      4. L1ChainAssetHandler.setAddresses (caches messageRoot/assetRouter from bridgehub)
+    ///      5. L1InteropHandler.acceptOwnership (completes 2-step transfer started during deploy)
     function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
         console.log("Preparing v31-specific stage1 governance calls...");
 
@@ -233,7 +256,19 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         // in updateContractConnections(), and ownership was transferred to governance.
         // Now governance needs to accept the ownership transfer.
 
-        calls = new Call[](4);
+        // The L1InteropHandler acceptance is only needed while its two-step transfer is pending
+        // (skipped on test-harness re-runs where governance already owns it).
+        bool acceptL1InteropHandler = Ownable2StepUpgradeable(coreAddresses.bridges.proxies.l1InteropHandler)
+            .pendingOwner() != address(0);
+        calls = new Call[](acceptL1InteropHandler ? 5 : 4);
+        if (acceptL1InteropHandler) {
+            // Accept ownership of the L1InteropHandler (completes the two-step transfer)
+            calls[4] = Call({
+                target: coreAddresses.bridges.proxies.l1InteropHandler,
+                value: 0,
+                data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
+            });
+        }
 
         // First, accept ownership of ChainRegistrationSender (completes the two-step transfer)
         calls[0] = Call({
@@ -290,7 +325,47 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     ///      separate lets `GatewayVotePreparation` stay reusable for any future
     ///      GW bring-up (not v31-specific).
     function prepareVersionSpecificStage2GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
-        return _buildLegacyGatewayDecommissionCalls();
+        Call[] memory decommissionCalls = _buildLegacyGatewayDecommissionCalls();
+        Call[] memory handlerCalls = _buildL1InteropHandlerWiringCalls();
+
+        calls = new Call[](decommissionCalls.length + handlerCalls.length);
+        for (uint256 i = 0; i < decommissionCalls.length; ++i) {
+            calls[i] = decommissionCalls[i];
+        }
+        for (uint256 i = 0; i < handlerCalls.length; ++i) {
+            calls[decommissionCalls.length + i] = handlerCalls[i];
+        }
+    }
+
+    /// @notice Wire the v31-new L1InteropHandler into the (governance-owned) asset router.
+    /// @dev The one-time setters revert with `AddressAlreadySet`, so a call is only generated while the
+    /// corresponding contract is still unwired. At generation time the proxies may still run pre-v31
+    /// implementations without the `l1InteropHandler()` getter — a failing getter therefore means
+    /// "not wired yet" (the real upgrade case), while a successful nonzero read means the contract is
+    /// already wired (upgrade re-runs and test-harness setups on freshly-wired deployments).
+    function _buildL1InteropHandlerWiringCalls() internal view returns (Call[] memory calls) {
+        address handlerProxy = coreAddresses.bridges.proxies.l1InteropHandler;
+        address assetRouterProxy = coreAddresses.bridges.proxies.l1AssetRouter;
+
+        bool wireAssetRouter = _readL1InteropHandlerOf(assetRouterProxy) == address(0);
+
+        calls = new Call[](wireAssetRouter ? 1 : 0);
+        if (wireAssetRouter) {
+            calls[0] = Call({
+                target: assetRouterProxy,
+                value: 0,
+                data: abi.encodeCall(L1AssetRouter.setL1InteropHandler, (handlerProxy))
+            });
+        }
+    }
+
+    /// @notice Reads `l1InteropHandler()` from a contract that may predate the getter.
+    /// @return handler The wired handler, or `address(0)` if unwired or the getter does not exist yet.
+    function _readL1InteropHandlerOf(address _target) internal view returns (address handler) {
+        (bool ok, bytes memory ret) = _target.staticcall(abi.encodeWithSignature("l1InteropHandler()"));
+        if (ok && ret.length == 32) {
+            handler = abi.decode(ret, (address));
+        }
     }
 
     /// @notice Post-governance migration: register bridged tokens in NTV and

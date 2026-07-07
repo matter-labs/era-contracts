@@ -54,7 +54,7 @@ export interface PendingWithdrawal {
   /**
    * ERC20 metadata bytes that the L2 NTV injects into the withdrawal message
    * via `_getERC20Metadata` / `getERC20Getters`. Empty for base-token (ETH)
-   * withdrawals; required for ERC20 withdrawals so that `L1Nullifier.finalizeDeposit`
+   * withdrawals; required for ERC20 withdrawals so that the L1 finalization
    * can call `DataEncoding.decodeTokenData(erc20Metadata)` without reverting
    * with `EmptyData()`.
    */
@@ -150,7 +150,7 @@ export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): P
  * destination of the L1 chain. The InteropCenter invokes
  * `L2AssetRouter.initiateIndirectCall`, which builds the bridgehub-deposit
  * request; because the destination is L1, it burns on L2 and produces the
- * `finalizeDeposit` message that `L1Nullifier.finalizeDeposit` consumes.
+ * `finalizeDeposit` message that the `L1InteropHandler` executes on L1.
  *
  * (The legacy `L2AssetRouter.withdraw(assetId, data)` entrypoint was removed; all
  * L2→L1 withdrawals now flow through the InteropCenter.)
@@ -223,7 +223,7 @@ export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalPar
 }
 
 /**
- * Finalise a pending withdrawal on L1 via the real `L1Nullifier.finalizeDeposit`.
+ * Finalise a pending withdrawal on L1 via the real `L1InteropHandler.executeBundle`.
  *
  * Returns `{ success: true, txHash }` if the L1 tx lands, otherwise
  * `{ success: false, errorMessage, revertData }` — callers can drive the
@@ -244,8 +244,8 @@ export async function finalizeWithdrawalOnL1(
 
   // Both base-token (ETH) and ERC20 withdrawals go through the InteropCenter: the L1 finalization
   // message is a single-call InteropBundle emitted by the L2 InteropCenter, wrapping the asset-router
-  // `finalizeDeposit` call targeting the L1 AssetRouter (raw asset-router messages are no longer
-  // accepted by the L1Nullifier). Under the mock proof we reconstruct that bundle here. The base-token
+  // `finalizeDeposit` call targeting the L1 AssetRouter (raw asset-router messages are not
+  // accepted). Under the mock proof we reconstruct that bundle here. The base-token
   // burn data carries an empty original caller / origin token / metadata.
   const transferData = isBaseToken
     ? encodeBridgeMintData(
@@ -272,32 +272,36 @@ export async function finalizeWithdrawalOnL1(
   ]);
   const l1ChainId = (await l1Provider.getNetwork()).chainId;
   // Field order mirrors `InteropBundle` / `InteropCall` in contracts/common/Messaging.sol. Only the
-  // fields checked by `DataEncoding.parseInteropWithdrawalBundle` matter (destinationChainId, the
-  // single call's to/from/data); the rest are placeholder values.
+  // fields checked by the `L1InteropHandler` matter (destinationChainId, destinationBaseTokenAssetId,
+  // the single call's to/data); the rest are placeholder values. The interopBundleSalt is unique per
+  // finalization so each reconstructed bundle has a distinct hash (replay protection is bundle-hash keyed).
+  const finalizationNumber = ++finalizationCounter;
   const interopBundle = [
     "0x01", // version
     pending.chainId, // sourceChainId
     l1ChainId, // destinationChainId
-    ethers.constants.HashZero, // destinationBaseTokenAssetId
-    ethers.constants.HashZero, // interopBundleSalt
+    encodeNtvAssetId(l1ChainId, ETH_TOKEN_ADDRESS), // destinationBaseTokenAssetId (L1's base token is ETH)
+    ethers.utils.hexZeroPad(ethers.utils.hexlify(finalizationNumber), 32), // interopBundleSalt
     [["0x01", false, l1Addresses.l1SharedBridge, L2_ASSET_ROUTER_ADDR, 0, finalizeCalldata]], // calls
     ["0x", "0x", false], // bundleAttributes (executionAddress, unbundlerAddress, useFixedFee)
   ];
-  const message = ethers.utils.hexConcat([
-    "0x01", // BUNDLE_IDENTIFIER
-    ethers.utils.defaultAbiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]),
-  ]);
-  const l2Sender = INTEROP_CENTER_ADDR;
+  const bundle = ethers.utils.defaultAbiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
+  const message = ethers.utils.hexConcat(["0x01" /* BUNDLE_IDENTIFIER */, bundle]);
 
   const merkleProof = buildWithdrawalMerkleProof(settlementLayerChainId);
 
-  const l2BatchNumber = ++finalizationCounter;
+  const l2BatchNumber = finalizationNumber;
   const l1Wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
-  const l1Nullifier = new Contract(l1Addresses.l1NullifierProxy, getAbi("L1Nullifier"), l1Wallet);
-  const finalizeArgs = [pending.chainId, l2BatchNumber, 0, l2Sender, 0, message, merkleProof];
+  const l1AssetRouter = new Contract(l1Addresses.l1SharedBridge, getAbi("L1AssetRouter"), l1Provider);
+  const l1InteropHandlerAddr: string = await l1AssetRouter.l1InteropHandler();
+  const l1InteropHandler = new Contract(l1InteropHandlerAddr, getAbi("L1InteropHandler"), l1Wallet);
+
+  // MessageInclusionProof: { chainId, l1BatchNumber, l2MessageIndex, message: L2Message, proof }.
+  // The L2Message sender is always the L2 InteropCenter for withdrawal bundles.
+  const inclusionProof = [pending.chainId, l2BatchNumber, 0, [0, INTEROP_CENTER_ADDR, message], merkleProof];
 
   console.log(
-    `   Finalizing withdrawal on L1 via L1Nullifier (settlement layer: ${settlementLayerChainId || "direct"})...`
+    `   Finalizing withdrawal on L1 via L1InteropHandler (settlement layer: ${settlementLayerChainId || "direct"})...`
   );
 
   // Simulate via `callStatic` first so we can surface revert data (the exact
@@ -305,14 +309,14 @@ export async function finalizeWithdrawalOnL1(
   // Anvil tx receipts strip revert data, so this is the only way to expose it
   // to the caller.
   try {
-    await l1Nullifier.callStatic.finalizeDeposit(finalizeArgs, { gasLimit: 5_000_000 });
+    await l1InteropHandler.callStatic.executeBundle(bundle, inclusionProof, { gasLimit: 5_000_000 });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const revertData = extractRevertDataFromError(error);
     return { success: false, errorMessage, revertData };
   }
 
-  const tx = await l1Nullifier.finalizeDeposit(finalizeArgs, { gasLimit: 5_000_000 });
+  const tx = await l1InteropHandler.executeBundle(bundle, inclusionProof, { gasLimit: 5_000_000 });
   const receipt = await tx.wait();
   console.log(`   L1 finalize tx: cast run ${receipt.transactionHash} -r ${l1RpcUrl}`);
   return { success: true, txHash: receipt.transactionHash };

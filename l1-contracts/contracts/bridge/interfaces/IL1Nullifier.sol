@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
-import {ConfirmTransferResultData, FinalizeL1DepositParams} from "../../common/Messaging.sol";
+import {ConfirmTransferResultData} from "../../common/Messaging.sol";
 
 /// @dev Transient storage slot for storing the settlement layer chain ID during proof verification.
 /// @dev This slot is used to temporarily store which settlement layer is processing the current proof,
@@ -22,15 +22,13 @@ interface IL1Nullifier {
         bytes32 indexed l2DepositTxHash
     );
 
-    event TransientSettlementLayerSet(uint256 indexed settlementLayerChainId);
-
+    /// @notice Historical record of withdrawals finalized through this contract before v31. From v31
+    /// onwards withdrawals are executed by the `L1InteropHandler` and this mapping is no longer written.
     function isWithdrawalFinalized(
         uint256 _chainId,
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex
     ) external view returns (bool);
-
-    function finalizeDeposit(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
 
     function BRIDGE_HUB() external view returns (IL1Bridgehub);
 
@@ -73,13 +71,4 @@ interface IL1Nullifier {
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external;
-
-    /// @notice When verifying recursive proofs, we mark the transient settlement layer,
-    /// this function retrieves the currently stored transient settlement layer chain ID.
-    /// @dev The transient settlement layer is cleared at the end of each transaction.
-    /// @dev Note, that it is hard assumption that must be enforced by all the users of this function:
-    /// Any operations that reads this value, must be preceded by a successful invocation of L1Nullifier
-    /// that has set this value. Otherwise, it is possible that the same value is reused multiple times.
-    /// @return The chain ID of the settlement layer that processed the current proof, or 0 if none is set.
-    function getTransientSettlementLayer() external view returns (uint256, uint256);
 }

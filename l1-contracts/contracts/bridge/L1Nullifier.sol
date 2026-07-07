@@ -8,31 +8,26 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-import {AssetRouterBase} from "./asset-router/AssetRouterBase.sol";
 import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
-import {FinalizeL1DepositParams, IL1Nullifier, TRANSIENT_SETTLEMENT_LAYER_SLOT} from "./interfaces/IL1Nullifier.sol";
+import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
 
-import {BUNDLE_IDENTIFIER, ConfirmTransferResultData, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
+import {ConfirmTransferResultData, L2Log, TxStatus} from "../common/Messaging.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
-import {L2_INTEROP_CENTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {
     AddressAlreadySet,
     DepositDoesNotExist,
     DepositExists,
     InvalidProof,
-    InvalidSelector,
     Unauthorized,
-    WithdrawalAlreadyFinalized,
     ZeroAddress
 } from "../common/L1ContractErrors.sol";
-import {NativeTokenVaultAlreadySet, WrongL2Sender, WrongMsgLength} from "./L1BridgeContractErrors.sol";
+import {NativeTokenVaultAlreadySet} from "./L1BridgeContractErrors.sol";
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
-import {TransientPrimitivesLib} from "../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
 
 /// @author Matter Labs
@@ -84,7 +79,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         public
         override depositHappened;
 
-    /// @dev Tracks the processing status of L2 to L1 messages, indicating whether a message has already been finalized.
+    /// @dev Historical record of withdrawals finalized through this contract before v31. From v31
+    /// onwards withdrawals are executed by the `L1InteropHandler` (replay-protected by bundle status)
+    /// and this mapping is no longer written.
     mapping(uint256 chainId => mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized)))
         public isWithdrawalFinalized;
 
@@ -260,9 +257,12 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _leaf: leaf,
                 _proof: _confirmTransferResultData._merkleProof
             });
-            TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT, proofData.settlementLayerChainId);
-            TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT + 1, _confirmTransferResultData._l2BatchNumber);
-            emit TransientSettlementLayerSet(proofData.settlementLayerChainId);
+            // Record the claim's settlement context in the L1AssetTracker, which reads it while
+            // attributing the chain-balance accounting of this failed-deposit claim.
+            l1NativeTokenVault.l1AssetTracker().setTransientSettlementLayer(
+                proofData.settlementLayerChainId,
+                _confirmTransferResultData._l2BatchNumber
+            );
         }
 
         {
@@ -279,109 +279,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             }
         }
         delete depositHappened[_confirmTransferResultData._chainId][_confirmTransferResultData._l2TxHash];
-    }
-
-    /// @notice Finalize the withdrawal and release funds.
-    /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
-    /// @dev We have both the legacy finalizeWithdrawal and the new finalizeDeposit functions,
-    /// finalizeDeposit uses the new format. On the L2 we have finalizeDeposit with new and old formats both.
-    function finalizeDeposit(FinalizeL1DepositParams memory _finalizeWithdrawalParams) public {
-        _finalizeDeposit(_finalizeWithdrawalParams);
-    }
-
-    /// @notice Internal function that handles the logic for finalizing withdrawals, supporting both the current bridge system and the legacy ERC20 bridge.
-    /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
-    function _finalizeDeposit(
-        FinalizeL1DepositParams memory _finalizeWithdrawalParams
-    ) internal nonReentrant whenNotPaused {
-        uint256 chainId = _finalizeWithdrawalParams.chainId;
-        uint256 l2BatchNumber = _finalizeWithdrawalParams.l2BatchNumber;
-        uint256 l2MessageIndex = _finalizeWithdrawalParams.l2MessageIndex;
-        require(!isWithdrawalFinalized[chainId][l2BatchNumber][l2MessageIndex], WithdrawalAlreadyFinalized());
-        isWithdrawalFinalized[chainId][l2BatchNumber][l2MessageIndex] = true;
-
-        (bytes32 assetId, bytes memory transferData) = _verifyWithdrawal(_finalizeWithdrawalParams);
-
-        AssetRouterBase(address(l1AssetRouter)).finalizeDeposit(chainId, assetId, transferData);
-    }
-
-    /// @notice Verifies the validity of a withdrawal message from L2 and returns withdrawal details.
-    /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
-    /// @return assetId The ID of the bridged asset.
-    /// @return transferData The transfer data used to finalize withdrawal.
-    function _verifyWithdrawal(
-        FinalizeL1DepositParams memory _finalizeWithdrawalParams
-    ) internal returns (bytes32 assetId, bytes memory transferData) {
-        (assetId, transferData) = _parseL2WithdrawalMessage(
-            _finalizeWithdrawalParams.chainId,
-            _finalizeWithdrawalParams.message
-        );
-        L2Message memory l2ToL1Message;
-        {
-            address l2Sender = _finalizeWithdrawalParams.l2Sender;
-            // All withdrawals are emitted by the L2 InteropCenter (which wraps the asset-router
-            // call in a single-call bundle). The bundle itself additionally authenticates that the inner
-            // call originated from the L2 asset router (see `DataEncoding.parseInteropWithdrawalBundle`).
-            require(l2Sender == L2_INTEROP_CENTER_ADDR, WrongL2Sender(l2Sender));
-
-            l2ToL1Message = L2Message({
-                txNumberInBatch: _finalizeWithdrawalParams.l2TxNumberInBatch,
-                sender: l2Sender,
-                data: _finalizeWithdrawalParams.message
-            });
-        }
-
-        bool success = MESSAGE_ROOT.proveL2MessageInclusionShared({
-            _chainId: _finalizeWithdrawalParams.chainId,
-            _blockOrBatchNumber: _finalizeWithdrawalParams.l2BatchNumber,
-            _index: _finalizeWithdrawalParams.l2MessageIndex,
-            _message: l2ToL1Message,
-            _proof: _finalizeWithdrawalParams.merkleProof
-        });
-        // withdrawal wrong proof
-        require(success, InvalidProof());
-
-        bytes32 leaf = MessageHashing.getLeafHashFromMessage(l2ToL1Message);
-        ProofData memory proofData = MESSAGE_ROOT.getProofData({
-            _chainId: _finalizeWithdrawalParams.chainId,
-            _batchNumber: _finalizeWithdrawalParams.l2BatchNumber,
-            _leafProofMask: _finalizeWithdrawalParams.l2MessageIndex,
-            _leaf: leaf,
-            _proof: _finalizeWithdrawalParams.merkleProof
-        });
-        TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT, proofData.settlementLayerChainId);
-        TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT + 1, _finalizeWithdrawalParams.l2BatchNumber);
-        emit TransientSettlementLayerSet(proofData.settlementLayerChainId);
-    }
-
-    /// @inheritdoc IL1Nullifier
-    function getTransientSettlementLayer() external view returns (uint256, uint256) {
-        return (
-            TransientPrimitivesLib.getUint256(TRANSIENT_SETTLEMENT_LAYER_SLOT),
-            TransientPrimitivesLib.getUint256(TRANSIENT_SETTLEMENT_LAYER_SLOT + 1)
-        );
-    }
-
-    /// @notice Parses the withdrawal message and returns withdrawal details.
-    /// @dev All withdrawals are routed through the L2 InteropCenter: the message is a single-call
-    /// @dev interop bundle wrapping an L2-asset-router `finalizeDeposit` call destined for L1.
-    /// @param _chainId The ZK chain ID.
-    /// @param _l2ToL1message The encoded L2 -> L1 message.
-    /// @return assetId The ID of the bridged asset.
-    /// @return transferData The transfer data used to finalize withdrawal.
-    /// @dev The `transferData` is expected to be encoded using `DataEncoding.encodeBridgeMintData`.
-    /// Note, that the `_originalCaller`, `_originToken` and `_erc20Metadata` fields in the encoded `transferData` could be empty,
-    /// so they should not be relied upon.
-    function _parseL2WithdrawalMessage(
-        uint256 _chainId,
-        bytes memory _l2ToL1message
-    ) internal view returns (bytes32 assetId, bytes memory transferData) {
-        // All withdrawals (base token and ERC20) arrive as a single-call InteropBundle prefixed with
-        // BUNDLE_IDENTIFIER, emitted by the L2 InteropCenter; raw asset-router messages are not accepted.
-        require(_l2ToL1message.length > 0, WrongMsgLength(1, 0));
-        require(_l2ToL1message[0] == BUNDLE_IDENTIFIER, InvalidSelector(DataEncoding.getSelector(_l2ToL1message)));
-        // slither-disable-next-line unused-return
-        return DataEncoding.parseInteropWithdrawalBundle(_chainId, _l2ToL1message, address(l1AssetRouter));
     }
 
     /*//////////////////////////////////////////////////////////////

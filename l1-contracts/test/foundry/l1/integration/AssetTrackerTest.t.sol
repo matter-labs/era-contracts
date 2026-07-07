@@ -45,7 +45,7 @@ import {
     IAssetTrackerBase,
     TOKEN_BALANCE_MIGRATION_DATA_VERSION
 } from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
-import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {FinalizeL1DepositParams} from "contracts/common/Messaging.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IL2AssetTracker, L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";

@@ -53,6 +53,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
+import {IInteropHandlerBase} from "contracts/interop/IInteropHandlerBase.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 
 import {DynamicIncrementalMerkleMemory} from "contracts/common/libraries/DynamicIncrementalMerkleMemory.sol";
@@ -355,7 +356,7 @@ contract GWAssetTrackerExtendedTest is Test {
     function test_ProcessLogsAndMessages_InteropHandler() public {
         // First, set up an interop balance change
         bytes32 bundleHash = keccak256("bundleHash");
-        bytes memory message = abi.encodePacked(IInteropHandler.verifyBundle.selector, bundleHash);
+        bytes memory message = abi.encodePacked(IInteropHandlerBase.verifyBundle.selector, bundleHash);
 
         L2Log[] memory logs = new L2Log[](1);
         logs[0] = L2Log({
@@ -407,7 +408,7 @@ contract GWAssetTrackerExtendedTest is Test {
 
         vm.prank(mockZKChain);
         vm.expectRevert(
-            abi.encodeWithSelector(InvalidFunctionSignature.selector, IInteropHandler.verifyBundle.selector)
+            abi.encodeWithSelector(InvalidFunctionSignature.selector, IInteropHandlerBase.verifyBundle.selector)
         );
         gwAssetTracker.processLogsAndMessages(input);
     }

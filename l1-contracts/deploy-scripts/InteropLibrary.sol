@@ -14,17 +14,47 @@ import {
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 // import {IInteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
-import {InteropCallStarter} from "contracts/common/Messaging.sol";
+import {BUNDLE_IDENTIFIER, InteropCallStarter, L2Message, MessageInclusionProof} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {AmountMustBeGreaterThanZero, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
 import {ArgumentsLengthNotIdentical} from "./utils/ZkSyncScriptErrors.sol";
+import {IInteropHandlerBase} from "contracts/interop/IInteropHandlerBase.sol";
+import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
 
 library InteropLibrary {
     /*//////////////////////////////////////////////////////////////
                                BUILDERS
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice Executes an L2->L1 withdrawal on the `L1InteropHandler` from the raw L2->L1 message.
+    /// @dev The message is the `BUNDLE_IDENTIFIER`-prefixed `abi.encode(InteropBundle)` payload emitted
+    /// by the L2 InteropCenter; the sender of that message is always the InteropCenter.
+    function executeWithdrawalBundleOnL1(
+        address _l1InteropHandler,
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes memory _message,
+        bytes32[] memory _merkleProof
+    ) internal {
+        IInteropHandlerBase(_l1InteropHandler).executeBundle(
+            UnsafeBytes.readRemainingBytes(_message, 1),
+            MessageInclusionProof({
+                chainId: _chainId,
+                l1BatchNumber: _l2BatchNumber,
+                l2MessageIndex: _l2MessageIndex,
+                message: L2Message({
+                    txNumberInBatch: _l2TxNumberInBatch,
+                    sender: L2_INTEROP_CENTER_ADDR,
+                    data: _message
+                }),
+                proof: _merkleProof
+            })
+        );
+    }
 
     /// @notice Build the “second bridge” calldata. Check DataEncoding library for details.
     function buildSecondBridgeCalldata(

@@ -20,7 +20,7 @@ import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {InteropLibrary} from "../InteropLibrary.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -189,20 +189,18 @@ contract DeployZKScript is Script {
     ) public {
         initializeConfig(_bridgehub, _chainId);
 
-        L1Nullifier l1Nullifier = L1Nullifier(config.l1Nullifier);
+        address l1InteropHandler = L1Nullifier(config.l1Nullifier).l1AssetRouter().l1InteropHandler();
 
         vm.broadcast();
-        l1Nullifier.finalizeDeposit(
-            FinalizeL1DepositParams({
-                chainId: _chainId,
-                l2BatchNumber: _l2BatchNumber,
-                l2MessageIndex: _l2MessageIndex,
-                l2Sender: L2_INTEROP_CENTER_ADDR,
-                l2TxNumberInBatch: _l2TxNumberInBatch,
-                message: _message,
-                merkleProof: _merkleProof
-            })
-        );
+        InteropLibrary.executeWithdrawalBundleOnL1({
+            _l1InteropHandler: l1InteropHandler,
+            _chainId: _chainId,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _message: _message,
+            _merkleProof: _merkleProof
+        });
     }
 
     function saveL1Address(address _bridgehub, uint256 _chainId) public {

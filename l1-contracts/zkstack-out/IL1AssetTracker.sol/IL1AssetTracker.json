@@ -213,6 +213,24 @@
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "setTransientSettlementLayer",
+    "inputs": [
+      {
+        "name": "_settlementLayerChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2BatchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
     "type": "event",
     "name": "PauseDepositsForChainRequested",
     "inputs": [
@@ -224,6 +242,19 @@
       },
       {
         "name": "settlementLayer",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "TransientSettlementLayerSet",
+    "inputs": [
+      {
+        "name": "settlementLayerChainId",
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
