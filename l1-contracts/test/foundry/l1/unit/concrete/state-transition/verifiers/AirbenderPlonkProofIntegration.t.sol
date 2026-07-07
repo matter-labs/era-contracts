@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
-import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
+import {AirbenderVerifierPlonk} from "contracts/state-transition/verifiers/AirbenderVerifierPlonk.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 
@@ -35,9 +35,10 @@ contract InertPlonkVerifier is IVerifier {
 }
 
 /// @notice Verifies a real airbender PLONK SNARK proof produced by
-/// `eravm-prover-host prove-snark` against the regenerated `L1VerifierPlonk`
-/// (whose `_loadVerificationKey` was rewritten from the matching `snark_vk.json`).
-/// Exercises both the standalone `L1VerifierPlonk.verify` path and the
+/// `eravm-prover-host prove-snark` against the regenerated `AirbenderVerifierPlonk`
+/// (generated from the matching `snark_vk.json` by
+/// `tools/verifier-gen/regenerate-airbender-verifier.sh`).
+/// Exercises both the standalone `AirbenderVerifierPlonk.verify` path and the
 /// airbender slot of `DualVerifier`'s router.
 contract AirbenderPlonkProofIntegrationTest is Test {
     uint256 internal constant AIRBENDER_PLONK_VERIFICATION_TYPE = 2;
@@ -61,11 +62,11 @@ contract AirbenderPlonkProofIntegrationTest is Test {
         2485515716, 1206552808, 429924834, 1342631824
     ];
 
-    EraVerifierPlonk internal airbenderVerifier;
+    AirbenderVerifierPlonk internal airbenderVerifier;
     EraDualVerifier internal dual;
 
     function setUp() public {
-        airbenderVerifier = new EraVerifierPlonk();
+        airbenderVerifier = new AirbenderVerifierPlonk();
         dual = new EraDualVerifier(
             IVerifierV2(address(new InertFflonkVerifier())),
             IVerifier(address(new InertPlonkVerifier())),
@@ -75,12 +76,12 @@ contract AirbenderPlonkProofIntegrationTest is Test {
 
     /// Sanity-check: the airbender PLONK verifier accepts the real proof when
     /// called directly, with no router in front.
-    function test_l1VerifierPlonk_acceptsAirbenderProof() public view {
+    function test_airbenderVerifierPlonk_acceptsAirbenderProof() public view {
         bool ok = airbenderVerifier.verify(
             AirbenderPlonkProofFixture.publicInputs(),
             AirbenderPlonkProofFixture.serializedProof()
         );
-        assertTrue(ok, "L1VerifierPlonk should accept the airbender proof directly");
+        assertTrue(ok, "AirbenderVerifierPlonk should accept the airbender proof directly");
     }
 
     /// Routing test: `DualVerifier` should dispatch a proof prefixed with
@@ -98,7 +99,7 @@ contract AirbenderPlonkProofIntegrationTest is Test {
     }
 
     /// The airbender slot's VK hash, surfaced through `DualVerifier`, must
-    /// equal the one baked into `L1VerifierPlonk` by codegen — i.e. the test
+    /// equal the one baked into `AirbenderVerifierPlonk` by codegen — i.e. the test
     /// is checking the new VK, not a stale one.
     function test_dualVerifier_airbenderVkHash_matchesUnderlyingVerifier() public view {
         bytes32 viaDual = dual.verificationKeyHash(AIRBENDER_PLONK_VERIFICATION_TYPE);
@@ -106,11 +107,15 @@ contract AirbenderPlonkProofIntegrationTest is Test {
         assertEq(viaDual, viaDirect, "DualVerifier should surface the airbender slot's VK hash");
     }
 
-    /// The VK hash baked into `L1VerifierPlonk` by codegen — recorded in the
+    /// The VK hash baked into `AirbenderVerifierPlonk` by codegen — recorded in the
     /// header comment of the regenerated contract. Pinning it here catches
-    /// accidental regenerations from the wrong key.
-    function test_l1VerifierPlonk_vkHashIsPinned() public view {
-        bytes32 expected = 0xac82c63fb5cbb3cfa3fa0d8c9a98926477687080bea1a10917a5f9ac83c012f7;
+    /// accidental regenerations from the wrong key. This value is the codegen
+    /// output for the `snark_vk.json` of the `eravm-airbender-verifier` release
+    /// pinned in `airbender_prover_server/Cargo.toml` (v29.9.0); regenerate the
+    /// contract with `tools/verifier-gen/regenerate-airbender-verifier.sh` and
+    /// update this pin whenever that release moves.
+    function test_airbenderVerifierPlonk_vkHashIsPinned() public view {
+        bytes32 expected = 0xaa199f9ed1cd9d196ce6cea06cf8d0a25da529b29d527aae6b945779bbf70dc1;
         assertEq(airbenderVerifier.verificationKeyHash(), expected, "VK hash drifted from codegen output");
     }
 
@@ -120,7 +125,7 @@ contract AirbenderPlonkProofIntegrationTest is Test {
     // -------------------------------------------------------------------------------------------
 
     /// Tampering with the public input by a single bit must invalidate the proof.
-    function test_l1VerifierPlonk_rejectsTamperedPublicInput() public {
+    function test_airbenderVerifierPlonk_rejectsTamperedPublicInput() public {
         uint256[] memory inputs = AirbenderPlonkProofFixture.publicInputs();
         inputs[0] ^= 1;
 
@@ -135,7 +140,7 @@ contract AirbenderPlonkProofIntegrationTest is Test {
     }
 
     /// Tampering with the proof itself must invalidate verification.
-    function test_l1VerifierPlonk_rejectsTamperedProof() public {
+    function test_airbenderVerifierPlonk_rejectsTamperedProof() public {
         uint256[] memory proof = AirbenderPlonkProofFixture.serializedProof();
         // Flip a low bit of an opening evaluation — these live near the end of
         // the serialized proof and reach the pairing check rather than the
@@ -153,7 +158,7 @@ contract AirbenderPlonkProofIntegrationTest is Test {
     /// Sanity-check that mutating one of the curve-point coordinates near the
     /// front of the proof trips `loadProof`'s structural validation. If the
     /// verifier were a no-op, nothing here would revert.
-    function test_l1VerifierPlonk_rejectsMalformedCurvePoint() public {
+    function test_airbenderVerifierPlonk_rejectsMalformedCurvePoint() public {
         uint256[] memory proof = AirbenderPlonkProofFixture.serializedProof();
         // Zero out the first commitment's (x, y); `loadProof` rejects (0, 0).
         proof[0] = 0;

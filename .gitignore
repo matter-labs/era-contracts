@@ -17,6 +17,7 @@ out/
 target/
 work/
 tools/verifier-gen/data/*.sol
+tools/verifier-gen/data/airbender_snark_vk.json
 typechain/
 yarn-debug.log*
 yarn-error.log*
