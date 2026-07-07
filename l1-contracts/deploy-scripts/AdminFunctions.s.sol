@@ -610,22 +610,14 @@ contract AdminFunctions is Script, IAdminFunctions {
         address _accessControlRestriction,
         address _bridgehub,
         uint256 _chainId,
-        uint256 _newProtocolVersion,
         uint256 _timestamp
     ) public {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
-        Call[] memory calls = new Call[](2);
-        // Admin.sol's upgradeChainFromVersion reads protocolVersionToUpgradeTimestamp from
-        // ChainAdmin for non-admin/non-CTM callers, so we must keep this write.
-        calls[0] = Call({
-            target: _adminAddr,
-            value: 0,
-            data: abi.encodeCall(ChainAdmin.setUpgradeTimestamp, (_newProtocolVersion, _timestamp))
-        });
+        Call[] memory calls = new Call[](1);
         // ServerNotifier.setUpgradeTimestamp validates upgrade cut data exists, eliminating
         // the race between timestamp and diamond-cut availability that exists on ChainAdmin alone.
-        calls[1] = Call({
+        calls[0] = Call({
             target: chainInfo.serverNotifier,
             value: 0,
             data: abi.encodeCall(ServerNotifier.setUpgradeTimestamp, (_chainId, _timestamp))
