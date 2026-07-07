@@ -2,6 +2,9 @@
 
 pragma solidity 0.8.28;
 
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
+
 import {InteropHandlerBase} from "./InteropHandlerBase.sol";
 import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, L2Message, MessageInclusionProof} from "../common/Messaging.sol";
 import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
@@ -34,7 +37,7 @@ interface IL1AssetTrackerTransient {
 ///   `finalizeDeposit` call), and no value can ride the call (the withdrawn amount is carried inside
 ///   the transfer data);
 /// - there is no unbundling and no post-execution GWAssetTracker accounting on L1.
-contract L1InteropHandler is InteropHandlerBase {
+contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @dev The L1 MessageRoot used to prove L2->L1 message inclusion and resolve proof data.
     IMessageRootBase public immutable MESSAGE_ROOT;
 
@@ -51,6 +54,7 @@ contract L1InteropHandler is InteropHandlerBase {
         address _l1AssetRouter,
         IL1AssetTrackerTransient _l1AssetTracker
     ) reentrancyGuardInitializer {
+        _disableInitializers();
         require(address(_messageRoot) != address(0), ZeroAddress());
         require(_l1AssetRouter != address(0), ZeroAddress());
         require(address(_l1AssetTracker) != address(0), ZeroAddress());
@@ -60,7 +64,10 @@ contract L1InteropHandler is InteropHandlerBase {
     }
 
     /// @dev Initializes the proxy: on L1 the handler runs on L1 itself.
-    function initialize() external reentrancyGuardInitializer {
+    /// @param _owner The owner, which can pause and unpause withdrawal execution.
+    function initialize(address _owner) external reentrancyGuardInitializer initializer {
+        require(_owner != address(0), ZeroAddress());
+        _transferOwnership(_owner);
         L1_CHAIN_ID = block.chainid;
     }
 
@@ -68,7 +75,10 @@ contract L1InteropHandler is InteropHandlerBase {
     /// @dev Before the base execution flow runs, the withdrawal's settlement context is recorded in
     /// the `L1AssetTracker`, which reads it while attributing the chain-balance accounting of the
     /// bundle's `finalizeDeposit` call.
-    function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public override nonReentrant {
+    function executeBundle(
+        bytes memory _bundle,
+        MessageInclusionProof memory _proof
+    ) public override nonReentrant whenNotPaused {
         _recordWithdrawalAttribution(_bundle, _proof);
         super.executeBundle(_bundle, _proof);
     }
@@ -143,4 +153,18 @@ contract L1InteropHandler is InteropHandlerBase {
     /// @notice No post-execution accounting on L1 (the L1AssetTracker accounts during `finalizeDeposit`
     /// itself, attributed via the transient settlement-layer context recorded in `executeBundle`).
     function _afterCallExecuted(bytes32, InteropCall memory) internal override {}
+
+    /*//////////////////////////////////////////////////////////////
+                            PAUSE
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Pauses withdrawal execution.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice Unpauses withdrawal execution.
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 }

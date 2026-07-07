@@ -20,6 +20,7 @@ import {CoreDeployedAddresses} from "../../../../deploy-scripts/ecosystem/Deploy
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {CTMDeployedAddresses, Config} from "../../../../deploy-scripts/ctm/DeployCTMUtils.s.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
 contract L1ContractDeployer is UtilsCallMockerTest {
     using stdStorage for StdStorage;
@@ -115,6 +116,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         addresses.sharedBridge.acceptOwnership();
         IOwnable(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).acceptOwnership();
         addresses.ctmDeploymentTracker.acceptOwnership();
+        Ownable2StepUpgradeable(addresses.sharedBridge.l1InteropHandler()).acceptOwnership();
         vm.stopPrank();
     }
 

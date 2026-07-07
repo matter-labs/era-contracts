@@ -214,6 +214,8 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         IL1AssetTracker assetTracker = IL1AssetTracker(coreAddresses.bridgehub.proxies.assetTracker);
         IOwnable(address(assetTracker)).transferOwnership(coreAddresses.shared.governance);
 
+        IOwnable(coreAddresses.bridges.proxies.l1InteropHandler).transferOwnership(coreAddresses.shared.governance);
+
         L1NativeTokenVault l1NativeTokenVault = L1NativeTokenVault(
             payable(coreAddresses.bridges.proxies.l1NativeTokenVault)
         );

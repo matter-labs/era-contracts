@@ -162,6 +162,23 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         vm.broadcast(getBroadcasterAddress());
         Ownable2StepUpgradeable(chainRegistrationSenderProxy).transferOwnership(properOwner);
         console.log("ChainRegistrationSender ownership transfer initiated (pending acceptance by governance)");
+
+        /////// L1InteropHandler
+        address l1InteropHandlerProxy = coreAddresses.bridges.proxies.l1InteropHandler;
+        require(l1InteropHandlerProxy != address(0), "L1InteropHandler proxy not deployed");
+        // On test-harness re-runs the create2 deployment resolves to an existing, already
+        // governance-owned handler — only transfer while the broadcaster still owns it.
+        if (Ownable2StepUpgradeable(l1InteropHandlerProxy).owner() == getBroadcasterAddress()) {
+            console.log("Transferring L1InteropHandler ownership from deployer to governance:", properOwner);
+            vm.broadcast(getBroadcasterAddress());
+            Ownable2StepUpgradeable(l1InteropHandlerProxy).transferOwnership(properOwner);
+            console.log("L1InteropHandler ownership transfer initiated (pending acceptance by governance)");
+        } else {
+            console.log(
+                "L1InteropHandler ownership transfer skipped, current owner:",
+                Ownable2StepUpgradeable(l1InteropHandlerProxy).owner()
+            );
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -214,6 +231,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     ///      2. AssetTracker.acceptOwnership (completes 2-step transfer started during deploy)
     ///      3. NTV.setAssetTracker (wires AssetTracker into NTV)
     ///      4. L1ChainAssetHandler.setAddresses (caches messageRoot/assetRouter from bridgehub)
+    ///      5. L1InteropHandler.acceptOwnership (completes 2-step transfer started during deploy)
     function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
         console.log("Preparing v31-specific stage1 governance calls...");
 
@@ -238,7 +256,19 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         // in updateContractConnections(), and ownership was transferred to governance.
         // Now governance needs to accept the ownership transfer.
 
-        calls = new Call[](4);
+        // The L1InteropHandler acceptance is only needed while its two-step transfer is pending
+        // (skipped on test-harness re-runs where governance already owns it).
+        bool acceptL1InteropHandler = Ownable2StepUpgradeable(coreAddresses.bridges.proxies.l1InteropHandler)
+            .pendingOwner() != address(0);
+        calls = new Call[](acceptL1InteropHandler ? 5 : 4);
+        if (acceptL1InteropHandler) {
+            // Accept ownership of the L1InteropHandler (completes the two-step transfer)
+            calls[4] = Call({
+                target: coreAddresses.bridges.proxies.l1InteropHandler,
+                value: 0,
+                data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
+            });
+        }
 
         // First, accept ownership of ChainRegistrationSender (completes the two-step transfer)
         calls[0] = Call({

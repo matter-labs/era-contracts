@@ -231,7 +231,7 @@ contract DeployL1CoreUtils is DeployUtils {
             } else if (compareStrings(contractName, "L1AssetRouter")) {
                 return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1InteropHandler")) {
-                return abi.encodeCall(L1InteropHandler.initialize, ());
+                return abi.encodeCall(L1InteropHandler.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1NativeTokenVault")) {
                 return
                     abi.encodeCall(
