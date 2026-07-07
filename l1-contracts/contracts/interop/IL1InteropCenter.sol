@@ -30,11 +30,12 @@ struct L1MessageAttributes {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IL1InteropCenter is IERC7786GatewaySource {
-    /// @notice The L1 Bridgehub that performs the L1->L2 transaction requests on behalf of the L1InteropCenter.
+    /// @notice The L1 Bridgehub, used as the registry of chains, base tokens and ZK chain addresses.
     function BRIDGE_HUB() external view returns (IL1Bridgehub);
 
     /// @notice Used to initialize the proxy.
-    function initialize() external;
+    /// @param _owner The owner of the contract.
+    function initialize(address _owner) external;
 
     /// @notice Parses ERC-7786 attributes into the L1-specific representation.
     /// @param _attributes The ERC-7786 attributes to parse.
@@ -42,4 +43,10 @@ interface IL1InteropCenter is IERC7786GatewaySource {
     function parseL1Attributes(
         bytes[] calldata _attributes
     ) external pure returns (L1MessageAttributes memory l1MessageAttributes);
+
+    /// @notice Pauses `sendMessage`. Used for incident response.
+    function pause() external;
+
+    /// @notice Unpauses `sendMessage`.
+    function unpause() external;
 }

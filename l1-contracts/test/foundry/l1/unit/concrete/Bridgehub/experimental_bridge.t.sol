@@ -337,7 +337,7 @@ contract ExperimentalBridgeTest is Test {
             address(0)
         );
         // interopCenter.setAddresses(sharedBridgeAddress, address(assetTracker));
-        l1InteropCenter = new L1InteropCenter(IL1Bridgehub(address(bridgehub)));
+        l1InteropCenter = new L1InteropCenter(IL1Bridgehub(address(bridgehub)), bridgeOwner);
         bridgehub.setInteropCenter(address(l1InteropCenter));
         vm.stopPrank();
 
@@ -1332,28 +1332,26 @@ contract ExperimentalBridgeTest is Test {
     // L1InteropCenter entry point
     /////////////////////////////////////////////////////////
 
-    function test_interopCenterRequestL2TransactionDirect_RevertWhen_notInteropCenter(address randomCaller) public {
-        _useMockSharedBridge();
+    function test_bridgehubDepositBaseToken_RevertWhen_notInteropCenter(address randomCaller) public {
+        _useFullSharedBridge();
         _initializeBridgehub();
         vm.assume(randomCaller != address(l1InteropCenter));
 
-        L2TransactionRequestDirect memory l2TxnReqDirect;
-
+        // The asset router authorizes the L1InteropCenter dynamically through the Bridgehub.
+        // A non-Era chain id is used so that the Era-diamond-proxy legacy path can not be hit by the fuzzer.
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
         vm.prank(randomCaller);
-        bridgehub.interopCenterRequestL2TransactionDirect(l2TxnReqDirect, randomCaller);
+        sharedBridge.bridgehubDepositBaseToken(eraChainId + 1, ETH_TOKEN_ASSET_ID, randomCaller, 1 ether);
     }
 
-    function test_interopCenterRequestL2TransactionTwoBridges_RevertWhen_notInteropCenter(address randomCaller) public {
-        _useMockSharedBridge();
+    function test_bridgehubDeposit_RevertWhen_notInteropCenter(address randomCaller) public {
+        _useFullSharedBridge();
         _initializeBridgehub();
         vm.assume(randomCaller != address(l1InteropCenter));
 
-        L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut;
-
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
         vm.prank(randomCaller);
-        bridgehub.interopCenterRequestL2TransactionTwoBridges(l2TxnReq2BridgeOut, randomCaller);
+        IL1CrossChainSender(address(sharedBridge)).bridgehubDeposit(eraChainId, randomCaller, 0, hex"");
     }
 
     function test_setInteropCenter(address randomCaller, address newInteropCenter) public {

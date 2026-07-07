@@ -115,6 +115,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         vm.startPrank(addresses.bridgehub.pendingOwner());
         addresses.bridgehub.acceptOwnership();
         addresses.sharedBridge.acceptOwnership();
+        IOwnable(ecosystemAddresses.bridgehub.proxies.interopCenter).acceptOwnership();
         IOwnable(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).acceptOwnership();
         addresses.ctmDeploymentTracker.acceptOwnership();
         vm.stopPrank();

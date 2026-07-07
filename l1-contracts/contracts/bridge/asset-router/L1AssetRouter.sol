@@ -69,10 +69,13 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         _;
     }
 
-    /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
-    modifier onlyBridgehubOrEra(uint256 _chainId) {
+    /// @notice Checks that the message sender is the L1InteropCenter or ZKsync Era Diamond Proxy.
+    /// @dev The L1InteropCenter is resolved dynamically through the Bridgehub, which keeps a single
+    /// source of truth for its address.
+    modifier onlyInteropCenterOrEra(uint256 _chainId) {
         require(
-            msg.sender == address(BRIDGE_HUB) || (_chainId == ERA_CHAIN_ID && msg.sender == address(ERA_DIAMOND_PROXY)),
+            msg.sender == BRIDGE_HUB.interopCenter() ||
+                (_chainId == ERA_CHAIN_ID && msg.sender == address(ERA_DIAMOND_PROXY)),
             Unauthorized(msg.sender)
         );
         _;
@@ -85,9 +88,11 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         _;
     }
 
-    /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyBridgehub() {
-        if (msg.sender != address(BRIDGE_HUB)) {
+    /// @notice Checks that the message sender is the L1InteropCenter.
+    /// @dev The L1InteropCenter is resolved dynamically through the Bridgehub, which keeps a single
+    /// source of truth for its address.
+    modifier onlyInteropCenter() {
+        if (msg.sender != BRIDGE_HUB.interopCenter()) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -195,7 +200,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes32 _assetId,
         address _originalCaller,
         uint256 _amount
-    ) public payable virtual override onlyBridgehubOrEra(_chainId) whenNotPaused {
+    ) public payable virtual override onlyInteropCenterOrEra(_chainId) whenNotPaused {
         _bridgehubDepositBaseToken(_chainId, _assetId, _originalCaller, _amount);
     }
 
@@ -210,7 +215,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         payable
         virtual
         override
-        onlyBridgehub
+        onlyInteropCenter
         whenNotPaused
         returns (L2TransactionRequestTwoBridgesInner memory request)
     {
@@ -242,7 +247,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _chainId,
         bytes32 _txDataHash,
         bytes32 _txHash
-    ) external override onlyBridgehub whenNotPaused {
+    ) external override onlyInteropCenter whenNotPaused {
         L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(_chainId, _txDataHash, _txHash);
     }
 

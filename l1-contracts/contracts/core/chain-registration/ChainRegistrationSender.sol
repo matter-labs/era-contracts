@@ -9,6 +9,7 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.sol";
 
 import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
@@ -41,9 +42,11 @@ contract ChainRegistrationSender is
     mapping(uint256 chainToBeRegistered => mapping(uint256 chainRegisteredOn => bool isRegistered))
         public chainRegisteredOnChain;
 
-    /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyBridgehub() {
-        if (msg.sender != address(BRIDGE_HUB)) {
+    /// @notice Checks that the message sender is the L1InteropCenter.
+    /// @dev The L1InteropCenter is resolved dynamically through the Bridgehub, which keeps a single
+    /// source of truth for its address.
+    modifier onlyInteropCenter() {
+        if (msg.sender != IL1Bridgehub(address(BRIDGE_HUB)).interopCenter()) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -89,7 +92,7 @@ contract ChainRegistrationSender is
         address,
         uint256,
         bytes calldata _data
-    ) external payable virtual override onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) external payable virtual override onlyInteropCenter returns (L2TransactionRequestTwoBridgesInner memory request) {
         if (msg.value != 0) {
             revert NoEthAllowed();
         }

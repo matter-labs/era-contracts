@@ -15,7 +15,7 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 
-import {BridgehubL2TransactionRequest, TokenBridgingData, TxStatus} from "../../common/Messaging.sol";
+import {TokenBridgingData, TxStatus} from "../../common/Messaging.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
@@ -358,27 +358,6 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     /*//////////////////////////////////////////////////////////////
                         Mailbox forwarder
     //////////////////////////////////////////////////////////////*/
-
-    /// @notice This function is used to send a request to the ZK chain.
-    /// @param _chainId the chainId of the chain
-    /// @param _refundRecipient the refund recipient
-    /// @param _originalCaller the account that initiated the request
-    /// @param _request the request
-    /// @return canonicalTxHash the canonical transaction hash
-    function _sendRequest(
-        uint256 _chainId,
-        address _refundRecipient,
-        address _originalCaller,
-        BridgehubL2TransactionRequest memory _request
-    ) internal returns (bytes32 canonicalTxHash) {
-        // Although the aliasing might happen in the Mailbox, we still want to determine the refund recipient
-        // in the BH, as the Mailbox won't have the original caller
-        address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, _originalCaller);
-        _request.refundRecipient = refundRecipient;
-        address zkChain = zkChainMap.get(_chainId);
-
-        canonicalTxHash = IZKChain(zkChain).bridgehubRequestL2Transaction(_request);
-    }
 
     /// @notice forwards function call to Mailbox based on ChainId
     function l2TransactionBaseCost(

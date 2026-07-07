@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
 import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.sol";
 
@@ -34,10 +35,13 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
     /// @dev L1AssetRouter smart contract that is used to bridge assets (including chains) between L1 and L2.
     IAssetRouterBase public immutable override L1_ASSET_ROUTER;
 
-    /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyBridgehub() {
-        if (msg.sender != address(BRIDGE_HUB)) {
-            revert OnlyBridgehub(msg.sender, address(BRIDGE_HUB));
+    /// @notice Checks that the message sender is the L1InteropCenter.
+    /// @dev The L1InteropCenter is resolved dynamically through the Bridgehub, which keeps a single
+    /// source of truth for its address.
+    modifier onlyInteropCenter() {
+        address l1InteropCenter = IL1Bridgehub(address(BRIDGE_HUB)).interopCenter();
+        if (msg.sender != l1InteropCenter) {
+            revert OnlyBridgehub(msg.sender, l1InteropCenter);
         }
         _;
     }
@@ -109,7 +113,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
         address _originalCaller,
         uint256,
         bytes calldata _data
-    ) external payable override onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) external payable override onlyInteropCenter returns (L2TransactionRequestTwoBridgesInner memory request) {
         if (msg.value != 0) {
             revert NoEthAllowed();
         }
@@ -132,7 +136,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
         uint256 _chainId,
         bytes32 _txDataHash,
         bytes32 _txHash
-    ) external override onlyBridgehub {}
+    ) external override onlyInteropCenter {}
 
     /// @notice Used to register the ctm asset in L2 AssetRouter.
     /// @param _originalCaller the address that called the Router

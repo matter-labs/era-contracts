@@ -8,7 +8,7 @@ import {console2 as console} from "forge-std/console2.sol";
 import {
     L2TransactionRequestDirect,
     L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
 
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";

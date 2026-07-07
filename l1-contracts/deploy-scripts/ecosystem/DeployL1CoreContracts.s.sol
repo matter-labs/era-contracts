@@ -205,6 +205,8 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         IOwnable(address(bridgehub)).transferOwnership(coreAddresses.shared.governance);
         bridgehub.setPendingAdmin(coreAddresses.shared.bridgehubAdmin);
 
+        IOwnable(coreAddresses.bridgehub.proxies.interopCenter).transferOwnership(coreAddresses.shared.governance);
+
         IL1AssetRouter sharedBridge = IL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
         IOwnable(address(sharedBridge)).transferOwnership(coreAddresses.shared.governance);
 

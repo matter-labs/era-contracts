@@ -548,153 +548,6 @@
   },
   {
     "type": "function",
-    "name": "interopCenterRequestL2TransactionDirect",
-    "inputs": [
-      {
-        "name": "_request",
-        "type": "tuple",
-        "internalType": "struct L2TransactionRequestDirect",
-        "components": [
-          {
-            "name": "chainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "mintValue",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "l2Contract",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "l2Value",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "l2Calldata",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "l2GasLimit",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "l2GasPerPubdataByteLimit",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "factoryDeps",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
-          },
-          {
-            "name": "refundRecipient",
-            "type": "address",
-            "internalType": "address"
-          }
-        ]
-      },
-      {
-        "name": "_originalCaller",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "canonicalTxHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "payable"
-  },
-  {
-    "type": "function",
-    "name": "interopCenterRequestL2TransactionTwoBridges",
-    "inputs": [
-      {
-        "name": "_request",
-        "type": "tuple",
-        "internalType": "struct L2TransactionRequestTwoBridgesOuter",
-        "components": [
-          {
-            "name": "chainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "mintValue",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "l2Value",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "l2GasLimit",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "l2GasPerPubdataByteLimit",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "refundRecipient",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "secondBridgeAddress",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "secondBridgeValue",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "secondBridgeCalldata",
-            "type": "bytes",
-            "internalType": "bytes"
-          }
-        ]
-      },
-      {
-        "name": "_originalCaller",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "canonicalTxHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "l2Contract",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "payable"
-  },
-  {
-    "type": "function",
     "name": "l1CtmDeployer",
     "inputs": [],
     "outputs": [
@@ -1388,22 +1241,6 @@
   },
   {
     "type": "error",
-    "name": "MsgValueMismatch",
-    "inputs": [
-      {
-        "name": "expectedMsgValue",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "providedMsgValue",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "NoCTMForAssetId",
     "inputs": [
       {
@@ -1451,22 +1288,6 @@
   },
   {
     "type": "error",
-    "name": "SecondBridgeAddressTooLow",
-    "inputs": [
-      {
-        "name": "secondBridgeAddress",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "minSecondBridgeAddress",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "SettlementLayersMustSettleOnL1",
     "inputs": []
   },
@@ -1488,22 +1309,6 @@
         "name": "caller",
         "type": "address",
         "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "WrongMagicValue",
-    "inputs": [
-      {
-        "name": "expectedMagicValue",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "providedMagicValue",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ]
   },
