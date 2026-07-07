@@ -14,18 +14,14 @@ const params = {
   SYSTEM_CONTRACTS_OFFSET: "0x8000",
 };
 
-async function preprocess(testMode: boolean) {
-  if (testMode) {
-    console.log("\x1b[31mWarning: test mode for the preprocessing being used!\x1b[0m");
-    params.SYSTEM_CONTRACTS_OFFSET = "0x9000";
-  }
+async function preprocess() {
   const substring = "uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000;";
   const replacingSubstring = `uint160 constant SYSTEM_CONTRACTS_OFFSET = ${params.SYSTEM_CONTRACTS_OFFSET};`;
 
   const timestampFilePath = path.join(process.cwd(), TIMESTAMP_FILE);
   const folderToCheck = path.join(process.cwd(), CONTRACTS_DIR);
 
-  if ((await isFolderEmpty(OUTPUT_DIR)) || needsRecompilation(folderToCheck, timestampFilePath) || testMode) {
+  if ((await isFolderEmpty(OUTPUT_DIR)) || needsRecompilation(folderToCheck, timestampFilePath)) {
     console.log("Preprocessing needed.");
     deleteDir(OUTPUT_DIR);
     setCompilationTime(timestampFilePath);
@@ -61,8 +57,8 @@ async function main() {
 
   program.version("0.1.0").name("system contracts preprocessor").description("preprocess the system contracts");
 
-  program.option("--test-mode").action(async (cmd) => {
-    await preprocess(cmd.testMode);
+  program.action(async () => {
+    await preprocess();
   });
 
   await program.parseAsync(process.argv);
