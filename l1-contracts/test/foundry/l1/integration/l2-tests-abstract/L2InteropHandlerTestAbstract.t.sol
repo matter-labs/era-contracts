@@ -38,6 +38,7 @@ import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol
 
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {CallStatus, IInteropHandler} from "contracts/interop/IInteropHandler.sol";
+import {IInteropHandlerBase} from "contracts/interop/IInteropHandlerBase.sol";
 
 import {
     UnauthorizedMessageSender,
@@ -188,7 +189,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
         // Expect event
         vm.expectEmit(true, false, false, false);
-        emit IInteropHandler.BundleExecuted(bundleHash);
+        emit IInteropHandlerBase.BundleExecuted(bundleHash);
         vm.prank(EXECUTION_ADDRESS);
         L2_INTEROP_HANDLER.executeBundle(bundle, proof);
         // Check storage changes
@@ -581,7 +582,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         // currentSettlementLayerChainId() due to access control restrictions.
         // After the fix: This should succeed and emit BundleVerified event.
         vm.expectEmit(true, false, false, false);
-        emit IInteropHandler.BundleVerified(bundleHash);
+        emit IInteropHandlerBase.BundleVerified(bundleHash);
 
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
 
@@ -632,7 +633,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         // currentSettlementLayerChainId due to access control.
         // After the fix: Should complete successfully
         vm.expectEmit(true, false, false, false);
-        emit IInteropHandler.BundleExecuted(bundleHash);
+        emit IInteropHandlerBase.BundleExecuted(bundleHash);
 
         vm.prank(EXECUTION_ADDRESS);
         L2_INTEROP_HANDLER.executeBundle(bundle, proof);

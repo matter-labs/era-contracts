@@ -135,6 +135,14 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridgehub.implementations.assetTracker,
             coreAddresses.bridgehub.proxies.assetTracker
         ) = deployTuppWithContract("L1AssetTracker", false);
+        (
+            coreAddresses.bridges.implementations.l1InteropHandler,
+            coreAddresses.bridges.proxies.l1InteropHandler
+        ) = deployTuppWithContract("L1InteropHandler", false);
+        vm.broadcast(getDeployerAddress());
+        L1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter).setL1InteropHandler(
+            coreAddresses.bridges.proxies.l1InteropHandler
+        );
         updateSharedBridge();
         (
             coreAddresses.bridgehub.implementations.ctmDeploymentTracker,
@@ -281,6 +289,12 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridges.implementations.l1Nullifier
         );
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
+        vm.serializeAddress(
+            "bridges",
+            "l1_interop_handler_implementation_addr",
+            coreAddresses.bridges.implementations.l1InteropHandler
+        );
+        vm.serializeAddress("bridges", "l1_interop_handler_proxy_addr", coreAddresses.bridges.proxies.l1InteropHandler);
         vm.serializeAddress(
             "bridges",
             "shared_bridge_implementation_addr",

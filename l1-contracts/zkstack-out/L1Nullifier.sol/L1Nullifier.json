@@ -294,74 +294,6 @@
   },
   {
     "type": "function",
-    "name": "finalizeDeposit",
-    "inputs": [
-      {
-        "name": "_finalizeWithdrawalParams",
-        "type": "tuple",
-        "internalType": "struct FinalizeL1DepositParams",
-        "components": [
-          {
-            "name": "chainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "l2BatchNumber",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "l2MessageIndex",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "l2Sender",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "l2TxNumberInBatch",
-            "type": "uint16",
-            "internalType": "uint16"
-          },
-          {
-            "name": "message",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "merkleProof",
-            "type": "bytes32[]",
-            "internalType": "bytes32[]"
-          }
-        ]
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "getTransientSettlementLayer",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "initialize",
     "inputs": [
       {
@@ -623,19 +555,6 @@
   },
   {
     "type": "event",
-    "name": "TransientSettlementLayerSet",
-    "inputs": [
-      {
-        "name": "settlementLayerChainId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "Unpaused",
     "inputs": [
       {
@@ -681,55 +600,8 @@
   },
   {
     "type": "error",
-    "name": "InteropWithdrawalNonZeroValue",
-    "inputs": [
-      {
-        "name": "value",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "InteropWithdrawalNotSingleCall",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InteropWithdrawalWrongDestination",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InteropWithdrawalWrongOrigin",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InteropWithdrawalWrongSource",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InteropWithdrawalWrongTarget",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "InvalidProof",
     "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidSelector",
-    "inputs": [
-      {
-        "name": "func",
-        "type": "bytes4",
-        "internalType": "bytes4"
-      }
-    ]
   },
   {
     "type": "error",
@@ -759,38 +631,6 @@
         "name": "caller",
         "type": "address",
         "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "WithdrawalAlreadyFinalized",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "WrongL2Sender",
-    "inputs": [
-      {
-        "name": "providedL2Sender",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "WrongMsgLength",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "length",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ]
   },

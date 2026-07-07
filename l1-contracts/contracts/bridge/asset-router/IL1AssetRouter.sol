@@ -30,6 +30,9 @@ interface IL1AssetRouter is IAssetRouterBase, IL1CrossChainSender {
 
     function nativeTokenVault() external view returns (INativeTokenVaultBase);
 
+    /// @notice The L1InteropHandler, which executes L2->L1 withdrawal bundles.
+    function l1InteropHandler() external view returns (address);
+
     function setAssetDeploymentTracker(bytes32 _assetRegistrationData, address _assetDeploymentTracker) external;
 
     function setNativeTokenVault(INativeTokenVaultBase _nativeTokenVault) external;

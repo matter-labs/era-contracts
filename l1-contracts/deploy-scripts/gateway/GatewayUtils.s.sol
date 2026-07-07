@@ -22,12 +22,12 @@ import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "../utils/Utils.sol";
 
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {FinalizeL1DepositParams, IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {InteropLibrary} from "../InteropLibrary.sol";
 import {ConfirmTransferResultData, TxStatus} from "contracts/common/Messaging.sol";
 import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 
@@ -105,20 +105,18 @@ contract GatewayUtils is Script, IGatewayUtils {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddr);
 
         address assetRouter = address(bridgehub.assetRouter());
-        IL1Nullifier l1Nullifier = L1AssetRouter(assetRouter).L1_NULLIFIER();
+        address l1InteropHandler = L1AssetRouter(assetRouter).l1InteropHandler();
 
         vm.broadcast();
-        l1Nullifier.finalizeDeposit(
-            FinalizeL1DepositParams({
-                chainId: gatewayChainId,
-                l2BatchNumber: l2BatchNumber,
-                l2MessageIndex: l2MessageIndex,
-                l2Sender: L2_INTEROP_CENTER_ADDR,
-                l2TxNumberInBatch: l2TxNumberInBatch,
-                message: message,
-                merkleProof: merkleProof
-            })
-        );
+        InteropLibrary.executeWithdrawalBundleOnL1({
+            _l1InteropHandler: l1InteropHandler,
+            _chainId: gatewayChainId,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: message,
+            _merkleProof: merkleProof
+        });
     }
 
     /// @notice Writes CTM `forceDeploymentsData` (from `NewChainCreationParams` logs) to a TOML fragment

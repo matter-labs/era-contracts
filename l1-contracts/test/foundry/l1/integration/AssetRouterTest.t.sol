@@ -23,11 +23,10 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/co
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
-import {L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 
-import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -173,17 +172,14 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             _amount: 100,
             _erc20Metadata: BridgeHelper.getERC20Getters(_tokenAddress, chainId)
         });
-        addresses.l1Nullifier.finalizeDeposit(
-            FinalizeL1DepositParams({
-                chainId: chainId,
-                l2BatchNumber: 1,
-                l2MessageIndex: 1,
-                l2Sender: L2_INTEROP_CENTER_ADDR,
-                l2TxNumberInBatch: 1,
-                message: _encodeWithdrawalBundleMessage(chainId, l2TokenAssetId, transferData),
-                merkleProof: new bytes32[](0)
-            })
-        );
+        _finalizeWithdrawalBundle({
+            _chainId: chainId,
+            _l2BatchNumber: 1,
+            _l2MessageIndex: 1,
+            _l2TxNumberInBatch: 1,
+            _message: _encodeWithdrawalBundleMessage(chainId, l2TokenAssetId, transferData),
+            _merkleProof: new bytes32[](0)
+        });
         tokenL1Address = addresses.l1NativeTokenVault.tokenAddress(l2TokenAssetId);
     }
 

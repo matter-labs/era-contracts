@@ -13,6 +13,7 @@ import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol"
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {CoreDeployedAddresses} from "../../../../deploy-scripts/ecosystem/DeployL1CoreUtils.s.sol";
@@ -140,7 +141,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
 
     /// @notice Wraps an asset-router `finalizeDeposit` payload in the single-call InteropBundle message
     /// form emitted by the L2 InteropCenter — the only withdrawal message form `L1Nullifier` accepts
-    /// (see `L1Nullifier._parseL2WithdrawalMessage` / `DataEncoding.parseInteropWithdrawalBundle`).
+    /// (validated and executed by the `L1InteropHandler`).
     function _encodeWithdrawalBundleMessage(
         uint256 _sourceChainId,
         bytes32 _assetId,
@@ -153,6 +154,27 @@ contract L1ContractDeployer is UtilsCallMockerTest {
                 _assetId,
                 _transferData
             );
+    }
+
+    /// @notice Executes an L2->L1 withdrawal message on the deployed `L1InteropHandler` (the
+    /// withdrawal finalization entry point).
+    function _finalizeWithdrawalBundle(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes memory _message,
+        bytes32[] memory _merkleProof
+    ) internal {
+        InteropLibrary.executeWithdrawalBundleOnL1({
+            _l1InteropHandler: addresses.sharedBridge.l1InteropHandler(),
+            _chainId: _chainId,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _message: _message,
+            _merkleProof: _merkleProof
+        });
     }
 
     // add this to be excluded from coverage report

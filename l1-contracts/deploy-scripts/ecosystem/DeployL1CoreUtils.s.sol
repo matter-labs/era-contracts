@@ -22,6 +22,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
+import {L1InteropHandler} from "contracts/interop/L1InteropHandler.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {CoreDeployedAddresses} from "../utils/Types.sol";
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
@@ -155,6 +156,13 @@ contract DeployL1CoreUtils is DeployUtils {
                     coreAddresses.bridges.proxies.l1AssetRouter,
                     coreAddresses.bridges.proxies.l1Nullifier
                 );
+        } else if (compareStrings(contractName, "L1InteropHandler")) {
+            return
+                abi.encode(
+                    coreAddresses.bridgehub.proxies.messageRoot,
+                    coreAddresses.bridges.proxies.l1AssetRouter,
+                    coreAddresses.bridgehub.proxies.assetTracker
+                );
         } else if (compareStrings(contractName, "Governance")) {
             return
                 abi.encode(
@@ -222,6 +230,8 @@ contract DeployL1CoreUtils is DeployUtils {
                 return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1));
             } else if (compareStrings(contractName, "L1AssetRouter")) {
                 return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "L1InteropHandler")) {
+                return abi.encodeCall(L1InteropHandler.initialize, ());
             } else if (compareStrings(contractName, "L1NativeTokenVault")) {
                 return
                     abi.encodeCall(

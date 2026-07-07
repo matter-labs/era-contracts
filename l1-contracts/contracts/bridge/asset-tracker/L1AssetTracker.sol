@@ -19,7 +19,8 @@ import {
     V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE
 } from "../../core/message-root/IMessageRoot.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
-import {FinalizeL1DepositParams, IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
+import {IL1Nullifier, TRANSIENT_SETTLEMENT_LAYER_SLOT} from "../../bridge/interfaces/IL1Nullifier.sol";
+import {FinalizeL1DepositParams} from "../../common/Messaging.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
@@ -50,6 +51,11 @@ import {IChainAssetHandlerBase} from "../../core/chain-asset-handler/IChainAsset
 import {IL2ChainAssetHandler} from "../../core/chain-asset-handler/IL2ChainAssetHandler.sol";
 import {IL1MessageRoot} from "../../core/message-root/IL1MessageRoot.sol";
 import {MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1} from "../../common/Config.sol";
+
+/// @dev Minimal getter interface to resolve the L1InteropHandler through the asset router.
+interface IL1AssetRouterInteropHandler {
+    function l1InteropHandler() external view returns (address);
+}
 
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     IBridgehubBase public immutable BRIDGE_HUB;
@@ -210,6 +216,27 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         chainBalance[block.chainid][_assetId] += _amount;
     }
 
+    /// @notice Records the settlement context of the withdrawal or failed-deposit claim being processed.
+    /// @dev Written transiently by the two claim entry points before they trigger the balance
+    /// accounting that reads it in `_getWithdrawalChain`:
+    /// - the `L1InteropHandler` when executing an L2->L1 withdrawal bundle;
+    /// - the `L1Nullifier` when a failed deposit is claimed.
+    /// @param _settlementLayerChainId The settlement layer the claim was proven against (0 for direct L1 settlement).
+    /// @param _l2BatchNumber The batch number the claim was proven against.
+    function setTransientSettlementLayer(uint256 _settlementLayerChainId, uint256 _l2BatchNumber) external {
+        require(msg.sender == address(L1_NULLIFIER) || msg.sender == _l1InteropHandler(), Unauthorized(msg.sender));
+        TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT, _settlementLayerChainId);
+        TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT + 1, _l2BatchNumber);
+        emit TransientSettlementLayerSet(_settlementLayerChainId);
+    }
+
+    /// @notice Resolves the current L1InteropHandler through the asset router.
+    /// @dev Read live (not cached) so the tracker works regardless of the wiring order during
+    /// deployments and upgrades.
+    function _l1InteropHandler() internal view returns (address) {
+        return IL1AssetRouterInteropHandler(address(BRIDGE_HUB.assetRouter())).l1InteropHandler();
+    }
+
     /// @notice Determines which chain's balance should be updated for a withdrawal operation.
     /// @dev This function handles the complex logic around V31 upgrade transitions and settlement layer changes.
     /// @dev The key insight is that before V31, withdrawals affected the chain's own balance, but after V31,
@@ -217,7 +244,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @param _chainId The ID of the chain from which the withdrawal is being processed.
     /// @return chainToUpdate The chain ID whose balance should be decremented for this withdrawal.
     function _getWithdrawalChain(uint256 _chainId) internal view returns (uint256 chainToUpdate) {
-        (uint256 settlementLayer, uint256 l2BatchNumber) = L1_NULLIFIER.getTransientSettlementLayer();
+        (uint256 settlementLayer, uint256 l2BatchNumber) = (
+            TransientPrimitivesLib.getUint256(TRANSIENT_SETTLEMENT_LAYER_SLOT),
+            TransientPrimitivesLib.getUint256(TRANSIENT_SETTLEMENT_LAYER_SLOT + 1)
+        );
         // This is the batch starting from which it is the responsibility of all the settlement layers to ensure that
         // all withdrawals coming from the chain are backed by the balance of this settlement layer.
         // Note, that since this method is used for claiming failed deposits, it implies that any failed deposit that has been processed

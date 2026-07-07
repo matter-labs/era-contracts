@@ -34,7 +34,7 @@ import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {InteropLibrary} from "../InteropLibrary.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -505,21 +505,18 @@ contract GatewayPreparation is Script {
     ) public {
         initializeConfig();
 
-        L1Nullifier l1Nullifier = L1Nullifier(config.l1NullifierProxy);
         IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehub);
-        bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
+        address l1InteropHandler = L1AssetRouter(address(bridgehub.assetRouter())).l1InteropHandler();
         vm.broadcast();
-        l1Nullifier.finalizeDeposit(
-            FinalizeL1DepositParams({
-                chainId: gatewayChainId,
-                l2BatchNumber: l2BatchNumber,
-                l2MessageIndex: l2MessageIndex,
-                l2Sender: L2_INTEROP_CENTER_ADDR,
-                l2TxNumberInBatch: l2TxNumberInBatch,
-                message: message,
-                merkleProof: merkleProof
-            })
-        );
+        InteropLibrary.executeWithdrawalBundleOnL1({
+            _l1InteropHandler: l1InteropHandler,
+            _chainId: gatewayChainId,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: message,
+            _merkleProof: merkleProof
+        });
     }
 
     /// @dev Calling this function requires private key to the admin of the chain

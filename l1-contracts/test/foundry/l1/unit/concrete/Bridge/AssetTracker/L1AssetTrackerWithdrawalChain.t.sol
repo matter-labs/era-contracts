@@ -65,13 +65,11 @@ contract L1AssetTrackerWithdrawalChainTest is Test {
         );
     }
 
-    /// @dev Mocks the transient settlement layer + batch number recorded by the nullifier during withdrawal proving.
+    /// @dev Records the transient settlement layer + batch number in the tracker, as the claim entry
+    /// points (L1InteropHandler for withdrawals, L1Nullifier for failed deposits) do before accounting.
     function _mockTransientSettlementLayer(uint256 _settlementLayer, uint256 _l2BatchNumber) internal {
-        vm.mockCall(
-            nullifier,
-            abi.encodeWithSelector(IL1Nullifier.getTransientSettlementLayer.selector),
-            abi.encode(_settlementLayer, _l2BatchNumber)
-        );
+        vm.prank(nullifier);
+        assetTracker.setTransientSettlementLayer(_settlementLayer, _l2BatchNumber);
     }
 
     /*//////////////////////////////////////////////////////////////

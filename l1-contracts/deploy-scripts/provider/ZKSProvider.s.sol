@@ -8,6 +8,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {FinalizeL1DepositParams} from "contracts/common/Messaging.sol";
+import {InteropLibrary} from "../InteropLibrary.sol";
 import {Utils} from "../utils/Utils.sol";
 import {
     AltL2ToL1Log,
@@ -38,13 +39,21 @@ contract ZKSProvider is Script {
 
         IBridgehubBase bridgehub = IBridgehubBase(l1Bridgehub);
         IL1AssetRouter assetRouter = IL1AssetRouter(address(bridgehub.assetRouter()));
-        IL1Nullifier nullifier = IL1Nullifier(assetRouter.L1_NULLIFIER());
+        address l1InteropHandler = assetRouter.l1InteropHandler();
 
         waitForBatchToBeExecuted(l1Bridgehub, chainId, params);
 
-        // Send the transaction
+        // Send the transaction. Withdrawals are interop bundles executed by the L1InteropHandler.
         vm.startBroadcast();
-        nullifier.finalizeDeposit(params);
+        InteropLibrary.executeWithdrawalBundleOnL1({
+            _l1InteropHandler: l1InteropHandler,
+            _chainId: params.chainId,
+            _l2BatchNumber: params.l2BatchNumber,
+            _l2MessageIndex: params.l2MessageIndex,
+            _l2TxNumberInBatch: params.l2TxNumberInBatch,
+            _message: params.message,
+            _merkleProof: params.merkleProof
+        });
         vm.stopBroadcast();
     }
 

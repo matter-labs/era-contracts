@@ -48,6 +48,7 @@ struct BridgeContracts {
     address l1AssetRouter;
     address l1Nullifier;
     address l1NativeTokenVault;
+    address l1InteropHandler;
 }
 
 // solhint-disable-next-line gas-struct-packing

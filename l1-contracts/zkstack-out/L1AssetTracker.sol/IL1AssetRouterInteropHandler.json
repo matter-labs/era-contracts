@@ -1,0 +1,15 @@
+[
+  {
+    "type": "function",
+    "name": "l1InteropHandler",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  }
+]

@@ -6,6 +6,14 @@ import {FinalizeL1DepositParams} from "../../common/Messaging.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 
 interface IL1AssetTracker {
+    /// @notice Emitted when the transient settlement context of a claim is recorded.
+    event TransientSettlementLayerSet(uint256 indexed settlementLayerChainId);
+
+    /// @notice Records the settlement context of the withdrawal or failed-deposit claim being processed.
+    /// @dev Callable only by the claim entry points: the `L1InteropHandler` (withdrawals) and the
+    /// `L1Nullifier` (failed deposits).
+    function setTransientSettlementLayer(uint256 _settlementLayerChainId, uint256 _l2BatchNumber) external;
+
     /// @notice Per-(chainId, assetId) migration accounting stored on L1.
     /// @param preV31ChainBalance Chain balance right before the v31 upgrade.
     /// - For non-native tokens it is exactly equal to chainBalance before the *ecosystem* upgraded to v31 (0 for new tokens).

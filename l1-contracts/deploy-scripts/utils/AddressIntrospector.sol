@@ -157,15 +157,28 @@ library AddressIntrospector {
             ? UpgradeableBeacon(bridgedTokenBeacon).implementation()
             : address(0);
 
+        // The L1InteropHandler only exists from v31 onwards; tolerate older routers without the getter.
+        address l1InteropHandlerProxy;
+        if (!isV29) {
+            (bool ok, bytes memory ret) = _assetRouter.staticcall(abi.encodeWithSignature("l1InteropHandler()"));
+            if (ok && ret.length == 32) {
+                l1InteropHandlerProxy = abi.decode(ret, (address));
+            }
+        }
+
         BridgeContracts memory proxies = BridgeContracts({
             l1AssetRouter: _assetRouter,
             l1Nullifier: l1NullifierProxy,
-            l1NativeTokenVault: l1NativeTokenVaultProxy
+            l1NativeTokenVault: l1NativeTokenVaultProxy,
+            l1InteropHandler: l1InteropHandlerProxy
         });
         BridgeContracts memory implementations = BridgeContracts({
             l1AssetRouter: Utils.getImplementation(_assetRouter),
             l1Nullifier: Utils.getImplementation(l1NullifierProxy),
-            l1NativeTokenVault: Utils.getImplementation(l1NativeTokenVaultProxy)
+            l1NativeTokenVault: Utils.getImplementation(l1NativeTokenVaultProxy),
+            l1InteropHandler: l1InteropHandlerProxy == address(0)
+                ? address(0)
+                : Utils.getImplementation(l1InteropHandlerProxy)
         });
 
         info = BridgesDeployedAddresses({
