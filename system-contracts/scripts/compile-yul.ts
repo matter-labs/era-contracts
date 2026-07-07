@@ -55,7 +55,6 @@ async function main() {
     if (needsRecompilation(folderToCheck, timestampFilePath)) {
       console.log("Compilation needed.");
       await compileYulFolder("bootloader/build");
-      await compileYulFolder("bootloader/tests");
       setCompilationTime(timestampFilePath);
     } else {
       console.log("Compilation not needed.");

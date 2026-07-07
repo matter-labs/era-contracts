@@ -3,7 +3,7 @@ import * as hre from "hardhat";
 
 import { ethers } from "ethers";
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
-import { render, renderFile } from "template-file";
+import { render } from "template-file";
 import { utils } from "zksync-ethers";
 import { getRevertSelector, getTransactionUtils } from "./constants";
 import * as fs from "node:fs";
@@ -139,56 +139,6 @@ const params = {
   ...SYSTEM_PARAMS,
 };
 
-function extractTestFunctionNames(sourceCode: string): string[] {
-  // Remove single-line comments
-  sourceCode = sourceCode.replace(/\/\/[^\n]*/g, "");
-
-  // Remove multi-line comments
-  sourceCode = sourceCode.replace(/\/\*[\s\S]*?\*\//g, "");
-
-  const regexPatterns = [/function\s+(TEST\w+)/g, /function\s+(INT_TEST\w+)/g];
-
-  const results: string[] = [];
-  for (const pattern of regexPatterns) {
-    let match;
-    while ((match = pattern.exec(sourceCode)) !== null) {
-      results.push(match[1]);
-    }
-  }
-
-  return [...new Set(results)]; // Remove duplicates
-}
-
-function createTestFramework(tests: string[]): string {
-  let testFramework = `
-    let test_id:= mload(0)
-
-    switch test_id
-    case 0 {
-        testing_totalTests(${tests.length})
-        return(0, 0)
-    }
-    `;
-
-  tests.forEach((value, index) => {
-    const isIntTest = value.startsWith("INT_TEST");
-    testFramework += `
-        case ${index + 1} {
-            testing_start("${value}")
-            ${value}()${isIntTest ? "" : "\n            return(0, 0)"}
-        }
-        `;
-  });
-
-  testFramework += `
-        default {
-            return(0, 0)
-        }
-    `;
-
-  return testFramework;
-}
-
 function validateSource(source: string) {
   const matches = source.matchAll(/<!-- @if BOOTLOADER_TYPE=='([^']*)' -->/g);
   for (const match of matches) {
@@ -229,23 +179,6 @@ async function main() {
     BOOTLOADER_TYPE: "playground_batch",
   });
 
-  console.log("Preprocessing bootloader tests");
-  const bootloaderTests = await renderFile("bootloader/tests/bootloader/bootloader_test.yul", {});
-
-  const testMethods = extractTestFunctionNames(bootloaderTests);
-
-  console.log("Found tests: " + testMethods);
-
-  const testFramework = createTestFramework(testMethods);
-
-  const bootloaderTestUtils = await renderFile("bootloader/tests/utils/test_utils.yul", {});
-
-  const bootloaderWithTests = await render(bootloaderSource, {
-    ...params,
-    CODE_START_PLACEHOLDER: "\n" + bootloaderTestUtils + "\n" + bootloaderTests + "\n" + testFramework,
-  });
-  const provedBootloaderWithTests = preprocess.preprocess(bootloaderWithTests, { BOOTLOADER_TYPE: "proved_batch" });
-
   if (!existsSync(OUTPUT_DIR_1)) {
     mkdirSync(OUTPUT_DIR_1);
   }
@@ -254,24 +187,15 @@ async function main() {
     mkdirSync(OUTPUT_DIR_2);
   }
 
-  const transferTest = readFileSync("bootloader/tests/transfer_test.yul").toString();
-  const dummy = readFileSync("bootloader/tests/dummy.yul").toString();
-
-  writeFileSync(`${OUTPUT_DIR_1}/bootloader_test.yul`, provedBootloaderWithTests);
   writeFileSync(`${OUTPUT_DIR_1}/proved_batch.yul`, provedBatchBootloader);
   writeFileSync(`${OUTPUT_DIR_1}/playground_batch.yul`, playgroundBatchBootloader);
   writeFileSync(`${OUTPUT_DIR_1}/gas_test.yul`, gasTestBootloader);
   writeFileSync(`${OUTPUT_DIR_1}/fee_estimate.yul`, feeEstimationBootloader);
-  writeFileSync(`${OUTPUT_DIR_1}/dummy.yul`, dummy);
-  writeFileSync(`${OUTPUT_DIR_1}/transfer_test.yul`, transferTest);
 
-  writeFileSync(`${OUTPUT_DIR_2}/bootloader_test.yul`, provedBootloaderWithTests);
   writeFileSync(`${OUTPUT_DIR_2}/proved_batch.yul`, provedBatchBootloader);
   writeFileSync(`${OUTPUT_DIR_2}/playground_batch.yul`, playgroundBatchBootloader);
   writeFileSync(`${OUTPUT_DIR_2}/gas_test.yul`, gasTestBootloader);
   writeFileSync(`${OUTPUT_DIR_2}/fee_estimate.yul`, feeEstimationBootloader);
-  writeFileSync(`${OUTPUT_DIR_2}/dummy.yul`, dummy);
-  writeFileSync(`${OUTPUT_DIR_2}/transfer_test.yul`, transferTest);
 
   console.log("Bootloader preprocessing done!");
 }
