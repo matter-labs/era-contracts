@@ -6,7 +6,6 @@ import {IZKChainBase} from "../chain-interfaces/IZKChainBase.sol";
 import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
-import {DiamondCutBuilder} from "../libraries/DiamondCutBuilder.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
 import {L2DACommitmentScheme} from "../../common/Config.sol";
 
@@ -88,22 +87,6 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @dev Only the ChainTypeManager contract can execute the upgrade
     /// @param _diamondCut The diamond cut parameters to be executed
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
-
-    /// @notice Executes an upgrade expressed as facet swaps: the diamond computes the facet cuts
-    ///         itself by diffing the selectors each old facet currently serves (read from its own
-    ///         storage) against the selectors each new facet declares
-    ///         (`ISelfDescribingFacet.selectors()`), so no selector list is shipped as calldata.
-    /// @dev Only the ChainTypeManager contract can execute the upgrade.
-    /// @param _swaps The facet swaps to realize (zero `oldFacet` = pure addition, zero `newFacet`
-    ///        = pure removal).
-    /// @param _initAddress The address that is delegate-called after the cuts are applied (see
-    ///        `Diamond.DiamondCutData.initAddress`).
-    /// @param _initCalldata The calldata for the init delegatecall.
-    function executeUpgradeBySwaps(
-        DiamondCutBuilder.FacetSwap[] calldata _swaps,
-        address _initAddress,
-        bytes calldata _initCalldata
-    ) external;
 
     /// @notice Instantly pause the functionality of all freezable facets & their selectors
     /// @dev Only the governance mechanism may freeze Diamond Proxy

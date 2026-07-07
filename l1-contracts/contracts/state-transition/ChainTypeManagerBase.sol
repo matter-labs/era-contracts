@@ -6,7 +6,6 @@ import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/Enumerable
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {Diamond} from "./libraries/Diamond.sol";
-import {DiamondCutBuilder} from "./libraries/DiamondCutBuilder.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
 import {IAdmin} from "./chain-interfaces/IAdmin.sol";
 import {IMigrator} from "./chain-interfaces/IMigrator.sol";
@@ -527,22 +526,6 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @param _diamondCut the diamond cut data
     function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
         IZKChain(getZKChain(_chainId)).executeUpgrade(_diamondCut);
-    }
-
-    /// @dev executes upgrade on chain expressed as facet swaps: the chain diamond composes the
-    /// facet cuts itself from its own storage and the new facets' declared selectors (see
-    /// `IAdmin.executeUpgradeBySwaps`), so no selector list flows through governance calldata
-    /// @param _chainId the chainId of the chain
-    /// @param _swaps the facet swaps to realize
-    /// @param _initAddress the address delegate-called after the cuts are applied
-    /// @param _initCalldata the calldata for the init delegatecall
-    function executeUpgradeBySwaps(
-        uint256 _chainId,
-        DiamondCutBuilder.FacetSwap[] calldata _swaps,
-        address _initAddress,
-        bytes calldata _initCalldata
-    ) external onlyOwner {
-        IZKChain(getZKChain(_chainId)).executeUpgradeBySwaps(_swaps, _initAddress, _initCalldata);
     }
 
     /// @dev setPriorityTxMaxGasLimit for the specified chain

@@ -226,51 +226,6 @@
   },
   {
     "type": "function",
-    "name": "executeUpgradeBySwaps",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_swaps",
-        "type": "tuple[]",
-        "internalType": "struct DiamondCutBuilder.FacetSwap[]",
-        "components": [
-          {
-            "name": "oldFacet",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "newFacet",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "isFreezable",
-            "type": "bool",
-            "internalType": "bool"
-          }
-        ]
-      },
-      {
-        "name": "_initAddress",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_initCalldata",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "forwardedBridgeBurn",
     "inputs": [
       {

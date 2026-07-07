@@ -3,7 +3,6 @@
 pragma solidity ^0.8.21;
 
 import {Diamond} from "./libraries/Diamond.sol";
-import {DiamondCutBuilder} from "./libraries/DiamondCutBuilder.sol";
 import {L2CanonicalTransaction, TxStatus} from "../common/Messaging.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 
@@ -178,13 +177,6 @@ interface IChainTypeManager {
     function setUpgradeDiamondCut(Diamond.DiamondCutData calldata _cutData, uint256 _oldProtocolVersion) external;
 
     function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external;
-
-    function executeUpgradeBySwaps(
-        uint256 _chainId,
-        DiamondCutBuilder.FacetSwap[] calldata _swaps,
-        address _initAddress,
-        bytes calldata _initCalldata
-    ) external;
 
     function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external;
 

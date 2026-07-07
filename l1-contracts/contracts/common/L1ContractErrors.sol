@@ -135,12 +135,6 @@ error EVMBytecodeAlreadyPublished(bytes32 bytecodeHash);
 error ExecuteMessageFailed();
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
-// 0x37fe7a86
-error FacetSwapEmptySelectors(address newFacet);
-// 0xfe1a6471
-error FacetSwapSameFacet(address facet);
-// 0x8eca01f7
-error FacetSwapUnknownOldFacet(address oldFacet);
 // 0x3fce21be
 error FeeParamsChangeTooLarge(uint256 oldPrice, uint256 newPrice, uint256 maxAllowedPrice);
 // 0xc91cf3b1
