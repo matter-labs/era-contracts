@@ -1152,7 +1152,7 @@ function printCastRunTrace(txHash: string, rpcUrl: string): void {
 /**
  * Trace a failed transaction via debug_traceTransaction and return a human-readable summary.
  */
-async function traceFailedTx(provider: ethers.providers.JsonRpcProvider, txHash: string): Promise<string> {
+export async function traceFailedTx(provider: ethers.providers.JsonRpcProvider, txHash: string): Promise<string> {
   try {
     const tx = await provider.getTransaction(txHash);
     const receipt = await provider.getTransactionReceipt(txHash);
@@ -1267,7 +1267,7 @@ export async function executeGovernanceCalls(
 
 // ── Diamond state helpers ────────────────────────────────────────────
 
-async function clearGenesisUpgradeTxHash(
+export async function clearGenesisUpgradeTxHash(
   provider: ethers.providers.JsonRpcProvider,
   chains: Array<{ chainId: number; diamondProxy: string }>
 ): Promise<void> {
@@ -1436,7 +1436,7 @@ function buildAddressToContract(isZKsyncOS: boolean): ReadonlyMap<string, Contra
   return new Map(entries);
 }
 
-function selectUpgradeChains(
+export function selectUpgradeChains(
   chainAddresses: Array<{ chainId: number; diamondProxy: string }>,
   chainConfigs: Array<{ chainId: number; role: ChainRole }>,
   targetRoles: ChainRole[]

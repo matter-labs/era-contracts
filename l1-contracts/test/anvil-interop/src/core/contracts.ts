@@ -17,6 +17,22 @@ import { loadAbiFromOut, loadBytecodeFromOut, loadCreationBytecodeFromOut } from
 const ARTIFACTS = {
   AdminFacet: "Admin.sol/AdminFacet.json",
   BaseTokenHolder: "BaseTokenHolder.sol/BaseTokenHolder.json",
+  // ── Registry-driven upgrade machinery (see registry-upgrade-test-runner.ts) ──
+  UpgradeExecutor: "UpgradeExecutor.sol/UpgradeExecutor.json",
+  CTMUpgradeModule: "CTMUpgradeModule.sol/CTMUpgradeModule.json",
+  EcosystemUpgradeModule: "EcosystemUpgradeModule.sol/EcosystemUpgradeModule.json",
+  RegistryComposerHarness: "RegistryComposerHarness.sol/RegistryComposerHarness.json",
+  IChainTypeManager: "IChainTypeManager.sol/IChainTypeManager.json",
+  ICTMRegistry: "ICTMRegistry.sol/ICTMRegistry.json",
+  DefaultUpgrade: "DefaultUpgrade.sol/DefaultUpgrade.json",
+  DiamondInit: "DiamondInit.sol/DiamondInit.json",
+  ZKsyncOSTestnetVerifier: "ZKsyncOSTestnetVerifier.sol/ZKsyncOSTestnetVerifier.json",
+  ProxyAdmin: "ProxyAdmin.sol/ProxyAdmin.json",
+  L1MessageRoot: "L1MessageRoot.sol/L1MessageRoot.json",
+  // Registries generated at runtime by scripts/gen-registry.ts (tag "AnvilHarness"); the
+  // artifacts only exist after the registry upgrade runner generates + forge-builds them.
+  CoreRegistryAnvilHarness: "CoreRegistryAnvilHarness.sol/CoreRegistryAnvilHarness.json",
+  ZKsyncOSCTMRegistryAnvilHarness: "ZKsyncOSCTMRegistryAnvilHarness.sol/ZKsyncOSCTMRegistryAnvilHarness.json",
   BridgedStandardERC20: "BridgedStandardERC20.sol/BridgedStandardERC20.json",
   ChainAdminOwnable: "ChainAdminOwnable.sol/ChainAdminOwnable.json",
   ChainRegistrationSender: "ChainRegistrationSender.sol/ChainRegistrationSender.json",

@@ -76,3 +76,7 @@ l1-contracts/foundry-zksync/
 # Local secrets (never commit)
 .env
 protocol-ops/target-linux/
+
+# Transient registry contracts generated at runtime by the anvil registry-driven
+# upgrade test runner (scripts/gen-registry.ts output; cleaned up after each run).
+l1-contracts/test/foundry/l1/unit/concrete/Upgrades/registry-gen-anvil/

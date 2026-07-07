@@ -73,8 +73,6 @@ interface Manifest {
   ctms: CTMManifest[];
 }
 
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-
 function packSemVer(version: string): bigint {
   const parts = version.split(".").map((p) => BigInt(p));
   if (parts.length !== 3) throw new Error(`invalid semver: ${version}`);
