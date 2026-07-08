@@ -185,24 +185,27 @@ library Utils {
             selectors[i] = selector;
         }
 
-        // Remove `getName()` selector if existing
-        bool hasGetName = false;
+        // Remove the unregistered helper views if present: every facet serves them,
+        // so registering them in the diamond would collide across facets.
+        selectors = removeSelector(selectors, bytes4(keccak256("getName()")));
+        selectors = removeSelector(selectors, bytes4(keccak256("selectors()")));
+
+        return selectors;
+    }
+
+    /// @dev Removes a single occurrence of `target` from `selectors` (order not preserved).
+    function removeSelector(bytes4[] memory selectors, bytes4 target) internal pure returns (bytes4[] memory) {
         uint256 selectorsLength = selectors.length;
         for (uint256 i = 0; i < selectorsLength; ++i) {
-            if (selectors[i] == bytes4(keccak256("getName()"))) {
-                selectors[i] = selectors[selectors.length - 1];
-                hasGetName = true;
-                break;
+            if (selectors[i] == target) {
+                selectors[i] = selectors[selectorsLength - 1];
+                bytes4[] memory newSelectors = new bytes4[](selectorsLength - 1);
+                for (uint256 j = 0; j < selectorsLength - 1; ++j) {
+                    newSelectors[j] = selectors[j];
+                }
+                return newSelectors;
             }
         }
-        if (hasGetName) {
-            bytes4[] memory newSelectors = new bytes4[](selectorsLength - 1);
-            for (uint256 i = 0; i < selectorsLength - 1; ++i) {
-                newSelectors[i] = selectors[i];
-            }
-            return newSelectors;
-        }
-
         return selectors;
     }
 

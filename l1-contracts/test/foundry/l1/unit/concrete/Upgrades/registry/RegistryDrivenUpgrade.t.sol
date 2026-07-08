@@ -127,8 +127,12 @@ contract RegistryDrivenUpgradeTest is ChainTypeManagerTest {
             _newVersion,
             _newAdminFacet == address(0) ? liveAdminFacet : _newAdminFacet
         );
+        // Old side: pinned list (the bootstrap override — the fixture installs a subset of the
+        // facet's full ABI, and old facet versions may predate ISelfDescribingFacet anyway).
         registry.addFacet(_oldVersion, CTMContract.AdminFacet, adminSelectors);
-        registry.addFacet(_newVersion, CTMContract.AdminFacet, adminSelectors);
+        // New side: NO pinned list — the composer reads the replacement facet's own
+        // ISelfDescribingFacet.selectors() (its full ABI), exercising the facet-default path.
+        registry.addFacet(_newVersion, CTMContract.AdminFacet, new bytes4[](0));
 
         registry.setBaseSystemContractHashes(bytes32(0), bytes32(0), bytes32(0)); // no updates
         registry.setChainCreationData(hex"f1f2", hex"c1c2");

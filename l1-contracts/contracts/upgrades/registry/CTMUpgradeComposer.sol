@@ -7,6 +7,7 @@ import {ICTMRegistry} from "./ICTMRegistry.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {DiamondCutBuilder} from "../../state-transition/libraries/DiamondCutBuilder.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
+import {ISelfDescribingFacet} from "../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {ChainCreationParams} from "../../state-transition/IChainTypeManager.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
@@ -42,8 +43,10 @@ library CTMUpgradeComposer {
 
     /// @notice Builds the facet swaps taking a chain from the registry's old protocol version to
     ///         its new one. Facets whose address is unchanged between the versions are skipped.
-    /// @dev Old selector lists come from the registry (facet sets are uniform across chains for a
-    ///      given protocol version), not from live diamond state.
+    /// @dev Selector lists come from the facets themselves (`ISelfDescribingFacet.selectors()`,
+    ///      immutable bytecode, so recomposition stays stable across the upgrade window) unless the
+    ///      registry pins a list for that facet version — the bootstrap override for facet versions
+    ///      deployed before `ISelfDescribingFacet` existed. Never from live diamond state.
     function buildFacetSwaps(ICTMRegistry _registry) internal view returns (SwapSet memory swapSet) {
         CTMContract[] memory oldFacets = _registry.facetList(_registry.oldProtocolVersion());
         CTMContract[] memory newFacets = _registry.facetList(_registry.newProtocolVersion());
@@ -97,10 +100,10 @@ library CTMUpgradeComposer {
                 newFacet: newAddress,
                 isFreezable: _registry.facetIsFreezable(facet)
             });
-            _buffer.oldSelectors[count] = _registry.facetSelectors(facet, oldVersion);
+            _buffer.oldSelectors[count] = _facetSelectors(_registry, facet, oldVersion, oldAddress);
             _buffer.newSelectors[count] = newAddress == address(0)
                 ? new bytes4[](0)
-                : _registry.facetSelectors(facet, newVersion);
+                : _facetSelectors(_registry, facet, newVersion, newAddress);
             ++count;
         }
     }
@@ -127,8 +130,28 @@ library CTMUpgradeComposer {
                 isFreezable: _registry.facetIsFreezable(facet)
             });
             _buffer.oldSelectors[count] = new bytes4[](0);
-            _buffer.newSelectors[count] = _registry.facetSelectors(facet, newVersion);
+            _buffer.newSelectors[count] = _facetSelectors(
+                _registry,
+                facet,
+                newVersion,
+                _registry.ctmAddress(facet, newVersion)
+            );
             ++count;
+        }
+    }
+
+    /// @dev The selector list of a facet at a version: the registry's pinned list when one
+    ///      exists (bootstrap override for facet versions predating `ISelfDescribingFacet`),
+    ///      otherwise read from the facet's own immutable bytecode.
+    function _facetSelectors(
+        ICTMRegistry _registry,
+        CTMContract _facet,
+        uint256 _protocolVersion,
+        address _facetAddress
+    ) private view returns (bytes4[] memory selectorList) {
+        selectorList = _registry.facetSelectors(_facet, _protocolVersion);
+        if (selectorList.length == 0) {
+            selectorList = ISelfDescribingFacet(_facetAddress).selectors();
         }
     }
 
@@ -245,7 +268,12 @@ library CTMUpgradeComposer {
                 isFreezable: _registry.facetIsFreezable(facets[i])
             });
             oldSelectors[i] = new bytes4[](0);
-            newSelectors[i] = _registry.facetSelectors(facets[i], _newVersion);
+            newSelectors[i] = _facetSelectors(
+                _registry,
+                facets[i],
+                _newVersion,
+                _registry.ctmAddress(facets[i], _newVersion)
+            );
         }
 
         return

@@ -223,7 +223,7 @@ contract ZKsyncOSCTMRegistryV32 is ICTMRegistry {
     function verifyAll() external view returns (bool) {
         if (
             address(uint160(0x00045857bdeae7c1c7252d611eb24eb55564198b4c)).codehash !=
-            0xa8979c4d7ef131ada260efa5438b874ee95783a34640727440245afece00923c
+            0xe8e31854a39f59042ebdf56730808bd85eabdff0c2a16bd8e67afbccb7425836
         ) return false;
         if (
             address(uint160(0x002b5a4e5493d4a54e717057b127cf0c000c876f9b)).codehash !=

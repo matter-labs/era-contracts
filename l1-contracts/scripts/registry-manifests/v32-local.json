@@ -28,7 +28,7 @@
         "AdminFacet": {
           "old": "0xbb27525459Cfa6650f9491808eCF1FeE6434b236",
           "new": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C",
-          "newCodehash": "0xa8979c4d7ef131ada260efa5438b874ee95783a34640727440245afece00923c"
+          "newCodehash": "0xe8e31854a39f59042ebdf56730808bd85eabdff0c2a16bd8e67afbccb7425836"
         },
         "DefaultUpgrade": {
           "new": "0x2b5A4e5493d4a54E717057B127cf0C000C876f9B",
