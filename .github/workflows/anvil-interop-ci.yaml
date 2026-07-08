@@ -90,6 +90,133 @@ jobs:
         run: |
           bash cleanup.sh
 
+  # V29 → V31 upgrade test: loads v29 chain states, runs the v31 ecosystem upgrade,
+  # executes governance calls, and verifies protocol version is updated.
+  # TEMPORARILY DISABLED: the legacy-bridge removal makes the upgrade-from-legacy
+  # path (v29/v30 chains that still have legacy bridges) non-applicable. Re-enable
+  # once the InteropCenter withdrawal migration lands.
+  v29-to-v31-upgrade-test:
+    if: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Foundry (for Anvil)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Install foundry-zksync (for forge --zksync)
+        uses: ./.github/actions/install-zksync-foundry
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build da-contracts artifacts
+        run: yarn da build:foundry
+
+      - name: Build system-contracts artifacts
+        run: yarn sc build:foundry
+
+      - name: Build l1-contracts artifacts
+        run: yarn l1 build:foundry
+
+      - name: Install anvil-interop dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install
+
+      - name: Run V29 to V31 upgrade test
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          echo "Running V29 -> V31 upgrade test..."
+          yarn ts-node run-v29-to-v31-upgrade-test.ts
+
+      - name: Cleanup
+        if: always()
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          bash cleanup.sh
+
+  # V30 → V31 upgrade test: loads v30 ZKsync OS chain states, runs the v31 ecosystem upgrade,
+  # executes governance calls, and verifies protocol version is updated.
+  # TEMPORARILY DISABLED: see the note on v29-to-v31-upgrade-test above.
+  v30-to-v31-upgrade-test:
+    if: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Foundry (for Anvil)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Install foundry-zksync (for forge --zksync)
+        uses: ./.github/actions/install-zksync-foundry
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build da-contracts artifacts
+        run: yarn da build:foundry
+
+      - name: Build system-contracts artifacts
+        run: yarn sc build:foundry
+
+      - name: Build l1-contracts artifacts
+        run: yarn l1 build:foundry
+
+      - name: Install anvil-interop dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install
+
+      - name: Run V30 to V31 upgrade test
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          echo "Running V30 -> V31 upgrade test..."
+          yarn ts-node run-v30-to-v31-upgrade-test.ts
+
+      - name: Cleanup
+        if: always()
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          bash cleanup.sh
+
+  # Mandatory determinism gate for the current protocol version's chain state:
+  # rebuilds the state from scratch and verifies it matches the committed
+  # snapshots. If a contract change alters genesis state, this fails —
+  # regenerate via the 'Regenerate Anvil Interop Chain States' workflow and push.
+  #
+  # The compare tolerates block-number-derived drift: the harness runs Anvil with
+  # interval mining (`--block-time 1`, required so the interop relayers/TBM keep
+  # progressing), so the block count is wall-clock-dependent. compare-chain-states
+  # ignores block.number and storage slots that just hold a block number (values
+  # ≤ block height), plus the block-indexed MessageRoot storage. Everything else
+  # (balances, roots, addresses, code, protocol version) must match exactly, so
+  # this still catches real drift. To block merges, add "state-generation-check"
+  # to the branch protection required checks.
   state-generation-check:
     runs-on: ubuntu-latest
     timeout-minutes: 45

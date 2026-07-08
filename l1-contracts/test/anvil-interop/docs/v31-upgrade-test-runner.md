@@ -2,12 +2,10 @@
 
 ## Overview
 
-The v31 upgrade test runner (`v31-upgrade-test-runner.ts`) drives the full ecosystem protocol
-upgrade flow on local Anvil chains. Its remaining entry point is `run-fork-upgrade-test.ts`, which
-rehearses the upgrade against a forked real network. (The synthetic v29->v31 / v30->v31 fixture
-runs were removed: the new ecosystem launches fresh, so there are no pre-v31 chains to upgrade.)
-It exercises the **production Solidity upgrade scripts** end-to-end, but patches around Anvil EVM
-limitations that prevent the real L2 ZKsync execution environment from working.
+The v31 upgrade test runner (`v31-upgrade-test-runner.ts`) tests the full v29->v31 and v30->v31
+protocol upgrade flow on local Anvil chains. It exercises the **production Solidity upgrade scripts**
+end-to-end, but patches around Anvil EVM limitations that prevent the real L2 ZKsync execution
+environment from working.
 
 ## Production upgrade flow (what the test reproduces)
 

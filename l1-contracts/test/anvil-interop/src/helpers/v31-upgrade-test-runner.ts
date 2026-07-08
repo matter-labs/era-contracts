@@ -82,6 +82,7 @@ export type V31UpgradeScenario = {
   targetRoles: ChainRole[];
   clearGenesisUpgradeTxHash?: boolean;
   seedBatchCounters?: boolean;
+  transferL1ChainAssetHandlerOwnership?: boolean;
 };
 
 // ── Main entry point ─────────────────────────────────────────────────
@@ -112,7 +113,7 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
 
     // ── Transfer L1 contract ownership to governance ──
     console.log("\n── Preparing L1 ownership for upgrade ──");
-    await transferL1Ownership(l1Provider, defaultSigner, l1Addresses, ctmAddresses);
+    await transferL1Ownership(l1Provider, defaultSigner, l1Addresses, ctmAddresses, scenario);
 
     // ── Deploy ChainAdmin for each upgrade target ──
     console.log("\n── Deploying temporary ChainAdminOwnable contracts ──");
@@ -228,14 +229,22 @@ async function transferL1Ownership(
     bridgehub: string;
     l1SharedBridge: string;
     l1NativeTokenVault: string;
+    l1ChainAssetHandler?: string;
   },
-  ctmAddresses: { chainTypeManager: string }
+  ctmAddresses: { chainTypeManager: string },
+  scenario: V31UpgradeScenario
 ): Promise<void> {
   const gov = l1Addresses.governance;
   await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.bridgehub);
   await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1SharedBridge);
   await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1NativeTokenVault);
   await transferOwnership2Step(provider, defaultSigner, gov, ctmAddresses.chainTypeManager);
+  // The pre-v31 chain states record the old L1ChainAssetHandler proxy (the v31 ecosystem
+  // upgrade reuses this proxy in place). Governance must own it to run the stage-0
+  // pauseMigration() governance call.
+  if (scenario.transferL1ChainAssetHandlerOwnership && l1Addresses.l1ChainAssetHandler) {
+    await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1ChainAssetHandler);
+  }
 }
 
 async function deployChainAdmins(
