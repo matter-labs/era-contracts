@@ -212,7 +212,7 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.BaseTokenHolder) return "BaseTokenHolder";
         if (_c == CoreContract.L2ChainAssetHandler) return "L2ChainAssetHandler";
         if (_c == CoreContract.InteropCenter) return "InteropCenter";
-        if (_c == CoreContract.InteropHandler) return "InteropHandler";
+        if (_c == CoreContract.L2InteropHandler) return "L2InteropHandler";
         if (_c == CoreContract.L2AssetTracker) return "L2AssetTracker";
         if (_c == CoreContract.L2WrappedBaseToken) return "L2WrappedBaseToken";
         if (_c == CoreContract.L2MessageVerification) return "L2MessageVerification";
@@ -246,7 +246,7 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.BaseTokenHolder) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.L2AssetTracker) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.InteropCenter) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.InteropHandler) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == CoreContract.L2InteropHandler) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.GWAssetTracker) return ZKsyncOSUpgradeType.SystemProxy;
         revert UnknownCoreContract();
     }
@@ -268,7 +268,7 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.BaseTokenHolder) return L2_BASE_TOKEN_HOLDER_ADDR;
         if (_c == CoreContract.L2AssetTracker) return L2_ASSET_TRACKER_ADDR;
         if (_c == CoreContract.InteropCenter) return L2_INTEROP_CENTER_ADDR;
-        if (_c == CoreContract.InteropHandler) return L2_INTEROP_HANDLER_ADDR;
+        if (_c == CoreContract.L2InteropHandler) return L2_INTEROP_HANDLER_ADDR;
         if (_c == CoreContract.GWAssetTracker) return GW_ASSET_TRACKER_ADDR;
         if (_c == CoreContract.UpgradeableBeaconDeployer) return L2_NTV_BEACON_DEPLOYER_ADDR;
         revert UnknownCoreContract();

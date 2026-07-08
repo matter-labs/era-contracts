@@ -21,16 +21,11 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.so
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
 import {
     AddressAlreadySet,
-    ExecuteMessageFailed,
-    InvalidSelector,
     NonEmptyMsgValue,
-    PayloadTooShort,
     Unauthorized,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {IERC7786Recipient} from "../../interop/IERC7786Recipient.sol";
-import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
@@ -44,7 +39,7 @@ import {TxStatus} from "../../common/Messaging.sol";
 /// @dev Handles the L1 side of asset routing for L1 <-> ZK chain bridging,
 /// supporting both ETH and ERC20 tokens.
 /// @dev Designed for use with a proxy for upgradability.
-contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard, IERC7786Recipient {
+contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @dev Bridgehub smart contract used for asynchronous cross-chain requests, including deposits and interop-related routing.
@@ -79,12 +74,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard, IERC
     /// @notice Checks that the message sender is the nullifier.
     modifier onlyNullifier() {
         require(msg.sender == address(L1_NULLIFIER), Unauthorized(msg.sender));
-        _;
-    }
-
-    /// @notice Checks that the message sender is the L1 interop handler that finalizes L2 -> L1 withdrawals.
-    modifier onlyInteropHandler() {
-        require(msg.sender == l1InteropHandler, Unauthorized(msg.sender));
         _;
     }
 
@@ -285,34 +274,19 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard, IERC
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Executes an L2 -> L1 withdrawal interop call following the ERC-7786 standard.
-    /// @dev Called by the L1 interop handler while executing a withdrawal bundle. The bundle's single call targets
-    /// this router with a `finalizeDeposit` payload originating from the L2 asset router; we re-invoke it via a
-    /// self-call, mirroring `L2AssetRouter.receiveMessage`.
-    /// @param sender ERC-7930 address of the message sender (the L2 asset router on the source chain).
-    /// @param payload Encoded `finalizeDeposit` call data.
-    /// @return The `receiveMessage` selector per ERC-7786.
-    function receiveMessage(
-        bytes32 /* receiveId */,
-        bytes calldata sender,
-        bytes calldata payload
-    ) external payable override onlyInteropHandler returns (bytes4) {
-        (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
+    /// @inheritdoc AssetRouterBase
+    /// @dev Withdrawal bundles are executed by the configured L1 interop handler.
+    function _interopHandler() internal view override returns (address) {
+        return l1InteropHandler;
+    }
 
-        // Withdrawals arriving on L1 are emitted by the L2 asset router on the source L2 chain (never L1 itself).
-        require(senderChainId != block.chainid && senderAddress == L2_ASSET_ROUTER_ADDR, Unauthorized(senderAddress));
-
-        // Only a `finalizeDeposit` call may be executed through the interop system.
-        require(payload.length > 4, PayloadTooShort());
-        require(
-            bytes4(payload[0:4]) == AssetRouterBase.finalizeDeposit.selector,
-            InvalidSelector(bytes4(payload[0:4]))
-        );
-
-        // slither-disable-next-line arbitrary-send-eth
-        (bool success, ) = address(this).call{value: msg.value}(payload);
-        require(success, ExecuteMessageFailed());
-        return IERC7786Recipient.receiveMessage.selector;
+    /// @inheritdoc AssetRouterBase
+    /// @dev Withdrawals arriving on L1 are emitted by the L2 asset router on the source L2 chain (never L1 itself).
+    function _isValidInteropSender(
+        uint256 _senderChainId,
+        address _senderAddress
+    ) internal view override returns (bool) {
+        return _senderChainId != block.chainid && _senderAddress == L2_ASSET_ROUTER_ADDR;
     }
 
     /// @inheritdoc AssetRouterBase

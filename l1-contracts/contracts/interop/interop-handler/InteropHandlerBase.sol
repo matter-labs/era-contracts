@@ -2,9 +2,9 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.24;
 
-import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
+import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 
-import {L2_INTEROP_CENTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_CENTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {
     BUNDLE_IDENTIFIER,
@@ -15,10 +15,10 @@ import {
     InteropBundle,
     InteropCall,
     MessageInclusionProof
-} from "../common/Messaging.sol";
-import {IERC7786Recipient} from "./IERC7786Recipient.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {InteropDataEncoding} from "./InteropDataEncoding.sol";
+} from "../../common/Messaging.sol";
+import {IERC7786Recipient} from "../IERC7786Recipient.sol";
+import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
+import {InteropDataEncoding} from "../InteropDataEncoding.sol";
 import {
     BundleAlreadyProcessed,
     CallAlreadyExecuted,
@@ -34,8 +34,8 @@ import {
     WrongSourceChainId,
     InvalidInteropBundleVersion,
     InvalidInteropCallVersion
-} from "./InteropErrors.sol";
-import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
+} from "../InteropErrors.sol";
+import {InvalidSelector, Unauthorized} from "../../common/L1ContractErrors.sol";
 
 /// @title InteropHandlerBase
 /// @author Matter Labs

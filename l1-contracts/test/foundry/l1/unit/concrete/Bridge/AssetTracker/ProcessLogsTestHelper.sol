@@ -120,7 +120,7 @@ library ProcessLogsTestHelper {
         });
     }
 
-    /// @notice Creates an L2Log for an InteropHandler message (via L2_TO_L1_MESSENGER).
+    /// @notice Creates an L2Log for an L2InteropHandler message (via L2_TO_L1_MESSENGER).
     function createInteropHandlerLog(
         uint16 _txNumberInBatch,
         bytes memory _message
@@ -129,7 +129,7 @@ library ProcessLogsTestHelper {
     }
 
     /// @notice Encodes an InteropCallExecutedMessage into the L2→L1 message format expected by
-    ///         processLogsAndMessages when handling InteropHandler logs.
+    ///         processLogsAndMessages when handling L2InteropHandler logs.
     function encodeInteropCallExecutedMessage(
         InteropCallExecutedMessage memory _msg
     ) internal pure returns (bytes memory) {

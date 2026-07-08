@@ -52,5 +52,5 @@ export const PREDEPLOY_SYSTEM_CONTRACTS: readonly SystemContractPredeploy[] = [
   { address: GW_ASSET_TRACKER_ADDR, contractName: "GWAssetTracker" },
   { address: L2_BASE_TOKEN_HOLDER_ADDR, contractName: "BaseTokenHolder" },
   { address: INTEROP_CENTER_ADDR, contractName: "InteropCenter" },
-  { address: L2_INTEROP_HANDLER_ADDR, contractName: "InteropHandler" },
+  { address: L2_INTEROP_HANDLER_ADDR, contractName: "L2InteropHandler" },
 ] as const;

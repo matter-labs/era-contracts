@@ -18,7 +18,7 @@ interface IAssetTrackerDataEncoding {
 
     function receiveGatewayToL1MigrationOnL1(GatewayToL1TokenBalanceMigrationData calldata _data) external;
 
-    /// @notice Used as a function selector source for messages sent by InteropHandler to GWAssetTracker.
+    /// @notice Used as a function selector source for messages sent by L2InteropHandler to GWAssetTracker.
     /// @dev One message is sent per successfully executed interop call so GWAssetTracker can move
     /// balances from pendingInteropBalance to chainBalance.
     function receiveInteropCallExecuted(InteropCallExecutedMessage calldata _data) external;

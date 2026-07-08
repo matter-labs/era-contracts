@@ -832,11 +832,6 @@
   },
   {
     "type": "error",
-    "name": "ExecuteMessageFailed",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "InteroperableAddressParsingError",
     "inputs": [
       {

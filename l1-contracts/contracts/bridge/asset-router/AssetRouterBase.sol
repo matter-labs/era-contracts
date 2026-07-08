@@ -19,17 +19,21 @@ import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/br
 import {
     AssetHandlerDoesNotExist,
     AssetIdNotSupported,
+    InvalidSelector,
+    PayloadTooShort,
     Unauthorized,
     UnsupportedEncodingVersion
 } from "../../common/L1ContractErrors.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
+import {IERC7786Recipient} from "../../interop/IERC7786Recipient.sol";
+import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Routes asset transfers for both L1 <-> ZK chain bridging and interop between ZK chains,
 /// supporting both ETH and ERC20 tokens.
 /// @dev Designed for use with a proxy for upgradability.
-abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, PausableUpgradeable {
+abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
     /// @dev Maps asset ID to address of corresponding asset handler.
@@ -189,6 +193,54 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /*//////////////////////////////////////////////////////////////
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice The interop handler on this chain that is allowed to deliver interop calls to this router.
+    /// @dev On L2 this is the `L2InteropHandler` system contract; on L1 the configured `L1InteropHandler`.
+    function _interopHandler() internal view virtual returns (address);
+
+    /// @notice Validates that the interop message sender is the asset-router counterpart on the source chain.
+    /// @dev On L2, only this same router (identical address on every ZK chain) may be the sender and the source
+    /// cannot be L1 (interop is only initiated on L2s). On L1, the sender must be the L2 asset router.
+    function _isValidInteropSender(
+        uint256 _senderChainId,
+        address _senderAddress
+    ) internal view virtual returns (bool);
+
+    /// @notice Executes a cross-chain asset-router call following the ERC-7786 standard.
+    /// @dev Called by this chain's interop handler while executing an interop bundle whose call targets this
+    /// router with a `finalizeDeposit` payload; the payload is re-invoked via a self-call. The sender and payload
+    /// validations prevent spoofed cross-chain messages and arbitrary function calls through the interop system.
+    /// @param sender ERC-7930 address of the message sender (the asset router on the source chain).
+    /// @param payload Encoded `finalizeDeposit` call data.
+    /// @return The `receiveMessage` selector per ERC-7786.
+    function receiveMessage(
+        bytes32 /* receiveId */,
+        bytes calldata sender,
+        bytes calldata payload
+    ) external payable override returns (bytes4) {
+        require(msg.sender == _interopHandler(), Unauthorized(msg.sender));
+
+        (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
+        require(_isValidInteropSender(senderChainId, senderAddress), Unauthorized(senderAddress));
+
+        // Only a `finalizeDeposit` call may be executed through the interop system.
+        require(payload.length > 4, PayloadTooShort());
+        require(
+            bytes4(payload[0:4]) == AssetRouterBase.finalizeDeposit.selector,
+            InvalidSelector(bytes4(payload[0:4]))
+        );
+
+        // slither-disable-next-line arbitrary-send-eth
+        (bool success, bytes memory returnData) = address(this).call{value: msg.value}(payload);
+        if (!success) {
+            // Bubble up the original revert reason (e.g. `InsufficientChainBalance`) instead of masking it, so
+            // callers can react to the specific error (the TBM flow retries withdrawals on `InsufficientChainBalance`).
+            assembly {
+                revert(add(returnData, 0x20), mload(returnData))
+            }
+        }
+        return IERC7786Recipient.receiveMessage.selector;
+    }
 
     /// @notice Finalize the withdrawal and release funds.
     /// @param _chainId The chain ID of the transaction to check.

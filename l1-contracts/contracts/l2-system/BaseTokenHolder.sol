@@ -60,7 +60,7 @@ import {Unauthorized} from "../common/L1ContractErrors.sol";
  */
 // slither-disable-next-line locked-ether
 contract BaseTokenHolder is IBaseTokenHolder {
-    /// @notice Modifier that restricts access to the InteropHandler only.
+    /// @notice Modifier that restricts access to the L2InteropHandler only.
     modifier onlyInteropHandler() {
         if (msg.sender != L2_INTEROP_HANDLER_ADDR) {
             revert Unauthorized(msg.sender);

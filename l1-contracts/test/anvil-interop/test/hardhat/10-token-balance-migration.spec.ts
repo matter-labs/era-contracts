@@ -337,7 +337,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
 
     it("cannot execute an interop bundle on an L1-settled chain (CannotClaimInteropOnL1Settlement)", async () => {
       const wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1SettledProvider);
-      const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+      const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
       const dummyProof = buildMockInteropProof(gwSettledChainIds[0]);
 
       // `callStatic` surfaces the custom-error selector; plain Anvil tx receipts
@@ -345,19 +345,19 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       await expectRevert(
         () => interopHandler.callStatic.executeBundle("0x", dummyProof, { gasLimit: 500_000 }),
         "executeBundle on L1-settled chain",
-        customError("InteropHandler", "CannotClaimInteropOnL1Settlement()"),
+        customError("L2InteropHandler", "CannotClaimInteropOnL1Settlement()"),
         l1SettledProvider
       );
     });
 
     it("cannot unbundle an interop bundle on an L1-settled chain (CannotClaimInteropOnL1Settlement)", async () => {
       const wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1SettledProvider);
-      const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+      const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
 
       await expectRevert(
         () => interopHandler.callStatic.unbundleBundle("0x", [], { gasLimit: 500_000 }),
         "unbundleBundle on L1-settled chain",
-        customError("InteropHandler", "CannotClaimInteropOnL1Settlement()"),
+        customError("L2InteropHandler", "CannotClaimInteropOnL1Settlement()"),
         l1SettledProvider
       );
     });
@@ -860,7 +860,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       await expectRevert(
         () => simulateExecuteBundle(reverseTbmProvider, oldExecuteBundleData, sourceChainIdForOldBundles),
         "executeBundle on chain after SL→L1",
-        customError("InteropHandler", "CannotClaimInteropOnL1Settlement()"),
+        customError("L2InteropHandler", "CannotClaimInteropOnL1Settlement()"),
         reverseTbmProvider
       );
     });
@@ -869,7 +869,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       await expectRevert(
         () => simulateUnbundleBundle(reverseTbmProvider, oldUnbundleBundleData, [0]),
         "unbundleBundle on chain after SL→L1",
-        customError("InteropHandler", "CannotClaimInteropOnL1Settlement()"),
+        customError("L2InteropHandler", "CannotClaimInteropOnL1Settlement()"),
         reverseTbmProvider
       );
     });

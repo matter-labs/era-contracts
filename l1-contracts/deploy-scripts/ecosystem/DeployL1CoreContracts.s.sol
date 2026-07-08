@@ -223,7 +223,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         IL1Nullifier l1Nullifier = IL1Nullifier(coreAddresses.bridges.proxies.l1Nullifier);
         IOwnable(address(l1Nullifier)).transferOwnership(coreAddresses.shared.governance);
 
-        // The L1 interop handler is not Ownable (symmetric with the L2 InteropHandler); nothing to transfer.
+        // The L1 interop handler is not Ownable (symmetric with the L2 L2InteropHandler); nothing to transfer.
 
         ICTMDeploymentTracker ctmDeploymentTracker = ICTMDeploymentTracker(
             coreAddresses.bridgehub.proxies.ctmDeploymentTracker

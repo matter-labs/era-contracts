@@ -20,8 +20,8 @@ import {
 } from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
-import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
-import {InteropHandler} from "contracts/interop/InteropHandler.sol";
+import {IInteropHandler} from "contracts/interop/interop-handler/IInteropHandler.sol";
+import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 import {Reentrancy} from "contracts/common/L1ContractErrors.sol";
 
 import {
@@ -34,7 +34,7 @@ import {
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 
 /// @title L2InteropHandlerReentrancyRegressionTestAbstract
-/// @notice Regression tests for the reentrancy fix in InteropHandler
+/// @notice Regression tests for the reentrancy fix in L2InteropHandler
 abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropTestUtils {
     address internal bundleExecutor;
 
@@ -43,12 +43,12 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         bundleExecutor = makeAddr("bundleExecutor");
     }
 
-    /// @notice Test that a bundle can call receiveMessage on InteropHandler via _executeCalls
-    /// @dev This tests the basic scenario where a bundle contains a call to InteropHandler
+    /// @notice Test that a bundle can call receiveMessage on L2InteropHandler via _executeCalls
+    /// @dev This tests the basic scenario where a bundle contains a call to L2InteropHandler
     ///      Before the fix: This would revert with ReentrancyGuard error
     ///      After the fix: This should not revert due to reentrancy (may fail for other reasons)
     function test_regression_bundleCanCallReceiveMessageOnInteropHandler() public {
-        // Create a simple bundle that targets InteropHandler's receiveMessage
+        // Create a simple bundle that targets L2InteropHandler's receiveMessage
         // When executed, the bundle will call interopHandler.receiveMessage(...)
         // receiveMessage requires msg.sender == address(this), which is satisfied
         // when called from _executeCalls
@@ -72,7 +72,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             )
         );
 
-        // Create the outer bundle that calls receiveMessage on InteropHandler
+        // Create the outer bundle that calls receiveMessage on L2InteropHandler
         InteropCall[] memory calls = new InteropCall[](1);
         calls[0] = InteropCall({
             version: INTEROP_CALL_VERSION,
@@ -119,7 +119,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             // If it succeeds, that's fine - reentrancy didn't block it
         } catch (bytes memory reason) {
             // Check that it's not a reentrancy error
-            // The InteropHandler contract used our custom ReentrancyGuard implementation, not the OZ one
+            // The L2InteropHandler contract used our custom ReentrancyGuard implementation, not the OZ one
             assertFalse(
                 reason.length >= 4 && bytes4(reason) == Reentrancy.selector,
                 "Should not revert due to reentrancy"
@@ -128,7 +128,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
     }
 
     /// @notice Test that executeBundle doesn't have nonReentrant modifier blocking nested calls
-    /// @dev Creates an outer bundle that calls receiveMessage on InteropHandler,
+    /// @dev Creates an outer bundle that calls receiveMessage on L2InteropHandler,
     ///      which dispatches to this.executeBundle() for an inner bundle.
     ///      With nonReentrant present, the nested executeBundle call triggers reentrancy.
     function test_regression_executeBundleNoReentrancyGuard() public {
@@ -161,7 +161,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         // Payload for receiveMessage that dispatches to executeBundle(innerBundle)
         bytes memory innerPayload = abi.encodeCall(IInteropHandler.executeBundle, (encodedInnerBundle, innerProof));
 
-        // Outer bundle: its call targets InteropHandler.receiveMessage with the above payload.
+        // Outer bundle: its call targets L2InteropHandler.receiveMessage with the above payload.
         // Call chain: executeBundle(outer) -> _executeCalls -> receiveMessage -> this.executeBundle(inner)
         InteropCall[] memory outerCalls = new InteropCall[](1);
         outerCalls[0] = InteropCall({
@@ -217,7 +217,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
     }
 
     /// @notice Test that verifyBundle doesn't have nonReentrant blocking it
-    /// @dev Creates an outer bundle that calls receiveMessage on InteropHandler,
+    /// @dev Creates an outer bundle that calls receiveMessage on L2InteropHandler,
     ///      which dispatches to this.verifyBundle() for an inner bundle.
     ///      With nonReentrant present, the nested verifyBundle call triggers reentrancy.
     function test_regression_verifyBundleNoReentrancyGuard() public {
@@ -250,7 +250,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         // Payload for receiveMessage that dispatches to verifyBundle(innerBundle)
         bytes memory innerPayload = abi.encodeCall(IInteropHandler.verifyBundle, (encodedInnerBundle, innerProof));
 
-        // Outer bundle: its call targets InteropHandler.receiveMessage with the above payload.
+        // Outer bundle: its call targets L2InteropHandler.receiveMessage with the above payload.
         // Call chain: executeBundle(outer) -> _executeCalls -> receiveMessage -> this.verifyBundle(inner)
         InteropCall[] memory outerCalls = new InteropCall[](1);
         outerCalls[0] = InteropCall({

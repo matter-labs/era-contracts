@@ -736,7 +736,7 @@ contract GWAssetTrackerTest is Test {
 
     /// @notice When source chain settles an interop bundle, source chainBalance decreases and
     ///         destination pendingInteropBalance increases (not chainBalance directly).
-    ///         After the destination confirms via InteropHandler, pending moves to chainBalance.
+    ///         After the destination confirms via L2InteropHandler, pending moves to chainBalance.
     function test_regression_chainBalanceChangeIncreasesDestinationBalance() public {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(ORIGIN_CHAIN_ID, ORIGIN_TOKEN);
         uint256 transferAmount = 1000;
@@ -764,7 +764,7 @@ contract GWAssetTrackerTest is Test {
             "Destination chainBalance stays 0 until confirmed"
         );
 
-        // Destination chain confirms via InteropHandler: pending moves to chainBalance.
+        // Destination chain confirms via L2InteropHandler: pending moves to chainBalance.
         _confirmInteropAsset(DEST_CHAIN_ID, assetId, transferAmount);
 
         assertEq(gwAssetTracker.pendingInteropBalance(DEST_CHAIN_ID, assetId), 0);
@@ -1201,7 +1201,7 @@ contract GWAssetTrackerTest is Test {
         gwAssetTracker.processLogsAndMessages(input);
     }
 
-    /// @notice A base-token-only InteropHandler confirmation moves pending → chainBalance.
+    /// @notice A base-token-only L2InteropHandler confirmation moves pending → chainBalance.
     function test_InteropHandlerMessage_BaseTokenOnly_ConfirmsBalance() public {
         gwAssetTracker.setPendingInteropBalance(DEST_CHAIN_ID, DEST_BASE_TOKEN_ASSET_ID, BASE_TOKEN_AMOUNT);
 

@@ -3,16 +3,16 @@
 pragma solidity 0.8.28;
 
 import {InteropHandlerBase} from "./InteropHandlerBase.sol";
-import {IL1InteropHandler, TRANSIENT_SETTLEMENT_LAYER_SLOT} from "../bridge/interfaces/IL1InteropHandler.sol";
+import {IL1InteropHandler, TRANSIENT_SETTLEMENT_LAYER_SLOT} from "./IL1InteropHandler.sol";
 
-import {InteropCall, MessageInclusionProof} from "../common/Messaging.sol";
-import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
-import {TransientPrimitivesLib} from "../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
-import {InteropWithdrawalNonZeroValue} from "../bridge/L1BridgeContractErrors.sol";
-import {Unauthorized} from "../common/L1ContractErrors.sol";
+import {InteropCall, MessageInclusionProof} from "../../common/Messaging.sol";
+import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
+import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
+import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
+import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
+import {InteropWithdrawalNonZeroValue} from "../../bridge/L1BridgeContractErrors.sol";
+import {Unauthorized} from "../../common/L1ContractErrors.sol";
 
 /// @title L1InteropHandler
 /// @author Matter Labs

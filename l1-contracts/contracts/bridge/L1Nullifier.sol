@@ -9,7 +9,7 @@ import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
-import {IL1InteropHandler} from "./interfaces/IL1InteropHandler.sol";
+import {IL1InteropHandler} from "../interop/interop-handler/IL1InteropHandler.sol";
 
 import {ConfirmTransferResultData, L2Log, TxStatus} from "../common/Messaging.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";

@@ -147,14 +147,14 @@ contract BaseTokenHolderTest is Test {
     }
 
     function test_receive_rejectFromInteropHandler() public {
-        // InteropHandler should use give() not receive()
+        // L2InteropHandler should use give() not receive()
         uint256 amount = 1 ether;
         vm.deal(L2_INTEROP_HANDLER_ADDR, amount);
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
         (bool success, ) = address(baseTokenHolder).call{value: amount}("");
 
-        assertFalse(success, "Transfer should fail - InteropHandler should use give()");
+        assertFalse(success, "Transfer should fail - L2InteropHandler should use give()");
     }
 
     function test_receive_rejectFromInteropCenter() public {

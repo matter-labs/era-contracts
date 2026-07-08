@@ -332,7 +332,7 @@ export async function executeBundle(
   gasLimit?: number
 ): Promise<ethers.providers.TransactionReceipt> {
   const wallet = new Wallet(getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
   const tx = await interopHandler.executeBundle(bundleData, proof, {
@@ -351,7 +351,7 @@ export async function simulateExecuteBundle(
   gasLimit?: number
 ): Promise<void> {
   const wallet = new Wallet(getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
   await interopHandler.callStatic.executeBundle(bundleData, proof, {
@@ -370,7 +370,7 @@ export async function verifyBundle(
   signerKey?: string
 ): Promise<ethers.providers.TransactionReceipt> {
   const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
   const tx = await interopHandler.verifyBundle(bundleData, proof, { gasLimit: DEFAULT_TX_GAS_LIMIT });
@@ -404,7 +404,7 @@ export async function unbundleBundle(
   signerKey?: string
 ): Promise<ethers.providers.TransactionReceipt> {
   const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
 
   const tx = await interopHandler.unbundleBundle(bundleData, callStatuses, { gasLimit: DEFAULT_TX_GAS_LIMIT });
   return tx.wait();
@@ -420,7 +420,7 @@ export async function simulateUnbundleBundle(
   signerKey?: string
 ): Promise<void> {
   const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
 
   await interopHandler.callStatic.unbundleBundle(bundleData, callStatuses, { gasLimit: DEFAULT_TX_GAS_LIMIT });
 }
@@ -429,7 +429,7 @@ export async function simulateUnbundleBundle(
  * Query bundle status from InteropHandler.
  */
 export async function getBundleStatus(provider: providers.JsonRpcProvider, bundleHash: string): Promise<number> {
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), provider);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), provider);
   const result = await interopHandler.bundleStatus(bundleHash);
   return typeof result === "number" ? result : result.toNumber();
 }
@@ -442,7 +442,7 @@ export async function getCallStatus(
   bundleHash: string,
   callIndex: number
 ): Promise<number> {
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), provider);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), provider);
   const result = await interopHandler.callStatus(bundleHash, callIndex);
   return typeof result === "number" ? result : result.toNumber();
 }

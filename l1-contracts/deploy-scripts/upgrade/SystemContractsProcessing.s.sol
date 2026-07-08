@@ -200,7 +200,7 @@ library SystemContractsProcessing {
         ids[i++] = CoreContract.BaseTokenHolder;
         ids[i++] = CoreContract.L2AssetTracker;
         ids[i++] = CoreContract.InteropCenter;
-        ids[i++] = CoreContract.InteropHandler;
+        ids[i++] = CoreContract.L2InteropHandler;
         ids[i++] = CoreContract.GWAssetTracker;
         // Under-filling would silently leave `CoreContract(0)` entries; over-filling
         // already reverts with an out-of-bounds access on the fixed-length array.

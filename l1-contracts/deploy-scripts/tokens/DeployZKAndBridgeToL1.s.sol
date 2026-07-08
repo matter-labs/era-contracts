@@ -22,7 +22,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
-import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
+import {IInteropHandler} from "contracts/interop/interop-handler/IInteropHandler.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";

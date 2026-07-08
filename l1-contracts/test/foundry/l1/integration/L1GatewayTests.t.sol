@@ -31,7 +31,7 @@ import {
     TokenBridgingData
 } from "contracts/common/Messaging.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {IL1InteropHandler} from "contracts/bridge/interfaces/IL1InteropHandler.sol";
+import {IL1InteropHandler} from "contracts/interop/interop-handler/IL1InteropHandler.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";

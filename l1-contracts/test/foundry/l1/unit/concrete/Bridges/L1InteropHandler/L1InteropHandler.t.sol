@@ -5,8 +5,8 @@ import {Test} from "forge-std/Test.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {L1InteropHandler} from "contracts/interop/L1InteropHandler.sol";
-import {IL1InteropHandler} from "contracts/bridge/interfaces/IL1InteropHandler.sol";
+import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
+import {IL1InteropHandler} from "contracts/interop/interop-handler/IL1InteropHandler.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 
 import {SlotOccupied, Unauthorized} from "contracts/common/L1ContractErrors.sol";

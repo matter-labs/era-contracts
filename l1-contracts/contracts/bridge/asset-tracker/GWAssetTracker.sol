@@ -131,7 +131,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// @notice Tracks token balances sent via interop that have not yet been confirmed as executed on the destination chain.
     /// @dev When a source chain settles and its interop bundle is processed, the destination chain's balance moves
     /// here rather than directly to chainBalance. When the destination chain settles and confirms execution via
-    /// InteropHandler messages, balances are moved from here to chainBalance.
+    /// L2InteropHandler messages, balances are moved from here to chainBalance.
     /// @dev This separation ensures chainBalance always equals the totalSupply of the token inside the chain.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public pendingInteropBalance;
 
@@ -437,7 +437,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// @notice Handles an interop center message and returns the number of chargeable calls for settlement fees.
     /// @dev Instead of immediately crediting the destination chain, balances are moved to pendingInteropBalance.
     /// They will be moved to chainBalance when the destination chain settles and confirms execution via
-    /// an InteropHandler message that includes the full bundle preimage.
+    /// an L2InteropHandler message that includes the full bundle preimage.
     /// @param _chainId The source chain ID.
     /// @param _message The message data from InteropCenter.
     /// @return chargeableCallCount Number of calls that should incur gateway settlement fees.
@@ -473,7 +473,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             _processInteropCall(_chainId, interopCall, interopBundle.destinationChainId);
         }
 
-        // We check on the InteropHandler of the destination chain that the `destinationBaseTokenAssetId` is the correct one.
+        // We check on the L2InteropHandler of the destination chain that the `destinationBaseTokenAssetId` is the correct one.
         _decreaseChainBalance(_chainId, interopBundle.destinationBaseTokenAssetId, totalBaseTokenAmount);
         // Increase destination chain pending interop balance for base token.
         // Balance will be moved to chainBalance when the destination chain confirms execution.
@@ -486,11 +486,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         return interopBundle.calls.length;
     }
 
-    /// @notice Handles a per-call message from InteropHandler confirming a single interop call was executed.
+    /// @notice Handles a per-call message from L2InteropHandler confirming a single interop call was executed.
     /// @dev One such message is emitted for each successfully executed call. Moves the call's balances
     /// from pendingInteropBalance to chainBalance.
     /// @param _chainId The chain ID that is settling (destination chain of the interop bundle).
-    /// @param _message The message data from InteropHandler.
+    /// @param _message The message data from L2InteropHandler.
     function _handleInteropHandlerMessage(uint256 _chainId, bytes calldata _message) internal whenNotPaused {
         bytes4 functionSignature = DataEncoding.getSelector(_message);
         require(

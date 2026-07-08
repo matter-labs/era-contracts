@@ -277,7 +277,7 @@ enum BundleStatus {
     Unbundled
 }
 
-/// @dev Message sent by InteropHandler to GWAssetTracker for each successfully executed interop call.
+/// @dev Message sent by L2InteropHandler to GWAssetTracker for each successfully executed interop call.
 /// @dev Allows GWAssetTracker to move the corresponding balance from pendingInteropBalance to chainBalance.
 /// @param destinationBaseTokenAssetId Asset ID of the base token of the destination chain.
 /// @param interopCall The interop call that was executed.

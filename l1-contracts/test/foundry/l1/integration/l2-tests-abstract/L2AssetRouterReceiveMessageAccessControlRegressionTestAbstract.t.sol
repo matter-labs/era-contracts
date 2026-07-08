@@ -47,7 +47,7 @@ abstract contract L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract
         );
     }
 
-    /// @notice Test that receiveMessage reverts for any address that is not InteropHandler
+    /// @notice Test that receiveMessage reverts for any address that is not L2InteropHandler
     /// @dev Tests various addresses to ensure none can bypass the access control
     function test_regression_receiveMessageRevertsForVariousUnauthorizedAddresses() public {
         bytes memory payload = abi.encodeWithSelector(
@@ -73,12 +73,12 @@ abstract contract L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract
         }
     }
 
-    /// @notice Test that receiveMessage does not revert with Unauthorized when called by InteropHandler
+    /// @notice Test that receiveMessage does not revert with Unauthorized when called by L2InteropHandler
     /// @dev We craft a payload with a deliberately wrong selector. Reaching the InvalidSelector
     ///      revert at L2AssetRouter.receiveMessage:251 is causally downstream of:
     ///        - the onlyL2InteropHandler gate at line 226, and
     ///        - the secondary sender-address Unauthorized check at line 244.
-    ///      Therefore an InvalidSelector revert proves the access-control gate is open for InteropHandler.
+    ///      Therefore an InvalidSelector revert proves the access-control gate is open for L2InteropHandler.
     function test_regression_receiveMessageAllowedForInteropHandler() public {
         bytes4 bogusSelector = bytes4(0xdeadbeef);
 
@@ -98,7 +98,7 @@ abstract contract L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract
         IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage(bytes32(0), sender, payload);
     }
 
-    /// @notice Test that a contract trying to impersonate InteropHandler still fails
+    /// @notice Test that a contract trying to impersonate L2InteropHandler still fails
     /// @dev Ensures that the access control cannot be bypassed by contract tricks
     function test_regression_contractCannotImpersonateInteropHandler() public {
         bytes memory payload = abi.encodeWithSelector(

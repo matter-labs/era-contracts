@@ -9,7 +9,7 @@ import {stdJson} from "forge-std/StdJson.sol";
 
 import {FinalizeL1DepositParams, MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
-import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
+import {IInteropHandler} from "contracts/interop/interop-handler/IInteropHandler.sol";
 import {Utils} from "../utils/Utils.sol";
 import {
     AltL2ToL1Log,

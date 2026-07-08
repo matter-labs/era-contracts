@@ -9,19 +9,19 @@ import {
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
     L2_COMPLEX_UPGRADER_ADDR
-} from "../common/l2-helpers/L2ContractInterfaces.sol";
+} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {InteropHandlerBase} from "./InteropHandlerBase.sol";
-import {InteropCall, InteropCallExecutedMessage, MessageInclusionProof} from "../common/Messaging.sol";
-import {CannotClaimInteropOnL1Settlement} from "./InteropErrors.sol";
-import {Unauthorized} from "../common/L1ContractErrors.sol";
-import {IAssetTrackerDataEncoding} from "../bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
+import {InteropCall, InteropCallExecutedMessage, MessageInclusionProof} from "../../common/Messaging.sol";
+import {CannotClaimInteropOnL1Settlement} from "../InteropErrors.sol";
+import {Unauthorized} from "../../common/L1ContractErrors.sol";
+import {IAssetTrackerDataEncoding} from "../../bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 
-/// @title InteropHandler
+/// @title L2InteropHandler
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev L2 system contract that serves as the entry-point for executing, verifying and unbundling interop bundles.
 /// The generic bundle logic lives in `InteropHandlerBase`; this contract wires in the L2 system-contract behaviour.
-contract InteropHandler is InteropHandlerBase {
+contract L2InteropHandler is InteropHandlerBase {
     /// @dev Only allows calls from the complex upgrader contract on L2.
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {

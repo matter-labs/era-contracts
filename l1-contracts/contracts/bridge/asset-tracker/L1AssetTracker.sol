@@ -21,7 +21,7 @@ import {
 } from "../../core/message-root/IMessageRoot.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
-import {IL1InteropHandler} from "../../bridge/interfaces/IL1InteropHandler.sol";
+import {IL1InteropHandler} from "../../interop/interop-handler/IL1InteropHandler.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 

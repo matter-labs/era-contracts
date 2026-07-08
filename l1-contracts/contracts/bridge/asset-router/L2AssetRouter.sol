@@ -21,15 +21,7 @@ import {
     L2_INTEROP_HANDLER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {
-    AssetIdNotSupported,
-    EmptyAddress,
-    ExecuteMessageFailed,
-    InvalidSelector,
-    PayloadTooShort,
-    Unauthorized
-} from "../../common/L1ContractErrors.sol";
-import {IERC7786Recipient} from "../../interop/IERC7786Recipient.sol";
+import {AssetIdNotSupported, EmptyAddress, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
 import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 
@@ -38,7 +30,7 @@ import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol"
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
-contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC7786Recipient {
+contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     /// @dev Deprecated: previously stored the L2 Bridgehub. Now the address is resolved via
     /// `_bridgehub()` → `L2_BRIDGEHUB_ADDR` constant. Kept as an empty slot to preserve storage layout.
     IL2Bridgehub private __DEPRECATED_BRIDGE_HUB;
@@ -117,12 +109,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _;
     }
 
-    /// @notice Checks that the message sender is the interop handler.
-    modifier onlyL2InteropHandler() {
-        require(msg.sender == L2_INTEROP_HANDLER_ADDR, Unauthorized(msg.sender));
-        _;
-    }
-
     /// @dev Only allows calls from the complex upgrader contract on L2.
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -197,45 +183,30 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _setAssetHandlerAddressThisChain(L2_NATIVE_TOKEN_VAULT_ADDR, _assetRegistrationData, _assetHandlerAddress);
     }
 
-    /// @notice Executes cross-chain interop messages following ERC-7786 standard
-    /// @param sender ERC-7930 Address of the message sender
-    /// @param payload Encoded function call data (must be finalizeDeposit)
-    /// @return Function selector confirming successful execution per ERC-7786
-    function receiveMessage(
-        bytes32 /* receiveId */, // Unique identifier
-        bytes calldata sender, // ERC-7930 address
-        bytes calldata payload
-    ) external payable onlyL2InteropHandler returns (bytes4) {
-        // This function serves as the L2AssetRouter's entry point for processing cross-chain bridge operations
-        // initiated through the InteropCenter system. It implements critical security validations:
-        // - L1->L2 calls: Currently Interop can only be initiated on L2, so this case shouldn't be covered.
-        // - L2->L2 calls: Only this contract (L2AssetRouter) can send messages from other L2 chains
-        //
-        // This dual validation prevents attackers from spoofing cross-chain messages by requiring
-        // both correct source chain ID and authorized sender address.
-        //
-        // INDIRECT CALL PATTERN (L2->L2 interop flow):
-        // 1. User calls InteropCenter on source L2
-        // 2. InteropCenter calls initiateIndirectCall() on source chain's L2AssetRouter
-        // 3. Source L2AssetRouter becomes the "sender" for the destination L2 call
-        // 4. Destination L2 validates senderAddress == address(this) for non-L1 sources
-        //    (L2AssetRouter address is equal for all ZKsync chains)
+    /// @inheritdoc AssetRouterBase
+    /// @dev Interop calls are delivered by the L2 interop handler system contract.
+    function _interopHandler() internal view override returns (address) {
+        return L2_INTEROP_HANDLER_ADDR;
+    }
 
-        (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
-
-        require((senderChainId != L1_CHAIN_ID && senderAddress == address(this)), Unauthorized(senderAddress));
-
-        // The payload must contain a valid finalizeDeposit selector to ensure only legitimate
-        // bridge operations are executed. This prevents arbitrary function calls through the interop system.
-        require(payload.length > 4, PayloadTooShort());
-        require(
-            bytes4(payload[0:4]) == AssetRouterBase.finalizeDeposit.selector,
-            InvalidSelector(bytes4(payload[0:4]))
-        );
-
-        (bool success, ) = address(this).call{value: msg.value}(payload);
-        require(success, ExecuteMessageFailed());
-        return IERC7786Recipient.receiveMessage.selector;
+    /// @inheritdoc AssetRouterBase
+    /// @dev Validates cross-chain bridge operations initiated through the InteropCenter system:
+    /// - L1->L2 calls: Currently Interop can only be initiated on L2, so this case shouldn't be covered.
+    /// - L2->L2 calls: Only this contract (L2AssetRouter) can send messages from other L2 chains
+    /// This dual validation prevents attackers from spoofing cross-chain messages by requiring
+    /// both correct source chain ID and authorized sender address.
+    ///
+    /// INDIRECT CALL PATTERN (L2->L2 interop flow):
+    /// 1. User calls InteropCenter on source L2
+    /// 2. InteropCenter calls initiateIndirectCall() on source chain's L2AssetRouter
+    /// 3. Source L2AssetRouter becomes the "sender" for the destination L2 call
+    /// 4. Destination L2 validates senderAddress == address(this) for non-L1 sources
+    ///    (L2AssetRouter address is equal for all ZKsync chains)
+    function _isValidInteropSender(
+        uint256 _senderChainId,
+        address _senderAddress
+    ) internal view override returns (bool) {
+        return _senderChainId != L1_CHAIN_ID && _senderAddress == address(this);
     }
 
     /*//////////////////////////////////////////////////////////////

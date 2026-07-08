@@ -46,7 +46,7 @@ import {L2MessageVerification} from "../../../../../contracts/interop/L2MessageV
 import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 
 import {InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
-import {InteropHandler} from "../../../../../contracts/interop/InteropHandler.sol";
+import {L2InteropHandler} from "../../../../../contracts/interop/interop-handler/L2InteropHandler.sol";
 import {DummyL2L1Messenger} from "../../../../../contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 
 import {DummyL2StandardTriggerAccount} from "../../../../../contracts/dev-contracts/test/DummyL2StandardTriggerAccount.sol";
@@ -130,10 +130,10 @@ library L2UtilsBase {
             L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner);
         }
         {
-            address interopHandler = address(new InteropHandler());
+            address interopHandler = address(new L2InteropHandler());
             vm.etch(L2_INTEROP_HANDLER_ADDR, interopHandler.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(_args.l1ChainId);
+            L2InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(_args.l1ChainId);
 
             address l2AssetTrackerAddress = address(new L2AssetTracker());
             vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
