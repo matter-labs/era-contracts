@@ -1,4 +1,5 @@
-import { BigNumber, Contract, providers } from "ethers";
+import type { BigNumber } from "ethers";
+import { Contract, providers } from "ethers";
 import { getAbi } from "../core/contracts";
 
 /**
