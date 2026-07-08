@@ -62,6 +62,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) internal DEPRECATED_chainBalance;
 
+    /// @dev Slot previously holding the removed L1AssetTracker address. Retained to preserve the
+    ///      storage layout of already-deployed vaults across the in-place upgrade.
+    // slither-disable-next-line unused-state
+    address private __DEPRECATED_l1AssetTracker;
+
     /// @notice Net amount of each L1-native token currently bridged out of L1.
     /// @dev Increases on outbound flows (deposits/interop sends) and decreases on inbound ones
     /// (withdrawal finalizations and failed-deposit refunds), so unlike the vault's raw `balanceOf`

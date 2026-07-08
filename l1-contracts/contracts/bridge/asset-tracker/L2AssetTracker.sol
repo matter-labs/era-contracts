@@ -3,6 +3,8 @@
 pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 import {
     L2_BASE_TOKEN_HOLDER_ADDR,
@@ -27,7 +29,11 @@ import {
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IL2AssetTracker, SavedTotalSupply, MAX_TOKEN_BALANCE} from "./IL2AssetTracker.sol";
 
-contract L2AssetTracker is IL2AssetTracker, ReentrancyGuard {
+/// @dev Inherits Ownable2StepUpgradeable and PausableUpgradeable to preserve the storage layout of the
+/// already-deployed L2AssetTracker (they occupy slots 0-200 via the former shared AssetTrackerBase, so the
+/// tracker state below must stay at slots 201+). The owner/pause features are unused on L2 — access control
+/// is enforced by the address-based modifiers below — but the slots are retained for upgrade compatibility.
+contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpgradeable, ReentrancyGuard {
     /// @notice Maps token balances for each chain.
     /// NOTE: this mapping may be removed in the future, don't rely on it!
     /// @dev This is write-only bookkeeping kept for future use; it is not consulted by any
@@ -36,6 +42,12 @@ contract L2AssetTracker is IL2AssetTracker, ReentrancyGuard {
     /// @dev The `chainBalance` is only used to track the balance of native tokens on the L2.
     /// For all the other tokens it is expected to be 0.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public override chainBalance;
+
+    /// @dev Slot previously holding `assetMigrationNumber` from the removed Token Balance Migration.
+    /// Retained to preserve the deployed storage layout across the in-place upgrade.
+    // slither-disable-next-line unused-state
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber))
+        private __DEPRECATED_assetMigrationNumber;
 
     /// @notice Denotes whether a token is registered or not: the token's chainBalance is set
     /// correctly and its `totalPreV31TotalSupply` is tracked correctly.
@@ -139,10 +151,6 @@ contract L2AssetTracker is IL2AssetTracker, ReentrancyGuard {
         L1_CHAIN_ID = _l1ChainId;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         needBaseTokenTotalSupplyBackfill = _needBaseTokenTotalSupplyBackfill;
-    }
-
-    function _l1ChainId() internal view returns (uint256) {
-        return L1_CHAIN_ID;
     }
 
     /// @inheritdoc IL2AssetTracker
