@@ -87,7 +87,7 @@ export const TEST_TOKEN_MINT_AMOUNT_UNITS = "1000";
 // ERC-7786 attribute and are parsed by the InteropCenter into an internal AtomicSend struct, so they
 // never affect the bundle bytes / bundleHash.
 export const INTEROP_BUNDLE_TUPLE_TYPE =
-  "tuple(bytes1,uint256,uint256,bytes32,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes,bool))";
+  "tuple(bytes1,uint256,uint256,bytes32,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes,bool,bytes32))";
 // Canonical signature of `InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle)`,
 // built from INTEROP_BUNDLE_TUPLE_TYPE so it stays in sync if the InteropBundle struct changes. Solidity
 // `tuple(...)` is spelled `(...)` in an event signature, hence the `tuple` -> `` strip.

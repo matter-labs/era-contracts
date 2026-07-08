@@ -43,6 +43,7 @@ import {
     AttributeViolatesRestriction,
     DestinationChainNotRegistered,
     IndirectCallValueMismatch,
+    InteropBundleSaltAlreadyUsed,
     InteroperableAddressChainReferenceNotEmpty,
     InteroperableAddressNotEmpty,
     FeeWithdrawalFailed,
@@ -83,10 +84,11 @@ contract InteropCenter is
     /// L1 that is at the most base layer.
     uint256 public L1_CHAIN_ID;
 
-    /// @notice This mapping stores a number of interop bundles sent by an individual sender.
-    ///         It's being used to derive interopBundleSalt in InteropBundle struct, whose role
-    ///         is to ensure that each bundle has a unique hash.
-    mapping(address sender => uint256 numberOfBundlesSent) public interopBundleNonce;
+    /// @notice DEPRECATED. This mapping used to store the number of interop bundles sent by an individual sender,
+    ///         which was used to derive the `interopBundleSalt` in the `InteropBundle` struct. The salt is now derived
+    ///         from a user-provided value supplied via the `interopBundleSalt` ERC-7786 bundle attribute, so this nonce
+    ///         is no longer read or written. The slot is retained to preserve the storage layout.
+    mapping(address sender => uint256 numberOfBundlesSent) internal __DEPRECATED_interopBundleNonce;
 
     /// @notice Operator-set fee in base token per interop call (when useFixedFee=false).
     uint256 public interopProtocolFee;
@@ -112,6 +114,14 @@ contract InteropCenter is
     /// @notice Accumulated ZK fees per coinbase.
     /// @dev Coinbase addresses can claim their accumulated fees via claimZKFees().
     mapping(address coinbase => uint256 amount) public accumulatedZKFees;
+
+    /// @notice Tracks which salts a given sender has already used for an interop bundle.
+    /// @dev Used to guarantee that each bundle has a unique hash: the bundle hash commits to `interopBundleSalt`,
+    ///      which is derived from `msg.sender` and the user-provided salt. Enforcing that each (sender, salt) pair is
+    ///      used at most once therefore makes every emitted bundle hash unique. A sender must provide a distinct salt
+    ///      for every bundle it sends, regardless of the bundle contents; reusing a salt makes `_sendBundle` revert with
+    ///      `InteropBundleSaltAlreadyUsed`.
+    mapping(address user => mapping(bytes32 salt => bool hasBeenUsed)) public isInteropBundleSaltUsed;
 
     modifier onlySettlementLayerRelayedSender() {
         require(msg.sender == SETTLEMENT_LAYER_RELAY_SENDER, Unauthorized(msg.sender));
@@ -423,6 +433,15 @@ contract InteropCenter is
         bytes[][] memory _originalCallAttributes,
         AtomicSend memory _atomicSend
     ) internal returns (bytes32 bundleHash) {
+        // Ensure the sender has not already used this salt. Since `interopBundleSalt` (and thus the bundle hash) is
+        // derived from `msg.sender` and the user-provided salt, enforcing a unique salt per sender guarantees that
+        // every emitted bundle has a unique hash.
+        require(
+            !isInteropBundleSaltUsed[msg.sender][_bundleAttributes.salt],
+            InteropBundleSaltAlreadyUsed(msg.sender, _bundleAttributes.salt)
+        );
+        isInteropBundleSaltUsed[msg.sender][_bundleAttributes.salt] = true;
+
         // Form an InteropBundle.
         bytes32 destinationBaseTokenAssetId = _getDestinationBaseTokenAssetId(_destinationChainId);
         InteropBundle memory bundle = InteropBundle({
@@ -430,13 +449,14 @@ contract InteropCenter is
             sourceChainId: block.chainid,
             destinationChainId: _destinationChainId,
             destinationBaseTokenAssetId: destinationBaseTokenAssetId,
-            interopBundleSalt: keccak256(abi.encodePacked(msg.sender, interopBundleNonce[msg.sender])),
+            // The salt is derived from the sender and a user-provided salt (from the `interopBundleSalt` bundle attribute).
+            // Mixing in `msg.sender` ensures bundles from different senders can never collide, while the user-provided salt
+            // lets the sender control uniqueness of their own bundles. A random user-provided salt additionally keeps the
+            // resulting bundle hash unpredictable, preserving the bundle's privacy.
+            interopBundleSalt: keccak256(abi.encodePacked(msg.sender, _bundleAttributes.salt)),
             calls: new InteropCall[](_callStarters.length),
             bundleAttributes: _bundleAttributes
         });
-
-        // Update interopBundleNonce for the msg.sender
-        ++interopBundleNonce[msg.sender];
 
         // This will calculate how much value does all of the calls use cumulatively.
         uint256 totalBurnedCallsValue;
@@ -772,6 +792,15 @@ contract InteropCenter is
                 // `_parseAtomicSend` and NOT stored in `BundleAttributes` — it must stay out of the
                 // cross-chain bundle so `bundleHash` does not depend on `flowId` (a circular dependency).
                 // Here we only validate it is a permitted, non-duplicate bundle attribute.
+            } else if (selector == IERC7786Attributes.interopBundleSalt.selector) {
+                require(!attributeUsed[6], AttributeAlreadySet(selector));
+                require(
+                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
+                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
+                    AttributeViolatesRestriction(selector, uint256(_restriction))
+                );
+                attributeUsed[6] = true;
+                bundleAttributes.salt = AttributesDecoder.decodeBytes32(_attributes[i]);
             } else {
                 revert IERC7786GatewaySource.UnsupportedAttribute(selector);
             }
@@ -826,7 +855,8 @@ contract InteropCenter is
                 IERC7786Attributes.executionAddress.selector,
                 IERC7786Attributes.unbundlerAddress.selector,
                 IERC7786Attributes.useFixedFee.selector,
-                IERC7786Attributes.atomicBundle.selector
+                IERC7786Attributes.atomicBundle.selector,
+                IERC7786Attributes.interopBundleSalt.selector
             ];
     }
 
