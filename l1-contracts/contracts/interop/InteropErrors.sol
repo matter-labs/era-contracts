@@ -13,6 +13,8 @@ error CallAlreadyExecuted(bytes32 bundleHash, uint256 callIndex);
 error CallNotExecutable(bytes32 bundleHash, uint256 callIndex);
 // 0xf36a88e5
 error CannotClaimInteropOnL1Settlement();
+// 0xa8ab28c8
+error CannotInitiateInteropOnL1(uint256 destinationChainId);
 // 0xf729f26d
 error CanNotUnbundle(bytes32 bundleHash);
 // 0x2d159f39

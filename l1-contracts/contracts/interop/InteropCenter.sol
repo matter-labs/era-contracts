@@ -41,6 +41,7 @@ import {AssetIdMismatch, MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress}
 import {
     AttributeAlreadySet,
     AttributeViolatesRestriction,
+    CannotInitiateInteropOnL1,
     DestinationChainNotRegistered,
     DirectCallToL1NotSupported,
     IndirectCallValueMismatch,
@@ -348,7 +349,8 @@ contract InteropCenter is
     /// @param _destinationChainId Destination chain ID.
     /// @param _callCount Number of calls in the bundle.
     function _ensureValidDestination(uint256 _destinationChainId, uint256 _callCount) internal view {
-        require(L1_CHAIN_ID != block.chainid, NotL2ToL2(block.chainid, _destinationChainId));
+        // Bundles can only be initiated on an L2; the destination may be another L2 or L1.
+        require(L1_CHAIN_ID != block.chainid, CannotInitiateInteropOnL1(_destinationChainId));
         require(_destinationChainId != block.chainid, InteropToSelfNotSupported());
         if (_destinationChainId == L1_CHAIN_ID) {
             require(_callCount == 1, MultiCallToL1NotSupported(_callCount));

@@ -24,7 +24,5 @@ error OnlyFailureStatusAllowed();
 error TokenAlreadyInBridgedTokensList();
 // 0xb4aeddbc
 error WrongCounterpart();
-// 0x636c90db
-error WrongL2Sender(address providedL2Sender);
 // 0x61cdb17e
 error WrongMsgLength(uint256 expected, uint256 length);

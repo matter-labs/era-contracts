@@ -131,8 +131,6 @@ error EmptyPublicInputsLength();
 error EraBytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0x61733a89
 error EVMBytecodeAlreadyPublished(bytes32 bytecodeHash);
-// 0xf4072616
-error ExecuteMessageFailed();
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
 // 0x3fce21be
@@ -464,8 +462,6 @@ error ValidateTxnNotEnoughGas();
 error ValueMismatch(uint256 expected, uint256 actual);
 // 0xe1022469
 error VerifiedBatchesExceedsCommittedBatches();
-// 0xae899454
-error WithdrawalAlreadyFinalized();
 // 0x750b219c
 error WithdrawFailed();
 // 0xf20c5c2a
