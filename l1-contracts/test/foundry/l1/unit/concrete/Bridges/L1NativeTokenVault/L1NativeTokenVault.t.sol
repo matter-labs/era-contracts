@@ -29,6 +29,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 import {OriginChainIdNotFound} from "contracts/common/L1ContractErrors.sol";
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {InsufficientChainBalance} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 
 /// @dev Test helper contract that exposes internal functions
 contract L1NativeTokenVaultTestHelper is L1NativeTokenVault {
@@ -291,7 +292,7 @@ contract L1NativeTokenVaultTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                totalBridgedOut / totalBridgedIn flow counters
+                    bridgedOut net flow accounting
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Deposits `_amount` of the native test token through the real
@@ -306,23 +307,22 @@ contract L1NativeTokenVaultTest is Test {
         nativeTokenVault.bridgeBurn(chainId, 0, tokenAssetId, owner, data);
     }
 
-    function test_totalBridgedOut_IncrementsOnNativeDeposit() public {
+    function test_bridgedOut_IncreasesOnNativeDeposit() public {
         uint256 amount = 100;
-        assertEq(nativeTokenVault.totalBridgedOut(tokenAssetId), 0);
+        assertEq(nativeTokenVault.bridgedOut(tokenAssetId), 0);
 
         _depositNativeTestToken(amount);
 
-        assertEq(nativeTokenVault.totalBridgedOut(tokenAssetId), amount, "outbound flow recorded");
-        assertEq(nativeTokenVault.totalBridgedIn(tokenAssetId), 0, "no inbound flow yet");
+        assertEq(nativeTokenVault.bridgedOut(tokenAssetId), amount, "outbound flow recorded");
 
-        // Direct transfers into the vault (donations) must not affect the flow counters,
+        // Direct transfers into the vault (donations) must not affect the accounting,
         // unlike the vault's raw balanceOf.
         testToken.mint(address(this), 999);
         testToken.transfer(address(nativeTokenVault), 999);
-        assertEq(nativeTokenVault.totalBridgedOut(tokenAssetId), amount, "donation ignored");
+        assertEq(nativeTokenVault.bridgedOut(tokenAssetId), amount, "donation ignored");
     }
 
-    function test_totalBridgedIn_IncrementsOnNativeWithdrawal() public {
+    function test_bridgedOut_DecreasesOnNativeWithdrawal() public {
         uint256 amount = 100;
         _depositNativeTestToken(amount);
 
@@ -336,25 +336,38 @@ contract L1NativeTokenVaultTest is Test {
         vm.prank(address(assetRouter));
         nativeTokenVault.bridgeMint(chainId, tokenAssetId, mintData);
 
-        assertEq(nativeTokenVault.totalBridgedIn(tokenAssetId), amount, "inbound flow recorded");
-        assertEq(
-            nativeTokenVault.totalBridgedOut(tokenAssetId) - nativeTokenVault.totalBridgedIn(tokenAssetId),
-            0,
-            "net bridged-out back to zero after round trip"
-        );
+        assertEq(nativeTokenVault.bridgedOut(tokenAssetId), 0, "net bridged-out back to zero after round trip");
     }
 
-    function test_totalBridgedIn_IncrementsOnFailedDepositRefund() public {
+    function test_bridgedOut_DecreasesOnFailedDepositRefund() public {
         uint256 amount = 100;
         bytes memory data = _depositNativeTestToken(amount);
 
         vm.prank(address(assetRouter));
         nativeTokenVault.bridgeConfirmTransferResult(chainId, TxStatus.Failure, tokenAssetId, owner, data);
 
-        assertEq(nativeTokenVault.totalBridgedIn(tokenAssetId), amount, "refund recorded as inbound flow");
+        assertEq(nativeTokenVault.bridgedOut(tokenAssetId), 0, "refund cancels the outbound flow");
     }
 
-    function test_flowCounters_UntouchedForNonNativeToken() public {
+    function test_bridgedOut_RevertsWhenInboundExceedsOutstanding() public {
+        // More of an L1-native asset coming back than is currently bridged out means bridged
+        // representations were forged upstream; the transfer must be blocked, not recorded.
+        uint256 amount = 100;
+        _depositNativeTestToken(amount);
+
+        bytes memory mintData = DataEncoding.encodeBridgeMintData({
+            _originalCaller: owner,
+            _remoteReceiver: owner,
+            _originToken: address(testToken),
+            _amount: amount + 1,
+            _erc20Metadata: BridgeHelper.getERC20Getters(address(testToken), block.chainid)
+        });
+        vm.prank(address(assetRouter));
+        vm.expectRevert(abi.encodeWithSelector(InsufficientChainBalance.selector, chainId, tokenAssetId, amount + 1));
+        nativeTokenVault.bridgeMint(chainId, tokenAssetId, mintData);
+    }
+
+    function test_bridgedOut_UntouchedForNonNativeToken() public {
         // A bridged (non-L1-native) token: originChainId != block.chainid.
         address mockBridgedToken = makeAddr("mockBridgedToken");
         bytes32 bridgedAssetId = keccak256(abi.encode("bridgedAsset"));
@@ -372,8 +385,7 @@ contract L1NativeTokenVaultTest is Test {
         vm.prank(address(assetRouter));
         nativeTokenVault.bridgeConfirmTransferResult(chainId, TxStatus.Failure, bridgedAssetId, owner, data);
 
-        assertEq(nativeTokenVault.totalBridgedOut(bridgedAssetId), 0, "no outbound flow for bridged token");
-        assertEq(nativeTokenVault.totalBridgedIn(bridgedAssetId), 0, "no inbound flow for bridged token");
+        assertEq(nativeTokenVault.bridgedOut(bridgedAssetId), 0, "no accounting for a non-L1-native token");
     }
 
     // add this to be excluded from coverage report

@@ -32,6 +32,7 @@ import {
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
 import {OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
+import {InsufficientChainBalance} from "../asset-tracker/AssetTrackerErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -61,17 +62,12 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) internal DEPRECATED_chainBalance;
 
-    /// @notice Cumulative amount of each L1-native token bridged out of L1 (deposits/interop sends).
-    /// @dev Write-only flow bookkeeping for tokens whose origin chain is L1; unlike the vault's raw
-    /// `balanceOf`, it cannot be skewed by direct transfers into the vault. Not consulted by any
-    /// bridging decision. The net amount currently bridged out is
-    /// `totalBridgedOut[assetId] - totalBridgedIn[assetId]`.
-    mapping(bytes32 assetId => uint256 amount) public totalBridgedOut;
-
-    /// @notice Cumulative amount of each L1-native token bridged back to L1
-    /// (withdrawal finalizations and failed-deposit refunds).
-    /// @dev See `totalBridgedOut`.
-    mapping(bytes32 assetId => uint256 amount) public totalBridgedIn;
+    /// @notice Net amount of each L1-native token currently bridged out of L1.
+    /// @dev Increases on outbound flows (deposits/interop sends) and decreases on inbound ones
+    /// (withdrawal finalizations and failed-deposit refunds), so unlike the vault's raw `balanceOf`
+    /// it cannot be skewed by direct transfers into the vault. It is bounded by the amount actually
+    /// escrowed in the vault, so it cannot overflow even for tokens with an astronomic total supply.
+    mapping(bytes32 assetId => uint256 amount) public bridgedOut;
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
@@ -261,17 +257,23 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return BeaconProxy(payable(proxyAddress));
     }
 
-    /// @dev Records the outbound flow of L1-native tokens; see `totalBridgedOut`.
+    /// @dev Records the outbound flow of L1-native tokens; see `bridgedOut`.
     function _handleBridgeToChain(uint256, bytes32 _assetId, uint256 _amount) internal override {
         if (originChainId[_assetId] == block.chainid) {
-            totalBridgedOut[_assetId] += _amount;
+            bridgedOut[_assetId] += _amount;
         }
     }
 
-    /// @dev Records the inbound flow of L1-native tokens; see `totalBridgedIn`.
-    function _handleBridgeFromChain(uint256, bytes32 _assetId, uint256 _amount) internal override {
+    /// @dev Records the inbound flow of L1-native tokens; see `bridgedOut`.
+    /// @dev An inbound amount exceeding the outstanding bridged-out amount is only possible if
+    /// bridged representations of the asset were forged somewhere upstream, so such a transfer
+    /// is blocked rather than recorded.
+    function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
         if (originChainId[_assetId] == block.chainid) {
-            totalBridgedIn[_assetId] += _amount;
+            if (bridgedOut[_assetId] < _amount) {
+                revert InsufficientChainBalance(_chainId, _assetId, _amount);
+            }
+            bridgedOut[_assetId] -= _amount;
         }
     }
 }
