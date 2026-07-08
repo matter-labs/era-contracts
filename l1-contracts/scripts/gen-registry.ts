@@ -325,13 +325,12 @@ library ${name}Data {
 ${addressRowsList.join("\n")}
     }
 
-    /// @dev \`AddressRow.key\` is unused for verifier rows (set to the first enum variant).
-    function verifierRows() internal pure returns (CTMRegistryBase.AddressRow[] memory rows) {
-        rows = new CTMRegistryBase.AddressRow[](2);
-        rows[0] = CTMRegistryBase.AddressRow({key: CTMContract.AdminFacet, protocolVersion: OLD_PROTOCOL_VERSION, value: ${addr(
+    function verifierRows() internal pure returns (CTMRegistryBase.VerifierRow[] memory rows) {
+        rows = new CTMRegistryBase.VerifierRow[](2);
+        rows[0] = CTMRegistryBase.VerifierRow({protocolVersion: OLD_PROTOCOL_VERSION, verifier: ${addr(
           ctm.verifierOld
         )}}); // verifier @ ${m.oldVersion}
-        rows[1] = CTMRegistryBase.AddressRow({key: CTMContract.AdminFacet, protocolVersion: NEW_PROTOCOL_VERSION, value: ${addr(
+        rows[1] = CTMRegistryBase.VerifierRow({protocolVersion: NEW_PROTOCOL_VERSION, verifier: ${addr(
           ctm.verifierNew
         )}}); // verifier @ ${m.newVersion}
     }
@@ -439,7 +438,7 @@ contract ${name} is CTMRegistryBase {
         return ${name}Data.ctmAddressRows();
     }
 
-    function _verifierRows() internal pure override returns (CTMRegistryBase.AddressRow[] memory) {
+    function _verifierRows() internal pure override returns (CTMRegistryBase.VerifierRow[] memory) {
         return ${name}Data.verifierRows();
     }
 

@@ -119,6 +119,10 @@ const STALE_REGISTRIES_HINT =
 const DETERMINISTIC_FOUNDRY_PROFILE = "registry-deterministic";
 const DETERMINISTIC_SOURCES = [
   "contracts/state-transition/chain-deps/facets/Admin.sol",
+  "contracts/state-transition/chain-deps/facets/Getters.sol",
+  "contracts/state-transition/chain-deps/facets/Executor.sol",
+  "contracts/state-transition/chain-deps/facets/Migrator.sol",
+  "contracts/state-transition/chain-deps/facets/Committer.sol",
   "contracts/upgrades/DefaultUpgrade.sol",
   "contracts/state-transition/chain-deps/DiamondInit.sol",
   "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol",
@@ -369,6 +373,14 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
         deployed.newAdminFacet,
         `chain ${chain.chainId}: AdminFacet re-pointed to the fresh implementation`
       );
+      // getProtocolVersion() — a GettersFacet selector — must now route to the fresh instance,
+      // proving the multi-facet replacement was applied (spot check; the cut-hash equality
+      // below covers the full composed cut).
+      assertEq(
+        await diamond.facetAddress("0x33ce93fe"),
+        deployed.newGettersFacet,
+        `chain ${chain.chainId}: GettersFacet re-pointed to the fresh implementation`
+      );
       assertEq(
         await diamond.getVerifier(),
         deployed.newVerifier,
@@ -433,6 +445,15 @@ type LiveUpgradeInputs = {
   messageRootProxy: string;
   oldMessageRootImpl: string;
 };
+
+/** The probed live facet address by name (see readLiveUpgradeInputs facet probes). */
+function liveFacet(live: LiveUpgradeInputs, name: string): string {
+  const entry = live.otherFacets.find((f) => f.name === name);
+  if (!entry) {
+    throw new Error(`live facet ${name} was not probed`);
+  }
+  return entry.address;
+}
 
 async function readLiveUpgradeInputs(
   l1Provider: ethers.providers.JsonRpcProvider,
@@ -542,6 +563,10 @@ type DeployedMachinery = {
   ecoModule: string;
   composerHarness: string;
   newAdminFacet: string;
+  newGettersFacet: string;
+  newExecutorFacet: string;
+  newMigratorFacet: string;
+  newCommitterFacet: string;
   newDefaultUpgrade: string;
   newDiamondInit: string;
   newVerifier: string;
@@ -589,6 +614,15 @@ async function deployUpgradeMachinery(
     // The synthetic v-bump's "changed facet": a fresh AdminFacet built from the same source,
     // constructed with the live RollupDAManager so DA-validation behavior is unchanged.
     newAdminFacet: await deployPinned("AdminFacet", [params.l1ChainId, params.rollupDAManager]),
+    // The rest of the replaced facet set — a representative multi-facet upgrade. Constructor
+    // args mirror the live deployment (config: era testnet, l1ChainId). MailboxFacet is the one
+    // facet NOT replaced: its constructor needs the live EIP7702Checker address, which only the
+    // original deployment config knows (a real upgrade-prepare pipeline has it; this harness
+    // pins Mailbox old == new instead).
+    newGettersFacet: await deployPinned("GettersFacet", []),
+    newExecutorFacet: await deployPinned("ExecutorFacet", [params.l1ChainId]),
+    newMigratorFacet: await deployPinned("MigratorFacet", [params.l1ChainId, true /* _isTestnet */]),
+    newCommitterFacet: await deployPinned("CommitterFacet", [params.l1ChainId]),
     newDefaultUpgrade: await deployPinned("DefaultUpgrade", []),
     newDiamondInit: await deployPinned("DiamondInit", [true /* _isZKOS */]),
     // Real verifier contract for the new version (same type the ZKsyncOS CTM uses). The proof
@@ -662,17 +696,35 @@ async function buildRegistryManifest(
           },
           DefaultUpgrade: { new: deployed.newDefaultUpgrade, newCodehash: await codehash(deployed.newDefaultUpgrade) },
           DiamondInit: { new: deployed.newDiamondInit, newCodehash: await codehash(deployed.newDiamondInit) },
-          // The facets this synthetic bump leaves untouched: pinned old == new (the composer
-          // skips unchanged facets) so the registry is the complete facet manifest and
-          // verifyAll() covers the whole live facet surface.
-          ...Object.fromEntries(
-            await Promise.all(
-              live.otherFacets.map(async (facet) => [
-                facet.name,
-                { old: facet.address, new: facet.address, newCodehash: await codehash(facet.address) },
-              ])
-            )
-          ),
+          // The rest of the replaced facet set (fresh implementations, same source).
+          GettersFacet: {
+            old: liveFacet(live, "GettersFacet"),
+            new: deployed.newGettersFacet,
+            newCodehash: await codehash(deployed.newGettersFacet),
+          },
+          ExecutorFacet: {
+            old: liveFacet(live, "ExecutorFacet"),
+            new: deployed.newExecutorFacet,
+            newCodehash: await codehash(deployed.newExecutorFacet),
+          },
+          MigratorFacet: {
+            old: liveFacet(live, "MigratorFacet"),
+            new: deployed.newMigratorFacet,
+            newCodehash: await codehash(deployed.newMigratorFacet),
+          },
+          CommitterFacet: {
+            old: liveFacet(live, "CommitterFacet"),
+            new: deployed.newCommitterFacet,
+            newCodehash: await codehash(deployed.newCommitterFacet),
+          },
+          // The one facet this bump leaves untouched (see deployUpgradeMachinery): pinned
+          // old == new (the composer skips it) so the registry stays the complete facet
+          // manifest and verifyAll() covers the whole live facet surface.
+          MailboxFacet: {
+            old: liveFacet(live, "MailboxFacet"),
+            new: liveFacet(live, "MailboxFacet"),
+            newCodehash: await codehash(liveFacet(live, "MailboxFacet")),
+          },
         },
         // No selector lists: every facet on the (regenerated) chain states implements
         // ISelfDescribingFacet, so the composer reads selectors from the facets themselves.

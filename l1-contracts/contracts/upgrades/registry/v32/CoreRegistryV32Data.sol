@@ -33,7 +33,7 @@ library CoreRegistryV32Data {
             key: EcosystemContract.MessageRoot,
             proxy: address(uint160(0x004a02a75c31b433fc8d87f510500b90e0fa7e0254)),
             implOld: address(uint160(0x0036529ce3fd7a08a689b0c707325b3f5034570eca)),
-            implNew: address(uint160(0x00821f3361d454cc98b7555221a06be563a7e2e0a6))
+            implNew: address(uint160(0x008f4ec854dd12f1fe79500a1f53d0cbb30f9b6134))
         }); // MessageRoot
         ++i;
     }
@@ -42,7 +42,7 @@ library CoreRegistryV32Data {
         pins = new CoreRegistryBase.CodehashPin[](1);
         uint256 i = 0;
         pins[i] = CoreRegistryBase.CodehashPin({
-            target: address(uint160(0x00821f3361d454cc98b7555221a06be563a7e2e0a6)),
+            target: address(uint160(0x008f4ec854dd12f1fe79500a1f53d0cbb30f9b6134)),
             expectedCodehash: 0x38a76dd3fa4cc1b89fd4fb2add08c18b50a7187c8f229f129a78af31070ccaa4
         }); // MessageRoot implNew
         ++i;

@@ -71,18 +71,15 @@ library ZKsyncOSCTMRegistryV99Data {
         ++i;
     }
 
-    /// @dev `AddressRow.key` is unused for verifier rows (set to the first enum variant).
-    function verifierRows() internal pure returns (CTMRegistryBase.AddressRow[] memory rows) {
-        rows = new CTMRegistryBase.AddressRow[](2);
-        rows[0] = CTMRegistryBase.AddressRow({
-            key: CTMContract.AdminFacet,
+    function verifierRows() internal pure returns (CTMRegistryBase.VerifierRow[] memory rows) {
+        rows = new CTMRegistryBase.VerifierRow[](2);
+        rows[0] = CTMRegistryBase.VerifierRow({
             protocolVersion: OLD_PROTOCOL_VERSION,
-            value: address(uint160(0x00000000000000000000000000000000000000e001))
+            verifier: address(uint160(0x00000000000000000000000000000000000000e001))
         }); // verifier @ 0.98.0
-        rows[1] = CTMRegistryBase.AddressRow({
-            key: CTMContract.AdminFacet,
+        rows[1] = CTMRegistryBase.VerifierRow({
             protocolVersion: NEW_PROTOCOL_VERSION,
-            value: address(uint160(0x00000000000000000000000000000000000000e002))
+            verifier: address(uint160(0x00000000000000000000000000000000000000e002))
         }); // verifier @ 0.99.0
     }
 

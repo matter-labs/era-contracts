@@ -32,7 +32,7 @@ contract ZKsyncOSCTMRegistryV99 is CTMRegistryBase {
         return ZKsyncOSCTMRegistryV99Data.ctmAddressRows();
     }
 
-    function _verifierRows() internal pure override returns (CTMRegistryBase.AddressRow[] memory) {
+    function _verifierRows() internal pure override returns (CTMRegistryBase.VerifierRow[] memory) {
         return ZKsyncOSCTMRegistryV99Data.verifierRows();
     }
 

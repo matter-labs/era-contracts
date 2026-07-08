@@ -34,6 +34,12 @@ abstract contract CTMRegistryBase is ICTMRegistry {
         bytes4[] selectorList;
     }
 
+    /// @dev One `version -> verifier` entry.
+    struct VerifierRow {
+        uint256 protocolVersion;
+        address verifier;
+    }
+
     /// @dev Version-independent facet freezability.
     struct FreezabilityRow {
         CTMContract facet;
@@ -67,9 +73,7 @@ abstract contract CTMRegistryBase is ICTMRegistry {
 
     function _ctmAddressRows() internal pure virtual returns (AddressRow[] memory);
 
-    /// @dev `(version -> verifier)` rows, keyed on `AddressRow.protocolVersion` with
-    ///      `AddressRow.key` unused (set to the first enum variant).
-    function _verifierRows() internal pure virtual returns (AddressRow[] memory);
+    function _verifierRows() internal pure virtual returns (VerifierRow[] memory);
 
     function _facetRows() internal pure virtual returns (FacetRow[] memory);
 
@@ -144,11 +148,11 @@ abstract contract CTMRegistryBase is ICTMRegistry {
 
     /// @inheritdoc ICTMRegistry
     function verifier(uint256 _protocolVersion) external pure returns (address) {
-        AddressRow[] memory rows = _verifierRows();
+        VerifierRow[] memory rows = _verifierRows();
         uint256 rowsLength = rows.length;
         for (uint256 i = 0; i < rowsLength; ++i) {
             if (rows[i].protocolVersion == _protocolVersion) {
-                return rows[i].value;
+                return rows[i].verifier;
             }
         }
         revert RegistryUnknownKey();
