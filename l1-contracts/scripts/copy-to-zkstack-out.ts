@@ -76,6 +76,7 @@ const REQUIRED_CONTRACTS = [
   "DummyL1MessageRoot.sol",
   "Migrator.sol",
   "L1Nullifier.sol",
+  "L1InteropHandler.sol",
   "IBaseToken.sol",
   "BaseTokenHolder.sol",
 ];
