@@ -9,8 +9,9 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {FinalizeL1DepositParams, ProofData} from "contracts/common/Messaging.sol";
+import {BundleStatus, L2Message, MessageInclusionProof, ProofData} from "contracts/common/Messaging.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
@@ -90,19 +91,19 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
             : currentToken.balanceOf(address(addresses.l1NativeTokenVault));
         uint256 beforeUserBalance = _isEth ? currentUser.balance : currentToken.balanceOf(currentUser);
 
-        FinalizeL1DepositParams memory params = _buildWithdrawalParams(assetId, _amountToWithdraw);
+        (bytes memory bundle, MessageInclusionProof memory proof) = _buildWithdrawal(assetId, _amountToWithdraw);
         _mockWithdrawalProof();
 
         if (beforeChainBalance < _amountToWithdraw) {
             // Not enough escrowed balance for this chain/asset -> the asset tracker reverts.
             vm.expectRevert();
-            addresses.l1InteropHandler.finalizeDeposit(params);
+            addresses.l1InteropHandler.executeBundle(bundle, proof);
             return;
         }
         tokenSumWithdrawal[currentTokenAddress] += _amountToWithdraw;
 
         vm.recordLogs();
-        addresses.l1InteropHandler.finalizeDeposit(params);
+        addresses.l1InteropHandler.executeBundle(bundle, proof);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Chain balance for the base-token asset decreased by the withdrawal amount.
@@ -134,14 +135,11 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
             );
         }
 
-        // Withdrawal marked as finalized (replay protection).
+        // Bundle marked as fully executed (replay protection lives in the interop handler's bundle status).
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(currentChainId, bundle);
         assertTrue(
-            addresses.l1InteropHandler.isWithdrawalFinalized(
-                currentChainId,
-                params.l2BatchNumber,
-                params.l2MessageIndex
-            ),
-            "Withdrawal should be marked as finalized"
+            addresses.l1InteropHandler.bundleStatus(bundleHash) == BundleStatus.FullyExecuted,
+            "Bundle should be marked as fully executed"
         );
 
         // Verify DepositFinalizedAssetRouter event emission.
@@ -149,14 +147,16 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
         assertEq(uint256(finalizedLog.topics[1]), currentChainId, "DepositFinalizedAssetRouter chainId mismatch");
     }
 
-    /// @notice Builds the `FinalizeL1DepositParams` for a base-token withdrawal of `_amount` to `currentUser`.
-    /// @dev Reconstructs the interop-bundle withdrawal message emitted by the L2 InteropCenter. For a
-    /// base-token withdrawal, the original caller and origin token are empty and the metadata is
-    /// empty (see `l2-withdrawal-helper.ts::finalizeWithdrawalOnL1`).
-    function _buildWithdrawalParams(
+    /// @notice Builds the withdrawal `bundle` and its `MessageInclusionProof` for a base-token withdrawal of
+    /// `_amount` to `currentUser`, as consumed by `L1InteropHandler.executeBundle`.
+    /// @dev Reconstructs the single-call interop bundle emitted by the L2 InteropCenter. For a base-token
+    /// withdrawal, the original caller and origin token are empty and the metadata is empty (see
+    /// `l2-withdrawal-helper.ts::finalizeWithdrawalOnL1`). The proof's message data is a placeholder because the
+    /// handler substitutes it with the bundle while verifying inclusion (which is mocked here anyway).
+    function _buildWithdrawal(
         bytes32 _assetId,
         uint256 _amount
-    ) internal returns (FinalizeL1DepositParams memory params) {
+    ) internal returns (bytes memory bundle, MessageInclusionProof memory proof) {
         bytes memory transferData = DataEncoding.encodeBridgeMintData({
             _originalCaller: address(0),
             _remoteReceiver: currentUser,
@@ -164,24 +164,32 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
             _amount: _amount,
             _erc20Metadata: hex""
         });
+        bundle = DataEncoding.encodeInteropWithdrawalBundle(
+            currentChainId,
+            address(addresses.sharedBridge),
+            _assetId,
+            transferData
+        );
         bytes32[] memory merkleProof = new bytes32[](1);
-        params = FinalizeL1DepositParams({
+        proof = MessageInclusionProof({
             chainId: currentChainId,
-            l2BatchNumber: uint256(uint160(makeAddr("l2BatchNumber"))),
+            l1BatchNumber: uint256(uint160(makeAddr("l2BatchNumber"))),
             l2MessageIndex: uint256(uint160(makeAddr("l2MessageIndex"))),
-            l2Sender: L2_INTEROP_CENTER_ADDR,
-            l2TxNumberInBatch: uint16(uint160(makeAddr("l2TxNumberInBatch"))),
-            message: _encodeWithdrawalBundleMessage(currentChainId, _assetId, transferData),
-            merkleProof: merkleProof
+            message: L2Message({
+                txNumberInBatch: uint16(uint160(makeAddr("l2TxNumberInBatch"))),
+                sender: L2_INTEROP_CENTER_ADDR,
+                data: hex""
+            }),
+            proof: merkleProof
         });
     }
 
-    /// @notice Mocks the two message-root proof calls made by `L1Nullifier._verifyWithdrawal`.
+    /// @notice Mocks the two message-root proof calls made by `L1InteropHandler` while proving bundle inclusion.
     /// @dev Mocked on selector only (loose match) so we do not have to reconstruct the exact `L2Message`/leaf.
     /// `getProofData` returns `settlementLayerChainId = 0` (direct L1 settlement) so the withdrawal is
     /// attributed to the source chain by `L1AssetTracker._getWithdrawalChain`.
     function _mockWithdrawalProof() internal {
-        address messageRoot = address(addresses.l1Nullifier.MESSAGE_ROOT());
+        address messageRoot = address(addresses.l1InteropHandler.MESSAGE_ROOT());
         vm.mockCall(
             messageRoot,
             abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),

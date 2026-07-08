@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_ROUTER_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
 import {NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
+import {ETH_TOKEN_ADDRESS} from "../Config.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
 import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
@@ -355,6 +356,27 @@ library DataEncoding {
         bytes32 _assetId,
         bytes memory _transferData
     ) internal view returns (bytes memory) {
+        return
+            abi.encodePacked(
+                BUNDLE_IDENTIFIER,
+                encodeInteropWithdrawalBundle(_chainId, _l1AssetRouter, _assetId, _transferData)
+            );
+    }
+
+    /// @notice Builds the ABI-encoded single-call `InteropBundle` for an interop-routed withdrawal, without the
+    /// `BUNDLE_IDENTIFIER` prefix. This is the form consumed by `IInteropHandler.executeBundle`.
+    /// @dev The `destinationBaseTokenAssetId` matches what the L2 InteropCenter sets for an L1-destined bundle
+    /// (L1's ETH asset ID), which `InteropHandlerBase._validateBundleDestinationContext` checks on execution.
+    /// @param _chainId The source ZK chain ID (encoded both in the bundle and the inner call).
+    /// @param _l1AssetRouter The L1 asset router that the bundle's single call targets.
+    /// @param _assetId The asset being withdrawn.
+    /// @param _transferData The bridge-mint/transfer data for the asset.
+    function encodeInteropWithdrawalBundle(
+        uint256 _chainId,
+        address _l1AssetRouter,
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) internal view returns (bytes memory) {
         InteropCall[] memory calls = new InteropCall[](1);
         calls[0] = InteropCall({
             version: INTEROP_CALL_VERSION,
@@ -368,12 +390,12 @@ library DataEncoding {
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: _chainId,
             destinationChainId: block.chainid,
-            destinationBaseTokenAssetId: bytes32(0),
+            destinationBaseTokenAssetId: encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
             interopBundleSalt: bytes32(0),
             calls: calls,
             bundleAttributes: BundleAttributes({executionAddress: hex"", unbundlerAddress: hex"", useFixedFee: false})
         });
-        return abi.encodePacked(BUNDLE_IDENTIFIER, abi.encode(bundle));
+        return abi.encode(bundle);
     }
 
     /// @notice Parses an interop-routed withdrawal: a single-call `InteropBundle` destined for this L1.

@@ -20,8 +20,9 @@ import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {FinalizeL1DepositParams} from "contracts/common/Messaging.sol";
-import {IL1InteropHandler} from "contracts/bridge/interfaces/IL1InteropHandler.sol";
+import {MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
+import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
+import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -191,18 +192,17 @@ contract DeployZKScript is Script {
         initializeConfig(_bridgehub, _chainId);
 
         L1Nullifier l1Nullifier = L1Nullifier(config.l1Nullifier);
-        IL1InteropHandler l1InteropHandler = IL1InteropHandler(l1Nullifier.l1InteropHandler());
+        address l1InteropHandlerAddr = l1Nullifier.l1InteropHandler();
 
         vm.broadcast();
-        l1InteropHandler.finalizeDeposit(
-            FinalizeL1DepositParams({
+        IInteropHandler(l1InteropHandlerAddr).executeBundle(
+            UnsafeBytes.readRemainingBytes(_message, 1),
+            MessageInclusionProof({
                 chainId: _chainId,
-                l2BatchNumber: _l2BatchNumber,
+                l1BatchNumber: _l2BatchNumber,
                 l2MessageIndex: _l2MessageIndex,
-                l2Sender: L2_INTEROP_CENTER_ADDR,
-                l2TxNumberInBatch: _l2TxNumberInBatch,
-                message: _message,
-                merkleProof: _merkleProof
+                message: L2Message({txNumberInBatch: _l2TxNumberInBatch, sender: L2_INTEROP_CENTER_ADDR, data: hex""}),
+                proof: _merkleProof
             })
         );
     }

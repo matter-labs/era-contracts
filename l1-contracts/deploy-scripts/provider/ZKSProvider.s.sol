@@ -7,7 +7,9 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {stdJson} from "forge-std/StdJson.sol";
 
-import {FinalizeL1DepositParams} from "contracts/common/Messaging.sol";
+import {FinalizeL1DepositParams, MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
+import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
+import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
 import {Utils} from "../utils/Utils.sol";
 import {
     AltL2ToL1Log,
@@ -23,7 +25,6 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {IL1InteropHandler} from "contracts/bridge/interfaces/IL1InteropHandler.sol";
 import {IGetters} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 
@@ -45,7 +46,16 @@ contract ZKSProvider is Script {
 
         // Send the transaction
         vm.startBroadcast();
-        IL1InteropHandler(nullifier.l1InteropHandler()).finalizeDeposit(params);
+        IInteropHandler(nullifier.l1InteropHandler()).executeBundle(
+            UnsafeBytes.readRemainingBytes(params.message, 1),
+            MessageInclusionProof({
+                chainId: params.chainId,
+                l1BatchNumber: params.l2BatchNumber,
+                l2MessageIndex: params.l2MessageIndex,
+                message: L2Message({txNumberInBatch: params.l2TxNumberInBatch, sender: params.l2Sender, data: hex""}),
+                proof: params.merkleProof
+            })
+        );
         vm.stopBroadcast();
     }
 

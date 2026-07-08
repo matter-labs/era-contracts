@@ -64,6 +64,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     IChainAssetHandlerBase public chainAssetHandler;
 
+    /// @notice The L1 interop handler, which owns the transient settlement-layer slot read during withdrawal
+    /// and failed-deposit attribution. Configured via `setAddresses`.
+    IL1InteropHandler public l1InteropHandler;
+
     mapping(uint256 chainId => mapping(bytes32 assetId => InteropL1Info info)) internal interopInfo;
 
     function _nativeTokenVault() internal view override returns (INativeTokenVaultBase) {
@@ -108,6 +112,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     function setAddresses() external onlyOwner {
         chainAssetHandler = IChainAssetHandlerBase(BRIDGE_HUB.chainAssetHandler());
+        l1InteropHandler = IL1InteropHandler(L1_NULLIFIER.l1InteropHandler());
     }
 
     function _requireRegistered(bytes32 _assetId) internal {
@@ -221,8 +226,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     function _getWithdrawalChain(uint256 _chainId) internal view returns (uint256 chainToUpdate) {
         // The L1 interop handler owns the transient settlement-layer slot for both withdrawal finalization and the
         // nullifier's failed-deposit recovery flow, so it is the single source we read here.
-        (uint256 settlementLayer, uint256 l2BatchNumber) = IL1InteropHandler(L1_NULLIFIER.l1InteropHandler())
-            .getTransientSettlementLayer();
+        (uint256 settlementLayer, uint256 l2BatchNumber) = l1InteropHandler.getTransientSettlementLayer();
         // This is the batch starting from which it is the responsibility of all the settlement layers to ensure that
         // all withdrawals coming from the chain are backed by the balance of this settlement layer.
         // Note, that since this method is used for claiming failed deposits, it implies that any failed deposit that has been processed

@@ -28,8 +28,9 @@ import {Utils} from "../utils/Utils.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {IL1InteropHandler} from "contracts/bridge/interfaces/IL1InteropHandler.sol";
-import {ConfirmTransferResultData, TxStatus, FinalizeL1DepositParams} from "contracts/common/Messaging.sol";
+import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
+import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
+import {ConfirmTransferResultData, TxStatus, MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
 import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
@@ -107,18 +108,17 @@ contract GatewayUtils is Script, IGatewayUtils {
 
         address assetRouter = address(bridgehub.assetRouter());
         IL1Nullifier l1Nullifier = L1AssetRouter(assetRouter).L1_NULLIFIER();
-        IL1InteropHandler l1InteropHandler = IL1InteropHandler(l1Nullifier.l1InteropHandler());
+        address l1InteropHandlerAddr = l1Nullifier.l1InteropHandler();
 
         vm.broadcast();
-        l1InteropHandler.finalizeDeposit(
-            FinalizeL1DepositParams({
+        IInteropHandler(l1InteropHandlerAddr).executeBundle(
+            UnsafeBytes.readRemainingBytes(message, 1),
+            MessageInclusionProof({
                 chainId: gatewayChainId,
-                l2BatchNumber: l2BatchNumber,
+                l1BatchNumber: l2BatchNumber,
                 l2MessageIndex: l2MessageIndex,
-                l2Sender: L2_INTEROP_CENTER_ADDR,
-                l2TxNumberInBatch: l2TxNumberInBatch,
-                message: message,
-                merkleProof: merkleProof
+                message: L2Message({txNumberInBatch: l2TxNumberInBatch, sender: L2_INTEROP_CENTER_ADDR, data: hex""}),
+                proof: merkleProof
             })
         );
     }

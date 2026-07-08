@@ -7,7 +7,7 @@ import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {L1InteropHandler} from "contracts/bridge/L1InteropHandler.sol";
+import {L1InteropHandler} from "contracts/interop/L1InteropHandler.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
@@ -224,7 +224,11 @@ contract DeployL1CoreUtils is DeployUtils {
             } else if (compareStrings(contractName, "L1Nullifier")) {
                 return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1));
             } else if (compareStrings(contractName, "L1InteropHandler")) {
-                return abi.encodeCall(L1InteropHandler.initialize, (config.deployerAddress));
+                return
+                    abi.encodeCall(
+                        L1InteropHandler.initialize,
+                        (config.l1ChainId, coreAddresses.bridges.proxies.l1Nullifier)
+                    );
             } else if (compareStrings(contractName, "L1AssetRouter")) {
                 return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1NativeTokenVault")) {

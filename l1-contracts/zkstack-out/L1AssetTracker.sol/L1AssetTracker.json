@@ -254,6 +254,19 @@
   },
   {
     "type": "function",
+    "name": "l1InteropHandler",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IL1InteropHandler"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "owner",
     "inputs": [],
     "outputs": [

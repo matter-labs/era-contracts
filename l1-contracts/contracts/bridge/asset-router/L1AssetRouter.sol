@@ -19,8 +19,18 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
-import {NonEmptyMsgValue, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {
+    AddressAlreadySet,
+    ExecuteMessageFailed,
+    InvalidSelector,
+    NonEmptyMsgValue,
+    PayloadTooShort,
+    Unauthorized,
+    ZeroAddress
+} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {IERC7786Recipient} from "../../interop/IERC7786Recipient.sol";
+import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
@@ -34,7 +44,7 @@ import {TxStatus} from "../../common/Messaging.sol";
 /// @dev Handles the L1 side of asset routing for L1 <-> ZK chain bridging,
 /// supporting both ETH and ERC20 tokens.
 /// @dev Designed for use with a proxy for upgradability.
-contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
+contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard, IERC7786Recipient {
     using SafeERC20 for IERC20;
 
     /// @dev Bridgehub smart contract used for asynchronous cross-chain requests, including deposits and interop-related routing.
@@ -63,6 +73,9 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     // slither-disable-next-line uninitialized-state
     address private __DEPRECATED_legacyBridge;
 
+    /// @dev Address of the L1 interop handler that finalizes L2 -> L1 withdrawals.
+    address public l1InteropHandler;
+
     /// @notice Checks that the message sender is the nullifier.
     modifier onlyNullifier() {
         require(msg.sender == address(L1_NULLIFIER), Unauthorized(msg.sender));
@@ -70,9 +83,15 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Checks that the message sender is the L1 interop handler that finalizes L2 -> L1 withdrawals.
-    /// @dev The handler is configured on the nullifier, which is the immutable anchor known at construction time.
     modifier onlyInteropHandler() {
-        require(msg.sender == L1_NULLIFIER.l1InteropHandler(), Unauthorized(msg.sender));
+        require(msg.sender == l1InteropHandler, Unauthorized(msg.sender));
+        _;
+    }
+
+    /// @notice Checks that the message sender is this contract itself.
+    /// @dev `finalizeDeposit` is reached only via `receiveMessage`'s self-call, mirroring the L2 asset router.
+    modifier onlySelf() {
+        require(msg.sender == address(this), Unauthorized(msg.sender));
         _;
     }
 
@@ -139,6 +158,15 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         require(address(_nativeTokenVault) != address(0), ZeroAddress());
         nativeTokenVault = _nativeTokenVault;
         _setAssetHandler(ETH_TOKEN_ASSET_ID, address(_nativeTokenVault));
+    }
+
+    /// @notice Sets the L1 interop handler contract address, the only caller allowed to finalize withdrawals.
+    /// @dev Should be called only once by the owner.
+    /// @param _l1InteropHandler The address of the L1 interop handler.
+    function setL1InteropHandler(address _l1InteropHandler) external onlyOwner {
+        require(l1InteropHandler == address(0), AddressAlreadySet(l1InteropHandler));
+        require(_l1InteropHandler != address(0), ZeroAddress());
+        l1InteropHandler = _l1InteropHandler;
     }
 
     /// @notice Used to set the asset deployment tracker address for given asset data.
@@ -257,12 +285,42 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Executes an L2 -> L1 withdrawal interop call following the ERC-7786 standard.
+    /// @dev Called by the L1 interop handler while executing a withdrawal bundle. The bundle's single call targets
+    /// this router with a `finalizeDeposit` payload originating from the L2 asset router; we re-invoke it via a
+    /// self-call, mirroring `L2AssetRouter.receiveMessage`.
+    /// @param sender ERC-7930 address of the message sender (the L2 asset router on the source chain).
+    /// @param payload Encoded `finalizeDeposit` call data.
+    /// @return The `receiveMessage` selector per ERC-7786.
+    function receiveMessage(
+        bytes32 /* receiveId */,
+        bytes calldata sender,
+        bytes calldata payload
+    ) external payable override onlyInteropHandler returns (bytes4) {
+        (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
+
+        // Withdrawals arriving on L1 are emitted by the L2 asset router on the source L2 chain (never L1 itself).
+        require(senderChainId != block.chainid && senderAddress == L2_ASSET_ROUTER_ADDR, Unauthorized(senderAddress));
+
+        // Only a `finalizeDeposit` call may be executed through the interop system.
+        require(payload.length > 4, PayloadTooShort());
+        require(
+            bytes4(payload[0:4]) == AssetRouterBase.finalizeDeposit.selector,
+            InvalidSelector(bytes4(payload[0:4]))
+        );
+
+        // slither-disable-next-line arbitrary-send-eth
+        (bool success, ) = address(this).call{value: msg.value}(payload);
+        require(success, ExecuteMessageFailed());
+        return IERC7786Recipient.receiveMessage.selector;
+    }
+
     /// @inheritdoc AssetRouterBase
     function finalizeDeposit(
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) public payable override onlyInteropHandler {
+    ) public payable override onlySelf {
         _finalizeDeposit(_chainId, _assetId, _transferData, address(nativeTokenVault));
         emit DepositFinalizedAssetRouter(_chainId, _assetId, _transferData);
     }

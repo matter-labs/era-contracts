@@ -25,6 +25,12 @@ contract L1AssetTrackerWithdrawalChainHarness is L1AssetTracker {
     function exposed_getWithdrawalChain(uint256 _chainId) external view returns (uint256) {
         return _getWithdrawalChain(_chainId);
     }
+
+    /// @dev Test hook: sets the interop handler that `_getWithdrawalChain` reads the settlement layer from,
+    /// bypassing the full `setAddresses` wiring (which would also require the bridgehub/chain-asset-handler).
+    function exposed_setInteropHandler(address _l1InteropHandler) external {
+        l1InteropHandler = IL1InteropHandler(_l1InteropHandler);
+    }
 }
 
 /// @title L1AssetTrackerWithdrawalChainTest
@@ -55,14 +61,9 @@ contract L1AssetTrackerWithdrawalChainTest is Test {
             abi.encodeWithSelector(IL1NativeTokenVault.L1_NULLIFIER.selector),
             abi.encode(nullifier)
         );
-        // `_getWithdrawalChain` reads the transient settlement layer from the interop handler, which it resolves
-        // from the nullifier.
-        vm.mockCall(
-            nullifier,
-            abi.encodeWithSelector(IL1Nullifier.l1InteropHandler.selector),
-            abi.encode(interopHandler)
-        );
         assetTracker = new L1AssetTrackerWithdrawalChainHarness(bridgehub, nativeTokenVault, messageRoot);
+        // `_getWithdrawalChain` reads the transient settlement layer from the stored interop handler.
+        assetTracker.exposed_setInteropHandler(interopHandler);
     }
 
     /// @dev Mocks the v31 marker stored on the MessageRoot for CHAIN_ID.

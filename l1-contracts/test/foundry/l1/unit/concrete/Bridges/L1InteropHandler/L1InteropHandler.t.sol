@@ -5,33 +5,32 @@ import {Test} from "forge-std/Test.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {L1InteropHandler} from "contracts/bridge/L1InteropHandler.sol";
+import {L1InteropHandler} from "contracts/interop/L1InteropHandler.sol";
 import {IL1InteropHandler} from "contracts/bridge/interfaces/IL1InteropHandler.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 
-import {AddressAlreadySet, SlotOccupied, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {SlotOccupied, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 /// @title L1InteropHandlerTest
-/// @notice Unit tests for the handler-specific surface of `L1InteropHandler`: initialization, the one-time
-/// dependency setters, the nullifier-gated transient settlement-layer recording, and the pause controls.
-/// @dev The full `finalizeDeposit` proof/parse/dispatch flow is exercised end-to-end by the integration suite
-/// (`AssetRouterTest`, the Bridgehub withdrawal harnesses); here we isolate the pieces the handler owns directly.
+/// @notice Unit tests for the L1-specific surface of `L1InteropHandler`: initialization and the nullifier-gated
+/// transient settlement-layer recording. The full `executeBundle` proof/parse/dispatch flow is exercised end-to-end
+/// by the integration suite (`AssetRouterTest`, the Bridgehub withdrawal harnesses).
 contract L1InteropHandlerTest is Test {
     L1InteropHandler internal handler;
     L1InteropHandler internal handlerImpl;
 
-    address internal owner = makeAddr("owner");
     address internal proxyAdmin = makeAddr("proxyAdmin");
     address internal messageRoot = makeAddr("messageRoot");
-    address internal assetRouter = makeAddr("assetRouter");
     address internal nullifier = makeAddr("nullifier");
+
+    uint256 internal constant L1_CHAIN_ID = 1;
 
     function setUp() public {
         handlerImpl = new L1InteropHandler(IMessageRootBase(messageRoot));
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(handlerImpl),
             proxyAdmin,
-            abi.encodeWithSelector(L1InteropHandler.initialize.selector, owner)
+            abi.encodeWithSelector(L1InteropHandler.initialize.selector, L1_CHAIN_ID, nullifier)
         );
         handler = L1InteropHandler(address(proxy));
     }
@@ -40,79 +39,32 @@ contract L1InteropHandlerTest is Test {
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    function test_Initialize_SetsOwnerAndMessageRoot() public view {
-        assertEq(handler.owner(), owner, "owner mismatch");
+    function test_Initialize_SetsState() public view {
+        assertEq(handler.L1_CHAIN_ID(), L1_CHAIN_ID, "L1_CHAIN_ID mismatch");
+        assertEq(handler.l1Nullifier(), nullifier, "l1Nullifier mismatch");
         assertEq(address(handler.MESSAGE_ROOT()), messageRoot, "MESSAGE_ROOT mismatch");
     }
 
-    function test_Initialize_RevertWhen_ZeroOwner() public {
+    function test_Initialize_RevertWhen_ZeroNullifier() public {
         L1InteropHandler impl = new L1InteropHandler(IMessageRootBase(messageRoot));
-        vm.expectRevert(ZeroAddress.selector);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(0)));
         new TransparentUpgradeableProxy(
             address(impl),
             proxyAdmin,
-            abi.encodeWithSelector(L1InteropHandler.initialize.selector, address(0))
+            abi.encodeWithSelector(L1InteropHandler.initialize.selector, L1_CHAIN_ID, address(0))
         );
     }
 
     function test_Initialize_RevertWhen_CalledTwice() public {
-        // The `reentrancyGuardInitializer` modifier runs first and rejects the second init with `SlotOccupied`.
+        // The `reentrancyGuardInitializer` modifier rejects the second init with `SlotOccupied`.
         vm.expectRevert(SlotOccupied.selector);
-        handler.initialize(owner);
+        handler.initialize(L1_CHAIN_ID, nullifier);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            SETTERS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_SetL1AssetRouter_Happy() public {
-        vm.prank(owner);
-        handler.setL1AssetRouter(assetRouter);
-        assertEq(address(handler.l1AssetRouter()), assetRouter);
-    }
-
-    function test_SetL1AssetRouter_RevertWhen_NotOwner() public {
-        vm.expectRevert("Ownable: caller is not the owner");
-        handler.setL1AssetRouter(assetRouter);
-    }
-
-    function test_SetL1AssetRouter_RevertWhen_Zero() public {
-        vm.prank(owner);
-        vm.expectRevert(ZeroAddress.selector);
-        handler.setL1AssetRouter(address(0));
-    }
-
-    function test_SetL1AssetRouter_RevertWhen_AlreadySet() public {
-        vm.prank(owner);
-        handler.setL1AssetRouter(assetRouter);
-        vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(AddressAlreadySet.selector, assetRouter));
-        handler.setL1AssetRouter(makeAddr("otherRouter"));
-    }
-
-    function test_SetL1Nullifier_Happy() public {
-        vm.prank(owner);
-        handler.setL1Nullifier(nullifier);
-        assertEq(handler.l1Nullifier(), nullifier);
-    }
-
-    function test_SetL1Nullifier_RevertWhen_NotOwner() public {
-        vm.expectRevert("Ownable: caller is not the owner");
-        handler.setL1Nullifier(nullifier);
-    }
-
-    function test_SetL1Nullifier_RevertWhen_Zero() public {
-        vm.prank(owner);
-        vm.expectRevert(ZeroAddress.selector);
-        handler.setL1Nullifier(address(0));
-    }
-
-    function test_SetL1Nullifier_RevertWhen_AlreadySet() public {
-        vm.prank(owner);
-        handler.setL1Nullifier(nullifier);
-        vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(AddressAlreadySet.selector, nullifier));
-        handler.setL1Nullifier(makeAddr("otherNullifier"));
+    function test_InitL2_Reverts() public {
+        // initL2 is the L2 system-contract entry point and is not usable on L1.
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
+        handler.initL2(L1_CHAIN_ID);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -126,9 +78,6 @@ contract L1InteropHandlerTest is Test {
     }
 
     function test_SetTransientSettlementLayer_OnlyNullifier() public {
-        vm.prank(owner);
-        handler.setL1Nullifier(nullifier);
-
         vm.expectEmit(true, false, false, false, address(handler));
         emit IL1InteropHandler.TransientSettlementLayerSet(777);
 
@@ -142,50 +91,9 @@ contract L1InteropHandlerTest is Test {
     }
 
     function test_SetTransientSettlementLayer_RevertWhen_NotNullifier() public {
-        vm.prank(owner);
-        handler.setL1Nullifier(nullifier);
-
         address notNullifier = makeAddr("notNullifier");
         vm.prank(notNullifier);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notNullifier));
         handler.setTransientSettlementLayer(1, 1);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                                PAUSE
-    //////////////////////////////////////////////////////////////*/
-
-    function test_Pause_RevertWhen_NotOwner() public {
-        address notOwner = makeAddr("notOwner");
-        vm.prank(notOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
-        handler.pause();
-    }
-
-    function test_PauseUnpause_Owner() public {
-        vm.prank(owner);
-        handler.pause();
-        assertTrue(handler.paused());
-        vm.prank(owner);
-        handler.unpause();
-        assertFalse(handler.paused());
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                                FUZZ
-    //////////////////////////////////////////////////////////////*/
-
-    function testFuzz_SetL1AssetRouter(address _router) public {
-        vm.assume(_router != address(0));
-        vm.prank(owner);
-        handler.setL1AssetRouter(_router);
-        assertEq(address(handler.l1AssetRouter()), _router);
-    }
-
-    function testFuzz_SetL1Nullifier(address _nullifier) public {
-        vm.assume(_nullifier != address(0));
-        vm.prank(owner);
-        handler.setL1Nullifier(_nullifier);
-        assertEq(handler.l1Nullifier(), _nullifier);
     }
 }

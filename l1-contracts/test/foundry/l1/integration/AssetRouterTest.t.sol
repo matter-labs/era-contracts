@@ -27,7 +27,7 @@ import {L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/comm
 
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 
-import {FinalizeL1DepositParams} from "contracts/common/Messaging.sol";
+import {MessageInclusionProof} from "contracts/common/Messaging.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -173,15 +173,19 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             _amount: 100,
             _erc20Metadata: BridgeHelper.getERC20Getters(_tokenAddress, chainId)
         });
-        addresses.l1InteropHandler.finalizeDeposit(
-            FinalizeL1DepositParams({
+        addresses.l1InteropHandler.executeBundle(
+            DataEncoding.encodeInteropWithdrawalBundle(
+                chainId,
+                address(addresses.sharedBridge),
+                l2TokenAssetId,
+                transferData
+            ),
+            MessageInclusionProof({
                 chainId: chainId,
-                l2BatchNumber: 1,
+                l1BatchNumber: 1,
                 l2MessageIndex: 1,
-                l2Sender: L2_INTEROP_CENTER_ADDR,
-                l2TxNumberInBatch: 1,
-                message: _encodeWithdrawalBundleMessage(chainId, l2TokenAssetId, transferData),
-                merkleProof: new bytes32[](0)
+                message: L2Message({txNumberInBatch: 1, sender: L2_INTEROP_CENTER_ADDR, data: hex""}),
+                proof: new bytes32[](0)
             })
         );
         tokenL1Address = addresses.l1NativeTokenVault.tokenAddress(l2TokenAssetId);
