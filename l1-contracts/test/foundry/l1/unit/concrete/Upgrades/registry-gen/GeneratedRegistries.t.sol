@@ -15,6 +15,7 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {RegistryUnknownKey} from "contracts/common/L1ContractErrors.sol";
 
 import {CoreRegistryV99} from "./CoreRegistryV99.sol";
 import {ZKsyncOSCTMRegistryV99} from "./ZKsyncOSCTMRegistryV99.sol";
@@ -79,13 +80,13 @@ contract GeneratedRegistriesTest is Test {
     }
 
     function test_revertWhen_unknownVersionQueried() public {
-        vm.expectRevert(CoreRegistryV99.RegistryUnknownKey.selector);
+        vm.expectRevert(RegistryUnknownKey.selector);
         coreRegistry.implAddress(EcosystemContract.Bridgehub, 12345);
 
-        vm.expectRevert(ZKsyncOSCTMRegistryV99.RegistryUnknownKey.selector);
+        vm.expectRevert(RegistryUnknownKey.selector);
         ctmRegistry.verifier(12345);
 
-        vm.expectRevert(ZKsyncOSCTMRegistryV99.RegistryUnknownKey.selector);
+        vm.expectRevert(RegistryUnknownKey.selector);
         ctmRegistry.facetSelectors(CTMContract.MailboxFacet, NEW_VERSION);
     }
 

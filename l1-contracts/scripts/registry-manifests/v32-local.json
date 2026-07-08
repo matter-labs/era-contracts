@@ -21,12 +21,12 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0xa7EF69A0644e7C3B24bcBE6bf2bf75662E851bF8",
+      "ctmProxy": "0x9B8FA6c5Da55af7887cc97eCcC7d788659475193",
       "verifierOld": "0x5422b0509a532dd24b0dD99AfaC766E66172af37",
       "verifierNew": "0x02df3a3F960393F5B349E40A599FEda91a7cc1A7",
       "contracts": {
         "AdminFacet": {
-          "old": "0xbb27525459Cfa6650f9491808eCF1FeE6434b236",
+          "old": "0x1834220Ad2494f02d62E5A66a8ebBF92e47Caa09",
           "new": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C",
           "newCodehash": "0xe8e31854a39f59042ebdf56730808bd85eabdff0c2a16bd8e67afbccb7425836"
         },
@@ -37,74 +37,94 @@
         "DiamondInit": {
           "new": "0x413b1AfCa96a3df5A686d8BFBF93d30688a7f7D9",
           "newCodehash": "0x3f62a808c81d674b4d985a0d617f95fe4cda74674182b9137e5119e147cc8045"
+        },
+        "GettersFacet": {
+          "old": "0x08CAeBAD34Fc471ddA5DcE669a2EB1D3dEeab945",
+          "new": "0x08CAeBAD34Fc471ddA5DcE669a2EB1D3dEeab945",
+          "newCodehash": "0x6eb8cfdb1a91fd28763e291cfe354d2bedbd8cbf7bbc01b1c30b60329c4f33f5"
+        },
+        "MailboxFacet": {
+          "old": "0xCf8F444A5Bf4F7dE2e2BC572C5Ba90245b2d3d89",
+          "new": "0xCf8F444A5Bf4F7dE2e2BC572C5Ba90245b2d3d89",
+          "newCodehash": "0x5b57e0c10904fb14593ff53e21abe0767c32b6842756dafa7ea76dbf2a22ff58"
+        },
+        "ExecutorFacet": {
+          "old": "0xD94e56e0C17BD1e0eB67CA231996079BAE2F7A9A",
+          "new": "0xD94e56e0C17BD1e0eB67CA231996079BAE2F7A9A",
+          "newCodehash": "0x941916e9669e766aedaf2f02c36405ab1a12393c8d7badd54607ca300a9048aa"
+        },
+        "MigratorFacet": {
+          "old": "0x1f3278a574430D5b79a7B8d507eB7126BA2C584D",
+          "new": "0x1f3278a574430D5b79a7B8d507eB7126BA2C584D",
+          "newCodehash": "0xb46bf0e9faf014f7ae48b518a854de07f262a5f7cfdcd4bc51404f56e0b87e2e"
+        },
+        "CommitterFacet": {
+          "old": "0x353Fc44dFe46c4ADa74A563f89923a65350c5741",
+          "new": "0x353Fc44dFe46c4ADa74A563f89923a65350c5741",
+          "newCodehash": "0xa528dfec9924d790b1a385a90a7313c3fcfa70f1916af8791d772a9950b55d6f"
         }
       },
       "facets": {
         "old": [
           {
             "name": "AdminFacet",
-            "selectors": [
-              "0x054e80a3",
-              "0x0e18b681",
-              "0x17338945",
-              "0xf9afb97e",
-              "0x1b48b94a",
-              "0x1cc5d103",
-              "0x21f603d7",
-              "0x235d9eb5",
-              "0x23b31192",
-              "0x2765d079",
-              "0x27ae4c16",
-              "0x2878fe74",
-              "0x3b6d7534",
-              "0x4623c91d",
-              "0x4dd18bf5",
-              "0x5b898748",
-              "0x60eae0e7",
-              "0x64bf8d66",
-              "0x6e762e98",
-              "0xa9f6d941",
-              "0xb4fcb577",
-              "0xbe6f11cf",
-              "0xc5f1f1f5",
-              "0xe76db865"
-            ]
+            "selectors": []
+          },
+          {
+            "name": "GettersFacet",
+            "selectors": []
+          },
+          {
+            "name": "MailboxFacet",
+            "selectors": []
+          },
+          {
+            "name": "ExecutorFacet",
+            "selectors": []
+          },
+          {
+            "name": "MigratorFacet",
+            "selectors": []
+          },
+          {
+            "name": "CommitterFacet",
+            "selectors": []
           }
         ],
         "new": [
           {
             "name": "AdminFacet",
-            "selectors": [
-              "0x054e80a3",
-              "0x0e18b681",
-              "0x17338945",
-              "0xf9afb97e",
-              "0x1b48b94a",
-              "0x1cc5d103",
-              "0x21f603d7",
-              "0x235d9eb5",
-              "0x23b31192",
-              "0x2765d079",
-              "0x27ae4c16",
-              "0x2878fe74",
-              "0x3b6d7534",
-              "0x4623c91d",
-              "0x4dd18bf5",
-              "0x5b898748",
-              "0x60eae0e7",
-              "0x64bf8d66",
-              "0x6e762e98",
-              "0xa9f6d941",
-              "0xb4fcb577",
-              "0xbe6f11cf",
-              "0xc5f1f1f5",
-              "0xe76db865"
-            ]
+            "selectors": []
+          },
+          {
+            "name": "GettersFacet",
+            "selectors": []
+          },
+          {
+            "name": "MailboxFacet",
+            "selectors": []
+          },
+          {
+            "name": "ExecutorFacet",
+            "selectors": []
+          },
+          {
+            "name": "MigratorFacet",
+            "selectors": []
+          },
+          {
+            "name": "CommitterFacet",
+            "selectors": []
           }
         ]
       },
       "facetFreezability": {
-        "AdminFacet": false
+        "AdminFacet": false,
+        "GettersFacet": false,
+        "MailboxFacet": true,
+        "ExecutorFacet": true,
+        "MigratorFacet": false,
+        "CommitterFacet": true
       },
       "l2": {
         "forceDeployments": [

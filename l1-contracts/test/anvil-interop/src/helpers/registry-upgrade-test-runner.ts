@@ -98,8 +98,10 @@ const CTM_REGISTRY_NAME = "ZKsyncOS";
 const REGISTRY_GEN_DIR_REL = "contracts/upgrades/registry/v32";
 const REGISTRY_MANIFEST_REL = "scripts/registry-manifests/v32-local.json";
 const GENERATED_REGISTRY_FILES = [
-  `CoreRegistry${REGISTRY_TAG}.sol`,
-  `${CTM_REGISTRY_NAME}CTMRegistry${REGISTRY_TAG}.sol`,
+  "CoreRegistryV32.sol",
+  "CoreRegistryV32Data.sol",
+  "ZKsyncOSCTMRegistryV32.sol",
+  "ZKsyncOSCTMRegistryV32Data.sol",
 ];
 
 // Set REGEN_REGISTRIES=1 to run in EMIT mode (see module docs).
@@ -420,6 +422,7 @@ type LiveUpgradeInputs = {
   newVersionString: string;
   oldAdminFacet: string;
   adminSelectors: string[];
+  otherFacets: { name: string; address: string }[];
   acceptAdminSelector: string;
   oldVerifier: string;
   genesisUpgrade: string;
@@ -454,6 +457,25 @@ async function readLiveUpgradeInputs(
   const firstDiamond = new ethers.Contract(upgradeChains[0].diamondProxy, getAbi("GettersFacet"), l1Provider);
   const oldAdminFacet: string = await firstDiamond.facetAddress(acceptAdminSelector);
   const adminSelectors: string[] = await firstDiamond.facetFunctionSelectors(oldAdminFacet);
+
+  // Locate the remaining live facets by probing one representative selector each, so the
+  // registry can pin (and verifyAll() can cover) the complete facet surface, not only the
+  // facet this synthetic bump replaces.
+  const facetProbes: { name: string; selector: string }[] = [
+    { name: "GettersFacet", selector: "0x33ce93fe" }, // getProtocolVersion()
+    { name: "MailboxFacet", selector: "0x12f43dab" }, // bridgehubRequestL2Transaction(...)
+    { name: "ExecutorFacet", selector: "0xa085344d" }, // executeBatchesSharedBridge(...)
+    { name: "MigratorFacet", selector: "0x64b554ad" }, // forwardedBridgeBurn(...)
+    { name: "CommitterFacet", selector: "0x0db9eb87" }, // commitBatchesSharedBridge(...)
+  ];
+  const otherFacets: { name: string; address: string }[] = [];
+  for (const probe of facetProbes) {
+    const facetAddress: string = await firstDiamond.facetAddress(probe.selector);
+    if (facetAddress === ethers.constants.AddressZero) {
+      throw new Error(`Probe selector for ${probe.name} is not installed on the live diamond`);
+    }
+    otherFacets.push({ name: probe.name, address: facetAddress });
+  }
   for (const chain of upgradeChains) {
     const diamond = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), l1Provider);
     const facet: string = await diamond.facetAddress(acceptAdminSelector);
@@ -499,6 +521,7 @@ async function readLiveUpgradeInputs(
     newVersionString: toVersionString(newVersion),
     oldAdminFacet,
     adminSelectors,
+    otherFacets,
     acceptAdminSelector,
     oldVerifier,
     genesisUpgrade,
@@ -639,15 +662,41 @@ async function buildRegistryManifest(
           },
           DefaultUpgrade: { new: deployed.newDefaultUpgrade, newCodehash: await codehash(deployed.newDefaultUpgrade) },
           DiamondInit: { new: deployed.newDiamondInit, newCodehash: await codehash(deployed.newDiamondInit) },
+          // The facets this synthetic bump leaves untouched: pinned old == new (the composer
+          // skips unchanged facets) so the registry is the complete facet manifest and
+          // verifyAll() covers the whole live facet surface.
+          ...Object.fromEntries(
+            await Promise.all(
+              live.otherFacets.map(async (facet) => [
+                facet.name,
+                { old: facet.address, new: facet.address, newCodehash: await codehash(facet.address) },
+              ])
+            )
+          ),
         },
-        // The facet plan pins the chain's REAL AdminFacet (address + selectors as installed on
-        // the live diamonds); the new version replaces it with the fresh implementation. All
-        // other facets are untouched by this synthetic bump and stay off the registry's plan.
+        // No selector lists: every facet on the (regenerated) chain states implements
+        // ISelfDescribingFacet, so the composer reads selectors from the facets themselves.
+        // Registry-pinned lists remain only as the bootstrap override for environments whose
+        // old facets predate that interface (e.g. real mainnet/testnet upgrades from v31).
         facets: {
-          old: [{ name: "AdminFacet", selectors: live.adminSelectors }],
-          new: [{ name: "AdminFacet", selectors: live.adminSelectors }],
+          old: [
+            { name: "AdminFacet", selectors: [] },
+            ...live.otherFacets.map((f) => ({ name: f.name, selectors: [] })),
+          ],
+          new: [
+            { name: "AdminFacet", selectors: [] },
+            ...live.otherFacets.map((f) => ({ name: f.name, selectors: [] })),
+          ],
         },
-        facetFreezability: { AdminFacet: false },
+        // Production freezability flags (DeployCTMUtils facet cuts).
+        facetFreezability: {
+          AdminFacet: false,
+          GettersFacet: false,
+          MailboxFacet: true,
+          ExecutorFacet: true,
+          MigratorFacet: false,
+          CommitterFacet: true,
+        },
         l2: {
           forceDeployments: [
             {
