@@ -12,9 +12,9 @@ import {AssetRouterBase} from "./asset-router/AssetRouterBase.sol";
 import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
-import {FinalizeL1DepositParams, IL1Nullifier, TRANSIENT_SETTLEMENT_LAYER_SLOT} from "./interfaces/IL1Nullifier.sol";
+import {FinalizeL1DepositParams, IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
 
-import {ConfirmTransferResultData, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
+import {ConfirmTransferResultData, L2Message, TxStatus} from "../common/Messaging.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
@@ -32,8 +32,6 @@ import {
     ZeroAddress
 } from "../common/L1ContractErrors.sol";
 import {NativeTokenVaultAlreadySet, WrongL2Sender} from "./L1BridgeContractErrors.sol";
-import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
-import {TransientPrimitivesLib} from "../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
 
 /// @author Matter Labs
@@ -247,23 +245,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _status: _confirmTransferResultData._txStatus
             });
             require(proofValid, InvalidProof());
-            L2Log memory l2Log = MessageHashing.getL2LogFromL1ToL2Transaction(
-                _confirmTransferResultData._l2TxNumberInBatch,
-                _confirmTransferResultData._l2TxHash,
-                _confirmTransferResultData._txStatus
-            );
-
-            bytes32 leaf = MessageHashing.getLeafHashFromLog(l2Log);
-            ProofData memory proofData = MESSAGE_ROOT.getProofData({
-                _chainId: _confirmTransferResultData._chainId,
-                _batchNumber: _confirmTransferResultData._l2BatchNumber,
-                _leafProofMask: _confirmTransferResultData._l2MessageIndex,
-                _leaf: leaf,
-                _proof: _confirmTransferResultData._merkleProof
-            });
-            TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT, proofData.settlementLayerChainId);
-            TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT + 1, _confirmTransferResultData._l2BatchNumber);
-            emit TransientSettlementLayerSet(proofData.settlementLayerChainId);
         }
 
         {
@@ -345,26 +326,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         });
         // withdrawal wrong proof
         require(success, InvalidProof());
-
-        bytes32 leaf = MessageHashing.getLeafHashFromMessage(l2ToL1Message);
-        ProofData memory proofData = MESSAGE_ROOT.getProofData({
-            _chainId: _finalizeWithdrawalParams.chainId,
-            _batchNumber: _finalizeWithdrawalParams.l2BatchNumber,
-            _leafProofMask: _finalizeWithdrawalParams.l2MessageIndex,
-            _leaf: leaf,
-            _proof: _finalizeWithdrawalParams.merkleProof
-        });
-        TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT, proofData.settlementLayerChainId);
-        TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT + 1, _finalizeWithdrawalParams.l2BatchNumber);
-        emit TransientSettlementLayerSet(proofData.settlementLayerChainId);
-    }
-
-    /// @inheritdoc IL1Nullifier
-    function getTransientSettlementLayer() external view returns (uint256, uint256) {
-        return (
-            TransientPrimitivesLib.getUint256(TRANSIENT_SETTLEMENT_LAYER_SLOT),
-            TransientPrimitivesLib.getUint256(TRANSIENT_SETTLEMENT_LAYER_SLOT + 1)
-        );
     }
 
     /// @notice Parses the withdrawal message and returns withdrawal details.

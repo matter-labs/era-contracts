@@ -30,7 +30,6 @@ import {
     ConfirmTransferResultData,
     TokenBridgingData
 } from "contracts/common/Messaging.sol";
-import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
@@ -806,14 +805,10 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     // Helper to verify migration events in correct order without stack-too-deep issues
     function _verifyMigrationEvents(TxStatus txStatus) internal {
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        uint256 transientSettlementLayerSetIndex = type(uint256).max;
         uint256 depositsUnpausedIndex = type(uint256).max;
         uint256 claimedFailedDepositIndex = type(uint256).max;
 
         for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == IL1Nullifier.TransientSettlementLayerSet.selector) {
-                transientSettlementLayerSetIndex = i;
-            }
             if (logs[i].topics[0] == IMigrator.DepositsUnpaused.selector) {
                 depositsUnpausedIndex = i;
             }
@@ -823,17 +818,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         }
 
         // Verify events are present
-        assertTrue(
-            transientSettlementLayerSetIndex != type(uint256).max,
-            "TransientSettlementLayerSet event not found"
-        );
         assertTrue(depositsUnpausedIndex != type(uint256).max, "DepositsUnpaused event not found");
-
-        // Verify order: TransientSettlementLayerSet must come before DepositsUnpaused
-        assertTrue(
-            transientSettlementLayerSetIndex < depositsUnpausedIndex,
-            "TransientSettlementLayerSet must be emitted before DepositsUnpaused"
-        );
 
         if (txStatus == TxStatus.Failure) {
             assertTrue(
