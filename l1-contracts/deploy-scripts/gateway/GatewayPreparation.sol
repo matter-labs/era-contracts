@@ -34,6 +34,7 @@ import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
 import {IInteropHandler} from "contracts/interop/interop-handler/IInteropHandler.sol";
@@ -464,12 +465,19 @@ contract GatewayPreparation is Script {
             // Route the CTM asset withdrawal from the gateway back to L1 through the InteropCenter as a
             // single-call bundle to the L1 asset router (the unified path that replaced
             // L2AssetRouter.withdraw). The gateway-side ChainAdmin multicall invokes the InteropCenter.
+            // Each (sender, salt) pair may be used only once by the InteropCenter; derive the salt from the
+            // migration content so distinct migrations get distinct salts deterministically.
+            bytes[] memory bundleAttributes = new bytes[](1);
+            bundleAttributes[0] = abi.encodeCall(
+                IERC7786Attributes.interopBundleSalt,
+                (keccak256(abi.encodePacked("ctm-migration-withdrawal", ctmAssetId, bridgehubBurnData)))
+            );
             bytes memory data = abi.encodeCall(
                 IInteropCenter.sendBundle,
                 (
                     InteroperableAddress.formatEvmV1(l1ChainId),
                     DataEncoding.encodeInteropWithdrawalCallStarters(ctmAssetId, bridgehubBurnData),
-                    new bytes[](0)
+                    bundleAttributes
                 )
             );
 

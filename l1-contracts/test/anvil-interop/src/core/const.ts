@@ -65,7 +65,7 @@ export const TEST_TOKEN_DECIMALS = 18;
 export const TEST_TOKEN_MINT_AMOUNT_UNITS = "1000";
 
 export const INTEROP_BUNDLE_TUPLE_TYPE =
-  "tuple(bytes1,uint256,uint256,bytes32,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes,bool))";
+  "tuple(bytes1,uint256,uint256,bytes32,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes,bool,bytes32))";
 
 // AddressAliasHelper offset: uint160(0x1111000000000000000000000000000000001111)
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";

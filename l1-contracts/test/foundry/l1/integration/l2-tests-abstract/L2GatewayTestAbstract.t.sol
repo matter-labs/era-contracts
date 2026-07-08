@@ -45,6 +45,7 @@ import {AssetIdMismatch} from "contracts/common/L1ContractErrors.sol";
 
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
@@ -201,13 +202,17 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         // asset handler (the chain-asset-handler), which starts the migration. The transferData for a
         // CTM asset is the ABI-encoded BridgehubBurnCTMAssetData. The bundle sender (ownerWallet) is
         // the chain admin whose authorization the migration burn checks.
-        uint256 bundleNonceBefore = l2InteropCenter.interopBundleNonce(ownerWallet);
+        // The bundle salt is user-provided via the `interopBundleSalt` bundle attribute; the InteropCenter
+        // commits to it together with the sender (keccak256(sender, salt)).
+        bytes32 withdrawalBundleSalt = keccak256("ctm-migration-withdrawal-salt");
+        bytes[] memory bundleAttributes = new bytes[](1);
+        bundleAttributes[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (withdrawalBundleSalt));
         vm.recordLogs();
         vm.prank(ownerWallet);
         l2InteropCenter.sendBundle(
             InteroperableAddress.formatEvmV1(L1_CHAIN_ID),
             DataEncoding.encodeInteropWithdrawalCallStarters(ctmAssetId, abi.encode(data)),
-            new bytes[](0)
+            bundleAttributes
         );
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
@@ -215,7 +220,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         // replacing the removed WithdrawalInitiatedAssetRouter event) and verify its content — the
         // same checks the old event assertions performed (sender, assetId, destination chain, asset
         // data).
-        _assertWithdrawalBundleSent(logs, bundleNonceBefore, migrationNumberBefore);
+        _assertWithdrawalBundleSent(logs, withdrawalBundleSalt, migrationNumberBefore);
 
         // Verify the chain-asset-handler MigrationStarted event. 3 indexed params
         // (chainId, assetId, settlementLayerChainId); migrationNumber lives in the data field.
@@ -242,24 +247,24 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     /// CTM-asset chain migration: destination, sender commitment (bundle salt), and the single inner
     /// `finalizeDeposit` call (origin, target, assetId, mint data). The InteropBundle tuple is
     /// (bytes1,uint256,uint256,bytes32,bytes32,InteropCall[],BundleAttributes), where InteropCall is
-    /// (bytes1,bool,address,address,uint256,bytes) and BundleAttributes is (bytes,bytes,bool).
+    /// (bytes1,bool,address,address,uint256,bytes) and BundleAttributes is (bytes,bytes,bool,bytes32).
     function _assertWithdrawalBundleSent(
         Vm.Log[] memory logs,
-        uint256 _bundleNonceBefore,
+        bytes32 _bundleSalt,
         uint256 _migrationNumberBefore
     ) internal view {
         Vm.Log memory bundleLog = logs.requireOneFrom(
-            "InteropBundleSent(bytes32,bytes32,(bytes1,uint256,uint256,bytes32,bytes32,(bytes1,bool,address,address,uint256,bytes)[],(bytes,bytes,bool)))",
+            "InteropBundleSent(bytes32,bytes32,(bytes1,uint256,uint256,bytes32,bytes32,(bytes1,bool,address,address,uint256,bytes)[],(bytes,bytes,bool,bytes32)))",
             L2_INTEROP_CENTER_ADDR
         );
         (, , InteropBundle memory sentBundle) = abi.decode(bundleLog.data, (bytes32, bytes32, InteropBundle));
         assertEq(sentBundle.sourceChainId, block.chainid, "InteropBundleSent: source chain mismatch");
         assertEq(sentBundle.destinationChainId, L1_CHAIN_ID, "InteropBundleSent: destination chain must be L1");
-        // The bundle salt commits to the bundle sender and its pre-send nonce — the equivalent of the
-        // old event's `l2Sender == ownerWallet` check.
+        // The bundle salt commits to the bundle sender and the user-provided salt attribute — the
+        // equivalent of the old event's `l2Sender == ownerWallet` check.
         assertEq(
             sentBundle.interopBundleSalt,
-            keccak256(abi.encodePacked(ownerWallet, _bundleNonceBefore)),
+            keccak256(abi.encodePacked(ownerWallet, _bundleSalt)),
             "InteropBundleSent: bundle salt must commit to ownerWallet as the sender"
         );
         assertEq(sentBundle.calls.length, 1, "InteropBundleSent: withdrawal bundle must hold exactly one call");

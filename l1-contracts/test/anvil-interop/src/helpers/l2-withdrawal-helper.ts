@@ -300,7 +300,9 @@ export async function finalizeWithdrawalOnL1(
     destinationBaseTokenAssetId, // destinationBaseTokenAssetId
     interopBundleSalt, // interopBundleSalt
     [["0x01", false, l1Addresses.l1SharedBridge, L2_ASSET_ROUTER_ADDR, 0, finalizeCalldata]], // calls
-    ["0x", "0x", false], // bundleAttributes (executionAddress, unbundlerAddress, useFixedFee)
+    // bundleAttributes (executionAddress, unbundlerAddress, useFixedFee, salt) — the attribute-level salt is a
+    // placeholder here; the reconstruction's uniqueness comes from `interopBundleSalt` above.
+    ["0x", "0x", false, ethers.constants.HashZero],
   ];
   const bundle = ethers.utils.defaultAbiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
   const l2Sender = INTEROP_CENTER_ADDR;

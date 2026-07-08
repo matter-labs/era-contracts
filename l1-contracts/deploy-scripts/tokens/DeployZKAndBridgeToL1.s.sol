@@ -19,6 +19,7 @@ import {
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 
 import {MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
@@ -152,12 +153,19 @@ contract DeployZKScript is Script {
         // approved the NTV above; the withdrawn amount rides in the bridge-burn transfer data.
         uint256 l1ChainId = l2AR.L1_CHAIN_ID();
         bytes memory zkTransferData = DataEncoding.encodeBridgeBurnData(someBigAmount, deployer, zkTokenAddress);
+        // Each (sender, salt) pair may be used only once by the InteropCenter; derive the salt from the
+        // withdrawal content so distinct withdrawals get distinct salts deterministically.
+        bytes[] memory bundleAttributes = new bytes[](1);
+        bundleAttributes[0] = abi.encodeCall(
+            IERC7786Attributes.interopBundleSalt,
+            (keccak256(abi.encodePacked("zk-token-withdrawal", zkTokenAssetId, zkTransferData)))
+        );
         vm.broadcast();
         // slither-disable-next-line unused-return
         IInteropCenter(L2_INTEROP_CENTER_ADDR).sendBundle(
             InteroperableAddress.formatEvmV1(l1ChainId),
             DataEncoding.encodeInteropWithdrawalCallStarters(zkTokenAssetId, zkTransferData),
-            new bytes[](0)
+            bundleAttributes
         );
         uint256 deployerBalanceAfterWithdraw = zkToken.balanceOf(deployer);
         console.log("Deployed balance after withdraw:", deployerBalanceAfterWithdraw);

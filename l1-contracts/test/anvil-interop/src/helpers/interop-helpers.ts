@@ -66,6 +66,32 @@ export function useFixedFeeAttr(useFixedFee: boolean): string {
   return erc7786Iface.encodeFunctionData("useFixedFee", [useFixedFee]);
 }
 
+/** Encode an interopBundleSalt bundle attribute. */
+export function interopBundleSaltAttr(salt: string): string {
+  return erc7786Iface.encodeFunctionData("interopBundleSalt", [salt]);
+}
+
+/** Selector of the interopBundleSalt bundle attribute, used to detect whether a salt was already supplied. */
+const INTEROP_BUNDLE_SALT_SELECTOR = erc7786Iface.getSighash("interopBundleSalt");
+
+/**
+ * Ensure the bundle attributes carry an `interopBundleSalt` attribute.
+ *
+ * The InteropCenter derives the bundle hash from `keccak256(msg.sender, salt)` and rejects a (sender, salt)
+ * pair that has already been used (`InteropBundleSaltAlreadyUsed`). Since the test harness sends many bundles
+ * from the same source wallet, we attach a fresh random salt whenever the caller did not provide one, so that
+ * each bundle gets a unique hash (mirroring the previously auto-incremented interop nonce). If the caller already
+ * supplied a salt attribute, it is left untouched.
+ */
+function ensureUniqueBundleSalt(attributes: string[]): string[] {
+  const hasSalt = attributes.some((attr) => attr.slice(0, 10).toLowerCase() === INTEROP_BUNDLE_SALT_SELECTOR);
+  if (hasSalt) {
+    return attributes;
+  }
+  const salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+  return [...attributes, interopBundleSaltAttr(salt)];
+}
+
 // ── Token transfer data encoding ───────────────────────────────
 
 /**
@@ -161,7 +187,7 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
   const tx = await interopCenter.sendBundle(
     destinationChainIdBytes,
     options.callStarters,
-    options.bundleAttributes || [],
+    ensureUniqueBundleSalt(options.bundleAttributes || []),
     {
       gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
       value: options.value || 0,
@@ -215,7 +241,7 @@ export async function simulateInteropBundle(options: SendBundleOptions): Promise
   await interopCenter.callStatic.sendBundle(
     destinationChainIdBytes,
     options.callStarters,
-    options.bundleAttributes || [],
+    ensureUniqueBundleSalt(options.bundleAttributes || []),
     {
       gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
       value: options.value || 0,
@@ -242,10 +268,15 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
   const wallet = new Wallet(getInteropSourcePrivateKey(), options.sourceProvider);
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
 
-  const tx = await interopCenter.sendMessage(options.recipient, options.payload, options.attributes, {
-    gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
-    value: options.value || 0,
-  });
+  const tx = await interopCenter.sendMessage(
+    options.recipient,
+    options.payload,
+    ensureUniqueBundleSalt(options.attributes),
+    {
+      gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
+      value: options.value || 0,
+    }
+  );
   const receipt = await tx.wait();
 
   // Extract InteropBundleSent event
