@@ -133,13 +133,7 @@ contract DeployL1CoreUtils is DeployUtils {
                     coreAddresses.bridgehub.proxies.messageRoot
                 );
         } else if (compareStrings(contractName, "L1Nullifier")) {
-            return
-                abi.encode(
-                    coreAddresses.bridgehub.proxies.bridgehub,
-                    coreAddresses.bridgehub.proxies.messageRoot,
-                    config.eraChainId,
-                    config.eraDiamondProxyAddress
-                );
+            return abi.encode(coreAddresses.bridgehub.proxies.bridgehub, coreAddresses.bridgehub.proxies.messageRoot);
         } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
             return abi.encode(config.ownerAddress, coreAddresses.bridgehub.proxies.bridgehub);
         } else if (compareStrings(contractName, "L1AssetRouter")) {
@@ -148,8 +142,7 @@ contract DeployL1CoreUtils is DeployUtils {
                     config.tokens.tokenWethAddress,
                     coreAddresses.bridgehub.proxies.bridgehub,
                     coreAddresses.bridges.proxies.l1Nullifier,
-                    config.eraChainId,
-                    config.eraDiamondProxyAddress
+                    config.eraChainId
                 );
         } else if (compareStrings(contractName, "L1NativeTokenVault")) {
             return

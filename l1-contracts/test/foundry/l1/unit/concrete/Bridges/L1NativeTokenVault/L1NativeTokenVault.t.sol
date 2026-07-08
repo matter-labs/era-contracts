@@ -97,9 +97,7 @@ contract L1NativeTokenVaultTest is Test {
         // Deploy L1Nullifier
         L1NullifierDev l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehubAddress),
-            _messageRoot: IMessageRootBase(messageRootAddress),
-            _eraChainId: eraChainId,
-            _eraDiamondProxy: eraDiamondProxy
+            _messageRoot: IMessageRootBase(messageRootAddress)
         });
         TransparentUpgradeableProxy l1NullifierProxy = new TransparentUpgradeableProxy(
             address(l1NullifierImpl),
@@ -113,8 +111,7 @@ contract L1NativeTokenVaultTest is Test {
             _l1WethToken: l1WethAddress,
             _bridgehub: bridgehubAddress,
             _l1Nullifier: address(l1Nullifier),
-            _eraChainId: eraChainId,
-            _eraDiamondProxy: eraDiamondProxy
+            _eraChainId: eraChainId
         });
         TransparentUpgradeableProxy assetRouterProxy = new TransparentUpgradeableProxy(
             address(assetRouterImpl),

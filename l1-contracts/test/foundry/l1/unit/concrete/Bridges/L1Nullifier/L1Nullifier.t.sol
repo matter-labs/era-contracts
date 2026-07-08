@@ -61,9 +61,7 @@ contract L1NullifierTest is Test {
 
         l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehub),
-            _messageRoot: IMessageRootBase(messageRoot),
-            _eraChainId: ERA_CHAIN_ID,
-            _eraDiamondProxy: eraDiamondProxy
+            _messageRoot: IMessageRootBase(messageRoot)
         });
 
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
@@ -86,9 +84,7 @@ contract L1NullifierTest is Test {
     function test_Initialize_RevertWhen_OwnerIsZeroAddress() public {
         L1NullifierDev impl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehub),
-            _messageRoot: IMessageRootBase(messageRoot),
-            _eraChainId: ERA_CHAIN_ID,
-            _eraDiamondProxy: eraDiamondProxy
+            _messageRoot: IMessageRootBase(messageRoot)
         });
 
         vm.expectRevert(ZeroAddress.selector);

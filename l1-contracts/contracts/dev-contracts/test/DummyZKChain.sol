@@ -6,19 +6,23 @@ import {MailboxFacet} from "../../state-transition/chain-deps/facets/Mailbox.sol
 import {FeeParams, PubdataPricingMode} from "../../state-transition/chain-deps/ZKChainStorage.sol";
 
 contract DummyZKChain is MailboxFacet {
+    /// @dev Kept as a constructor-provided value so existing test setups keep their call signature;
+    /// the MailboxFacet itself no longer knows about Era.
+    uint256 internal immutable DUMMY_ERA_CHAIN_ID;
+
     constructor(
         address bridgeHubAddress,
-        uint256 _eraChainId, // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
+        uint256 _eraChainId,
         uint256 _l1ChainId,
         address _chainAssetHandler,
         IEIP7702Checker _eip7702Checker
-    ) MailboxFacet(_eraChainId, _l1ChainId, _chainAssetHandler, _eip7702Checker, false) {
+    ) MailboxFacet(_l1ChainId, _chainAssetHandler, _eip7702Checker, false) {
         s.bridgehub = bridgeHubAddress;
+        DUMMY_ERA_CHAIN_ID = _eraChainId;
     }
 
     function getEraChainId() public view returns (uint256) {
-        // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
-        return ERA_CHAIN_ID;
+        return DUMMY_ERA_CHAIN_ID;
     }
 
     function setBridgeHubAddress(address bridgeHubAddress) public {

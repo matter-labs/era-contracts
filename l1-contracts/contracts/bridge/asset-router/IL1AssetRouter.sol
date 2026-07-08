@@ -6,27 +6,20 @@ import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {IL1CrossChainSender} from "../interfaces/IL1CrossChainSender.sol";
-import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
-import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {TxStatus} from "../../common/Messaging.sol";
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IL1AssetRouter is IAssetRouterBase, IL1CrossChainSender {
+    /// @notice Chain ID of Era, kept as an introspectable registry value for deployment tooling.
+    function ERA_CHAIN_ID() external view returns (uint256);
+
     event ClaimedFailedDepositAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
     function L1_NULLIFIER() external view returns (IL1Nullifier);
 
     function L1_WETH_TOKEN() external view returns (address);
-
-    function ETH_TOKEN_ASSET_ID() external view returns (bytes32);
-
-    function BRIDGE_HUB() external view returns (IL1Bridgehub);
-
-    function ERA_CHAIN_ID() external view returns (uint256);
-
-    function ERA_DIAMOND_PROXY() external view returns (IZKChain);
 
     function nativeTokenVault() external view returns (INativeTokenVaultBase);
 

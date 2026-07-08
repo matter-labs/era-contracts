@@ -21,11 +21,6 @@
         "name": "_eraChainId",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "_eraDiamondProxy",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "stateMutability": "nonpayable"
@@ -52,19 +47,6 @@
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ERA_DIAMOND_PROXY",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IZKChain"
       }
     ],
     "stateMutability": "view"

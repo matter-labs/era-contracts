@@ -11,16 +11,6 @@
         "name": "_messageRoot",
         "type": "address",
         "internalType": "contract IMessageRootBase"
-      },
-      {
-        "name": "_eraChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_eraDiamondProxy",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "stateMutability": "nonpayable"

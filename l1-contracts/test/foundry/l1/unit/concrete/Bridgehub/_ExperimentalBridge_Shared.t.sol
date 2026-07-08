@@ -182,7 +182,7 @@ abstract contract ExperimentalBridgeTestBase is Test {
         address mockL1WethAddress = makeAddr("Weth");
         address eraDiamondProxy = makeAddr("eraDiamondProxy");
 
-        l1Nullifier = new L1Nullifier(bridgehub, messageRoot, eraChainId, eraDiamondProxy);
+        l1Nullifier = new L1Nullifier(bridgehub, messageRoot);
         l1NullifierAddress = address(l1Nullifier);
 
         mockSharedBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
@@ -266,13 +266,7 @@ abstract contract ExperimentalBridgeTestBase is Test {
         address _l1WethAddress,
         address _eraDiamondProxy
     ) internal returns (L1AssetRouter assetRouter) {
-        assetRouter = new L1AssetRouter(
-            _l1WethAddress,
-            address(bridgehub),
-            l1NullifierAddress,
-            eraChainId,
-            _eraDiamondProxy
-        );
+        assetRouter = new L1AssetRouter(_l1WethAddress, address(bridgehub), l1NullifierAddress, eraChainId);
         address defaultOwner = assetRouter.owner();
         vm.prank(defaultOwner);
         assetRouter.transferOwnership(bridgeOwner);
