@@ -204,6 +204,66 @@ jobs:
         run: |
           bash cleanup.sh
 
+  # Registry-driven upgrade test: loads the current chain states, deploys the
+  # UpgradeExecutor + orchestrator modules and fresh new-version implementations,
+  # generates constants-in-bytecode registries from live on-chain data
+  # (scripts/gen-registry.ts, verifyAll() asserted against the deployment),
+  # hands CTM/ProxyAdmin ownership to the executor, executes the whole upgrade
+  # through executor.execute(module, ...) — no stage governance calldata — and
+  # relays the registry-composed L2 upgrade transaction through the real
+  # L2ComplexUpgrader on the L2 anvils.
+  registry-driven-upgrade-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Foundry (for Anvil)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Install foundry-zksync (for forge --zksync)
+        uses: ./.github/actions/install-zksync-foundry
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build da-contracts artifacts
+        run: yarn da build:foundry
+
+      - name: Build system-contracts artifacts
+        run: yarn sc build:foundry
+
+      - name: Build l1-contracts artifacts
+        run: yarn l1 build:foundry
+
+      - name: Install anvil-interop dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install
+
+      - name: Run registry-driven upgrade test
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          echo "Running registry-driven upgrade test..."
+          yarn ts-node run-registry-driven-upgrade-test.ts
+
+      - name: Cleanup
+        if: always()
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          bash cleanup.sh
+
   # Mandatory determinism gate for the current protocol version's chain state:
   # rebuilds the state from scratch and verifies it matches the committed
   # snapshots. If a contract change alters genesis state, this fails —
