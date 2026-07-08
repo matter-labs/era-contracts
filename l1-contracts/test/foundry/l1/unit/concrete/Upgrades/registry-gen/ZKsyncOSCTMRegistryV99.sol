@@ -13,14 +13,14 @@ import {CoreContract} from "contracts/upgrades/registry/ContractIdentifiers.sol"
 import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
-contract EraCTMRegistryV99 is ICTMRegistry {
+contract ZKsyncOSCTMRegistryV99 is ICTMRegistry {
     uint256 internal constant OLD_PROTOCOL_VERSION = 420906795008; // 0.98.0
     uint256 internal constant NEW_PROTOCOL_VERSION = 425201762304; // 0.99.0
 
     error RegistryUnknownKey();
 
     function isZKsyncOS() external pure returns (bool) {
-        return false;
+        return true;
     }
 
     function oldProtocolVersion() external pure returns (uint256) {
@@ -136,7 +136,7 @@ contract EraCTMRegistryV99 is ICTMRegistry {
         if (_contract == CoreContract.L2Bridgehub && _protocolVersion == NEW_PROTOCOL_VERSION) {
             return
                 IComplexUpgrader.UniversalContractUpgradeInfo({
-                    upgradeType: IComplexUpgrader.ContractUpgradeType.EraForceDeployment,
+                    upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
                     deployedBytecodeInfo: hex"aa01",
                     newAddress: address(uint160(0x000000000000000000000000000000000000010002))
                 });
@@ -144,7 +144,7 @@ contract EraCTMRegistryV99 is ICTMRegistry {
         if (_contract == CoreContract.L2AssetRouter && _protocolVersion == NEW_PROTOCOL_VERSION) {
             return
                 IComplexUpgrader.UniversalContractUpgradeInfo({
-                    upgradeType: IComplexUpgrader.ContractUpgradeType.EraForceDeployment,
+                    upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
                     deployedBytecodeInfo: hex"aa02",
                     newAddress: address(uint160(0x000000000000000000000000000000000000010003))
                 });

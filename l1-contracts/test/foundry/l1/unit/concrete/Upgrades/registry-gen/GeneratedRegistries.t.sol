@@ -12,12 +12,12 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
 import {ProposedUpgrade} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
+import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 import {CoreRegistryV99} from "./CoreRegistryV99.sol";
-import {EraCTMRegistryV99} from "./EraCTMRegistryV99.sol";
+import {ZKsyncOSCTMRegistryV99} from "./ZKsyncOSCTMRegistryV99.sol";
 
 /// @notice Tests the generator's output (checked-in sample from
 ///         scripts/gen-registry-manifest.example.json) and the on-chain composition the
@@ -26,14 +26,14 @@ import {EraCTMRegistryV99} from "./EraCTMRegistryV99.sol";
 ///          test/foundry/l1/unit/concrete/upgrades/registry-gen`
 contract GeneratedRegistriesTest is Test {
     CoreRegistryV99 internal coreRegistry;
-    EraCTMRegistryV99 internal ctmRegistry;
+    ZKsyncOSCTMRegistryV99 internal ctmRegistry;
 
     uint256 internal constant OLD_VERSION = uint256(98) << 32; // 0.98.0
     uint256 internal constant NEW_VERSION = uint256(99) << 32; // 0.99.0
 
     function setUp() public {
         coreRegistry = new CoreRegistryV99();
-        ctmRegistry = new EraCTMRegistryV99();
+        ctmRegistry = new ZKsyncOSCTMRegistryV99();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -58,7 +58,7 @@ contract GeneratedRegistriesTest is Test {
     }
 
     function test_ctmRegistryPinsManifestValues() public view {
-        assertFalse(ctmRegistry.isZKsyncOS());
+        assertTrue(ctmRegistry.isZKsyncOS());
         assertEq(ctmRegistry.ctmProxy(), address(0xD001));
         assertEq(ctmRegistry.verifier(NEW_VERSION), address(0xE002));
         assertEq(ctmRegistry.ctmAddress(CTMContract.AdminFacet, OLD_VERSION), address(0xF101));
@@ -82,10 +82,10 @@ contract GeneratedRegistriesTest is Test {
         vm.expectRevert(CoreRegistryV99.RegistryUnknownKey.selector);
         coreRegistry.implAddress(EcosystemContract.Bridgehub, 12345);
 
-        vm.expectRevert(EraCTMRegistryV99.RegistryUnknownKey.selector);
+        vm.expectRevert(ZKsyncOSCTMRegistryV99.RegistryUnknownKey.selector);
         ctmRegistry.verifier(12345);
 
-        vm.expectRevert(EraCTMRegistryV99.RegistryUnknownKey.selector);
+        vm.expectRevert(ZKsyncOSCTMRegistryV99.RegistryUnknownKey.selector);
         ctmRegistry.facetSelectors(CTMContract.MailboxFacet, NEW_VERSION);
     }
 
@@ -138,7 +138,7 @@ contract GeneratedRegistriesTest is Test {
             ICTMRegistry(address(ctmRegistry))
         );
 
-        assertEq(transaction.txType, SYSTEM_UPGRADE_L2_TX_TYPE);
+        assertEq(transaction.txType, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE);
         assertEq(transaction.from, uint256(uint160(L2_FORCE_DEPLOYER_ADDR)));
         assertEq(transaction.to, uint256(uint160(L2_COMPLEX_UPGRADER_ADDR)));
         // BaseZkSyncUpgrade requires nonce == new minor version.
@@ -164,7 +164,10 @@ contract GeneratedRegistriesTest is Test {
         ) = abi.decode(args, (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes));
         assertEq(deployments.length, 2);
         assertEq(deployments[0].newAddress, address(0x00010002));
-        assertEq(uint256(deployments[0].upgradeType), uint256(IComplexUpgrader.ContractUpgradeType.EraForceDeployment));
+        assertEq(
+            uint256(deployments[0].upgradeType),
+            uint256(IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade)
+        );
         assertEq(deployments[0].deployedBytecodeInfo, hex"aa01");
         assertEq(delegateTo, address(0x00010004));
         assertEq(data, hex"beef");

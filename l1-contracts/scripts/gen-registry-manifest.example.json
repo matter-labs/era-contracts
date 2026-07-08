@@ -29,8 +29,8 @@
   },
   "ctms": [
     {
-      "name": "Era",
-      "isZKsyncOS": false,
+      "name": "ZKsyncOS",
+      "isZKsyncOS": true,
       "ctmProxy": "0x000000000000000000000000000000000000d001",
       "verifierOld": "0x000000000000000000000000000000000000e001",
       "verifierNew": "0x000000000000000000000000000000000000e002",
@@ -55,13 +55,28 @@
       },
       "facets": {
         "old": [
-          { "name": "AdminFacet", "selectors": ["0x00000001", "0x00000002"] },
-          { "name": "GettersFacet", "selectors": ["0x00000010", "0x00000011"] }
+          {
+            "name": "AdminFacet",
+            "selectors": ["0x00000001", "0x00000002"]
+          },
+          {
+            "name": "GettersFacet",
+            "selectors": ["0x00000010", "0x00000011"]
+          }
         ],
         "new": [
-          { "name": "AdminFacet", "selectors": ["0x00000002", "0x00000003"] },
-          { "name": "GettersFacet", "selectors": ["0x00000010", "0x00000011"] },
-          { "name": "ExecutorFacet", "selectors": ["0x00000020"] }
+          {
+            "name": "AdminFacet",
+            "selectors": ["0x00000002", "0x00000003"]
+          },
+          {
+            "name": "GettersFacet",
+            "selectors": ["0x00000010", "0x00000011"]
+          },
+          {
+            "name": "ExecutorFacet",
+            "selectors": ["0x00000020"]
+          }
         ]
       },
       "facetFreezability": {
@@ -73,14 +88,14 @@
         "forceDeployments": [
           {
             "contract": "L2Bridgehub",
-            "upgradeType": "EraForceDeployment",
+            "upgradeType": "ZKsyncOSSystemProxyUpgrade",
             "deployedBytecodeInfo": "0xaa01",
             "newAddress": "0x0000000000000000000000000000000000010002",
             "bytecodeHash": "0x0100000000000000000000000000000000000000000000000000000000000001"
           },
           {
             "contract": "L2AssetRouter",
-            "upgradeType": "EraForceDeployment",
+            "upgradeType": "ZKsyncOSSystemProxyUpgrade",
             "deployedBytecodeInfo": "0xaa02",
             "newAddress": "0x0000000000000000000000000000000000010003",
             "bytecodeHash": "0x0100000000000000000000000000000000000000000000000000000000000002"
