@@ -170,17 +170,11 @@
   },
   {
     "type": "function",
-    "name": "interopBundleNonce",
-    "inputs": [
-      {
-        "name": "sender",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
+    "name": "interopProtocolFee",
+    "inputs": [],
     "outputs": [
       {
-        "name": "numberOfBundlesSent",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -189,13 +183,24 @@
   },
   {
     "type": "function",
-    "name": "interopProtocolFee",
-    "inputs": [],
+    "name": "isInteropBundleSaltUsed",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "salt",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
     "outputs": [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "hasBeenUsed",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
@@ -270,6 +275,11 @@
             "name": "useFixedFee",
             "type": "bool",
             "internalType": "bool"
+          },
+          {
+            "name": "salt",
+            "type": "bytes32",
+            "internalType": "bytes32"
           }
         ]
       }
@@ -597,6 +607,11 @@
                 "name": "useFixedFee",
                 "type": "bool",
                 "internalType": "bool"
+              },
+              {
+                "name": "salt",
+                "type": "bytes32",
+                "internalType": "bytes32"
               }
             ]
           }
@@ -875,6 +890,22 @@
         "name": "actual",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InteropBundleSaltAlreadyUsed",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "salt",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ]
   },
