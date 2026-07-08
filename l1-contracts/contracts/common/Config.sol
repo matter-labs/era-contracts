@@ -155,9 +155,6 @@ uint256 constant MEMORY_OVERHEAD_GAS = 10;
 /// @dev The maximum gas limit for a priority transaction in L2.
 uint256 constant PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 
-/// @dev The gas limit of the L1 -> L2 protocol upgrade transaction.
-uint256 constant PROTOCOL_UPGRADE_TX_GAS_LIMIT = 72_000_000;
-
 /// @dev the address used to identify eth as the base token for chains.
 address constant ETH_TOKEN_ADDRESS = address(1);
 

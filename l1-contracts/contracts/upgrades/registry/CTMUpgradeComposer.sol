@@ -11,7 +11,7 @@ import {ChainCreationParams} from "../../state-transition/IChainTypeManager.sol"
 import {ProposedUpgrade, ProposedUpgradeLib} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 import {
-    PROTOCOL_UPGRADE_TX_GAS_LIMIT,
+    PRIORITY_TX_MAX_GAS_LIMIT,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     SYSTEM_UPGRADE_L2_TX_TYPE,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
@@ -176,7 +176,7 @@ library CTMUpgradeComposer {
         transaction.txType = _registry.isZKsyncOS() ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
         transaction.from = uint256(uint160(L2_FORCE_DEPLOYER_ADDR));
         transaction.to = uint256(uint160(L2_COMPLEX_UPGRADER_ADDR));
-        transaction.gasLimit = PROTOCOL_UPGRADE_TX_GAS_LIMIT;
+        transaction.gasLimit = PRIORITY_TX_MAX_GAS_LIMIT;
         transaction.gasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
         transaction.nonce = protocolUpgradeNonce(newVersion);
         transaction.data = abi.encodeCall(
