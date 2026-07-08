@@ -6,16 +6,6 @@ pragma solidity ^0.8.21;
 error EmptyToken();
 // 0xabd51c42
 error InteropWithdrawalNonZeroValue(uint256 value);
-// 0x72df0b2f
-error InteropWithdrawalNotSingleCall();
-// 0x6cf6fc42
-error InteropWithdrawalWrongDestination();
-// 0x0582e7c1
-error InteropWithdrawalWrongOrigin();
-// 0x9dda99a3
-error InteropWithdrawalWrongSource();
-// 0xeb166a12
-error InteropWithdrawalWrongTarget();
 // 0x1c55230b
 error NativeTokenVaultAlreadySet();
 // 0x7ec6d3a1

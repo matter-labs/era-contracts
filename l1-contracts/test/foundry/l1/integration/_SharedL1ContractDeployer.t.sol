@@ -14,6 +14,7 @@ import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {InteropWithdrawalBundleEncoder} from "test-utils/InteropWithdrawalBundleEncoder.sol";
 import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {CoreDeployedAddresses} from "../../../../deploy-scripts/ecosystem/DeployL1CoreUtils.s.sol";
@@ -148,14 +149,14 @@ contract L1ContractDeployer is UtilsCallMockerTest {
 
     /// @notice Wraps an asset-router `finalizeDeposit` payload in the single-call InteropBundle message
     /// form emitted by the L2 InteropCenter — the only withdrawal message form accepted on L1
-    /// (see `InteropHandlerBase` / `DataEncoding.parseInteropWithdrawalBundle`).
+    /// (see `InteropHandlerBase` / `L1AssetRouter.receiveMessage`).
     function _encodeWithdrawalBundleMessage(
         uint256 _sourceChainId,
         bytes32 _assetId,
         bytes memory _transferData
     ) internal returns (bytes memory) {
         return
-            DataEncoding.encodeInteropWithdrawalBundleMessage(
+            InteropWithdrawalBundleEncoder.encodeInteropWithdrawalBundleMessage(
                 _sourceChainId,
                 address(addresses.sharedBridge),
                 _assetId,

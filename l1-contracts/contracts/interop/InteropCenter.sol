@@ -474,10 +474,10 @@ contract InteropCenter is
         uint256 callStartersLength = _callStarters.length;
         for (uint256 i = 0; i < callStartersLength; ++i) {
             if (_destinationChainId == L1_CHAIN_ID) {
-                // An L2->L1 withdrawal is finalized by the L1Nullifier, which only accepts a single
-                // indirect asset-router `finalizeDeposit` call with no destination-side value (see
-                // `DataEncoding.parseInteropWithdrawalBundle`). Reject anything else at send time —
-                // otherwise the burned funds would end up in an unfinalizable bundle.
+                // An L2->L1 withdrawal is executed by the L1InteropHandler, whose call target (the L1
+                // asset router) only accepts an indirect asset-router `finalizeDeposit` call with no
+                // destination-side value (see `L1AssetRouter.receiveMessage`). Reject anything else at
+                // send time — otherwise the burned funds would end up in an unfinalizable bundle.
                 require(_callStarters[i].callAttributes.indirectCall, DirectCallToL1NotSupported());
                 require(
                     _callStarters[i].callAttributes.interopCallValue == 0,

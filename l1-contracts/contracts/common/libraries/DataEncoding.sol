@@ -4,39 +4,23 @@ pragma solidity 0.8.28;
 
 import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_ROUTER_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
 import {NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
-import {ETH_TOKEN_ADDRESS} from "../Config.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
 import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 import {
     AssetIdMismatch,
     InvalidNTVBurnData,
-    InvalidSelector,
     UnsupportedEncodingVersion,
     BadTransferDataLength,
     EmptyData
 } from "../L1ContractErrors.sol";
 import {WrongMsgLength} from "../../bridge/L1BridgeContractErrors.sol";
-import {
-    InteropWithdrawalNonZeroValue,
-    InteropWithdrawalNotSingleCall,
-    InteropWithdrawalWrongDestination,
-    InteropWithdrawalWrongOrigin,
-    InteropWithdrawalWrongSource,
-    InteropWithdrawalWrongTarget
-} from "../../bridge/L1BridgeContractErrors.sol";
 import {InvalidFunctionSignature} from "../../bridge/asset-tracker/AssetTrackerErrors.sol";
 import {IAssetTrackerDataEncoding} from "../../bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 import {UnsafeBytes} from "./UnsafeBytes.sol";
 import {
-    BUNDLE_IDENTIFIER,
-    BundleAttributes,
     GatewayToL1TokenBalanceMigrationData,
-    INTEROP_BUNDLE_VERSION,
-    INTEROP_CALL_VERSION,
     L1ToGatewayTokenBalanceMigrationData,
-    InteropBundle,
-    InteropCall,
     InteropCallStarter
 } from "../../common/Messaging.sol";
 
@@ -314,12 +298,11 @@ library DataEncoding {
     }
 
     /// @notice Builds the single indirect-call `InteropCallStarter` for an L2->L1 asset withdrawal.
-    /// @dev This is the encode counterpart of {parseInteropWithdrawalBundle}: an L2->L1 withdrawal is a
-    /// single-call interop bundle whose one call is an indirect call to the L2 AssetRouter carrying the
-    /// bridgehub-deposit payload for the withdrawn asset. Callers pass the resulting array to
-    /// `InteropCenter.sendBundle` (directly, or ABI-encoded for an admin L1->L2 transaction). No value
-    /// rides the bundle (`indirectCall` and `interopCallValue` are both zero); the withdrawn amount is
-    /// carried inside `_transferData`.
+    /// @dev An L2->L1 withdrawal is a single-call interop bundle whose one call is an indirect call to the
+    /// L2 AssetRouter carrying the bridgehub-deposit payload for the withdrawn asset; on L1 it is executed
+    /// by `L1InteropHandler.executeBundle`. Callers pass the resulting array to `InteropCenter.sendBundle`
+    /// (directly, or ABI-encoded for an admin L1->L2 transaction). No value rides the bundle (`indirectCall`
+    /// and `interopCallValue` are both zero); the withdrawn amount is carried inside `_transferData`.
     /// @param _assetId The asset being withdrawn (ERC20 assetId, base-token assetId, or CTM assetId).
     /// @param _transferData The bridgehub-burn/transfer data for the asset.
     function encodeInteropWithdrawalCallStarters(
@@ -336,114 +319,6 @@ library DataEncoding {
             data: encodeAssetRouterBridgehubDepositData(_assetId, _transferData),
             callAttributes: callAttributes
         });
-    }
-
-    /// @notice Builds the L2->L1 withdrawal message accepted by {parseInteropWithdrawalBundle}: a
-    /// `BUNDLE_IDENTIFIER`-prefixed single-call `InteropBundle` wrapping the L2-asset-router
-    /// `finalizeDeposit` call for the withdrawn asset, destined for this chain.
-    /// @dev Message-level encode counterpart of {parseInteropWithdrawalBundle}, used to reconstruct
-    /// the message the L2 InteropCenter emits (e.g. by tests and tooling that finalize withdrawals
-    /// under a mocked inclusion proof).
-    /// @param _chainId The source ZK chain ID (encoded both in the bundle and the inner call).
-    /// @param _l1AssetRouter The L1 asset router that the bundle's single call targets.
-    /// @param _assetId The asset being withdrawn.
-    /// @param _transferData The bridge-mint/transfer data for the asset.
-    /// @param _interopBundleSalt The bundle salt; see {encodeInteropWithdrawalBundle}.
-    function encodeInteropWithdrawalBundleMessage(
-        uint256 _chainId,
-        address _l1AssetRouter,
-        bytes32 _assetId,
-        bytes memory _transferData,
-        bytes32 _interopBundleSalt
-    ) internal view returns (bytes memory) {
-        return
-            abi.encodePacked(
-                BUNDLE_IDENTIFIER,
-                encodeInteropWithdrawalBundle(_chainId, _l1AssetRouter, _assetId, _transferData, _interopBundleSalt)
-            );
-    }
-
-    /// @notice Builds the ABI-encoded single-call `InteropBundle` for an interop-routed withdrawal, without the
-    /// `BUNDLE_IDENTIFIER` prefix. This is the form consumed by `IInteropHandler.executeBundle`.
-    /// @dev The `destinationBaseTokenAssetId` matches what the L2 InteropCenter sets for an L1-destined bundle
-    /// (L1's ETH asset ID), which `InteropHandlerBase._validateBundleDestinationContext` checks on execution.
-    /// @param _chainId The source ZK chain ID (encoded both in the bundle and the inner call).
-    /// @param _l1AssetRouter The L1 asset router that the bundle's single call targets.
-    /// @param _assetId The asset being withdrawn.
-    /// @param _transferData The bridge-mint/transfer data for the asset.
-    /// @param _interopBundleSalt The bundle salt. Real bundles carry the salt assigned by the L2 InteropCenter
-    /// (`keccak256(abi.encodePacked(sender, interopBundleNonce[sender]))`) — a reconstruction can only be
-    /// finalized against a real inclusion proof if it supplies that same salt, since the bundle bytes must
-    /// hash-match the emitted message. Tests running under mocked proofs must still pass a salt unique per
-    /// bundle, because the salt is what keeps distinct-but-identical withdrawals from colliding into the same
-    /// bundle hash (and thus reverting with `BundleAlreadyProcessed`).
-    function encodeInteropWithdrawalBundle(
-        uint256 _chainId,
-        address _l1AssetRouter,
-        bytes32 _assetId,
-        bytes memory _transferData,
-        bytes32 _interopBundleSalt
-    ) internal view returns (bytes memory) {
-        InteropCall[] memory calls = new InteropCall[](1);
-        calls[0] = InteropCall({
-            version: INTEROP_CALL_VERSION,
-            shadowAccount: false,
-            to: _l1AssetRouter,
-            from: L2_ASSET_ROUTER_ADDR,
-            value: 0,
-            data: abi.encodeCall(IAssetRouterShared.finalizeDeposit, (_chainId, _assetId, _transferData))
-        });
-        InteropBundle memory bundle = InteropBundle({
-            version: INTEROP_BUNDLE_VERSION,
-            sourceChainId: _chainId,
-            destinationChainId: block.chainid,
-            destinationBaseTokenAssetId: encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
-            interopBundleSalt: _interopBundleSalt,
-            calls: calls,
-            bundleAttributes: BundleAttributes({executionAddress: hex"", unbundlerAddress: hex"", useFixedFee: false})
-        });
-        return abi.encode(bundle);
-    }
-
-    /// @notice Parses an interop-routed withdrawal: a single-call `InteropBundle` destined for this L1.
-    /// @dev The bundle is emitted by the L2 InteropCenter (`BUNDLE_IDENTIFIER`-prefixed). It must contain
-    /// exactly one call, originated by the L2 asset router (`from`) and targeting this chain's L1 asset router
-    /// (`to`) via `finalizeDeposit`. The inner `finalizeDeposit` payload carries `(sourceChainId, assetId, transferData)`.
-    /// @param _chainId The source ZK chain ID (must match the chainId encoded in the inner call).
-    /// @param _l2ToL1message The `BUNDLE_IDENTIFIER`-prefixed `abi.encode(InteropBundle)` message.
-    /// @param _l1AssetRouter The L1 asset router that the bundle's single call must target.
-    /// @return assetId The ID of the bridged asset.
-    /// @return transferData The transfer data used to finalize the withdrawal.
-    function parseInteropWithdrawalBundle(
-        uint256 _chainId,
-        bytes memory _l2ToL1message,
-        address _l1AssetRouter
-    ) internal view returns (bytes32 assetId, bytes memory transferData) {
-        // Strip the 1-byte BUNDLE_IDENTIFIER prefix; the remainder is exactly `abi.encode(InteropBundle)`.
-        InteropBundle memory bundle = abi.decode(UnsafeBytes.readRemainingBytes(_l2ToL1message, 1), (InteropBundle));
-
-        require(bundle.sourceChainId == _chainId, InteropWithdrawalWrongSource());
-        require(bundle.destinationChainId == block.chainid, InteropWithdrawalWrongDestination());
-        require(bundle.calls.length == 1, InteropWithdrawalNotSingleCall());
-
-        InteropCall memory interopCall = bundle.calls[0];
-        require(interopCall.to == _l1AssetRouter, InteropWithdrawalWrongTarget());
-        require(interopCall.from == L2_ASSET_ROUTER_ADDR, InteropWithdrawalWrongOrigin());
-        // No value can ride an L2->L1 withdrawal call: the withdrawn amount is carried inside the
-        // `finalizeDeposit` transfer data, and L1 finalization never forwards value.
-        require(interopCall.value == 0, InteropWithdrawalNonZeroValue(interopCall.value));
-
-        // The inner call is `abi.encodeCall(IAssetRouterShared.finalizeDeposit, (sourceChainId, assetId, transferData))`.
-        require(
-            bytes4(interopCall.data) == IAssetRouterShared.finalizeDeposit.selector,
-            InvalidSelector(bytes4(interopCall.data))
-        );
-        uint256 sourceChainId;
-        (sourceChainId, assetId, transferData) = abi.decode(
-            UnsafeBytes.readRemainingBytes(interopCall.data, 4),
-            (uint256, bytes32, bytes)
-        );
-        require(sourceChainId == _chainId, InteropWithdrawalWrongSource());
     }
 
     function decodeL1ToGatewayTokenBalanceMigrationData(

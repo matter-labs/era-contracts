@@ -11,6 +11,7 @@ import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {BundleStatus, L2Message, MessageInclusionProof, ProofData} from "contracts/common/Messaging.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {InteropWithdrawalBundleEncoder} from "test-utils/InteropWithdrawalBundleEncoder.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
@@ -164,7 +165,7 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
             _amount: _amount,
             _erc20Metadata: hex""
         });
-        bundle = DataEncoding.encodeInteropWithdrawalBundle(
+        bundle = InteropWithdrawalBundleEncoder.encodeInteropWithdrawalBundle(
             currentChainId,
             address(addresses.sharedBridge),
             _assetId,

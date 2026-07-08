@@ -31,6 +31,7 @@ import {MessageInclusionProof} from "contracts/common/Messaging.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {InteropWithdrawalBundleEncoder} from "test-utils/InteropWithdrawalBundleEncoder.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
 import {BridgedStandardERC20, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
@@ -174,7 +175,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             _erc20Metadata: BridgeHelper.getERC20Getters(_tokenAddress, chainId)
         });
         addresses.l1InteropHandler.executeBundle(
-            DataEncoding.encodeInteropWithdrawalBundle(
+            InteropWithdrawalBundleEncoder.encodeInteropWithdrawalBundle(
                 chainId,
                 address(addresses.sharedBridge),
                 l2TokenAssetId,
