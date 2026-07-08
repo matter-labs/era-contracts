@@ -15,8 +15,8 @@ use serde_json::Value;
 use crate::common::ethereum::get_provider;
 use crate::common::{logger, PrivateKey};
 
-/// One replayed Safe tx as it lands on L1, persisted to `--out` so the
-/// PUVT (`ecosystem verify-upgrade`) can later reconstruct CREATE2 / TUPP
+/// One replayed Safe tx as it lands on L1, persisted to `--out` so that
+/// downstream verification tooling can later reconstruct CREATE2 / TUPP
 /// deployments from the prepare bundles. The fields mirror the legacy
 /// `UpgradeOutput.transactions` shape but with the raw input data alongside
 /// each hash, so verifier-side parsing doesn't need an extra
@@ -117,9 +117,9 @@ pub struct DevExecuteSafeArgs {
     /// Optional path to append the replayed transactions to as JSON. Use the
     /// same path across multiple bundles (the file is read on entry and
     /// rewritten on exit, so successful replays of multiple bundles
-    /// accumulate in execution order). Consumed later by
-    /// `ecosystem verify-upgrade --executed-bundles <path>` so the verifier
-    /// can reconstruct CREATE2 / TUPP deployments from the prepare output.
+    /// accumulate in execution order). Kept as an audit trail so verification
+    /// tooling can reconstruct CREATE2 / TUPP deployments from the prepare
+    /// output.
     #[clap(long)]
     pub out: Option<PathBuf>,
 }

@@ -13,8 +13,7 @@ docs/ai-review/
     └── ...
 
 .claude/skills/         ← reusable AI-agent workflows (Claude Code auto-discovers)
-├── v31-calldata-review/SKILL.md
-└── regenerate-v31-stage-calldata/SKILL.md
+└── <name>/SKILL.md
 ```
 
 The rules are the following:

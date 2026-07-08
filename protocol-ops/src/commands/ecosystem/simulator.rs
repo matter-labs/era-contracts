@@ -364,8 +364,6 @@ pub struct GovernanceTomlToSimulatorArgs {
     /// broadcasts them to real Sepolia; the sim's fork inherits their effects
     /// from chain tip. Re-running them in the sim would revert (legacy-Gov
     /// `OperationMustBePending()`, already-deployed CREATE2 collisions, …).
-    /// See `contracts/.claude/skills/regenerate-v31-stage-calldata/SKILL.md`
-    /// ("Core principle") for the full reasoning.
     ///
     /// Defaults to `<env-out>/prepare/manifest.json` when `--env` is set and
     /// the manifest exists. Pass an explicit path to override.
@@ -399,7 +397,7 @@ pub struct GovernanceTomlToSimulatorArgs {
     ///
     /// This is the VPS handoff artifact: the regen box commits `<dir>` alongside
     /// `ecosystem.toml`, and a local emit then reproduces the sim purely from
-    /// git. See `.claude/skills/fix-calldata-bug`. Short-circuits sim emission.
+    /// git. Short-circuits sim emission.
     #[clap(long)]
     pub emit_sim_inputs: Option<PathBuf>,
 }
@@ -690,7 +688,7 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
 ///
 /// Bundle `file` fields stay bare filenames resolved relative to the manifest
 /// dir, so the copied set is portable: commit `out_dir` and a local emit
-/// reproduces the sim with no out-of-band copy. See the fix-calldata-bug skill.
+/// reproduces the sim with no out-of-band copy.
 fn write_sim_inputs(
     manifest_path: &Path,
     explicit_camp_a: &[Address],
