@@ -441,8 +441,7 @@ struct UpgradePrepareAllOutput {
     /// 0/1/2 hex), `[core]` (the CTM-agnostic core prepare output), and one
     /// `[ctms.<flavor>]` table per CTM (`era` or `zksync_os`, keyed off
     /// `is_zk_sync_os`) carrying the per-CTM diamond cut + contracts config.
-    /// Downstream `upgrade-governance --env <env>` and `verify-upgrade` both
-    /// consume this single file.
+    /// Downstream `upgrade-governance --env <env>` consumes this single file.
     #[serde(skip_serializing_if = "Option::is_none")]
     merged_ecosystem_toml: Option<String>,
     puh_proxy: String,
@@ -542,8 +541,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // works on a fork via `anvil_impersonateAccount`; on a real chain
         // nobody can sign as that contract. The caller must pass
         // `--deployer-address <real-EOA>` (or derive it from the broadcast
-        // signer's private key — see `regen-and-verify-stage.sh` for an
-        // example using `cast wallet address`).
+        // signer's private key via `cast wallet address`).
         // Default --upgrade-input-path to upgrade-envs/v0.31.0-interopB/<env>.toml
         // when running with `--env`. The CLI default is `local.toml` (for
         // local-anvil fixtures). On stage / mainnet / testnet the per-env
@@ -594,9 +592,8 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // script the prepare flow spawns. `Utils.executeCalls` / `executeUpgrade`
     // read this via `vm.envOr("LEGACY_GOV_SALT", bytes32(0))`. Child
     // processes inherit env vars from this process, so a single `set_var`
-    // here covers every script in the pipeline. See
-    // `contracts/.claude/skills/regenerate-v31-stage-calldata/SKILL.md`
-    // ("Core principle") for why a per-regen salt is required.
+    // here covers every script in the pipeline. A per-regen salt is required
+    // so re-runs never collide with already-deployed CREATE2 addresses.
     if let Some(cfg) = env_cfg.as_ref() {
         if let Some(salt) = cfg.v31_legacy_gov_salt()? {
             logger::info(format!(

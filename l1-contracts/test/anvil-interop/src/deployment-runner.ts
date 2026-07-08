@@ -76,8 +76,8 @@ export class DeploymentRunner {
    * Protocol version string used to name the chain-states folder (e.g. "v0.32.0").
    *
    * Read from the anvil-interop harness's OWN config (`config/anvil-config.json`
-   * → `stateVersion`), NOT the shared `configs/genesis/era/latest.json`. The
-   * shared genesis is the base protocol version for the L1 foundry suite (v31);
+   * → `stateVersion`), NOT the shared `configs/genesis/` files. The shared
+   * genesis pins the base protocol version for the L1 foundry suite (v31);
    * the anvil harness runs atomic-interop (v32). Keeping the harness version
    * local decouples the two, so the anvil state can live under `v0.32.0` without
    * re-versioning the whole L1 test suite (which pins v31).
