@@ -168,7 +168,8 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
             currentChainId,
             address(addresses.sharedBridge),
             _assetId,
-            transferData
+            transferData,
+            _nextWithdrawalBundleSalt()
         );
         bytes32[] memory merkleProof = new bytes32[](1);
         proof = MessageInclusionProof({

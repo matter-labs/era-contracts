@@ -141,21 +141,32 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         }
     }
 
+    /// @dev Nonce making each reconstructed withdrawal bundle unique. On a real chain the salt is assigned by
+    /// the L2 InteropCenter (`keccak256(sender, nonce)`); under mocked proofs we only need per-bundle uniqueness
+    /// so that repeated withdrawals do not collide into the same bundle hash (`BundleAlreadyProcessed`).
+    uint256 private withdrawalBundleSaltNonce;
+
     /// @notice Wraps an asset-router `finalizeDeposit` payload in the single-call InteropBundle message
-    /// form emitted by the L2 InteropCenter — the only withdrawal message form `L1Nullifier` accepts
-    /// (see `L1Nullifier._parseL2WithdrawalMessage` / `DataEncoding.parseInteropWithdrawalBundle`).
+    /// form emitted by the L2 InteropCenter — the only withdrawal message form accepted on L1
+    /// (see `InteropHandlerBase` / `DataEncoding.parseInteropWithdrawalBundle`).
     function _encodeWithdrawalBundleMessage(
         uint256 _sourceChainId,
         bytes32 _assetId,
         bytes memory _transferData
-    ) internal view returns (bytes memory) {
+    ) internal returns (bytes memory) {
         return
             DataEncoding.encodeInteropWithdrawalBundleMessage(
                 _sourceChainId,
                 address(addresses.sharedBridge),
                 _assetId,
-                _transferData
+                _transferData,
+                _nextWithdrawalBundleSalt()
             );
+    }
+
+    /// @notice Returns a fresh unique salt for a reconstructed withdrawal bundle.
+    function _nextWithdrawalBundleSalt() internal returns (bytes32) {
+        return keccak256(abi.encodePacked("test-withdrawal-bundle-salt", withdrawalBundleSaltNonce++));
     }
 
     // add this to be excluded from coverage report

@@ -282,15 +282,23 @@ export async function finalizeWithdrawalOnL1(
   const l1AssetRouter = new Contract(l1Addresses.l1SharedBridge, getAbi("L1AssetRouter"), l1Provider);
   const destinationBaseTokenAssetId = await l1AssetRouter.ETH_TOKEN_ASSET_ID();
 
+  const l2BatchNumber = ++finalizationCounter;
+  // Real bundles carry the salt assigned by the L2 InteropCenter (keccak256(sender, nonce)); under the mocked
+  // inclusion proof we only need a unique salt per finalization so that identical withdrawals do not collide
+  // into the same bundle hash (`BundleAlreadyProcessed`).
+  const interopBundleSalt = ethers.utils.keccak256(
+    ethers.utils.defaultAbiCoder.encode(["string", "uint256"], ["anvil-withdrawal-salt", l2BatchNumber])
+  );
+
   // Field order mirrors `InteropBundle` / `InteropCall` in contracts/common/Messaging.sol. Only the fields
-  // checked while executing (destinationChainId, destinationBaseTokenAssetId, the single call's to/from/value/data)
-  // carry meaning; the rest are placeholder values.
+  // checked while executing (destinationChainId, destinationBaseTokenAssetId, the single call's
+  // to/from/value/data) and the uniqueness-providing salt carry meaning; the rest are placeholder values.
   const interopBundle = [
     "0x01", // version
     pending.chainId, // sourceChainId
     l1ChainId, // destinationChainId
     destinationBaseTokenAssetId, // destinationBaseTokenAssetId
-    ethers.constants.HashZero, // interopBundleSalt
+    interopBundleSalt, // interopBundleSalt
     [["0x01", false, l1Addresses.l1SharedBridge, L2_ASSET_ROUTER_ADDR, 0, finalizeCalldata]], // calls
     ["0x", "0x", false], // bundleAttributes (executionAddress, unbundlerAddress, useFixedFee)
   ];
@@ -298,7 +306,6 @@ export async function finalizeWithdrawalOnL1(
   const l2Sender = INTEROP_CENTER_ADDR;
 
   const merkleProof = buildWithdrawalMerkleProof(settlementLayerChainId);
-  const l2BatchNumber = ++finalizationCounter;
   // MessageInclusionProof: the handler substitutes `message.data` with the bundle while proving inclusion, so the
   // data field is a placeholder here.
   const proof = [pending.chainId, l2BatchNumber, 0, [0, l2Sender, "0x"], merkleProof];

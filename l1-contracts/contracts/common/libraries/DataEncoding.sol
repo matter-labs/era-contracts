@@ -343,23 +343,23 @@ library DataEncoding {
     /// `finalizeDeposit` call for the withdrawn asset, destined for this chain.
     /// @dev Message-level encode counterpart of {parseInteropWithdrawalBundle}, used to reconstruct
     /// the message the L2 InteropCenter emits (e.g. by tests and tooling that finalize withdrawals
-    /// under a mocked inclusion proof). Only the fields that {parseInteropWithdrawalBundle} validates
-    /// carry meaning here; the remaining bundle fields are placeholders (the real values are assigned
-    /// by the L2 InteropCenter when it emits the bundle).
+    /// under a mocked inclusion proof).
     /// @param _chainId The source ZK chain ID (encoded both in the bundle and the inner call).
     /// @param _l1AssetRouter The L1 asset router that the bundle's single call targets.
     /// @param _assetId The asset being withdrawn.
     /// @param _transferData The bridge-mint/transfer data for the asset.
+    /// @param _interopBundleSalt The bundle salt; see {encodeInteropWithdrawalBundle}.
     function encodeInteropWithdrawalBundleMessage(
         uint256 _chainId,
         address _l1AssetRouter,
         bytes32 _assetId,
-        bytes memory _transferData
+        bytes memory _transferData,
+        bytes32 _interopBundleSalt
     ) internal view returns (bytes memory) {
         return
             abi.encodePacked(
                 BUNDLE_IDENTIFIER,
-                encodeInteropWithdrawalBundle(_chainId, _l1AssetRouter, _assetId, _transferData)
+                encodeInteropWithdrawalBundle(_chainId, _l1AssetRouter, _assetId, _transferData, _interopBundleSalt)
             );
     }
 
@@ -371,11 +371,18 @@ library DataEncoding {
     /// @param _l1AssetRouter The L1 asset router that the bundle's single call targets.
     /// @param _assetId The asset being withdrawn.
     /// @param _transferData The bridge-mint/transfer data for the asset.
+    /// @param _interopBundleSalt The bundle salt. Real bundles carry the salt assigned by the L2 InteropCenter
+    /// (`keccak256(abi.encodePacked(sender, interopBundleNonce[sender]))`) — a reconstruction can only be
+    /// finalized against a real inclusion proof if it supplies that same salt, since the bundle bytes must
+    /// hash-match the emitted message. Tests running under mocked proofs must still pass a salt unique per
+    /// bundle, because the salt is what keeps distinct-but-identical withdrawals from colliding into the same
+    /// bundle hash (and thus reverting with `BundleAlreadyProcessed`).
     function encodeInteropWithdrawalBundle(
         uint256 _chainId,
         address _l1AssetRouter,
         bytes32 _assetId,
-        bytes memory _transferData
+        bytes memory _transferData,
+        bytes32 _interopBundleSalt
     ) internal view returns (bytes memory) {
         InteropCall[] memory calls = new InteropCall[](1);
         calls[0] = InteropCall({
@@ -391,7 +398,7 @@ library DataEncoding {
             sourceChainId: _chainId,
             destinationChainId: block.chainid,
             destinationBaseTokenAssetId: encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
-            interopBundleSalt: bytes32(0),
+            interopBundleSalt: _interopBundleSalt,
             calls: calls,
             bundleAttributes: BundleAttributes({executionAddress: hex"", unbundlerAddress: hex"", useFixedFee: false})
         });

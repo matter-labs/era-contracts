@@ -178,7 +178,8 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
                 chainId,
                 address(addresses.sharedBridge),
                 l2TokenAssetId,
-                transferData
+                transferData,
+                _nextWithdrawalBundleSalt()
             ),
             MessageInclusionProof({
                 chainId: chainId,
