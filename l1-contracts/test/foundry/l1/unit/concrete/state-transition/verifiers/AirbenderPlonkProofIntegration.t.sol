@@ -47,8 +47,14 @@ contract AirbenderPlonkProofIntegrationTest is Test {
     /// `proof_public_input` from `eravm-airbender-verifier` for batch 506093 —
     /// the full keccak(prev_commitment ‖ curr_commitment), packed `[u32; 8]`.
     uint32[8] internal PROGRAM_OUTPUT = [
-        uint32(1130987272), 3890202368, 1477174677, 3755385212,
-        2290908159, 161842629, 2088189254, 3910592463
+        uint32(1130987272),
+        3890202368,
+        1477174677,
+        3755385212,
+        2290908159,
+        161842629,
+        2088189254,
+        3910592463
     ];
 
     /// Commitment to the eravm-airbender-verifier guest binary, as the
@@ -58,8 +64,14 @@ contract AirbenderPlonkProofIntegrationTest is Test {
     /// here from the artifact; the production wiring is for L1 to either bake
     /// in the audited binary's commitment or fetch it from a registry.
     uint32[8] internal BINARY_COMMITMENT = [
-        uint32(1510299098), 4057252708, 2938844326, 4124090251,
-        2485515716, 1206552808, 429924834, 1342631824
+        uint32(1510299098),
+        4057252708,
+        2938844326,
+        4124090251,
+        2485515716,
+        1206552808,
+        429924834,
+        1342631824
     ];
 
     AirbenderVerifierPlonk internal airbenderVerifier;

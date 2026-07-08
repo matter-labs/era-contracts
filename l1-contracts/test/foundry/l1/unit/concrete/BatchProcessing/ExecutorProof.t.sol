@@ -59,7 +59,8 @@ contract ExecutorProofTest is UtilsCallMockerTest {
     UtilsFacet internal utilsFacet;
     TestExecutorFacet internal executor;
     TestCommitterFacet internal committer;
-    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier =
+        address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), IVerifier(address(0))));
     DummyBridgehub internal dummyBridgehub;
 
     function getTestExecutorFacetSelectors() private pure returns (bytes4[] memory) {

@@ -516,11 +516,7 @@ library AddressIntrospector {
     /// @param _isV29 The V29 verifier is a dual verifier, but the sub-verifier getters were only
     ///        added in V31, so they cannot be introspected and are reported as `address(0)`.
     /// @param _isZKsyncOS If true, uses the ZKsyncOSDualVerifier interface; otherwise EraDualVerifier.
-    function _getVerifiers(
-        address _verifier,
-        bool _isV29,
-        bool _isZKsyncOS
-    ) private view returns (Verifiers memory) {
+    function _getVerifiers(address _verifier, bool _isV29, bool _isZKsyncOS) private view returns (Verifiers memory) {
         (address verifierFflonk, address verifierPlonk, address airbenderVerifierPlonk) = _isV29
             ? (address(0), address(0), address(0))
             : _getSubVerifiers(_verifier, _isZKsyncOS);

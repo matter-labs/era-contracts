@@ -145,7 +145,11 @@ contract GatewayCTMDeployerTest is Test {
         // Verifier contracts
         new EraVerifierFflonk();
         new EraVerifierPlonk();
-        new EraTestnetVerifier(EraVerifierFflonk(address(0)), EraVerifierPlonk(address(0)), EraVerifierPlonk(address(0)));
+        new EraTestnetVerifier(
+            EraVerifierFflonk(address(0)),
+            EraVerifierPlonk(address(0)),
+            EraVerifierPlonk(address(0))
+        );
 
         // CTM contracts
         new ServerNotifier();
