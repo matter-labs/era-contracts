@@ -67,6 +67,18 @@ allow_internal_expect_revert = true
 cbor_metadata = false
 bytecode_hash = "none"
 
+# Deterministic sub-build for the anvil registry-driven upgrade test: the committed v32
+# registries (contracts/upgrades/registry/v32) pin the CODEHASHES of the implementations the
+# runner deploys, so those artifacts must be byte-identical across platforms (macOS regen vs
+# Linux CI). Same metadata settings as anvil-interop, but with a dedicated out/cache so it
+# never clobbers the default-profile artifacts the rest of the harness loads.
+# Usage: FOUNDRY_PROFILE=registry-deterministic forge build <sources>
+[profile.registry-deterministic]
+cbor_metadata = false
+bytecode_hash = "none"
+out = "out-registry-deterministic"
+cache_path = "cache-forge-registry-deterministic"
+
 [profile.default.zksync]
 enable_eravm_extensions = true
 zksolc = "1.5.11"

@@ -1,0 +1,138 @@
+{
+  "tag": "V32",
+  "oldVersion": "0.31.0",
+  "newVersion": "0.32.0",
+  "core": {
+    "proxyAdmin": "0x0FA38b5c8cb180809E0C95E2EE923eC093123285",
+    "ctmRegistries": {
+      "era": "0x0000000000000000000000000000000000000000",
+      "zksyncOS": "0x0000000000000000000000000000000000000000"
+    },
+    "contracts": {
+      "MessageRoot": {
+        "proxy": "0x4A02a75C31b433fc8D87F510500b90e0fa7E0254",
+        "implOld": "0x36529ce3Fd7A08A689b0C707325b3F5034570Eca",
+        "implNew": "0x821f3361D454cc98b7555221A06Be563a7E2E0A6",
+        "implNewCodehash": "0x38a76dd3fa4cc1b89fd4fb2add08c18b50a7187c8f229f129a78af31070ccaa4"
+      }
+    }
+  },
+  "ctms": [
+    {
+      "name": "ZKsyncOS",
+      "isZKsyncOS": true,
+      "ctmProxy": "0xa7EF69A0644e7C3B24bcBE6bf2bf75662E851bF8",
+      "verifierOld": "0x5422b0509a532dd24b0dD99AfaC766E66172af37",
+      "verifierNew": "0x02df3a3F960393F5B349E40A599FEda91a7cc1A7",
+      "contracts": {
+        "AdminFacet": {
+          "old": "0xbb27525459Cfa6650f9491808eCF1FeE6434b236",
+          "new": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C",
+          "newCodehash": "0xa8979c4d7ef131ada260efa5438b874ee95783a34640727440245afece00923c"
+        },
+        "DefaultUpgrade": {
+          "new": "0x2b5A4e5493d4a54E717057B127cf0C000C876f9B",
+          "newCodehash": "0x615b7fee27d5819c81ad8dad8e000bf8c663ac10aa772345d8792527a8dc6fe7"
+        },
+        "DiamondInit": {
+          "new": "0x413b1AfCa96a3df5A686d8BFBF93d30688a7f7D9",
+          "newCodehash": "0x3f62a808c81d674b4d985a0d617f95fe4cda74674182b9137e5119e147cc8045"
+        }
+      },
+      "facets": {
+        "old": [
+          {
+            "name": "AdminFacet",
+            "selectors": [
+              "0x054e80a3",
+              "0x0e18b681",
+              "0x17338945",
+              "0xf9afb97e",
+              "0x1b48b94a",
+              "0x1cc5d103",
+              "0x21f603d7",
+              "0x235d9eb5",
+              "0x23b31192",
+              "0x2765d079",
+              "0x27ae4c16",
+              "0x2878fe74",
+              "0x3b6d7534",
+              "0x4623c91d",
+              "0x4dd18bf5",
+              "0x5b898748",
+              "0x60eae0e7",
+              "0x64bf8d66",
+              "0x6e762e98",
+              "0xa9f6d941",
+              "0xb4fcb577",
+              "0xbe6f11cf",
+              "0xc5f1f1f5",
+              "0xe76db865"
+            ]
+          }
+        ],
+        "new": [
+          {
+            "name": "AdminFacet",
+            "selectors": [
+              "0x054e80a3",
+              "0x0e18b681",
+              "0x17338945",
+              "0xf9afb97e",
+              "0x1b48b94a",
+              "0x1cc5d103",
+              "0x21f603d7",
+              "0x235d9eb5",
+              "0x23b31192",
+              "0x2765d079",
+              "0x27ae4c16",
+              "0x2878fe74",
+              "0x3b6d7534",
+              "0x4623c91d",
+              "0x4dd18bf5",
+              "0x5b898748",
+              "0x60eae0e7",
+              "0x64bf8d66",
+              "0x6e762e98",
+              "0xa9f6d941",
+              "0xb4fcb577",
+              "0xbe6f11cf",
+              "0xc5f1f1f5",
+              "0xe76db865"
+            ]
+          }
+        ]
+      },
+      "facetFreezability": {
+        "AdminFacet": false
+      },
+      "l2": {
+        "forceDeployments": [
+          {
+            "contract": "L2V31Upgrade",
+            "upgradeType": "ZKsyncOSUnsafeForceDeployment",
+            "deployedBytecodeInfo": "0xd8ceeb1af16ce49c7c068d8b9bcbca8a80f978611cb4ec0a1c08a95b0295dce30000000000000000000000000000000000000000000000000000000000000006d8ceeb1af16ce49c7c068d8b9bcbca8a80f978611cb4ec0a1c08a95b0295dce3",
+            "newAddress": "0x00000000000000000000000000000000000ab001",
+            "bytecodeHash": "0xd8ceeb1af16ce49c7c068d8b9bcbca8a80f978611cb4ec0a1c08a95b0295dce3"
+          }
+        ],
+        "delegateTo": "0x00000000000000000000000000000000000ab001",
+        "delegateCalldata": "0x",
+        "factoryDepHashes": [],
+        "baseSystemContracts": {
+          "bootloader": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "defaultAccount": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "evmEmulator": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "fixedForceDeploymentsData": "0xf1f2",
+        "chainCreationInitCalldata": "0xc1c2"
+      },
+      "genesis": {
+        "genesisUpgrade": "0xcB41110b0bd637A219021f0c5aa416BCCb4ff100",
+        "batchHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "batchCommitment": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "indexRepeatedStorageChanges": 54
+      }
+    }
+  ]
+}

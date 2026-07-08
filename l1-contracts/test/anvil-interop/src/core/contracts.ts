@@ -6,7 +6,13 @@
  */
 
 import type { JsonFragment } from "@ethersproject/abi";
-import { loadAbiFromOut, loadBytecodeFromOut, loadCreationBytecodeFromOut } from "./artifacts";
+import {
+  loadAbiFromOut,
+  loadBytecodeFromOut,
+  loadCreationBytecodeFromOut,
+  loadDeterministicBytecodeFromOut,
+  loadDeterministicCreationBytecodeFromOut,
+} from "./artifacts";
 
 // ── Artifact path registry ──────────────────────────────────────
 //
@@ -24,15 +30,17 @@ const ARTIFACTS = {
   RegistryComposerHarness: "RegistryComposerHarness.sol/RegistryComposerHarness.json",
   IChainTypeManager: "IChainTypeManager.sol/IChainTypeManager.json",
   ICTMRegistry: "ICTMRegistry.sol/ICTMRegistry.json",
+  ICoreRegistry: "ICoreRegistry.sol/ICoreRegistry.json",
   DefaultUpgrade: "DefaultUpgrade.sol/DefaultUpgrade.json",
   DiamondInit: "DiamondInit.sol/DiamondInit.json",
   ZKsyncOSTestnetVerifier: "ZKsyncOSTestnetVerifier.sol/ZKsyncOSTestnetVerifier.json",
   ProxyAdmin: "ProxyAdmin.sol/ProxyAdmin.json",
   L1MessageRoot: "L1MessageRoot.sol/L1MessageRoot.json",
-  // Registries generated at runtime by scripts/gen-registry.ts (tag "AnvilHarness"); the
-  // artifacts only exist after the registry upgrade runner generates + forge-builds them.
-  CoreRegistryAnvilHarness: "CoreRegistryAnvilHarness.sol/CoreRegistryAnvilHarness.json",
-  ZKsyncOSCTMRegistryAnvilHarness: "ZKsyncOSCTMRegistryAnvilHarness.sol/ZKsyncOSCTMRegistryAnvilHarness.json",
+  // Committed generated registries (contracts/upgrades/registry/v32, tag "V32"). They compile
+  // with the regular forge build; regenerate via `yarn regen:v32-registries` (emit mode of the
+  // registry upgrade runner).
+  CoreRegistryV32: "CoreRegistryV32.sol/CoreRegistryV32.json",
+  ZKsyncOSCTMRegistryV32: "ZKsyncOSCTMRegistryV32.sol/ZKsyncOSCTMRegistryV32.json",
   BridgedStandardERC20: "BridgedStandardERC20.sol/BridgedStandardERC20.json",
   ChainAdminOwnable: "ChainAdminOwnable.sol/ChainAdminOwnable.json",
   ChainRegistrationSender: "ChainRegistrationSender.sol/ChainRegistrationSender.json",
@@ -106,6 +114,20 @@ export function getBytecode(name: ContractName): string {
 
 export function getCreationBytecode(name: ContractName): string {
   return loadCreationBytecodeFromOut(ARTIFACTS[name]);
+}
+
+/**
+ * Deployed (runtime) bytecode from the deterministic (CBOR-metadata-free) build — see
+ * `[profile.registry-deterministic]` in l1-contracts/foundry.toml. Used for every contract
+ * whose bytecode (codehash) is pinned inside the committed v32 registries.
+ */
+export function getDeterministicBytecode(name: ContractName): string {
+  return loadDeterministicBytecodeFromOut(ARTIFACTS[name]);
+}
+
+/** Creation (init) bytecode from the deterministic (CBOR-metadata-free) build. */
+export function getDeterministicCreationBytecode(name: ContractName): string {
+  return loadDeterministicCreationBytecodeFromOut(ARTIFACTS[name]);
 }
 
 // ── Legacy ABIs ─────────────────────────────────────────────────

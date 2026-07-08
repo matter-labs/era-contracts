@@ -77,6 +77,8 @@ l1-contracts/foundry-zksync/
 .env
 protocol-ops/target-linux/
 
-# Transient registry contracts generated at runtime by the anvil registry-driven
-# upgrade test runner (scripts/gen-registry.ts output; cleaned up after each run).
-l1-contracts/test/foundry/l1/unit/concrete/Upgrades/registry-gen-anvil/
+# Deterministic sub-build used by the anvil registry-driven upgrade test (see
+# [profile.registry-deterministic] in l1-contracts/foundry.toml): CBOR-metadata-free
+# artifacts for the implementations whose codehashes the committed v32 registries pin.
+l1-contracts/out-registry-deterministic/
+l1-contracts/cache-forge-registry-deterministic/

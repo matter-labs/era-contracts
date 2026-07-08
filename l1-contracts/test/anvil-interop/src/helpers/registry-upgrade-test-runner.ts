@@ -11,12 +11,23 @@
  *      `CTMUpgradeModule`, `EcosystemUpgradeModule`, plus the new-version implementations of a
  *      synthetic minor version bump (fresh `AdminFacet` as the facet change, `DefaultUpgrade`
  *      as the init contract, fresh `ZKsyncOSTestnetVerifier`, fresh `DiamondInit`, and a fresh
- *      `L1MessageRoot` implementation for the ecosystem leg).
- *   3. Build a gen-registry manifest from the LIVE deployment (live facet address + selectors,
- *      live genesis-upgrade address, freshly deployed new implementations, pinned codehashes),
- *      run `scripts/gen-registry.ts`, `forge build` the generated sources and deploy the
- *      generated `CoreRegistryAnvilHarness` + `ZKsyncOSCTMRegistryAnvilHarness` contracts —
- *      exercising the generator on real deployment output.
+ *      `L1MessageRoot` implementation for the ecosystem leg). Every codehash-pinned
+ *      implementation is deployed from the `registry-deterministic` forge profile output
+ *      (CBOR-metadata-free ⇒ byte-identical across platforms), and the deployer key + starting
+ *      nonce are fixed by the committed chain states, so all addresses AND codehashes are
+ *      reproducible run-to-run and machine-to-machine.
+ *   3. Deploy the COMMITTED generated registries `CoreRegistryV32` +
+ *      `ZKsyncOSCTMRegistryV32` (contracts/upgrades/registry/v32 — fixed, audited,
+ *      checked-in generator output) and assert `verifyAll()` against the live deployment.
+ *      This is the default CONSUME mode: the registries are never regenerated here, so any
+ *      drift between the committed constants and the live/freshly-deployed addresses or
+ *      codehashes fails loudly. With `REGEN_REGISTRIES=1` (EMIT mode, `yarn
+ *      regen:v32-registries`) the runner instead rebuilds the manifest from the LIVE
+ *      deployment (live facet address + selectors, live genesis-upgrade address, freshly
+ *      deployed implementations, pinned codehashes), writes it to
+ *      scripts/registry-manifests/v32-local.json, reruns `scripts/gen-registry.ts` into the
+ *      committed directory (prettier-formatted so the output is byte-stable), and then
+ *      continues exactly like consume mode — regenerated files are meant to be committed.
  *   4. Hand the CTM to the executor through the production surface
  *      (`transferOwnership` + `executor.forward(acceptOwnership)`) and the ecosystem
  *      `ProxyAdmin` through its 1-step `transferOwnership`.
@@ -58,7 +69,12 @@ import { ethers } from "ethers";
 import { AnvilManager } from "../daemons/anvil-manager";
 import { DeploymentRunner } from "../deployment-runner";
 import { ANVIL_DEFAULT_PRIVATE_KEY, L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR } from "../core/const";
-import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
+import {
+  getAbi,
+  getCreationBytecode,
+  getDeterministicBytecode,
+  getDeterministicCreationBytecode,
+} from "../core/contracts";
 import { impersonateAndRun } from "../core/utils";
 import type { ChainRole } from "../core/types";
 import { clearGenesisUpgradeTxHash, selectUpgradeChains, traceFailedTx } from "./v31-upgrade-test-runner";
@@ -73,13 +89,40 @@ const SEMVER_MINOR_SHIFT = 32;
 
 // gen-registry manifest tag: contract names are `CoreRegistry${TAG}` and
 // `${ctmName}CTMRegistry${TAG}`, matching the ARTIFACTS entries in core/contracts.ts.
-const REGISTRY_TAG = "AnvilHarness";
+const REGISTRY_TAG = "V32";
 const CTM_REGISTRY_NAME = "ZKsyncOS";
 
-// Transient output dir for the generated registry sources. Lives under test/foundry so that
-// `forge build <path>` compiles it with the project's remappings; gitignored and removed in
-// the runner's finally block.
-const REGISTRY_GEN_DIR_REL = "test/foundry/l1/unit/concrete/Upgrades/registry-gen-anvil";
+// Committed home of the generated production registries for the local (chain-states)
+// environment. The default CONSUME mode deploys these checked-in sources as-is; the EMIT mode
+// (REGEN_REGISTRIES=1) regenerates them in place so the diff can be reviewed and committed.
+const REGISTRY_GEN_DIR_REL = "contracts/upgrades/registry/v32";
+const REGISTRY_MANIFEST_REL = "scripts/registry-manifests/v32-local.json";
+const GENERATED_REGISTRY_FILES = [
+  `CoreRegistry${REGISTRY_TAG}.sol`,
+  `${CTM_REGISTRY_NAME}CTMRegistry${REGISTRY_TAG}.sol`,
+];
+
+// Set REGEN_REGISTRIES=1 to run in EMIT mode (see module docs).
+const REGEN_ENV_VAR = "REGEN_REGISTRIES";
+
+const STALE_REGISTRIES_HINT =
+  `committed v32 registries are stale — rerun with ${REGEN_ENV_VAR}=1 ` +
+  "(yarn regen:v32-registries in l1-contracts/test/anvil-interop) and commit the result " +
+  `(${REGISTRY_GEN_DIR_REL}/*.sol + ${REGISTRY_MANIFEST_REL}).`;
+
+// Sources compiled with the `registry-deterministic` forge profile (CBOR-metadata-free ⇒
+// byte-identical across platforms; see foundry.toml). Everything the committed registries pin
+// a codehash/bytecode-hash for MUST be deployed from this build, otherwise registries
+// regenerated on one machine would fail verifyAll() on another.
+const DETERMINISTIC_FOUNDRY_PROFILE = "registry-deterministic";
+const DETERMINISTIC_SOURCES = [
+  "contracts/state-transition/chain-deps/facets/Admin.sol",
+  "contracts/upgrades/DefaultUpgrade.sol",
+  "contracts/state-transition/chain-deps/DiamondInit.sol",
+  "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol",
+  "contracts/core/message-root/L1MessageRoot.sol",
+  "contracts/dev-contracts/MockContractDeployer.sol",
+];
 
 // Fixed L2 address the registry pins for the upgrade's L2 delegate target (and its unsafe
 // force-deployment entry). In production this is where the per-upgrade L2 upgrade
@@ -144,8 +187,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
   const anvilManager = new AnvilManager();
   const runner = new DeploymentRunner();
   const keepChains = process.env.ANVIL_INTEROP_KEEP_CHAINS === "1";
-  const genDir = path.join(l1ContractsDir, REGISTRY_GEN_DIR_REL);
-  const scratchDir = path.join(anvilInteropDir, "outputs", `registry-upgrade-${scenario.label}`);
+  const regenRegistries = process.env[REGEN_ENV_VAR] === "1";
 
   try {
     // ── 1. Boot the pre-generated ecosystem ──
@@ -176,6 +218,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
 
     // ── 3. Deploy the registry-driven upgrade machinery + new implementations ──
     console.log("\n── Deploying UpgradeExecutor, modules and new-version implementations ──");
+    buildDeterministicArtifacts();
     const deployed = await deployUpgradeMachinery(deployer, {
       l1ChainId,
       rollupDAManager: live.rollupDAManager,
@@ -184,26 +227,45 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       chainAssetHandler: live.chainAssetHandler,
     });
 
-    // ── 4. Generate + build + deploy the registries from a manifest of the live addresses ──
-    console.log("\n── Generating constants-in-bytecode registries via scripts/gen-registry.ts ──");
-    fs.mkdirSync(scratchDir, { recursive: true });
-    const manifestPath = path.join(scratchDir, "registry-manifest.json");
-    fs.writeFileSync(
-      manifestPath,
-      JSON.stringify(await buildRegistryManifest(l1Provider, live, deployed, ctmAddresses.chainTypeManager), null, 2)
-    );
-    const registries = await generateAndDeployRegistries(deployer, manifestPath, genDir);
+    // ── 4. Regenerate (EMIT mode) or validate (CONSUME mode) the committed registries, then
+    //       deploy them ──
+    const manifestPath = path.join(l1ContractsDir, REGISTRY_MANIFEST_REL);
+    if (regenRegistries) {
+      console.log(`\n── ${REGEN_ENV_VAR}=1: regenerating the committed v32 registries in place ──`);
+      const manifest = await buildRegistryManifest(l1Provider, live, deployed, ctmAddresses.chainTypeManager);
+      fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
+      fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+      console.log(`  manifest written to ${REGISTRY_MANIFEST_REL}`);
+      regenerateCommittedRegistries(manifestPath);
+    } else {
+      console.log(`\n── Consuming the committed v32 registries (${REGISTRY_GEN_DIR_REL}) ──`);
+      assertCommittedManifestMatchesLiveDeployment(manifestPath, live, deployed, ctmAddresses.chainTypeManager);
+    }
+    const registries = await deployCommittedRegistries(deployer);
     console.log(`  CTM registry:  ${registries.ctmRegistry}`);
     console.log(`  core registry: ${registries.coreRegistry}`);
 
-    // The generated verifyAll() checks the pinned codehashes of every new implementation.
+    // The generated verifyAll() checks the pinned codehashes of every new implementation
+    // against the code actually live on this chain — the staleness gate for the committed
+    // registries.
     const ctmRegistryContract = new ethers.Contract(registries.ctmRegistry, getAbi("ICTMRegistry"), l1Provider);
-    assertTrue(await ctmRegistryContract.verifyAll(), "CTM registry verifyAll() passes on the live deployment");
-    assertEq(
-      (await ctmRegistryContract.newProtocolVersion()).toString(),
-      live.newVersion.toString(),
-      "generated registry pins the new protocol version"
-    );
+    const coreRegistryContract = new ethers.Contract(registries.coreRegistry, getAbi("ICoreRegistry"), l1Provider);
+    try {
+      assertTrue(await ctmRegistryContract.verifyAll(), "CTM registry verifyAll() passes on the live deployment");
+      assertTrue(await coreRegistryContract.verifyAll(), "core registry verifyAll() passes on the live deployment");
+      assertEq(
+        (await ctmRegistryContract.newProtocolVersion()).toString(),
+        live.newVersion.toString(),
+        "CTM registry pins the new protocol version"
+      );
+      assertEq(
+        (await coreRegistryContract.newProtocolVersion()).toString(),
+        live.newVersion.toString(),
+        "core registry pins the new protocol version"
+      );
+    } catch (error) {
+      throw regenRegistries ? error : staleRegistriesError(error);
+    }
 
     // ── 5. Authority handover ──
     console.log("\n── Handing CTM + ProxyAdmin authority to the UpgradeExecutor ──");
@@ -336,9 +398,13 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     }
 
     console.log("\n✅ Registry-driven upgrade verified successfully!\n");
+    if (regenRegistries) {
+      console.log(
+        `Regenerated ${GENERATED_REGISTRY_FILES.join(", ")} in ${REGISTRY_GEN_DIR_REL} ` +
+          `and ${REGISTRY_MANIFEST_REL} — review the diff and commit it.\n`
+      );
+    }
   } finally {
-    fs.rmSync(genDir, { recursive: true, force: true });
-    fs.rmSync(scratchDir, { recursive: true, force: true });
     if (!keepChains) {
       await anvilManager.stopAll();
     }
@@ -469,14 +535,28 @@ async function deployUpgradeMachinery(
     chainAssetHandler: string;
   }
 ): Promise<DeployedMachinery> {
-  const deploy = async (name: Parameters<typeof getAbi>[0], args: unknown[]): Promise<string> => {
-    const factory = new ethers.ContractFactory(getAbi(name), getCreationBytecode(name), deployer);
+  const deployFrom = async (
+    name: Parameters<typeof getAbi>[0],
+    creationBytecode: string,
+    args: unknown[]
+  ): Promise<string> => {
+    const factory = new ethers.ContractFactory(getAbi(name), creationBytecode, deployer);
     const contract = await factory.deploy(...args);
     await contract.deployed();
     console.log(`  ${name}: ${contract.address}`);
     return contract.address;
   };
+  const deploy = (name: Parameters<typeof getAbi>[0], args: unknown[]) =>
+    deployFrom(name, getCreationBytecode(name), args);
+  // The committed registries pin these contracts' codehashes, so they are deployed from the
+  // deterministic (CBOR-metadata-free) build — see buildDeterministicArtifacts().
+  const deployPinned = (name: Parameters<typeof getAbi>[0], args: unknown[]) =>
+    deployFrom(name, getDeterministicCreationBytecode(name), args);
 
+  // NOTE: the deploy ORDER below is part of the committed registries' contract: the deployer
+  // key + starting nonce are fixed by the chain states, so each contract's address is a pure
+  // function of its position in this sequence. Reordering/inserting deploys invalidates the
+  // committed registries (rerun with REGEN_REGISTRIES=1).
   return {
     // The deployer plays the role of protocol governance: it owns the executor.
     executor: await deploy("UpgradeExecutor", [deployer.address]),
@@ -485,18 +565,18 @@ async function deployUpgradeMachinery(
     composerHarness: await deploy("RegistryComposerHarness", []),
     // The synthetic v-bump's "changed facet": a fresh AdminFacet built from the same source,
     // constructed with the live RollupDAManager so DA-validation behavior is unchanged.
-    newAdminFacet: await deploy("AdminFacet", [params.l1ChainId, params.rollupDAManager]),
-    newDefaultUpgrade: await deploy("DefaultUpgrade", []),
-    newDiamondInit: await deploy("DiamondInit", [true /* _isZKOS */]),
+    newAdminFacet: await deployPinned("AdminFacet", [params.l1ChainId, params.rollupDAManager]),
+    newDefaultUpgrade: await deployPinned("DefaultUpgrade", []),
+    newDiamondInit: await deployPinned("DiamondInit", [true /* _isZKOS */]),
     // Real verifier contract for the new version (same type the ZKsyncOS CTM uses). The proof
     // sub-verifiers are zero like in the foundry e2e test — no proofs are verified here.
-    newVerifier: await deploy("ZKsyncOSTestnetVerifier", [
+    newVerifier: await deployPinned("ZKsyncOSTestnetVerifier", [
       ethers.constants.AddressZero,
       ethers.constants.AddressZero,
       deployer.address,
     ]),
     // Ecosystem leg: a fresh L1MessageRoot implementation with the live immutable values.
-    newMessageRootImpl: await deploy("L1MessageRoot", [
+    newMessageRootImpl: await deployPinned("L1MessageRoot", [
       params.bridgehub,
       params.eraGatewayChainId,
       params.chainAssetHandler,
@@ -518,7 +598,7 @@ async function buildRegistryManifest(
   // implementation at the pinned delegate address, then delegatecall it — the exact shape of a
   // production ZKsyncOS upgrade transaction. The bytecode info describes the no-op stand-in
   // the harness places at that address (see relayL2UpgradeTx).
-  const delegateBytecode = getBytecode("MockContractDeployer");
+  const delegateBytecode = getDeterministicBytecode("MockContractDeployer");
   const delegateCodeHash = ethers.utils.keccak256(delegateBytecode);
   const deployedBytecodeInfo = ethers.utils.defaultAbiCoder.encode(
     ["bytes32", "uint256", "bytes32"],
@@ -607,23 +687,98 @@ async function buildRegistryManifest(
   };
 }
 
-async function generateAndDeployRegistries(
-  deployer: ethers.Wallet,
-  manifestPath: string,
-  genDir: string
-): Promise<{ ctmRegistry: string; coreRegistry: string }> {
-  fs.rmSync(genDir, { recursive: true, force: true });
-
-  // Generate the constants-in-bytecode registry sources from the manifest…
-  execSync(`npx ts-node scripts/gen-registry.ts ${JSON.stringify(manifestPath)} ${JSON.stringify(genDir)}`, {
+/**
+ * Compile the codehash-pinned sources with the `registry-deterministic` forge profile
+ * (CBOR-metadata-free ⇒ byte-identical across platforms) into out-registry-deterministic/.
+ * Both modes run this: emit pins the resulting codehashes, consume deploys the exact same
+ * bytecode so verifyAll() can hold.
+ */
+function buildDeterministicArtifacts(): void {
+  console.log(`  compiling pinned sources with FOUNDRY_PROFILE=${DETERMINISTIC_FOUNDRY_PROFILE}…`);
+  execSync(`forge build ${DETERMINISTIC_SOURCES.join(" ")}`, {
     cwd: l1ContractsDir,
     stdio: "inherit",
+    env: { ...process.env, FOUNDRY_PROFILE: DETERMINISTIC_FOUNDRY_PROFILE },
   });
-  // …and compile them with the project's remappings. Incremental build: only the generated
-  // sources are new, everything else comes from cache.
+}
+
+/**
+ * EMIT mode: rerun scripts/gen-registry.ts on the freshly written manifest, regenerating the
+ * committed registry sources in place, then prettier-format them so the files are byte-stable
+ * against the committed (lint-clean) versions.
+ */
+function regenerateCommittedRegistries(manifestPath: string): void {
+  execSync(
+    `npx ts-node scripts/gen-registry.ts ${JSON.stringify(manifestPath)} ${JSON.stringify(REGISTRY_GEN_DIR_REL)}`,
+    { cwd: l1ContractsDir, stdio: "inherit" }
+  );
+  const files = GENERATED_REGISTRY_FILES.map((f) => JSON.stringify(path.join(REGISTRY_GEN_DIR_REL, f))).join(" ");
+  execSync(`npx prettier --write ${files}`, { cwd: l1ContractsDir, stdio: "inherit" });
+}
+
+function staleRegistriesError(cause: unknown): Error {
+  const message = cause instanceof Error ? cause.message : String(cause);
+  return new Error(`${message}\n\n${STALE_REGISTRIES_HINT}`);
+}
+
+/**
+ * CONSUME mode gate: the committed manifest must describe exactly the live deployment this run
+ * produced — same protocol versions, same live (old) addresses from the chain states, and the
+ * same nonce-deterministic freshly deployed implementation addresses. Any drift means the
+ * committed registries were generated against different code/states and must be regenerated.
+ */
+function assertCommittedManifestMatchesLiveDeployment(
+  manifestPath: string,
+  live: LiveUpgradeInputs,
+  deployed: DeployedMachinery,
+  ctmProxy: string
+): void {
+  if (!fs.existsSync(manifestPath)) {
+    throw new Error(`Committed registry manifest not found at ${manifestPath}.\n\n${STALE_REGISTRIES_HINT}`);
+  }
+  // Same shape as the object built by buildRegistryManifest (the emit-mode output).
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+  const ctm = (manifest.ctms || []).find((c: { name?: string }) => c.name === CTM_REGISTRY_NAME);
+  const checks: Array<[string, unknown, unknown]> = [
+    ["tag", manifest.tag, REGISTRY_TAG],
+    ["oldVersion", manifest.oldVersion, live.oldVersionString],
+    ["newVersion", manifest.newVersion, live.newVersionString],
+    ["core.proxyAdmin", manifest.core?.proxyAdmin, live.ecosystemProxyAdmin],
+    ["core.contracts.MessageRoot.proxy", manifest.core?.contracts?.MessageRoot?.proxy, live.messageRootProxy],
+    ["core.contracts.MessageRoot.implOld", manifest.core?.contracts?.MessageRoot?.implOld, live.oldMessageRootImpl],
+    ["core.contracts.MessageRoot.implNew", manifest.core?.contracts?.MessageRoot?.implNew, deployed.newMessageRootImpl],
+    ["ctm.ctmProxy", ctm?.ctmProxy, ctmProxy],
+    ["ctm.verifierOld", ctm?.verifierOld, live.oldVerifier],
+    ["ctm.verifierNew", ctm?.verifierNew, deployed.newVerifier],
+    ["ctm.contracts.AdminFacet.old", ctm?.contracts?.AdminFacet?.old, live.oldAdminFacet],
+    ["ctm.contracts.AdminFacet.new", ctm?.contracts?.AdminFacet?.new, deployed.newAdminFacet],
+    ["ctm.contracts.DefaultUpgrade.new", ctm?.contracts?.DefaultUpgrade?.new, deployed.newDefaultUpgrade],
+    ["ctm.contracts.DiamondInit.new", ctm?.contracts?.DiamondInit?.new, deployed.newDiamondInit],
+    ["ctm.genesis.genesisUpgrade", ctm?.genesis?.genesisUpgrade, live.genesisUpgrade],
+  ];
+  const mismatches = checks
+    .filter(([, actual, expected]) => String(actual).toLowerCase() !== String(expected).toLowerCase())
+    .map(([label, actual, expected]) => `  ${label}: manifest has ${actual}, live deployment has ${expected}`);
+  if (mismatches.length > 0) {
+    throw new Error(
+      `Committed registry manifest ${REGISTRY_MANIFEST_REL} does not match the live deployment:\n` +
+        `${mismatches.join("\n")}\n\n${STALE_REGISTRIES_HINT}`
+    );
+  }
+  console.log("  ✓ committed manifest matches the live deployment (addresses + versions)");
+}
+
+/**
+ * Deploy the COMMITTED generated registries. Their artifacts come from the regular forge
+ * build (the sources live under contracts/); the incremental build below makes sure they are
+ * present and current.
+ */
+async function deployCommittedRegistries(
+  deployer: ethers.Wallet
+): Promise<{ ctmRegistry: string; coreRegistry: string }> {
   execSync(`forge build ${REGISTRY_GEN_DIR_REL}`, { cwd: l1ContractsDir, stdio: "inherit" });
 
-  const deployGenerated = async (name: "ZKsyncOSCTMRegistryAnvilHarness" | "CoreRegistryAnvilHarness") => {
+  const deployGenerated = async (name: "ZKsyncOSCTMRegistryV32" | "CoreRegistryV32") => {
     const factory = new ethers.ContractFactory(getAbi(name), getCreationBytecode(name), deployer);
     const contract = await factory.deploy();
     await contract.deployed();
@@ -631,8 +786,8 @@ async function generateAndDeployRegistries(
   };
 
   return {
-    ctmRegistry: await deployGenerated("ZKsyncOSCTMRegistryAnvilHarness"),
-    coreRegistry: await deployGenerated("CoreRegistryAnvilHarness"),
+    ctmRegistry: await deployGenerated("ZKsyncOSCTMRegistryV32"),
+    coreRegistry: await deployGenerated("CoreRegistryV32"),
   };
 }
 
@@ -724,7 +879,7 @@ async function relayL2UpgradeTx(
   upgradeTxData: string,
   chainId: number
 ): Promise<void> {
-  await l2Provider.send("anvil_setCode", [L2_UPGRADE_DELEGATE_ADDR, getBytecode("MockContractDeployer")]);
+  await l2Provider.send("anvil_setCode", [L2_UPGRADE_DELEGATE_ADDR, getDeterministicBytecode("MockContractDeployer")]);
 
   const txHash = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
     const tx = await signer.sendTransaction({

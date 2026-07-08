@@ -17,6 +17,8 @@ l1-contracts/cache-forge
 l1-contracts/artifacts
 l1-contracts/artifacts-forge
 l1-contracts/out
+l1-contracts/out-registry-deterministic
+l1-contracts/cache-forge-registry-deterministic
 l1-contracts/zkout
 l1-contracts/zkstack-out
 l2-contracts/zkout
