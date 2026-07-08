@@ -9,7 +9,11 @@ import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_
 import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
+import {
+    ProposedUpgrade,
+    ProposedUpgradeLib,
+    UpgradeFacetSwap
+} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../../../deploy-scripts/utils/Types.sol";
 import {PublishFactoryDepsResult} from "../../../../deploy-scripts/utils/bytecode/BytecodePublisher.s.sol";
 import {Test} from "forge-std/Test.sol";
@@ -75,7 +79,8 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
             upgradeTimestamp: 0,
-            newProtocolVersion: chainCreationParams.latestProtocolVersion
+            newProtocolVersion: chainCreationParams.latestProtocolVersion,
+            facetSwaps: new UpgradeFacetSwap[](0)
         });
     }
 }

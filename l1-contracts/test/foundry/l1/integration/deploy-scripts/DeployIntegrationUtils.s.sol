@@ -27,52 +27,10 @@ abstract contract DeployIntegrationUtils is Script, DeployCTMUtils {
         return super.getInitializeCalldata(contractName, isZKBytecode);
     }
 
-    function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
-        facetCuts = new Diamond.FacetCut[](6);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: ctmAddresses.stateTransition.facets.adminFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getSelectorsFromArtifact("/out/Admin.sol/AdminFacet.json")
-        });
-        facetCuts[1] = Diamond.FacetCut({
-            facet: ctmAddresses.stateTransition.facets.gettersFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getSelectorsFromArtifact("/out/Getters.sol/GettersFacet.json")
-        });
-        facetCuts[2] = Diamond.FacetCut({
-            facet: ctmAddresses.stateTransition.facets.mailboxFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getSelectorsFromArtifact("/out/Mailbox.sol/MailboxFacet.json")
-        });
-        facetCuts[3] = Diamond.FacetCut({
-            facet: ctmAddresses.stateTransition.facets.executorFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getSelectorsFromArtifact("/out/Executor.sol/ExecutorFacet.json")
-        });
-        facetCuts[4] = Diamond.FacetCut({
-            facet: ctmAddresses.stateTransition.facets.migratorFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getSelectorsFromArtifact("/out/Migrator.sol/MigratorFacet.json")
-        });
-        facetCuts[5] = Diamond.FacetCut({
-            facet: ctmAddresses.stateTransition.facets.committerFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getSelectorsFromArtifact("/out/Committer.sol/CommitterFacet.json")
-        });
-    }
-
     function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
-        return getChainCreationFacetCuts(stateTransition);
+        return getLegacyChainCreationFacetCuts(stateTransition);
     }
 
     function clearPriorityQueue(address _bridgehub, uint256 _chainId) public {

@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
+import {ProposedUpgrade, UpgradeFacetSwap} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {
@@ -34,22 +34,23 @@ contract BaseUpgrade is Test {
     function _prepareEmptyProposedUpgrade() internal {
         protocolVersion = SemVer.packSemVer(0, 1, 0);
 
-        proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: l2CanonicalTransaction,
-            bootloaderHash: bytes32(0),
-            defaultAccountHash: bytes32(0),
-            evmEmulatorHash: bytes32(0),
-            verifier: address(0),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            }),
-            l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: new bytes(0),
-            upgradeTimestamp: 0,
-            newProtocolVersion: protocolVersion
+        // Assigned field by field: whole-struct memory->storage assignment is unsupported in
+        // legacy codegen now that ProposedUpgrade contains a dynamic struct array (facetSwaps).
+        proposedUpgrade.l2ProtocolUpgradeTx = l2CanonicalTransaction;
+        proposedUpgrade.bootloaderHash = bytes32(0);
+        proposedUpgrade.defaultAccountHash = bytes32(0);
+        proposedUpgrade.evmEmulatorHash = bytes32(0);
+        proposedUpgrade.verifier = address(0);
+        proposedUpgrade.verifierParams = VerifierParams({
+            recursionNodeLevelVkHash: bytes32(0),
+            recursionLeafLevelVkHash: bytes32(0),
+            recursionCircuitsSetVksHash: bytes32(0)
         });
+        proposedUpgrade.l1ContractsUpgradeCalldata = new bytes(0);
+        proposedUpgrade.postUpgradeCalldata = new bytes(0);
+        proposedUpgrade.upgradeTimestamp = 0;
+        proposedUpgrade.newProtocolVersion = protocolVersion;
+        delete proposedUpgrade.facetSwaps;
     }
 
     function _prepareProposedUpgrade() internal {
@@ -90,22 +91,25 @@ contract BaseUpgrade is Test {
             reservedDynamic: new bytes(0)
         });
 
-        proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: l2CanonicalTransaction,
-            bootloaderHash: bytes32(0x01000121a363b3fbec270986067c1b553bf540c30a6f186f45313133ff1a1019),
-            defaultAccountHash: bytes32(0x01000121a363b3fbec270986067c1b553bf540c30a6f186f45313133ff1a1019),
-            evmEmulatorHash: bytes32(0x01000121a363b3fbec270986067c1b553bf540c30a6f186f45313133ff1a1019),
-            verifier: address(0),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            }),
-            l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: postUpgradeCalldata,
-            upgradeTimestamp: 0,
-            newProtocolVersion: protocolVersion
+        // Assigned field by field: whole-struct memory->storage assignment is unsupported in
+        // legacy codegen now that ProposedUpgrade contains a dynamic struct array (facetSwaps).
+        proposedUpgrade.l2ProtocolUpgradeTx = l2CanonicalTransaction;
+        proposedUpgrade.bootloaderHash = bytes32(0x01000121a363b3fbec270986067c1b553bf540c30a6f186f45313133ff1a1019);
+        proposedUpgrade.defaultAccountHash = bytes32(
+            0x01000121a363b3fbec270986067c1b553bf540c30a6f186f45313133ff1a1019
+        );
+        proposedUpgrade.evmEmulatorHash = bytes32(0x01000121a363b3fbec270986067c1b553bf540c30a6f186f45313133ff1a1019);
+        proposedUpgrade.verifier = address(0);
+        proposedUpgrade.verifierParams = VerifierParams({
+            recursionNodeLevelVkHash: bytes32(0),
+            recursionLeafLevelVkHash: bytes32(0),
+            recursionCircuitsSetVksHash: bytes32(0)
         });
+        proposedUpgrade.l1ContractsUpgradeCalldata = new bytes(0);
+        proposedUpgrade.postUpgradeCalldata = postUpgradeCalldata;
+        proposedUpgrade.upgradeTimestamp = 0;
+        proposedUpgrade.newProtocolVersion = protocolVersion;
+        delete proposedUpgrade.facetSwaps;
     }
 
     // add this to be excluded from coverage report

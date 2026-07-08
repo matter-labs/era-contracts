@@ -79,7 +79,6 @@ interface CTMManifest {
     factoryDepHashes: string[];
     baseSystemContracts: { bootloader: string; defaultAccount: string; evmEmulator: string };
     fixedForceDeploymentsData: string;
-    chainCreationInitCalldata: string;
   };
   genesis: {
     genesisUpgrade: string;
@@ -424,10 +423,6 @@ ${factoryDeps.join("\n")}
         return ${hexBytes(ctm.l2.fixedForceDeploymentsData)};
     }
 
-    function chainCreationInitCalldata() internal pure returns (bytes memory) {
-        return ${hexBytes(ctm.l2.chainCreationInitCalldata)};
-    }
-
     function genesisParams()
         internal
         pure
@@ -514,10 +509,6 @@ contract ${name} is CTMRegistryBase {
 
     function _fixedForceDeploymentsData() internal pure override returns (bytes memory) {
         return ${name}Data.fixedForceDeploymentsData();
-    }
-
-    function _chainCreationInitCalldata() internal pure override returns (bytes memory) {
-        return ${name}Data.chainCreationInitCalldata();
     }
 
     function _genesisParams() internal pure override returns (address, bytes32, bytes32, uint64) {

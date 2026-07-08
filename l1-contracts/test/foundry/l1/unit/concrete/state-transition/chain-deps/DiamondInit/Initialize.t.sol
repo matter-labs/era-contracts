@@ -24,7 +24,10 @@ contract InitializeTest is DiamondInitTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+            initCalldata: abi.encodeCall(
+                DiamondInit.initialize,
+                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
+            )
         });
 
         vm.expectRevert(ZeroAddress.selector);
@@ -37,7 +40,10 @@ contract InitializeTest is DiamondInitTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+            initCalldata: abi.encodeCall(
+                DiamondInit.initialize,
+                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
+            )
         });
 
         vm.expectRevert(ZeroAddress.selector);
@@ -50,7 +56,10 @@ contract InitializeTest is DiamondInitTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+            initCalldata: abi.encodeCall(
+                DiamondInit.initialize,
+                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
+            )
         });
 
         vm.expectRevert(ZeroAddress.selector);
@@ -63,7 +72,10 @@ contract InitializeTest is DiamondInitTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+            initCalldata: abi.encodeCall(
+                DiamondInit.initialize,
+                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
+            )
         });
 
         vm.expectRevert(ZeroAddress.selector);
@@ -76,7 +88,10 @@ contract InitializeTest is DiamondInitTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+            initCalldata: abi.encodeCall(
+                DiamondInit.initialize,
+                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
+            )
         });
 
         vm.expectRevert(ZeroAddress.selector);
@@ -89,7 +104,10 @@ contract InitializeTest is DiamondInitTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+            initCalldata: abi.encodeCall(
+                DiamondInit.initialize,
+                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
+            )
         });
 
         vm.expectRevert(EmptyAssetId.selector);
@@ -107,7 +125,10 @@ contract InitializeTest is DiamondInitTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+            initCalldata: abi.encodeCall(
+                DiamondInit.initialize,
+                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
+            )
         });
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
@@ -125,8 +146,17 @@ contract InitializeTest is DiamondInitTest {
         assertEq(utilsFacet.util_getValidator(initializeData.validatorTimelock), true);
 
         assertEq(utilsFacet.util_getStoredBatchHashes(0), initializeData.storedBatchZero);
-        assertEq(utilsFacet.util_getL2BootloaderBytecodeHash(), initializeData.l2BootloaderBytecodeHash);
-        assertEq(utilsFacet.util_getL2DefaultAccountBytecodeHash(), initializeData.l2DefaultAccountBytecodeHash);
-        assertEq(utilsFacet.util_getL2EvmEmulatorBytecodeHash(), initializeData.l2EvmEmulatorBytecodeHash);
+        assertEq(
+            utilsFacet.util_getL2BootloaderBytecodeHash(),
+            Utils.makeInitializeDataForNewChain().l2BootloaderBytecodeHash
+        );
+        assertEq(
+            utilsFacet.util_getL2DefaultAccountBytecodeHash(),
+            Utils.makeInitializeDataForNewChain().l2DefaultAccountBytecodeHash
+        );
+        assertEq(
+            utilsFacet.util_getL2EvmEmulatorBytecodeHash(),
+            Utils.makeInitializeDataForNewChain().l2EvmEmulatorBytecodeHash
+        );
     }
 }

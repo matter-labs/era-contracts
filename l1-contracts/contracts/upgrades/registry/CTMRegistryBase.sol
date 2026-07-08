@@ -101,8 +101,6 @@ abstract contract CTMRegistryBase is ICTMRegistry {
 
     function _fixedForceDeploymentsData() internal pure virtual returns (bytes memory);
 
-    function _chainCreationInitCalldata() internal pure virtual returns (bytes memory);
-
     function _genesisParams()
         internal
         pure
@@ -287,12 +285,6 @@ abstract contract CTMRegistryBase is ICTMRegistry {
     function fixedForceDeploymentsData(uint256 _protocolVersion) external pure returns (bytes memory) {
         _requireNewVersion(_protocolVersion);
         return _fixedForceDeploymentsData();
-    }
-
-    /// @inheritdoc ICTMRegistry
-    function chainCreationInitCalldata(uint256 _protocolVersion) external pure returns (bytes memory) {
-        _requireNewVersion(_protocolVersion);
-        return _chainCreationInitCalldata();
     }
 
     /// @inheritdoc ICTMRegistry

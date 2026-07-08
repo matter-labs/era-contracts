@@ -85,9 +85,9 @@ contract CTMUpgradeModule {
         emit ChainUpgradeApplied(address(ctm), _chainId, _registry.newProtocolVersion());
     }
 
-    /// @dev Composes the full upgrade cut: registry-diffed facet cuts with the
-    ///      `DefaultUpgrade.upgrade(proposedUpgrade)` init delegatecall embedding the L2
-    ///      protocol upgrade transaction.
+    /// @dev Composes the full upgrade cut: a `DefaultUpgrade.upgrade(proposedUpgrade)` init
+    ///      delegatecall embedding the facet-swap plan and the L2 protocol upgrade transaction
+    ///      (no outer `facetCuts` — the upgrade contract applies the swaps itself).
     function _buildUpgradeCut(
         ICTMRegistry _registry,
         uint256 _upgradeTimestamp
@@ -95,7 +95,6 @@ contract CTMUpgradeModule {
         ProposedUpgrade memory proposedUpgrade = CTMUpgradeComposer.buildProposedUpgrade(_registry, _upgradeTimestamp);
         return
             CTMUpgradeComposer.buildUpgradeCutData(
-                _registry,
                 _registry.ctmAddress(CTMContract.DefaultUpgrade, _registry.newProtocolVersion()),
                 abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade))
             );

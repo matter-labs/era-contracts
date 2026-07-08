@@ -175,12 +175,6 @@ contract GatewayCTMDeployerTest is Test {
             l1ChainId: 1,
             testnetVerifier: true,
             isZKsyncOS: false,
-            adminSelectors: new bytes4[](2),
-            executorSelectors: new bytes4[](2),
-            mailboxSelectors: new bytes4[](2),
-            gettersSelectors: new bytes4[](2),
-            migratorSelectors: new bytes4[](2),
-            committerSelectors: new bytes4[](2),
             bootloaderHash: bytes32(uint256(0xabc)),
             defaultAccountHash: bytes32(uint256(0xdef)),
             evmEmulatorHash: bytes32(uint256(0xdef)),
@@ -190,18 +184,6 @@ contract GatewayCTMDeployerTest is Test {
             forceDeploymentsData: hex"deadbeef",
             protocolVersion: 1
         });
-
-        // Initialize selectors with sample function selectors
-        config.adminSelectors[0] = bytes4(keccak256("adminFunction1()"));
-        config.adminSelectors[1] = bytes4(keccak256("adminFunction2()"));
-        config.executorSelectors[0] = bytes4(keccak256("executorFunction1()"));
-        config.executorSelectors[1] = bytes4(keccak256("executorFunction2()"));
-        config.mailboxSelectors[0] = bytes4(keccak256("mailboxFunction1()"));
-        config.mailboxSelectors[1] = bytes4(keccak256("mailboxFunction2()"));
-        config.gettersSelectors[0] = bytes4(keccak256("gettersFunction1()"));
-        config.gettersSelectors[1] = bytes4(keccak256("gettersFunction2()"));
-        config.migratorSelectors[0] = bytes4(keccak256("migratorFunction1()"));
-        config.migratorSelectors[1] = bytes4(keccak256("migratorFunction2()"));
 
         deployerConfig = config;
 

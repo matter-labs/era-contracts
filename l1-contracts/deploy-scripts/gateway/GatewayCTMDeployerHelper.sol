@@ -19,7 +19,10 @@ import {
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {
+    FacetInstallation,
+    InitializeDataNewChain as DiamondInitializeDataNewChain
+} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {
     ChainCreationParams,
     ChainTypeManagerInitializeData,
@@ -688,50 +691,47 @@ library GatewayCTMDeployerHelper {
         Facets memory facets,
         GatewayCTMDeployerConfig memory baseConfig
     ) private pure returns (bytes memory) {
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](6);
-        facetCuts[0] = Diamond.FacetCut({
+        // Mirrors GatewayCTMDeployerCTMBase: no facet cuts and no selector lists — DiamondInit
+        // installs the self-describing facets itself on the chain where the cut runs.
+        FacetInstallation[] memory facetInstallations = new FacetInstallation[](6);
+        facetInstallations[0] = FacetInstallation({
             facet: facets.adminFacet,
-            action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: baseConfig.adminSelectors
+            selectors: new bytes4[](0)
         });
-        facetCuts[1] = Diamond.FacetCut({
+        facetInstallations[1] = FacetInstallation({
             facet: facets.gettersFacet,
-            action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: baseConfig.gettersSelectors
+            selectors: new bytes4[](0)
         });
-        facetCuts[2] = Diamond.FacetCut({
+        facetInstallations[2] = FacetInstallation({
             facet: facets.mailboxFacet,
-            action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: baseConfig.mailboxSelectors
+            selectors: new bytes4[](0)
         });
-        facetCuts[3] = Diamond.FacetCut({
+        facetInstallations[3] = FacetInstallation({
             facet: facets.executorFacet,
-            action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: baseConfig.executorSelectors
+            selectors: new bytes4[](0)
         });
-        facetCuts[4] = Diamond.FacetCut({
+        facetInstallations[4] = FacetInstallation({
             facet: facets.migratorFacet,
-            action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: baseConfig.migratorSelectors
+            selectors: new bytes4[](0)
         });
-        facetCuts[5] = Diamond.FacetCut({
+        facetInstallations[5] = FacetInstallation({
             facet: facets.committerFacet,
-            action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: baseConfig.committerSelectors
+            selectors: new bytes4[](0)
         });
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
             l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
-            l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
+            l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash,
+            facets: facetInstallations
         });
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
+            facetCuts: new Diamond.FacetCut[](0),
             initAddress: facets.diamondInit,
             initCalldata: abi.encode(initializeData)
         });

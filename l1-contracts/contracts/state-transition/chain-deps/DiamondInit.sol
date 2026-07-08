@@ -15,7 +15,13 @@ import {
     DEFAULT_PUBDATA_PRICING_MODE,
     DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT
 } from "../../common/Config.sol";
-import {IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol";
+import {
+    FacetInstallation,
+    IDiamondInit,
+    InitializeData,
+    InitializeDataNewChain
+} from "../chain-interfaces/IDiamondInit.sol";
+import {ISelfDescribingFacet} from "../chain-interfaces/ISelfDescribingFacet.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../IChainTypeManager.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
@@ -49,8 +55,14 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
     /// initializer
     function initialize(
-        InitializeData calldata _initializeData
+        InitializeData calldata _initializeData,
+        bytes calldata _newChainData
     ) public virtual reentrancyGuardInitializer returns (bytes32) {
+        // The chain-independent half, committed in the chain-creation cut and passed through by
+        // the CTM as opaque bytes: decoding it here keeps the (size-constrained) CTM free of the
+        // nested-type codecs.
+        InitializeDataNewChain memory newChainData = abi.decode(_newChainData, (InitializeDataNewChain));
+
         if (_initializeData.admin == address(0)) {
             revert ZeroAddress();
         }
@@ -67,16 +79,21 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
             revert EmptyAssetId();
         }
 
+        // Facets are installed here, by the init itself, mirroring the legacy path where the
+        // outer cut's `facetCuts` executed before this delegatecall: the genesis cut carries
+        // facet addresses only, never selector lists (see `FacetInstallation`).
+        _installFacets(newChainData.facets);
+
         if (!IS_ZKSYNC_OS) {
-            if (_initializeData.l2BootloaderBytecodeHash == bytes32(0)) {
+            if (newChainData.l2BootloaderBytecodeHash == bytes32(0)) {
                 revert EmptyBytes32();
             }
 
-            if (_initializeData.l2DefaultAccountBytecodeHash == bytes32(0)) {
+            if (newChainData.l2DefaultAccountBytecodeHash == bytes32(0)) {
                 revert EmptyBytes32();
             }
 
-            if (_initializeData.l2EvmEmulatorBytecodeHash == bytes32(0)) {
+            if (newChainData.l2EvmEmulatorBytecodeHash == bytes32(0)) {
                 revert EmptyBytes32();
             }
         }
@@ -110,9 +127,9 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.validators[_initializeData.validatorTimelock] = true;
 
         s.storedBatchHashes[0] = _initializeData.storedBatchZero;
-        s.l2BootloaderBytecodeHash = _initializeData.l2BootloaderBytecodeHash;
-        s.l2DefaultAccountBytecodeHash = _initializeData.l2DefaultAccountBytecodeHash;
-        s.l2EvmEmulatorBytecodeHash = _initializeData.l2EvmEmulatorBytecodeHash;
+        s.l2BootloaderBytecodeHash = newChainData.l2BootloaderBytecodeHash;
+        s.l2DefaultAccountBytecodeHash = newChainData.l2DefaultAccountBytecodeHash;
+        s.l2EvmEmulatorBytecodeHash = newChainData.l2EvmEmulatorBytecodeHash;
         s.priorityTxMaxGasLimit = DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT;
         s.priorityModeInfo.permissionlessValidator = IChainTypeManager(_initializeData.chainTypeManager)
             .PERMISSIONLESS_VALIDATOR();
@@ -137,5 +154,29 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
+    }
+
+    /// @dev Adds every facet to the diamond this contract is delegatecalled into. Selector lists
+    ///      resolve at execution time: a pinned non-empty list wins, otherwise the facet's own
+    ///      `ISelfDescribingFacet.selectors()` is read (its immutable bytecode is the single
+    ///      source of truth for what it serves).
+    function _installFacets(FacetInstallation[] memory _facets) private {
+        uint256 facetsLength = _facets.length;
+        if (facetsLength == 0) {
+            return;
+        }
+
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](facetsLength);
+        for (uint256 i = 0; i < facetsLength; ++i) {
+            FacetInstallation memory facet = _facets[i];
+            facetCuts[i] = Diamond.FacetCut({
+                facet: facet.facet,
+                action: Diamond.Action.Add,
+                isFreezable: facet.isFreezable,
+                selectors: facet.selectors.length != 0 ? facet.selectors : ISelfDescribingFacet(facet.facet).selectors()
+            });
+        }
+
+        Diamond.diamondCut(Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: ""}));
     }
 }

@@ -8,4 +8,6 @@ interface IDefaultUpgrade {
     function upgrade(ProposedUpgrade calldata _upgrade) external returns (bytes32);
 
     function upgradeInner(ProposedUpgrade calldata _upgrade) external returns (bytes32);
+
+    function patchUpgrade(uint256 _newProtocolVersion) external returns (bytes32);
 }

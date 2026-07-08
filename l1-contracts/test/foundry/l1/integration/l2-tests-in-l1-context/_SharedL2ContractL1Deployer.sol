@@ -86,17 +86,6 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
     // add this to be excluded from coverage report
     function test() internal virtual override(DeployCTMIntegrationScript, SharedL2ContractDeployer) {}
 
-    function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    )
-        internal
-        virtual
-        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
-        returns (Diamond.FacetCut[] memory)
-    {
-        return super.getChainCreationFacetCuts(stateTransition);
-    }
-
     function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     )

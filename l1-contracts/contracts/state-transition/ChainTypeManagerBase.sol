@@ -35,7 +35,6 @@ import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHan
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TxStatus} from "../common/Messaging.sol";
-import {ProposedUpgrade, ProposedUpgradeLib} from "./libraries/ProposedUpgradeLib.sol";
 import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
 
 /// @title Chain Type Manager Base contract
@@ -396,10 +395,9 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             }
         }
 
-        // Construct minimal ProposedUpgrade for patch (VK-only) upgrade
-        ProposedUpgrade memory proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(_newProtocolVersion);
-
-        bytes memory upgradeCalldata = abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade));
+        // The empty (VK-only) proposal is composed inside the upgrade contract itself
+        // (`DefaultUpgrade.patchUpgrade`), keeping this contract free of ProposedUpgrade codecs.
+        bytes memory upgradeCalldata = abi.encodeCall(IDefaultUpgrade.patchUpgrade, (_newProtocolVersion));
 
         // Create diamond cut data with empty facet cuts but with upgrade contract
         Diamond.FacetCut[] memory emptyFacetCuts = new Diamond.FacetCut[](0);
@@ -598,9 +596,15 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             }
         }
 
-        // construct init data
+        // Construct init data: the committed cut's initCalldata is the chain-independent tail
+        // (the abi-encoded `InitializeDataNewChain`, including the facets DiamondInit installs
+        // itself). It is passed through OPAQUELY — DiamondInit decodes it — so this
+        // (size-constrained) contract carries no codecs for the nested types; only the CTM-known,
+        // chain-specific head is filled in here. The encoding of
+        // `initialize(InitializeData, bytes)` is assembled by hand: the 9-word static struct is
+        // inline, followed by the `bytes` offset word (10 * 32), its length, and the (already
+        // 32-byte-padded, being abi.encode output) tail itself.
         bytes memory initData;
-        /// all together 4+9*32=292 bytes for the selector + mandatory data
         // solhint-disable-next-line func-named-parameters
         initData = bytes.concat(
             IDiamondInit.initialize.selector,
@@ -613,9 +617,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             bytes32(uint256(uint160(validatorTimelockPostV29))),
             _baseTokenAssetId,
             storedBatchZero,
+            bytes32(uint256(10 * 32)),
+            bytes32(diamondCut.initCalldata.length),
             diamondCut.initCalldata
         );
-
         diamondCut.initCalldata = initData;
         // deploy zkChainContract
         // slither-disable-next-line reentrancy-no-eth

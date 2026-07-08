@@ -99,7 +99,7 @@ contract CTMUpgradeModuleTest is ChainTypeManagerTest {
         factoryDeps[0] = 1;
         ctmRegistry.setFactoryDepHashes(factoryDeps);
         ctmRegistry.setBaseSystemContractHashes(bytes32(uint256(0xb00)), bytes32(uint256(0xda0)), bytes32(0));
-        ctmRegistry.setChainCreationData(hex"f1f2", hex"c1c2");
+        ctmRegistry.setChainCreationData(hex"f1f2");
         ctmRegistry.setGenesis(makeAddr("genesisUpgrade"), bytes32(uint256(1)), bytes32(uint256(2)), 54);
     }
 
@@ -111,7 +111,6 @@ contract CTMUpgradeModuleTest is ChainTypeManagerTest {
         );
         return
             CTMUpgradeComposer.buildUpgradeCutData(
-                ICTMRegistry(address(ctmRegistry)),
                 ctmRegistry.ctmAddress(CTMContract.DefaultUpgrade, newVersion),
                 abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade))
             );

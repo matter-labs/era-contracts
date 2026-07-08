@@ -64,10 +64,6 @@ contract ZKsyncOSCTMRegistryV32 is CTMRegistryBase {
         return ZKsyncOSCTMRegistryV32Data.fixedForceDeploymentsData();
     }
 
-    function _chainCreationInitCalldata() internal pure override returns (bytes memory) {
-        return ZKsyncOSCTMRegistryV32Data.chainCreationInitCalldata();
-    }
-
     function _genesisParams() internal pure override returns (address, bytes32, bytes32, uint64) {
         return ZKsyncOSCTMRegistryV32Data.genesisParams();
     }

@@ -750,7 +750,6 @@ async function buildRegistryManifest(
           // are stored by setChainCreationParams; no new chain is created in this test, so
           // synthetic payloads (mirroring the foundry e2e test) suffice.
           fixedForceDeploymentsData: "0xf1f2",
-          chainCreationInitCalldata: "0xc1c2",
         },
         genesis: {
           genesisUpgrade: live.genesisUpgrade,

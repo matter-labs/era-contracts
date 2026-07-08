@@ -42,12 +42,6 @@ contract L2InteropIndirectCallValueRegressionL1Test is
         super.deployL2Contracts(_l1ChainId);
     }
 
-    function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
-        return super.getChainCreationFacetCuts(stateTransition);
-    }
-
     function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {

@@ -94,10 +94,6 @@ interface ICTMRegistry {
     ///         `ChainCreationParams.forceDeploymentsData` for newly created chains.
     function fixedForceDeploymentsData(uint256 _protocolVersion) external view returns (bytes memory);
 
-    /// @notice The init calldata of the chain-creation diamond cut (the encoded
-    ///         `DiamondInit.initialize` payload) at a given protocol version.
-    function chainCreationInitCalldata(uint256 _protocolVersion) external view returns (bytes memory);
-
     /// @notice Genesis VM-state values for a given protocol version. These are outputs of running
     ///         the genesis VM off-chain with the pinned L2 system-contract set; the audit step is
     ///         reproducing that run.

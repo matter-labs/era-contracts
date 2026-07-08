@@ -192,10 +192,6 @@ library ZKsyncOSCTMRegistryV99Data {
         return hex"f1f2";
     }
 
-    function chainCreationInitCalldata() internal pure returns (bytes memory) {
-        return hex"c1c2c3";
-    }
-
     function genesisParams()
         internal
         pure

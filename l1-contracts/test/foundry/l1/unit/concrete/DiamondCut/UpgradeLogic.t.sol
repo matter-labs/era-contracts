@@ -4,7 +4,12 @@ pragma solidity 0.8.28;
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
-import {DiamondInit, InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.sol";
+import {
+    DiamondInit,
+    FacetInstallation,
+    InitializeData,
+    InitializeDataNewChain
+} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -96,18 +101,17 @@ contract UpgradeLogicTest is DiamondCutTest {
             admin: admin,
             validatorTimelock: makeAddr("validatorTimelock"),
             baseTokenAssetId: baseTokenAssetId,
-            storedBatchZero: bytes32(0),
-            // genesisBatchHash: 0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,
-            // genesisIndexRepeatedStorageChanges: 0,
-            // genesisBatchCommitment: bytes32(0),
-            // zkPorterIsAvailable: false,
-            l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-            l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-            l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
+            storedBatchZero: bytes32(0)
         });
         // initialProtocolVersion: 0,
+        InitializeDataNewChain memory newChainParams = InitializeDataNewChain({
+            l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+            l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+            l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+            facets: new FacetInstallation[](0)
+        });
 
-        bytes memory diamondInitCalldata = abi.encodeWithSelector(diamondInit.initialize.selector, params);
+        bytes memory diamondInitCalldata = abi.encodeCall(diamondInit.initialize, (params, abi.encode(newChainParams)));
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,

@@ -98,6 +98,19 @@
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "selectors",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "result",
+        "type": "bytes4[]",
+        "internalType": "bytes4[]"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
     "type": "event",
     "name": "BlockExecution",
     "inputs": [

@@ -7,9 +7,12 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol";
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
+import {ISelfDescribingFacet} from "../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
-import {ProposedUpgrade} from "../state-transition/libraries/ProposedUpgradeLib.sol";
+import {Diamond} from "../state-transition/libraries/Diamond.sol";
+import {DiamondCutBuilder} from "../state-transition/libraries/DiamondCutBuilder.sol";
+import {ProposedUpgrade, UpgradeFacetSwap} from "../state-transition/libraries/ProposedUpgradeLib.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {
@@ -70,6 +73,11 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         if (block.timestamp < _proposedUpgrade.upgradeTimestamp) {
             revert TimeNotReached(_proposedUpgrade.upgradeTimestamp, block.timestamp);
         }
+
+        // Facet swaps are applied first, mirroring the legacy path where the outer cut's
+        // `facetCuts` execute before this init delegatecall runs.
+        _upgradeFacets(_proposedUpgrade.facetSwaps);
+
         // If settlement layer is 0, it means that this diamond proxy is located on the settlement layer.
         bool isOnSettlementLayer = s.settlementLayer == address(0);
 
@@ -107,6 +115,55 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         _postUpgrade(_proposedUpgrade.postUpgradeCalldata);
 
         emit UpgradeComplete(_proposedUpgrade.newProtocolVersion, txHash, _proposedUpgrade);
+    }
+
+    /// @notice Applies the proposed facet swaps to the diamond this contract is delegatecalled
+    ///         into. A no-op when the plan is empty (the legacy path, where facet changes ride in
+    ///         the outer diamond cut's `facetCuts`).
+    /// @dev Selector lists are resolved here, at execution time: a pinned non-empty list wins
+    ///      (bootstrap override for facets predating `ISelfDescribingFacet`), otherwise the
+    ///      facet's own `selectors()` is read. Facet bytecode is immutable, so every execution of
+    ///      the same plan produces the same cut — which keeps the committed upgrade-cut hash
+    ///      recomposable for the whole upgrade window without carting selector lists around.
+    function _upgradeFacets(UpgradeFacetSwap[] memory _facetSwaps) internal {
+        uint256 swapsLength = _facetSwaps.length;
+        if (swapsLength == 0) {
+            return;
+        }
+
+        DiamondCutBuilder.FacetSwap[] memory swaps = new DiamondCutBuilder.FacetSwap[](swapsLength);
+        bytes4[][] memory oldSelectors = new bytes4[][](swapsLength);
+        bytes4[][] memory newSelectors = new bytes4[][](swapsLength);
+        for (uint256 i = 0; i < swapsLength; ++i) {
+            UpgradeFacetSwap memory swap = _facetSwaps[i];
+            swaps[i] = DiamondCutBuilder.FacetSwap({
+                oldFacet: swap.oldFacet,
+                newFacet: swap.newFacet,
+                isFreezable: swap.isFreezable
+            });
+            oldSelectors[i] = _resolveFacetSelectors(swap.oldFacet, swap.oldSelectors);
+            newSelectors[i] = _resolveFacetSelectors(swap.newFacet, swap.newSelectors);
+        }
+
+        Diamond.diamondCut(
+            Diamond.DiamondCutData({
+                facetCuts: DiamondCutBuilder.buildCuts(swaps, oldSelectors, newSelectors),
+                initAddress: address(0),
+                initCalldata: ""
+            })
+        );
+    }
+
+    /// @dev A zero facet has no selectors (pure addition/removal side); a pinned list overrides;
+    ///      otherwise the facet self-describes.
+    function _resolveFacetSelectors(
+        address _facet,
+        bytes4[] memory _pinnedSelectors
+    ) private view returns (bytes4[] memory) {
+        if (_facet == address(0) || _pinnedSelectors.length != 0) {
+            return _pinnedSelectors;
+        }
+        return ISelfDescribingFacet(_facet).selectors();
     }
 
     /// @notice Change default account bytecode hash, that is used on L2

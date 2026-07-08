@@ -28,7 +28,11 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
-import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {
+    FacetInstallation,
+    InitializeData,
+    InitializeDataNewChain
+} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
@@ -320,11 +324,14 @@ contract ExecutorTest is UtilsCallMockerTest {
             admin: owner,
             validatorTimelock: address(validatorTimelock),
             baseTokenAssetId: baseTokenAssetId,
-            storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
-            // verifier is fetched from CTM
+            storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo))
+        });
+        // verifier is fetched from CTM
+        InitializeDataNewChain memory newChainParams = InitializeDataNewChain({
             l2BootloaderBytecodeHash: dummyHash,
             l2DefaultAccountBytecodeHash: dummyHash,
-            l2EvmEmulatorBytecodeHash: dummyHash
+            l2EvmEmulatorBytecodeHash: dummyHash,
+            facets: new FacetInstallation[](0)
         });
         mockDiamondInitInteropCenterCallsWithAddress(
             address(dummyBridgehub),
@@ -334,7 +341,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             address(permissionlessValidator)
         );
 
-        bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
+        bytes memory diamondInitData = abi.encodeCall(diamondInit.initialize, (params, abi.encode(newChainParams)));
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](5);
         facetCuts[0] = Diamond.FacetCut({

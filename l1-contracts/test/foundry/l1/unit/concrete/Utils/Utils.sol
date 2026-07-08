@@ -22,7 +22,11 @@ import {
     VerifierParams
 } from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
-import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {
+    FacetInstallation,
+    InitializeData,
+    InitializeDataNewChain
+} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {
     IExecutor,
     SystemLogKey,
@@ -541,10 +545,7 @@ library Utils {
                 admin: address(0x32149872498357874258787),
                 validatorTimelock: address(0x85430237648403822345345),
                 baseTokenAssetId: bytes32(uint256(0x923645439232223445)),
-                storedBatchZero: bytes32(0),
-                l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
+                storedBatchZero: bytes32(0)
             });
     }
 
@@ -553,15 +554,16 @@ library Utils {
             InitializeDataNewChain({
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
+                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+                facets: new FacetInstallation[](0)
             });
     }
 
     function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address bridgehub) public returns (address) {
         DiamondInit diamondInit = new DiamondInit(false);
-        bytes memory diamondInitData = abi.encodeWithSelector(
-            diamondInit.initialize.selector,
-            makeInitializeData(bridgehub)
+        bytes memory diamondInitData = abi.encodeCall(
+            diamondInit.initialize,
+            (makeInitializeData(bridgehub), abi.encode(makeInitializeDataForNewChain()))
         );
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({

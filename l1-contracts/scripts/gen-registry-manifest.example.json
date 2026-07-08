@@ -107,8 +107,7 @@
           "defaultAccount": "0x0100000000000000000000000000000000000000000000000000000000000da0",
           "evmEmulator": "0x0000000000000000000000000000000000000000000000000000000000000000"
         },
-        "fixedForceDeploymentsData": "0xf1f2",
-        "chainCreationInitCalldata": "0xc1c2c3"
+        "fixedForceDeploymentsData": "0xf1f2"
       },
       "genesis": {
         "genesisUpgrade": "0x0000000000000000000000000000000000010005",

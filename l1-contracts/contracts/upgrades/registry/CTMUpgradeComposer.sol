@@ -5,11 +5,14 @@ pragma solidity 0.8.28;
 import {CoreContract, CTMContract} from "./ContractIdentifiers.sol";
 import {ICTMRegistry} from "./ICTMRegistry.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
-import {DiamondCutBuilder} from "../../state-transition/libraries/DiamondCutBuilder.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
-import {ISelfDescribingFacet} from "../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
+import {FacetInstallation, InitializeDataNewChain} from "../../state-transition/chain-interfaces/IDiamondInit.sol";
 import {ChainCreationParams} from "../../state-transition/IChainTypeManager.sol";
-import {ProposedUpgrade, ProposedUpgradeLib} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
+import {
+    ProposedUpgrade,
+    ProposedUpgradeLib,
+    UpgradeFacetSwap
+} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 import {
     PRIORITY_TX_MAX_GAS_LIMIT,
@@ -35,75 +38,47 @@ import {SEMVER_MINOR_OFFSET} from "../../common/libraries/SemVer.sol";
 ///      chains) are derived from the same registry constants, they cannot drift apart.
 library CTMUpgradeComposer {
     /// @dev The facet swaps of an upgrade together with the selector lists they diff.
-    struct SwapSet {
-        DiamondCutBuilder.FacetSwap[] swaps;
-        bytes4[][] oldSelectors;
-        bytes4[][] newSelectors;
-    }
-
-    /// @notice Builds the facet swaps taking a chain from the registry's old protocol version to
-    ///         its new one. The registry's old-version facet rows ARE the plan: one swap per row,
-    ///         no diffing heuristics — the generated data already says exactly what changes.
+    /// @notice Builds the facet-swap plan taking a chain from the registry's old protocol version
+    ///         to its new one. The registry's old-version facet rows ARE the plan: one swap per
+    ///         row, no diffing heuristics — the generated data already says exactly what changes.
     /// @dev Per planned facet, the old address comes from the old-side row (zero = pure addition)
     ///      and the new address from the new-side facet set (absent = pure removal). Selector
-    ///      lists come from the facets themselves (`ISelfDescribingFacet.selectors()`, immutable
-    ///      bytecode, so recomposition stays stable across the upgrade window) unless the
-    ///      registry pins a list for that facet version — the bootstrap override for facet
-    ///      versions deployed before `ISelfDescribingFacet` existed. Never from live diamond
-    ///      state.
-    function buildFacetSwaps(ICTMRegistry _registry) internal view returns (SwapSet memory swapSet) {
+    ///      lists are copied verbatim from the registry — empty (the steady state) defers to the
+    ///      facet's own `ISelfDescribingFacet.selectors()` at execution time inside
+    ///      `BaseZkSyncUpgrade._upgradeFacets`; a pinned list is the bootstrap override for facet
+    ///      versions deployed before that interface existed. Nothing here reads facet or diamond
+    ///      state, so the committed calldata stays small and recomposition is trivially stable.
+    function buildFacetSwapPlan(ICTMRegistry _registry) internal view returns (UpgradeFacetSwap[] memory plan) {
         uint256 oldVersion = _registry.oldProtocolVersion();
         uint256 newVersion = _registry.newProtocolVersion();
-        CTMContract[] memory plan = _registry.facetList(oldVersion);
-        uint256 planLength = plan.length;
+        CTMContract[] memory planFacets = _registry.facetList(oldVersion);
+        uint256 planLength = planFacets.length;
 
-        swapSet.swaps = new DiamondCutBuilder.FacetSwap[](planLength);
-        swapSet.oldSelectors = new bytes4[][](planLength);
-        swapSet.newSelectors = new bytes4[][](planLength);
+        plan = new UpgradeFacetSwap[](planLength);
         for (uint256 i = 0; i < planLength; ++i) {
-            CTMContract facet = plan[i];
+            CTMContract facet = planFacets[i];
             address oldAddress = _registry.ctmAddress(facet, oldVersion);
             address newAddress = _registry.ctmAddress(facet, newVersion);
-            swapSet.swaps[i] = DiamondCutBuilder.FacetSwap({
+            plan[i] = UpgradeFacetSwap({
                 oldFacet: oldAddress,
                 newFacet: newAddress,
-                isFreezable: _registry.facetIsFreezable(facet)
+                isFreezable: _registry.facetIsFreezable(facet),
+                oldSelectors: oldAddress == address(0) ? new bytes4[](0) : _registry.facetSelectors(facet, oldVersion),
+                newSelectors: newAddress == address(0) ? new bytes4[](0) : _registry.facetSelectors(facet, newVersion)
             });
-            swapSet.oldSelectors[i] = oldAddress == address(0)
-                ? new bytes4[](0)
-                : _facetSelectors(_registry, facet, oldVersion, oldAddress);
-            swapSet.newSelectors[i] = newAddress == address(0)
-                ? new bytes4[](0)
-                : _facetSelectors(_registry, facet, newVersion, newAddress);
         }
     }
 
-    /// @dev The selector list of a facet at a version: the registry's pinned list when one
-    ///      exists (bootstrap override for facet versions predating `ISelfDescribingFacet`),
-    ///      otherwise read from the facet's own immutable bytecode.
-    function _facetSelectors(
-        ICTMRegistry _registry,
-        CTMContract _facet,
-        uint256 _protocolVersion,
-        address _facetAddress
-    ) private view returns (bytes4[] memory selectorList) {
-        selectorList = _registry.facetSelectors(_facet, _protocolVersion);
-        if (selectorList.length == 0) {
-            selectorList = ISelfDescribingFacet(_facetAddress).selectors();
-        }
-    }
-
-    /// @notice Builds the diamond cut that upgrades an existing chain, with the given init
-    ///         delegatecall (typically `DefaultUpgrade.upgrade(proposedUpgrade)`).
+    /// @notice Builds the diamond cut that upgrades an existing chain: no `facetCuts` of its own —
+    ///         facet swaps ride inside the init calldata's `ProposedUpgrade.facetSwaps` and are
+    ///         applied by `BaseZkSyncUpgrade` itself, inside the diamond's context.
     function buildUpgradeCutData(
-        ICTMRegistry _registry,
         address _initAddress,
         bytes memory _initCalldata
-    ) internal view returns (Diamond.DiamondCutData memory) {
-        SwapSet memory swapSet = buildFacetSwaps(_registry);
+    ) internal pure returns (Diamond.DiamondCutData memory) {
         return
             Diamond.DiamondCutData({
-                facetCuts: DiamondCutBuilder.buildCuts(swapSet.swaps, swapSet.oldSelectors, swapSet.newSelectors),
+                facetCuts: new Diamond.FacetCut[](0),
                 initAddress: _initAddress,
                 initCalldata: _initCalldata
             });
@@ -162,6 +137,7 @@ library CTMUpgradeComposer {
             proposedUpgrade.evmEmulatorHash
         ) = _registry.baseSystemContractHashes(newVersion);
         proposedUpgrade.upgradeTimestamp = _upgradeTimestamp;
+        proposedUpgrade.facetSwaps = buildFacetSwapPlan(_registry);
     }
 
     /// @notice Builds the `ChainCreationParams` for chains created at the registry's new protocol
@@ -188,37 +164,40 @@ library CTMUpgradeComposer {
             });
     }
 
-    /// @dev The initial cut of a new chain: a pure addition of the new facet set, initialized
-    ///      through `DiamondInit` with the registry-pinned init calldata.
+    /// @dev The initial cut of a new chain: no `facetCuts` — `DiamondInit` installs the new
+    ///      facet set itself from the `FacetInstallation` list in its init calldata, composed
+    ///      here from the same registry rows the upgrade path uses (no drift by construction).
+    ///      Selector lists ride along only when the registry pins them (bootstrap override);
+    ///      empty means DiamondInit reads the facet's own `selectors()` at execution time.
     function _buildChainCreationCut(
         ICTMRegistry _registry,
         uint256 _newVersion
     ) private view returns (Diamond.DiamondCutData memory) {
         CTMContract[] memory facets = _registry.facetList(_newVersion);
         uint256 facetsLength = facets.length;
-        DiamondCutBuilder.FacetSwap[] memory swaps = new DiamondCutBuilder.FacetSwap[](facetsLength);
-        bytes4[][] memory oldSelectors = new bytes4[][](facetsLength);
-        bytes4[][] memory newSelectors = new bytes4[][](facetsLength);
+        FacetInstallation[] memory installations = new FacetInstallation[](facetsLength);
         for (uint256 i = 0; i < facetsLength; ++i) {
-            swaps[i] = DiamondCutBuilder.FacetSwap({
-                oldFacet: address(0),
-                newFacet: _registry.ctmAddress(facets[i], _newVersion),
-                isFreezable: _registry.facetIsFreezable(facets[i])
+            installations[i] = FacetInstallation({
+                facet: _registry.ctmAddress(facets[i], _newVersion),
+                isFreezable: _registry.facetIsFreezable(facets[i]),
+                selectors: _registry.facetSelectors(facets[i], _newVersion)
             });
-            oldSelectors[i] = new bytes4[](0);
-            newSelectors[i] = _facetSelectors(
-                _registry,
-                facets[i],
-                _newVersion,
-                _registry.ctmAddress(facets[i], _newVersion)
-            );
         }
+        (bytes32 bootloaderHash, bytes32 defaultAccountHash, bytes32 evmEmulatorHash) = _registry
+            .baseSystemContractHashes(_newVersion);
 
         return
             Diamond.DiamondCutData({
-                facetCuts: DiamondCutBuilder.buildCuts(swaps, oldSelectors, newSelectors),
+                facetCuts: new Diamond.FacetCut[](0),
                 initAddress: _registry.ctmAddress(CTMContract.DiamondInit, _newVersion),
-                initCalldata: _registry.chainCreationInitCalldata(_newVersion)
+                initCalldata: abi.encode(
+                    InitializeDataNewChain({
+                        l2BootloaderBytecodeHash: bootloaderHash,
+                        l2DefaultAccountBytecodeHash: defaultAccountHash,
+                        l2EvmEmulatorBytecodeHash: evmEmulatorHash,
+                        facets: installations
+                    })
+                )
             });
     }
 

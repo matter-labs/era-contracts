@@ -10,7 +10,8 @@ import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
-import {ProposedUpgrade} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
+import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {ProposedUpgrade, UpgradeFacetSwap} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -106,50 +107,40 @@ contract GeneratedRegistriesTest is Test {
                      composition on generated data
     //////////////////////////////////////////////////////////////*/
 
-    function test_buildFacetSwaps_swapsExactlyThePlanRows() public view {
-        CTMUpgradeComposer.SwapSet memory swapSet = CTMUpgradeComposer.buildFacetSwaps(
-            ICTMRegistry(address(ctmRegistry))
-        );
+    function test_buildFacetSwapPlan_plansExactlyThePlanRows() public view {
+        UpgradeFacetSwap[] memory plan = CTMUpgradeComposer.buildFacetSwapPlan(ICTMRegistry(address(ctmRegistry)));
 
-        // The swaps are exactly the plan (old-side) rows, in row order: AdminFacet changes
-        // address (swap), MailboxFacet is removed, ExecutorFacet is added. GettersFacet is
-        // unchanged and has no plan row, so no swap.
-        assertEq(swapSet.swaps.length, 3);
-        assertEq(swapSet.swaps[0].oldFacet, address(0xF101));
-        assertEq(swapSet.swaps[0].newFacet, address(0xF201));
-        assertFalse(swapSet.swaps[0].isFreezable);
-        assertEq(swapSet.swaps[1].oldFacet, address(0xF103));
-        assertEq(swapSet.swaps[1].newFacet, address(0)); // pure removal
-        assertEq(swapSet.swaps[2].oldFacet, address(0)); // pure addition
-        assertEq(swapSet.swaps[2].newFacet, address(0xF203));
-        assertTrue(swapSet.swaps[2].isFreezable);
+        // The plan is exactly the old-side rows, in row order: AdminFacet changes address
+        // (swap), MailboxFacet is removed, ExecutorFacet is added. GettersFacet is unchanged
+        // and has no plan row, so no swap.
+        assertEq(plan.length, 3);
+        assertEq(plan[0].oldFacet, address(0xF101));
+        assertEq(plan[0].newFacet, address(0xF201));
+        assertFalse(plan[0].isFreezable);
+        // The sample pins selector lists (the bootstrap override); they ride along verbatim.
+        assertEq(plan[0].oldSelectors.length, 2);
+        assertEq(plan[0].oldSelectors[0], bytes4(uint32(1)));
+        assertEq(plan[0].newSelectors.length, 2);
+        assertEq(plan[0].newSelectors[1], bytes4(uint32(3)));
+        assertEq(plan[1].oldFacet, address(0xF103));
+        assertEq(plan[1].newFacet, address(0)); // pure removal: no new address, no new selectors
+        assertEq(plan[1].newSelectors.length, 0);
+        assertEq(plan[1].oldSelectors.length, 1);
+        assertEq(plan[2].oldFacet, address(0)); // pure addition: no old address, no old selectors
+        assertEq(plan[2].oldSelectors.length, 0);
+        assertEq(plan[2].newFacet, address(0xF203));
+        assertEq(plan[2].newSelectors.length, 1);
+        assertTrue(plan[2].isFreezable);
     }
 
-    function test_buildUpgradeCutData_diffsSelectors() public view {
-        Diamond.DiamondCutData memory cut = CTMUpgradeComposer.buildUpgradeCutData(
-            ICTMRegistry(address(ctmRegistry)),
-            address(0xF205),
-            hex"1234"
-        );
+    function test_buildUpgradeCutData_hasNoOuterFacetCuts() public pure {
+        Diamond.DiamondCutData memory cut = CTMUpgradeComposer.buildUpgradeCutData(address(0xF205), hex"1234");
 
         assertEq(cut.initAddress, address(0xF205));
         assertEq(cut.initCalldata, hex"1234");
-        // AdminFacet: selector 1 removed, 2 replaced, 3 added; MailboxFacet: 0x30 removed;
-        // ExecutorFacet: 0x20 added. Removals are emitted first, then replaces, then adds.
-        assertEq(cut.facetCuts.length, 5);
-        assertEq(uint256(cut.facetCuts[0].action), uint256(Diamond.Action.Remove));
-        assertEq(cut.facetCuts[0].selectors[0], bytes4(uint32(1)));
-        assertEq(uint256(cut.facetCuts[1].action), uint256(Diamond.Action.Remove));
-        assertEq(cut.facetCuts[1].selectors[0], bytes4(uint32(0x30)));
-        assertEq(uint256(cut.facetCuts[2].action), uint256(Diamond.Action.Replace));
-        assertEq(cut.facetCuts[2].facet, address(0xF201));
-        assertEq(cut.facetCuts[2].selectors[0], bytes4(uint32(2)));
-        assertEq(uint256(cut.facetCuts[3].action), uint256(Diamond.Action.Add));
-        assertEq(cut.facetCuts[3].facet, address(0xF201));
-        assertEq(cut.facetCuts[3].selectors[0], bytes4(uint32(3)));
-        assertEq(uint256(cut.facetCuts[4].action), uint256(Diamond.Action.Add));
-        assertEq(cut.facetCuts[4].facet, address(0xF203));
-        assertEq(cut.facetCuts[4].selectors[0], bytes4(uint32(0x20)));
+        // Facet swaps ride inside the init calldata's ProposedUpgrade.facetSwaps and are applied
+        // by BaseZkSyncUpgrade itself; the committed cut carries no facet cuts at all.
+        assertEq(cut.facetCuts.length, 0);
     }
 
     function test_buildL2UpgradeTx_matchesProtocolRequirements() public view {
@@ -209,6 +200,10 @@ contract GeneratedRegistriesTest is Test {
             bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000da0))
         );
         assertEq(proposedUpgrade.evmEmulatorHash, bytes32(0));
+        // The facet-swap plan is embedded: BaseZkSyncUpgrade applies it inside the diamond.
+        assertEq(proposedUpgrade.facetSwaps.length, 3);
+        assertEq(proposedUpgrade.facetSwaps[0].oldFacet, address(0xF101));
+        assertEq(proposedUpgrade.facetSwaps[2].newFacet, address(0xF203));
     }
 
     function test_buildChainCreationParams_installsFullNewFacetSet() public view {
@@ -220,17 +215,26 @@ contract GeneratedRegistriesTest is Test {
         assertEq(params.genesisIndexRepeatedStorageChanges, 54);
         assertEq(params.forceDeploymentsData, hex"f1f2");
         assertEq(params.diamondCut.initAddress, address(0xF204)); // DiamondInit
-        assertEq(params.diamondCut.initCalldata, hex"c1c2c3");
-        // All three new facets are pure additions.
-        assertEq(params.diamondCut.facetCuts.length, 3);
-        for (uint256 i = 0; i < 3; ++i) {
-            assertEq(uint256(params.diamondCut.facetCuts[i].action), uint256(Diamond.Action.Add));
-        }
-        // The chain-creation facet set equals the post-upgrade facet set (no drift by construction):
-        // AdminFacet(new) + GettersFacet + ExecutorFacet.
-        assertEq(params.diamondCut.facetCuts[0].facet, address(0xF201));
-        assertEq(params.diamondCut.facetCuts[1].facet, address(0xF102));
-        assertEq(params.diamondCut.facetCuts[2].facet, address(0xF203));
+        // The genesis cut carries no facet cuts of its own: DiamondInit installs the facets
+        // itself, from the FacetInstallation list in its init calldata.
+        assertEq(params.diamondCut.facetCuts.length, 0);
+        InitializeDataNewChain memory newChainData = abi.decode(
+            params.diamondCut.initCalldata,
+            (InitializeDataNewChain)
+        );
+        assertEq(
+            newChainData.l2BootloaderBytecodeHash,
+            bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000b00))
+        );
+        // The chain-creation facet set equals the post-upgrade facet set (no drift by
+        // construction): AdminFacet(new) + GettersFacet + ExecutorFacet, with the registry's
+        // pinned selector lists riding along.
+        assertEq(newChainData.facets.length, 3);
+        assertEq(newChainData.facets[0].facet, address(0xF201));
+        assertEq(newChainData.facets[1].facet, address(0xF102));
+        assertEq(newChainData.facets[2].facet, address(0xF203));
+        assertTrue(newChainData.facets[2].isFreezable);
+        assertEq(newChainData.facets[0].selectors.length, 2);
     }
 
     /*//////////////////////////////////////////////////////////////

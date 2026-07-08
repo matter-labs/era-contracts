@@ -8,7 +8,10 @@ import {console2 as console} from "forge-std/Script.sol";
 
 import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {
+    FacetInstallation,
+    InitializeDataNewChain as DiamondInitializeDataNewChain
+} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -167,12 +170,53 @@ abstract contract DeployCTMUtils is DeployUtils {
         return ChainCreationParamsLib.getChainCreationParams(_config, config.isZKsyncOS);
     }
 
-    /// @notice Get all six facet cuts
-    function getChainCreationFacetCuts(
+    /// @notice The six facets of a new chain, installed by DiamondInit itself. Selector lists
+    /// are left empty: every production facet self-describes (ISelfDescribingFacet.selectors()),
+    /// and DiamondInit reads them at execution time on the chain where the cut runs — which is
+    /// exactly what makes this shape work on Gateway, where we cannot query selectors from here.
+    function getChainCreationFacetInstallations(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
-        // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
-        // If we start to use different selectors for Gateway, we should change this.
+    ) internal virtual returns (FacetInstallation[] memory facets) {
+        facets = new FacetInstallation[](6);
+        facets[0] = FacetInstallation({
+            facet: stateTransition.facets.adminFacet,
+            isFreezable: false,
+            selectors: new bytes4[](0)
+        });
+        facets[1] = FacetInstallation({
+            facet: stateTransition.facets.gettersFacet,
+            isFreezable: false,
+            selectors: new bytes4[](0)
+        });
+        facets[2] = FacetInstallation({
+            facet: stateTransition.facets.mailboxFacet,
+            isFreezable: true,
+            selectors: new bytes4[](0)
+        });
+        facets[3] = FacetInstallation({
+            facet: stateTransition.facets.executorFacet,
+            isFreezable: true,
+            selectors: new bytes4[](0)
+        });
+        facets[4] = FacetInstallation({
+            facet: stateTransition.facets.migratorFacet,
+            isFreezable: false,
+            selectors: new bytes4[](0)
+        });
+        facets[5] = FacetInstallation({
+            facet: stateTransition.facets.committerFacet,
+            isFreezable: true,
+            selectors: new bytes4[](0)
+        });
+    }
+
+    /// @notice The six facet Add-cuts of the legacy upgrade pipeline, with explicit selector
+    /// lists read from the compiled artifacts. Kept only for this banner-marked pipeline: the
+    /// registry-driven path carries facet addresses and lets the diamond-side code read
+    /// selectors from the facets themselves.
+    function getLegacyChainCreationFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal returns (Diamond.FacetCut[] memory facetCuts) {
         facetCuts = new Diamond.FacetCut[](6);
         facetCuts[0] = Diamond.FacetCut({
             facet: stateTransition.facets.adminFacet,
@@ -215,12 +259,10 @@ abstract contract DeployCTMUtils is DeployUtils {
     function getChainCreationDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
-        Diamond.FacetCut[] memory facetCuts = getChainCreationFacetCuts(stateTransition);
-
         DiamondInitializeDataNewChain memory initializeData = getInitializeData(stateTransition);
 
         diamondCut = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
+            facetCuts: new Diamond.FacetCut[](0),
             initAddress: stateTransition.facets.diamondInit,
             initCalldata: abi.encode(initializeData)
         });
@@ -275,7 +317,8 @@ abstract contract DeployCTMUtils is DeployUtils {
             DiamondInitializeDataNewChain({
                 l2BootloaderBytecodeHash: config.contracts.chainCreationParams.bootloaderHash,
                 l2DefaultAccountBytecodeHash: config.contracts.chainCreationParams.defaultAAHash,
-                l2EvmEmulatorBytecodeHash: config.contracts.chainCreationParams.evmEmulatorHash
+                l2EvmEmulatorBytecodeHash: config.contracts.chainCreationParams.evmEmulatorHash,
+                facets: getChainCreationFacetInstallations(stateTransition)
             });
     }
 

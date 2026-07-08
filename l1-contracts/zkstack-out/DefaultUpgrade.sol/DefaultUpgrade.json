@@ -1,6 +1,25 @@
 [
   {
     "type": "function",
+    "name": "patchUpgrade",
+    "inputs": [
+      {
+        "name": "_newProtocolVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "upgrade",
     "inputs": [
       {
@@ -156,6 +175,38 @@
             "name": "newProtocolVersion",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "facetSwaps",
+            "type": "tuple[]",
+            "internalType": "struct UpgradeFacetSwap[]",
+            "components": [
+              {
+                "name": "oldFacet",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "newFacet",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "isFreezable",
+                "type": "bool",
+                "internalType": "bool"
+              },
+              {
+                "name": "oldSelectors",
+                "type": "bytes4[]",
+                "internalType": "bytes4[]"
+              },
+              {
+                "name": "newSelectors",
+                "type": "bytes4[]",
+                "internalType": "bytes4[]"
+              }
+            ]
           }
         ]
       }
@@ -168,6 +219,53 @@
       }
     ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "DiamondCut",
+    "inputs": [
+      {
+        "name": "facetCuts",
+        "type": "tuple[]",
+        "indexed": false,
+        "internalType": "struct Diamond.FacetCut[]",
+        "components": [
+          {
+            "name": "facet",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "action",
+            "type": "uint8",
+            "internalType": "enum Diamond.Action"
+          },
+          {
+            "name": "isFreezable",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "selectors",
+            "type": "bytes4[]",
+            "internalType": "bytes4[]"
+          }
+        ]
+      },
+      {
+        "name": "initAddress",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "initCalldata",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
+      }
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -434,11 +532,81 @@
             "name": "newProtocolVersion",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "facetSwaps",
+            "type": "tuple[]",
+            "internalType": "struct UpgradeFacetSwap[]",
+            "components": [
+              {
+                "name": "oldFacet",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "newFacet",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "isFreezable",
+                "type": "bool",
+                "internalType": "bool"
+              },
+              {
+                "name": "oldSelectors",
+                "type": "bytes4[]",
+                "internalType": "bytes4[]"
+              },
+              {
+                "name": "newSelectors",
+                "type": "bytes4[]",
+                "internalType": "bytes4[]"
+              }
+            ]
           }
         ]
       }
     ],
     "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "AddressHasNoCode",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "DelegateCallFailed",
+    "inputs": [
+      {
+        "name": "returnData",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "FacetExists",
+    "inputs": [
+      {
+        "name": "selector",
+        "type": "bytes4",
+        "internalType": "bytes4"
+      },
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
   },
   {
     "type": "error",
@@ -492,6 +660,16 @@
   {
     "type": "error",
     "name": "NewProtocolMajorVersionNotZero",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NoFunctionsForDiamondCut",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NonEmptyCalldata",
     "inputs": []
   },
   {
@@ -585,6 +763,32 @@
   },
   {
     "type": "error",
+    "name": "RemoveFunctionFacetAddressNotZero",
+    "inputs": [
+      {
+        "name": "facet",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "RemoveFunctionFacetAddressZero",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ReplaceFunctionFacetAddressZero",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SelectorsMustAllHaveSameFreezability",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "SettlementLayerUpgradeMustPrecedeChainUpgrade",
     "inputs": []
   },
@@ -617,6 +821,11 @@
   {
     "type": "error",
     "name": "TxnBodyGasLimitNotEnoughGas",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "UndefinedDiamondCutAction",
     "inputs": []
   },
   {

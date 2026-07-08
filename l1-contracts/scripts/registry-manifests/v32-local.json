@@ -20,16 +20,16 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0x9B8FA6c5Da55af7887cc97eCcC7d788659475193",
+      "ctmProxy": "0x8B5E3cC1807d737C105FB252C13dD0Ace87409d6",
       "verifierNew": "0x71089Ba41e478702e1904692385Be3972B2cBf9e",
       "contracts": {
         "DefaultUpgrade": {
           "new": "0x1780bCf4103D3F501463AD3414c7f4b654bb7aFd",
-          "newCodehash": "0x615b7fee27d5819c81ad8dad8e000bf8c663ac10aa772345d8792527a8dc6fe7"
+          "newCodehash": "0xde886c04a29b3fe2b23b0bc765d87595cf3160c8cd7d47d4e8354573b57a3372"
         },
         "DiamondInit": {
           "new": "0x5133BBdfCCa3Eb4F739D599ee4eC45cBCD0E16c5",
-          "newCodehash": "0x3f62a808c81d674b4d985a0d617f95fe4cda74674182b9137e5119e147cc8045"
+          "newCodehash": "0x79b1b53d6ed41b825cbc718dd5f7958e0c0bfc1a1ce01efbc82e8e4d45fc7045"
         }
       },
       "facets": {
@@ -125,11 +125,10 @@
           "defaultAccount": "0x0000000000000000000000000000000000000000000000000000000000000000",
           "evmEmulator": "0x0000000000000000000000000000000000000000000000000000000000000000"
         },
-        "fixedForceDeploymentsData": "0xf1f2",
-        "chainCreationInitCalldata": "0xc1c2"
+        "fixedForceDeploymentsData": "0xf1f2"
       },
       "genesis": {
-        "genesisUpgrade": "0xcB41110b0bd637A219021f0c5aa416BCCb4ff100",
+        "genesisUpgrade": "0xf1D8eB9381BA180eb8b4E8818Ef5a28438185b70",
         "batchHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
         "batchCommitment": "0x0000000000000000000000000000000000000000000000000000000000000001",
         "indexRepeatedStorageChanges": 54

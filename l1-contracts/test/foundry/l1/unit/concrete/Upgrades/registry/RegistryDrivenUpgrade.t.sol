@@ -186,7 +186,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         }
 
         registry.setBaseSystemContractHashes(bytes32(0), bytes32(0), bytes32(0)); // no updates
-        registry.setChainCreationData(hex"f1f2", hex"c1c2");
+        registry.setChainCreationData(hex"f1f2");
         registry.setGenesis(makeAddr("genesisUpgrade"), bytes32(uint256(1)), _registryGenesisBatchCommitment(), 54);
         registry.setL2UpgradeDelegate(address(0), hex"");
 

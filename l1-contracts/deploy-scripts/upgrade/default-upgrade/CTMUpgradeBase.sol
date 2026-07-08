@@ -15,11 +15,16 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 import {PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
-import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
+import {
+    ProposedUpgrade,
+    ProposedUpgradeLib,
+    UpgradeFacetSwap
+} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {DeployCTMScript} from "../../ctm/DeployCTM.s.sol";
 import {FacetCutsLib} from "./FacetCutsLib.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
+import {Utils} from "../../utils/Utils.sol";
 
 abstract contract CTMUpgradeBase is DeployCTMScript {
     /// @notice Build the active VM's full force-deployment list in universal format.
@@ -115,7 +120,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         Diamond.FacetCut[] memory facetCutsForDeletion = FacetCutsLib.getDeletionCuts(_registeredChainIdDiamondProxy);
 
         Diamond.FacetCut[] memory facetCuts;
-        facetCuts = getChainCreationFacetCuts(_stateTransition);
+        facetCuts = getLegacyChainCreationFacetCuts(_stateTransition);
         facetCuts = FacetCutsLib.merge(facetCutsForDeletion, facetCuts);
         uint256 nonce = UpgradeHelperLib.getProtocolUpgradeNonce(_chainCreationParams.latestProtocolVersion);
         ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(
@@ -164,7 +169,8 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: encodePostUpgradeCalldata(_stateTransition),
             upgradeTimestamp: 0,
-            newProtocolVersion: _chainCreationParams.latestProtocolVersion
+            newProtocolVersion: _chainCreationParams.latestProtocolVersion,
+            facetSwaps: new UpgradeFacetSwap[](0)
         });
     }
 

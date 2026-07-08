@@ -12,7 +12,7 @@ import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {IDiamondInit, InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
 import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 
@@ -241,36 +241,26 @@ contract ZKChainDeployer is L1ContractDeployer {
             ecosystemConfig.contracts.diamondCutData,
             (Diamond.DiamondCutData)
         );
-        bytes memory initData1;
-        bytes memory initData2;
-
-        {
-            // stack too deep
-            // InitializeData layout includes bridgehub, interop center, and CTM for v31+ init calldata.
-            initData1 = bytes.concat(
-                IDiamondInit.initialize.selector,
-                bytes32(_chainId),
-                bytes32(uint256(uint160(address(_bridgehub)))),
-                bytes32(uint256(uint160(address(_interopCenter)))),
-                bytes32(uint256(uint160(_chainTypeManager)))
-            );
-        }
-        {
-            initData2 = bytes.concat(
-                bytes32(_protocolVersion),
-                bytes32(uint256(uint160(_admin))),
-                bytes32(uint256(uint160(address(0x1337)))),
-                _baseTokenAssetId,
-                _storedBatchZero,
+        // Composed exactly as ChainTypeManagerBase._deployNewChain does: the chain-specific
+        // head plus the committed cut's chain-independent tail (abi-encoded
+        // InitializeDataNewChain, incl. the facets DiamondInit installs itself).
+        diamondCut.initCalldata = abi.encodeCall(
+            IDiamondInit.initialize,
+            (
+                InitializeData({
+                    chainId: _chainId,
+                    bridgehub: _bridgehub,
+                    interopCenter: _interopCenter,
+                    chainTypeManager: _chainTypeManager,
+                    protocolVersion: _protocolVersion,
+                    admin: _admin,
+                    validatorTimelock: address(0x1337),
+                    baseTokenAssetId: _baseTokenAssetId,
+                    storedBatchZero: _storedBatchZero
+                }),
                 diamondCut.initCalldata
-            );
-        }
-        bytes memory initData;
-        {
-            initData = bytes.concat(initData1, initData2);
-        }
-
-        diamondCut.initCalldata = initData;
+            )
+        );
         DiamondProxy hyperchainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
         return address(hyperchainContract);
     }

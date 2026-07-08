@@ -16,7 +16,7 @@ import {
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {IDiamondInit, InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
@@ -205,25 +205,28 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
             abi.encode(makeAddr("mockVerifier"))
         );
 
-        // Build full initCalldata: selector + InitializeData fields.
+        // Build full initCalldata: the chain-specific head plus the committed cut's
+        // chain-independent tail (abi-encoded InitializeDataNewChain, incl. the facets
+        // DiamondInit installs itself), exactly as ChainTypeManagerBase composes it.
         // Use L2_BRIDGEHUB_ADDR as bridgehub so initialize() takes the L2 branch
         // (sets nativeTokenVault/assetTracker from L2 constants, no external calls).
-        bytes memory initData1 = bytes.concat(
-            IDiamondInit.initialize.selector,
-            bytes32(uint256(GATEWAY_CHAIN_ID)), // chainId
-            bytes32(uint256(uint160(L2_BRIDGEHUB_ADDR))), // bridgehub
-            bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR))), // interopCenter
-            bytes32(uint256(uint160(mockCTM))) // chainTypeManager
+        diamondCut.initCalldata = abi.encodeCall(
+            IDiamondInit.initialize,
+            (
+                InitializeData({
+                    chainId: GATEWAY_CHAIN_ID,
+                    bridgehub: L2_BRIDGEHUB_ADDR,
+                    interopCenter: L2_INTEROP_CENTER_ADDR,
+                    chainTypeManager: mockCTM,
+                    protocolVersion: config.protocolVersion,
+                    admin: address(0xAD01),
+                    validatorTimelock: address(0x1337),
+                    baseTokenAssetId: keccak256("baseTokenAssetId"),
+                    storedBatchZero: bytes32(uint256(1))
+                }),
+                diamondCut.initCalldata
+            )
         );
-        bytes memory initData2 = bytes.concat(
-            bytes32(config.protocolVersion), // protocolVersion
-            bytes32(uint256(uint160(address(0xAD01)))), // admin
-            bytes32(uint256(uint160(address(0x1337)))), // validatorTimelock
-            keccak256("baseTokenAssetId"), // baseTokenAssetId (non-zero)
-            bytes32(uint256(1)), // storedBatchZero
-            diamondCut.initCalldata // abi.encode(InitializeDataNewChain)
-        );
-        diamondCut.initCalldata = bytes.concat(initData1, initData2);
 
         // Deploy the DiamondProxy with real facets - validates all facets have code AND runs initialize()
         new DiamondProxy(GATEWAY_CHAIN_ID, diamondCut);
@@ -255,10 +258,6 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
 
         assertTrue(config.aliasedGovernanceAddress != address(0), "Aliased governance should be set");
         assertTrue(config.l1ChainId != 0, "L1 chain ID should be set");
-        assertTrue(config.adminSelectors.length > 0, "Admin selectors should be populated");
-        assertTrue(config.executorSelectors.length > 0, "Executor selectors should be populated");
-        assertTrue(config.mailboxSelectors.length > 0, "Mailbox selectors should be populated");
-        assertTrue(config.gettersSelectors.length > 0, "Getters selectors should be populated");
         assertTrue(config.genesisRoot != bytes32(0), "Genesis root should be set");
         assertTrue(config.protocolVersion != 0, "Protocol version should be set");
         assertTrue(config.isZKsyncOS, "Config should be in ZKsyncOS mode");

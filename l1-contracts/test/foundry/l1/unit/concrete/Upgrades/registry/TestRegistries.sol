@@ -98,7 +98,6 @@ contract TestCTMRegistry is ICTMRegistry {
     bytes32 internal defaultAccountHash;
     bytes32 internal evmEmulatorHash;
     bytes internal fixedFDD;
-    bytes internal chainCreationInit;
     address internal genesisUpgradeAddress;
     bytes32 internal genesisBatchHashValue;
     bytes32 internal genesisBatchCommitmentValue;
@@ -162,9 +161,8 @@ contract TestCTMRegistry is ICTMRegistry {
         evmEmulatorHash = _evmEmulator;
     }
 
-    function setChainCreationData(bytes calldata _fixedFDD, bytes calldata _initCalldata) external {
+    function setChainCreationData(bytes calldata _fixedFDD) external {
         fixedFDD = _fixedFDD;
-        chainCreationInit = _initCalldata;
     }
 
     function setGenesis(address _genesisUpgrade, bytes32 _batchHash, bytes32 _commitment, uint64 _index) external {
@@ -239,10 +237,6 @@ contract TestCTMRegistry is ICTMRegistry {
 
     function fixedForceDeploymentsData(uint256) external view returns (bytes memory) {
         return fixedFDD;
-    }
-
-    function chainCreationInitCalldata(uint256) external view returns (bytes memory) {
-        return chainCreationInit;
     }
 
     function genesisParams(uint256) external view returns (address, bytes32, bytes32, uint64) {
