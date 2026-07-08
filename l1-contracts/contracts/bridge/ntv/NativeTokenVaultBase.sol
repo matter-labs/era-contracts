@@ -456,15 +456,15 @@ abstract contract NativeTokenVaultBase is
         );
     }
 
-    /// @dev Chain-local asset tracker hook invoked when funds are bridged out towards `_chainId`.
-    /// @dev On L2 this records outbound amounts in the L2AssetTracker. On L1 there is no asset
-    /// tracker, so the default implementation is a no-op.
+    /// @dev Chain-local bookkeeping hook invoked when funds are bridged out towards `_chainId`.
+    /// @dev On L2 this records outbound amounts in the L2AssetTracker; on L1 it records the
+    /// outbound flow of L1-native tokens in `totalBridgedOut`.
     // solhint-disable-next-line no-empty-blocks
     function _handleBridgeToChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual {}
 
-    /// @dev Chain-local asset tracker hook invoked when funds bridged from `_chainId` are finalized here.
-    /// @dev On L2 this records inbound amounts in the L2AssetTracker. On L1 there is no asset
-    /// tracker, so the default implementation is a no-op.
+    /// @dev Chain-local bookkeeping hook invoked when funds bridged from `_chainId` are finalized here.
+    /// @dev On L2 this records inbound amounts in the L2AssetTracker; on L1 it records the
+    /// inbound flow of L1-native tokens in `totalBridgedIn`.
     // solhint-disable-next-line no-empty-blocks
     function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual {}
 

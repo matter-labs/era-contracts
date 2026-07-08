@@ -61,6 +61,18 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) internal DEPRECATED_chainBalance;
 
+    /// @notice Cumulative amount of each L1-native token bridged out of L1 (deposits/interop sends).
+    /// @dev Write-only flow bookkeeping for tokens whose origin chain is L1; unlike the vault's raw
+    /// `balanceOf`, it cannot be skewed by direct transfers into the vault. Not consulted by any
+    /// bridging decision. The net amount currently bridged out is
+    /// `totalBridgedOut[assetId] - totalBridgedIn[assetId]`.
+    mapping(bytes32 assetId => uint256 amount) public totalBridgedOut;
+
+    /// @notice Cumulative amount of each L1-native token bridged back to L1
+    /// (withdrawal finalizations and failed-deposit refunds).
+    /// @dev See `totalBridgedOut`.
+    mapping(bytes32 assetId => uint256 amount) public totalBridgedIn;
+
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -169,7 +181,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     ///  @inheritdoc IL1AssetHandler
     function bridgeConfirmTransferResult(
-        uint256, // _chainId
+        uint256 _chainId,
         TxStatus _txStatus,
         bytes32 _assetId,
         address _depositSender,
@@ -180,6 +192,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         (uint256 _amount, , ) = DataEncoding.decodeBridgeBurnData(_data);
         address l1Token = tokenAddress[_assetId];
         require(_amount != 0, NoFundsTransferred());
+
+        // Record the refund before giving out funds so the flow counters are already
+        // consistent if the recipient re-enters a view of them.
+        _handleBridgeFromChain(_chainId, _assetId, _amount);
 
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
@@ -243,5 +259,19 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(bridgedTokenBeacon, ""))
         );
         return BeaconProxy(payable(proxyAddress));
+    }
+
+    /// @dev Records the outbound flow of L1-native tokens; see `totalBridgedOut`.
+    function _handleBridgeToChain(uint256, bytes32 _assetId, uint256 _amount) internal override {
+        if (originChainId[_assetId] == block.chainid) {
+            totalBridgedOut[_assetId] += _amount;
+        }
+    }
+
+    /// @dev Records the inbound flow of L1-native tokens; see `totalBridgedIn`.
+    function _handleBridgeFromChain(uint256, bytes32 _assetId, uint256 _amount) internal override {
+        if (originChainId[_assetId] == block.chainid) {
+            totalBridgedIn[_assetId] += _amount;
+        }
     }
 }
