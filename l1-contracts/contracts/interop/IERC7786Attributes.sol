@@ -23,6 +23,16 @@ interface IERC7786Attributes {
     /// @dev Contracts should be able to toggle this flag for Stage1/Stage2 compatibility, this is due to the fact that operator-set base token amount is dependent on operator of the chain, while fixed ZK option is not.
     function useFixedFee(bool _useFixed) external pure;
 
+    /// @notice Specifies a user-provided salt for the interop bundle.
+    /// @param _salt Arbitrary 32-byte salt chosen by the sender.
+    /// @dev The salt is mixed with `msg.sender` to derive the bundle's `interopBundleSalt`, which guarantees a unique
+    ///      bundle hash. Senders should provide a random salt: it keeps the bundle hash unpredictable and thus preserves
+    ///      the bundle's privacy. Each salt must be unique per sender: a sender MUST provide a distinct salt for every
+    ///      bundle it sends, regardless of the bundle contents.
+    /// @dev Omitting this attribute (or passing `bytes32(0)`) is allowed but discouraged: since each salt must be unique
+    ///      per sender, a sender can send at most one bundle without a distinct, non-zero salt.
+    function interopBundleSalt(bytes32 _salt) external pure;
+
     /// @notice Parameters of the L1->L2 priority transaction that delivers a message sent from L1.
     /// @param _mintValue The total amount of the destination chain's base token to be minted with the transaction.
     /// It must cover both the transaction fee (base cost) and the value passed with the message (`interopCallValue`).

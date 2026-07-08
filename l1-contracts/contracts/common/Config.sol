@@ -274,7 +274,7 @@ uint64 constant DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 uint256 constant INITIAL_BASE_TOKEN_HOLDER_BALANCE = (2 ** 127) - 1;
 
 /// @dev The total number of supported interop attributes.
-uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 5;
+uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 6;
 
 /// @dev The total number of interop attributes supported by the L1InteropCenter.
 uint256 constant SUPPORTED_L1_INTEROP_ATTRIBUTES = 4;

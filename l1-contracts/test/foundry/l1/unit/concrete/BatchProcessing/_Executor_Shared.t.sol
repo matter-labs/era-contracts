@@ -23,6 +23,7 @@ import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.s
 import {FeeParams, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {TestExecutor} from "contracts/dev-contracts/test/TestExecutor.sol";
 import {TestCommitter} from "contracts/dev-contracts/test/TestCommitter.sol";
+import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -62,6 +63,8 @@ contract ExecutorTest is UtilsCallMockerTest {
     TestCommitter internal committer;
     GettersFacet internal getters;
     MailboxFacet internal mailbox;
+    // UtilsFacet is attached to every diamond by default (see constructor) so tests can manipulate chain state.
+    UtilsFacet internal utilsFacet;
     bytes32 internal newCommittedBlockBatchHash;
     bytes32 internal newCommittedBlockCommitment;
     uint256 internal currentTimestamp;
@@ -335,7 +338,7 @@ contract ExecutorTest is UtilsCallMockerTest {
 
         bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](5);
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](6);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(admin),
             action: Diamond.Action.Add,
@@ -366,6 +369,12 @@ contract ExecutorTest is UtilsCallMockerTest {
             isFreezable: true,
             selectors: getMailboxSelectors()
         });
+        facetCuts[5] = Diamond.FacetCut({
+            facet: address(new UtilsFacet()),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getUtilsFacetSelectors()
+        });
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -381,6 +390,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         getters = GettersFacet(address(diamondProxy));
         mailbox = MailboxFacet(address(diamondProxy));
         admin = AdminFacet(address(diamondProxy));
+        utilsFacet = UtilsFacet(address(diamondProxy));
         chainTypeManager.setZKChain(l2ChainId, address(diamondProxy));
 
         // Initiate the token multiplier to enable L1 -> L2 transactions.

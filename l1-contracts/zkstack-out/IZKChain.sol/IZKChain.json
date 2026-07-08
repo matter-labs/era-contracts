@@ -2869,6 +2869,31 @@
   },
   {
     "type": "event",
+    "name": "ReportCommittedBatchProtocolVersion",
+    "inputs": [
+      {
+        "name": "batchNumber",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "uint64"
+      },
+      {
+        "name": "protocolVersion",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "upgradeTxHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "ReportCommittedBatchRangeZKsyncOS",
     "inputs": [
       {

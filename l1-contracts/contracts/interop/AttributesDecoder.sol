@@ -18,6 +18,10 @@ library AttributesDecoder {
         return abi.decode(_data[4:], (bool));
     }
 
+    function decodeBytes32(bytes calldata _data) internal pure returns (bytes32) {
+        return abi.decode(_data[4:], (bytes32));
+    }
+
     function decodeL1ToL2TransactionParams(
         bytes calldata _data
     )
