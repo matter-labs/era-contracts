@@ -112,10 +112,10 @@ const BLOCK_NUMBER_STORAGE_SLOTS = new Set([
 // large (real) drift is still caught. Before the asset trackers were removed this
 // drift lived in the L1AssetTracker, whose storage was skipped wholesale; it now
 // lives in the L1NativeTokenVault's `bridgedOut[ETH]` entry.
-//   slot = keccak256(abi.encode(ethAssetId, 252)), where 252 is the `bridgedOut`
-//   mapping's storage index. Recompute with `cast index bytes32 <ethAssetId> 252`
+//   slot = keccak256(abi.encode(ethAssetId, 253)), where 253 is the `bridgedOut`
+//   mapping's storage index. Recompute with `cast index bytes32 <ethAssetId> 253`
 //   if the L1NativeTokenVault layout changes.
-const GAS_DEPENDENT_VALUE_SLOTS = new Set(["0x5d4c0bb2d1287a084a819640db056b2f91852db517f9fac74f1043a49ae6b595"]);
+const GAS_DEPENDENT_VALUE_SLOTS = new Set(["0xa779570f23bf75d0370baade00c3f15fe23265e729cfb55c61a10ccf98dc7093"]);
 
 // True when two raw storage words differ by no more than the native-balance
 // tolerance (used only for slots known to hold a gas-dependent ETH amount).
