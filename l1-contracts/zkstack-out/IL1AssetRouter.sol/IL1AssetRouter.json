@@ -412,7 +412,7 @@
     "name": "DepositFinalizedAssetRouter",
     "inputs": [
       {
-        "name": "chainId",
+        "name": "sourceChainId",
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"

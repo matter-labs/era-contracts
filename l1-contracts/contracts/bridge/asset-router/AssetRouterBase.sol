@@ -201,10 +201,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
     /// @notice Validates that the interop message sender is the asset-router counterpart on the source chain.
     /// @dev On L2, only this same router (identical address on every ZK chain) may be the sender and the source
     /// cannot be L1 (interop is only initiated on L2s). On L1, the sender must be the L2 asset router.
-    function _isValidInteropSender(
-        uint256 _senderChainId,
-        address _senderAddress
-    ) internal view virtual returns (bool);
+    function _isValidInteropSender(uint256 _senderChainId, address _senderAddress) internal view virtual returns (bool);
 
     /// @notice Executes a cross-chain asset-router call following the ERC-7786 standard.
     /// @dev Called by this chain's interop handler while executing an interop bundle whose call targets this
@@ -243,17 +240,22 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
     }
 
     /// @notice Finalize the withdrawal and release funds.
-    /// @param _chainId The chain ID of the transaction to check.
+    /// @param _sourceChainId The chain ID the deposit/withdrawal message originates from. Note that this is the
+    /// source chain of the message, not necessarily the origin chain of the bridged token.
     /// @param _assetId The bridged asset ID.
     /// @param _transferData The data used to finalize the withdrawal, it includes the data needed for the asset handler (e.g. NativeTokenVault).
     /// @dev Important note is that chains can be potentially malicious and provide arbitrary data here, so in case
-    /// a piece of data affects other chains than the `_chainId`, special care needs to be applied for validation.
+    /// a piece of data affects other chains than the `_sourceChainId`, special care needs to be applied for validation.
     /// @dev We have both the legacy finalizeWithdrawal and the new finalizeDeposit functions,
     /// finalizeDeposit uses the new format. On the L2 we have finalizeDeposit with new and old formats both.
-    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) public payable virtual;
+    function finalizeDeposit(
+        uint256 _sourceChainId,
+        bytes32 _assetId,
+        bytes calldata _transferData
+    ) public payable virtual;
 
     function _finalizeDeposit(
-        uint256 _chainId,
+        uint256 _sourceChainId,
         bytes32 _assetId,
         bytes calldata _transferData,
         address _nativeTokenVault
@@ -261,13 +263,13 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         address assetHandler = assetHandlerAddress[_assetId];
 
         if (assetHandler != address(0)) {
-            IAssetHandler(assetHandler).bridgeMint{value: msg.value}(_chainId, _assetId, _transferData);
+            IAssetHandler(assetHandler).bridgeMint{value: msg.value}(_sourceChainId, _assetId, _transferData);
         } else {
             _setAssetHandler(_assetId, _nativeTokenVault);
             // Native token vault may not support non-zero `msg.value`, but we still provide it here to
             // prevent the passed ETH from being stuck in the asset router and also for consistency.
             // So the decision on whether to support non-zero `msg.value` is done at the asset handler layer.
-            IAssetHandler(_nativeTokenVault).bridgeMint{value: msg.value}(_chainId, _assetId, _transferData); // ToDo: Maybe it's better to receive amount and receiver here? transferData may have different encoding
+            IAssetHandler(_nativeTokenVault).bridgeMint{value: msg.value}(_sourceChainId, _assetId, _transferData); // ToDo: Maybe it's better to receive amount and receiver here? transferData may have different encoding
         }
     }
 

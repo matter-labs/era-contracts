@@ -6,7 +6,7 @@ pragma solidity 0.8.28;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IAssetRouterShared {
-    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) external payable;
+    function finalizeDeposit(uint256 _sourceChainId, bytes32 _assetId, bytes calldata _transferData) external payable;
 
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 and L2->L2 transactions.
     /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.

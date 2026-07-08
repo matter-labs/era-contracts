@@ -66,8 +66,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Checks that the message sender is the asset-router counterpart for messages originating on L1.
-    modifier onlyAssetRouterCounterpart(uint256 _originChainId) {
-        if (_originChainId == L1_CHAIN_ID) {
+    modifier onlyAssetRouterCounterpart(uint256 _sourceChainId) {
+        if (_sourceChainId == L1_CHAIN_ID) {
             // For messages originating on L1, only the L1 Asset Router counterpart may call this function.
             require(
                 AddressAliasHelper.undoL1ToL2Alias(msg.sender) == address(L1_ASSET_ROUTER),
@@ -81,8 +81,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
 
     /// @notice Checks that the message sender is the L1 asset-router counterpart or this contract itself.
     /// @dev Self-calls are used for interop flows where the destination L2AssetRouter re-enters its own finalize path.
-    modifier onlyAssetRouterCounterpartOrSelf(uint256 _chainId) {
-        if (_chainId == L1_CHAIN_ID) {
+    modifier onlyAssetRouterCounterpartOrSelf(uint256 _sourceChainId) {
+        if (_sourceChainId == L1_CHAIN_ID) {
             // For messages originating on L1, only the L1 Asset Router counterpart may call this function.
             if (
                 (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != address(L1_ASSET_ROUTER)) &&
@@ -168,10 +168,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
 
     /// @inheritdoc IL2AssetRouter
     function setAssetHandlerAddress(
-        uint256 _originChainId,
+        uint256 _sourceChainId,
         bytes32 _assetId,
         address _assetHandlerAddress
-    ) external override onlyAssetRouterCounterpart(_originChainId) {
+    ) external override onlyAssetRouterCounterpart(_sourceChainId) {
         _setAssetHandler(_assetId, _assetHandlerAddress);
     }
 
@@ -227,19 +227,20 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Finalizes a bridge request and mints funds.
+    /// @param _sourceChainId The chain ID the deposit message originates from (the source chain of the
+    /// message, not the origin chain of the bridged token).
     /// @param _assetId The encoding of the asset on L2
     /// @param _transferData The encoded data required for finalization
     /// (address _sender, uint256 _amount, address _receiver, bytes memory erc20Data, address originToken)
     function finalizeDeposit(
-        // solhint-disable-next-line no-unused-vars
-        uint256 _originChainId,
+        uint256 _sourceChainId,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) public payable override onlyAssetRouterCounterpartOrSelf(_originChainId) nonReentrant {
+    ) public payable override onlyAssetRouterCounterpartOrSelf(_sourceChainId) nonReentrant {
         require(_assetId != BASE_TOKEN_ASSET_ID, AssetIdNotSupported(BASE_TOKEN_ASSET_ID));
-        _finalizeDeposit(_originChainId, _assetId, _transferData, L2_NATIVE_TOKEN_VAULT_ADDR);
+        _finalizeDeposit(_sourceChainId, _assetId, _transferData, L2_NATIVE_TOKEN_VAULT_ADDR);
 
-        emit DepositFinalizedAssetRouter(_originChainId, _assetId, _transferData);
+        emit DepositFinalizedAssetRouter(_sourceChainId, _assetId, _transferData);
     }
 
     /// @inheritdoc IL2CrossChainSender

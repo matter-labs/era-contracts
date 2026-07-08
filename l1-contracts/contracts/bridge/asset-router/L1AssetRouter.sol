@@ -19,12 +19,7 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
-import {
-    AddressAlreadySet,
-    NonEmptyMsgValue,
-    Unauthorized,
-    ZeroAddress
-} from "../../common/L1ContractErrors.sol";
+import {AddressAlreadySet, NonEmptyMsgValue, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
@@ -291,12 +286,12 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
     /// @inheritdoc AssetRouterBase
     function finalizeDeposit(
-        uint256 _chainId,
+        uint256 _sourceChainId,
         bytes32 _assetId,
         bytes calldata _transferData
     ) public payable override onlySelf {
-        _finalizeDeposit(_chainId, _assetId, _transferData, address(nativeTokenVault));
-        emit DepositFinalizedAssetRouter(_chainId, _assetId, _transferData);
+        _finalizeDeposit(_sourceChainId, _assetId, _transferData, address(nativeTokenVault));
+        emit DepositFinalizedAssetRouter(_sourceChainId, _assetId, _transferData);
     }
 
     /*//////////////////////////////////////////////////////////////
