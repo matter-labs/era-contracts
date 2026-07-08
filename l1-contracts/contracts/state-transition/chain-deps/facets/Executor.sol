@@ -195,7 +195,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Append each batch's proven `l2LogsTreeRoot` to the global message root. On Gateway the
         // committed `l2LogsTreeRoot` is the chain batch root (it already commits to the empty
         // multichain batch root), so the append is identical to the L1 path. Asset correctness across
-        // chains is guaranteed by ZK proofs (assuming proofs are correct and chains are not malicious),
+        // chains is guaranteed by ZK proofs (assuming proofs are correct),
         // so no per-batch log reconstruction / balance accounting is performed.
         for (uint256 i = 0; i < nBatches; ++i) {
             _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
