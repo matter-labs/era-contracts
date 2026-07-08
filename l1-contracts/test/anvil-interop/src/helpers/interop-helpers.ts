@@ -79,16 +79,25 @@ const INTEROP_BUNDLE_SALT_SELECTOR = erc7786Iface.getSighash("interopBundleSalt"
  *
  * The InteropCenter derives the bundle hash from `keccak256(msg.sender, salt)` and rejects a (sender, salt)
  * pair that has already been used (`InteropBundleSaltAlreadyUsed`). Since the test harness sends many bundles
- * from the same source wallet, we attach a fresh random salt whenever the caller did not provide one, so that
- * each bundle gets a unique hash (mirroring the previously auto-incremented interop nonce). If the caller already
+ * from the same source wallet, we attach a fresh salt whenever the caller did not provide one, so that each
+ * bundle gets a unique hash (mirroring the previously auto-incremented interop nonce). If the caller already
  * supplied a salt attribute, it is left untouched.
+ *
+ * The salt is derived deterministically from `(sender, account nonce)` rather than random bytes: the nonce is
+ * consumed by the send so every bundle still gets a fresh salt, but re-runs of the harness reproduce identical
+ * salts. That keeps the pre-generated chain-state snapshots byte-deterministic (random salts change both the
+ * salt-keyed storage slots and the calldata gas cost run-to-run), and later test runs against a loaded snapshot
+ * cannot collide with salts already used during state generation because the account nonce has advanced.
  */
-function ensureUniqueBundleSalt(attributes: string[]): string[] {
+async function ensureUniqueBundleSalt(attributes: string[], wallet: Wallet): Promise<string[]> {
   const hasSalt = attributes.some((attr) => attr.slice(0, 10).toLowerCase() === INTEROP_BUNDLE_SALT_SELECTOR);
   if (hasSalt) {
     return attributes;
   }
-  const salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+  const nonce = await wallet.getTransactionCount();
+  const salt = ethers.utils.keccak256(
+    ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [wallet.address, nonce])
+  );
   return [...attributes, interopBundleSaltAttr(salt)];
 }
 
@@ -187,7 +196,7 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
   const tx = await interopCenter.sendBundle(
     destinationChainIdBytes,
     options.callStarters,
-    ensureUniqueBundleSalt(options.bundleAttributes || []),
+    await ensureUniqueBundleSalt(options.bundleAttributes || [], wallet),
     {
       gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
       value: options.value || 0,
@@ -241,7 +250,7 @@ export async function simulateInteropBundle(options: SendBundleOptions): Promise
   await interopCenter.callStatic.sendBundle(
     destinationChainIdBytes,
     options.callStarters,
-    ensureUniqueBundleSalt(options.bundleAttributes || []),
+    await ensureUniqueBundleSalt(options.bundleAttributes || [], wallet),
     {
       gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
       value: options.value || 0,
@@ -271,7 +280,7 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
   const tx = await interopCenter.sendMessage(
     options.recipient,
     options.payload,
-    ensureUniqueBundleSalt(options.attributes),
+    await ensureUniqueBundleSalt(options.attributes, wallet),
     {
       gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
       value: options.value || 0,

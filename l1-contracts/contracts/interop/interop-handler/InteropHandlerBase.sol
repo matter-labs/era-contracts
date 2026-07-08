@@ -24,6 +24,7 @@ import {
     CallAlreadyExecuted,
     CallNotExecutable,
     CanNotUnbundle,
+    EmptyBundle,
     ExecutingNotAllowed,
     MessageNotIncluded,
     UnauthorizedMessageSender,
@@ -247,6 +248,8 @@ abstract contract InteropHandlerBase is IInteropHandler, IERC7786Recipient, Reen
     function _getBundleData(
         bytes memory _bundle
     ) internal view returns (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus currentStatus) {
+        // Revert with a clean error on an empty bundle instead of the panic `abi.decode` would produce.
+        require(_bundle.length != 0, EmptyBundle());
         interopBundle = abi.decode(_bundle, (InteropBundle));
         require(interopBundle.version == INTEROP_BUNDLE_VERSION, InvalidInteropBundleVersion());
         bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, _bundle);

@@ -368,6 +368,11 @@
   },
   {
     "type": "error",
+    "name": "EmptyBundle",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "ExecutingNotAllowed",
     "inputs": [
       {

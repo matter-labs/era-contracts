@@ -21,6 +21,8 @@ error CanNotUnbundle(bytes32 bundleHash);
 error DestinationChainNotRegistered(uint256 destinationChainId);
 // 0x43f0659c
 error DirectCallToL1NotSupported();
+// 0x558c44fc
+error EmptyBundle();
 // 0xe845be4c
 error ExecutingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes executionAddress);
 // 0x16b0fa00
