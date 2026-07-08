@@ -132,7 +132,8 @@ library ZKsyncOSCTMRegistryV32Data {
         rows = new CTMRegistryBase.FacetRow[](12);
         uint256 i = 0;
         {
-            bytes4[] memory selectorList;
+            // No pinned selector list: the facet self-describes (ISelfDescribingFacet.selectors()).
+            bytes4[] memory selectorList = new bytes4[](0);
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.AdminFacet,
                 protocolVersion: OLD_PROTOCOL_VERSION,
@@ -141,7 +142,8 @@ library ZKsyncOSCTMRegistryV32Data {
             ++i;
         }
         {
-            bytes4[] memory selectorList;
+            // No pinned selector list: the facet self-describes (ISelfDescribingFacet.selectors()).
+            bytes4[] memory selectorList = new bytes4[](0);
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.GettersFacet,
                 protocolVersion: OLD_PROTOCOL_VERSION,
@@ -150,7 +152,8 @@ library ZKsyncOSCTMRegistryV32Data {
             ++i;
         }
         {
-            bytes4[] memory selectorList;
+            // No pinned selector list: the facet self-describes (ISelfDescribingFacet.selectors()).
+            bytes4[] memory selectorList = new bytes4[](0);
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.MailboxFacet,
                 protocolVersion: OLD_PROTOCOL_VERSION,
@@ -159,7 +162,8 @@ library ZKsyncOSCTMRegistryV32Data {
             ++i;
         }
         {
-            bytes4[] memory selectorList;
+            // No pinned selector list: the facet self-describes (ISelfDescribingFacet.selectors()).
+            bytes4[] memory selectorList = new bytes4[](0);
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.ExecutorFacet,
                 protocolVersion: OLD_PROTOCOL_VERSION,
@@ -168,7 +172,8 @@ library ZKsyncOSCTMRegistryV32Data {
             ++i;
         }
         {
-            bytes4[] memory selectorList;
+            // No pinned selector list: the facet self-describes (ISelfDescribingFacet.selectors()).
+            bytes4[] memory selectorList = new bytes4[](0);
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.MigratorFacet,
                 protocolVersion: OLD_PROTOCOL_VERSION,
@@ -177,7 +182,8 @@ library ZKsyncOSCTMRegistryV32Data {
             ++i;
         }
         {
-            bytes4[] memory selectorList;
+            // No pinned selector list: the facet self-describes (ISelfDescribingFacet.selectors()).
+            bytes4[] memory selectorList = new bytes4[](0);
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.CommitterFacet,
                 protocolVersion: OLD_PROTOCOL_VERSION,
@@ -186,7 +192,8 @@ library ZKsyncOSCTMRegistryV32Data {
             ++i;
         }
         {
-            bytes4[] memory selectorList;
+            // No pinned selector list: the facet self-describes (ISelfDescribingFacet.selectors()).
+            bytes4[] memory selectorList = new bytes4[](0);
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.AdminFacet,
                 protocolVersion: NEW_PROTOCOL_VERSION,
@@ -195,7 +202,8 @@ library ZKsyncOSCTMRegistryV32Data {
             ++i;
         }
         {
-            bytes4[] memory selectorList;
+            // No pinned selector list: the facet self-describes (ISelfDescribingFacet.selectors()).
+            bytes4[] memory selectorList = new bytes4[](0);
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.GettersFacet,
                 protocolVersion: NEW_PROTOCOL_VERSION,
@@ -204,7 +212,8 @@ library ZKsyncOSCTMRegistryV32Data {
             ++i;
         }
         {
-            bytes4[] memory selectorList;
+            // No pinned selector list: the facet self-describes (ISelfDescribingFacet.selectors()).
+            bytes4[] memory selectorList = new bytes4[](0);
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.MailboxFacet,
                 protocolVersion: NEW_PROTOCOL_VERSION,
@@ -213,7 +222,8 @@ library ZKsyncOSCTMRegistryV32Data {
             ++i;
         }
         {
-            bytes4[] memory selectorList;
+            // No pinned selector list: the facet self-describes (ISelfDescribingFacet.selectors()).
+            bytes4[] memory selectorList = new bytes4[](0);
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.ExecutorFacet,
                 protocolVersion: NEW_PROTOCOL_VERSION,
@@ -222,7 +232,8 @@ library ZKsyncOSCTMRegistryV32Data {
             ++i;
         }
         {
-            bytes4[] memory selectorList;
+            // No pinned selector list: the facet self-describes (ISelfDescribingFacet.selectors()).
+            bytes4[] memory selectorList = new bytes4[](0);
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.MigratorFacet,
                 protocolVersion: NEW_PROTOCOL_VERSION,
@@ -231,7 +242,8 @@ library ZKsyncOSCTMRegistryV32Data {
             ++i;
         }
         {
-            bytes4[] memory selectorList;
+            // No pinned selector list: the facet self-describes (ISelfDescribingFacet.selectors()).
+            bytes4[] memory selectorList = new bytes4[](0);
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.CommitterFacet,
                 protocolVersion: NEW_PROTOCOL_VERSION,

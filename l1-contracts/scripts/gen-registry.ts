@@ -253,8 +253,12 @@ function generateCTM(
   const facetRow = (f: FacetEntry, versionConst: string, versionLabel: string): string => {
     const lines = [
       "        {",
-      "            bytes4[] memory selectorList;",
-      ...(f.selectors.length > 0 ? selectorFill("selectorList", f.selectors, "            ") : []),
+      ...(f.selectors.length > 0
+        ? ["            bytes4[] memory selectorList;", ...selectorFill("selectorList", f.selectors, "            ")]
+        : [
+            "            // No pinned selector list: the facet self-describes (ISelfDescribingFacet.selectors()).",
+            "            bytes4[] memory selectorList = new bytes4[](0);",
+          ]),
       `            rows[i] = CTMRegistryBase.FacetRow({facet: CTMContract.${f.name}, protocolVersion: ${versionConst}, selectorList: selectorList}); // ${f.name} @ ${versionLabel}`,
       "            ++i;",
       "        }",
