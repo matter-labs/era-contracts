@@ -24,14 +24,15 @@ interface ICoreRegistry {
     /// @notice Proxy address of an ecosystem contract. Version-independent: proxies survive upgrades.
     function proxyAddress(EcosystemContract _contract) external view returns (address);
 
-    /// @notice Implementation address of an ecosystem contract at a given protocol version.
-    /// @param _contract The ecosystem contract identifier.
-    /// @param _protocolVersion Packed SemVer protocol version; only the versions pinned by this
-    ///        registry (old and new) are answerable.
-    function implAddress(EcosystemContract _contract, uint256 _protocolVersion) external view returns (address);
+    /// @notice The new-version implementation address of an ecosystem contract, or zero when this
+    ///         upgrade pins no new implementation for it (nothing to upgrade). Old-version
+    ///         implementations are deliberately not recorded: the upgrade only needs where each
+    ///         proxy must point AFTER it runs.
+    /// @param _contract The ecosystem contract identifier; unknown identifiers revert.
+    function implAddress(EcosystemContract _contract) external view returns (address);
 
     /// @notice The ecosystem contracts that participate in this upgrade (i.e. that have a proxy
-    ///         and per-version implementations pinned in this registry).
+    ///         and, when upgraded, a new implementation pinned in this registry).
     function ecosystemContractList() external view returns (EcosystemContract[] memory);
 
     /// @notice The ecosystem `ProxyAdmin` that administers every ecosystem proxy.

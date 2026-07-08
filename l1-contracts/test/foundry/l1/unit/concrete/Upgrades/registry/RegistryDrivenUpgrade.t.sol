@@ -149,11 +149,12 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         registryV33 = _makeRegistry(V32, V33, verifierV33, newAdminFacet);
     }
 
-    /// @dev Builds a registry for one hop. The facet plan pins the chain's REAL AdminFacet
-    ///      (address + selectors as installed by the fixture); when `_newAdminFacet` is zero the
-    ///      facet is unchanged between the versions (skipped -> L1-only upgrade with empty cuts),
-    ///      otherwise it is replaced by the given implementation. A non-zero `_newAdminFacet` hop
-    ///      also carries an L2 force-deployment, making it a full minor upgrade.
+    /// @dev Builds a registry for one hop. When `_newAdminFacet` is zero the AdminFacet is
+    ///      unchanged by the hop, so it appears on the new side only (no old row — an EMPTY
+    ///      facet plan -> L1-only upgrade with empty cuts); otherwise the plan holds exactly one
+    ///      row replacing the chain's REAL AdminFacet by the given implementation. A non-zero
+    ///      `_newAdminFacet` hop also carries an L2 force-deployment, making it a full minor
+    ///      upgrade.
     function _makeRegistry(
         uint256 _oldVersion,
         uint256 _newVersion,
@@ -169,18 +170,20 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         // The live AdminFacet the fixture installed at chain creation.
         address liveAdminFacet = facetCuts[1].facet;
         bytes4[] memory adminSelectors = Utils.getAdminSelectors();
-        registry.setCtmAddress(CTMContract.AdminFacet, _oldVersion, liveAdminFacet);
-        registry.setCtmAddress(
-            CTMContract.AdminFacet,
-            _newVersion,
-            _newAdminFacet == address(0) ? liveAdminFacet : _newAdminFacet
-        );
-        // Old side: pinned list (the bootstrap override — the fixture installs a subset of the
-        // facet's full ABI, and old facet versions may predate ISelfDescribingFacet anyway).
-        registry.addFacet(_oldVersion, CTMContract.AdminFacet, adminSelectors);
-        // New side: NO pinned list — the composer reads the replacement facet's own
-        // ISelfDescribingFacet.selectors() (its full ABI), exercising the facet-default path.
-        registry.addFacet(_newVersion, CTMContract.AdminFacet, new bytes4[](0));
+        if (_newAdminFacet == address(0)) {
+            // Unchanged facet: NO old-side (plan) row — the upgrade cut is empty. The facet
+            // still appears in the new-side set (with the fixture's pinned selector subset), so
+            // chain-creation params stay complete.
+            registry.addFacet(_newVersion, CTMContract.AdminFacet, liveAdminFacet, adminSelectors);
+        } else {
+            // Old side (the plan): pinned list (the bootstrap override — the fixture installs a
+            // subset of the facet's full ABI, and old facet versions may predate
+            // ISelfDescribingFacet anyway).
+            registry.addFacet(_oldVersion, CTMContract.AdminFacet, liveAdminFacet, adminSelectors);
+            // New side: NO pinned list — the composer reads the replacement facet's own
+            // ISelfDescribingFacet.selectors() (its full ABI), exercising the facet-default path.
+            registry.addFacet(_newVersion, CTMContract.AdminFacet, _newAdminFacet, new bytes4[](0));
+        }
 
         registry.setBaseSystemContractHashes(bytes32(0), bytes32(0), bytes32(0)); // no updates
         registry.setChainCreationData(hex"f1f2", hex"c1c2");

@@ -45,13 +45,11 @@ contract GeneratedRegistriesTest is Test {
         assertEq(coreRegistry.oldProtocolVersion(), OLD_VERSION);
         assertEq(coreRegistry.newProtocolVersion(), NEW_VERSION);
         assertEq(coreRegistry.proxyAddress(EcosystemContract.Bridgehub), address(0xB001));
-        assertEq(coreRegistry.implAddress(EcosystemContract.Bridgehub, OLD_VERSION), address(0xB101));
-        assertEq(coreRegistry.implAddress(EcosystemContract.Bridgehub, NEW_VERSION), address(0xB201));
-        // MessageRoot's implementation is unchanged across the two versions.
-        assertEq(
-            coreRegistry.implAddress(EcosystemContract.MessageRoot, OLD_VERSION),
-            coreRegistry.implAddress(EcosystemContract.MessageRoot, NEW_VERSION)
-        );
+        assertEq(coreRegistry.implAddress(EcosystemContract.Bridgehub), address(0xB201));
+        assertEq(coreRegistry.implAddress(EcosystemContract.L1AssetRouter), address(0xB202));
+        // MessageRoot participates (its proxy is pinned) but this upgrade pins no new
+        // implementation for it: zero means "nothing to upgrade".
+        assertEq(coreRegistry.implAddress(EcosystemContract.MessageRoot), address(0));
         assertEq(coreRegistry.proxyAdmin(), address(0xA001));
         assertEq(coreRegistry.ctmRegistry(false), address(0xC001));
         assertEq(coreRegistry.ctmRegistry(true), address(0xC002));
@@ -62,9 +60,17 @@ contract GeneratedRegistriesTest is Test {
         assertTrue(ctmRegistry.isZKsyncOS());
         assertEq(ctmRegistry.ctmProxy(), address(0xD001));
         assertEq(ctmRegistry.verifier(NEW_VERSION), address(0xE002));
-        assertEq(ctmRegistry.ctmAddress(CTMContract.AdminFacet, OLD_VERSION), address(0xF101));
+        // Facet addresses resolve from the facet rows: the old side pins only the facets the
+        // upgrade touches, the new side the complete post-upgrade set.
+        assertEq(ctmRegistry.ctmAddress(CTMContract.AdminFacet, OLD_VERSION), address(0xF101)); // changed
         assertEq(ctmRegistry.ctmAddress(CTMContract.AdminFacet, NEW_VERSION), address(0xF201));
-        assertEq(ctmRegistry.facetList(OLD_VERSION).length, 2);
+        assertEq(ctmRegistry.ctmAddress(CTMContract.GettersFacet, OLD_VERSION), address(0)); // unchanged: no old row
+        assertEq(ctmRegistry.ctmAddress(CTMContract.GettersFacet, NEW_VERSION), address(0xF102));
+        assertEq(ctmRegistry.ctmAddress(CTMContract.ExecutorFacet, OLD_VERSION), address(0)); // added
+        assertEq(ctmRegistry.ctmAddress(CTMContract.MailboxFacet, NEW_VERSION), address(0)); // removed
+        assertEq(ctmRegistry.ctmAddress(CTMContract.MailboxFacet, OLD_VERSION), address(0xF103));
+        // Old facet list = the upgrade plan (changed + added + removed); new list = installed set.
+        assertEq(ctmRegistry.facetList(OLD_VERSION).length, 3);
         assertEq(ctmRegistry.facetList(NEW_VERSION).length, 3);
         assertTrue(ctmRegistry.facetIsFreezable(CTMContract.ExecutorFacet));
         assertFalse(ctmRegistry.facetIsFreezable(CTMContract.AdminFacet));
@@ -79,13 +85,19 @@ contract GeneratedRegistriesTest is Test {
         assertEq(adminNew[1], bytes4(uint32(3)));
     }
 
-    function test_revertWhen_unknownVersionQueried() public {
+    function test_revertWhen_unknownKeyQueried() public {
+        // The core registry answers implAddress only for contracts it lists.
         vm.expectRevert(RegistryUnknownKey.selector);
-        coreRegistry.implAddress(EcosystemContract.Bridgehub, 12345);
+        coreRegistry.implAddress(EcosystemContract.L1Nullifier);
+
+        // Only the new version's verifier is recorded: the old one is not this upgrade's data.
+        vm.expectRevert(RegistryUnknownKey.selector);
+        ctmRegistry.verifier(OLD_VERSION);
 
         vm.expectRevert(RegistryUnknownKey.selector);
         ctmRegistry.verifier(12345);
 
+        // MailboxFacet is removed by this upgrade: it has no new-side row.
         vm.expectRevert(RegistryUnknownKey.selector);
         ctmRegistry.facetSelectors(CTMContract.MailboxFacet, NEW_VERSION);
     }
@@ -94,20 +106,23 @@ contract GeneratedRegistriesTest is Test {
                      composition on generated data
     //////////////////////////////////////////////////////////////*/
 
-    function test_buildFacetSwaps_skipsUnchangedFacet() public view {
+    function test_buildFacetSwaps_swapsExactlyThePlanRows() public view {
         CTMUpgradeComposer.SwapSet memory swapSet = CTMUpgradeComposer.buildFacetSwaps(
             ICTMRegistry(address(ctmRegistry))
         );
 
-        // AdminFacet changes address (swap), GettersFacet is unchanged (skipped),
-        // ExecutorFacet is new (pure addition).
-        assertEq(swapSet.swaps.length, 2);
+        // The swaps are exactly the plan (old-side) rows, in row order: AdminFacet changes
+        // address (swap), MailboxFacet is removed, ExecutorFacet is added. GettersFacet is
+        // unchanged and has no plan row, so no swap.
+        assertEq(swapSet.swaps.length, 3);
         assertEq(swapSet.swaps[0].oldFacet, address(0xF101));
         assertEq(swapSet.swaps[0].newFacet, address(0xF201));
         assertFalse(swapSet.swaps[0].isFreezable);
-        assertEq(swapSet.swaps[1].oldFacet, address(0));
-        assertEq(swapSet.swaps[1].newFacet, address(0xF203));
-        assertTrue(swapSet.swaps[1].isFreezable);
+        assertEq(swapSet.swaps[1].oldFacet, address(0xF103));
+        assertEq(swapSet.swaps[1].newFacet, address(0)); // pure removal
+        assertEq(swapSet.swaps[2].oldFacet, address(0)); // pure addition
+        assertEq(swapSet.swaps[2].newFacet, address(0xF203));
+        assertTrue(swapSet.swaps[2].isFreezable);
     }
 
     function test_buildUpgradeCutData_diffsSelectors() public view {
@@ -119,19 +134,22 @@ contract GeneratedRegistriesTest is Test {
 
         assertEq(cut.initAddress, address(0xF205));
         assertEq(cut.initCalldata, hex"1234");
-        // AdminFacet: selector 1 removed, 2 replaced, 3 added; ExecutorFacet: 0x20 added.
-        assertEq(cut.facetCuts.length, 4);
+        // AdminFacet: selector 1 removed, 2 replaced, 3 added; MailboxFacet: 0x30 removed;
+        // ExecutorFacet: 0x20 added. Removals are emitted first, then replaces, then adds.
+        assertEq(cut.facetCuts.length, 5);
         assertEq(uint256(cut.facetCuts[0].action), uint256(Diamond.Action.Remove));
         assertEq(cut.facetCuts[0].selectors[0], bytes4(uint32(1)));
-        assertEq(uint256(cut.facetCuts[1].action), uint256(Diamond.Action.Replace));
-        assertEq(cut.facetCuts[1].facet, address(0xF201));
-        assertEq(cut.facetCuts[1].selectors[0], bytes4(uint32(2)));
-        assertEq(uint256(cut.facetCuts[2].action), uint256(Diamond.Action.Add));
+        assertEq(uint256(cut.facetCuts[1].action), uint256(Diamond.Action.Remove));
+        assertEq(cut.facetCuts[1].selectors[0], bytes4(uint32(0x30)));
+        assertEq(uint256(cut.facetCuts[2].action), uint256(Diamond.Action.Replace));
         assertEq(cut.facetCuts[2].facet, address(0xF201));
-        assertEq(cut.facetCuts[2].selectors[0], bytes4(uint32(3)));
+        assertEq(cut.facetCuts[2].selectors[0], bytes4(uint32(2)));
         assertEq(uint256(cut.facetCuts[3].action), uint256(Diamond.Action.Add));
-        assertEq(cut.facetCuts[3].facet, address(0xF203));
-        assertEq(cut.facetCuts[3].selectors[0], bytes4(uint32(0x20)));
+        assertEq(cut.facetCuts[3].facet, address(0xF201));
+        assertEq(cut.facetCuts[3].selectors[0], bytes4(uint32(3)));
+        assertEq(uint256(cut.facetCuts[4].action), uint256(Diamond.Action.Add));
+        assertEq(cut.facetCuts[4].facet, address(0xF203));
+        assertEq(cut.facetCuts[4].selectors[0], bytes4(uint32(0x20)));
     }
 
     function test_buildL2UpgradeTx_matchesProtocolRequirements() public view {

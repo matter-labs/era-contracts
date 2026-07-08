@@ -32,23 +32,20 @@ library CoreRegistryV99Data {
         rows[i] = CoreRegistryBase.EcosystemContractRow({
             key: EcosystemContract.Bridgehub,
             proxy: address(uint160(0x00000000000000000000000000000000000000b001)),
-            implOld: address(uint160(0x00000000000000000000000000000000000000b101)),
             implNew: address(uint160(0x00000000000000000000000000000000000000b201))
         }); // Bridgehub
         ++i;
         rows[i] = CoreRegistryBase.EcosystemContractRow({
             key: EcosystemContract.L1AssetRouter,
             proxy: address(uint160(0x00000000000000000000000000000000000000b002)),
-            implOld: address(uint160(0x00000000000000000000000000000000000000b102)),
             implNew: address(uint160(0x00000000000000000000000000000000000000b202))
         }); // L1AssetRouter
         ++i;
         rows[i] = CoreRegistryBase.EcosystemContractRow({
             key: EcosystemContract.MessageRoot,
             proxy: address(uint160(0x00000000000000000000000000000000000000b003)),
-            implOld: address(uint160(0x00000000000000000000000000000000000000b103)),
-            implNew: address(uint160(0x00000000000000000000000000000000000000b103))
-        }); // MessageRoot
+            implNew: address(0)
+        }); // MessageRoot (not upgraded)
         ++i;
     }
 

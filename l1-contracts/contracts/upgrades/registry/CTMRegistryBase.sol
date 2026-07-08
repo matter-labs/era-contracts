@@ -18,23 +18,31 @@ import {RegistryUnknownKey} from "../../common/L1ContractErrors.sol";
 ///      the deployed registry is still a single constants-in-bytecode contract whose
 ///      `EXTCODEHASH` commits to every value.
 abstract contract CTMRegistryBase is ICTMRegistry {
-    /// @dev One `(contract, version) -> address` entry.
+    /// @dev One `(contract, version) -> address` entry for NON-FACET contracts (DefaultUpgrade,
+    ///      DiamondInit, ...), pinned for the new version only; facet addresses live in the facet
+    ///      rows. Old-version data is deliberately not recorded — the upgrade only needs the new
+    ///      addresses.
     struct AddressRow {
         CTMContract key;
         uint256 protocolVersion;
         address value;
     }
 
-    /// @dev The facets installed at a protocol version, with the (bootstrap) selector list.
+    /// @dev One facet row. NEW-version rows are the complete post-upgrade facet set, each with
+    ///      its address. OLD-version rows are the upgrade PLAN — only the facets this upgrade
+    ///      touches: a changed facet carries its old address, a facet being added carries a zero
+    ///      address, and a facet being removed appears on the old side only. Facets unchanged by
+    ///      the upgrade have NO old row.
     ///      An empty `selectorList` means "read the facet's own `ISelfDescribingFacet.selectors()`"
     ///      downstream (see `CTMUpgradeComposer`).
     struct FacetRow {
         CTMContract facet;
         uint256 protocolVersion;
+        address facetAddress;
         bytes4[] selectorList;
     }
 
-    /// @dev One `version -> verifier` entry.
+    /// @dev One `version -> verifier` entry (pinned for the new version only).
     struct VerifierRow {
         uint256 protocolVersion;
         address verifier;
@@ -135,6 +143,15 @@ abstract contract CTMRegistryBase is ICTMRegistry {
     /// @inheritdoc ICTMRegistry
     function ctmAddress(CTMContract _contract, uint256 _protocolVersion) external pure returns (address) {
         _requireKnownVersion(_protocolVersion);
+        // Facet addresses resolve from the facet rows (see `FacetRow`); everything else from the
+        // address rows.
+        FacetRow[] memory facetRows = _facetRows();
+        uint256 facetRowsLength = facetRows.length;
+        for (uint256 i = 0; i < facetRowsLength; ++i) {
+            if (facetRows[i].facet == _contract && facetRows[i].protocolVersion == _protocolVersion) {
+                return facetRows[i].facetAddress;
+            }
+        }
         AddressRow[] memory rows = _ctmAddressRows();
         uint256 rowsLength = rows.length;
         for (uint256 i = 0; i < rowsLength; ++i) {

@@ -64,27 +64,24 @@ contract EcosystemUpgradeModuleTest is Test {
         coreRegistry = new TestCoreRegistry();
         coreRegistry.setVersions(0, NEW_VERSION);
         coreRegistry.setProxyAdmin(address(proxyAdmin));
-        // Bridgehub gets a new implementation; MessageRoot's is unchanged and must be skipped.
-        coreRegistry.addContract(
-            EcosystemContract.Bridgehub,
-            address(bridgehubProxy),
-            address(implOld),
-            address(implNew)
-        );
-        coreRegistry.addContract(
-            EcosystemContract.MessageRoot,
-            address(messageRootProxy),
-            address(implOld),
-            address(implOld)
-        );
+        // Bridgehub gets a new implementation; MessageRoot pins its live implementation (the
+        // module's live comparison must skip it); L1AssetRouter pins no new implementation at
+        // all (zero => skipped before any proxy interaction).
+        coreRegistry.addContract(EcosystemContract.Bridgehub, address(bridgehubProxy), address(implNew));
+        coreRegistry.addContract(EcosystemContract.MessageRoot, address(messageRootProxy), address(implOld));
+        coreRegistry.addContract(EcosystemContract.L1AssetRouter, address(0), address(0));
     }
 
-    function test_applyL1Upgrade_upgradesChangedProxiesOnly() public {
+    function _applyL1Upgrade() internal {
         vm.prank(ecosystemGovernor);
         ecosystemExecutor.execute(
             address(module),
             abi.encodeCall(EcosystemUpgradeModule.applyL1Upgrade, (ICoreRegistry(address(coreRegistry))))
         );
+    }
+
+    function test_applyL1Upgrade_upgradesChangedProxiesOnly() public {
+        _applyL1Upgrade();
 
         assertEq(
             address(uint160(uint256(vm.load(address(bridgehubProxy), EIP1967_IMPL_SLOT)))),
@@ -94,7 +91,20 @@ contract EcosystemUpgradeModuleTest is Test {
         assertEq(
             address(uint160(uint256(vm.load(address(messageRootProxy), EIP1967_IMPL_SLOT)))),
             address(implOld),
-            "unchanged implementation must be skipped"
+            "proxy already pointing at the pinned implementation must be skipped"
+        );
+    }
+
+    function test_applyL1Upgrade_isIdempotent() public {
+        _applyL1Upgrade();
+        // Second run: Bridgehub's proxy now already points at the pinned implementation, so the
+        // live comparison skips everything and the call succeeds without effect.
+        _applyL1Upgrade();
+
+        assertEq(
+            address(uint160(uint256(vm.load(address(bridgehubProxy), EIP1967_IMPL_SLOT)))),
+            address(implNew),
+            "implementation must stay at the pinned value after a replay"
         );
     }
 

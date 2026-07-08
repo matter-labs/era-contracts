@@ -12,12 +12,13 @@ import {RegistryUnknownKey} from "../../common/L1ContractErrors.sol";
 /// @notice The FIXED, hand-written half of a generated core registry — see `CTMRegistryBase` for
 ///         the model: logic audited once here, generated per-upgrade code supplies data rows only.
 abstract contract CoreRegistryBase is ICoreRegistry {
-    /// @dev One ecosystem contract's proxy and per-version implementations. A zero
-    ///      implementation means "not pinned for that version".
+    /// @dev One ecosystem contract's proxy and new-version implementation. A zero `implNew`
+    ///      means "this upgrade pins no new implementation" (nothing to upgrade). Old-version
+    ///      implementations are deliberately not recorded — the upgrade only needs where each
+    ///      proxy must point AFTER it runs.
     struct EcosystemContractRow {
         EcosystemContract key;
         address proxy;
-        address implOld;
         address implNew;
     }
 
@@ -70,19 +71,15 @@ abstract contract CoreRegistryBase is ICoreRegistry {
     }
 
     /// @inheritdoc ICoreRegistry
-    function implAddress(EcosystemContract _contract, uint256 _protocolVersion) external pure returns (address) {
-        if (_protocolVersion != _oldProtocolVersion() && _protocolVersion != _newProtocolVersion()) {
-            revert RegistryUnknownKey();
-        }
+    function implAddress(EcosystemContract _contract) external pure returns (address) {
         EcosystemContractRow[] memory rows = _contractRows();
         uint256 rowsLength = rows.length;
         for (uint256 i = 0; i < rowsLength; ++i) {
             if (rows[i].key == _contract) {
-                return _protocolVersion == _oldProtocolVersion() ? rows[i].implOld : rows[i].implNew;
+                return rows[i].implNew;
             }
         }
-        // Known version, unpinned contract: no implementation pinned.
-        return address(0);
+        revert RegistryUnknownKey();
     }
 
     /// @inheritdoc ICoreRegistry

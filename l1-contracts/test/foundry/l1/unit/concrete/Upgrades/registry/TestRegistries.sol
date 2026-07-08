@@ -18,7 +18,7 @@ contract TestCoreRegistry is ICoreRegistry {
     address internal zksyncOSCTMRegistry;
     EcosystemContract[] internal contractList;
     mapping(EcosystemContract contractId => address proxy) internal proxies;
-    mapping(uint256 protocolVersion => mapping(EcosystemContract contractId => address impl)) internal impls;
+    mapping(EcosystemContract contractId => address impl) internal newImpls;
 
     function setVersions(uint256 _oldVersion, uint256 _newVersion) external {
         oldVersion = _oldVersion;
@@ -37,11 +37,11 @@ contract TestCoreRegistry is ICoreRegistry {
         }
     }
 
-    function addContract(EcosystemContract _contract, address _proxy, address _implOld, address _implNew) external {
+    /// @dev A zero `_implNew` pins "no new implementation" (the module skips the contract).
+    function addContract(EcosystemContract _contract, address _proxy, address _implNew) external {
         contractList.push(_contract);
         proxies[_contract] = _proxy;
-        impls[oldVersion][_contract] = _implOld;
-        impls[newVersion][_contract] = _implNew;
+        newImpls[_contract] = _implNew;
     }
 
     function oldProtocolVersion() external view returns (uint256) {
@@ -56,8 +56,8 @@ contract TestCoreRegistry is ICoreRegistry {
         return proxies[_contract];
     }
 
-    function implAddress(EcosystemContract _contract, uint256 _protocolVersion) external view returns (address) {
-        return impls[_protocolVersion][_contract];
+    function implAddress(EcosystemContract _contract) external view returns (address) {
+        return newImpls[_contract];
     }
 
     function ecosystemContractList() external view returns (EcosystemContract[] memory) {
@@ -119,8 +119,17 @@ contract TestCTMRegistry is ICTMRegistry {
         verifiers[_protocolVersion] = _verifier;
     }
 
-    function addFacet(uint256 _protocolVersion, CTMContract _facet, bytes4[] calldata _selectors) external {
+    /// @dev Adds a facet row: old-version rows form the upgrade plan (`_facetAddress` zero =
+    ///      pure addition), new-version rows the post-upgrade facet set. The facet's address
+    ///      resolves through `ctmAddress`, mirroring the production base.
+    function addFacet(
+        uint256 _protocolVersion,
+        CTMContract _facet,
+        address _facetAddress,
+        bytes4[] calldata _selectors
+    ) external {
         facets[_protocolVersion].push(_facet);
+        addresses[_protocolVersion][_facet] = _facetAddress;
         selectors[_protocolVersion][_facet] = _selectors;
     }
 

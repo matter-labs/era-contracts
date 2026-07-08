@@ -68,7 +68,8 @@ contract CTMUpgradeModuleTest is ChainTypeManagerTest {
         ctmRegistry.setCtmAddress(CTMContract.DefaultUpgrade, newVersion, makeAddr("defaultUpgrade"));
         ctmRegistry.setCtmAddress(CTMContract.DiamondInit, newVersion, makeAddr("newDiamondInit"));
 
-        // Facet plan: AdminFacet is swapped, ExecutorFacet is added.
+        // Facet plan (the old-side rows): AdminFacet is swapped, ExecutorFacet is added (zero
+        // old address). The new-side rows are the complete post-upgrade facet set.
         bytes4[] memory adminOld = new bytes4[](2);
         adminOld[0] = bytes4(uint32(1));
         adminOld[1] = bytes4(uint32(2));
@@ -77,12 +78,10 @@ contract CTMUpgradeModuleTest is ChainTypeManagerTest {
         adminNew[1] = bytes4(uint32(3));
         bytes4[] memory executorNew = new bytes4[](1);
         executorNew[0] = bytes4(uint32(0x20));
-        ctmRegistry.setCtmAddress(CTMContract.AdminFacet, 0, makeAddr("adminFacetOld"));
-        ctmRegistry.setCtmAddress(CTMContract.AdminFacet, newVersion, makeAddr("adminFacetNew"));
-        ctmRegistry.setCtmAddress(CTMContract.ExecutorFacet, newVersion, makeAddr("executorFacetNew"));
-        ctmRegistry.addFacet(0, CTMContract.AdminFacet, adminOld);
-        ctmRegistry.addFacet(newVersion, CTMContract.AdminFacet, adminNew);
-        ctmRegistry.addFacet(newVersion, CTMContract.ExecutorFacet, executorNew);
+        ctmRegistry.addFacet(0, CTMContract.AdminFacet, makeAddr("adminFacetOld"), adminOld);
+        ctmRegistry.addFacet(0, CTMContract.ExecutorFacet, address(0), new bytes4[](0));
+        ctmRegistry.addFacet(newVersion, CTMContract.AdminFacet, makeAddr("adminFacetNew"), adminNew);
+        ctmRegistry.addFacet(newVersion, CTMContract.ExecutorFacet, makeAddr("executorFacetNew"), executorNew);
         ctmRegistry.setFreezable(CTMContract.ExecutorFacet, true);
 
         // L2 side.

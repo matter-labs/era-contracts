@@ -25,38 +25,8 @@ library ZKsyncOSCTMRegistryV99Data {
     }
 
     function ctmAddressRows() internal pure returns (CTMRegistryBase.AddressRow[] memory rows) {
-        rows = new CTMRegistryBase.AddressRow[](7);
+        rows = new CTMRegistryBase.AddressRow[](2);
         uint256 i = 0;
-        rows[i] = CTMRegistryBase.AddressRow({
-            key: CTMContract.AdminFacet,
-            protocolVersion: OLD_PROTOCOL_VERSION,
-            value: address(uint160(0x00000000000000000000000000000000000000f101))
-        }); // AdminFacet @ 0.98.0
-        ++i;
-        rows[i] = CTMRegistryBase.AddressRow({
-            key: CTMContract.AdminFacet,
-            protocolVersion: NEW_PROTOCOL_VERSION,
-            value: address(uint160(0x00000000000000000000000000000000000000f201))
-        }); // AdminFacet @ 0.99.0
-        ++i;
-        rows[i] = CTMRegistryBase.AddressRow({
-            key: CTMContract.GettersFacet,
-            protocolVersion: OLD_PROTOCOL_VERSION,
-            value: address(uint160(0x00000000000000000000000000000000000000f102))
-        }); // GettersFacet @ 0.98.0
-        ++i;
-        rows[i] = CTMRegistryBase.AddressRow({
-            key: CTMContract.GettersFacet,
-            protocolVersion: NEW_PROTOCOL_VERSION,
-            value: address(uint160(0x00000000000000000000000000000000000000f102))
-        }); // GettersFacet @ 0.99.0
-        ++i;
-        rows[i] = CTMRegistryBase.AddressRow({
-            key: CTMContract.ExecutorFacet,
-            protocolVersion: NEW_PROTOCOL_VERSION,
-            value: address(uint160(0x00000000000000000000000000000000000000f203))
-        }); // ExecutorFacet @ 0.99.0
-        ++i;
         rows[i] = CTMRegistryBase.AddressRow({
             key: CTMContract.DiamondInit,
             protocolVersion: NEW_PROTOCOL_VERSION,
@@ -72,19 +42,15 @@ library ZKsyncOSCTMRegistryV99Data {
     }
 
     function verifierRows() internal pure returns (CTMRegistryBase.VerifierRow[] memory rows) {
-        rows = new CTMRegistryBase.VerifierRow[](2);
+        rows = new CTMRegistryBase.VerifierRow[](1);
         rows[0] = CTMRegistryBase.VerifierRow({
-            protocolVersion: OLD_PROTOCOL_VERSION,
-            verifier: address(uint160(0x00000000000000000000000000000000000000e001))
-        }); // verifier @ 0.98.0
-        rows[1] = CTMRegistryBase.VerifierRow({
             protocolVersion: NEW_PROTOCOL_VERSION,
             verifier: address(uint160(0x00000000000000000000000000000000000000e002))
         }); // verifier @ 0.99.0
     }
 
     function facetRows() internal pure returns (CTMRegistryBase.FacetRow[] memory rows) {
-        rows = new CTMRegistryBase.FacetRow[](5);
+        rows = new CTMRegistryBase.FacetRow[](6);
         uint256 i = 0;
         {
             bytes4[] memory selectorList;
@@ -94,20 +60,32 @@ library ZKsyncOSCTMRegistryV99Data {
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.AdminFacet,
                 protocolVersion: OLD_PROTOCOL_VERSION,
+                facetAddress: address(uint160(0x00000000000000000000000000000000000000f101)),
                 selectorList: selectorList
             }); // AdminFacet @ 0.98.0
             ++i;
         }
         {
             bytes4[] memory selectorList;
-            selectorList = new bytes4[](2);
-            selectorList[0] = bytes4(0x00000010);
-            selectorList[1] = bytes4(0x00000011);
+            selectorList = new bytes4[](1);
+            selectorList[0] = bytes4(0x00000030);
             rows[i] = CTMRegistryBase.FacetRow({
-                facet: CTMContract.GettersFacet,
+                facet: CTMContract.MailboxFacet,
                 protocolVersion: OLD_PROTOCOL_VERSION,
+                facetAddress: address(uint160(0x00000000000000000000000000000000000000f103)),
                 selectorList: selectorList
-            }); // GettersFacet @ 0.98.0
+            }); // MailboxFacet @ 0.98.0
+            ++i;
+        }
+        {
+            // No pinned selector list: the facet self-describes (ISelfDescribingFacet.selectors()).
+            bytes4[] memory selectorList = new bytes4[](0);
+            rows[i] = CTMRegistryBase.FacetRow({
+                facet: CTMContract.ExecutorFacet,
+                protocolVersion: OLD_PROTOCOL_VERSION,
+                facetAddress: address(0),
+                selectorList: selectorList
+            }); // ExecutorFacet @ 0.98.0 (added by this upgrade)
             ++i;
         }
         {
@@ -118,6 +96,7 @@ library ZKsyncOSCTMRegistryV99Data {
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.AdminFacet,
                 protocolVersion: NEW_PROTOCOL_VERSION,
+                facetAddress: address(uint160(0x00000000000000000000000000000000000000f201)),
                 selectorList: selectorList
             }); // AdminFacet @ 0.99.0
             ++i;
@@ -130,6 +109,7 @@ library ZKsyncOSCTMRegistryV99Data {
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.GettersFacet,
                 protocolVersion: NEW_PROTOCOL_VERSION,
+                facetAddress: address(uint160(0x00000000000000000000000000000000000000f102)),
                 selectorList: selectorList
             }); // GettersFacet @ 0.99.0
             ++i;
@@ -141,6 +121,7 @@ library ZKsyncOSCTMRegistryV99Data {
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.ExecutorFacet,
                 protocolVersion: NEW_PROTOCOL_VERSION,
+                facetAddress: address(uint160(0x00000000000000000000000000000000000000f203)),
                 selectorList: selectorList
             }); // ExecutorFacet @ 0.99.0
             ++i;
@@ -148,11 +129,13 @@ library ZKsyncOSCTMRegistryV99Data {
     }
 
     function freezabilityRows() internal pure returns (CTMRegistryBase.FreezabilityRow[] memory rows) {
-        rows = new CTMRegistryBase.FreezabilityRow[](3);
+        rows = new CTMRegistryBase.FreezabilityRow[](4);
         uint256 i = 0;
         rows[i] = CTMRegistryBase.FreezabilityRow({facet: CTMContract.AdminFacet, isFreezable: false}); // AdminFacet
         ++i;
         rows[i] = CTMRegistryBase.FreezabilityRow({facet: CTMContract.GettersFacet, isFreezable: false}); // GettersFacet
+        ++i;
+        rows[i] = CTMRegistryBase.FreezabilityRow({facet: CTMContract.MailboxFacet, isFreezable: true}); // MailboxFacet
         ++i;
         rows[i] = CTMRegistryBase.FreezabilityRow({facet: CTMContract.ExecutorFacet, isFreezable: true}); // ExecutorFacet
         ++i;

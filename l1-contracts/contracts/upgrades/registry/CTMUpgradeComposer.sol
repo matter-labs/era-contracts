@@ -42,101 +42,39 @@ library CTMUpgradeComposer {
     }
 
     /// @notice Builds the facet swaps taking a chain from the registry's old protocol version to
-    ///         its new one. Facets whose address is unchanged between the versions are skipped.
-    /// @dev Selector lists come from the facets themselves (`ISelfDescribingFacet.selectors()`,
-    ///      immutable bytecode, so recomposition stays stable across the upgrade window) unless the
-    ///      registry pins a list for that facet version — the bootstrap override for facet versions
-    ///      deployed before `ISelfDescribingFacet` existed. Never from live diamond state.
+    ///         its new one. The registry's old-version facet rows ARE the plan: one swap per row,
+    ///         no diffing heuristics — the generated data already says exactly what changes.
+    /// @dev Per planned facet, the old address comes from the old-side row (zero = pure addition)
+    ///      and the new address from the new-side facet set (absent = pure removal). Selector
+    ///      lists come from the facets themselves (`ISelfDescribingFacet.selectors()`, immutable
+    ///      bytecode, so recomposition stays stable across the upgrade window) unless the
+    ///      registry pins a list for that facet version — the bootstrap override for facet
+    ///      versions deployed before `ISelfDescribingFacet` existed. Never from live diamond
+    ///      state.
     function buildFacetSwaps(ICTMRegistry _registry) internal view returns (SwapSet memory swapSet) {
-        CTMContract[] memory oldFacets = _registry.facetList(_registry.oldProtocolVersion());
-        CTMContract[] memory newFacets = _registry.facetList(_registry.newProtocolVersion());
-
-        // Upper bound: every old facet swapped plus every new facet added.
-        SwapSet memory buffer;
-        buffer.swaps = new DiamondCutBuilder.FacetSwap[](oldFacets.length + newFacets.length);
-        buffer.oldSelectors = new bytes4[][](oldFacets.length + newFacets.length);
-        buffer.newSelectors = new bytes4[][](oldFacets.length + newFacets.length);
-
-        uint256 count = _appendOldFacetSwaps({
-            _buffer: buffer,
-            _registry: _registry,
-            _oldFacets: oldFacets,
-            _newFacets: newFacets
-        });
-        count = _appendNewFacetSwaps({
-            _buffer: buffer,
-            _registry: _registry,
-            _oldFacets: oldFacets,
-            _newFacets: newFacets,
-            _count: count
-        });
-
-        swapSet.swaps = _trimSwaps(buffer.swaps, count);
-        swapSet.oldSelectors = _trimSelectorLists(buffer.oldSelectors, count);
-        swapSet.newSelectors = _trimSelectorLists(buffer.newSelectors, count);
-    }
-
-    /// @dev Old facets: replaced (present in the new set) or removed (absent from it). Facets
-    ///      whose address did not change are skipped entirely.
-    function _appendOldFacetSwaps(
-        SwapSet memory _buffer,
-        ICTMRegistry _registry,
-        CTMContract[] memory _oldFacets,
-        CTMContract[] memory _newFacets
-    ) private view returns (uint256 count) {
         uint256 oldVersion = _registry.oldProtocolVersion();
         uint256 newVersion = _registry.newProtocolVersion();
-        uint256 oldFacetsLength = _oldFacets.length;
-        for (uint256 i = 0; i < oldFacetsLength; ++i) {
-            CTMContract facet = _oldFacets[i];
+        CTMContract[] memory plan = _registry.facetList(oldVersion);
+        uint256 planLength = plan.length;
+
+        swapSet.swaps = new DiamondCutBuilder.FacetSwap[](planLength);
+        swapSet.oldSelectors = new bytes4[][](planLength);
+        swapSet.newSelectors = new bytes4[][](planLength);
+        for (uint256 i = 0; i < planLength; ++i) {
+            CTMContract facet = plan[i];
             address oldAddress = _registry.ctmAddress(facet, oldVersion);
-            address newAddress = _contains(_newFacets, facet) ? _registry.ctmAddress(facet, newVersion) : address(0);
-            if (oldAddress == newAddress) {
-                // The facet is unchanged by this upgrade.
-                continue;
-            }
-            _buffer.swaps[count] = DiamondCutBuilder.FacetSwap({
+            address newAddress = _registry.ctmAddress(facet, newVersion);
+            swapSet.swaps[i] = DiamondCutBuilder.FacetSwap({
                 oldFacet: oldAddress,
                 newFacet: newAddress,
                 isFreezable: _registry.facetIsFreezable(facet)
             });
-            _buffer.oldSelectors[count] = _facetSelectors(_registry, facet, oldVersion, oldAddress);
-            _buffer.newSelectors[count] = newAddress == address(0)
+            swapSet.oldSelectors[i] = oldAddress == address(0)
+                ? new bytes4[](0)
+                : _facetSelectors(_registry, facet, oldVersion, oldAddress);
+            swapSet.newSelectors[i] = newAddress == address(0)
                 ? new bytes4[](0)
                 : _facetSelectors(_registry, facet, newVersion, newAddress);
-            ++count;
-        }
-    }
-
-    /// @dev New facets that did not exist at the old version: pure additions.
-    function _appendNewFacetSwaps(
-        SwapSet memory _buffer,
-        ICTMRegistry _registry,
-        CTMContract[] memory _oldFacets,
-        CTMContract[] memory _newFacets,
-        uint256 _count
-    ) private view returns (uint256 count) {
-        count = _count;
-        uint256 newVersion = _registry.newProtocolVersion();
-        uint256 newFacetsLength = _newFacets.length;
-        for (uint256 i = 0; i < newFacetsLength; ++i) {
-            CTMContract facet = _newFacets[i];
-            if (_contains(_oldFacets, facet)) {
-                continue;
-            }
-            _buffer.swaps[count] = DiamondCutBuilder.FacetSwap({
-                oldFacet: address(0),
-                newFacet: _registry.ctmAddress(facet, newVersion),
-                isFreezable: _registry.facetIsFreezable(facet)
-            });
-            _buffer.oldSelectors[count] = new bytes4[](0);
-            _buffer.newSelectors[count] = _facetSelectors(
-                _registry,
-                facet,
-                newVersion,
-                _registry.ctmAddress(facet, newVersion)
-            );
-            ++count;
         }
     }
 
@@ -289,35 +227,5 @@ library CTMUpgradeComposer {
     ///      patch component. `BaseZkSyncUpgrade` enforces this equals the new minor version.
     function protocolUpgradeNonce(uint256 _protocolVersion) internal pure returns (uint256) {
         return _protocolVersion >> SEMVER_MINOR_OFFSET;
-    }
-
-    function _contains(CTMContract[] memory _list, CTMContract _item) private pure returns (bool) {
-        uint256 listLength = _list.length;
-        for (uint256 i = 0; i < listLength; ++i) {
-            if (_list[i] == _item) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    function _trimSwaps(
-        DiamondCutBuilder.FacetSwap[] memory _swaps,
-        uint256 _count
-    ) private pure returns (DiamondCutBuilder.FacetSwap[] memory trimmed) {
-        trimmed = new DiamondCutBuilder.FacetSwap[](_count);
-        for (uint256 i = 0; i < _count; ++i) {
-            trimmed[i] = _swaps[i];
-        }
-    }
-
-    function _trimSelectorLists(
-        bytes4[][] memory _lists,
-        uint256 _count
-    ) private pure returns (bytes4[][] memory trimmed) {
-        trimmed = new bytes4[][](_count);
-        for (uint256 i = 0; i < _count; ++i) {
-            trimmed[i] = _lists[i];
-        }
     }
 }

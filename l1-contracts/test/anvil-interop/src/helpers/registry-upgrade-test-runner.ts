@@ -436,14 +436,12 @@ type LiveUpgradeInputs = {
   adminSelectors: string[];
   otherFacets: { name: string; address: string }[];
   acceptAdminSelector: string;
-  oldVerifier: string;
   genesisUpgrade: string;
   rollupDAManager: string;
   chainAssetHandler: string;
   eraGatewayChainId: ethers.BigNumber;
   ecosystemProxyAdmin: string;
   messageRootProxy: string;
-  oldMessageRootImpl: string;
 };
 
 /** The probed live facet address by name (see readLiveUpgradeInputs facet probes). */
@@ -516,7 +514,6 @@ async function readLiveUpgradeInputs(
   const adminFacetView = new ethers.Contract(upgradeChains[0].diamondProxy, getAbi("AdminFacet"), l1Provider);
   const rollupDAManager: string = await adminFacetView.getRollupDAManager();
 
-  const oldVerifier: string = await ctm.protocolVersionVerifier(oldVersion);
   const genesisUpgrade: string = await ctm.l1GenesisUpgrade();
 
   const bridgehubAddr: string = await ctm.BRIDGE_HUB();
@@ -525,8 +522,6 @@ async function readLiveUpgradeInputs(
 
   const messageRoot = new ethers.Contract(messageRootProxy, getAbi("L1MessageRoot"), l1Provider);
   const eraGatewayChainId: ethers.BigNumber = await messageRoot.ERA_GATEWAY_CHAIN_ID();
-  const implSlot = await l1Provider.getStorageAt(messageRootProxy, EIP1967_IMPL_SLOT);
-  const oldMessageRootImpl = ethers.utils.getAddress("0x" + implSlot.slice(26));
   const adminSlotRaw = await l1Provider.getStorageAt(
     messageRootProxy,
     // EIP-1967 admin slot: keccak256("eip1967.proxy.admin") - 1
@@ -544,14 +539,12 @@ async function readLiveUpgradeInputs(
     adminSelectors,
     otherFacets,
     acceptAdminSelector,
-    oldVerifier,
     genesisUpgrade,
     rollupDAManager,
     chainAssetHandler,
     eraGatewayChainId,
     ecosystemProxyAdmin,
     messageRootProxy,
-    oldMessageRootImpl,
   };
 }
 
@@ -662,6 +655,29 @@ async function buildRegistryManifest(
     [delegateCodeHash, ethers.utils.hexDataLength(delegateBytecode), delegateCodeHash]
   );
 
+  // The facet PLAN (old-side rows): the five facets this synthetic bump replaces, each with its
+  // live (old) address — the one irreducible old-side datum (the composed cut diffs against the
+  // old facet's own ISelfDescribingFacet.selectors()). MailboxFacet is NOT replaced (see
+  // deployUpgradeMachinery) so it has no plan row.
+  const replacedFacets = [
+    { name: "AdminFacet", oldAddress: live.oldAdminFacet, newAddress: deployed.newAdminFacet },
+    { name: "GettersFacet", oldAddress: liveFacet(live, "GettersFacet"), newAddress: deployed.newGettersFacet },
+    { name: "ExecutorFacet", oldAddress: liveFacet(live, "ExecutorFacet"), newAddress: deployed.newExecutorFacet },
+    { name: "MigratorFacet", oldAddress: liveFacet(live, "MigratorFacet"), newAddress: deployed.newMigratorFacet },
+    { name: "CommitterFacet", oldAddress: liveFacet(live, "CommitterFacet"), newAddress: deployed.newCommitterFacet },
+  ];
+  // The INSTALLED set (new-side rows): the complete post-upgrade facet surface, all
+  // codehash-pinned so verifyAll() covers it. MailboxFacet keeps its live address — unchanged
+  // by this bump, installed-side only.
+  const installedFacets = [
+    ...replacedFacets.map(({ name, newAddress }) => ({ name, address: newAddress })),
+    { name: "MailboxFacet", address: liveFacet(live, "MailboxFacet") },
+  ];
+  const installed = [];
+  for (const { name, address } of installedFacets) {
+    installed.push({ name, address, codehash: await codehash(address), selectors: [] });
+  }
+
   return {
     tag: REGISTRY_TAG,
     oldVersion: live.oldVersionString,
@@ -675,7 +691,6 @@ async function buildRegistryManifest(
       contracts: {
         MessageRoot: {
           proxy: live.messageRootProxy,
-          implOld: live.oldMessageRootImpl,
           implNew: deployed.newMessageRootImpl,
           implNewCodehash: await codehash(deployed.newMessageRootImpl),
         },
@@ -686,59 +701,20 @@ async function buildRegistryManifest(
         name: CTM_REGISTRY_NAME,
         isZKsyncOS: true,
         ctmProxy,
-        verifierOld: live.oldVerifier,
         verifierNew: deployed.newVerifier,
+        // Non-facet CTM contracts (new implementations only; facets live in `facets`).
         contracts: {
-          AdminFacet: {
-            old: live.oldAdminFacet,
-            new: deployed.newAdminFacet,
-            newCodehash: await codehash(deployed.newAdminFacet),
-          },
           DefaultUpgrade: { new: deployed.newDefaultUpgrade, newCodehash: await codehash(deployed.newDefaultUpgrade) },
           DiamondInit: { new: deployed.newDiamondInit, newCodehash: await codehash(deployed.newDiamondInit) },
-          // The rest of the replaced facet set (fresh implementations, same source).
-          GettersFacet: {
-            old: liveFacet(live, "GettersFacet"),
-            new: deployed.newGettersFacet,
-            newCodehash: await codehash(deployed.newGettersFacet),
-          },
-          ExecutorFacet: {
-            old: liveFacet(live, "ExecutorFacet"),
-            new: deployed.newExecutorFacet,
-            newCodehash: await codehash(deployed.newExecutorFacet),
-          },
-          MigratorFacet: {
-            old: liveFacet(live, "MigratorFacet"),
-            new: deployed.newMigratorFacet,
-            newCodehash: await codehash(deployed.newMigratorFacet),
-          },
-          CommitterFacet: {
-            old: liveFacet(live, "CommitterFacet"),
-            new: deployed.newCommitterFacet,
-            newCodehash: await codehash(deployed.newCommitterFacet),
-          },
-          // The one facet this bump leaves untouched (see deployUpgradeMachinery): pinned
-          // old == new (the composer skips it) so the registry stays the complete facet
-          // manifest and verifyAll() covers the whole live facet surface.
-          MailboxFacet: {
-            old: liveFacet(live, "MailboxFacet"),
-            new: liveFacet(live, "MailboxFacet"),
-            newCodehash: await codehash(liveFacet(live, "MailboxFacet")),
-          },
         },
-        // No selector lists: every facet on the (regenerated) chain states implements
-        // ISelfDescribingFacet, so the composer reads selectors from the facets themselves.
-        // Registry-pinned lists remain only as the bootstrap override for environments whose
-        // old facets predate that interface (e.g. real mainnet/testnet upgrades from v31).
+        // Empty selector lists everywhere: every facet on the (regenerated) chain states
+        // implements ISelfDescribingFacet, so the composer reads selectors from the facets
+        // themselves. Registry-pinned lists remain only as the bootstrap override for
+        // environments whose old facets predate that interface (e.g. real mainnet/testnet
+        // upgrades from v31).
         facets: {
-          old: [
-            { name: "AdminFacet", selectors: [] },
-            ...live.otherFacets.map((f) => ({ name: f.name, selectors: [] })),
-          ],
-          new: [
-            { name: "AdminFacet", selectors: [] },
-            ...live.otherFacets.map((f) => ({ name: f.name, selectors: [] })),
-          ],
+          plan: replacedFacets.map(({ name, oldAddress }) => ({ name, oldAddress, selectors: [] })),
+          installed,
         },
         // Production freezability flags (DeployCTMUtils facet cuts).
         facetFreezability: {
@@ -840,19 +816,27 @@ function assertCommittedManifestMatchesLiveDeployment(
   // Same shape as the object built by buildRegistryManifest (the emit-mode output).
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
   const ctm = (manifest.ctms || []).find((c: { name?: string }) => c.name === CTM_REGISTRY_NAME);
+  const planFacet = (name: string) => (ctm?.facets?.plan || []).find((f: { name?: string }) => f.name === name);
+  const installedFacet = (name: string) =>
+    (ctm?.facets?.installed || []).find((f: { name?: string }) => f.name === name);
   const checks: Array<[string, unknown, unknown]> = [
     ["tag", manifest.tag, REGISTRY_TAG],
     ["oldVersion", manifest.oldVersion, live.oldVersionString],
     ["newVersion", manifest.newVersion, live.newVersionString],
     ["core.proxyAdmin", manifest.core?.proxyAdmin, live.ecosystemProxyAdmin],
     ["core.contracts.MessageRoot.proxy", manifest.core?.contracts?.MessageRoot?.proxy, live.messageRootProxy],
-    ["core.contracts.MessageRoot.implOld", manifest.core?.contracts?.MessageRoot?.implOld, live.oldMessageRootImpl],
     ["core.contracts.MessageRoot.implNew", manifest.core?.contracts?.MessageRoot?.implNew, deployed.newMessageRootImpl],
     ["ctm.ctmProxy", ctm?.ctmProxy, ctmProxy],
-    ["ctm.verifierOld", ctm?.verifierOld, live.oldVerifier],
     ["ctm.verifierNew", ctm?.verifierNew, deployed.newVerifier],
-    ["ctm.contracts.AdminFacet.old", ctm?.contracts?.AdminFacet?.old, live.oldAdminFacet],
-    ["ctm.contracts.AdminFacet.new", ctm?.contracts?.AdminFacet?.new, deployed.newAdminFacet],
+    ["ctm.facets.plan[AdminFacet].oldAddress", planFacet("AdminFacet")?.oldAddress, live.oldAdminFacet],
+    ["ctm.facets.installed[AdminFacet].address", installedFacet("AdminFacet")?.address, deployed.newAdminFacet],
+    // MailboxFacet is unchanged by this bump: installed-side only, at its live address.
+    ["ctm.facets.plan[MailboxFacet]", planFacet("MailboxFacet") === undefined, true],
+    [
+      "ctm.facets.installed[MailboxFacet].address",
+      installedFacet("MailboxFacet")?.address,
+      liveFacet(live, "MailboxFacet"),
+    ],
     ["ctm.contracts.DefaultUpgrade.new", ctm?.contracts?.DefaultUpgrade?.new, deployed.newDefaultUpgrade],
     ["ctm.contracts.DiamondInit.new", ctm?.contracts?.DiamondInit?.new, deployed.newDiamondInit],
     ["ctm.genesis.genesisUpgrade", ctm?.genesis?.genesisUpgrade, live.genesisUpgrade],

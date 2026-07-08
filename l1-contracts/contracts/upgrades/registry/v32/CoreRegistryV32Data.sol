@@ -20,10 +20,7 @@ library CoreRegistryV32Data {
     }
 
     function ctmRegistry(bool _isZKsyncOS) internal pure returns (address) {
-        return
-            _isZKsyncOS
-                ? address(uint160(0x000000000000000000000000000000000000000000))
-                : address(uint160(0x000000000000000000000000000000000000000000));
+        return _isZKsyncOS ? address(0) : address(0);
     }
 
     function contractRows() internal pure returns (CoreRegistryBase.EcosystemContractRow[] memory rows) {
@@ -32,7 +29,6 @@ library CoreRegistryV32Data {
         rows[i] = CoreRegistryBase.EcosystemContractRow({
             key: EcosystemContract.MessageRoot,
             proxy: address(uint160(0x004a02a75c31b433fc8d87f510500b90e0fa7e0254)),
-            implOld: address(uint160(0x0036529ce3fd7a08a689b0c707325b3f5034570eca)),
             implNew: address(uint160(0x008f4ec854dd12f1fe79500a1f53d0cbb30f9b6134))
         }); // MessageRoot
         ++i;

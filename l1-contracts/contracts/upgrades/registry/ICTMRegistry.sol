@@ -30,18 +30,24 @@ interface ICTMRegistry {
     /// @notice The ChainTypeManager proxy address (version-independent).
     function ctmProxy() external view returns (address);
 
-    /// @notice Address of a CTM-scoped contract (facet, verifier, upgrade contract, DiamondInit,
-    ///         ValidatorTimelock, CTM implementation, ...) at a given protocol version.
-    ///         Returns zero for contracts that do not exist at that version.
+    /// @notice Address of a CTM-scoped contract (facet, upgrade contract, DiamondInit, ...) at a
+    ///         given protocol version. Only new-version addresses are pinned, with one exception:
+    ///         facets the upgrade touches also pin their old address (the one irreducible
+    ///         old-side datum — the upgrade cut needs the old facet to read its old selectors).
+    ///         Returns zero for anything else, including contracts unchanged by this upgrade.
     function ctmAddress(CTMContract _contract, uint256 _protocolVersion) external view returns (address);
 
-    /// @notice The verifier address chains verify against at a given protocol version.
+    /// @notice The verifier address chains verify against at the new protocol version; reverts
+    ///         for any other version.
     function verifier(uint256 _protocolVersion) external view returns (address);
 
-    /// @notice The facets installed in every chain diamond at a given protocol version.
+    /// @notice At the new protocol version: the complete facet set installed in every chain
+    ///         diamond. At the old protocol version: the upgrade PLAN — only the facets this
+    ///         upgrade changes, adds or removes (unchanged facets are absent).
     function facetList(uint256 _protocolVersion) external view returns (CTMContract[] memory);
 
-    /// @notice The function selectors a facet registers in the diamond at a given protocol version.
+    /// @notice The pinned selector-list override of a facet at a given protocol version; an
+    ///         empty list means "read the facet's own `ISelfDescribingFacet.selectors()`".
     /// @dev Generated from the audited facet source (`forge inspect <Facet> methodIdentifiers`).
     ///      Together with `ctmAddress`, this lets the orchestrator diff the old and new facet sets
     ///      without reading live diamond state (uniform facet sets per protocol version).

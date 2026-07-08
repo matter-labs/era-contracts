@@ -24,14 +24,35 @@ import * as path from "path";
 
 interface CoreContractEntry {
   proxy: string;
-  implOld?: string;
+  /** New-version implementation; omit for contracts this upgrade does not touch. */
   implNew?: string;
   implNewCodehash?: string;
 }
 
-interface FacetEntry {
+/**
+ * One old-side facet row: the upgrade PLAN lists exactly the facets this upgrade touches.
+ * `oldAddress` is the facet currently installed (the one irreducible old-version datum — the
+ * upgrade cut diffs against its selectors); the zero address marks a facet ADDED by this
+ * upgrade, and a facet absent from `installed` is REMOVED by it. `selectors` is the optional
+ * bootstrap override for old facets predating `ISelfDescribingFacet` (empty/omitted = read the
+ * facet's own `selectors()`).
+ */
+interface FacetPlanEntry {
   name: string;
-  selectors: string[];
+  oldAddress: string;
+  selectors?: string[];
+}
+
+/**
+ * One new-side facet row: `installed` is the COMPLETE post-upgrade facet set. `codehash` pins
+ * the deployed bytecode for `verifyAll()`; `selectors` optionally overrides the facet's own
+ * `ISelfDescribingFacet.selectors()`.
+ */
+interface InstalledFacetEntry {
+  name: string;
+  address: string;
+  codehash?: string;
+  selectors?: string[];
 }
 
 interface L2ForceDeployment {
@@ -46,10 +67,10 @@ interface CTMManifest {
   name: string;
   isZKsyncOS: boolean;
   ctmProxy: string;
-  verifierOld: string;
   verifierNew: string;
-  contracts: Record<string, { old?: string; new?: string; newCodehash?: string }>;
-  facets: { old: FacetEntry[]; new: FacetEntry[] };
+  /** Non-facet CTM contracts (DefaultUpgrade, DiamondInit, ...); facets live in `facets`. */
+  contracts: Record<string, { new?: string; newCodehash?: string }>;
+  facets: { plan: FacetPlanEntry[]; installed: InstalledFacetEntry[] };
   facetFreezability: Record<string, boolean>;
   l2: {
     forceDeployments: L2ForceDeployment[];
@@ -89,6 +110,9 @@ function packSemVer(version: string): bigint {
 }
 
 function addr(a: string): string {
+  if (/^0x0{40}$/.test(a.toLowerCase())) {
+    return "address(0)";
+  }
   // Addresses are emitted lowercase; Solidity accepts 40-hex-digit literals only when EIP-55
   // checksummed. To stay dependency-free, prepend `00` so the literal is a plain number and
   // cast it back down to an address.
@@ -128,9 +152,8 @@ function generateCore(m: Manifest, manifestPath: string, ifacePath: string): { d
       ([c, e]) => `        rows[i] = CoreRegistryBase.EcosystemContractRow({
             key: EcosystemContract.${c},
             proxy: ${addr(e.proxy)},
-            implOld: ${e.implOld ? addr(e.implOld) : "address(0)"},
             implNew: ${e.implNew ? addr(e.implNew) : "address(0)"}
-        }); // ${c}
+        }); // ${c}${e.implNew ? "" : " (not upgraded)"}
         ++i;`
     )
     .join("\n");
@@ -233,14 +256,10 @@ function generateCTM(
   const oldV = packSemVer(m.oldVersion);
   const newV = packSemVer(m.newVersion);
 
+  // Non-facet CTM contracts, new-version addresses only (facet addresses live in the facet
+  // rows; old-version addresses are not recorded).
   const addressRowsList: string[] = [];
   for (const [c, e] of Object.entries(ctm.contracts)) {
-    if (e.old)
-      addressRowsList.push(
-        `        rows[i] = CTMRegistryBase.AddressRow({key: CTMContract.${c}, protocolVersion: OLD_PROTOCOL_VERSION, value: ${addr(
-          e.old
-        )}}); // ${c} @ ${m.oldVersion}\n        ++i;`
-      );
     if (e.new)
       addressRowsList.push(
         `        rows[i] = CTMRegistryBase.AddressRow({key: CTMContract.${c}, protocolVersion: NEW_PROTOCOL_VERSION, value: ${addr(
@@ -250,23 +269,48 @@ function generateCTM(
   }
 
   const facetRowsList: string[] = [];
-  const facetRow = (f: FacetEntry, versionConst: string, versionLabel: string): string => {
+  const facetRow = (
+    name: string,
+    facetAddress: string,
+    selectors: string[],
+    versionConst: string,
+    comment: string
+  ): string => {
     const lines = [
       "        {",
-      ...(f.selectors.length > 0
-        ? ["            bytes4[] memory selectorList;", ...selectorFill("selectorList", f.selectors, "            ")]
+      ...(selectors.length > 0
+        ? ["            bytes4[] memory selectorList;", ...selectorFill("selectorList", selectors, "            ")]
         : [
             "            // No pinned selector list: the facet self-describes (ISelfDescribingFacet.selectors()).",
             "            bytes4[] memory selectorList = new bytes4[](0);",
           ]),
-      `            rows[i] = CTMRegistryBase.FacetRow({facet: CTMContract.${f.name}, protocolVersion: ${versionConst}, selectorList: selectorList}); // ${f.name} @ ${versionLabel}`,
+      `            rows[i] = CTMRegistryBase.FacetRow({facet: CTMContract.${name}, protocolVersion: ${versionConst}, facetAddress: ${addr(
+        facetAddress
+      )}, selectorList: selectorList}); // ${comment}`,
       "            ++i;",
       "        }",
     ];
     return lines.join("\n");
   };
-  for (const f of ctm.facets.old) facetRowsList.push(facetRow(f, "OLD_PROTOCOL_VERSION", m.oldVersion));
-  for (const f of ctm.facets.new) facetRowsList.push(facetRow(f, "NEW_PROTOCOL_VERSION", m.newVersion));
+  // Old side: the upgrade PLAN — only the facets this upgrade touches (zero address = added).
+  for (const f of ctm.facets.plan) {
+    const added = /^0x0{40}$/.test(f.oldAddress.toLowerCase());
+    facetRowsList.push(
+      facetRow(
+        f.name,
+        f.oldAddress,
+        f.selectors ?? [],
+        "OLD_PROTOCOL_VERSION",
+        `${f.name} @ ${m.oldVersion}${added ? " (added by this upgrade)" : ""}`
+      )
+    );
+  }
+  // New side: the complete post-upgrade facet set.
+  for (const f of ctm.facets.installed) {
+    facetRowsList.push(
+      facetRow(f.name, f.address, f.selectors ?? [], "NEW_PROTOCOL_VERSION", `${f.name} @ ${m.newVersion}`)
+    );
+  }
 
   const freezabilityRowsList = Object.entries(ctm.facetFreezability).map(
     ([f, freezable]) =>
@@ -288,14 +332,19 @@ function generateCTM(
 
   const factoryDeps = ctm.l2.factoryDepHashes.map((h, i) => `        hashes[${i}] = uint256(${h});`);
 
-  const pinned = Object.entries(ctm.contracts).filter(([, e]) => e.new && e.newCodehash);
-  const pinRows = pinned.map(
-    ([c, e]) => `        pins[i] = CTMRegistryBase.CodehashPin({
-            target: ${addr(e.new!)},
-            expectedCodehash: ${e.newCodehash}
-        }); // ${c} @ ${m.newVersion}
-        ++i;`
-  );
+  const pin = (target: string, codehash: string, comment: string) => `        pins[i] = CTMRegistryBase.CodehashPin({
+            target: ${addr(target)},
+            expectedCodehash: ${codehash}
+        }); // ${comment}
+        ++i;`;
+  const pinRows = [
+    ...Object.entries(ctm.contracts)
+      .filter(([, e]) => e.new && e.newCodehash)
+      .map(([c, e]) => pin(e.new!, e.newCodehash!, `${c} @ ${m.newVersion}`)),
+    ...ctm.facets.installed
+      .filter((f) => f.codehash)
+      .map((f) => pin(f.address, f.codehash!, `${f.name} @ ${m.newVersion}`)),
+  ];
 
   const data = `// SPDX-License-Identifier: MIT
 
@@ -326,11 +375,8 @@ ${addressRowsList.join("\n")}
     }
 
     function verifierRows() internal pure returns (CTMRegistryBase.VerifierRow[] memory rows) {
-        rows = new CTMRegistryBase.VerifierRow[](2);
-        rows[0] = CTMRegistryBase.VerifierRow({protocolVersion: OLD_PROTOCOL_VERSION, verifier: ${addr(
-          ctm.verifierOld
-        )}}); // verifier @ ${m.oldVersion}
-        rows[1] = CTMRegistryBase.VerifierRow({protocolVersion: NEW_PROTOCOL_VERSION, verifier: ${addr(
+        rows = new CTMRegistryBase.VerifierRow[](1);
+        rows[0] = CTMRegistryBase.VerifierRow({protocolVersion: NEW_PROTOCOL_VERSION, verifier: ${addr(
           ctm.verifierNew
         )}}); // verifier @ ${m.newVersion}
     }
