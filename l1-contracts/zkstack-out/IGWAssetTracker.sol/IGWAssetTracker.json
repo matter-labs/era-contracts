@@ -306,6 +306,23 @@
             "internalType": "bytes32"
           },
           {
+            "name": "imtRoots",
+            "type": "tuple",
+            "internalType": "struct BatchImtRoots",
+            "components": [
+              {
+                "name": "rootBegin",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "rootEnd",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              }
+            ]
+          },
+          {
             "name": "settlementFeePayer",
             "type": "address",
             "internalType": "address"

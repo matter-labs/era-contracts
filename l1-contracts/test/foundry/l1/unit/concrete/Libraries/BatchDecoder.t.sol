@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
-import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor, BatchImtRoots} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, PrecommitInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {InteropRoot, L2Log} from "contracts/common/Messaging.sol";
@@ -182,26 +182,28 @@ contract BatchDecoderTest is Test {
         L2Log[][] memory logs = new L2Log[][](2);
         bytes[][] memory messages = new bytes[][](2);
         bytes32[] memory multichainBatchRoots = new bytes32[](2);
+        BatchImtRoots[] memory imtRoots = new BatchImtRoots[](2);
 
         bytes memory encodedData = abi.encodePacked(
             SUPPORTED_ENCODING_VERSION,
-            abi.encode(executeBatches, priorityOps, dependencyRoots, logs, messages, multichainBatchRoots, address(0))
+            abi.encode(
+                executeBatches,
+                priorityOps,
+                dependencyRoots,
+                logs,
+                messages,
+                multichainBatchRoots,
+                imtRoots,
+                address(0)
+            )
         );
 
-        (
-            IExecutor.StoredBatchInfo[] memory decodedExecuteBatches,
-            PriorityOpsBatchInfo[] memory decodedPriorityOps,
-            ,
-            ,
-            ,
-            ,
+        BatchDecoder.DecodedExecuteData memory decoded = this.externalDecodeAndCheckExecuteData(encodedData, 11, 12);
 
-        ) = this.externalDecodeAndCheckExecuteData(encodedData, 11, 12);
-
-        assertEq(decodedExecuteBatches.length, 2);
-        assertEq(decodedExecuteBatches[0].batchNumber, 11);
-        assertEq(decodedExecuteBatches[1].batchNumber, 12);
-        assertEq(decodedPriorityOps.length, 2);
+        assertEq(decoded.batchesData.length, 2);
+        assertEq(decoded.batchesData[0].batchNumber, 11);
+        assertEq(decoded.batchesData[1].batchNumber, 12);
+        assertEq(decoded.priorityOpsData.length, 2);
     }
 
     function test_decodeAndCheckExecuteData_revertsOnEmptyData() public {
@@ -221,10 +223,20 @@ contract BatchDecoderTest is Test {
         L2Log[][] memory logs = new L2Log[][](1);
         bytes[][] memory messages = new bytes[][](1);
         bytes32[] memory multichainBatchRoots = new bytes32[](1);
+        BatchImtRoots[] memory imtRoots = new BatchImtRoots[](1);
 
         bytes memory encodedData = abi.encodePacked(
             unsupportedVersion,
-            abi.encode(executeBatches, priorityOps, dependencyRoots, logs, messages, multichainBatchRoots, address(0))
+            abi.encode(
+                executeBatches,
+                priorityOps,
+                dependencyRoots,
+                logs,
+                messages,
+                multichainBatchRoots,
+                imtRoots,
+                address(0)
+            )
         );
 
         vm.expectRevert(abi.encodeWithSelector(UnsupportedExecuteBatchEncoding.selector, unsupportedVersion));
@@ -241,10 +253,20 @@ contract BatchDecoderTest is Test {
         L2Log[][] memory logs = new L2Log[][](2);
         bytes[][] memory messages = new bytes[][](2);
         bytes32[] memory multichainBatchRoots = new bytes32[](2);
+        BatchImtRoots[] memory imtRoots = new BatchImtRoots[](2);
 
         bytes memory encodedData = abi.encodePacked(
             SUPPORTED_ENCODING_VERSION,
-            abi.encode(executeBatches, priorityOps, dependencyRoots, logs, messages, multichainBatchRoots, address(0))
+            abi.encode(
+                executeBatches,
+                priorityOps,
+                dependencyRoots,
+                logs,
+                messages,
+                multichainBatchRoots,
+                imtRoots,
+                address(0)
+            )
         );
 
         vm.expectRevert(abi.encodeWithSelector(IncorrectBatchBounds.selector, 100, 200, 11, 12));
@@ -258,10 +280,20 @@ contract BatchDecoderTest is Test {
         L2Log[][] memory logs = new L2Log[][](0);
         bytes[][] memory messages = new bytes[][](0);
         bytes32[] memory multichainBatchRoots = new bytes32[](0);
+        BatchImtRoots[] memory imtRoots = new BatchImtRoots[](0);
 
         bytes memory encodedData = abi.encodePacked(
             SUPPORTED_ENCODING_VERSION,
-            abi.encode(executeBatches, priorityOps, dependencyRoots, logs, messages, multichainBatchRoots, address(0))
+            abi.encode(
+                executeBatches,
+                priorityOps,
+                dependencyRoots,
+                logs,
+                messages,
+                multichainBatchRoots,
+                imtRoots,
+                address(0)
+            )
         );
 
         vm.expectRevert(EmptyData.selector);
@@ -313,19 +345,7 @@ contract BatchDecoderTest is Test {
         bytes calldata _executeData,
         uint256 _processBatchFrom,
         uint256 _processBatchTo
-    )
-        external
-        pure
-        returns (
-            IExecutor.StoredBatchInfo[] memory,
-            PriorityOpsBatchInfo[] memory,
-            InteropRoot[][] memory,
-            L2Log[][] memory,
-            bytes[][] memory,
-            bytes32[] memory,
-            address
-        )
-    {
+    ) external pure returns (BatchDecoder.DecodedExecuteData memory) {
         return BatchDecoder.decodeAndCheckExecuteData(_executeData, _processBatchFrom, _processBatchTo);
     }
 

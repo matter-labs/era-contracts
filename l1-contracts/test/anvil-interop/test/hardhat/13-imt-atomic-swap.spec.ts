@@ -13,8 +13,8 @@
  *   RECEIVE `InteropHandler.executeAtomicBundle(bundleBytes, AtomicFinalityProof)`. Proves every leg
  *           was committed in its source chain's IMT before the deadline (one inclusion proof per leg),
  *           then executes the bundle's calls (the destination mint). `bundleStatus` guards double-execute.
- *   TIMEOUT `AtomicFlowManager.authorizeRefund(...)` (proves the missing leg absent from the last batch
- *           with `t <= deadline`, pinned by a successor batch with `t > deadline`) then
+ *   TIMEOUT `AtomicFlowManager.authorizeRefund(...)` (proves the missing leg absent from the
+ *           batch-begin IMT root of a batch with `t > deadline`) then
  *           `claimRefund(flowId, bundleBytes)` recovers the burned source funds
  *           to the depositor via L2AssetRouter's recoverAtomicCall.
  *
@@ -29,19 +29,20 @@
  *   - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
  *
  * The deadline is a settlement-layer timestamp, compared on-chain against each batch's settlement
- * timestamp `t` from the real `MessageHashing._getProofData` parse of `messageProof`, so the off-chain
- * builders embed a chosen `t` in format-valid multi-hop proof bytes. Root-message authentication is mocked to `true` on the
- * anvil harness. The off-chain IMT engine reconstructs the root / Merkle paths from the live leaf set
- * and asserts it matches `tree.root()` before emitting a proof, so a passing test also confirms the
- * off-chain engine agrees with the on-chain one.
+ * timestamp `t` from the real `MessageHashing._getProofData` parse of `settlementProof`, so the
+ * off-chain builders embed a chosen `t` in format-valid multi-hop proof bytes (including the exact
+ * 3-hop chain-batch-root leaf path the verifier enforces). Chain-batch-root leaf authentication is
+ * mocked to `true` on the anvil harness. The off-chain IMT engine reconstructs the root / Merkle paths
+ * from the live leaf set and asserts it matches `tree.root()` before emitting a proof, so a passing
+ * test also confirms the off-chain engine agrees with the on-chain one.
  *
  * Verifies:
  *   - HAPPY PATH: atomic send (source burn + IMT insert) on both legs -> executeAtomicBundle (every-leg
  *     inclusion proof, `t <= deadline`) on each destination. Recipients receive the bridged token;
  *     source legs stay terminal at Committed; both destination bundles end FullyExecuted.
- *   - TIMEOUT PATH: one leg commits, the other never does -> after the deadline, an adjacency proof
- *     (missing leg absent from the last batch with `t <= deadline`, pinned by a successor with
- *     `t > deadline`) authorizes a refund -> claimRefund recovers the depositor's tokens; the
+ *   - TIMEOUT PATH: one leg commits, the other never does -> after the deadline, a single absence
+ *     proof (missing leg absent from the batch-begin IMT root of a batch with `t > deadline`)
+ *     authorizes a refund -> claimRefund recovers the depositor's tokens; the
  *     source leg ends Reverted.
  */
 
@@ -74,13 +75,12 @@ import {
 import {
   atomicFinalityProofTuple,
   atomicFlowTuple,
-  atomicTimeoutProofTuple,
   buildInclusionProof,
   buildNonInclusionProof,
-  buildSuccessorProof,
   commitValue,
   computeFlowId,
   lowNullifierIndexFor,
+  proofTuple,
   reconstructChainImt,
 } from "../../src/helpers/imt-engine-lib";
 
@@ -450,9 +450,10 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
 
   it("timeout path: one leg commits, peer never does -> authorizeRefund + claimRefund recovers depositor", async () => {
     const user = chainA.user.address;
-    // The deadline is an SL timestamp. The timeout proof pins the missing leg absent from the last
-    // in-time batch (`t <= deadline`), using a consecutive successor batch with `t = deadline + 1`.
-    // Both `t`s are fabricated on the harness — only the deadline/adjacency checks are exercised.
+    // The deadline is an SL timestamp. The timeout proof shows the missing leg absent from the
+    // batch-BEGIN IMT root of a late batch (`t = deadline + 1 > deadline`); since the tree is
+    // append-only and begin(N) == end(N-1), that proves it was never committed in time. `t` is
+    // fabricated on the harness — only the deadline/absence checks are exercised.
     const deadline = 1_000;
 
     const refundRecipient = chainB.user.address; // irrelevant for refund; distinct dest recipient
@@ -492,21 +493,16 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       "AB depositor burned tokens at commit"
     );
 
-    // ── Build the timeout proof for the missing BA leg against B's IMT: absence at the last in-time
-    //    batch N (`t_N <= deadline`) pinned by the consecutive successor N+1 (`t_{N+1} > deadline`).
+    // ── Build the timeout proof for the missing BA leg against B's IMT: non-inclusion against the
+    //    batch-begin root of a late batch (`t > deadline`). The live tree root stands in for the
+    //    begin-root snapshot (leaf 2 of the chain batch root) on the harness.
     const baValue = commitValue(flowId, hBA);
     const absence = await buildNonInclusionProof({
       l2Tree: chainB.stack.tree,
       chainId: chainB.chainId,
       value: baValue,
-      l1Timestamp: deadline, // t_N <= deadline
-      batchNumber: 1, // batch N
-    });
-    const successor = await buildSuccessorProof({
-      l2Tree: chainB.stack.tree,
-      chainId: chainB.chainId,
-      l1Timestamp: deadline + 1, // t_{N+1} > deadline
-      batchNumber: 2, // batch N+1 (consecutive)
+      l1Timestamp: deadline + 1, // t > deadline: the first late batch's begin root
+      batchNumber: 1,
     });
     const missingIdx = legHashesAsc[0] === hBA ? 0 : 1;
 
@@ -516,7 +512,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       await managerA.authorizeRefund(
         atomicFlowTuple({ flowId, deadline, legBundleHashes: legHashesAsc, chainIds: chainIdsAsc }),
         missingIdx,
-        atomicTimeoutProofTuple(absence, successor),
+        proofTuple(absence),
         { gasLimit: DEFAULT_TX_GAS_LIMIT }
       )
     ).wait();

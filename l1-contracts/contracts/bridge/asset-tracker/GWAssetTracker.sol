@@ -25,7 +25,6 @@ import {
     L2_COMPLEX_UPGRADER_ADDR,
     L2_COMPRESSOR_ADDR,
     L2_INTEROP_CENTER_ADDR,
-    L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_INTEROP_HANDLER_ADDR,
     L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR,
     L2_MESSAGE_ROOT,
@@ -78,6 +77,7 @@ import {
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
+import {ChainBatchRootTree} from "../../common/libraries/ChainBatchRootTree.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
@@ -320,11 +320,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                     // No further action is required in this case.
                 } else if (log.key == bytes32(uint256(uint160(address(L2_INTEROP_HANDLER_ADDR))))) {
                     _handleInteropHandlerMessage(_processLogsInputs.chainId, message);
-                } else if (log.key == bytes32(uint256(uint160(L2_INTEROP_COMMITMENT_TREE_ADDR)))) {
-                    // The atomic-interop commitment tree publishes `abi.encode(root)` on every insert
-                    // (and the genesis seed). The settlement layer needs no action: the message is
-                    // authenticated downstream by consuming chains against the interop root they import
-                    // for this chain. It is already folded into the reconstructed logs tree above.
                 } else if (uint256(log.key) <= MAX_BUILT_IN_CONTRACT_ADDR) {
                     // This Log is not supported
                     revert InvalidBuiltInContractMessage(logCount, msgCount - 1, log.key);
@@ -342,7 +337,17 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             _processLogsInputs.multichainBatchRoot == expectedEmptyMultichainBatchRoot,
             InvalidEmptyMultichainBatchRoot(expectedEmptyMultichainBatchRoot, _processLogsInputs.multichainBatchRoot)
         );
-        bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.multichainBatchRoot));
+        // Reconstruct the chain batch root: a fixed height-3 tree over (logs root, multichain root,
+        // IMT root at batch begin, IMT root at batch end) — see {ChainBatchRootTree}. The IMT roots
+        // are operator-supplied pass-throughs; their authenticity comes from the equality check with
+        // the committed `chainBatchRoot` below (the chain's proof system computed the committed root
+        // from the real storage snapshots).
+        bytes32 chainBatchRootHash = ChainBatchRootTree.compute({
+            _logsRoot: localLogsRootHash,
+            _multichainRoot: _processLogsInputs.multichainBatchRoot,
+            _imtRootBegin: _processLogsInputs.imtRoots.rootBegin,
+            _imtRootEnd: _processLogsInputs.imtRoots.rootEnd
+        });
 
         if (chainBatchRootHash != _processLogsInputs.chainBatchRoot) {
             revert ReconstructionMismatch(chainBatchRootHash, _processLogsInputs.chainBatchRoot);

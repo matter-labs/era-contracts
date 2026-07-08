@@ -24,7 +24,8 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "contracts/common/Config.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 import {DynamicIncrementalMerkleMemory} from "contracts/common/libraries/DynamicIncrementalMerkleMemory.sol";
-import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {ProcessLogsInput, BatchImtRoots} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 
 import {GWAssetTrackerTestHelper} from "./GWAssetTracker.t.sol";
 import {RAND_ADDRESS} from "test/foundry/TestConstants.sol";
@@ -379,7 +380,9 @@ library ProcessLogsTestHelper {
     ) internal returns (ProcessLogsInput memory) {
         bytes32 emptyMultichainBatchRoot = _gwAssetTracker.getEmptyMultichainBatchRoot(_chainId);
         bytes32 logsRoot = buildLogsMerkleRoot(_logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
+        // These fixtures model chains without the atomic-interop tree, so both IMT boundary
+        // snapshots (chain-batch-root leaves 2/3) are zero.
+        bytes32 chainBatchRoot = ChainBatchRootTree.compute(logsRoot, emptyMultichainBatchRoot, bytes32(0), bytes32(0));
 
         return
             ProcessLogsInput({
@@ -389,6 +392,7 @@ library ProcessLogsTestHelper {
                 messages: _messages,
                 chainBatchRoot: chainBatchRoot,
                 multichainBatchRoot: emptyMultichainBatchRoot,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: _settlementFeePayer
             });
     }

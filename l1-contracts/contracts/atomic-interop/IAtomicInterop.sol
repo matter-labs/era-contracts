@@ -23,52 +23,42 @@ enum LegState {
 
 /// @notice A single IMT proof against a source chain's interop commitment tree, used both ways:
 ///   - inclusion ({AtomicInteropProof.verifyInclusion}): `leaf` is the leaf holding the leg's commit
-///     value (`leaf.value == commitValue`), proven present as of a root that settled no later than the
-///     flow deadline;
-///   - non-inclusion ({AtomicInteropProof.verifyTimeoutAdjacency}, timeout/refund path): `leaf` is the
-///     low-nullifier (predecessor) leaf that brackets the absent commit value, proven against a root
-///     that settled strictly after the deadline. Because the IMT is append-only, absence in a
-///     post-deadline snapshot implies absence at the deadline, so the leg can no longer finalize.
+///     value (`leaf.value == commitValue`), proven present in the batch-END IMT root of a batch whose
+///     `l1Timestamp <= deadline`;
+///   - non-inclusion ({AtomicInteropProof.verifyTimeoutAbsence}, timeout/refund path): `leaf` is the
+///     low-nullifier (predecessor) leaf that brackets the absent commit value, proven against the
+///     batch-BEGIN IMT root of a batch whose `l1Timestamp > deadline`. Since the IMT is append-only
+///     and `begin(N) == end(N-1)`, absence at the begin of a late batch means the value was not
+///     committed in any in-time batch, so the leg can never finalize.
 ///
-/// The two structs were identical in layout, so they are unified; the meaning of `leaf` (the value's
-/// own leaf vs. its predecessor) is fixed by which verify function consumes the proof.
+/// The meaning of `leaf` (the value's own leaf vs. its predecessor) is fixed by which verify function
+/// consumes the proof.
 ///
 /// Authentication has two layers, both resolved against an SL aggregation root the verifying chain
 /// imported (`interopRoots[slChainId][slBlock]`; the claimed `(sourceChainId, batchNumber)` binds via
 /// the source chain's chain-id leaf inside that root):
-///   1. The origin {L2InteropCommitmentTree}'s `abi.encode(chainImtRoot)` L2->L1 message (sender
-///      pinned to the canonical commitment-tree address) is proven included; this authenticates the
-///      root.
+///   1. `chainImtRoot` is proven to be a leaf of the source batch's **chain batch root** — the fixed
+///      height-3 tree the bootloader commits, whose leaves 2/3 are the IMT roots at batch begin/end
+///      (see {ChainBatchRootTree}) — via `proveL2LeafInclusionShared` with `settlementProof`. The leaf
+///      index (2 = begin, 3 = end) is hardcoded by the consuming verify function, and the top-tree
+///      depth is enforced to be exactly {ChainBatchRootTree.TREE_DEPTH}, so the claimed value can only
+///      ever be a real batch-boundary IMT root written by the bootloader.
 ///   2. `leaf` at `imtLeafIndex` with `imtProof` hashes up to `chainImtRoot` (delegated to
 ///      {IndexedMerkleTree.verifyInclusion} / `verifyNonInclusion`).
 /// The batch's `l1Timestamp` is not a struct field, since that would be spoofable. It is parsed in-module
-/// from `messageProof` via {MessageHashing._getProofData} and is bound to the verified interop root by
+/// from `settlementProof` via {MessageHashing._getProofData} and is bound to the verified interop root by
 /// being folded into the chain batch leaf. The proof library then enforces the `l1Timestamp` vs `deadline`
-/// bound (inclusion: `l1Timestamp <= deadline`; timeout adjacency).
-/// @dev `batchNumber` is the source chain's top-level batch number passed to the message verifier and
+/// bound (inclusion: `l1Timestamp <= deadline`; absence: `l1Timestamp > deadline`).
+/// @dev `batchNumber` is the source chain's top-level batch number passed to the leaf verifier and
 /// to `_getProofData`.
 struct ImtProof {
     uint256 sourceChainId;
     uint256 batchNumber;
     bytes32 chainImtRoot;
-    uint16 messageTxNumberInBatch;
-    uint256 messageIndex;
-    bytes32[] messageProof;
+    bytes32[] settlementProof;
     IMTLeaf leaf;
     uint256 imtLeafIndex;
     bytes32[] imtProof;
-}
-
-/// @notice Adjacency timeout proof: two authenticated batches pinning the missing leg as absent from the
-/// last batch with `l1Timestamp <= deadline`. Grouping both `ImtProof`s into one struct also
-/// keeps {AtomicFlowManager.authorizeRefund}'s stack shallow.
-/// @param absence Non-inclusion proof of the missing leg's commit value at batch `N` (`t_N <= deadline`).
-/// @param successor Root-authentication proof of the consecutive batch `N+1` (same source chain and
-/// settlement layer) with `t_{N+1} > deadline`, pinning `N` as the last in-time batch. Its IMT membership
-/// fields are unused.
-struct AtomicTimeoutProof {
-    ImtProof absence;
-    ImtProof successor;
 }
 
 /// @notice The definition of an atomic flow: `flowId` plus the exact fields it hashes over. Grouping them

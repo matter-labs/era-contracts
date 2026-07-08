@@ -69,147 +69,61 @@
         "internalType": "uint256"
       },
       {
-        "name": "_timeout",
+        "name": "_absence",
         "type": "tuple",
-        "internalType": "struct AtomicTimeoutProof",
+        "internalType": "struct ImtProof",
         "components": [
           {
-            "name": "absence",
+            "name": "sourceChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "batchNumber",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "chainImtRoot",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "settlementProof",
+            "type": "bytes32[]",
+            "internalType": "bytes32[]"
+          },
+          {
+            "name": "leaf",
             "type": "tuple",
-            "internalType": "struct ImtProof",
+            "internalType": "struct IMTLeaf",
             "components": [
               {
-                "name": "sourceChainId",
+                "name": "value",
                 "type": "uint256",
                 "internalType": "uint256"
               },
               {
-                "name": "batchNumber",
+                "name": "nextIndex",
                 "type": "uint256",
                 "internalType": "uint256"
               },
               {
-                "name": "chainImtRoot",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              },
-              {
-                "name": "messageTxNumberInBatch",
-                "type": "uint16",
-                "internalType": "uint16"
-              },
-              {
-                "name": "messageIndex",
+                "name": "nextValue",
                 "type": "uint256",
                 "internalType": "uint256"
-              },
-              {
-                "name": "messageProof",
-                "type": "bytes32[]",
-                "internalType": "bytes32[]"
-              },
-              {
-                "name": "leaf",
-                "type": "tuple",
-                "internalType": "struct IMTLeaf",
-                "components": [
-                  {
-                    "name": "value",
-                    "type": "uint256",
-                    "internalType": "uint256"
-                  },
-                  {
-                    "name": "nextIndex",
-                    "type": "uint256",
-                    "internalType": "uint256"
-                  },
-                  {
-                    "name": "nextValue",
-                    "type": "uint256",
-                    "internalType": "uint256"
-                  }
-                ]
-              },
-              {
-                "name": "imtLeafIndex",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "imtProof",
-                "type": "bytes32[]",
-                "internalType": "bytes32[]"
               }
             ]
           },
           {
-            "name": "successor",
-            "type": "tuple",
-            "internalType": "struct ImtProof",
-            "components": [
-              {
-                "name": "sourceChainId",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "batchNumber",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "chainImtRoot",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              },
-              {
-                "name": "messageTxNumberInBatch",
-                "type": "uint16",
-                "internalType": "uint16"
-              },
-              {
-                "name": "messageIndex",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "messageProof",
-                "type": "bytes32[]",
-                "internalType": "bytes32[]"
-              },
-              {
-                "name": "leaf",
-                "type": "tuple",
-                "internalType": "struct IMTLeaf",
-                "components": [
-                  {
-                    "name": "value",
-                    "type": "uint256",
-                    "internalType": "uint256"
-                  },
-                  {
-                    "name": "nextIndex",
-                    "type": "uint256",
-                    "internalType": "uint256"
-                  },
-                  {
-                    "name": "nextValue",
-                    "type": "uint256",
-                    "internalType": "uint256"
-                  }
-                ]
-              },
-              {
-                "name": "imtLeafIndex",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "imtProof",
-                "type": "bytes32[]",
-                "internalType": "bytes32[]"
-              }
-            ]
+            "name": "imtLeafIndex",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "imtProof",
+            "type": "bytes32[]",
+            "internalType": "bytes32[]"
           }
         ]
       }
@@ -365,17 +279,7 @@
                 "internalType": "bytes32"
               },
               {
-                "name": "messageTxNumberInBatch",
-                "type": "uint16",
-                "internalType": "uint16"
-              },
-              {
-                "name": "messageIndex",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "messageProof",
+                "name": "settlementProof",
                 "type": "bytes32[]",
                 "internalType": "bytes32[]"
               },
@@ -712,22 +616,6 @@
   },
   {
     "type": "error",
-    "name": "ProofAdjacencyNotConsecutive",
-    "inputs": [
-      {
-        "name": "absenceBatchNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "successorBatchNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "ProofDeadlineExceeded",
     "inputs": [
       {
@@ -760,6 +648,27 @@
   },
   {
     "type": "error",
+    "name": "ProofImtRootInclusionFailed",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "batchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "imtRoot",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ProofInclusionFailed",
     "inputs": [
       {
@@ -769,6 +678,22 @@
       },
       {
         "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ProofInvalidChainBatchRootDepth",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "actual",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -801,22 +726,6 @@
       },
       {
         "name": "value",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "ProofRootMessageInclusionFailed",
-    "inputs": [
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "batchNumber",
         "type": "uint256",
         "internalType": "uint256"
       }

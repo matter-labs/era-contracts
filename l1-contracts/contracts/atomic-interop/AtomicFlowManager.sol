@@ -5,7 +5,7 @@ import {IAtomicFlowManager} from "./IAtomicFlowManager.sol";
 import {IL2InteropCommitmentTree} from "./IL2InteropCommitmentTree.sol";
 import {IAtomicRecoverable} from "./IAtomicRecoverable.sol";
 import {AtomicInteropProof} from "./libraries/AtomicInteropProof.sol";
-import {LegState, AtomicFlow, AtomicTimeoutProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
+import {LegState, AtomicFlow, ImtProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
 import {InteropDataEncoding} from "../interop/InteropDataEncoding.sol";
 import {
@@ -39,12 +39,13 @@ import {
 /// Timeout: {authorizeRefund} + {claimRefund} recover the burned source funds to the depositor by
 /// asking each of the bundle's call targets to reverse itself via {IAtomicRecoverable.recoverAtomicCall}.
 ///
-/// No double-spend: executing a bundle requires every leg present in a batch whose `l1Timestamp <=
-/// deadline`, while a refund requires some leg absent from the last such batch (pinned by the next batch
-/// with `l1Timestamp > deadline`). Since the per-chain trees are append-only and `l1Timestamp` is monotone, both cannot
-/// hold — but only when both proofs are checked against the leg's own source chain on the same settlement
-/// layer. Both bindings are committed in `flowId`. Without the source-chain binding a leg's commit value
-/// is trivially absent from any other chain's tree, re-opening a cross-chain force-refund double-mint.
+/// No double-spend: executing a bundle requires every leg present in the batch-END IMT root of a batch
+/// whose `l1Timestamp <= deadline`, while a refund requires some leg absent from the batch-BEGIN IMT
+/// root of a batch whose `l1Timestamp > deadline`. Since the per-chain trees are append-only,
+/// `begin(N) == end(N-1)`, and `l1Timestamp` is monotone, both cannot hold — but only when both proofs
+/// are checked against the leg's own source chain on the same settlement layer. Both bindings are
+/// committed in `flowId`. Without the source-chain binding a leg's commit value is trivially absent
+/// from any other chain's tree, re-opening a cross-chain force-refund double-mint.
 contract AtomicFlowManager is IAtomicFlowManager {
     /// @dev (flowId, bundleHash) => source-leg state on this chain. All collaborators
     /// (commitment tree, interop center, interop handler) are genesis-deployed built-ins
@@ -108,11 +109,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
     }
 
     /// @inheritdoc IAtomicFlowManager
-    function authorizeRefund(
-        AtomicFlow calldata _flow,
-        uint256 _missingLegIndex,
-        AtomicTimeoutProof calldata _timeout
-    ) external {
+    function authorizeRefund(AtomicFlow calldata _flow, uint256 _missingLegIndex, ImtProof calldata _absence) external {
         _checkFlowId(_flow);
 
         // 1. Bind the absence proof to the missing leg's declared source chain. Without this, the leg's
@@ -120,23 +117,17 @@ contract AtomicFlowManager is IAtomicFlowManager {
         //    any other chain's tree, so an on-time, finalized leg could be force-refunded against an
         //    unrelated chain (double-mint).
         uint256 missingLegChainId = _flow.legSourceChainIds[_missingLegIndex];
-        if (_timeout.absence.sourceChainId != missingLegChainId) {
-            revert ProofSourceChainMismatch(missingLegChainId, _timeout.absence.sourceChainId);
+        if (_absence.sourceChainId != missingLegChainId) {
+            revert ProofSourceChainMismatch(missingLegChainId, _absence.sourceChainId);
         }
 
-        // 2. Adjacency timeout: the leg's commit value is absent from the last batch with settlement
-        //    timestamp `t <= deadline` (the absence proof), pinned by the next batch with `t > deadline`
-        //    (the successor witness). This closes the stale/genesis-root force-refund: an old/empty root
-        //    can't be used because its successor would still be `<= deadline`.
+        // 2. Timeout: the leg's commit value is absent from the batch-BEGIN IMT root of a batch with
+        //    settlement timestamp `t > deadline`. Append-only + `begin(N) == end(N-1)` make this
+        //    equivalent to absence from every in-time batch, so the flow can never finalize. Requiring
+        //    the batch itself to be late closes the stale/genesis-root force-refund: an in-time
+        //    snapshot proves nothing about the deadline moment.
         uint256 value = AtomicInteropProof.commitValue(_flow.flowId, _flow.legBundleHashes[_missingLegIndex]);
-        // solhint-disable-next-line func-named-parameters
-        AtomicInteropProof.verifyTimeoutAdjacency(
-            _timeout.absence,
-            _timeout.successor,
-            value,
-            _flow.deadline,
-            _flow.settlementLayerChainId
-        );
+        AtomicInteropProof.verifyTimeoutAbsence(_absence, value, _flow.deadline, _flow.settlementLayerChainId);
 
         // 3. Mark this chain's committed source legs Revertable (legs committed on other chains are not
         //    in this manager's state, so they are skipped).

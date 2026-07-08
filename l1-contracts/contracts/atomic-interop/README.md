@@ -4,9 +4,11 @@ This module makes a multi-leg interop flow **atomic** — every leg executes or 
 central L1 coordinator**. It rides on the normal interop bundle path (`InteropCenter.sendBundle` ->
 `L2AssetRouter` -> `InteropHandler.executeAtomicBundle`); the only addition is an **Indexed Merkle
 Tree (IMT)** per chain that records each leg's commitment, plus per-leg **IMT proofs** authenticated
-against the regular **interop-root channel** (each chain's IMT root is published to L1 and re-imported
-on every chain). There is no extra L1 contract and no global-root registry — finality is proven, not
-dispatched.
+against the regular **interop-root channel**: the ZKsync OS bootloader snapshots each chain's IMT root
+at every batch boundary and commits both snapshots as dedicated leaves of the batch's **chain batch
+root** (`ChainBatchRootTree`: leaf 2 = batch begin, leaf 3 = batch end), which settles and is
+re-imported on every chain. There is no extra L1 contract, no global-root registry, and no L2->L1
+message — finality is proven, not dispatched.
 
 ## Key values
 
@@ -31,24 +33,31 @@ bundle, so `bundleHash` does not depend on `flowId` (which would be circular).
    `AtomicFlowManager.append`, which inserts `commitValue` into this chain's `L2InteropCommitmentTree`
    (an append-only **indexed** Merkle tree; leaves carry `{value, nextIndex, nextValue}` so both
    membership and non-membership are provable in O(log n)). The leg's local state becomes `Committed`.
-2. **Root settlement + import.** On every insert the commitment tree publishes `abi.encode(root)` to L1
-   via the L2->L1 messenger. That root settles into L1's `MessageRoot` and is re-imported into every
-   chain's `L2InteropRootStorage` through the standard interop-root channel — the same channel used for
-   all interop, built on both L1 and the gateway, so it works for L1-settling chains too.
+2. **Root settlement + import.** The bootloader reads the tree's root directly from storage at every
+   batch boundary and commits both snapshots into the batch's chain batch root (leaf 2 = begin, leaf 3
+   = end; see `common/libraries/ChainBatchRootTree.sol`). The chain batch root settles into the
+   settlement layer's `MessageRoot` and is re-imported into every chain's `L2InteropRootStorage`
+   through the standard interop-root channel — the same channel used for all interop, built on both L1
+   and the gateway, so it works for L1-settling chains too.
 3. **Finalize** (destination). `InteropHandler.executeAtomicBundle(bundle, finalityProof)` calls
    `AtomicFlowManager.requireFlowFinalized`, which for **every** leg verifies an IMT **inclusion** proof
-   (`AtomicInteropProof.verifyInclusion`): the leg's `commitValue` is present in its source chain's IMT
-   as of an authenticated interop root whose batch settled by the deadline (`l1Timestamp <= deadline`)
-   on the flow's `settlementLayerChainId`, and the proof's `sourceChainId` matches the
+   (`AtomicInteropProof.verifyInclusion`): the leg's `commitValue` is present in its source chain's
+   **batch-end** IMT root (chain-batch-root leaf 3, authenticated with an exact-depth 3-sibling path)
+   of a batch that settled by the deadline (`l1Timestamp <= deadline`) on the flow's
+   `settlementLayerChainId`, and the proof's `sourceChainId` matches the
    leg's declared `legSourceChainIds[i]`. If all legs are proven committed in time, the bundle's calls
    execute (the destination mint). A `commitValue` can only exist in its true source chain's tree, so
    inclusion is self-binding; non-inclusion is not, which is why the source chain is checked explicitly.
-4. **Timeout / refund.** If a leg never commits in time, `AtomicFlowManager.authorizeRefund` takes an
-   adjacency proof (`AtomicInteropProof.verifyTimeoutAdjacency`): the missing leg's `commitValue` is
-   absent from the source chain's **last** batch `N` with `t_N <= deadline`, pinned by its successor
-   batch `N+1` with `t_{N+1} > deadline`. Since the IMT is append-only and `t` is monotone, a value
-   committed by the deadline must be present in `N`, so this cannot succeed for an on-time or
-   already-finalized leg. The proof is bound to the missing leg's source chain and settlement layer. It
+4. **Timeout / refund.** If a leg never commits in time, `AtomicFlowManager.authorizeRefund` takes a
+   single absence proof (`AtomicInteropProof.verifyTimeoutAbsence`): the missing leg's `commitValue` is
+   absent from the **batch-begin** IMT root (leaf 2) of a source batch with `t > deadline`. Since the
+   IMT is append-only, `begin(N) == end(N-1)`, and `t` is monotone, absence at the begin of a late
+   batch means the value was not committed in any in-time batch — so this cannot succeed for an on-time
+   or already-finalized leg, while a genuinely missing (or late-committed) leg is refundable against
+   the first late batch. A chain whose first-ever settled batch is already late is refundable against
+   that batch's begin root (the seeded genesis root); the only remaining liveness gap is a source chain
+   that halts before settling any late batch.
+   The proof is bound to the missing leg's source chain and settlement layer. It
    marks this chain's `Committed` legs `Revertable`; `claimRefund` then reverses each burn by asking the
    call's target to recover itself via `IAtomicRecoverable.recoverAtomicCall` (implemented by
    `L2AssetRouter`), re-minting to the original depositor. Recovery is **best-effort**: each target
@@ -63,12 +72,12 @@ Leg state machine (`LegState`): `Unset -> Committed` (send) `-> Revertable -> Re
 
 ## Contracts
 
-| Contract                                                                                  | Layer | Role                                                                                                                                                                                                                                                                                |
-| ----------------------------------------------------------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `L2InteropCommitmentTree`                                                                 | L2    | Per-chain append-only **Indexed** Merkle Tree (`{value, nextIndex, nextValue}` leaves). `append` is appender-gated (the flow manager); publishes `abi.encode(root)` to L1 on every insert. Built-in at `0x10012`.                                                                   |
-| `AtomicFlowManager`                                                                       | L2    | `append` (from `InteropCenter`), `requireFlowFinalized` (from `InteropHandler`), `authorizeRefund` / `claimRefund` (timeout). Holds per-leg `LegState`. Built-in at `0x10014`.                                                                                                      |
-| `libraries/AtomicInteropProof`                                                            | L2    | `verifyInclusion` and `verifyTimeoutAdjacency` (for inclusion and timeout proofs respectively), `commitValue`, and the private `_authenticateRoot` — authenticates a `chainImtRoot` against the imported interop root and derives the batch's `l1Timestamp` for the deadline check. |
-| `IL2InteropCommitmentTree`, `IAtomicFlowManager`, `IAtomicInterop`, `AtomicInteropErrors` | L2    | Interfaces, shared structs (`ImtProof`, `AtomicFlow`, `AtomicTimeoutProof`, `AtomicFinalityProof`, `LegState`), and errors.                                                                                                                                                         |
+| Contract                                                                                  | Layer | Role                                                                                                                                                                                                                                                                                                                                            |
+| ----------------------------------------------------------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `L2InteropCommitmentTree`                                                                 | L2    | Per-chain append-only **Indexed** Merkle Tree (`{value, nextIndex, nextValue}` leaves). `insert` is appender-gated (the flow manager). Publishes nothing: the bootloader reads the root straight from its (consensus-critical) storage at batch boundaries. Built-in at `0x10012`.                                                              |
+| `AtomicFlowManager`                                                                       | L2    | `append` (from `InteropCenter`), `requireFlowFinalized` (from `InteropHandler`), `authorizeRefund` / `claimRefund` (timeout). Holds per-leg `LegState`. Built-in at `0x10014`.                                                                                                                                                                  |
+| `libraries/AtomicInteropProof`                                                            | L2    | `verifyInclusion` and `verifyTimeoutAbsence` (for inclusion and timeout proofs respectively), `commitValue`, and the private `_authenticateRoot` — authenticates a `chainImtRoot` as a chain-batch-root leaf (2 = begin / 3 = end, exact depth) against the imported interop root and derives the batch's `l1Timestamp` for the deadline check. |
+| `IL2InteropCommitmentTree`, `IAtomicFlowManager`, `IAtomicInterop`, `AtomicInteropErrors` | L2    | Interfaces, shared structs (`ImtProof`, `AtomicFlow`, `AtomicFinalityProof`, `LegState`), and errors.                                                                                                                                                                                                                                           |
 
 The flow's entry points live outside this directory: `InteropCenter` (`interop/`, `0x1000d`) drives the
 send + `append`; `InteropHandler` (`interop/`, `0x1000e`) drives `executeAtomicBundle`; `L2AssetRouter`
@@ -96,11 +105,12 @@ The two L2 contracts are predeployed in the ZKsync OS genesis (no `Executor` / c
 
 - `src/helpers/imt-engine-lib.ts` — the off-chain IMT engine: commit values, the
   low-nullifier index for an insert, and the O(log n) inclusion / non-inclusion proofs (must match
-  `IndexedMerkleTree` bit-for-bit).
-- `src/helpers/imt-atomic-deployer.ts` — installs the atomic built-ins (`anvil_setCode`) on the anvil
-  harness chains and wires them as genesis would, for the hardhat spec.
-- `test/hardhat/13-imt-atomic-swap.spec.ts` — the anvil-interop atomic-swap spec.
+  `IndexedMerkleTree` bit-for-bit), plus the settlement-proof byte builder (metadata header, the 3-hop
+  chain-batch-root leaf path, `l1Timestamp`).
+- `test/hardhat/13-imt-atomic-swap.spec.ts` — the anvil-interop atomic-swap spec (the atomic
+  built-ins are predeployed in the harness chain states, as genesis would).
 
 In production, the IMT proofs are served by the zksync-os-server `zks_getImtInclusionProof` /
-`zks_getImtLowNullifierIndex` RPCs (a Rust port of the engine above), paired with `zks_getL2ToL1LogProof`
-for the message/interop-root half of each proof.
+`zks_getImtLowNullifierIndex` RPCs (a Rust port of the engine above), paired with the settlement proof
+(the chain-batch-root leaf path plus the batch-leaf / chain-tree / shared-tree hops) for the
+interop-root half of each proof.

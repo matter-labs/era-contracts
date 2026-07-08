@@ -34,16 +34,21 @@ error ManagerExecutingBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
 error ManagerNoRecoverableCalls(bytes32 flowId, bytes32 bundleHash);
 
 // ── AtomicInteropProof library errors ────────────────────────────────────────────────
-/// @dev The commitment tree's `(root)` message could not be proven against the imported interop root
-/// for `(chainId, batchNumber)`.
-error ProofRootMessageInclusionFailed(uint256 chainId, uint256 batchNumber);
+/// @dev The claimed IMT root could not be proven as a chain-batch-root leaf of `(chainId, batchNumber)`
+/// against the imported interop root.
+error ProofImtRootInclusionFailed(uint256 chainId, uint256 batchNumber, bytes32 imtRoot);
+/// @dev The leaf-to-chain-batch-root section of the proof is not exactly {ChainBatchRootTree.TREE_DEPTH}
+/// hops. Pinning the depth guarantees the claimed value is a real batch-boundary IMT root leaf; a longer
+/// path could descend into the IMT itself and pass off an internal node as "the root".
+error ProofInvalidChainBatchRootDepth(uint256 expected, uint256 actual);
 /// @dev The proof is a single-level / commit-based (final-node) proof, which carries no settlement-layer
 /// block anchor. The atomic flow requires a multi-hop / SL-global proof so the deadline can be checked
 /// against `pd.settlementLayerBatchNumber`.
 error ProofMissingSettlementLayerAnchor(uint256 chainId, uint256 batchNumber);
-/// @dev The batch's `l1Timestamp` is newer than the deadline (inclusion / absence-batch path).
+/// @dev The batch's `l1Timestamp` is newer than the deadline (inclusion path).
 error ProofDeadlineExceeded(uint256 batchTimestamp, uint64 deadline);
-/// @dev The batch's `l1Timestamp` is not strictly after the deadline (adjacency-successor path).
+/// @dev The batch's `l1Timestamp` is not strictly after the deadline (timeout-absence path: an in-time
+/// batch's begin root says nothing about the deadline moment).
 error ProofDeadlineNotExceeded(uint256 batchTimestamp, uint64 deadline);
 /// @dev The commit value is not a member of the authenticated root.
 error ProofInclusionFailed(bytes32 root, uint256 value);
@@ -57,7 +62,3 @@ error ProofSourceChainMismatch(uint256 expectedSourceChainId, uint256 proofSourc
 /// Legs settling on different settlement layers have incomparable deadline/timestamp scales, so rejecting
 /// them keeps the single-`deadline` comparison well-defined.
 error ProofSettlementLayerMismatch(uint256 expectedSlChainId, uint256 proofSlChainId);
-/// @dev The timeout's adjacency witness is not the consecutive successor of the absence batch
-/// (`successorBatchNumber != absenceBatchNumber + 1`). The witness must be batch N+1 so it pins N as the
-/// last batch with `l1Timestamp <= deadline`.
-error ProofAdjacencyNotConsecutive(uint256 absenceBatchNumber, uint256 successorBatchNumber);

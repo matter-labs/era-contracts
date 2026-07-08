@@ -50,6 +50,31 @@ function efficientHash(left: string, right: string): string {
   return ethers.utils.keccak256(ethers.utils.concat([left, right]));
 }
 
+const ZERO_BYTES32 = ethers.constants.HashZero;
+
+/**
+ * Chain batch root — the fixed height-3 (8-leaf) keccak tree the ZKsync OS bootloader commits,
+ * matching ChainBatchRootTree.sol / `compute_chain_batch_root`:
+ *   leaf 0 = logs root, leaf 1 = multichain root, leaf 2 = IMT root at batch begin,
+ *   leaf 3 = IMT root at batch end, leaves 4..7 reserved zero.
+ */
+export function computeChainBatchRoot(
+  logsRoot: string,
+  multichainRoot: string,
+  imtRootBegin: string,
+  imtRootEnd: string
+): string {
+  const reservedSubtreeNode = efficientHash(
+    efficientHash(ZERO_BYTES32, ZERO_BYTES32),
+    efficientHash(ZERO_BYTES32, ZERO_BYTES32)
+  );
+  const liveSubtreeNode = efficientHash(
+    efficientHash(logsRoot, multichainRoot),
+    efficientHash(imtRootBegin, imtRootEnd)
+  );
+  return efficientHash(liveSubtreeNode, reservedSubtreeNode);
+}
+
 /**
  * Hash an L2Log into a leaf, matching MessageHashing.getLeafHashFromLog:
  *   keccak256(abi.encodePacked(l2ShardId, isService, txNumberInBatch, sender, key, value))
@@ -347,7 +372,7 @@ async function getZKChainAddressOnGW(gwProvider: providers.JsonRpcProvider, chai
  * Steps:
  * 1. Compute logsRoot from logs
  * 2. Compute messageRoot (empty message root for the chain)
- * 3. Compute chainBatchRoot = keccak256(logsRoot ++ messageRoot)
+ * 3. Compute chainBatchRoot = ChainBatchRootTree.compute(logsRoot, messageRoot, imtBegin, imtEnd)
  * 4. Resolve the chain's diamond proxy on GW (from zkChainAddress param or L2Bridgehub)
  * 5. Impersonate that address (onlyChain modifier)
  * 6. Call processLogsAndMessages
@@ -360,6 +385,11 @@ export async function callProcessLogsAndMessages(params: {
   logs: L2Log[];
   messages: string[];
   zkChainAddress?: string;
+  /** IMT (interop commitment tree) root snapshots at the synthetic batch's boundaries — chain-batch-root
+   * leaves 2/3. Default zero: the GW specs don't exercise atomic proofs against relayed roots (leaf
+   * authentication is mocked on the harness), so zero snapshots keep the reconstruction consistent. */
+  imtRootBegin?: string;
+  imtRootEnd?: string;
   logger?: (line: string) => void;
 }): Promise<ProcessLogsResult> {
   const log = params.logger || console.log;
@@ -381,8 +411,10 @@ export async function callProcessLogsAndMessages(params: {
   const messageRoot = computeEmptyMessageRoot(chainId);
   log(`   Message root: ${messageRoot}`);
 
-  // 3. Compute chain batch root
-  const chainBatchRoot = efficientHash(logsRoot, messageRoot);
+  // 3. Compute chain batch root (8-leaf tree: logs root, multichain root, IMT begin/end snapshots)
+  const imtRootBegin = params.imtRootBegin ?? ZERO_BYTES32;
+  const imtRootEnd = params.imtRootEnd ?? ZERO_BYTES32;
+  const chainBatchRoot = computeChainBatchRoot(logsRoot, messageRoot, imtRootBegin, imtRootEnd);
   log(`   Chain batch root: ${chainBatchRoot}`);
 
   // 4. Resolve the chain's diamond proxy on GW
@@ -413,6 +445,7 @@ export async function callProcessLogsAndMessages(params: {
       batchNumber,
       chainBatchRoot,
       multichainBatchRoot: messageRoot,
+      imtRoots: { rootBegin: imtRootBegin, rootEnd: imtRootEnd },
       // TODO(EVM-1300): Interop fees are currently zero. Add non-zero fee testing when fee logic is implemented.
       settlementFeePayer: ethers.constants.AddressZero,
     };

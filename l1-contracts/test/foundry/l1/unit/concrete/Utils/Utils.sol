@@ -25,6 +25,7 @@ import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.so
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {
     IExecutor,
+    BatchImtRoots,
     SystemLogKey,
     MAX_NUMBER_OF_BLOBS,
     TOTAL_BLOBS_IN_COMMITMENT
@@ -324,6 +325,7 @@ library Utils {
             new L2Log[](_logsLen),
             new bytes[](_logsLen),
             new bytes32[](_logsLen),
+            new BatchImtRoots[](_logsLen),
             _settlementFeePayer
         );
         return (

@@ -30,7 +30,7 @@ import {
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
-import {InteropRoot, L2Log} from "../../../common/Messaging.sol";
+import {InteropRoot} from "../../../common/Messaging.sol";
 
 /// @title ZK chain Executor contract capable of processing events emitted in the ZK chain protocol.
 /// @author Matter Labs
@@ -163,32 +163,40 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _processTo,
         bytes calldata _executeData
     ) external nonReentrant onlyValidatorOrPriorityMode onlySettlementLayer {
-        (
-            StoredBatchInfo[] memory batchesData,
-            PriorityOpsBatchInfo[] memory priorityOpsData,
-            InteropRoot[][] memory dependencyRoots,
-            L2Log[][] memory logs,
-            bytes[][] memory messages,
-            bytes32[] memory multichainBatchRoots,
-            address settlementFeePayer
-        ) = BatchDecoder.decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
+        BatchDecoder.DecodedExecuteData memory decoded = BatchDecoder.decodeAndCheckExecuteData(
+            _executeData,
+            _processFrom,
+            _processTo
+        );
+        StoredBatchInfo[] memory batchesData = decoded.batchesData;
         uint256 nBatches = batchesData.length;
-        if (batchesData.length != priorityOpsData.length) {
-            revert InvalidBatchesDataLength(batchesData.length, priorityOpsData.length);
+        if (batchesData.length != decoded.priorityOpsData.length) {
+            revert InvalidBatchesDataLength(batchesData.length, decoded.priorityOpsData.length);
         }
         if (block.chainid == L1_CHAIN_ID) {
-            require(logs.length == 0, InvalidBatchesDataLength(0, logs.length));
-            require(messages.length == 0, InvalidBatchesDataLength(0, messages.length));
-            require(multichainBatchRoots.length == 0, InvalidBatchesDataLength(0, multichainBatchRoots.length));
-        } else {
-            require(batchesData.length == logs.length, InvalidBatchesDataLength(batchesData.length, logs.length));
+            require(decoded.logs.length == 0, InvalidBatchesDataLength(0, decoded.logs.length));
+            require(decoded.messages.length == 0, InvalidBatchesDataLength(0, decoded.messages.length));
             require(
-                batchesData.length == messages.length,
-                InvalidBatchesDataLength(batchesData.length, messages.length)
+                decoded.multichainBatchRoots.length == 0,
+                InvalidBatchesDataLength(0, decoded.multichainBatchRoots.length)
+            );
+            require(decoded.imtRoots.length == 0, InvalidBatchesDataLength(0, decoded.imtRoots.length));
+        } else {
+            require(
+                batchesData.length == decoded.logs.length,
+                InvalidBatchesDataLength(batchesData.length, decoded.logs.length)
             );
             require(
-                batchesData.length == multichainBatchRoots.length,
-                InvalidBatchesDataLength(batchesData.length, multichainBatchRoots.length)
+                batchesData.length == decoded.messages.length,
+                InvalidBatchesDataLength(batchesData.length, decoded.messages.length)
+            );
+            require(
+                batchesData.length == decoded.multichainBatchRoots.length,
+                InvalidBatchesDataLength(batchesData.length, decoded.multichainBatchRoots.length)
+            );
+            require(
+                batchesData.length == decoded.imtRoots.length,
+                InvalidBatchesDataLength(batchesData.length, decoded.imtRoots.length)
             );
         }
 
@@ -199,16 +207,17 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // chain batch roots are used for L2->L1 message verification. L1 does not run the asset-tracker
         // message processing, hence no logs/messages are passed on L1 (enforced above).
         if (block.chainid != L1_CHAIN_ID) {
-            uint256 messagesLength = messages.length;
+            uint256 messagesLength = decoded.messages.length;
             for (uint256 i = 0; i < messagesLength; ++i) {
                 ProcessLogsInput memory processLogsInput = ProcessLogsInput({
-                    logs: logs[i],
-                    messages: messages[i],
+                    logs: decoded.logs[i],
+                    messages: decoded.messages[i],
                     chainId: s.chainId,
                     batchNumber: batchesData[i].batchNumber,
                     chainBatchRoot: batchesData[i].l2LogsTreeRoot,
-                    multichainBatchRoot: multichainBatchRoots[i],
-                    settlementFeePayer: settlementFeePayer
+                    multichainBatchRoot: decoded.multichainBatchRoots[i],
+                    imtRoots: decoded.imtRoots[i],
+                    settlementFeePayer: decoded.settlementFeePayer
                 });
                 GW_ASSET_TRACKER.processLogsAndMessages(processLogsInput);
             }
@@ -220,7 +229,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         for (uint256 i = 0; i < nBatches; ++i) {
-            _executeOneBatch(batchesData[i], priorityOpsData[i], dependencyRoots[i], i);
+            _executeOneBatch(batchesData[i], decoded.priorityOpsData[i], decoded.dependencyRoots[i], i);
             emit BlockExecution(batchesData[i].batchNumber, batchesData[i].batchHash, batchesData[i].commitment);
         }
 

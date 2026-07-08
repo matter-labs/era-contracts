@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
-import {LegState, AtomicFlow, AtomicTimeoutProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
+import {LegState, AtomicFlow, ImtProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -54,16 +54,13 @@ interface IAtomicFlowManager {
     /// @notice Mark this chain's committed source legs `Revertable` for a flow that can no longer
     /// finalize, proven by a timeout for one leg. Permissionless.
     /// @param _flow The flow definition ({AtomicFlow}); its `flowId` is recomputed from the other fields
-    /// and matched. The timeout proofs for the missing leg must target
+    /// and matched. The absence proof for the missing leg must target
     /// `_flow.legSourceChainIds[_missingLegIndex]`.
     /// @param _missingLegIndex Index into `_flow.legBundleHashes` of the leg proven absent.
-    /// @param _timeout Timeout proof: absence at the last batch `N` with `t_N <= deadline`, plus its
-    /// consecutive successor `N+1` with `t_{N+1} > deadline`.
-    function authorizeRefund(
-        AtomicFlow calldata _flow,
-        uint256 _missingLegIndex,
-        AtomicTimeoutProof calldata _timeout
-    ) external;
+    /// @param _absence Timeout proof: non-inclusion of the leg's commit value in the batch-BEGIN IMT
+    /// root of a source batch with `l1Timestamp > deadline` (see
+    /// {AtomicInteropProof.verifyTimeoutAbsence}).
+    function authorizeRefund(AtomicFlow calldata _flow, uint256 _missingLegIndex, ImtProof calldata _absence) external;
 
     /// @notice Recover the burned source funds for a `Revertable` leg by reversing the bundle's
     /// asset-router calls (re-minting each burned asset to its depositor). Permissionless. State

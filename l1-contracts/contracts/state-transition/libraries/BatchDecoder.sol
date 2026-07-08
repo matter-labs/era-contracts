@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IExecutor} from "../chain-interfaces/IExecutor.sol";
+import {IExecutor, BatchImtRoots} from "../chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, CommitBatchInfoZKsyncOS, PrecommitInfo} from "../chain-interfaces/ICommitter.sol";
 import {PriorityOpsBatchInfo} from "./PriorityTree.sol";
 import {
@@ -236,45 +236,54 @@ library BatchDecoder {
         }
     }
 
-    /// @notice Decodes execution data from a calldata byte array into an array of stored batch information.
+    /// @notice The decoded contents of the execute-batches wire data (an 8-tuple on the wire; grouped
+    /// into one struct so callers keep a single stack slot).
+    /// @param batchesData The stored batch information for execution.
+    /// @param priorityOpsData Merkle proofs of the priority operations for each batch.
+    /// @param dependencyRoots Interop dependency roots for each batch.
+    /// @param logs L2 logs for each batch.
+    /// @param messages L2 messages for each batch.
+    /// @param multichainBatchRoots Multichain batch roots for chain for each batch.
+    /// @param imtRoots Interop commitment tree root snapshots (batch begin / batch end) for each batch.
+    /// @param settlementFeePayer Address that pays gateway settlement fees.
+    struct DecodedExecuteData {
+        IExecutor.StoredBatchInfo[] batchesData;
+        PriorityOpsBatchInfo[] priorityOpsData;
+        InteropRoot[][] dependencyRoots;
+        L2Log[][] logs;
+        bytes[][] messages;
+        bytes32[] multichainBatchRoots;
+        BatchImtRoots[] imtRoots;
+        address settlementFeePayer;
+    }
+
+    /// @notice Decodes execution data from a calldata byte array.
     /// @param _executeData The calldata byte array containing the execution data to decode.
-    /// @return executeData An array containing the stored batch information for execution.
-    /// @return priorityOpsData Merkle proofs of the priority operations for each batch.
-    /// @return dependencyRoots Interop dependency roots for each batch.
-    /// @return logs L2 logs for each batch.
-    /// @return messages L2 messages for each batch.
-    /// @return multichainBatchRoots Multichain batch roots for chain for each batch.
-    /// @return settlementFeePayer Address that pays gateway settlement fees.
-    function _decodeExecuteData(
-        bytes calldata _executeData
-    )
-        private
-        pure
-        returns (
-            IExecutor.StoredBatchInfo[] memory executeData,
-            PriorityOpsBatchInfo[] memory priorityOpsData,
-            InteropRoot[][] memory dependencyRoots,
-            L2Log[][] memory logs,
-            bytes[][] memory messages,
-            bytes32[] memory multichainBatchRoots,
-            address settlementFeePayer
-        )
-    {
+    /// @return decoded The decoded execute data (see {DecodedExecuteData}).
+    function _decodeExecuteData(bytes calldata _executeData) private pure returns (DecodedExecuteData memory decoded) {
         if (_executeData.length == 0) {
             revert EmptyData();
         }
 
         uint8 encodingVersion = uint8(_executeData[0]);
         if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
-            (
-                executeData,
-                priorityOpsData,
-                dependencyRoots,
-                logs,
-                messages,
-                multichainBatchRoots,
-                settlementFeePayer
-            ) = abi.decode(
+            // Decoded in two passes (each binding half of the 8-tuple) to keep the legacy-codegen
+            // stack shallow; `abi.decode` is pure, so both passes read identical data.
+            (decoded.batchesData, decoded.priorityOpsData, decoded.dependencyRoots, decoded.logs, , , , ) = abi.decode(
+                _executeData[1:],
+                (
+                    IExecutor.StoredBatchInfo[],
+                    PriorityOpsBatchInfo[],
+                    InteropRoot[][],
+                    L2Log[][],
+                    bytes[][],
+                    bytes32[],
+                    BatchImtRoots[],
+                    address
+                )
+            );
+            (, , , , decoded.messages, decoded.multichainBatchRoots, decoded.imtRoots, decoded.settlementFeePayer) = abi
+                .decode(
                     _executeData[1:],
                     (
                         IExecutor.StoredBatchInfo[],
@@ -283,6 +292,7 @@ library BatchDecoder {
                         L2Log[][],
                         bytes[][],
                         bytes32[],
+                        BatchImtRoots[],
                         address
                     )
                 );
@@ -297,53 +307,28 @@ library BatchDecoder {
     /// @param _executeData The calldata byte array containing the execution data to decode.
     /// @param _processBatchFrom The expected batch number of the first batch in the array.
     /// @param _processBatchTo The expected batch number of the last batch in the array.
-    /// @return executeData An array containing the stored batch information for execution.
-    /// @return priorityOpsData Merkle proofs of the priority operations for each batch.
-    /// @return dependencyRoots Interop dependency roots for each batch.
-    /// @return logs L2 logs for each batch.
-    /// @return messages L2 messages for each batch.
-    /// @return multichainBatchRoots Multichain batch roots for chain for each batch.
-    /// @return settlementFeePayer Address that pays gateway settlement fees.
+    /// @return decoded The decoded execute data (see {DecodedExecuteData}).
     function decodeAndCheckExecuteData(
         bytes calldata _executeData,
         uint256 _processBatchFrom,
         uint256 _processBatchTo
-    )
-        internal
-        pure
-        returns (
-            IExecutor.StoredBatchInfo[] memory executeData,
-            PriorityOpsBatchInfo[] memory priorityOpsData,
-            InteropRoot[][] memory dependencyRoots,
-            L2Log[][] memory logs,
-            bytes[][] memory messages,
-            bytes32[] memory multichainBatchRoots,
-            address settlementFeePayer
-        )
-    {
-        (
-            executeData,
-            priorityOpsData,
-            dependencyRoots,
-            logs,
-            messages,
-            multichainBatchRoots,
-            settlementFeePayer
-        ) = _decodeExecuteData(_executeData);
+    ) internal pure returns (DecodedExecuteData memory decoded) {
+        decoded = _decodeExecuteData(_executeData);
+        IExecutor.StoredBatchInfo[] memory batchesData = decoded.batchesData;
 
-        if (executeData.length == 0) {
+        if (batchesData.length == 0) {
             revert EmptyData();
         }
 
         if (
-            executeData[0].batchNumber != _processBatchFrom ||
-            executeData[executeData.length - 1].batchNumber != _processBatchTo
+            batchesData[0].batchNumber != _processBatchFrom ||
+            batchesData[batchesData.length - 1].batchNumber != _processBatchTo
         ) {
             revert IncorrectBatchBounds(
                 _processBatchFrom,
                 _processBatchTo,
-                executeData[0].batchNumber,
-                executeData[executeData.length - 1].batchNumber
+                batchesData[0].batchNumber,
+                batchesData[batchesData.length - 1].batchNumber
             );
         }
     }

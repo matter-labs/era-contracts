@@ -32,6 +32,9 @@ uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max);
 /// @param batchNumber The batch number being processed.
 /// @param chainBatchRoot The batch root hash for verification.
 /// @param multichainBatchRoot The multichain batch root for chain for verification.
+/// @param imtRoots The chain's interop commitment tree (IMT) roots at the batch boundaries
+///        (chain-batch-root leaves 2 and 3). Operator-supplied pass-throughs, authenticated by the
+///        reconstruction check against the committed `chainBatchRoot` (see {ChainBatchRootTree}).
 /// @param settlementFeePayer Address that pays gateway settlement fees for interop calls in this batch.
 ///
 /// @dev Settlement Fee Payer Requirements:
@@ -52,7 +55,18 @@ struct ProcessLogsInput {
     uint256 batchNumber;
     bytes32 chainBatchRoot;
     bytes32 multichainBatchRoot;
+    BatchImtRoots imtRoots;
     address settlementFeePayer;
+}
+
+/// @notice A batch's interop commitment tree (IMT) root snapshots at its boundaries, as committed by
+/// the bootloader into the chain batch root (leaves 2 and 3; see {ChainBatchRootTree}).
+/// @param rootBegin The IMT root before the batch's first block ran; equals the previous batch's
+/// `rootEnd` (append-only tree).
+/// @param rootEnd The IMT root after the batch's last block.
+struct BatchImtRoots {
+    bytes32 rootBegin;
+    bytes32 rootEnd;
 }
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch)

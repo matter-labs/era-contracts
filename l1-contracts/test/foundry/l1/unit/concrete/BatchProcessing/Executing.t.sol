@@ -738,15 +738,7 @@ contract ExecutingTest is ExecutorTest {
         bytes calldata data,
         uint256 from
     ) public view returns (IExecutor.StoredBatchInfo[] memory, PriorityOpsBatchInfo[] memory, InteropRoot[][] memory) {
-        (
-            IExecutor.StoredBatchInfo[] memory storedBatchInfos,
-            PriorityOpsBatchInfo[] memory priorityOpsBatchInfos,
-            InteropRoot[][] memory dependencyRoots,
-            ,
-            ,
-            ,
-
-        ) = BatchDecoder.decodeAndCheckExecuteData(data, from, from);
-        return (storedBatchInfos, priorityOpsBatchInfos, dependencyRoots);
+        BatchDecoder.DecodedExecuteData memory decoded = BatchDecoder.decodeAndCheckExecuteData(data, from, from);
+        return (decoded.batchesData, decoded.priorityOpsData, decoded.dependencyRoots);
     }
 }

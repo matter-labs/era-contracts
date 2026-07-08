@@ -131,7 +131,7 @@
   },
   {
     "type": "event",
-    "name": "RootPublished",
+    "name": "RootUpdated",
     "inputs": [
       {
         "name": "leafIndex",

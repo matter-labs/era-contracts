@@ -3,7 +3,8 @@
 pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
-import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {ProcessLogsInput, BatchImtRoots} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {L2Log} from "contracts/common/Messaging.sol";
 import {DynamicIncrementalMerkleMemory} from "contracts/common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
@@ -48,7 +49,9 @@ library L2AssetTrackerData {
         reconstructedLogsTree.extendUntilEnd();
         bytes32 localLogsRootHash = reconstructedLogsTree.root();
 
-        return keccak256(bytes.concat(localLogsRootHash, multichainBatchRoot));
+        // These fixtures model chains without the atomic-interop tree: the bootloader reads zero for
+        // both IMT boundary snapshots, so leaves 2/3 of the chain batch root are zero.
+        return ChainBatchRootTree.compute(localLogsRootHash, multichainBatchRoot, bytes32(0), bytes32(0));
     }
 
     function getData2() public returns (bytes[] memory) {
@@ -95,6 +98,7 @@ library L2AssetTrackerData {
                 batchNumber: 5,
                 chainBatchRoot: computeChainBatchRoot(logs_batch5, multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -115,6 +119,7 @@ library L2AssetTrackerData {
                 batchNumber: 2,
                 chainBatchRoot: computeChainBatchRoot(logs_batch2, multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -136,6 +141,7 @@ library L2AssetTrackerData {
                 batchNumber: 7,
                 chainBatchRoot: computeChainBatchRoot(logs_batch4, multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -156,6 +162,7 @@ library L2AssetTrackerData {
                 batchNumber: 6,
                 chainBatchRoot: computeChainBatchRoot(logs_batch6, multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -176,6 +183,7 @@ library L2AssetTrackerData {
                 batchNumber: 14,
                 chainBatchRoot: computeChainBatchRoot(logs_batch14, multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -200,6 +208,7 @@ library L2AssetTrackerData {
                 batchNumber: 25,
                 chainBatchRoot: computeChainBatchRoot(logs_batch25, multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -278,6 +287,7 @@ library L2AssetTrackerData {
                 batchNumber: 1,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -307,6 +317,7 @@ library L2AssetTrackerData {
                 batchNumber: 3,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -328,6 +339,7 @@ library L2AssetTrackerData {
                 batchNumber: 4,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -349,6 +361,7 @@ library L2AssetTrackerData {
                 batchNumber: 21,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -382,6 +395,7 @@ library L2AssetTrackerData {
                 batchNumber: 12,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -403,6 +417,7 @@ library L2AssetTrackerData {
                 batchNumber: 8,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -424,6 +439,7 @@ library L2AssetTrackerData {
                 batchNumber: 13,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -450,6 +466,7 @@ library L2AssetTrackerData {
                 batchNumber: 19,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -476,6 +493,7 @@ library L2AssetTrackerData {
                 batchNumber: 23,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -502,6 +520,7 @@ library L2AssetTrackerData {
                 batchNumber: 11,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -523,6 +542,7 @@ library L2AssetTrackerData {
                 batchNumber: 16,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -544,6 +564,7 @@ library L2AssetTrackerData {
                 batchNumber: 28,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -565,6 +586,7 @@ library L2AssetTrackerData {
                 batchNumber: 29,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -591,6 +613,7 @@ library L2AssetTrackerData {
                 batchNumber: 24,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -612,6 +635,7 @@ library L2AssetTrackerData {
                 batchNumber: 39,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -633,6 +657,7 @@ library L2AssetTrackerData {
                 batchNumber: 36,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -659,6 +684,7 @@ library L2AssetTrackerData {
                 batchNumber: 37,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -680,6 +706,7 @@ library L2AssetTrackerData {
                 batchNumber: 38,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -701,6 +728,7 @@ library L2AssetTrackerData {
                 batchNumber: 40,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -727,6 +755,7 @@ library L2AssetTrackerData {
                 batchNumber: 35,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
                 multichainBatchRoot: multichainBatchRoot_260,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -753,6 +782,7 @@ library L2AssetTrackerData {
                 batchNumber: 7,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
                 multichainBatchRoot: multichainBatchRoot_271,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -779,6 +809,7 @@ library L2AssetTrackerData {
                 batchNumber: 8,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
                 multichainBatchRoot: multichainBatchRoot_271,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -800,6 +831,7 @@ library L2AssetTrackerData {
                 batchNumber: 10,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
                 multichainBatchRoot: multichainBatchRoot_271,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -837,6 +869,7 @@ library L2AssetTrackerData {
                 batchNumber: 9,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
                 multichainBatchRoot: multichainBatchRoot_271,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -858,6 +891,7 @@ library L2AssetTrackerData {
                 batchNumber: 5,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
                 multichainBatchRoot: multichainBatchRoot_271,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -884,6 +918,7 @@ library L2AssetTrackerData {
                 batchNumber: 15,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
                 multichainBatchRoot: multichainBatchRoot_271,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -910,6 +945,7 @@ library L2AssetTrackerData {
                 batchNumber: 6,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
                 multichainBatchRoot: multichainBatchRoot_271,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -931,6 +967,7 @@ library L2AssetTrackerData {
                 batchNumber: 14,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
                 multichainBatchRoot: multichainBatchRoot_271,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
@@ -1008,6 +1045,7 @@ library L2AssetTrackerData {
                 batchNumber: 100,
                 chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
                 multichainBatchRoot: multichainBatchRoot_271,
+                imtRoots: BatchImtRoots({rootBegin: bytes32(0), rootEnd: bytes32(0)}),
                 settlementFeePayer: address(0)
             });
         }
