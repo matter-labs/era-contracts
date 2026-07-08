@@ -319,7 +319,7 @@ today's flow by simply not using the executor (escape hatch preserves raw govern
 1. **Registry proxy admin is a new root of trust** for self-wiring constructors. Mitigated
    by: orchestrator/verification never read through the proxy; only deploy-time
    constructor wiring does, and only for version-independent proxy addresses. Worst case
-   from a malicious impl swap is mis-wired _future_ deployments, which CREATE2-address
+   from a malicious impl swap is incorrectly wired _future_ deployments, which CREATE2-address
    verification (step 4 of the deployment plan) catches.
 2. **Reproducible builds are load-bearing.** A solc bump or metadata drift silently breaks
    every hash commitment. Needs CI enforcement from day one (extend the
