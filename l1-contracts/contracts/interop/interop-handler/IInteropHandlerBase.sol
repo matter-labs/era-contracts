@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 import {BundleStatus, CallStatus, MessageInclusionProof} from "../../common/Messaging.sol";
 
-interface IInteropHandler {
+interface IInteropHandlerBase {
     event BundleVerified(bytes32 indexed bundleHash);
 
     event BundleExecuted(bytes32 indexed bundleHash);

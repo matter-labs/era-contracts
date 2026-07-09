@@ -37,7 +37,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
-import {IInteropHandler} from "contracts/interop/interop-handler/IInteropHandler.sol";
+import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -520,7 +520,7 @@ contract GatewayPreparation is Script {
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
         address l1InteropHandlerAddr = l1Nullifier.l1InteropHandler();
         vm.broadcast();
-        IInteropHandler(l1InteropHandlerAddr).executeBundle(
+        IInteropHandlerBase(l1InteropHandlerAddr).executeBundle(
             UnsafeBytes.readRemainingBytes(message, 1),
             MessageInclusionProof({
                 chainId: gatewayChainId,

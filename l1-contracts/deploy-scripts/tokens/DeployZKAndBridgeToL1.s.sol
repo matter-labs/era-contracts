@@ -23,7 +23,7 @@ import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 
 import {MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
-import {IInteropHandler} from "contracts/interop/interop-handler/IInteropHandler.sol";
+import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -203,7 +203,7 @@ contract DeployZKScript is Script {
         address l1InteropHandlerAddr = l1Nullifier.l1InteropHandler();
 
         vm.broadcast();
-        IInteropHandler(l1InteropHandlerAddr).executeBundle(
+        IInteropHandlerBase(l1InteropHandlerAddr).executeBundle(
             UnsafeBytes.readRemainingBytes(_message, 1),
             MessageInclusionProof({
                 chainId: _chainId,

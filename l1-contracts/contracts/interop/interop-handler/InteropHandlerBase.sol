@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 
 import {L2_INTEROP_CENTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {IInteropHandler} from "./IInteropHandler.sol";
+import {IInteropHandlerBase} from "./IInteropHandlerBase.sol";
 import {
     BUNDLE_IDENTIFIER,
     INTEROP_BUNDLE_VERSION,
@@ -45,7 +45,7 @@ import {InvalidSelector, Unauthorized} from "../../common/L1ContractErrors.sol";
 /// contract (`L2InteropHandler`) and the L1-side `L1InteropHandler` inherit this base and provide the environment
 /// specific behaviour (message-inclusion verification, settlement-layer gating, and base-token value handling) via
 /// the virtual hooks below.
-abstract contract InteropHandlerBase is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
+abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, ReentrancyGuard {
     /// @notice The chain ID of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
     uint256 public L1_CHAIN_ID;
@@ -81,7 +81,7 @@ abstract contract InteropHandlerBase is IInteropHandler, IERC7786Recipient, Reen
                             Public entry points
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc IInteropHandler
+    /// @inheritdoc IInteropHandlerBase
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         // Interop claiming requires the chain to settle on a layer that can process the execution confirmation.
         // See the concrete implementations for details.
@@ -147,7 +147,7 @@ abstract contract InteropHandlerBase is IInteropHandler, IERC7786Recipient, Reen
         emit BundleExecuted(bundleHash);
     }
 
-    /// @inheritdoc IInteropHandler
+    /// @inheritdoc IInteropHandlerBase
     function verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
@@ -161,7 +161,7 @@ abstract contract InteropHandlerBase is IInteropHandler, IERC7786Recipient, Reen
         _verifyBundle(_bundle, _proof, bundleHash);
     }
 
-    /// @inheritdoc IInteropHandler
+    /// @inheritdoc IInteropHandlerBase
     function unbundleBundle(bytes memory _bundle, CallStatus[] calldata _providedCallStatus) public {
         // Interop claiming requires the chain to settle on a layer that can process the execution confirmation.
         _settlementGuard();

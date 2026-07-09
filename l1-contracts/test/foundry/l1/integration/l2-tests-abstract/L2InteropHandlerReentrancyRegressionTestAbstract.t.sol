@@ -20,7 +20,7 @@ import {
 } from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
-import {IInteropHandler} from "contracts/interop/interop-handler/IInteropHandler.sol";
+import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 import {Reentrancy} from "contracts/common/L1ContractErrors.sol";
 
@@ -59,7 +59,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         // We'll use verifyBundle selector with empty data - it will fail validation
         // but the key is it shouldn't fail due to reentrancy
         bytes memory innerPayload = abi.encodeCall(
-            IInteropHandler.verifyBundle,
+            IInteropHandlerBase.verifyBundle,
             (
                 new bytes(0),
                 MessageInclusionProof({
@@ -159,7 +159,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         MessageInclusionProof memory innerProof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
 
         // Payload for receiveMessage that dispatches to executeBundle(innerBundle)
-        bytes memory innerPayload = abi.encodeCall(IInteropHandler.executeBundle, (encodedInnerBundle, innerProof));
+        bytes memory innerPayload = abi.encodeCall(IInteropHandlerBase.executeBundle, (encodedInnerBundle, innerProof));
 
         // Outer bundle: its call targets L2InteropHandler.receiveMessage with the above payload.
         // Call chain: executeBundle(outer) -> _executeCalls -> receiveMessage -> this.executeBundle(inner)
@@ -248,7 +248,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         MessageInclusionProof memory innerProof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
 
         // Payload for receiveMessage that dispatches to verifyBundle(innerBundle)
-        bytes memory innerPayload = abi.encodeCall(IInteropHandler.verifyBundle, (encodedInnerBundle, innerProof));
+        bytes memory innerPayload = abi.encodeCall(IInteropHandlerBase.verifyBundle, (encodedInnerBundle, innerProof));
 
         // Outer bundle: its call targets L2InteropHandler.receiveMessage with the above payload.
         // Call chain: executeBundle(outer) -> _executeCalls -> receiveMessage -> this.verifyBundle(inner)

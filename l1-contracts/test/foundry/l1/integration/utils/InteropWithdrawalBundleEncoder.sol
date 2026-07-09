@@ -40,7 +40,7 @@ library InteropWithdrawalBundleEncoder {
     }
 
     /// @notice Builds the ABI-encoded single-call `InteropBundle` for an interop-routed withdrawal, without the
-    /// `BUNDLE_IDENTIFIER` prefix. This is the form consumed by `IInteropHandler.executeBundle`.
+    /// `BUNDLE_IDENTIFIER` prefix. This is the form consumed by `IInteropHandlerBase.executeBundle`.
     /// @dev The `destinationBaseTokenAssetId` matches what the L2 InteropCenter sets for an L1-destined bundle
     /// (L1's ETH asset ID), which `InteropHandlerBase._validateBundleDestinationContext` checks on execution.
     /// @param _chainId The source ZK chain ID (encoded both in the bundle and the inner call).
