@@ -58,8 +58,7 @@
   "scripts": {
     "build": "hardhat compile && CONTRACTS_BASE_NETWORK_ZKSYNC=true hardhat compile ",
     "build-l1": "hardhat compile",
-    "build:foundry": "forge build && forge build --zksync --skip '*/l1-contracts/test/*' 'L2BaseToken.sol' 'Burner.sol' && yarn alias-legacy-zkout-artifacts && yarn copy-to-zkstack-out",
-    "alias-legacy-zkout-artifacts": "ts-node scripts/alias-legacy-zkout-artifacts.ts",
+    "build:foundry": "forge build && forge build --zksync --skip '*/l1-contracts/test/*' 'L2BaseToken.sol' 'Burner.sol' && yarn copy-to-zkstack-out",
     "build:anvil-interop-dev-artifacts": "ts-node test/anvil-interop/build-dev-artifacts.ts",
     "clean": "hardhat clean && CONTRACTS_BASE_NETWORK_ZKSYNC=true hardhat clean",
     "clean:foundry": "forge clean",

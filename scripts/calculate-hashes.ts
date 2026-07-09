@@ -18,14 +18,6 @@ const SKIPPED_FOLDERS = [
 ];
 const FORCE_INCLUDE = ["Create2AndTransfer.sol", "L1MessageRootStageSepolia.sol"];
 
-// Compiled artifacts that are byte-identical aliases of another contract's output, emitted at build time
-// for external consumers pinned to a legacy contract name (see
-// `l1-contracts/scripts/alias-legacy-zkout-artifacts.ts`). They have no source of their own, so the
-// source-driven `SKIPPED_FOLDERS` logic cannot exclude them; list their artifact paths here directly.
-// They must NOT be tracked as separate contracts — the real source is hashed under its actual name.
-// Remove an entry once its alias is dropped from `alias-legacy-zkout-artifacts.ts`.
-const SKIPPED_ARTIFACTS = ["/l1-contracts/zkout/InteropHandler.sol/InteropHandler.json"];
-
 // Opens a Solidity file and returns all the contracts/libraries created inside of it.
 function parseSolFile(filePath: string): string[] {
   const content = fs.readFileSync(filePath, "utf-8");
@@ -110,7 +102,7 @@ function getIgnoredFiles() {
 }
 
 function shouldSkipFolderOrFile(filePath: string): boolean {
-  return SKIPPED_ARTIFACTS.includes(filePath) || !!getIgnoredFiles()[filePath];
+  return !!getIgnoredFiles()[filePath];
 }
 
 type SourceContractDetails = {
