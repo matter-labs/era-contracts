@@ -49,11 +49,6 @@ contract L1InteropHandler is InteropHandlerBase {
     }
 
     /// @inheritdoc InteropHandlerBase
-    /// @dev L1 has no settlement-layer restriction: it is the base layer where withdrawals are ultimately claimed.
-    // solhint-disable-next-line no-empty-blocks
-    function _settlementGuard() internal view override {}
-
-    /// @inheritdoc InteropHandlerBase
     /// @dev Withdrawals carry the amount inside the `finalizeDeposit` transfer data, never as call value.
     function _handleCallValue(uint256 _value, uint256 /* _sourceChainId */) internal pure override {
         require(_value == 0, InteropWithdrawalNonZeroValue(_value));

@@ -43,8 +43,7 @@ import {InvalidSelector, Unauthorized} from "../../common/L1ContractErrors.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Shared entry-point logic for executing, verifying and unbundling interop bundles. Both the L2 system
 /// contract (`L2InteropHandler`) and the L1-side `L1InteropHandler` inherit this base and provide the environment
-/// specific behaviour (message-inclusion verification, settlement-layer gating, and base-token value handling) via
-/// the virtual hooks below.
+/// specific behaviour (message-inclusion verification and base-token value handling) via the virtual hooks below.
 abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, ReentrancyGuard {
     /// @notice The chain ID of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
@@ -65,10 +64,6 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
     /// the settlement layer of the proof in transient storage).
     function _proveInclusion(MessageInclusionProof memory _proof) internal virtual returns (bool);
 
-    /// @notice Guards bundle processing against being claimed on a layer that cannot account for it.
-    /// @dev L2 requires the chain to settle on a layer other than L1; L1 has no such restriction.
-    function _settlementGuard() internal view virtual;
-
     /// @notice Handles the base-token value that rides along an interop call before it is forwarded.
     /// @dev L2 pulls the value from the `BaseTokenHolder`; L1 forbids non-zero value (withdrawals carry the amount in
     /// their transfer data, not as call value).
@@ -83,10 +78,6 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
 
     /// @inheritdoc IInteropHandlerBase
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
-        // Interop claiming requires the chain to settle on a layer that can process the execution confirmation.
-        // See the concrete implementations for details.
-        _settlementGuard();
-
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
@@ -163,9 +154,6 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
 
     /// @inheritdoc IInteropHandlerBase
     function unbundleBundle(bytes memory _bundle, CallStatus[] calldata _providedCallStatus) public {
-        // Interop claiming requires the chain to settle on a layer that can process the execution confirmation.
-        _settlementGuard();
-
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 

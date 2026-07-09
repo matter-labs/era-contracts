@@ -6,12 +6,10 @@ import {
     L2_BASE_TOKEN_HOLDER,
     L2_NATIVE_TOKEN_VAULT,
     L2_MESSAGE_VERIFICATION,
-    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
     L2_COMPLEX_UPGRADER_ADDR
 } from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {InteropHandlerBase} from "./InteropHandlerBase.sol";
 import {MessageInclusionProof} from "../../common/Messaging.sol";
-import {CannotClaimInteropOnL1Settlement} from "../InteropErrors.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 
 /// @title L2InteropHandler
@@ -44,20 +42,6 @@ contract L2InteropHandler is InteropHandlerBase {
                 _message: _proof.message,
                 _proof: _proof.proof
             });
-    }
-
-    /// @inheritdoc InteropHandlerBase
-    /// @dev Interop claiming requires the chain to settle on Gateway so that GWAssetTracker can process the execution
-    /// confirmation and move balances from pendingInteropBalance to chainBalance. We read the chain's current
-    /// settlement layer from `SystemContext` (kept in sync with each batch's bootloader-driven
-    /// `setSettlementLayerChainId` call); the analogous mapping on the chain's own `L2Bridgehub` is only written for
-    /// chains that *settle on this Bridgehub* (i.e. populated on L1's L1Bridgehub and on a Gateway's L2Bridgehub for
-    /// the chains it hosts), and is never written on a chain's own L2Bridgehub for itself.
-    function _settlementGuard() internal view override {
-        require(
-            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
-            CannotClaimInteropOnL1Settlement()
-        );
     }
 
     /// @inheritdoc InteropHandlerBase
