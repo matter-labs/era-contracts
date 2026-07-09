@@ -363,11 +363,6 @@
   },
   {
     "type": "error",
-    "name": "CannotClaimInteropOnL1Settlement",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "EmptyBundle",
     "inputs": []
   },
