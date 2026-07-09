@@ -279,5 +279,5 @@ No patches. Reads on-chain state to assert:
 - Proxy upgrades for all L1 core contracts
 - L2 upgrade initialization logic (`L2V31Upgrade.upgrade()` delegatecall path)
 - New contract configuration (ownership transfers for newly deployed proxies)
-- Token balance migration (stage 3 via `TokenMigrationUtils`)
+- Bridged-token registration in the NTV (stage 3 via `TokenMigrationUtils.registerBridgedTokensInNTV`)
 - Protocol version advancement on all target chains

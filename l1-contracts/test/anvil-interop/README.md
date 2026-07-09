@@ -199,8 +199,7 @@ test/anvil-interop/
 │       ├── l1-deposit-helper.ts   # L1->L2 ETH/ERC20 deposits
 │       ├── l2-withdrawal-helper.ts          # L2->L1 ETH/ERC20 withdrawals
 │       ├── token-transfer.ts                # L2<->L2 interop token transfers
-│       ├── token-balance-migration-helper.ts # Token balance migration (L2->L1->GW)
-│       ├── process-logs-helper.ts           # Build/process withdrawal logs on GW
+│       ├── bridged-out-helper.ts            # Read L1NativeTokenVault.bridgedOut in bridge tests
 │       └── deploy-test-token.ts             # Deploy ERC20 test tokens to L2 chains
 ├── test/hardhat/
 │   ├── 01-deployment-verification.spec.ts
