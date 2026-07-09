@@ -298,19 +298,14 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
         // so L2NativeTokenVault doesn't have to handle balance changes on GW.
         // We need to check the migration number.
-        IL2AssetTracker(address(_assetTracker())).handleInitiateBridgingOnL2(
-            _chainid,
-            _assetId,
-            _amount,
-            originChainId[_assetId]
-        );
+        L2_ASSET_TRACKER.handleInitiateBridgingOnL2(_chainid, _assetId, _amount, originChainId[_assetId]);
     }
 
     function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual override {
         // on L2s we don't track the balance.
         // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
         // so L2NativeTokenVault doesn't have to handle balance changes on GW.
-        IL2AssetTracker(address(_assetTracker())).handleFinalizeBridgingOnL2({
+        L2_ASSET_TRACKER.handleFinalizeBridgingOnL2({
             _fromChainId: _chainId,
             _assetId: _assetId,
             _amount: _amount,
