@@ -7,8 +7,12 @@ import {AtomicInteropProof} from "contracts/atomic-interop/libraries/AtomicInter
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {ImtProof, ATOMIC_COMMIT_LEAF_TAG} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {IMTLeaf} from "contracts/common/libraries/IndexedMerkleTree.sol";
+import {L2Message} from "contracts/common/Messaging.sol";
 import {SUPPORTED_PROOF_METADATA_VERSION} from "contracts/common/Config.sol";
-import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ATOMIC_FLOW_MANAGER_ADDR,
+    L2_INTEROP_COMMITMENT_TREE_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {
     L2_MESSAGE_VERIFICATION,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
@@ -95,6 +99,30 @@ abstract contract AtomicInteropProofBuilder is Test {
             address(L2_MESSAGE_VERIFICATION),
             abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
             abi.encode(_ok)
+        );
+    }
+
+    /// @dev Asserts that the proof library authenticates exactly the root-publishing message for `_proof`.
+    /// The default verifier mock remains selector-wide for branch-driving; this expectation makes the
+    /// adapter boundary fail if chain id, batch, index, sender, encoded root, tx number, or proof drift.
+    function _expectRootAuthentication(ImtProof memory _proof) internal {
+        vm.expectCall(address(L2_MESSAGE_VERIFICATION), _rootAuthenticationCall(_proof));
+    }
+
+    function _rootAuthenticationCall(ImtProof memory _proof) internal pure returns (bytes memory) {
+        L2Message memory message = L2Message({
+            txNumberInBatch: _proof.messageTxNumberInBatch,
+            sender: L2_INTEROP_COMMITMENT_TREE_ADDR,
+            data: abi.encode(_proof.chainImtRoot)
+        });
+
+        return abi.encodeWithSelector(
+            L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector,
+            _proof.sourceChainId,
+            _proof.batchNumber,
+            _proof.messageIndex,
+            message,
+            _proof.messageProof
         );
     }
 

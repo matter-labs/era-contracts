@@ -203,6 +203,11 @@ contract MessageRootTest is Test {
             block.timestamp,
             "chainBatchRootTimestamp should record block.timestamp"
         );
+        assertEq(
+            l2MessageRoot.getChainRoot(alphaChainId),
+            MessageHashing.batchLeafHash(bytes32(alphaChainId), 1, block.timestamp),
+            "chain root should be the timestamp-bound first batch leaf"
+        );
 
         // Verify interopRootLogId incremented once for the new block
         assertEq(

@@ -119,18 +119,14 @@ contract MessageHashingTest is Test {
         assertTrue(leafHash != MessageHashing.batchLeafHash(batchRoot, batchNumber, 0));
     }
 
-    /// @dev Distinct settlement timestamps for the same batch must yield distinct leaves, so a timestamp
-    /// cannot be swapped without breaking the leaf (and therefore the reconstructed aggregated root).
-    function testFuzz_batchLeafHash_distinctTimestampsDistinctLeaf(
+    function testFuzz_batchLeafHash_matchesSpecWithTimestamp(
         bytes32 batchRoot,
         uint256 batchNumber,
-        uint256 t1,
-        uint256 t2
+        uint256 l1Timestamp
     ) public pure {
-        vm.assume(t1 != t2);
-        assertTrue(
-            MessageHashing.batchLeafHash(batchRoot, batchNumber, t1) !=
-                MessageHashing.batchLeafHash(batchRoot, batchNumber, t2)
+        assertEq(
+            MessageHashing.batchLeafHash(batchRoot, batchNumber, l1Timestamp),
+            keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber, l1Timestamp))
         );
     }
 

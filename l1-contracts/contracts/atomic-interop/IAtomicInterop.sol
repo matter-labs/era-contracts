@@ -26,9 +26,10 @@ enum LegState {
 ///     value (`leaf.value == commitValue`), proven present as of a root that settled no later than the
 ///     flow deadline;
 ///   - non-inclusion ({AtomicInteropProof.verifyTimeoutAdjacency}, timeout/refund path): `leaf` is the
-///     low-nullifier (predecessor) leaf that brackets the absent commit value, proven against a root
-///     that settled strictly after the deadline. Because the IMT is append-only, absence in a
-///     post-deadline snapshot implies absence at the deadline, so the leg can no longer finalize.
+///     low-nullifier (predecessor) leaf that brackets the absent commit value, proven against the last
+///     source batch with `l1Timestamp <= deadline`; a consecutive successor batch with
+///     `l1Timestamp > deadline` pins that root as the final in-time snapshot, so the leg can no longer
+///     finalize.
 ///
 /// The two structs were identical in layout, so they are unified; the meaning of `leaf` (the value's
 /// own leaf vs. its predecessor) is fixed by which verify function consumes the proof.
