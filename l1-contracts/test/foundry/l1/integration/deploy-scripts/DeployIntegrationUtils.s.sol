@@ -27,12 +27,6 @@ abstract contract DeployIntegrationUtils is Script, DeployCTMUtils {
         return super.getInitializeCalldata(contractName, isZKBytecode);
     }
 
-    function getUpgradeAddedFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
-        return getLegacyChainCreationFacetCuts(stateTransition);
-    }
-
     function clearPriorityQueue(address _bridgehub, uint256 _chainId) public {
         IZKChain chain = IZKChain(IBridgehubBase(_bridgehub).getZKChain(_chainId));
         uint256 treeSize = chain.getPriorityQueueSize();

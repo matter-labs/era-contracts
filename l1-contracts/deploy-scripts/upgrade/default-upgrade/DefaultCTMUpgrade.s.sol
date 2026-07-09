@@ -442,12 +442,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;
     }
 
-    function getUpgradeAddedFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
-        return getLegacyChainCreationFacetCuts(stateTransition);
-    }
-
     /////////////////////////// Blockchain interactions ////////////////////////////
 
     bool skipFactoryDepsCheck = false;

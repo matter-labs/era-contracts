@@ -15,9 +15,4 @@ contract DeployCTMIntegrationScript is Script, DeployCTMScript {
 
     function test() internal virtual override {}
 
-    function getUpgradeAddedFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
-        return getLegacyChainCreationFacetCuts(stateTransition);
-    }
 }
