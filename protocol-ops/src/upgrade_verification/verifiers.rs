@@ -48,7 +48,6 @@ pub(crate) struct Verifiers {
     pub new_gateway_chain_id: u64,
     pub new_gateway_representative_chain_id: u64,
     pub new_gateway_representative_ctm: Address,
-    pub new_gateway_settlement_fee: U256,
     pub expected_l1_chain_id: u64,
     pub zk_token_asset_id: FixedBytes<32>,
     /// CREATE2 salt used by the new-gateway CTM deployer contracts.
@@ -87,7 +86,6 @@ impl Verifiers {
         legacy_gateway_chain_intervals: &[ChainInterval],
         new_gateway_chain_id: u64,
         new_gateway_representative_chain_id: u64,
-        new_gateway_settlement_fee: U256,
         expected_l1_chain_id: u64,
         zk_token_asset_id: FixedBytes<32>,
     ) -> anyhow::Result<Self> {
@@ -204,7 +202,6 @@ impl Verifiers {
             new_gateway_chain_id,
             new_gateway_representative_chain_id,
             new_gateway_representative_ctm,
-            new_gateway_settlement_fee,
             expected_l1_chain_id,
             zk_token_asset_id,
             gateway_ctm_create2_salt,

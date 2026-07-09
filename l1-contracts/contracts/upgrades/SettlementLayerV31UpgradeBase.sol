@@ -7,8 +7,7 @@ import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
-import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
-import {PriorityQueueNotReady, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {PriorityQueueNotReady} from "../common/L1ContractErrors.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IL1MessageRoot} from "../core/message-root/IL1MessageRoot.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
@@ -33,12 +32,6 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
         // the bridgehub. DiamondInit does the same on chain creation.
         s.nativeTokenVault = nativeTokenVaultAddr;
 
-        // This call reverts with an unrecognised selector if NTV has not been upgraded to v31.
-        // If NTV is upgraded but l1AssetTracker has not been set yet, it returns address(0),
-        // so we assert non-zero to avoid silently leaving s.assetTracker zeroed.
-        address assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
-        require(assetTracker != address(0), ZeroAddress());
-        s.assetTracker = assetTracker;
         s.__DEPRECATED_l2DAValidator = address(0);
         // Reset DA validators, mirroring what the v30 upgrade did. ZKsync OS chains already reset
         // these during their v30 upgrade, so we only need to do it for Era chains here.

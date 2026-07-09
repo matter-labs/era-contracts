@@ -42,7 +42,7 @@ import {
     ZeroChainId
 } from "../../common/L1ContractErrors.sol";
 import {HARD_CODED_CHAIN_ID, MAINNET_CHAIN_ID, SEPOLIA_CHAIN_ID} from "../../common/Config.sol";
-import {GW_ASSET_TRACKER, L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -446,10 +446,6 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         // To keep `assetIdIsRegistered` consistent, we'll also automatically register the base token.
         // It is assumed that if the bridging happened, the token was approved on L1 already.
         assetIdIsRegistered[_baseTokenBridgingData.assetId] = true;
-
-        if (block.chainid != _l1ChainId()) {
-            GW_ASSET_TRACKER.registerBaseTokenOnGateway(_baseTokenBridgingData);
-        }
 
         zkChain = getZKChain(_chainId);
     }

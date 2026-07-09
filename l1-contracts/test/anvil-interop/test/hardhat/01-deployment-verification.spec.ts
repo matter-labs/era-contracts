@@ -5,14 +5,13 @@ import { getAbi } from "../../src/core/contracts";
 import {
   L2_BRIDGEHUB_ADDR,
   L2_ASSET_ROUTER_ADDR,
+  L2_ASSET_TRACKER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
   L2_MESSAGE_ROOT_ADDR,
   L2_CHAIN_ASSET_HANDLER_ADDR,
   INTEROP_CENTER_ADDR,
   L2_INTEROP_HANDLER_ADDR,
-  L2_ASSET_TRACKER_ADDR,
   L2_MESSAGE_VERIFICATION_ADDR,
-  GW_ASSET_TRACKER_ADDR,
 } from "../../src/core/const";
 
 describe("01 - Deployment Verification", function () {
@@ -51,11 +50,6 @@ describe("01 - Deployment Verification", function () {
       expect(code).to.not.equal("0x");
     });
 
-    it("has L1AssetTracker deployed with code", async () => {
-      const code = await l1Provider.getCode(state.l1Addresses!.l1AssetTracker);
-      expect(code).to.not.equal("0x");
-    });
-
     it("has CTM registered in Bridgehub", async () => {
       const bridgehubAbi = getAbi("L1Bridgehub");
       const bridgehub = new Contract(state.l1Addresses!.bridgehub, bridgehubAbi, l1Provider);
@@ -86,13 +80,12 @@ describe("01 - Deployment Verification", function () {
       { addr: L2_BRIDGEHUB_ADDR, name: "L2Bridgehub" },
       { addr: L2_ASSET_ROUTER_ADDR, name: "L2AssetRouter" },
       { addr: L2_NATIVE_TOKEN_VAULT_ADDR, name: "L2NativeTokenVault" },
+      { addr: L2_ASSET_TRACKER_ADDR, name: "L2AssetTracker" },
       { addr: L2_MESSAGE_ROOT_ADDR, name: "L2MessageRoot" },
       { addr: L2_CHAIN_ASSET_HANDLER_ADDR, name: "L2ChainAssetHandler" },
       { addr: INTEROP_CENTER_ADDR, name: "InteropCenter" },
       { addr: L2_INTEROP_HANDLER_ADDR, name: "InteropHandler" },
-      { addr: L2_ASSET_TRACKER_ADDR, name: "L2AssetTracker" },
       { addr: L2_MESSAGE_VERIFICATION_ADDR, name: "L2MessageVerification" },
-      { addr: GW_ASSET_TRACKER_ADDR, name: "GWAssetTracker" },
     ];
 
     const config = runner.getConfig();

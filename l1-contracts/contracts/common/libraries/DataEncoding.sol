@@ -14,10 +14,7 @@ import {
     L2WithdrawalMessageWrongLength
 } from "../L1ContractErrors.sol";
 import {WrongMsgLength} from "../../bridge/L1BridgeContractErrors.sol";
-import {InvalidFunctionSignature} from "../../bridge/asset-tracker/AssetTrackerErrors.sol";
-import {IAssetTrackerDataEncoding} from "../../bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 import {UnsafeBytes} from "./UnsafeBytes.sol";
-import {GatewayToL1TokenBalanceMigrationData, L1ToGatewayTokenBalanceMigrationData} from "../../common/Messaging.sol";
 
 /**
  * @author Matter Labs
@@ -202,51 +199,6 @@ library DataEncoding {
         return bytes.concat(NEW_ENCODING_VERSION, abi.encode(_chainId, _name, _symbol, _decimals));
     }
 
-    /// @notice Encodes the asset tracker data by combining chain id, asset id, amount, minting chain status and settlement layer balance.
-    /// @param _chainId The id of the chain being migrated.
-    /// @param _assetId The id of the asset being migrated.
-    /// @param _amount The amount being migrated.
-    /// @param _migratingChainIsMinter Whether the migrating chain is a minter.
-    /// @param _hasSettlingMintingChains Whether there are still settling minting chains.
-    /// @param _newSLBalance The new settlement layer balance.
-    /// @return The encoded asset tracker data.
-    function encodeAssetTrackerData(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        bool _migratingChainIsMinter,
-        bool _hasSettlingMintingChains,
-        uint256 _newSLBalance
-    ) internal pure returns (bytes memory) {
-        return
-            abi.encode(_chainId, _assetId, _amount, _migratingChainIsMinter, _hasSettlingMintingChains, _newSLBalance);
-    }
-
-    /// @notice Decodes the asset tracker data into its component parts.
-    /// @param _data The encoded asset tracker data.
-    /// @return chainId The id of the chain being migrated.
-    /// @return assetId The id of the asset being migrated.
-    /// @return amount The amount being migrated.
-    /// @return migratingChainIsMinter Whether the migrating chain is a minter.
-    /// @return hasSettlingMintingChains Whether there are still settling minting chains.
-    /// @return newSLBalance The new settlement layer balance.
-    function decodeAssetTrackerData(
-        bytes calldata _data
-    )
-        internal
-        pure
-        returns (
-            uint256 chainId,
-            bytes32 assetId,
-            uint256 amount,
-            bool migratingChainIsMinter,
-            bool hasSettlingMintingChains,
-            uint256 newSLBalance
-        )
-    {
-        return abi.decode(_data, (uint256, bytes32, uint256, bool, bool, uint256));
-    }
-
     /// @notice Checks if the assetId is correct.
     /// @param _tokenOriginChainId The chain id of the token origin.
     /// @param _assetId The asset id to check.
@@ -309,32 +261,6 @@ library DataEncoding {
         (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
         // slither-disable-next-line unused-return
         (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
-    }
-
-    function decodeL1ToGatewayTokenBalanceMigrationData(
-        bytes memory _l2ToL1message
-    ) internal pure returns (bytes4 functionSignature, L1ToGatewayTokenBalanceMigrationData memory data) {
-        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
-        functionSignature = bytes4(functionSignatureUint);
-        require(
-            functionSignature == IAssetTrackerDataEncoding.receiveL1ToGatewayMigrationOnL1.selector,
-            InvalidFunctionSignature(functionSignature)
-        );
-        bytes memory transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
-        data = abi.decode(transferData, (L1ToGatewayTokenBalanceMigrationData));
-    }
-
-    function decodeGatewayToL1TokenBalanceMigrationData(
-        bytes memory _l2ToL1message
-    ) internal pure returns (bytes4 functionSignature, GatewayToL1TokenBalanceMigrationData memory data) {
-        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
-        functionSignature = bytes4(functionSignatureUint);
-        require(
-            functionSignature == IAssetTrackerDataEncoding.receiveGatewayToL1MigrationOnL1.selector,
-            InvalidFunctionSignature(functionSignature)
-        );
-        bytes memory transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
-        data = abi.decode(transferData, (GatewayToL1TokenBalanceMigrationData));
     }
 
     function getSelector(bytes memory _data) internal pure returns (bytes4) {

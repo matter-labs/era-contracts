@@ -68,8 +68,6 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {IL1AssetTracker, L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
-
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
 
@@ -94,7 +92,6 @@ contract ExperimentalBridgeTest is Test {
     L1NativeTokenVault ntv;
     IMessageRootBase messageRoot;
     L1Nullifier l1Nullifier;
-    L1AssetTracker assetTracker;
     SimpleExecutor simpleExecutor;
 
     bytes32 tokenAssetId;
@@ -176,10 +173,6 @@ contract ExperimentalBridgeTest is Test {
 
         // kl todo: clean this up. NTV id deployed below in deployNTV. its was a mess before this upgrade.
         ntv = _deployNTVWithoutEthToken(address(mockSharedBridge));
-        assetTracker = new L1AssetTracker(address(bridgehub), address(ntv), address(0));
-
-        vm.prank(bridgeOwner);
-        ntv.setAssetTracker(address(assetTracker));
         ntv.registerEthToken();
 
         vm.prank(bridgeOwner);
@@ -224,12 +217,6 @@ contract ExperimentalBridgeTest is Test {
         bytes32 baseTokenGasPriceDenominatorLocation = bytes32(uint256(41));
         vm.store(address(mockChainContract), baseTokenGasPriceDenominatorLocation, bytes32(uint256(1)));
         // The ownership can only be transferred by the current owner to a new owner via the two-step approach
-
-        vm.mockCall(
-            address(assetTracker),
-            abi.encodeWithSelector(IL1AssetTracker.handleChainBalanceIncreaseOnL1.selector),
-            abi.encode()
-        );
 
         // Default owner calls transferOwnership
         vm.prank(defaultOwner);
@@ -282,18 +269,6 @@ contract ExperimentalBridgeTest is Test {
     function _deployNTV(address _sharedBridgeAddr) internal returns (L1NativeTokenVault addr) {
         addr = _deployNTVWithoutEthToken(_sharedBridgeAddr);
 
-        assetTracker = new L1AssetTracker(address(bridgehub), address(addr), address(0));
-
-        vm.prank(bridgeOwner);
-        addr.setAssetTracker(address(assetTracker));
-
-        // re-do the mock that has been set before inside the `setUp` function, since the assetTracker address has changed
-        vm.mockCall(
-            address(assetTracker),
-            abi.encodeWithSelector(IL1AssetTracker.handleChainBalanceIncreaseOnL1.selector),
-            abi.encode()
-        );
-
         addr.registerEthToken();
     }
 
@@ -323,7 +298,6 @@ contract ExperimentalBridgeTest is Test {
             address(0),
             address(0)
         );
-        // interopCenter.setAddresses(sharedBridgeAddress, address(assetTracker));
         vm.stopPrank();
 
         vm.prank(l1Nullifier.owner());

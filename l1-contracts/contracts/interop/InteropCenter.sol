@@ -12,7 +12,6 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
 
 import {
-    GW_ASSET_TRACKER,
     L2_ASSET_ROUTER_ADDR,
     L2_BASE_TOKEN_HOLDER,
     L2_BRIDGEHUB,
@@ -25,7 +24,6 @@ import {SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_INTEROP_ATTRIBUTES} from "../co
 import {L2_BOOTLOADER_ADDRESS, L2_ATOMIC_FLOW_MANAGER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {
     BUNDLE_IDENTIFIER,
-    BalanceChange,
     BundleAttributes,
     CallAttributes,
     INTEROP_BUNDLE_VERSION,
@@ -35,7 +33,7 @@ import {
     InteropCallStarter,
     InteropCallStarterInternal
 } from "../common/Messaging.sol";
-import {AssetIdMismatch, MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 import {
     AtomicBundleCallCarriesValue,
@@ -684,26 +682,15 @@ contract InteropCenter is
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IInteropCenter
-    function forwardTransactionOnGatewayWithBalanceChange(
+    function forwardTransactionOnGateway(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp,
-        BalanceChange calldata _balanceChange
+        uint64 _expirationTimestamp
     ) external override onlySettlementLayerRelayedSender {
         address zkChain = L2_BRIDGEHUB.getZKChain(_chainId);
         if (zkChain == address(0)) {
             revert DestinationChainNotRegistered(_chainId);
         }
-
-        bytes32 baseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_chainId);
-        if (_balanceChange.baseTokenAssetId != baseTokenAssetId) {
-            revert AssetIdMismatch(baseTokenAssetId, _balanceChange.baseTokenAssetId);
-        }
-        GW_ASSET_TRACKER.handleChainBalanceIncreaseOnGateway({
-            _chainId: _chainId,
-            _canonicalTxHash: _canonicalTxHash,
-            _balanceChange: _balanceChange
-        });
 
         IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }
