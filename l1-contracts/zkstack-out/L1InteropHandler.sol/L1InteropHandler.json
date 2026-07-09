@@ -6,11 +6,6 @@
         "name": "_messageRoot",
         "type": "address",
         "internalType": "contract IMessageRootBase"
-      },
-      {
-        "name": "_l1Nullifier",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "stateMutability": "nonpayable"
@@ -148,24 +143,6 @@
   },
   {
     "type": "function",
-    "name": "getTransientSettlementLayer",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "initialize",
     "inputs": [
       {
@@ -176,19 +153,6 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "l1Nullifier",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -218,24 +182,6 @@
       }
     ],
     "stateMutability": "payable"
-  },
-  {
-    "type": "function",
-    "name": "setTransientSettlementLayer",
-    "inputs": [
-      {
-        "name": "_settlementLayerChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_l2BatchNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -377,19 +323,6 @@
         "type": "uint8",
         "indexed": false,
         "internalType": "enum CallStatus"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "TransientSettlementLayerSet",
-    "inputs": [
-      {
-        "name": "settlementLayerChainId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
       }
     ],
     "anonymous": false

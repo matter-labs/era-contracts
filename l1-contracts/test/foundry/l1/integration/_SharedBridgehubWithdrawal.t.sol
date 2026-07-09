@@ -9,11 +9,10 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {BundleStatus, L2Message, MessageInclusionProof, ProofData} from "contracts/common/Messaging.sol";
+import {BundleStatus, L2Message, MessageInclusionProof} from "contracts/common/Messaging.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {InteropWithdrawalBundleEncoder} from "test-utils/InteropWithdrawalBundleEncoder.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
-import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 
 import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -60,22 +59,18 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
         _finalizeBaseTokenWithdrawal(amountToWithdraw, true);
     }
 
-    /// @notice Drives a real `L1Nullifier.finalizeDeposit` for the current chain's base-token withdrawal
+    /// @notice Drives a real `L1InteropHandler.executeBundle` for the current chain's base-token withdrawal
     /// and asserts the balance outcomes.
-    /// @dev Replaces the removed legacy `L1AssetRouter.finalizeWithdrawal` flow. The withdrawal message is
-    /// reconstructed as the single-call interop bundle emitted by the L2 InteropCenter (see
-    /// `L1Nullifier._parseL2WithdrawalMessage`): the base-token assetId plus `encodeBridgeMintData`
-    /// transfer data, wrapped via `_encodeWithdrawalBundleMessage` and sent by the L2 InteropCenter (the
-    /// only sender the nullifier accepts in `_verifyWithdrawal`).
+    /// @dev Replaces the removed legacy `L1AssetRouter.finalizeWithdrawal` flow. The withdrawal is
+    /// reconstructed as the single-call interop bundle emitted by the L2 InteropCenter whose only call targets
+    /// the L1 asset router's `finalizeDeposit` (the base-token assetId plus `encodeBridgeMintData` transfer
+    /// data), and is finalized on L1 via `L1InteropHandler.executeBundle`.
     ///
     /// Mock justification: L2 batch commitments and merkle trees are unavailable in this L1-only
-    /// integration environment, so the two message-root proof calls that `_verifyWithdrawal` makes are
-    /// mocked:
+    /// integration environment, so the message-root inclusion proof that `L1InteropHandler` makes is mocked:
     ///   - `proveL2MessageInclusionShared` -> `true` (message accepted as included)
-    ///   - `getProofData` -> a `ProofData` with `settlementLayerChainId = 0`, i.e. direct-L1 settlement,
-    ///     which makes `L1AssetTracker._getWithdrawalChain` attribute the withdrawal to `currentChainId`.
-    /// Both are mocked on the selector only (loose match) because the exact `L2Message`/leaf reconstructed
-    /// inside the nullifier is an implementation detail we do not want to duplicate here.
+    /// It is mocked on the selector only (loose match) because the exact `L2Message`/leaf reconstructed inside
+    /// the handler is an implementation detail we do not want to duplicate here.
     /// @param _amountToWithdraw The base-token amount to withdraw.
     /// @param _isEth Whether the chain's base token is native ETH (vs an ERC20).
     function _finalizeBaseTokenWithdrawal(uint256 _amountToWithdraw, bool _isEth) internal {
