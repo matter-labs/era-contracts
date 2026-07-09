@@ -451,26 +451,15 @@ async fn verify_gateway_bring_up_calls(
         );
         errors += check_l2_target(idx, label, req.l2Contract, expected_l2_contract, result);
         errors += check_l2_selector(idx, label, &req.l2Calldata, expected_selector, result);
-        match offset {
-            3 => {
-                errors += check_inner_address_arg(
-                    idx,
-                    label,
-                    expected_selector,
-                    &req.l2Calldata,
-                    new_gw.gateway_chain_type_manager_addr,
-                    result,
-                );
-            }
-            15 => {
-                errors += check_set_gateway_settlement_fee(
-                    idx,
-                    &req.l2Calldata,
-                    verifiers.new_gateway_settlement_fee,
-                    result,
-                );
-            }
-            _ => {}
+        if offset == 3 {
+            errors += check_inner_address_arg(
+                idx,
+                label,
+                expected_selector,
+                &req.l2Calldata,
+                new_gw.gateway_chain_type_manager_addr,
+                result,
+            );
         }
     }
 
@@ -853,32 +842,6 @@ fn check_inner_address_arg(
     } else {
         result.report_error(&format!(
             "GW priority tx #{idx} ({label}) {selector_sig} arg mismatch: expected {expected_arg}, got {actual_arg}"
-        ));
-        1
-    }
-}
-
-fn check_set_gateway_settlement_fee(
-    idx: usize,
-    calldata: &Bytes,
-    expected_fee: U256,
-    result: &mut VerificationResult,
-) -> usize {
-    if calldata.len() < 4 + 32 {
-        result.report_error(&format!(
-            "GW priority tx #{idx} setGatewaySettlementFee calldata is too short"
-        ));
-        return 1;
-    }
-    let fee = U256::from_be_slice(&calldata[4..36]);
-    if fee == expected_fee {
-        result.report_ok(&format!(
-            "GW priority tx #{idx} setGatewaySettlementFee({fee}) matches env config"
-        ));
-        0
-    } else {
-        result.report_error(&format!(
-            "GW priority tx #{idx} setGatewaySettlementFee mismatch: expected env settlement_fee {expected_fee}, got {fee}"
         ));
         1
     }

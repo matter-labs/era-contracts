@@ -13,7 +13,6 @@
 //!   - L1→L2 two-bridges `setAssetHandler` for the chain assetId.
 //!   - L1→L2 two-bridges chain-asset-handler registration for the GW CTM.
 //!   - L1→L2 `acceptOwnership` on the GW RollupDAManager (+ ServerNotifier).
-//!   - L1→L2 `setGatewaySettlementFee(fee)` on `GW_ASSET_TRACKER_ADDR`.
 //!
 //! The script writes its bundle as abi-encoded `Call[]` into the
 //! `governance_calls_to_execute` field of an output TOML; the ecosystem
@@ -124,10 +123,6 @@ pub async fn prepare_new_gateway(
         new_gw.chain_id, source_ctm, ctm_representative_chain_id
     ));
     logger::info(format!(
-        "Settlement fee:   {} (wrapped-ZK wei)",
-        new_gw.settlement_fee
-    ));
-    logger::info(format!(
         "Refund recipient: {refund_recipient:#x}{}",
         if new_gw.refund_recipient.is_some() {
             " (from [new_gateway].refund_recipient)"
@@ -207,7 +202,6 @@ pub async fn prepare_new_gateway(
             ctm_representative_chain_id,
             vote_preparation_toml: VOTE_PREP_OUTPUT_REL,
             refund_recipient,
-            gateway_settlement_fee: new_gw.settlement_fee,
             force_deployments_data_override: Some(force_deployments_data),
             create2_salt: gw_create2_salt,
         },
