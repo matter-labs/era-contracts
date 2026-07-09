@@ -348,7 +348,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         address _receiver,
         uint256 _amount
     ) external onlyAtomicFlowManager nonReentrant {
-        IL2NativeTokenVault(_nativeTokenVaultAddr()).bridgeRecoverBaseToken(_chainId, _assetId, _receiver, _amount);
+        // Reuse the generic failed-transfer recovery. The base-token deposit (bridgehubDepositBaseToken)
+        // discarded its bridge-mint data, so reconstruct the minimal form: `bridgeRecoverFailedTransfer`
+        // refunds the mint data's `originalCaller` for `amount`, and the asset is already registered on
+        // this chain (it was burned from the depositor), so origin-token / erc20 metadata go unused.
+        // solhint-disable-next-line func-named-parameters
+        bytes memory mintData = DataEncoding.encodeBridgeMintData(_receiver, _receiver, address(0), _amount, "");
+        IL2NativeTokenVault(_nativeTokenVaultAddr()).bridgeRecoverFailedTransfer(_chainId, _assetId, mintData);
     }
 
     /// @inheritdoc IL2CrossChainSender

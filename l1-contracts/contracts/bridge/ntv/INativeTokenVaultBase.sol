@@ -57,16 +57,4 @@ interface INativeTokenVaultBase {
     /// @param _assetId The asset being recovered.
     /// @param _data Bridge-mint-formatted data whose receiver is the original depositor.
     function bridgeRecoverFailedTransfer(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable;
-
-    /// @notice Refunds a timed-out atomic-interop base-token value leg that was funded via
-    /// `bridgehubDepositBaseToken` (the different-base-token path): unlock for an origin-native asset,
-    /// re-mint for a bridged one, reversing the `bridgeBurn` performed at send time.
-    /// @dev Like {bridgeRecoverFailedTransfer} but takes the receiver/amount directly, since the base-token
-    /// deposit discarded its bridge-mint data. The asset is already registered on this chain (it was
-    /// burned from the depositor), so no origin-token/metadata is needed. Callable only by the asset router.
-    /// @param _chainId The chain the asset was being bridged to at burn time.
-    /// @param _assetId The (destination base token) asset being recovered.
-    /// @param _receiver The original depositor to refund.
-    /// @param _amount The amount to recover.
-    function bridgeRecoverBaseToken(uint256 _chainId, bytes32 _assetId, address _receiver, uint256 _amount) external;
 }
