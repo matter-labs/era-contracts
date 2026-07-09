@@ -776,6 +776,17 @@ async fn verify_v31_zksync_os_verifier_ownership(
     result: &mut VerificationResult,
 ) -> Result<()> {
     let provider = verifiers.network_verifier.get_l1_provider();
+    // The ZKsync OS dual verifier's ownership is routed to governance (PUH) via
+    // the ecosystem ChainAdmin (`Bridgehub.admin()`): the deployer transfers the
+    // freshly deployed verifier to that ChainAdmin (pending), the ChainAdmin then
+    // accepts it and forwards it to PUH, and PUH accepts in stage 0. Any of those
+    // en-route states — as well as the final PUH ownership — is acceptable, so we
+    // treat both PUH and the ecosystem ChainAdmin as valid owners/pending owners.
+    let eco_chain_admin = BridgehubContract::new(verifiers.bridgehub_address, provider.clone())
+        .admin()
+        .call()
+        .await
+        .ok();
     for ctm in &artifact.ctms {
         if ctm.flavor != CtmFlavor::ZksyncOs {
             continue;
@@ -787,6 +798,7 @@ async fn verify_v31_zksync_os_verifier_ownership(
             required_address(&ctm.value, &scope, &["state_transition", "verifier_addr"])?;
         let expected_owner =
             required_address(&ctm.value, &scope, &["admin", "timer_governance_addr"])?;
+        let acceptable = |a: Address| a == expected_owner || Some(a) == eco_chain_admin;
 
         let ownable = Ownable2Step::new(verifier, provider.clone());
         match (
@@ -796,11 +808,12 @@ async fn verify_v31_zksync_os_verifier_ownership(
             (Ok(owner), _) if owner == expected_owner => result.report_ok(&format!(
                 "{label}.verifier.owner() matches expected ({expected_owner})"
             )),
-            (Ok(_), Ok(pending)) if pending == expected_owner => result.report_ok(&format!(
-                "{label}.verifier ownership transfer to {expected_owner} is pending"
-            )),
+            (Ok(owner), Ok(pending)) if acceptable(owner) || acceptable(pending) => result
+                .report_ok(&format!(
+                    "{label}.verifier ownership en route to {expected_owner} via the ecosystem ChainAdmin (owner={owner}, pendingOwner={pending})"
+                )),
             (Ok(owner), _) => result.report_error(&format!(
-                "{label}.verifier.owner() mismatch: expected {expected_owner} (or pendingOwner), got {owner}"
+                "{label}.verifier.owner() mismatch: expected {expected_owner} (or pendingOwner, or the ecosystem ChainAdmin), got {owner}"
             )),
             (Err(err), _) => result.report_error(&format!(
                 "Failed to call {label}.verifier.owner(): {err}"

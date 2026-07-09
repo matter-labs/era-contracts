@@ -226,6 +226,16 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
         ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, false);
 
+        // ZKsync OS dual verifiers are Ownable2Step. Instead of transferring the
+        // fresh verifier straight to governance (PUH) — which routes ownership
+        // through the deployer — hand it to the ecosystem ChainAdmin
+        // (`Bridgehub.admin()`), which then accepts it and forwards it to
+        // governance via a ChainAdmin multicall (see `prepareVerifierHandoverCall`
+        // in DefaultCTMUpgrade). Era verifiers are not Ownable, so this is a no-op
+        // for them and `config.ownerAddress` is passed through unused.
+        address verifierOwner = config.isZKsyncOS
+            ? L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).admin()
+            : config.ownerAddress;
         // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
         vm.startBroadcast(getDeployerAddress());
         // Called as library (not through vms) to preserve msg.sender
@@ -233,7 +243,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.stateTransition.verifiers.verifier,
             ctmAddresses.stateTransition.verifiers.verifierFflonk,
             ctmAddresses.stateTransition.verifiers.verifierPlonk,
-            config.ownerAddress,
+            verifierOwner,
             config.isZKsyncOS
         );
         vm.stopBroadcast();

@@ -27,6 +27,7 @@ import {Governance} from "contracts/governance/Governance.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
@@ -46,7 +47,6 @@ import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {DefaultL2UpgradeStrategy} from "./DefaultL2UpgradeStrategy.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
-import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 interface IAdminPreV31 {
     function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
@@ -535,6 +535,17 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         vm.serializeAddress("ctm_admin_calls", "chain_admin", chainAdmin);
         vm.serializeAddress("ctm_admin_calls", "chain_admin_owner", chainAdminOwner);
 
+        // ZKsync OS dual verifier ownership handover, routed through the ecosystem
+        // ChainAdmin (`Bridgehub.admin()`): the deployer transferred the freshly
+        // deployed verifier to that ChainAdmin (see `DeployCTM.deployVerifiers`);
+        // here the ChainAdmin accepts it and forwards it to governance (PUH). PUH
+        // then accepts in stage 0 (the aux deferred-accept block). Empty for Era.
+        (Call[] memory verifierHandover, address verifierChainAdmin) = prepareVerifierHandoverCall();
+        if (verifierHandover.length > 0) {
+            vm.serializeAddress("ctm_admin_calls", "verifier_handover_chain_admin", verifierChainAdmin);
+            vm.serializeBytes("ctm_admin_calls", "verifier_handover", abi.encode(verifierHandover));
+        }
+
         string memory ctmAdminCallsSerialized = vm.serializeBytes(
             "ctm_admin_calls",
             "server_notifier_upgrade",
@@ -542,6 +553,33 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         );
 
         vm.writeToml(ctmAdminCallsSerialized, upgradeConfig.outputPath, ".ctm_admin_calls");
+    }
+
+    /// @notice Build the ChainAdmin multicall that hands the freshly deployed
+    ///         ZKsync OS dual verifier from the ecosystem ChainAdmin
+    ///         (`Bridgehub.admin()`, its pending owner set at deploy time) to
+    ///         governance (PUH): `acceptOwnership()` then `transferOwnership(PUH)`.
+    ///         PUH accepts in stage 0. Returns `(empty, address(0))` for Era (its
+    ///         verifier is not Ownable) or when the deploy-time transfer to the
+    ///         ChainAdmin hasn't landed (guards against a reverting accept).
+    function prepareVerifierHandoverCall() public virtual returns (Call[] memory calls, address chainAdmin) {
+        if (!config.isZKsyncOS) {
+            return (new Call[](0), address(0));
+        }
+        address verifier = ctmAddresses.stateTransition.verifiers.verifier;
+        // Same source as the deploy-time transfer in `DeployCTM.deployVerifiers`,
+        // so the ChainAdmin here matches the verifier's pending owner exactly.
+        chainAdmin = L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).admin();
+        if (chainAdmin == address(0) || IOwnable(verifier).pendingOwner() != chainAdmin) {
+            return (new Call[](0), address(0));
+        }
+        calls = new Call[](2);
+        calls[0] = Call({target: verifier, data: abi.encodeCall(IOwnable.acceptOwnership, ()), value: 0});
+        calls[1] = Call({
+            target: verifier,
+            data: abi.encodeCall(IOwnable.transferOwnership, (config.ownerAddress)),
+            value: 0
+        });
     }
 
     function prepareDefaultTestUpgradeCalls() public {
@@ -561,24 +599,40 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     function prepareUpgradeServerNotifierCall() public virtual returns (Call[] memory calls) {
-        address serverNotifierProxyAdmin = Utils.getProxyAdminAddress(
-            ctmAddresses.stateTransition.proxies.serverNotifier
-        );
+        address serverNotifier = ctmAddresses.stateTransition.proxies.serverNotifier;
+        address serverNotifierProxyAdmin = Utils.getProxyAdminAddress(serverNotifier);
+        // The ChainAdmin that both owns the ServerNotifier's ProxyAdmin and
+        // executes this multicall (see `prepareDefaultCTMAdminCalls`).
+        address chainAdmin = IOwnable(serverNotifierProxyAdmin).owner();
 
-        Call memory call = Call({
+        Call memory upgradeCall = Call({
             target: serverNotifierProxyAdmin,
             data: abi.encodeCall(
                 ProxyAdmin.upgrade,
                 (
-                    ITransparentUpgradeableProxy(payable(ctmAddresses.stateTransition.proxies.serverNotifier)),
+                    ITransparentUpgradeableProxy(payable(serverNotifier)),
                     ctmAddresses.stateTransition.implementations.serverNotifier
                 )
             ),
             value: 0
         });
 
-        calls = new Call[](1);
-        calls[0] = call;
+        // The ServerNotifier is `Ownable2Step`. Its ownership was transferred to
+        // the ChainAdmin at deploy time (`DeployCTM.updateOwners`), but that
+        // leaves the transfer dangling until the new owner calls
+        // `acceptOwnership()`. Since this multicall is executed BY the ChainAdmin
+        // (the pending owner), fold the `acceptOwnership()` in here so ownership
+        // isn't left dangling. Guard on `pendingOwner == chainAdmin` so CTMs
+        // whose ServerNotifier is already fully owned by the ChainAdmin (e.g. a
+        // prior upgrade completed the transfer) don't emit a reverting accept.
+        if (IOwnable(serverNotifier).pendingOwner() == chainAdmin) {
+            calls = new Call[](2);
+            calls[0] = upgradeCall;
+            calls[1] = Call({target: serverNotifier, data: abi.encodeCall(IOwnable.acceptOwnership, ()), value: 0});
+        } else {
+            calls = new Call[](1);
+            calls[0] = upgradeCall;
+        }
     }
 
     /// @notice The zeroth step of upgrade. By default it just stops gateway migrations

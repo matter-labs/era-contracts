@@ -899,12 +899,21 @@ target = "mn_era_chain_admin"
 selector = "0x69340beb"  # multicall
 inner_target = "mn_era_serdnotifier_proxy_admin"  # existing Era ServerNotifier's ProxyAdmin
 inner_selector = "0x99a88ec4"  # upgrade(address,address)
-desc = "Mainnet Era ChainAdmin: multicall → ProxyAdmin(0x257fc0c3…).upgrade(existing Era ServerNotifier proxy 0xfca808a7…, newImpl). IN-PLACE ServerNotifier upgrade — proxy address stays stable, off-chain server config doesn't change."
+desc = "Mainnet Era ChainAdmin: multicall → ProxyAdmin(0x257fc0c3…).upgrade(existing Era ServerNotifier proxy 0xfca808a7…, newImpl). IN-PLACE ServerNotifier upgrade — proxy address stays stable, off-chain server config doesn't change. (Era ServerNotifier ownership is already the ChainAdmin, so no acceptOwnership is folded in.)"
+
+# Verifier ownership handover, routed through the ecosystem ChainAdmin (Bridgehub.admin() = 0x2cf3bd6a…, same address as mn_era_chain_admin).
+# Disambiguated from the Era ServerNotifier upgrade above by the first inner call (verifier.acceptOwnership vs ProxyAdmin.upgrade).
+[[entries]]
+target = "mn_era_chain_admin"
+selector = "0x69340beb"  # multicall
+inner_target = "mn_atlas_verifier"
+inner_selector = "0x79ba5097"  # acceptOwnership()
+desc = "Mainnet ecosystem ChainAdmin (Bridgehub.admin()): multicall → [ZKsync OS dual verifier.acceptOwnership(), verifier.transferOwnership(PUH)]. Completes the deploy-time transfer of the freshly deployed verifier to this ChainAdmin (deployer never persists as owner), then forwards ownership to governance (PUH); PUH accepts in stage 0 (aux deferred-accept)."
 
 [[entries]]
 target = "mn_atlas_chain_admin"
 selector = "0x69340beb"  # multicall
-desc = "Mainnet Atlas ChainAdmin: multicall → ProxyAdmin(0xe5f57E87…).upgrade(existing Atlas ServerNotifier proxy 0xBfaa7332…, newImpl). IN-PLACE ServerNotifier upgrade (same shape as the Era ChainAdmin one)."
+desc = "Mainnet Atlas ChainAdmin: multicall → [ProxyAdmin(0xe5f57E87…).upgrade(existing Atlas ServerNotifier proxy 0xBfaa7332…, newImpl), ServerNotifier.acceptOwnership()]. IN-PLACE ServerNotifier upgrade PLUS completes the dangling Ownable2Step transfer of the Atlas ServerNotifier to this ChainAdmin (its pendingOwner)."
 
 # ─── Stage 0: PUH governance (pause, timers, PUH/Guardians redeploy, acceptOwnership) ───
 [[entries]]

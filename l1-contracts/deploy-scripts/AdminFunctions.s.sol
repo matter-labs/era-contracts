@@ -414,6 +414,28 @@ contract AdminFunctions is Script, IAdminFunctions {
         }
     }
 
+    /// Execute a set of calls as a SINGLE `ChainAdmin.multicall`, broadcast by the
+    /// ChainAdmin's EOA owner. Unlike `executeOwnableCallsWithWraps` (which routes
+    /// each call by its target's `owner()`), every call here runs with
+    /// `msg.sender == _chainAdmin`. This is required for calls whose executor must
+    /// be the ChainAdmin as the *pending* owner (e.g. `acceptOwnership()` on a
+    /// ServerNotifier / verifier whose ownership was transferred to the ChainAdmin
+    /// but not yet accepted) — a plain owner-routed call would run as the stale
+    /// current owner and revert. It also mirrors exactly how the transaction
+    /// simulator encodes a `ctm_admin_calls` entry (one `ChainAdmin.multicall`),
+    /// keeping the prepare broadcast and the sim bundle byte-identical.
+    function executeCtmAdminMulticall(bytes memory _callsToExecute, address _chainAdmin) public {
+        Call[] memory calls = abi.decode(_callsToExecute, (Call[]));
+        if (calls.length == 0) {
+            return;
+        }
+        address chainAdminOwner = IOwnableSingleStep(_chainAdmin).owner();
+        _anvilFund(chainAdminOwner);
+        vm.startBroadcast(chainAdminOwner);
+        IChainAdminMulticall(_chainAdmin).multicall(calls, true);
+        vm.stopBroadcast();
+    }
+
     function _issueAsOperationalOwner(
         address _currentOwner,
         address _target,

@@ -424,6 +424,10 @@ pub struct GovernanceTomlToSimulatorArgs {
 struct CtmAdminCallsSection {
     chain_admin: Address,
     server_notifier_upgrade: String,
+    #[serde(default)]
+    verifier_handover_chain_admin: Option<Address>,
+    #[serde(default)]
+    verifier_handover: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -469,6 +473,22 @@ fn build_ctm_admin_calls_tags(parsed: &GovernanceCallsToml) -> anyhow::Result<Ct
                     ),
                     tag.to_string(),
                 ));
+                // The ZKsync OS verifier ownership handover is a second, separate
+                // ChainAdmin multicall (routed through `Bridgehub.admin()`).
+                if let (Some(vh_admin), Some(vh)) = (
+                    section.verifier_handover_chain_admin,
+                    &section.verifier_handover,
+                ) {
+                    tags.push((
+                        (
+                            vh_admin,
+                            encode_chain_admin_multicall(vh).with_context(|| {
+                                format!("encoding verifier_handover for flavor {flavor}")
+                            })?,
+                        ),
+                        format!("verifier_handover_{flavor}"),
+                    ));
+                }
             }
         }
     }
