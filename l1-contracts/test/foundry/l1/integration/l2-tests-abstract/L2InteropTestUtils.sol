@@ -44,11 +44,7 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
     /// {SharedL2ContractDeployer} setUp, which many non-interop suites rely on.
     function setUp() public virtual override {
         super.setUp();
-        vm.mockCall(
-            L2_ATOMIC_FLOW_MANAGER_ADDR,
-            abi.encodeWithSelector(IAtomicFlowManager.append.selector),
-            ""
-        );
+        vm.mockCall(L2_ATOMIC_FLOW_MANAGER_ADDR, abi.encodeWithSelector(IAtomicFlowManager.append.selector), "");
         vm.mockCall(
             L2_ATOMIC_FLOW_MANAGER_ADDR,
             abi.encodeWithSelector(IAtomicFlowManager.requireFlowFinalized.selector),

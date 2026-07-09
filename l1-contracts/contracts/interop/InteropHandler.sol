@@ -310,7 +310,6 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
         }
     }
 
-
     /// @notice The sole purpose of this function is to serve as a rescue mechanism in case the sender is a contract,
     ///         the unbundler chainid is set to the sender chainid and the unbundler address is set to the contract's address.
     ///         In particular, this happens when the unbundler is not specified.

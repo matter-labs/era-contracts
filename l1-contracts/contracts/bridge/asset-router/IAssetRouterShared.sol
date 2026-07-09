@@ -27,12 +27,7 @@ interface IAssetRouterShared {
     /// @param _assetId The destination base-token asset id that was burned.
     /// @param _receiver The original depositor to refund.
     /// @param _amount The amount to recover.
-    function bridgehubRecoverBaseToken(
-        uint256 _chainId,
-        bytes32 _assetId,
-        address _receiver,
-        uint256 _amount
-    ) external;
+    function bridgehubRecoverBaseToken(uint256 _chainId, bytes32 _assetId, address _receiver, uint256 _amount) external;
 
     /// @notice Generates a calldata for calling the deposit finalization on the L2 native token contract.
     /// @param _sender The address of the deposit initiator.

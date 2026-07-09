@@ -836,22 +836,6 @@
   },
   {
     "type": "error",
-    "name": "AtomicBundleCallCarriesValue",
-    "inputs": [
-      {
-        "name": "callIndex",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "value",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "AttributeAlreadySet",
     "inputs": [
       {
@@ -973,6 +957,11 @@
         "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "NonAtomicSendUnsupported",
+    "inputs": []
   },
   {
     "type": "error",

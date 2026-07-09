@@ -68,10 +68,5 @@ interface INativeTokenVaultBase {
     /// @param _assetId The (destination base token) asset being recovered.
     /// @param _receiver The original depositor to refund.
     /// @param _amount The amount to recover.
-    function bridgeRecoverBaseToken(
-        uint256 _chainId,
-        bytes32 _assetId,
-        address _receiver,
-        uint256 _amount
-    ) external;
+    function bridgeRecoverBaseToken(uint256 _chainId, bytes32 _assetId, address _receiver, uint256 _amount) external;
 }
