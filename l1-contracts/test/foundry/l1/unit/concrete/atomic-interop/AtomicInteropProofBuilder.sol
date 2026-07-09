@@ -116,14 +116,15 @@ abstract contract AtomicInteropProofBuilder is Test {
             data: abi.encode(_proof.chainImtRoot)
         });
 
-        return abi.encodeWithSelector(
-            L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector,
-            _proof.sourceChainId,
-            _proof.batchNumber,
-            _proof.messageIndex,
-            message,
-            _proof.messageProof
-        );
+        return
+            abi.encodeWithSelector(
+                L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector,
+                _proof.sourceChainId,
+                _proof.batchNumber,
+                _proof.messageIndex,
+                message,
+                _proof.messageProof
+            );
     }
 
     // ------------------------------------------------------------------------------------------------

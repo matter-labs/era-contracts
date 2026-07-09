@@ -84,8 +84,13 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     /// @dev Boundary: `l1Timestamp == deadline` is in time (the check is strictly `>`).
     function test_verifyInclusion_boundary_timestampEqualsDeadline_passes() public {
-        ImtProof memory proof =
-            _inclusionProof(SOURCE_CHAIN_ID, BATCH_N, committedIndex, SETTLEMENT_LAYER_CHAIN_ID, DEADLINE);
+        ImtProof memory proof = _inclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            committedIndex,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            DEADLINE
+        );
         _expectRootAuthentication(proof);
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
@@ -94,16 +99,26 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     function test_RevertWhen_inclusion_rootMessageInclusionFails() public {
         _mockVerifier(false);
-        ImtProof memory proof =
-            _inclusionProof(SOURCE_CHAIN_ID, BATCH_N, committedIndex, SETTLEMENT_LAYER_CHAIN_ID, DEADLINE - 1);
+        ImtProof memory proof = _inclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            committedIndex,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            DEADLINE - 1
+        );
         _expectRootAuthentication(proof);
         vm.expectRevert(abi.encodeWithSelector(ProofRootMessageInclusionFailed.selector, SOURCE_CHAIN_ID, BATCH_N));
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
     function test_RevertWhen_inclusion_missingSettlementLayerAnchor() public {
-        ImtProof memory proof =
-            _inclusionProof(SOURCE_CHAIN_ID, BATCH_N, committedIndex, SETTLEMENT_LAYER_CHAIN_ID, DEADLINE - 1);
+        ImtProof memory proof = _inclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            committedIndex,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            DEADLINE - 1
+        );
         // A final-node (single-level) proof carries no settlement-layer anchor.
         proof.messageProof = _finalMessageProof();
         _expectRootAuthentication(proof);
@@ -123,8 +138,13 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     function test_RevertWhen_inclusion_deadlineExceeded() public {
         uint256 lateTimestamp = uint256(DEADLINE) + 1;
-        ImtProof memory proof =
-            _inclusionProof(SOURCE_CHAIN_ID, BATCH_N, committedIndex, SETTLEMENT_LAYER_CHAIN_ID, lateTimestamp);
+        ImtProof memory proof = _inclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            committedIndex,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            lateTimestamp
+        );
         _expectRootAuthentication(proof);
         vm.expectRevert(abi.encodeWithSelector(ProofDeadlineExceeded.selector, lateTimestamp, DEADLINE));
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
@@ -134,8 +154,13 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// the claimed root: the IMT check fails (distinct from a value/leaf mismatch, which the engine catches
     /// earlier). We keep the real leaf (so `leaf.value == commitValue`) and only corrupt `chainImtRoot`.
     function test_RevertWhen_inclusion_inclusionFailed() public {
-        ImtProof memory proof =
-            _inclusionProof(SOURCE_CHAIN_ID, BATCH_N, committedIndex, SETTLEMENT_LAYER_CHAIN_ID, DEADLINE - 1);
+        ImtProof memory proof = _inclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            committedIndex,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            DEADLINE - 1
+        );
         proof.chainImtRoot = WRONG_ROOT;
         _expectRootAuthentication(proof);
         vm.expectRevert(abi.encodeWithSelector(ProofInclusionFailed.selector, WRONG_ROOT, committedValue));
@@ -143,8 +168,13 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     }
 
     function test_RevertWhen_inclusion_commitValueMismatch() public {
-        ImtProof memory proof =
-            _inclusionProof(SOURCE_CHAIN_ID, BATCH_N, committedIndex, SETTLEMENT_LAYER_CHAIN_ID, DEADLINE - 1);
+        ImtProof memory proof = _inclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            committedIndex,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            DEADLINE - 1
+        );
         uint256 wrongCommitValue = absentValue;
         _expectRootAuthentication(proof);
         vm.expectRevert(abi.encodeWithSelector(IMTLeafValueMismatch.selector, wrongCommitValue, committedValue));
@@ -174,10 +204,19 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     /// @dev Boundary: absence batch `t_N == deadline` is still in time (`t_N <= deadline`).
     function test_verifyTimeoutAdjacency_boundary_absenceTimestampEqualsDeadline_passes() public {
-        ImtProof memory absence =
-            _nonInclusionProof(SOURCE_CHAIN_ID, BATCH_N, absentValue, SETTLEMENT_LAYER_CHAIN_ID, DEADLINE);
-        ImtProof memory successor =
-            _rootAuthProof(SOURCE_CHAIN_ID, BATCH_N + 1, SETTLEMENT_LAYER_CHAIN_ID, uint256(DEADLINE) + 1);
+        ImtProof memory absence = _nonInclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            absentValue,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            DEADLINE
+        );
+        ImtProof memory successor = _rootAuthProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N + 1,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            uint256(DEADLINE) + 1
+        );
         _expectRootAuthentication(absence);
         _expectRootAuthentication(successor);
         proofLib.verifyTimeoutAdjacency(absence, successor, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
@@ -186,8 +225,13 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// @dev Boundary: successor `t_{N+1} == deadline` is NOT strictly after the deadline, so N is not
     /// pinned as the last in-time batch — this is the stale/genesis-root guard.
     function test_RevertWhen_timeout_successorTimestampEqualsDeadline() public {
-        ImtProof memory absence =
-            _nonInclusionProof(SOURCE_CHAIN_ID, BATCH_N, absentValue, SETTLEMENT_LAYER_CHAIN_ID, DEADLINE - 1);
+        ImtProof memory absence = _nonInclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            absentValue,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            DEADLINE - 1
+        );
         ImtProof memory successor = _rootAuthProof(SOURCE_CHAIN_ID, BATCH_N + 1, SETTLEMENT_LAYER_CHAIN_ID, DEADLINE);
         _expectRootAuthentication(absence);
         _expectRootAuthentication(successor);
@@ -199,46 +243,84 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     function test_RevertWhen_timeout_absenceDeadlineExceeded() public {
         uint256 lateTimestamp = uint256(DEADLINE) + 1;
-        ImtProof memory absence =
-            _nonInclusionProof(SOURCE_CHAIN_ID, BATCH_N, absentValue, SETTLEMENT_LAYER_CHAIN_ID, lateTimestamp);
-        ImtProof memory successor =
-            _rootAuthProof(SOURCE_CHAIN_ID, BATCH_N + 1, SETTLEMENT_LAYER_CHAIN_ID, lateTimestamp + 1);
+        ImtProof memory absence = _nonInclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            absentValue,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            lateTimestamp
+        );
+        ImtProof memory successor = _rootAuthProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N + 1,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            lateTimestamp + 1
+        );
         _expectRootAuthentication(absence);
         vm.expectRevert(abi.encodeWithSelector(ProofDeadlineExceeded.selector, lateTimestamp, DEADLINE));
         proofLib.verifyTimeoutAdjacency(absence, successor, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
     function test_RevertWhen_timeout_nonInclusionFailed() public {
-        ImtProof memory absence =
-            _nonInclusionProof(SOURCE_CHAIN_ID, BATCH_N, absentValue, SETTLEMENT_LAYER_CHAIN_ID, DEADLINE - 1);
+        ImtProof memory absence = _nonInclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            absentValue,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            DEADLINE - 1
+        );
         // The low-nullifier leaf brackets `absentValue`, but the membership path no longer hashes to the
         // claimed root, so absence is not certified.
         absence.chainImtRoot = WRONG_ROOT;
-        ImtProof memory successor =
-            _rootAuthProof(SOURCE_CHAIN_ID, BATCH_N + 1, SETTLEMENT_LAYER_CHAIN_ID, uint256(DEADLINE) + 1);
+        ImtProof memory successor = _rootAuthProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N + 1,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            uint256(DEADLINE) + 1
+        );
         _expectRootAuthentication(absence);
         vm.expectRevert(abi.encodeWithSelector(ProofNonInclusionFailed.selector, WRONG_ROOT, absentValue));
         proofLib.verifyTimeoutAdjacency(absence, successor, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
     function test_RevertWhen_timeout_successorSourceChainMismatch() public {
-        ImtProof memory absence =
-            _nonInclusionProof(SOURCE_CHAIN_ID, BATCH_N, absentValue, SETTLEMENT_LAYER_CHAIN_ID, DEADLINE - 1);
+        ImtProof memory absence = _nonInclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            absentValue,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            DEADLINE - 1
+        );
         uint256 wrongSuccessorChain = SOURCE_CHAIN_ID + 1;
-        ImtProof memory successor =
-            _rootAuthProof(wrongSuccessorChain, BATCH_N + 1, SETTLEMENT_LAYER_CHAIN_ID, uint256(DEADLINE) + 1);
+        ImtProof memory successor = _rootAuthProof(
+            wrongSuccessorChain,
+            BATCH_N + 1,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            uint256(DEADLINE) + 1
+        );
         _expectRootAuthentication(absence);
         _expectRootAuthentication(successor);
-        vm.expectRevert(abi.encodeWithSelector(ProofSourceChainMismatch.selector, SOURCE_CHAIN_ID, wrongSuccessorChain));
+        vm.expectRevert(
+            abi.encodeWithSelector(ProofSourceChainMismatch.selector, SOURCE_CHAIN_ID, wrongSuccessorChain)
+        );
         proofLib.verifyTimeoutAdjacency(absence, successor, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
     function test_RevertWhen_timeout_adjacencyNotConsecutive() public {
-        ImtProof memory absence =
-            _nonInclusionProof(SOURCE_CHAIN_ID, BATCH_N, absentValue, SETTLEMENT_LAYER_CHAIN_ID, DEADLINE - 1);
+        ImtProof memory absence = _nonInclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            absentValue,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            DEADLINE - 1
+        );
         uint256 nonConsecutive = BATCH_N + 2;
-        ImtProof memory successor =
-            _rootAuthProof(SOURCE_CHAIN_ID, nonConsecutive, SETTLEMENT_LAYER_CHAIN_ID, uint256(DEADLINE) + 1);
+        ImtProof memory successor = _rootAuthProof(
+            SOURCE_CHAIN_ID,
+            nonConsecutive,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            uint256(DEADLINE) + 1
+        );
         _expectRootAuthentication(absence);
         _expectRootAuthentication(successor);
         vm.expectRevert(abi.encodeWithSelector(ProofAdjacencyNotConsecutive.selector, BATCH_N, nonConsecutive));
@@ -248,8 +330,12 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     function test_RevertWhen_timeout_absenceSettlementLayerMismatch() public {
         uint256 proofSl = SETTLEMENT_LAYER_CHAIN_ID + 1;
         ImtProof memory absence = _nonInclusionProof(SOURCE_CHAIN_ID, BATCH_N, absentValue, proofSl, DEADLINE - 1);
-        ImtProof memory successor =
-            _rootAuthProof(SOURCE_CHAIN_ID, BATCH_N + 1, SETTLEMENT_LAYER_CHAIN_ID, uint256(DEADLINE) + 1);
+        ImtProof memory successor = _rootAuthProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N + 1,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            uint256(DEADLINE) + 1
+        );
         _expectRootAuthentication(absence);
         vm.expectRevert(
             abi.encodeWithSelector(ProofSettlementLayerMismatch.selector, SETTLEMENT_LAYER_CHAIN_ID, proofSl)
@@ -258,8 +344,13 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     }
 
     function test_RevertWhen_timeout_successorSettlementLayerMismatch() public {
-        ImtProof memory absence =
-            _nonInclusionProof(SOURCE_CHAIN_ID, BATCH_N, absentValue, SETTLEMENT_LAYER_CHAIN_ID, DEADLINE - 1);
+        ImtProof memory absence = _nonInclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            absentValue,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            DEADLINE - 1
+        );
         uint256 successorSl = SETTLEMENT_LAYER_CHAIN_ID + 1;
         ImtProof memory successor = _rootAuthProof(SOURCE_CHAIN_ID, BATCH_N + 1, successorSl, uint256(DEADLINE) + 1);
         _expectRootAuthentication(absence);
@@ -278,8 +369,13 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// refundable (proven absent). Source-chain binding is enforced by the manager-level refund path.
     function test_includedValueCannotBeProvenAbsent() public {
         // Sanity: the committed value verifies as included in time.
-        ImtProof memory inclusion =
-            _inclusionProof(SOURCE_CHAIN_ID, BATCH_N, committedIndex, SETTLEMENT_LAYER_CHAIN_ID, DEADLINE - 1);
+        ImtProof memory inclusion = _inclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            committedIndex,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            DEADLINE - 1
+        );
         _expectRootAuthentication(inclusion);
         proofLib.verifyInclusion(inclusion, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
 
@@ -296,8 +392,12 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
             imtLeafIndex: predIndex,
             imtProof: tree.merklePath(predIndex)
         });
-        ImtProof memory successor =
-            _rootAuthProof(SOURCE_CHAIN_ID, BATCH_N + 1, SETTLEMENT_LAYER_CHAIN_ID, uint256(DEADLINE) + 1);
+        ImtProof memory successor = _rootAuthProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N + 1,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            uint256(DEADLINE) + 1
+        );
 
         // The predecessor's `nextValue == committedValue`, so non-inclusion is rejected by the IMT engine.
         _expectRootAuthentication(absence);
@@ -309,8 +409,13 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     /// @dev Across the deadline boundary, an inclusion proof passes iff `l1Timestamp <= deadline`.
     function testFuzz_verifyInclusion_deadlineBoundary(uint64 _l1Timestamp, uint64 _deadline) public {
-        ImtProof memory proof =
-            _inclusionProof(SOURCE_CHAIN_ID, BATCH_N, committedIndex, SETTLEMENT_LAYER_CHAIN_ID, _l1Timestamp);
+        ImtProof memory proof = _inclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            committedIndex,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            _l1Timestamp
+        );
         if (uint256(_l1Timestamp) > uint256(_deadline)) {
             vm.expectRevert(abi.encodeWithSelector(ProofDeadlineExceeded.selector, uint256(_l1Timestamp), _deadline));
         }
@@ -322,8 +427,13 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// (`t_N <= deadline && t_{N+1} > deadline`). Notably, `t_N <= deadline && t_{N+1} <= deadline` must
     /// FAIL — that is the guard that a stale/genesis root cannot force a refund.
     function testFuzz_verifyTimeoutAdjacency_deadlineWindow(uint64 _tN, uint64 _tS, uint64 _deadline) public {
-        ImtProof memory absence =
-            _nonInclusionProof(SOURCE_CHAIN_ID, BATCH_N, absentValue, SETTLEMENT_LAYER_CHAIN_ID, _tN);
+        ImtProof memory absence = _nonInclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            absentValue,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            _tN
+        );
         ImtProof memory successor = _rootAuthProof(SOURCE_CHAIN_ID, BATCH_N + 1, SETTLEMENT_LAYER_CHAIN_ID, _tS);
         bool inTimeWindow = (uint256(_tN) <= uint256(_deadline)) && (uint256(_tS) > uint256(_deadline));
         if (!inTimeWindow) {
@@ -343,10 +453,19 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// @dev The adjacency witness must be exactly `absence.batchNumber + 1`.
     function testFuzz_verifyTimeoutAdjacency_adjacency(uint256 _successorBatch) public {
         vm.assume(_successorBatch != BATCH_N + 1);
-        ImtProof memory absence =
-            _nonInclusionProof(SOURCE_CHAIN_ID, BATCH_N, absentValue, SETTLEMENT_LAYER_CHAIN_ID, DEADLINE - 1);
-        ImtProof memory successor =
-            _rootAuthProof(SOURCE_CHAIN_ID, _successorBatch, SETTLEMENT_LAYER_CHAIN_ID, uint256(DEADLINE) + 1);
+        ImtProof memory absence = _nonInclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            absentValue,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            DEADLINE - 1
+        );
+        ImtProof memory successor = _rootAuthProof(
+            SOURCE_CHAIN_ID,
+            _successorBatch,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            uint256(DEADLINE) + 1
+        );
         _expectRootAuthentication(absence);
         _expectRootAuthentication(successor);
         vm.expectRevert(abi.encodeWithSelector(ProofAdjacencyNotConsecutive.selector, BATCH_N, _successorBatch));
