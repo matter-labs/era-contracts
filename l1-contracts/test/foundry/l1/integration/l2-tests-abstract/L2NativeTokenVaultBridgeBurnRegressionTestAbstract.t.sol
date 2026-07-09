@@ -8,7 +8,7 @@ import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
-import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
@@ -72,7 +72,7 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         // as the base token asset id. Overwrite BASE_TOKEN_ASSET_ID to the actual local value
         // and then register it via the upgrade path so the BaseTokenHolder accounting works.
         stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(baseTokenAssetIdLocal);
-        if (!IAssetTrackerBase(L2_ASSET_TRACKER_ADDR).isAssetRegistered(baseTokenAssetIdLocal)) {
+        if (!IL2AssetTracker(L2_ASSET_TRACKER_ADDR).isAssetRegistered(baseTokenAssetIdLocal)) {
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
             IL2AssetTracker(L2_ASSET_TRACKER_ADDR).registerBaseTokenDuringUpgrade();
         }
@@ -89,7 +89,7 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
 
         // Record the BaseTokenHolder balance before
         uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
-        uint256 chainBalanceBefore = IAssetTrackerBase(L2_ASSET_TRACKER_ADDR).chainBalance(
+        uint256 chainBalanceBefore = IL2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(
             block.chainid,
             baseTokenAssetIdLocal
         );
@@ -116,7 +116,7 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
             "BaseTokenHolder should receive the deposit amount"
         );
         assertEq(
-            IAssetTrackerBase(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, baseTokenAssetIdLocal),
+            IL2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, baseTokenAssetIdLocal),
             chainBalanceBefore,
             "chainBalance should not change for bridged base token burns on L2"
         );

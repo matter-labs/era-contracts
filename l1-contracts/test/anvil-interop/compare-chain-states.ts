@@ -64,9 +64,12 @@ const BALANCE_TOLERANCE_WEI = BigInt("10000000000000000"); // 10^16
 //     (`historicalRoot[blockNumber]`, `chainBatchRoots`, incremental Merkle trees
 //     and batch counters all grow with the number of blocks/batches produced).
 //  2. Deployment-specific L1 contracts resolved by ROLE from addresses.json (see
-//     collectSkipStorageAccounts): the L1 messageRoot, every chain diamond proxy
-//     (per-batch `storedBatchHashes`/`l2LogsRootHashes` + batch counters) and the
-//     L1 asset tracker (gas-cost-dependent balances).
+//     collectSkipStorageAccounts): the L1 messageRoot and every chain diamond
+//     proxy (per-batch `storedBatchHashes`/`l2LogsRootHashes` + batch counters).
+//
+// The L1NativeTokenVault is NOT skipped wholesale (most of its storage is
+// deterministic); its single gas-dependent `bridgedOut[ETH]` slot is handled by
+// GAS_DEPENDENT_VALUE_SLOTS below instead.
 //
 // Everything NOT in this set is still storage-compared exactly, so real drift in
 // the bridgehub, CTM, bridges, NTV, tokens, etc. is still caught.
@@ -79,14 +82,13 @@ function collectSkipStorageAccounts(versionDir: string): Set<string> {
   const p = path.join(versionDir, "addresses.json");
   if (!fs.existsSync(p)) return skip;
   const a = JSON.parse(fs.readFileSync(p, "utf-8")) as {
-    l1Addresses?: { messageRoot?: string; l1AssetTracker?: string };
+    l1Addresses?: { messageRoot?: string };
     chainAddresses?: Array<{ diamondProxy?: string }>;
   };
   const add = (v: unknown) => {
     if (typeof v === "string" && /^0x[0-9a-fA-F]{40}$/.test(v)) skip.add(v.toLowerCase());
   };
   add(a.l1Addresses?.messageRoot);
-  add(a.l1Addresses?.l1AssetTracker);
   for (const c of a.chainAddresses ?? []) add(c.diamondProxy);
   return skip;
 }
@@ -102,6 +104,31 @@ const BLOCK_NUMBER_STORAGE_SLOTS = new Set([
   "0xe12917faa952038297cceeb966eb4f054126fd0f1307df22b19432454cb24b37",
   "0xa1a0bcd6e1eb10e34e86589f0737ed295f21e2780238b04598ea22e184199ff6",
 ]);
+
+// Storage slots that hold a gas-cost-dependent ETH amount and therefore drift
+// run-to-run by the same tiny margin as a native balance (the harness bridges a
+// gas-dependent mintValue on L1->L2 deposits). They are compared with the same
+// BALANCE_TOLERANCE_WEI slack as native balances rather than skipped outright, so
+// large (real) drift is still caught. Before the asset trackers were removed this
+// drift lived in the L1AssetTracker, whose storage was skipped wholesale; it now
+// lives in the L1NativeTokenVault's `bridgedOut[ETH]` entry.
+//   slot = keccak256(abi.encode(ethAssetId, 253)), where 253 is the `bridgedOut`
+//   mapping's storage index. Recompute with `cast index bytes32 <ethAssetId> 253`
+//   if the L1NativeTokenVault layout changes.
+const GAS_DEPENDENT_VALUE_SLOTS = new Set(["0xa779570f23bf75d0370baade00c3f15fe23265e729cfb55c61a10ccf98dc7093"]);
+
+// True when two raw storage words differ by no more than the native-balance
+// tolerance (used only for slots known to hold a gas-dependent ETH amount).
+function withinBalanceTolerance(v1?: string, v2?: string): boolean {
+  try {
+    const a = BigInt(v1 ?? "0x0");
+    const b = BigInt(v2 ?? "0x0");
+    const diff = a > b ? a - b : b - a;
+    return diff <= BALANCE_TOLERANCE_WEI;
+  } catch {
+    return false;
+  }
+}
 
 interface ChainStateAccount {
   nonce?: number;
@@ -174,16 +201,21 @@ function compareChainState(
     }
 
     // Skip storage for batch-indexed / fee-dependent contracts (MessageRoots,
-    // chain diamonds, asset tracker): their state tracks the non-deterministic
-    // block count / gas cost.
+    // chain diamonds): their state tracks the non-deterministic block count.
     if (!skipStorageAccounts.has(addr.toLowerCase())) {
       const s1 = a1.storage || {};
       const s2 = a2.storage || {};
       if (JSON.stringify(s1) !== JSON.stringify(s2)) {
         const allSlots = [...new Set([...Object.keys(s1), ...Object.keys(s2)])].sort();
-        // Drop the explicitly-listed block-number slots (see above); everything
-        // else must match exactly.
-        const diffSlots = allSlots.filter((s) => s1[s] !== s2[s] && !BLOCK_NUMBER_STORAGE_SLOTS.has(s));
+        // Drop the explicitly-listed block-number slots (see above) and tolerate
+        // gas-scale drift on the known gas-dependent value slots; everything else
+        // must match exactly.
+        const diffSlots = allSlots.filter((s) => {
+          if (s1[s] === s2[s]) return false;
+          if (BLOCK_NUMBER_STORAGE_SLOTS.has(s)) return false;
+          if (GAS_DEPENDENT_VALUE_SLOTS.has(s) && withinBalanceTolerance(s1[s], s2[s])) return false;
+          return true;
+        });
         if (diffSlots.length > 0) {
           diffs.push(`  ${name}: account ${addr} storage differs in ${diffSlots.length} slot(s)`);
           for (const slot of diffSlots.slice(0, 5)) {

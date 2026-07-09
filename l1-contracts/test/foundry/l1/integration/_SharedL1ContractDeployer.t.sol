@@ -9,7 +9,6 @@ import {RegisterCTM} from "../../../../deploy-scripts/ecosystem/RegisterCTM.s.so
 import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -34,7 +33,6 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         IInteropCenter interopCenter;
         CTMDeploymentTracker ctmDeploymentTracker;
         L1AssetRouter sharedBridge;
-        L1AssetTracker l1AssetTracker;
         L1Nullifier l1Nullifier;
         L1NativeTokenVault l1NativeTokenVault;
         IChainTypeManager chainTypeManager;

@@ -19,11 +19,6 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {AlreadyCurrentSL, NotChainAssetHandler} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {TokenBridgingData} from "contracts/common/Messaging.sol";
-import {GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-
-contract DummyGWAssetTracker {
-    function registerBaseTokenOnGateway(TokenBridgingData calldata) external {}
-}
 
 contract BridgehubBase_Extended_Test is Test {
     L1Bridgehub bridgehub;
@@ -347,8 +342,6 @@ contract BridgehubBase_Extended_Test is Test {
         });
 
         // First call to set up the chain on this settlement layer
-        DummyGWAssetTracker dummyTracker = new DummyGWAssetTracker();
-        vm.etch(GW_ASSET_TRACKER_ADDR, address(dummyTracker).code);
         vm.prank(chainAssetHandler);
         bridgehub.forwardedBridgeMint(ctmAssetId, chainId, baseTokenBridgingData);
 

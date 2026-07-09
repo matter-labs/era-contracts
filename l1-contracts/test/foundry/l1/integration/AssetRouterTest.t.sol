@@ -36,7 +36,6 @@ import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
 import {BridgedStandardERC20, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 
@@ -92,21 +91,8 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         }
     }
 
-    function _setAssetTrackerChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(eraZKChainId, _token);
-        if (address(addresses.l1AssetTracker) != address(0)) {
-            stdstore
-                .target(address(addresses.l1AssetTracker))
-                .sig(IAssetTrackerBase.chainBalance.selector)
-                .with_key(_chainId)
-                .with_key(assetId)
-                .checked_write(_value);
-        }
-    }
-
     function setUp() public {
         prepare();
-        bytes32 ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(eraZKChainId, ETH_TOKEN_ADDRESS);
 
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler),
@@ -119,15 +105,6 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             abi.encode(10)
         );
 
-        _setAssetTrackerChainBalance(eraZKChainId, ETH_TOKEN_ADDRESS, 1e30);
-        _setAssetTrackerChainBalance(506, ETH_TOKEN_ADDRESS, 1e30);
-        bytes32 ethAssetId = 0x8df3463b1850eb1d8d1847743ea155aef6b16074db8ba81d897dc30554fb2085;
-        stdstore
-            .target(address(ecosystemAddresses.bridgehub.proxies.assetTracker))
-            .sig(IAssetTrackerBase.chainBalance.selector)
-            .with_key(eraZKChainId)
-            .with_key(ETH_TOKEN_ASSET_ID)
-            .checked_write(100);
         vm.prank(Ownable2StepUpgradeable(addresses.l1NativeTokenVault).pendingOwner());
         Ownable2StepUpgradeable(addresses.l1NativeTokenVault).acceptOwnership();
     }
