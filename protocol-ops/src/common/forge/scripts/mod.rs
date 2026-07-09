@@ -243,7 +243,7 @@ script_calls! {
     AdminFunctionsAbi::ensureCtmsAndProxyAdminsOwnedByGovernanceWithWrapsCall => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::ensureOwnable2StepTargetsOwnedByGovernanceWithWrapsCall => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::executeOwnableCallsWithWrapsCall                 => ADMIN_FUNCTIONS_INVOCATION,
-    AdminFunctionsAbi::executeCtmAdminMulticallCall                     => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::executeChainAdminMulticallCall                  => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::upgradeChainFromCTMCall                          => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::upgradeChainFromCTMAndSetDAValidatorPairCall     => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::updateValidatorCall                              => ADMIN_FUNCTIONS_INVOCATION,

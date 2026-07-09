@@ -402,7 +402,7 @@
   },
   {
     "type": "function",
-    "name": "executeCtmAdminMulticall",
+    "name": "executeChainAdminMulticall",
     "inputs": [
       {
         "name": "_callsToExecute",

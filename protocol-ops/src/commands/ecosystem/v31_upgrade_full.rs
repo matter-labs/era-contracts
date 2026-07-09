@@ -176,7 +176,7 @@ impl<'a> V31UpgradeFull<'a> {
 
             // ServerNotifier ProxyAdmin upgrade (+ deferred acceptOwnership when the
             // ServerNotifier's ownership was transferred to this ChainAdmin) executed
-            // as a single ChainAdmin.multicall — see `executeCtmAdminMulticall`.
+            // as a single ChainAdmin.multicall — see `executeChainAdminMulticall`.
             let sn_calls =
                 hex::decode(admin_calls.server_notifier_upgrade.trim_start_matches("0x"))
                     .with_context(|| {
@@ -191,7 +191,7 @@ impl<'a> V31UpgradeFull<'a> {
             ));
             runner.run(
                 runner
-                    .script_call(AdminFunctionsAbi::executeCtmAdminMulticallCall {
+                    .script_call(AdminFunctionsAbi::executeChainAdminMulticallCall {
                         _callsToExecute: Bytes::from(sn_calls),
                         _chainAdmin: admin_calls.chain_admin,
                     })
@@ -214,7 +214,7 @@ impl<'a> V31UpgradeFull<'a> {
                 ));
                 runner.run(
                     runner
-                        .script_call(AdminFunctionsAbi::executeCtmAdminMulticallCall {
+                        .script_call(AdminFunctionsAbi::executeChainAdminMulticallCall {
                             _callsToExecute: Bytes::from(vh_calls),
                             _chainAdmin: vh_admin,
                         })

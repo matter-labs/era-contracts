@@ -424,7 +424,7 @@ contract AdminFunctions is Script, IAdminFunctions {
     /// current owner and revert. It also mirrors exactly how the transaction
     /// simulator encodes a `ctm_admin_calls` entry (one `ChainAdmin.multicall`),
     /// keeping the prepare broadcast and the sim bundle byte-identical.
-    function executeCtmAdminMulticall(bytes memory _callsToExecute, address _chainAdmin) public {
+    function executeChainAdminMulticall(bytes memory _callsToExecute, address _chainAdmin) public {
         Call[] memory calls = abi.decode(_callsToExecute, (Call[]));
         if (calls.length == 0) {
             return;
