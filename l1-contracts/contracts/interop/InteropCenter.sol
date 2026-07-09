@@ -255,7 +255,7 @@ contract InteropCenter is
         // slither-disable-next-line unused-return
         (uint256 destinationChainId, ) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
 
-        // Ensure the destination is valid: L2->L2, or an L2->L1 withdrawal expressed as a single-call bundle.
+        // Ensure the destination is valid: L2->L2, or an L2->L1 bundle expressed as a single call (canonically a withdrawal).
         _ensureValidDestination(destinationChainId, _callStarters.length);
         InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](
             _callStarters.length
@@ -345,8 +345,8 @@ contract InteropCenter is
     /// @notice Validates the bundle destination.
     /// @dev The InteropCenter only runs on L2s (never on L1 itself). Destinations may be:
     ///      - another L2 (the classic L2->L2 interop), or
-    ///      - L1, but only for a single-call bundle (an L2->L1 asset withdrawal). Multi-call bundles to L1
-    ///        are not supported, since an L1 withdrawal corresponds to exactly one finalizeDeposit call.
+    ///      - L1, but only for a single-call bundle (canonically an L2->L1 asset withdrawal). Multi-call
+    ///        bundles to L1 are not supported; an L1-destined bundle is exactly one indirect, zero-value call.
     /// @dev The destination must not be this chain itself: a chain can end up registered for interop on
     ///      its own Bridgehub, and a self-destination bundle would burn value into a self-bridging
     ///      accounting path that is not supported.
@@ -366,7 +366,7 @@ contract InteropCenter is
     }
 
     /// @notice Strict L2->L2 destination check used by the generic single-message `sendMessage` entry point.
-    /// @dev Unlike `_ensureValidDestination`, this never allows an L1 destination; the L2->L1 withdrawal path
+    /// @dev Unlike `_ensureValidDestination`, this never allows an L1 destination; the L2->L1 path
     /// goes through `sendBundle` (single-call bundle) instead.
     function _ensureL2ToL2(uint256 _destinationChainId) internal view {
         require(
@@ -379,7 +379,7 @@ contract InteropCenter is
     /// @notice Ensures the received base token value matches expected for the destination chain
     /// @dev Handles fee collection based on useFixedFee flag. When useFixedFee is true, no base token fee is charged.
     /// @dev When useFixedFee is false, interopProtocolFee is charged in base tokens.
-    /// @dev L2->L1 withdrawals (destination is L1) are not interop and are free: no protocol fee is charged.
+    /// @dev L2->L1 bundles (destination is L1) are not interop and are free: no protocol fee is charged.
     /// @param _destinationChainId Destination chain ID.
     /// @param _totalBurnedCallsValue Sum of requested interop call values.
     /// @param _totalIndirectCallsValue Sum of requested indirect call values.
@@ -461,7 +461,7 @@ contract InteropCenter is
         isInteropBundleSaltUsed[msg.sender][_bundleAttributes.salt] = true;
 
         // Form an InteropBundle.
-        // For an L2->L1 withdrawal the L1 chain is not registered as an interop destination in the
+        // For an L2->L1 bundle the L1 chain is not registered as an interop destination in the
         // L2 Bridgehub, so `baseTokenAssetId(L1_CHAIN_ID)` is unset. L1's base token is ETH, so the
         // destination base token asset id is the L1-native ETH asset id (which is NOT necessarily this
         // L2's base token — they only coincide on ETH-based chains). This value drives the
@@ -495,10 +495,11 @@ contract InteropCenter is
         uint256 callStartersLength = _callStarters.length;
         for (uint256 i = 0; i < callStartersLength; ++i) {
             if (_destinationChainId == L1_CHAIN_ID) {
-                // An L2->L1 withdrawal is executed by the L1InteropHandler, whose call target (the L1
-                // asset router) only accepts an indirect asset-router `finalizeDeposit` call with no
-                // destination-side value (see `L1AssetRouter.receiveMessage`). Reject anything else at
-                // send time — otherwise the burned funds would end up in an unfinalizable bundle.
+                // An L1-destined call is executed by the L1InteropHandler, which invokes ERC-7786
+                // `receiveMessage` on the call target. The target is general (the canonical case is an
+                // L2->L1 withdrawal targeting the L1 asset router's `finalizeDeposit`), but the call must be
+                // indirect with no destination-side value. Rejecting direct/value-bearing calls at send time
+                // prevents burned funds from ending up in an unfinalizable bundle.
                 require(_callStarters[i].callAttributes.indirectCall, DirectCallToL1NotSupported());
                 require(
                     _callStarters[i].callAttributes.interopCallValue == 0,
@@ -517,7 +518,7 @@ contract InteropCenter is
         // If using fixed fees, collect ZK tokens per-call and accumulate for coinbase.
         // Coinbase can later claim via claimZKFees().
         // This is handled to not allow malicious operator to fail sending bundles by providing malicious coinbase.
-        // L2->L1 withdrawals are not interop and are free: no fixed ZK fee is collected for them.
+        // L2->L1 bundles are not interop and are free: no fixed ZK fee is collected for them.
         if (_bundleAttributes.useFixedFee && _destinationChainId != L1_CHAIN_ID) {
             uint256 totalZKFee = ZK_INTEROP_FEE * callStartersLength;
             _getZKToken().safeTransferFrom(msg.sender, address(this), totalZKFee);

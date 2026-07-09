@@ -13,10 +13,11 @@ import {InteropWithdrawalNonZeroValue} from "../../bridge/L1BridgeContractErrors
 /// @title L1InteropHandler
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice L1-side interop handler. It executes L2 -> L1 withdrawal bundles through the shared
-/// `InteropHandlerBase.executeBundle` interface (symmetric to the L2 `L2InteropHandler`): a withdrawal is a
-/// single-call interop bundle emitted by the L2 InteropCenter whose only call targets the L1 asset router's
-/// `finalizeDeposit` via ERC-7786 `receiveMessage`.
+/// @notice L1-side interop handler. It executes L2 -> L1 interop bundles through the shared
+/// `InteropHandlerBase.executeBundle` interface (symmetric to the L2 `L2InteropHandler`). An L1-destined bundle
+/// is a single indirect, zero-value call (enforced at send time by the L2 InteropCenter) delivered to its target
+/// on L1 via ERC-7786 `receiveMessage`. The target and payload are general: the canonical use is an L2 -> L1
+/// withdrawal (the call targets the L1 asset router's `finalizeDeposit`), but any single such call is allowed.
 /// @dev Deployed behind a proxy on L1.
 contract L1InteropHandler is InteropHandlerBase {
     /// @dev MessageRoot smart contract that is used to prove message inclusion.
@@ -36,7 +37,7 @@ contract L1InteropHandler is InteropHandlerBase {
     }
 
     /// @inheritdoc InteropHandlerBase
-    /// @dev Proves the withdrawal bundle's inclusion via the L1 MessageRoot.
+    /// @dev Proves the bundle's inclusion via the L1 MessageRoot.
     function _proveInclusion(MessageInclusionProof memory _proof) internal override returns (bool) {
         return
             MESSAGE_ROOT.proveL2MessageInclusionShared({
@@ -49,13 +50,14 @@ contract L1InteropHandler is InteropHandlerBase {
     }
 
     /// @inheritdoc InteropHandlerBase
-    /// @dev Withdrawals carry the amount inside the `finalizeDeposit` transfer data, never as call value.
+    /// @dev L1-destined calls carry no base-token call value; any transferred amount rides inside the call
+    /// payload (e.g. a withdrawal's `finalizeDeposit` transfer data).
     function _handleCallValue(uint256 _value, uint256 /* _sourceChainId */) internal pure override {
         require(_value == 0, InteropWithdrawalNonZeroValue(_value));
     }
 
     /// @inheritdoc InteropHandlerBase
-    /// @dev On L1 the base token is ETH; withdrawal bundles destined for L1 carry L1's ETH asset ID.
+    /// @dev On L1 the base token is ETH; bundles destined for L1 carry L1's ETH asset ID.
     function _expectedDestinationBaseTokenAssetId() internal view override returns (bytes32) {
         return DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
     }
