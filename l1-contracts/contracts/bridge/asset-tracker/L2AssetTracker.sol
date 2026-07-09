@@ -259,6 +259,34 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
         _handleInitiateBridgingOnL2Inner(_toChainId, baseTokenAssetId, _amount, baseTokenOriginChainId);
     }
 
+    /// @notice Reverses the accounting of a previous {handleInitiateBaseTokenBridgingOnL2}, used when an
+    /// atomic-interop value leg times out and its base-token value is refunded on the source chain.
+    /// @dev The exact arithmetic inverse of {_handleInitiateBridgingOnL2Inner} for the base token: it
+    /// re-credits `chainBalance` iff the base token is native to this chain, and un-counts the pending
+    /// withdrawal iff the value was bridged towards L1 under L1 settlement. The token is already
+    /// registered (it was registered at initiate time), so no legacy-token registration is needed.
+    /// @param _toChainId The chain ID the funds were originally sent to.
+    /// @param _amount The amount of base tokens being refunded.
+    function handleRevertInitiateBaseTokenBridgingOnL2(
+        uint256 _toChainId,
+        uint256 _amount
+    ) external onlyBaseTokenHolder {
+        bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
+        uint256 baseTokenOriginChainId = L2_NATIVE_TOKEN_VAULT.originChainId(baseTokenAssetId);
+
+        if (baseTokenOriginChainId == block.chainid) {
+            /// On the L2 we only save chainBalance for native tokens. Inverse of `_decreaseChainBalance`.
+            chainBalance[block.chainid][baseTokenAssetId] += _amount;
+        }
+
+        if (
+            _toChainId == L1_CHAIN_ID &&
+            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == L1_CHAIN_ID
+        ) {
+            interopInfo[baseTokenAssetId].totalWithdrawalsToL1 -= _amount;
+        }
+    }
+
     /// @notice Handles the finalization of incoming token bridging operations on L2.
     /// @dev This function is called when tokens are bridged into this L2 from another chain.
     /// @param _fromChainId The source chain id of the transfer.

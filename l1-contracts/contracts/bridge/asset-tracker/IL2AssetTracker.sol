@@ -46,6 +46,8 @@ interface IL2AssetTracker {
 
     function handleInitiateBaseTokenBridgingOnL2(uint256 _maybeToBlockChainId, uint256 _amount) external;
 
+    function handleRevertInitiateBaseTokenBridgingOnL2(uint256 _toChainId, uint256 _amount) external;
+
     function handleFinalizeBaseTokenBridgingOnL2(uint256 _fromChainId, uint256 _amount) external;
 
     function handleFinalizeBridgingOnL2(

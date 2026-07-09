@@ -232,6 +232,30 @@ abstract contract NativeTokenVaultBase is
         emit BridgeRecoverFailedTransfer(_chainId, _assetId, originalCaller, amount);
     }
 
+    /// @inheritdoc INativeTokenVaultBase
+    /// @dev Reuses {_disburseFailedTransfer} for the different-base-token atomic-interop refund path. The
+    /// base-token deposit (`bridgehubDepositBaseToken`) burned `_amount` of `_assetId` from the depositor
+    /// without keeping bridge-mint data, so we reconstruct the disburse from primitives: the asset is
+    /// already registered (it was burned from the depositor), hence the origin-token/erc20 params are dead.
+    function bridgeRecoverBaseToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _receiver,
+        uint256 _amount
+    ) external override onlyAssetRouter whenNotPaused {
+        _disburseFailedTransfer({
+            _chainId: _chainId,
+            _assetId: _assetId,
+            _receiver: _receiver,
+            _amount: _amount,
+            _isNative: originChainId[_assetId] == block.chainid,
+            _originToken: address(0),
+            _erc20Data: ""
+        });
+        // solhint-disable-next-line func-named-parameters
+        emit BridgeRecoverFailedTransfer(_chainId, _assetId, _receiver, _amount);
+    }
+
     /// @notice Mints/releases a bridged-in asset to the receiver and decreases the chain balance.
     /// @dev Unifies the native and bridged-token paths. A bridged token is minted (and deployed on first
     /// bridging if needed); a native token's escrowed funds are released via `_withdrawFunds`.

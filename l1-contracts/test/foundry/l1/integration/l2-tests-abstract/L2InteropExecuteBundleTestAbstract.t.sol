@@ -12,7 +12,8 @@ import {
     L2_INTEROP_HANDLER,
     L2_INTEROP_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {InteropBundle, MessageInclusionProof} from "contracts/common/Messaging.sol";
+import {InteropBundle} from "contracts/common/Messaging.sol";
+import {AtomicFinalityProof} from "contracts/atomic-interop/IAtomicInterop.sol";
 
 import {BundleExecutionResult, L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
@@ -42,7 +43,9 @@ abstract contract L2InteropExecuteBundleTestAbstract is L2InteropTestUtils {
         assertTrue(interopBundle.calls.length > 0, "Bundle should contain calls");
 
         bytes memory bundle = abi.encode(interopBundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR, block.chainid);
+        // Atomic interop: the destination-side finality is proven via the AtomicFlowManager IMT gate
+        // (mocked in these unit tests), so a default AtomicFinalityProof suffices in the rescue payload.
+        AtomicFinalityProof memory proof;
 
         vm.recordLogs();
 

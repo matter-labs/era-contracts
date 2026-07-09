@@ -334,6 +334,23 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         return true;
     }
 
+    /// @notice Refunds a timed-out atomic-interop value leg that was funded via the different-base-token
+    /// path (`bridgehubDepositBaseToken`), re-crediting the destination base-token asset to the depositor.
+    /// @dev Manager-gated wrapper symmetric with {bridgehubDepositBaseToken}; forwards to the NTV, which
+    /// reverses the `bridgeBurn` done at send time.
+    /// @param _chainId The chain the asset was being bridged to at burn time.
+    /// @param _assetId The destination base-token asset id that was burned.
+    /// @param _receiver The original depositor to refund.
+    /// @param _amount The amount to recover.
+    function bridgehubRecoverBaseToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _receiver,
+        uint256 _amount
+    ) external onlyAtomicFlowManager nonReentrant {
+        IL2NativeTokenVault(_nativeTokenVaultAddr()).bridgeRecoverBaseToken(_chainId, _assetId, _receiver, _amount);
+    }
+
     /// @inheritdoc IL2CrossChainSender
     function initiateIndirectCall(
         uint256 _chainId,

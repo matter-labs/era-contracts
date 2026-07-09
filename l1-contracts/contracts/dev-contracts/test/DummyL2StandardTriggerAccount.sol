@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IInteropHandler} from "../../interop/IInteropHandler.sol";
 import {L2Message, MessageInclusionProof} from "../../common/Messaging.sol";
+import {AtomicFinalityProof} from "../../atomic-interop/IAtomicInterop.sol";
 import {GasFields, InteropTrigger, TRIGGER_IDENTIFIER} from "./Utils.sol";
 import {L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_VERIFICATION} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {Transaction} from "../../common/l2-helpers/L2ContractHelper.sol";
@@ -57,15 +58,15 @@ contract DummyL2StandardTriggerAccount {
                 _transaction.signature,
                 (bytes, bytes, address, address, bytes)
             );
-            MessageInclusionProof memory paymasterInclusionProof = abi.decode(paymasterProof, (MessageInclusionProof));
-            L2_INTEROP_HANDLER.executeBundle(paymasterBundle, paymasterInclusionProof);
+            AtomicFinalityProof memory paymasterFinality = abi.decode(paymasterProof, (AtomicFinalityProof));
+            L2_INTEROP_HANDLER.executeBundle(paymasterBundle, paymasterFinality);
         }
 
         /// execution bundle
         {
             (bytes memory executionBundle, bytes memory executionProof) = abi.decode(_transaction.data, (bytes, bytes));
-            MessageInclusionProof memory executionInclusionProof = abi.decode(executionProof, (MessageInclusionProof));
-            L2_INTEROP_HANDLER.executeBundle(executionBundle, executionInclusionProof);
+            AtomicFinalityProof memory executionFinality = abi.decode(executionProof, (AtomicFinalityProof));
+            L2_INTEROP_HANDLER.executeBundle(executionBundle, executionFinality);
         }
         return true;
     }

@@ -70,7 +70,10 @@ const ANVIL_INTEROP_PROTOCOL_FEE = BigNumber.from(ANVIL_INTEROP_PROTOCOL_FEE_WEI
  *
  * Topology: gwSettledChainIds[0] = source, gwSettledChainIds[1] = destination
  */
-describe("07 - Interop Bundles (GW-settled chains)", function () {
+// SKIPPED: public interop (L1-published bundles executed via MessageInclusionProof) was removed; all
+// interop is now atomic. Rewriting this spec onto the atomic IMT path (like 13-imt-atomic-swap) plus
+// regenerating the dumped chain states is a tracked follow-up.
+describe.skip("07 - Interop Bundles (GW-settled chains)", function () {
   this.timeout(0);
 
   const runner = new DeploymentRunner();

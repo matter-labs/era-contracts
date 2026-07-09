@@ -2,7 +2,6 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-bytes1 constant BUNDLE_IDENTIFIER = 0x01;
 bytes1 constant INTEROP_BUNDLE_VERSION = 0x01;
 bytes1 constant INTEROP_CALL_VERSION = 0x01;
 
@@ -289,7 +288,7 @@ enum BundleStatus {
 /// @param chainId Source chain identifier.
 /// @param l1BatchNumber Batch number on L1 where the message root was committed.
 /// @param l2MessageIndex Position in the L2 logs Merkle tree of this message.
-/// @param message The raw L2 message payload (including `BUNDLE_IDENTIFIER` prefix).
+/// @param message The raw L2 message payload.
 /// @param proof Merkle‐proof for verifying the message inclusion.
 struct MessageInclusionProof {
     uint256 chainId;

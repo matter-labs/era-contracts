@@ -16,14 +16,12 @@ import {
     L2_BASE_TOKEN_HOLDER,
     L2_BRIDGEHUB,
     L2_COMPLEX_UPGRADER_ADDR,
-    L2_NATIVE_TOKEN_VAULT,
-    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
+    L2_NATIVE_TOKEN_VAULT
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 
 import {SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_INTEROP_ATTRIBUTES} from "../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_ATOMIC_FLOW_MANAGER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {
-    BUNDLE_IDENTIFIER,
     BundleAttributes,
     CallAttributes,
     INTEROP_BUNDLE_VERSION,
@@ -36,7 +34,7 @@ import {
 import {MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 import {
-    AtomicBundleCallCarriesValue,
+    NonAtomicSendUnsupported,
     AttributeAlreadySet,
     AttributeViolatesRestriction,
     DestinationChainNotRegistered,
@@ -138,13 +136,13 @@ contract InteropCenter is
         _;
     }
 
-    /// @notice Returns the asset router address. Virtual to allow override in private interop.
-    function _assetRouterAddr() internal view virtual returns (address) {
+    /// @notice Returns the asset router address.
+    function _assetRouterAddr() internal view returns (address) {
         return L2_ASSET_ROUTER_ADDR;
     }
 
-    /// @notice Returns the native token vault. Virtual to allow override in private interop.
-    function _nativeTokenVault() internal view virtual returns (IL2NativeTokenVault) {
+    /// @notice Returns the native token vault.
+    function _nativeTokenVault() internal view returns (IL2NativeTokenVault) {
         return IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT);
     }
 
@@ -236,13 +234,16 @@ contract InteropCenter is
         bytes[][] memory originalCallAttributes = new bytes[][](1);
         originalCallAttributes[0] = attributes;
 
-        // This single-call send path is never atomic; pass an empty AtomicSend (publishes to L1 as usual).
+        // Every send is atomic now (public interop was removed). A single-call send is a valid
+        // single-leg atomic flow: it must carry the `atomicBundle` attribute like any other send.
+        AtomicSend memory atomicSend = _parseAtomicSend(attributes);
+
         bytes32 bundleHash = _sendBundle({
             _destinationChainId: recipientChainId,
             _callStarters: callStartersInternal,
             _bundleAttributes: bundleAttributes,
             _originalCallAttributes: originalCallAttributes,
-            _atomicSend: AtomicSend({flowId: bytes32(0), lowNullifierIndex: 0, deadline: 0, isAtomic: false})
+            _atomicSend: atomicSend
         });
 
         // We return the sendId of the only message that was sent in the bundle above. We always send messages in bundles, even if there's only one message being sent.
@@ -493,12 +494,11 @@ contract InteropCenter is
             _callCount: callStartersLength
         });
 
-        // Hash the bundle and dispatch it: an atomic bundle (one carrying the `atomicBundle` attribute)
-        // is appended to the interop IMT via the AtomicFlowManager and is NOT published to L1; a normal
-        // bundle is published to L1. The atomic send metadata travels out-of-band (`_atomicSend`), not
-        // embedded in the bundle, so `bundleHash` does not depend on `flowId` (a circular dependency).
-        bytes32 msgHash;
-        (bundleHash, msgHash) = _dispatchBundle(bundle, _atomicSend);
+        // Hash the bundle and dispatch it: its commit value is appended to the interop IMT via the
+        // AtomicFlowManager (interop is atomic-only). The atomic send metadata travels out-of-band
+        // (`_atomicSend`), not embedded in the bundle, so `bundleHash` does not depend on `flowId`
+        // (a circular dependency).
+        bundleHash = _dispatchBundle(bundle, _atomicSend);
 
         _emitMessageSent({
             _calls: bundle.calls,
@@ -508,8 +508,9 @@ contract InteropCenter is
             _originalCallAttributes: _originalCallAttributes
         });
 
-        // Emit event stating that the bundle was sent out successfully.
-        emit InteropBundleSent(msgHash, bundleHash, bundle);
+        // Emit event stating that the bundle was sent out successfully. Atomic bundles are never
+        // published to L1, so there is no L2->L1 message hash.
+        emit InteropBundleSent(bytes32(0), bundleHash, bundle);
     }
 
     /// @notice Returns the base token asset ID for the destination chain. Override for pre-v31 chains.
@@ -544,63 +545,33 @@ contract InteropCenter is
         );
     }
 
-    /// @notice Sends the bundle message to L1. Override in private interop to send hash-only format.
-    /// @return msgHash The hash returned by the L2→L1 messenger.
-    function _sendBundleToL1(
-        bytes memory _interopBundleBytes,
-        uint256 /* _callCount */
-    ) internal virtual returns (bytes32 msgHash) {
-        msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(BUNDLE_IDENTIFIER, _interopBundleBytes));
-    }
-
-    /// @notice Hashes the bundle and dispatches it. An atomic bundle (`_atomicSend.isAtomic`) has its
-    /// commit value appended to the interop IMT via the {AtomicFlowManager} and is NOT published to L1
-    /// — the burn already happened through the normal `initiateIndirectCall` path, and the destination
-    /// executes it via {InteropHandler.executeAtomicBundle}. A normal bundle is published to L1 via
-    /// {_sendBundleToL1}.
+    /// @notice Hashes the bundle and dispatches it. All interop is atomic: the bundle's commit value is
+    /// appended to the interop IMT via the {AtomicFlowManager} and is NOT published to L1 — the burn
+    /// already happened through the normal `initiateIndirectCall` path, and the destination executes it
+    /// via {InteropHandler.executeBundle}. Native-`value` legs are allowed; they are refunded on timeout
+    /// via {AtomicFlowManager._recoverBundle}.
     /// @dev `_atomicSend` (flowId/deadline/lowNullifierIndex) is passed out-of-band and is intentionally
     /// NOT embedded in `_bundle`, so `bundleHash` is independent of `flowId`. This is required:
     /// `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`
     /// must be computable off-chain before the send, which is impossible if a `bundleHash` (a flowId
-    /// input) embedded `flowId`.
+    /// input) embedded `flowId`. Reverts with {NonAtomicSendUnsupported} if the `atomicBundle` attribute
+    /// is missing — public (L1-published) interop has been removed.
     function _dispatchBundle(
         InteropBundle memory _bundle,
         AtomicSend memory _atomicSend
-    ) internal returns (bytes32 bundleHash, bytes32 msgHash) {
+    ) internal returns (bytes32 bundleHash) {
         bytes memory interopBundleBytes = abi.encode(_bundle);
         bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
 
-        if (_atomicSend.isAtomic) {
-            // Reject legs carrying irreversible native `value` before committing; timeout recovery is
-            // otherwise best-effort (see {AtomicFlowManager._recoverBundle}).
-            _validateAtomicBundle(_bundle);
-            IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
-                _flowId: _atomicSend.flowId,
-                _bundleHash: bundleHash,
-                _deadline: _atomicSend.deadline,
-                _lowNullifierIndex: _atomicSend.lowNullifierIndex
-            });
-        } else {
-            msgHash = _sendBundleToL1(interopBundleBytes, _bundle.calls.length);
+        if (!_atomicSend.isAtomic) {
+            revert NonAtomicSendUnsupported();
         }
-    }
-
-    /// @notice Rejects atomic-bundle calls that carry native base-token `value`. Such a leg is bridged via
-    /// the base-token holder, which {IAtomicRecoverable.recoverAtomicCall} cannot reverse, so it would lock
-    /// on timeout with no way to return the funds. Everything else is allowed: an atomic bundle may mix
-    /// recoverable fund calls (asset-router deposits) with calls that move no funds (e.g. flipping a flag),
-    /// and timeout recovery is best-effort (see {AtomicFlowManager._recoverBundle}). Refund safety for a
-    /// fund-moving leg is therefore the flow author's responsibility; only native-`value` legs — which no
-    /// one can reverse — are blocked here.
-    /// @dev `pure`, since it inspects only the bundle's own calls. Every atomic send passes through
-    /// {_dispatchBundle}, so this covers all atomic bundles regardless of entry path.
-    function _validateAtomicBundle(InteropBundle memory _bundle) internal pure {
-        uint256 callsLength = _bundle.calls.length;
-        for (uint256 i = 0; i < callsLength; ++i) {
-            if (_bundle.calls[i].value != 0) {
-                revert AtomicBundleCallCarriesValue(i, _bundle.calls[i].value);
-            }
-        }
+        IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
+            _flowId: _atomicSend.flowId,
+            _bundleHash: bundleHash,
+            _deadline: _atomicSend.deadline,
+            _lowNullifierIndex: _atomicSend.lowNullifierIndex
+        });
     }
 
     /// @notice Emits ERC-7786 MessageSent events for each call in a bundle.

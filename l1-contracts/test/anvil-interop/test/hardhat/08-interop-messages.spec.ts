@@ -54,7 +54,10 @@ const ANVIL_INTEROP_PROTOCOL_FEE = ethers.BigNumber.from(ANVIL_INTEROP_PROTOCOL_
  *
  * Topology: gwSettledChainIds[0] = source, gwSettledChainIds[1] = destination
  */
-describe("08 - Interop Messages (GW-settled chains)", function () {
+// SKIPPED: public interop (single-call sendMessage + MessageInclusionProof execution) was removed; all
+// interop is now atomic. Rewriting this spec onto the atomic IMT path plus regenerating the dumped chain
+// states is a tracked follow-up.
+describe.skip("08 - Interop Messages (GW-settled chains)", function () {
   this.timeout(0);
 
   const runner = new DeploymentRunner();

@@ -11,11 +11,13 @@ import {
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_HANDLER,
     L2_INTEROP_HANDLER_ADDR,
-    L2_MESSAGE_VERIFICATION,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
-import {InteropBundle, MessageInclusionProof} from "contracts/common/Messaging.sol";
+import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {InteropBundle} from "contracts/common/Messaging.sol";
+import {AtomicFinalityProof} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
+import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
@@ -32,6 +34,43 @@ struct BundleExecutionResult {
 abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
     uint256 destinationChainId = 271;
     bytes32 destinationBaseTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+
+    /// @dev Interop is atomic-only. On the send side `InteropCenter` calls
+    /// `AtomicFlowManager.append`, and on the destination side `InteropHandler` calls
+    /// `AtomicFlowManager.requireFlowFinalized`. The AtomicFlowManager is not deployed in these
+    /// unit-level Foundry tests (its IMT proof machinery is exercised end-to-end in the anvil-interop
+    /// atomic-swap spec), so we mock both (void) calls to succeed. This mock is scoped to the interop
+    /// test suites (which all extend {L2InteropTestUtils}) and is intentionally NOT placed in the shared
+    /// {SharedL2ContractDeployer} setUp, which many non-interop suites rely on.
+    function setUp() public virtual override {
+        super.setUp();
+        vm.mockCall(
+            L2_ATOMIC_FLOW_MANAGER_ADDR,
+            abi.encodeWithSelector(IAtomicFlowManager.append.selector),
+            ""
+        );
+        vm.mockCall(
+            L2_ATOMIC_FLOW_MANAGER_ADDR,
+            abi.encodeWithSelector(IAtomicFlowManager.requireFlowFinalized.selector),
+            ""
+        );
+    }
+
+    /// @notice Returns a copy of `_attrs` with the mandatory ERC-7786 `atomicBundle` attribute appended.
+    /// @dev Every interop send must be atomic (see {InteropCenter}); without this attribute the send
+    ///      reverts with `NonAtomicSendUnsupported`. The flow metadata is a placeholder because the
+    ///      `AtomicFlowManager.append` gate is mocked in setUp. Use this to wrap inline attribute arrays;
+    ///      arrays produced by {InteropLibrary.buildBundleAttributes} already include the attribute.
+    function _withAtomicBundle(bytes[] memory _attrs) internal pure returns (bytes[] memory out) {
+        out = new bytes[](_attrs.length + 1);
+        for (uint256 i = 0; i < _attrs.length; ++i) {
+            out[i] = _attrs[i];
+        }
+        out[_attrs.length] = abi.encodeCall(
+            IERC7786Attributes.atomicBundle,
+            (bytes32(uint256(1)), type(uint64).max, uint256(0))
+        );
+    }
 
     function extractAndExecuteSingleBundle(
         Vm.Log[] memory logs,
@@ -67,19 +106,22 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
             (bytes32, bytes32, InteropBundle)
         );
         bytes memory bundle = abi.encode(interopBundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR, block.chainid);
 
-        // Calculate bundle hash for assertions
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+        // Interop is atomic: the cross-chain binding is the bundle's own sourceChainId, and finality is
+        // proven via the AtomicFlowManager's IMT gate. We mock that gate to succeed here (the IMT-proof
+        // machinery is exercised end-to-end in the anvil-interop atomic-swap spec, not in these unit-level
+        // Foundry tests). A default AtomicFinalityProof suffices since the gate is mocked.
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
+        AtomicFinalityProof memory finality;
 
         vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
+            L2_ATOMIC_FLOW_MANAGER_ADDR,
+            abi.encodeWithSelector(IAtomicFlowManager.requireFlowFinalized.selector),
+            ""
         );
         vm.chainId(_destinationChainId);
         vm.prank(executionAddress);
-        L2_INTEROP_HANDLER.executeBundle(bundle, proof);
+        L2_INTEROP_HANDLER.executeBundle(bundle, finality);
 
         result = BundleExecutionResult({
             bundleHash: bundleHash,

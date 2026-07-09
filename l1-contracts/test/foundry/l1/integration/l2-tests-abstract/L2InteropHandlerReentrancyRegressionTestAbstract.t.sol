@@ -13,13 +13,11 @@ import {
     BundleAttributes,
     BundleStatus,
     CallStatus,
-    MessageInclusionProof,
-    L2Message,
     INTEROP_BUNDLE_VERSION,
     INTEROP_CALL_VERSION
 } from "contracts/common/Messaging.sol";
+import {AtomicFinalityProof} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
-import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 import {Reentrancy} from "contracts/common/L1ContractErrors.sol";
@@ -27,8 +25,7 @@ import {Reentrancy} from "contracts/common/L1ContractErrors.sol";
 import {
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_HANDLER,
-    L2_INTEROP_HANDLER_ADDR,
-    L2_MESSAGE_VERIFICATION
+    L2_INTEROP_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
@@ -57,20 +54,10 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
 
         // Create the inner payload for receiveMessage
         // We'll use verifyBundle selector with empty data - it will fail validation
-        // but the key is it shouldn't fail due to reentrancy
-        bytes memory innerPayload = abi.encodeCall(
-            IInteropHandler.verifyBundle,
-            (
-                new bytes(0),
-                MessageInclusionProof({
-                    chainId: sourceChainId,
-                    l1BatchNumber: 0,
-                    l2MessageIndex: 0,
-                    message: L2Message({txNumberInBatch: 0, sender: L2_INTEROP_CENTER_ADDR, data: new bytes(0)}),
-                    proof: new bytes32[](0)
-                })
-            )
-        );
+        // but the key is it shouldn't fail due to reentrancy. Atomic interop: a default
+        // AtomicFinalityProof suffices (the finality gate is mocked in setUp).
+        AtomicFinalityProof memory innerFinality;
+        bytes memory innerPayload = abi.encodeCall(IInteropHandler.verifyBundle, (new bytes(0), innerFinality));
 
         // Create the outer bundle that calls receiveMessage on InteropHandler
         InteropCall[] memory calls = new InteropCall[](1);
@@ -94,14 +81,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         });
 
         bytes memory encodedBundle = abi.encode(bundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
-
-        // Mock the message verification to return true
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
+        AtomicFinalityProof memory proof;
 
         // Switch to destination chain
         vm.chainId(destinationChainId);
@@ -156,7 +136,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         });
 
         bytes memory encodedInnerBundle = abi.encode(innerBundle);
-        MessageInclusionProof memory innerProof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
+        AtomicFinalityProof memory innerProof;
 
         // Payload for receiveMessage that dispatches to executeBundle(innerBundle)
         bytes memory innerPayload = abi.encodeCall(IInteropHandler.executeBundle, (encodedInnerBundle, innerProof));
@@ -184,14 +164,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         });
 
         bytes memory encodedOuterBundle = abi.encode(outerBundle);
-        MessageInclusionProof memory outerProof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
-
-        // Mock the message verification to return true
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
+        AtomicFinalityProof memory outerProof;
 
         // Mock receiveMessage on recipient to return correct selector
         vm.mockCall(
@@ -245,7 +218,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         });
 
         bytes memory encodedInnerBundle = abi.encode(innerBundle);
-        MessageInclusionProof memory innerProof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
+        AtomicFinalityProof memory innerProof;
 
         // Payload for receiveMessage that dispatches to verifyBundle(innerBundle)
         bytes memory innerPayload = abi.encodeCall(IInteropHandler.verifyBundle, (encodedInnerBundle, innerProof));
@@ -273,14 +246,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         });
 
         bytes memory encodedOuterBundle = abi.encode(outerBundle);
-        MessageInclusionProof memory outerProof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
-
-        // Mock the message verification to return true
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
+        AtomicFinalityProof memory outerProof;
 
         // Switch to destination chain
         vm.chainId(destinationChainId);

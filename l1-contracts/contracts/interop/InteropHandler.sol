@@ -6,10 +6,7 @@ import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 
 import {
     L2_BASE_TOKEN_HOLDER,
-    L2_INTEROP_CENTER_ADDR,
     L2_NATIVE_TOKEN_VAULT,
-    L2_MESSAGE_VERIFICATION,
-    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
     L2_COMPLEX_UPGRADER_ADDR
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {IL2NativeTokenVault} from "../bridge/ntv/IL2NativeTokenVault.sol";
@@ -18,14 +15,12 @@ import {IAtomicFlowManager} from "../atomic-interop/IAtomicFlowManager.sol";
 import {AtomicFinalityProof} from "../atomic-interop/IAtomicInterop.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {
-    BUNDLE_IDENTIFIER,
     INTEROP_BUNDLE_VERSION,
     INTEROP_CALL_VERSION,
     BundleStatus,
     CallStatus,
     InteropBundle,
-    InteropCall,
-    MessageInclusionProof
+    InteropCall
 } from "../common/Messaging.sol";
 import {IERC7786Recipient} from "./IERC7786Recipient.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
@@ -35,10 +30,7 @@ import {
     CallAlreadyExecuted,
     CallNotExecutable,
     CanNotUnbundle,
-    CannotClaimInteropOnL1Settlement,
     ExecutingNotAllowed,
-    MessageNotIncluded,
-    UnauthorizedMessageSender,
     UnbundlingNotAllowed,
     WrongCallStatusLength,
     WrongDestinationChainId,
@@ -72,13 +64,8 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
         _;
     }
 
-    /// @notice Returns the interop center address. Virtual to allow override in private interop.
-    function _interopCenterAddr() internal view virtual returns (address) {
-        return L2_INTEROP_CENTER_ADDR;
-    }
-
-    /// @notice Returns the native token vault. Virtual to allow override in private interop.
-    function _nativeTokenVault() internal view virtual returns (IL2NativeTokenVault) {
+    /// @notice Returns the native token vault.
+    function _nativeTokenVault() internal view returns (IL2NativeTokenVault) {
         return L2_NATIVE_TOKEN_VAULT;
     }
 
@@ -88,44 +75,10 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
     }
 
     /// @inheritdoc IInteropHandler
-    function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
-        // Interop is only supported while the chain settles on Gateway (not on L1).
-        // We read the chain's current settlement layer from `SystemContext` (kept in sync with each
-        // batch's bootloader-driven `setSettlementLayerChainId` call); the analogous mapping on the
-        // chain's own `L2Bridgehub` is only written for chains that *settle on this Bridgehub*
-        // (i.e. populated on L1's L1Bridgehub and on a Gateway's L2Bridgehub for the chains it
-        // hosts), and is never written on a chain's own L2Bridgehub for itself.
-        require(
-            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
-            CannotClaimInteropOnL1Settlement()
-        );
-
-        // Decode the bundle data, calculate its hash and get the current status of the bundle.
-        (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
-
-        // For a non-atomic bundle the cross-chain binding is the L1 message; the proof carries its chainId.
-        _validateBundleDestinationContext(bundleHash, interopBundle, _proof.chainId);
-        _requireExecutionAllowed(bundleHash, interopBundle);
-
-        // We can only process bundles that are either unreceived (first time processing) or verified (already verified but not executed).
-        // This whitelist approach ensures that if new bundle statuses are added in the future, they will be explicitly rejected
-        // until they are explicitly allowed, preventing potential security vulnerabilities.
-        require(
-            status == BundleStatus.Unreceived || status == BundleStatus.Verified,
-            BundleAlreadyProcessed(bundleHash)
-        );
-
-        // Proof gate: verify the bundle's L1-message inclusion, if not done yet.
-        if (status != BundleStatus.Verified) _verifyBundle(_bundle, _proof, bundleHash);
-
-        _markFullyExecutedAndRun(bundleHash, interopBundle);
-    }
-
-    /// @inheritdoc IInteropHandler
-    function executeAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public {
-        // No gateway-mode requirement here (unlike executeBundle): an atomic bundle's cross-chain
+    function executeBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public {
+        // Interop is atomic. There is no gateway-settlement requirement: an atomic bundle's cross-chain
         // binding comes from the per-leg IMT inclusion proofs authenticated against the interop root,
-        // which is built on both L1 and the gateway. Atomic execution is therefore valid regardless of
+        // which is built on both L1 and the gateway. Execution is therefore valid regardless of
         // settlement layer, including L1-settled chains.
 
         // Decode the bundle, compute its hash, read its status.
@@ -136,27 +89,32 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
         _validateBundleDestinationContext(bundleHash, interopBundle, interopBundle.sourceChainId);
         _requireExecutionAllowed(bundleHash, interopBundle);
 
-        // Atomic bundles have no verify path (they were never published to L1), so only a fresh bundle
-        // may be executed; replay is then prevented by marking it FullyExecuted below. (A non-atomic
-        // bundle cannot reach here: the gate requires its commit value in an IMT, which only `append`
-        // — i.e. an atomic send — ever writes.)
-        require(status == BundleStatus.Unreceived, BundleAlreadyProcessed(bundleHash));
+        // We can only process bundles that are either unreceived (first time processing) or verified
+        // (already verified but not executed). This whitelist approach ensures that if new bundle
+        // statuses are added in the future, they will be explicitly rejected until they are explicitly
+        // allowed, preventing potential security vulnerabilities.
+        require(
+            status == BundleStatus.Unreceived || status == BundleStatus.Verified,
+            BundleAlreadyProcessed(bundleHash)
+        );
 
-        // Atomicity gate: replaces executeBundle's L1-message inclusion proof. Proves every leg of the
-        // flow was committed in its source chain's IMT before the deadline, and that this bundle is one
-        // of the flow's legs. Reverts otherwise. No explicit "block.chainid in flow" check is needed: the
-        // bundle self-binds its own destinationChainId (asserted == block.chainid above) and per-send
-        // salts make each leg's bundleHash unique to its destination.
-        IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).requireFlowFinalized(bundleHash, _finality);
+        // Atomicity gate: prove every leg of the flow was committed in its source chain's IMT before the
+        // deadline, and that this bundle is one of the flow's legs. Reverts otherwise. Skipped if the
+        // bundle was already verified via {verifyBundle}. No explicit "block.chainid in flow" check is
+        // needed: the bundle self-binds its own destinationChainId (asserted == block.chainid above) and
+        // per-send salts make each leg's bundleHash unique to its destination.
+        if (status != BundleStatus.Verified) {
+            IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).requireFlowFinalized(bundleHash, _finality);
+        }
 
-        // No nonReentrant guard, matching executeBundle. Replay safety is by CEI: _markFullyExecutedAndRun
-        // sets bundleStatus = FullyExecuted before running any call, so a reentrant call for THIS bundle
-        // hits the Unreceived check and reverts; a reentry for a different bundle is independently guarded.
-        // A global lock would also block legitimate nested interop.
+        // No nonReentrant guard. Replay safety is by CEI: _markFullyExecutedAndRun sets bundleStatus =
+        // FullyExecuted before running any call, so a reentrant call for THIS bundle hits the status
+        // check and reverts; a reentry for a different bundle is independently guarded. A global lock
+        // would also block legitimate nested interop.
         _markFullyExecutedAndRun(bundleHash, interopBundle);
     }
 
-    /// @notice Execution-address permission gate shared by executeBundle / executeAtomicBundle.
+    /// @notice Execution-address permission gate shared by executeBundle / verifyBundle.
     /// @dev Permissionless when no `executionAddress` is set; otherwise only that address (on this
     /// chain, or chain-agnostic via chainId 0) may execute — or this contract itself, when execution
     /// was initiated through `receiveMessage`.
@@ -179,7 +137,7 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
     }
 
     /// @notice Marks the bundle `FullyExecuted` (CEI) and executes all of its calls — the shared tail of
-    /// executeBundle / executeAtomicBundle. `_executeAllCalls = true`, so any failing call reverts the
+    /// executeBundle. `_executeAllCalls = true`, so any failing call reverts the
     /// whole flow, leaving no state changes.
     function _markFullyExecutedAndRun(bytes32 _bundleHash, InteropBundle memory _interopBundle) internal {
         bundleStatus[_bundleHash] = BundleStatus.FullyExecuted;
@@ -201,27 +159,31 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
     }
 
     /// @inheritdoc IInteropHandler
-    function verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
+    function verifyBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
-        _validateBundleDestinationContext(bundleHash, interopBundle, _proof.chainId);
+        // An atomic bundle is never published to L1, so its source chain id is the bundle's own field.
+        _validateBundleDestinationContext(bundleHash, interopBundle, interopBundle.sourceChainId);
 
         // If the bundle was already fully executed or unbundled, we revert stating that it was processed already.
         require(status == BundleStatus.Unreceived, BundleAlreadyProcessed(bundleHash));
 
-        // Verify the bundle inclusion
-        _verifyBundle(_bundle, _proof, bundleHash);
+        // Atomicity gate (view): prove every leg of the flow was committed in its source chain's IMT
+        // before the deadline, and that this bundle is one of the flow's legs. Marking the bundle
+        // Verified enables the verify->unbundle flow without re-proving.
+        IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).requireFlowFinalized(bundleHash, _finality);
+
+        bundleStatus[bundleHash] = BundleStatus.Verified;
+
+        // Emit event stating that the bundle was verified.
+        emit BundleVerified(bundleHash);
     }
 
     /// @inheritdoc IInteropHandler
     function unbundleBundle(bytes memory _bundle, CallStatus[] calldata _providedCallStatus) public {
-        // Interop is only supported while the chain settles on Gateway (not on L1).
-        // See `executeBundle` for why this reads `SystemContext` rather than `L2_BRIDGEHUB`.
-        require(
-            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
-            CannotClaimInteropOnL1Settlement()
-        );
+        // No gateway-settlement requirement: atomic interop is valid on any settlement layer (see
+        // {executeBundle}). Unbundling operates on a bundle already marked Verified by {verifyBundle}.
 
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
@@ -348,50 +310,6 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
         }
     }
 
-    /// @notice Verifies the bundle, meaning checking that the message corresponding to the bundle was received.
-    /// @param _bundle The abi-encoded InteropBundle struct corresponding to the bundle that is to be verified.
-    /// @param _proof Proof for the message that corresponds to the bundle that is to be verified.
-    /// @param _bundleHash Hash corresponding to the bundle that is to be verified.
-    /// That message gets sent to L1 by origin chain in InteropCenter contract, and is picked up and included in receiving chain by sequencer.
-    function _verifyBundle(
-        bytes memory _bundle,
-        MessageInclusionProof memory _proof,
-        bytes32 _bundleHash
-    ) internal virtual {
-        // Verify that the message came from the legitimate InteropCenter.
-        // The bundle is authenticated solely by message inclusion plus the sender being the
-        // canonical `L2_INTEROP_CENTER_ADDR`. Asset correctness across chains is guaranteed by ZK
-        // proofs (assuming proofs are correct and chains are not malicious), so no on-chain
-        // per-chain balance reconciliation is performed here.
-        address interopCenter = _interopCenterAddr();
-        require(
-            _proof.message.sender == interopCenter,
-            UnauthorizedMessageSender(interopCenter, _proof.message.sender)
-        );
-
-        // Substitute provided message data with format-specific data.
-        _proof.message.data = _getBundleMessageData(_bundle);
-
-        bool isIncluded = L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared({
-            _chainId: _proof.chainId,
-            _blockOrBatchNumber: _proof.l1BatchNumber,
-            _index: _proof.l2MessageIndex,
-            _message: _proof.message,
-            _proof: _proof.proof
-        });
-
-        require(isIncluded, MessageNotIncluded());
-
-        bundleStatus[_bundleHash] = BundleStatus.Verified;
-
-        // Emit event stating that the bundle was verified.
-        emit BundleVerified(_bundleHash);
-    }
-
-    /// @notice Returns the message data for bundle verification. Override for private interop format.
-    function _getBundleMessageData(bytes memory _bundle) internal view virtual returns (bytes memory) {
-        return bytes.concat(BUNDLE_IDENTIFIER, _bundle);
-    }
 
     /// @notice The sole purpose of this function is to serve as a rescue mechanism in case the sender is a contract,
     ///         the unbundler chainid is set to the sender chainid and the unbundler address is set to the contract's address.
@@ -443,9 +361,9 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
         address senderAddress,
         bytes calldata sender
     ) internal {
-        (bytes memory bundle, MessageInclusionProof memory proof) = abi.decode(
+        (bytes memory bundle, AtomicFinalityProof memory finality) = abi.decode(
             payload[4:],
-            (bytes, MessageInclusionProof)
+            (bytes, AtomicFinalityProof)
         );
 
         // Decode the bundle to get execution permissions
@@ -464,17 +382,17 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
             );
         }
 
-        this.executeBundle(bundle, proof);
+        this.executeBundle(bundle, finality);
     }
 
     function _handleVerifyBundle(bytes calldata payload) internal {
-        (bytes memory bundle, MessageInclusionProof memory proof) = abi.decode(
+        (bytes memory bundle, AtomicFinalityProof memory finality) = abi.decode(
             payload[4:],
-            (bytes, MessageInclusionProof)
+            (bytes, AtomicFinalityProof)
         );
 
         // Bundle verification is permissionless
-        this.verifyBundle(bundle, proof);
+        this.verifyBundle(bundle, finality);
     }
 
     function _handleUnbundleBundle(

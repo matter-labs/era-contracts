@@ -9,7 +9,7 @@ import {IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
 ///   Source happy path: `Unset -> Committed` (the burn happens during `InteropCenter.sendBundle` via
 ///   the normal `initiateIndirectCall`; `AtomicFlowManager.append` records the leg as `Committed`,
 ///   which is terminal on the happy path — the destination mint is driven by
-///   `InteropHandler.executeAtomicBundle`, which has its own bundle-level replay guard).
+///   `InteropHandler.executeBundle`, which has its own bundle-level replay guard).
 ///   Source timeout path: `Unset -> Committed -> Revertable -> Reverted`.
 ///
 /// Destination execution is NOT tracked here: the {InteropHandler}'s own `bundleStatus` set is the
@@ -91,7 +91,7 @@ struct AtomicFlow {
 
 /// @notice The full atomicity proof a destination needs to execute an atomic bundle: the flow definition
 /// plus one IMT inclusion proof per leg. Passed as one calldata reference to
-/// `InteropHandler.executeAtomicBundle` / `AtomicFlowManager.requireFlowFinalized`.
+/// `InteropHandler.executeBundle` / `AtomicFlowManager.requireFlowFinalized`.
 /// @param flow The flow definition (see {AtomicFlow}).
 /// @param proofs One inclusion proof per leg, in `flow.legBundleHashes` order.
 struct AtomicFinalityProof {

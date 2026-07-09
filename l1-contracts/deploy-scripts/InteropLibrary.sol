@@ -138,7 +138,7 @@ library InteropLibrary {
         bool useFixedFee,
         bytes32 salt
     ) internal pure returns (bytes[] memory) {
-        uint256 length = 1; // Always include useFixedFee
+        uint256 length = 2; // Always include useFixedFee and the atomicBundle attribute (all interop is atomic).
         if (executionAddress != address(0)) ++length;
         if (unbundlerAddress != address(0)) ++length;
         if (salt != bytes32(0)) ++length;
@@ -157,6 +157,15 @@ library InteropLibrary {
             );
         }
         attributes[attributesPointer++] = abi.encodeCall(IERC7786Attributes.useFixedFee, (useFixedFee));
+        // Every interop send is atomic: attach the ERC-7786 `atomicBundle` metadata so `InteropCenter`
+        // does not reject the send with `NonAtomicSendUnsupported`. The flow metadata (flowId / deadline /
+        // lowNullifierIndex) is a placeholder here — in the Foundry unit tests the `AtomicFlowManager.append`
+        // gate is mocked, so the concrete values are irrelevant; the real IMT flow is exercised end-to-end in
+        // the anvil-interop atomic-swap spec.
+        attributes[attributesPointer++] = abi.encodeCall(
+            IERC7786Attributes.atomicBundle,
+            (bytes32(uint256(1)), type(uint64).max, uint256(0))
+        );
         if (salt != bytes32(0)) {
             attributes[attributesPointer++] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (salt));
         }

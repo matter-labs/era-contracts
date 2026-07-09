@@ -115,7 +115,7 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
         bytes32 bundleHash = L2_INTEROP_CENTER.sendBundle(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Verify a bundle hash was returned
@@ -140,7 +140,7 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
         bytes32 bundleHash1 = L2_INTEROP_CENTER.sendBundle(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
         assertNotEq(bundleHash1, bytes32(0), "First bundle to registered chain should succeed");
 

@@ -68,7 +68,10 @@ const ANVIL_INTEROP_PROTOCOL_FEE = BigNumber.from(ANVIL_INTEROP_PROTOCOL_FEE_WEI
  *
  * Topology: gwSettledChainIds[0] = source, gwSettledChainIds[1] = destination
  */
-describe("09 - Interop Unbundle (failing calls)", function () {
+// SKIPPED: public interop (verify->unbundle via MessageInclusionProof) was removed; all interop is now
+// atomic. Rewriting this spec onto the atomic IMT path plus regenerating the dumped chain states is a
+// tracked follow-up.
+describe.skip("09 - Interop Unbundle (failing calls)", function () {
   this.timeout(0);
 
   const runner = new DeploymentRunner();

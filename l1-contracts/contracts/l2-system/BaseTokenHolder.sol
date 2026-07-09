@@ -12,6 +12,7 @@ import {
     L2_INTEROP_HANDLER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {Unauthorized} from "../common/L1ContractErrors.sol";
 
 /**
@@ -92,6 +93,15 @@ contract BaseTokenHolder is IBaseTokenHolder {
         _;
     }
 
+    /// @notice Modifier that restricts access to the AtomicFlowManager only.
+    /// @dev Used for refunding base-token value on an atomic-interop value-leg timeout.
+    modifier onlyAtomicFlowManager() {
+        if (msg.sender != L2_ATOMIC_FLOW_MANAGER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @notice Gives out base tokens from the holder to a recipient.
     /// @dev This replaces the mint operation. Tokens are transferred from this contract's balance.
     /// @dev NOTE: This is not the only way funds leave this contract:
@@ -120,6 +130,29 @@ contract BaseTokenHolder is IBaseTokenHolder {
     function burnAndStartBridging(uint256 _toChainId) external payable onlyBridgingCaller {
         L2_ASSET_TRACKER.handleInitiateBaseTokenBridgingOnL2(_toChainId, msg.value);
         emit BaseTokenBurntInterop(msg.sender, _toChainId, msg.value);
+    }
+
+    /// @notice Refunds base-token value previously received via burnAndStartBridging, on an atomic-interop
+    /// value-leg timeout. Reverses the accounting of the matching handleInitiateBaseTokenBridgingOnL2,
+    /// then returns the value to the original depositor.
+    /// @dev Mirrors give()'s CEI ordering (tracker notify before value send). Only the AtomicFlowManager,
+    /// which flips the leg to Reverted (CEI) before invoking this, may call it — so each leg is refunded
+    /// at most once.
+    /// @param _to The address to receive the refund (the original depositor).
+    /// @param _amount The amount of base tokens to refund.
+    /// @param _toChainId The destination chain ID the funds were originally sent to.
+    function refundBridgedBaseToken(
+        address _to,
+        uint256 _amount,
+        uint256 _toChainId
+    ) external override onlyAtomicFlowManager {
+        if (_amount == 0) {
+            return;
+        }
+        // Effects (accounting) before interaction (value send), mirroring give().
+        L2_ASSET_TRACKER.handleRevertInitiateBaseTokenBridgingOnL2(_toChainId, _amount);
+        Address.sendValue(payable(_to), _amount);
+        emit BaseTokenRefundedInterop(_to, _toChainId, _amount);
     }
 
     /// @notice Fallback to accept base token transfers from L2BaseToken only.

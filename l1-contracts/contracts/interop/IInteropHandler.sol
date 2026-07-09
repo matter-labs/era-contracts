@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-import {BundleStatus, CallStatus, MessageInclusionProof} from "../common/Messaging.sol";
+import {BundleStatus, CallStatus} from "../common/Messaging.sol";
 import {AtomicFinalityProof} from "../atomic-interop/IAtomicInterop.sol";
 
 interface IInteropHandler {
@@ -14,25 +14,19 @@ interface IInteropHandler {
 
     event CallProcessed(bytes32 indexed bundleHash, uint256 indexed callIndex, CallStatus status);
 
-    /// @notice Executes a full bundle atomically.
-    /// @dev Reverts if any call fails, or if bundle has been processed already.
-    /// @param _bundle ABI-encoded InteropBundle to execute.
-    /// @param _proof Inclusion proof for the bundle message.
-    function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) external;
-
-    /// @notice Executes an **atomic interop** bundle: like {executeBundle}, but instead of an
-    /// L1-message inclusion proof it requires (via the AtomicFlowManager) that every leg of the flow
-    /// was committed in its source chain's IMT before the deadline. Atomic bundles are never published
-    /// to L1, so this is their only execution entry point.
+    /// @notice Executes a full **atomic interop** bundle atomically. Instead of an L1-message inclusion
+    /// proof it requires (via the AtomicFlowManager) that every leg of the flow was committed in its
+    /// source chain's IMT before the deadline. Interop is atomic-only: bundles are never published to L1.
+    /// @dev Reverts if any call fails, or if the bundle has been processed already.
     /// @param _bundle ABI-encoded InteropBundle to execute (must carry the `atomicBundle` attribute).
     /// @param _finality The flow definition (`flowId`, legs, deadline) + one IMT inclusion proof per leg.
-    function executeAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) external;
+    function executeBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) external;
 
-    /// @notice Verifies receipt of a bundle without executing calls.
-    /// @dev Marks bundle as Verified on success.
+    /// @notice Verifies receipt of an atomic bundle without executing calls.
+    /// @dev Marks bundle as Verified on success, enabling the verify->unbundle flow.
     /// @param _bundle ABI-encoded InteropBundle to verify.
-    /// @param _proof Inclusion proof for the bundle message.
-    function verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof) external;
+    /// @param _finality The flow definition + one IMT inclusion proof per leg.
+    function verifyBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) external;
 
     /// @notice Function used to unbundle the bundle. It's present to give more flexibility in cancelling and overall processing of bundles.
     ///         Can be invoked multiple times until all calls are processed.

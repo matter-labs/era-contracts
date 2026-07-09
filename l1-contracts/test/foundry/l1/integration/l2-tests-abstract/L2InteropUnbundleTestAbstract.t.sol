@@ -10,11 +10,10 @@ import "forge-std/console.sol";
 import {
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_HANDLER,
-    L2_INTEROP_HANDLER_ADDR,
-    L2_MESSAGE_VERIFICATION
+    L2_INTEROP_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
-import {CallStatus, InteropBundle, MessageInclusionProof} from "contracts/common/Messaging.sol";
+import {CallStatus, InteropBundle} from "contracts/common/Messaging.sol";
+import {AtomicFinalityProof} from "contracts/atomic-interop/IAtomicInterop.sol";
 
 import {BundleExecutionResult, L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
@@ -45,17 +44,14 @@ abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
         assertTrue(interopBundleHash != bytes32(0), "Interop bundle hash should be non-zero");
 
         bytes memory bundle = abi.encode(interopBundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR, block.chainid);
+        // Atomic interop: finality is proven via the AtomicFlowManager IMT gate (mocked in setUp), so a
+        // default AtomicFinalityProof suffices and the cross-chain binding is the bundle's sourceChainId.
+        AtomicFinalityProof memory proof;
 
         // Calculate bundle hash for assertions
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
 
         vm.chainId(destinationChainId);
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
         L2_INTEROP_HANDLER.verifyBundle(bundle, proof);
 
         // Verify bundle status is Verified after verifyBundle call

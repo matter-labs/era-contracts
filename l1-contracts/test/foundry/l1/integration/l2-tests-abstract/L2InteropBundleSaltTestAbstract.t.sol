@@ -48,15 +48,25 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
         });
     }
 
-    /// @notice Builds bundle attributes containing only the salt attribute (when `_includeSalt` is true).
+    /// @notice Builds bundle attributes containing the salt attribute (when `_includeSalt` is true) plus the
+    ///         mandatory `atomicBundle` attribute (all interop is atomic).
+    /// @dev The salt is placed first so that restriction-violation tests, which parse this array under
+    ///      `OnlyCallAttributes`, still surface the salt selector as the first offending attribute. The
+    ///      atomicBundle flow metadata is a placeholder — the `AtomicFlowManager.append` gate is mocked in
+    ///      these unit tests (see {L2InteropTestUtils.setUp}).
     function _buildBundleAttributesWithSalt(
         bytes32 _salt,
         bool _includeSalt
     ) internal pure returns (bytes[] memory attrs) {
-        attrs = new bytes[](_includeSalt ? 1 : 0);
+        attrs = new bytes[](_includeSalt ? 2 : 1);
+        uint256 idx = 0;
         if (_includeSalt) {
-            attrs[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (_salt));
+            attrs[idx++] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (_salt));
         }
+        attrs[idx++] = abi.encodeCall(
+            IERC7786Attributes.atomicBundle,
+            (bytes32(uint256(1)), type(uint64).max, uint256(0))
+        );
     }
 
     /// @notice Sends a bundle and returns the `InteropBundle` decoded from the `InteropBundleSent` event.

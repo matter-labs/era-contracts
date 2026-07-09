@@ -40,6 +40,13 @@ interface IBaseTokenHolder {
     /// @param amount The amount of base tokens burnt.
     event BaseTokenBurntInterop(address indexed from, uint256 toChainId, uint256 amount);
 
+    /// @notice Emitted when base tokens previously bridged out are refunded on the source chain, on an
+    /// atomic-interop value-leg timeout.
+    /// @param to The address that received the refund (the original depositor).
+    /// @param toChainId The destination chain ID the funds were originally sent to.
+    /// @param amount The amount of base tokens refunded.
+    event BaseTokenRefundedInterop(address indexed to, uint256 toChainId, uint256 amount);
+
     /// @notice Gives out base tokens from the holder to a recipient.
     /// @param _to The address to receive the base tokens.
     /// @param _amount The amount of base tokens to give out.
@@ -50,4 +57,12 @@ interface IBaseTokenHolder {
     /// @dev Called by InteropHandler, InteropCenter, NativeTokenVault, and L2BaseToken during bridging operations.
     /// @param _toChainId The chain ID which the funds are sent to.
     function burnAndStartBridging(uint256 _toChainId) external payable;
+
+    /// @notice Refunds base-token value previously received via {burnAndStartBridging}, when an
+    /// atomic-interop value leg times out. Reverses the tracker accounting, then returns the value.
+    /// @dev Only callable by the AtomicFlowManager, which owns the timeout state machine.
+    /// @param _to The address to receive the refund (the original depositor).
+    /// @param _amount The amount of base tokens to refund.
+    /// @param _toChainId The destination chain ID the funds were originally sent to.
+    function refundBridgedBaseToken(address _to, uint256 _amount, uint256 _toChainId) external;
 }

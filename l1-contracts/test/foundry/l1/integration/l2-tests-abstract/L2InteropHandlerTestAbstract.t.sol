@@ -28,6 +28,7 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Transaction} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
@@ -39,12 +40,11 @@ import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {CallStatus, IInteropHandler} from "contracts/interop/IInteropHandler.sol";
 
-import {
-    UnauthorizedMessageSender,
-    WrongDestinationBaseTokenAssetId,
-    WrongDestinationChainId
-} from "contracts/interop/InteropErrors.sol";
+import {WrongDestinationBaseTokenAssetId, WrongDestinationChainId} from "contracts/interop/InteropErrors.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+
+import {AtomicFinalityProof} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {
@@ -58,8 +58,6 @@ import {
     MessageInclusionProof
 } from "contracts/common/Messaging.sol";
 
-import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
-
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
@@ -69,6 +67,19 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
 
     // Function selector for requestL2TransactionDirect(L2TransactionRequestDirect)
     bytes4 private constant REQUEST_L2_TX_DIRECT_SELECTOR = 0xd52471c1;
+
+    /// @dev Interop is atomic: execution/verification is gated by the AtomicFlowManager's IMT-based
+    /// finality proof rather than an L1-message inclusion proof. The proof machinery itself is exercised
+    /// end-to-end in the anvil-interop atomic-swap spec; here we mock the (view) gate to succeed so these
+    /// unit-level Foundry tests can focus on the InteropHandler bookkeeping. A default AtomicFinalityProof
+    /// argument suffices while the gate is mocked.
+    function _mockRequireFlowFinalized() internal {
+        vm.mockCall(
+            L2_ATOMIC_FLOW_MANAGER_ADDR,
+            abi.encodeWithSelector(IAtomicFlowManager.requireFlowFinalized.selector),
+            ""
+        );
+    }
 
     function test_requestL2TransactionDirectWithCalldata() public {
         // Build the L2TransactionRequestDirect struct with explicit values
@@ -169,12 +180,8 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     function test_executeBundle() public {
         InteropBundle memory interopBundle = getInteropBundle(1);
         bytes memory bundle = abi.encode(interopBundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
+        AtomicFinalityProof memory finality;
+        _mockRequireFlowFinalized();
         vm.mockCall(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
@@ -185,12 +192,13 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes32(0))
         );
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+        // For an atomic bundle the cross-chain binding is the bundle's own sourceChainId.
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
         // Expect event
         vm.expectEmit(true, false, false, false);
         emit IInteropHandler.BundleExecuted(bundleHash);
         vm.prank(EXECUTION_ADDRESS);
-        L2_INTEROP_HANDLER.executeBundle(bundle, proof);
+        L2_INTEROP_HANDLER.executeBundle(bundle, finality);
         // Check storage changes
         assertEq(
             uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
@@ -209,12 +217,8 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     function test_unbundleBundle() public {
         InteropBundle memory interopBundle = getInteropBundle(3);
         bytes memory bundle = abi.encode(interopBundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
+        AtomicFinalityProof memory finality;
+        _mockRequireFlowFinalized();
         vm.mockCall(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
@@ -225,8 +229,8 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes32(0))
         );
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
         CallStatus[] memory callStatuses1 = new CallStatus[](3);
         callStatuses1[0] = CallStatus.Unprocessed;
         callStatuses1[1] = CallStatus.Cancelled;
@@ -381,28 +385,10 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         return interopBundle;
     }
 
-    /// @notice Regression test to ensure bundles can only be verified from InteropCenter
-    /// @dev This test verifies that the fix for unauthorized bundle verification is working
-    function test_verifyBundle_revertWhen_messageNotFromInteropCenter() public {
-        address nonInteropCenter = makeAddr("nonInteropCenter");
-
-        InteropBundle memory interopBundle = getInteropBundle(1);
-        bytes memory bundle = abi.encode(interopBundle);
-
-        MessageInclusionProof memory proof = getInclusionProof(nonInteropCenter);
-
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
-
-        vm.expectRevert(
-            abi.encodeWithSelector(UnauthorizedMessageSender.selector, L2_INTEROP_CENTER_ADDR, nonInteropCenter)
-        );
-
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
-    }
+    // removed: test_verifyBundle_revertWhen_messageNotFromInteropCenter tested the public
+    // L1-message-inclusion path (UnauthorizedMessageSender when the L1 message sender was not the
+    // InteropCenter), which no longer exists — atomic interop authenticates via the AtomicFlowManager
+    // IMT gate, not the message sender.
 
     /// @notice Regression test to ensure bundles can only be executed on the correct destination chain
     /// @dev This test verifies that the fix for destination chain ID validation is working
@@ -412,52 +398,38 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         interopBundle.destinationChainId = wrongChainId;
 
         bytes memory bundle = abi.encode(interopBundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
+        AtomicFinalityProof memory finality;
+        _mockRequireFlowFinalized();
 
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
-
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
 
         vm.expectRevert(
             abi.encodeWithSelector(WrongDestinationChainId.selector, bundleHash, wrongChainId, block.chainid)
         );
 
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
     }
 
     /// @notice Test that verifyBundle works while settling on L1.
-    /// @dev Bundle verification is not restricted to gateway mode.
+    /// @dev Atomic interop has no gateway-settlement requirement: verification is valid regardless of
+    /// the chain's settlement layer, including L1-settled chains.
     function test_verifyBundleWorksWhenSettlingOnL1() public {
-        // Set the L1_CHAIN_ID storage variable in InteropHandler
-        // (The test setup doesn't call initL2, so L1_CHAIN_ID is uninitialized at slot 0)
-        vm.store(L2_INTEROP_HANDLER_ADDR, bytes32(0), bytes32(uint256(L1_CHAIN_ID)));
-
         InteropBundle memory interopBundle = getInteropBundle(1);
         bytes memory bundle = abi.encode(interopBundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
+        AtomicFinalityProof memory finality;
+        _mockRequireFlowFinalized();
 
-        // Mock message verification to return true
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
-
-        // Mock currentSettlementLayerChainId to return L1_CHAIN_ID (not in gateway mode)
-        // This simulates the chain settling directly on L1
+        // Simulate the chain settling directly on L1 (rather than on Gateway). This must not affect
+        // atomic verification.
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
             abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
             abi.encode(L1_CHAIN_ID)
         );
 
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
 
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
 
         assertEq(
             uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
@@ -474,16 +446,10 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         interopBundle.destinationBaseTokenAssetId = wrongDestinationBaseTokenAssetId;
 
         bytes memory bundle = abi.encode(interopBundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
+        AtomicFinalityProof memory finality;
+        _mockRequireFlowFinalized();
 
-        // Mock message verification to return true
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
-
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -494,8 +460,9 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             )
         );
 
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
     }
+
     /// @notice Test pause functionality in InteropCenter
     function test_interopCenter_pause() public {
         address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
@@ -509,6 +476,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         bytes memory payload = abi.encode("test");
         bytes[] memory attributes = new bytes[](0);
 
+        // The whenNotPaused modifier reverts before the atomic-attribute check, so no attributes needed.
         vm.expectRevert("Pausable: paused");
         InteropCenter(L2_INTEROP_CENTER_ADDR).sendMessage(recipient, payload, attributes);
     }
@@ -548,20 +516,17 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
     }
 
+    /// @notice Regression test to ensure verifyBundle can access currentSettlementLayerChainId without
+    /// tripping access control, and emits BundleVerified / marks the bundle Verified.
+    /// @dev Atomic verification no longer gates on the settlement layer, but the chain may still be in
+    /// gateway mode; this exercises that path.
     function test_regression_verifyBundleCanAccessCurrentSettlementLayerChainId() public {
         InteropBundle memory interopBundle = getInteropBundle(1);
         bytes memory bundle = abi.encode(interopBundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
+        AtomicFinalityProof memory finality;
+        _mockRequireFlowFinalized();
 
-        // Mock message verification to return true
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
-
-        // Mock currentSettlementLayerChainId to return a non-L1 chain ID (gateway mode)
-        // This simulates the chain settling on Gateway instead of L1
+        // Simulate the chain settling on Gateway instead of L1.
         uint256 gatewayChainId = GATEWAY_CHAIN_ID;
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
@@ -576,15 +541,12 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encode(bytes32(0))
         );
 
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
 
-        // Before the fix: This would revert because InteropHandler couldn't call
-        // currentSettlementLayerChainId() due to access control restrictions.
-        // After the fix: This should succeed and emit BundleVerified event.
         vm.expectEmit(true, false, false, false);
         emit IInteropHandler.BundleVerified(bundleHash);
 
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
 
         // Verify the bundle status was updated correctly
         assertEq(
@@ -594,21 +556,15 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         );
     }
 
-    /// @notice Test that executeBundle works in gateway mode by accessing currentSettlementLayerChainId
-    /// @dev executeBundle internally calls verifyBundle which calls currentSettlementLayerChainId
+    /// @notice Test that executeBundle works in gateway mode.
+    /// @dev Atomic execution is valid regardless of the settlement layer; here the chain is in gateway mode.
     function test_regression_executeBundleWorksInGatewayMode() public {
         InteropBundle memory interopBundle = getInteropBundle(1);
         bytes memory bundle = abi.encode(interopBundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
+        AtomicFinalityProof memory finality;
+        _mockRequireFlowFinalized();
 
-        // Mock message verification
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
-
-        // Mock gateway mode - settling on Gateway, not L1
+        // Simulate gateway mode - settling on Gateway, not L1.
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
             abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
@@ -627,16 +583,13 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encode(bytes32(0))
         );
 
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
 
-        // Before the fix: executeBundle would fail because it couldn't access
-        // currentSettlementLayerChainId due to access control.
-        // After the fix: Should complete successfully
         vm.expectEmit(true, false, false, false);
         emit IInteropHandler.BundleExecuted(bundleHash);
 
         vm.prank(EXECUTION_ADDRESS);
-        L2_INTEROP_HANDLER.executeBundle(bundle, proof);
+        L2_INTEROP_HANDLER.executeBundle(bundle, finality);
 
         // Verify successful execution
         assertEq(
@@ -752,25 +705,14 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         uint256 callValue = 100;
         InteropBundle memory interopBundle = getInteropBundleWithValue(callValue);
         bytes memory bundle = abi.encode(interopBundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
+        AtomicFinalityProof memory finality;
 
-        // Standard mocks for bundle verification and messenger (not related to asset tracker)
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
+        // Atomicity gate mocked to succeed (see _mockRequireFlowFinalized).
+        _mockRequireFlowFinalized();
         vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes32(0))
-        );
-        // executeBundle now reads the settlement layer from SystemContext, not L2_BRIDGEHUB.
-        // Return a non-L1 chain id so the require(... != L1_CHAIN_ID) check passes.
-        vm.mockCall(
-            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
-            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
-            abi.encode(block.chainid)
         );
 
         // Record deposits before
@@ -791,7 +733,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         emit IBaseTokenHolder.BaseTokenMintedInterop(L2_INTEROP_HANDLER_ADDR, callValue);
 
         vm.prank(EXECUTION_ADDRESS);
-        L2_INTEROP_HANDLER.executeBundle(bundle, proof);
+        L2_INTEROP_HANDLER.executeBundle(bundle, finality);
 
         // Interop source is ERA_CHAIN_ID (not L1), so totalSuccessfulDepositsFromL1 must NOT increase
         uint256 depositsAfter = _readTotalSuccessfulDepositsFromL1(_baseTokenAssetId);
