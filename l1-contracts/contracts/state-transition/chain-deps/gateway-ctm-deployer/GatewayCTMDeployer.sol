@@ -24,18 +24,10 @@ struct GatewayCTMDeployerConfig {
     bool testnetVerifier;
     /// @notice Flag indicating whether to use ZKsync OS mode.
     bool isZKsyncOS;
-    /// @notice Array of function selectors for the Admin facet.
-    bytes4[] adminSelectors;
-    /// @notice Array of function selectors for the Executor facet.
-    bytes4[] executorSelectors;
-    /// @notice Array of function selectors for the Mailbox facet.
-    bytes4[] mailboxSelectors;
-    /// @notice Array of function selectors for the Getters facet.
-    bytes4[] gettersSelectors;
-    /// @notice Array of function selectors for the Migrator facet.
-    bytes4[] migratorSelectors;
-    /// @notice Array of function selectors for the Committer facet.
-    bytes4[] committerSelectors;
+    // Facet selector lists are intentionally absent: the genesis cut installs no facets directly.
+    // The Gateway CTM points at a `GatewayGenesisRegistry` (deployed and initialized by this
+    // deployer), and `DiamondInit` reads each facet's own `ISelfDescribingFacet.selectors()` at
+    // chain creation — mirroring the L1 registry-driven genesis path.
     /// @notice Hash of the bootloader bytecode.
     bytes32 bootloaderHash;
     /// @notice Hash of the default account bytecode.

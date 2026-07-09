@@ -374,6 +374,8 @@ error ReconstructionMismatch(bytes32, bytes32);
 error Reentrancy();
 // 0x1f20dafa
 error RegistryUnknownKey();
+error RegistryAlreadyInitialized();
+error RegistryLengthMismatch();
 // 0x667d17de
 error RemoveFunctionFacetAddressNotZero(address facet);
 // 0xa2d4b16c

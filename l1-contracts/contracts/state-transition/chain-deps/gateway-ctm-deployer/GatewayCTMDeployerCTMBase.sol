@@ -10,6 +10,8 @@ import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} 
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
 
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
+import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+import {GatewayGenesisRegistry} from "./GatewayGenesisRegistry.sol";
 import {GatewayCTMDeployerConfig, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "./GatewayCTMDeployer.sol";
 
 /// @title GatewayCTMDeployerCTMBase
@@ -86,47 +88,15 @@ abstract contract GatewayCTMDeployerCTMBase {
         GatewayCTMDeployerConfig memory baseConfig = _config.baseConfig;
         Facets memory facets = _config.facets;
 
-        // Gateway pins no registry (`registry == address(0)` below): the facet set rides in the
-        // cut's own `facetCuts`, with selector lists carried in the config (computed off-chain so
-        // the cut is reproducible for CREATE2 address calculation). DiamondInit sees no genesis
-        // registry and installs nothing further.
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](6);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: facets.adminFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: baseConfig.adminSelectors
-        });
-        facetCuts[1] = Diamond.FacetCut({
-            facet: facets.gettersFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: baseConfig.gettersSelectors
-        });
-        facetCuts[2] = Diamond.FacetCut({
-            facet: facets.mailboxFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: baseConfig.mailboxSelectors
-        });
-        facetCuts[3] = Diamond.FacetCut({
-            facet: facets.executorFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: baseConfig.executorSelectors
-        });
-        facetCuts[4] = Diamond.FacetCut({
-            facet: facets.migratorFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: baseConfig.migratorSelectors
-        });
-        facetCuts[5] = Diamond.FacetCut({
-            facet: facets.committerFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: baseConfig.committerSelectors
-        });
+        // Gateway pins a genesis registry, exactly like L1: the committed cut carries NO facet
+        // addresses (empty `facetCuts`), only a pointer to the registry. `DiamondInit` reads the
+        // registry (via the CTM's `genesisRegistry()`) and installs the facets itself, resolving
+        // each facet's selectors from its own `ISelfDescribingFacet.selectors()` bytecode. The
+        // registry is deployed via CREATE2 (deterministic address, independent of the facet
+        // addresses) so the off-chain helper can put it in the cut before any facet exists.
+        address genesisRegistry = _deployGenesisRegistry(_salt, baseConfig.protocolVersion, facets);
+
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
 
         // Only system contract hashes are initialized here; the verifier is read from the CTM.
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
@@ -150,7 +120,7 @@ abstract contract GatewayCTMDeployerCTMBase {
             genesisBatchCommitment: baseConfig.genesisBatchCommitment,
             diamondCut: diamondCut,
             forceDeploymentsData: baseConfig.forceDeploymentsData,
-            registry: address(0)
+            registry: genesisRegistry
         });
 
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
@@ -171,6 +141,53 @@ abstract contract GatewayCTMDeployerCTMBase {
                 initCalldata
             )
         );
+    }
+
+    /// @notice Deploys the Gateway genesis facet registry and pins the facet set into it.
+    /// @dev CREATE2 with the shared salt: the address is deterministic and independent of the
+    ///      facet addresses (no constructor args), so the off-chain helper reproduces it for the
+    ///      genesis cut before the facets are deployed. Initialized in the same transaction; the
+    ///      facet order and freezability mirror the diamond's installed set.
+    /// @param _salt Salt used for the CREATE2 deployment.
+    /// @param _protocolVersion The packed SemVer protocol version new chains are created at.
+    /// @param _facets The deployed diamond facet addresses.
+    /// @return registry The address of the deployed and initialized genesis registry.
+    function _deployGenesisRegistry(
+        bytes32 _salt,
+        uint256 _protocolVersion,
+        Facets memory _facets
+    ) internal returns (address registry) {
+        CTMContract[] memory facetIds = new CTMContract[](6);
+        address[] memory facetAddresses = new address[](6);
+        bool[] memory freezable = new bool[](6);
+
+        facetIds[0] = CTMContract.AdminFacet;
+        facetAddresses[0] = _facets.adminFacet;
+        freezable[0] = false;
+
+        facetIds[1] = CTMContract.GettersFacet;
+        facetAddresses[1] = _facets.gettersFacet;
+        freezable[1] = false;
+
+        facetIds[2] = CTMContract.MailboxFacet;
+        facetAddresses[2] = _facets.mailboxFacet;
+        freezable[2] = true;
+
+        facetIds[3] = CTMContract.ExecutorFacet;
+        facetAddresses[3] = _facets.executorFacet;
+        freezable[3] = true;
+
+        facetIds[4] = CTMContract.MigratorFacet;
+        facetAddresses[4] = _facets.migratorFacet;
+        freezable[4] = false;
+
+        facetIds[5] = CTMContract.CommitterFacet;
+        facetAddresses[5] = _facets.committerFacet;
+        freezable[5] = true;
+
+        GatewayGenesisRegistry genesisRegistry = new GatewayGenesisRegistry{salt: _salt}();
+        genesisRegistry.initialize(_protocolVersion, facetIds, facetAddresses, freezable);
+        registry = address(genesisRegistry);
     }
 
     /// @notice Sets the previously deployed CTM inside the ServerNotifier and transfers ownership.

@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {CTMContract} from "./ContractIdentifiers.sol";
 import {ICTMRegistry} from "./ICTMRegistry.sol";
+import {IGenesisFacetRegistry} from "./IGenesisFacetRegistry.sol";
 import {FacetInstallation} from "../../state-transition/chain-interfaces/IDiamondInit.sol";
 import {UpgradeFacetSwap} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
 
@@ -23,7 +24,7 @@ library RegistryFacetReader {
     /// @notice The complete facet set a chain created at the registry's new protocol version
     ///         installs at genesis (all pure additions).
     function newChainInstallations(
-        ICTMRegistry _registry
+        IGenesisFacetRegistry _registry
     ) internal view returns (FacetInstallation[] memory installations) {
         uint256 newVersion = _registry.newProtocolVersion();
         CTMContract[] memory facets = _registry.facetList(newVersion);

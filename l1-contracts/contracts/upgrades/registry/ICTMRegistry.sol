@@ -2,7 +2,8 @@
 
 pragma solidity 0.8.28;
 
-import {CoreContract, CTMContract} from "./ContractIdentifiers.sol";
+import {CoreContract} from "./ContractIdentifiers.sol";
+import {IGenesisFacetRegistry} from "./IGenesisFacetRegistry.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
 
 /// @title Per-CTM upgrade registry (one per ChainTypeManager: Era and ZKsyncOS).
@@ -17,44 +18,27 @@ import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.
 ///      is ever passed as hand-built calldata.
 /// @dev Getters revert for unknown `(key, version)` combinations; only the two pinned versions
 ///      (`oldProtocolVersion`, `newProtocolVersion`) are answerable.
-interface ICTMRegistry {
+interface ICTMRegistry is IGenesisFacetRegistry {
     /// @notice Whether this registry describes the ZKsyncOS CTM (true) or the Era one (false).
     function isZKsyncOS() external view returns (bool);
 
     /// @notice The packed SemVer (see `SemVer.sol`) protocol version this registry upgrades from.
     function oldProtocolVersion() external view returns (uint256);
 
-    /// @notice The packed SemVer protocol version this registry upgrades to.
-    function newProtocolVersion() external view returns (uint256);
-
     /// @notice The ChainTypeManager proxy address (version-independent).
     function ctmProxy() external view returns (address);
 
-    /// @notice Address of a CTM-scoped contract (facet, upgrade contract, DiamondInit, ...) at a
-    ///         given protocol version. Only new-version addresses are pinned, with one exception:
-    ///         facets the upgrade touches also pin their old address (the one irreducible
-    ///         old-side datum — the upgrade cut needs the old facet to read its old selectors).
-    ///         Returns zero for anything else, including contracts unchanged by this upgrade.
-    function ctmAddress(CTMContract _contract, uint256 _protocolVersion) external view returns (address);
+    // `newProtocolVersion`, `facetList`, `ctmAddress`, `facetSelectors` and `facetIsFreezable` are
+    // inherited from `IGenesisFacetRegistry`. For this registry: `ctmAddress` also pins the old
+    // address of facets the upgrade touches (the one irreducible old-side datum — the upgrade cut
+    // needs the old facet to read its old selectors); `facetList` at the OLD version returns the
+    // upgrade PLAN (only the facets this upgrade changes, adds or removes), and at the NEW version
+    // the complete installed set. `facetSelectors` is generated from the audited facet source
+    // (`forge inspect <Facet> methodIdentifiers`).
 
     /// @notice The verifier address chains verify against at the new protocol version; reverts
     ///         for any other version.
     function verifier(uint256 _protocolVersion) external view returns (address);
-
-    /// @notice At the new protocol version: the complete facet set installed in every chain
-    ///         diamond. At the old protocol version: the upgrade PLAN — only the facets this
-    ///         upgrade changes, adds or removes (unchanged facets are absent).
-    function facetList(uint256 _protocolVersion) external view returns (CTMContract[] memory);
-
-    /// @notice The pinned selector-list override of a facet at a given protocol version; an
-    ///         empty list means "read the facet's own `ISelfDescribingFacet.selectors()`".
-    /// @dev Generated from the audited facet source (`forge inspect <Facet> methodIdentifiers`).
-    ///      Together with `ctmAddress`, this lets the orchestrator diff the old and new facet sets
-    ///      without reading live diamond state (uniform facet sets per protocol version).
-    function facetSelectors(CTMContract _facet, uint256 _protocolVersion) external view returns (bytes4[] memory);
-
-    /// @notice Whether the facet's selectors are freezable in the diamond.
-    function facetIsFreezable(CTMContract _facet) external view returns (bool);
 
     /// @notice The core L2 contracts force-deployed by the upgrade transaction of a given
     ///         protocol version, in deployment order (the L2 registry, if any, goes first).

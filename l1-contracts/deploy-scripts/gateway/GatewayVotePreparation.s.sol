@@ -117,14 +117,9 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
             isZKsyncOS: config.isZKsyncOS,
-            // Selectors are computed off-chain here so the Gateway genesis cut is reproducible for
-            // CREATE2 address calculation (the facets are not yet deployed at that point).
-            adminSelectors: Utils.getAllSelectorsForFacet("Admin"),
-            executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
-            mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
-            gettersSelectors: Utils.getAllSelectorsForFacet("Getters"),
-            migratorSelectors: Utils.getAllSelectorsForFacet("Migrator"),
-            committerSelectors: Utils.getAllSelectorsForFacet("Committer"),
+            // No facet selectors: the Gateway genesis cut installs no facets directly; the
+            // GatewayGenesisRegistry the CTM points at drives installation, and DiamondInit reads
+            // each facet's own `selectors()` at chain creation.
             bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
             defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,
             evmEmulatorHash: config.contracts.chainCreationParams.evmEmulatorHash,

@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {CoreContract, CTMContract} from "./ContractIdentifiers.sol";
 import {ICTMRegistry} from "./ICTMRegistry.sol";
+import {IGenesisFacetRegistry} from "./IGenesisFacetRegistry.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
 import {RegistryUnknownKey} from "../../common/L1ContractErrors.sol";
 
@@ -128,7 +129,7 @@ abstract contract CTMRegistryBase is ICTMRegistry {
         return _oldProtocolVersion();
     }
 
-    /// @inheritdoc ICTMRegistry
+    /// @inheritdoc IGenesisFacetRegistry
     function newProtocolVersion() external pure returns (uint256) {
         return _newProtocolVersion();
     }
@@ -138,7 +139,7 @@ abstract contract CTMRegistryBase is ICTMRegistry {
         return _ctmProxy();
     }
 
-    /// @inheritdoc ICTMRegistry
+    /// @inheritdoc IGenesisFacetRegistry
     function ctmAddress(CTMContract _contract, uint256 _protocolVersion) external pure returns (address) {
         _requireKnownVersion(_protocolVersion);
         // Facet addresses resolve from the facet rows (see `FacetRow`); everything else from the
@@ -173,7 +174,7 @@ abstract contract CTMRegistryBase is ICTMRegistry {
         revert RegistryUnknownKey();
     }
 
-    /// @inheritdoc ICTMRegistry
+    /// @inheritdoc IGenesisFacetRegistry
     function facetList(uint256 _protocolVersion) external pure returns (CTMContract[] memory list) {
         _requireKnownVersion(_protocolVersion);
         FacetRow[] memory rows = _facetRows();
@@ -194,7 +195,7 @@ abstract contract CTMRegistryBase is ICTMRegistry {
         }
     }
 
-    /// @inheritdoc ICTMRegistry
+    /// @inheritdoc IGenesisFacetRegistry
     function facetSelectors(CTMContract _facet, uint256 _protocolVersion) external pure returns (bytes4[] memory) {
         FacetRow[] memory rows = _facetRows();
         uint256 rowsLength = rows.length;
@@ -206,7 +207,7 @@ abstract contract CTMRegistryBase is ICTMRegistry {
         revert RegistryUnknownKey();
     }
 
-    /// @inheritdoc ICTMRegistry
+    /// @inheritdoc IGenesisFacetRegistry
     function facetIsFreezable(CTMContract _facet) external pure returns (bool) {
         FreezabilityRow[] memory rows = _freezabilityRows();
         uint256 rowsLength = rows.length;

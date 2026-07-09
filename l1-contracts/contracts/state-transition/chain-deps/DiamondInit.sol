@@ -24,7 +24,7 @@ import {
 import {ISelfDescribingFacet} from "../chain-interfaces/ISelfDescribingFacet.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../IChainTypeManager.sol";
-import {ICTMRegistry} from "../../upgrades/registry/ICTMRegistry.sol";
+import {IGenesisFacetRegistry} from "../../upgrades/registry/IGenesisFacetRegistry.sol";
 import {RegistryFacetReader} from "../../upgrades/registry/RegistryFacetReader.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
@@ -90,7 +90,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         // bytecode at execution time.
         address genesisRegistry = IChainTypeManager(_initializeData.chainTypeManager).genesisRegistry();
         if (genesisRegistry != address(0)) {
-            _installFacets(RegistryFacetReader.newChainInstallations(ICTMRegistry(genesisRegistry)));
+            _installFacets(RegistryFacetReader.newChainInstallations(IGenesisFacetRegistry(genesisRegistry)));
         }
 
         if (!IS_ZKSYNC_OS) {

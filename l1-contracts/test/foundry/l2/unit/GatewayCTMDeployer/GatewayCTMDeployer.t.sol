@@ -46,6 +46,7 @@ import {ValidatorTimelock} from "contracts/state-transition/validators/Validator
 
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
+import {GatewayGenesisRegistry} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayGenesisRegistry.sol";
 
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
@@ -160,6 +161,7 @@ contract GatewayCTMDeployerTest is Test {
         new MigratorFacet(1, false);
         new DiamondInit(false);
         new L1GenesisUpgrade();
+        new GatewayGenesisRegistry();
         new Multicall3();
 
         // This call will likely fail due to various checks, but we just need to get the bytecode published
@@ -175,12 +177,6 @@ contract GatewayCTMDeployerTest is Test {
             l1ChainId: 1,
             testnetVerifier: true,
             isZKsyncOS: false,
-            adminSelectors: _sampleSelectors(0x10),
-            executorSelectors: _sampleSelectors(0x20),
-            mailboxSelectors: _sampleSelectors(0x30),
-            gettersSelectors: _sampleSelectors(0x40),
-            migratorSelectors: _sampleSelectors(0x50),
-            committerSelectors: _sampleSelectors(0x60),
             bootloaderHash: bytes32(uint256(0xabc)),
             defaultAccountHash: bytes32(uint256(0xdef)),
             evmEmulatorHash: bytes32(uint256(0xdef)),
@@ -194,13 +190,6 @@ contract GatewayCTMDeployerTest is Test {
         deployerConfig = config;
 
         _predeployContracts();
-    }
-
-    /// @dev Two distinct sample selectors per facet, so the genesis cut is well-formed.
-    function _sampleSelectors(uint32 _base) private pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](2);
-        selectors[0] = bytes4(_base);
-        selectors[1] = bytes4(_base + 1);
     }
 
     // It is more a smoke test that indeed the deployment works

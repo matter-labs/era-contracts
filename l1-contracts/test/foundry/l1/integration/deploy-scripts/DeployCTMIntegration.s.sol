@@ -14,5 +14,4 @@ contract DeployCTMIntegrationScript is Script, DeployCTMScript {
     using stdToml for string;
 
     function test() internal virtual override {}
-
 }

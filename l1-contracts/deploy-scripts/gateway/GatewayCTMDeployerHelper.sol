@@ -666,12 +666,21 @@ library GatewayCTMDeployerHelper {
         );
 
         {
+            // The genesis registry is deployed by the CTM deployer contract via CREATE2 with the
+            // shared salt and no constructor args, so its address is deterministic and independent
+            // of the facet addresses — computable here, before the facets exist, for the cut.
+            address genesisRegistry = _deployInternalEmptyParams(
+                "GatewayGenesisRegistry",
+                "GatewayGenesisRegistry.sol",
+                innerConfig,
+                isZKsyncOS
+            );
             bytes memory proxyConstructorArgs = _buildCTMProxyConstructorArgs(
                 config,
                 baseConfig,
                 result.chainTypeManagerImplementation,
                 result.serverNotifierProxy,
-                deployerAddr
+                genesisRegistry
             );
             result.diamondCutData = _buildDiamondCutDataEncoded(config.facets, baseConfig);
             result.chainTypeManagerProxy = _deployInternalWithParams(
@@ -688,46 +697,12 @@ library GatewayCTMDeployerHelper {
         Facets memory facets,
         GatewayCTMDeployerConfig memory baseConfig
     ) private pure returns (bytes memory) {
-        // Mirrors GatewayCTMDeployerCTMBase: facets ride in the cut, selectors carried in the
-        // config so this off-chain reconstruction matches the on-chain cut exactly (both feed the
-        // CTM proxy's CREATE2 address). No registry pinned; DiamondInit installs nothing further.
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](6);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: facets.adminFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: baseConfig.adminSelectors
-        });
-        facetCuts[1] = Diamond.FacetCut({
-            facet: facets.gettersFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: baseConfig.gettersSelectors
-        });
-        facetCuts[2] = Diamond.FacetCut({
-            facet: facets.mailboxFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: baseConfig.mailboxSelectors
-        });
-        facetCuts[3] = Diamond.FacetCut({
-            facet: facets.executorFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: baseConfig.executorSelectors
-        });
-        facetCuts[4] = Diamond.FacetCut({
-            facet: facets.migratorFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: baseConfig.migratorSelectors
-        });
-        facetCuts[5] = Diamond.FacetCut({
-            facet: facets.committerFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: baseConfig.committerSelectors
-        });
+        // Mirrors GatewayCTMDeployerCTMBase: the cut carries NO facet addresses (empty
+        // `facetCuts`), only a pointer to the genesis registry set in `ChainCreationParams` below.
+        // DiamondInit reads the registry and installs the facets itself. Empty here means this
+        // off-chain reconstruction matches the on-chain cut exactly (both feed the CTM proxy's
+        // CREATE2 address).
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
             l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
@@ -746,7 +721,7 @@ library GatewayCTMDeployerHelper {
         GatewayCTMDeployerConfig memory baseConfig,
         address ctmImplementation,
         address serverNotifierProxy,
-        address temporaryOwner
+        address genesisRegistry
     ) private pure returns (bytes memory) {
         Diamond.DiamondCutData memory diamondCut = abi.decode(
             _buildDiamondCutDataEncoded(config.facets, baseConfig),
@@ -759,7 +734,7 @@ library GatewayCTMDeployerHelper {
             genesisBatchCommitment: baseConfig.genesisBatchCommitment,
             diamondCut: diamondCut,
             forceDeploymentsData: baseConfig.forceDeploymentsData,
-            registry: address(0)
+            registry: genesisRegistry
         });
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
             owner: baseConfig.aliasedGovernanceAddress,
@@ -890,7 +865,7 @@ library GatewayCTMDeployerHelper {
     /// @notice Bytecodes required for Gateway CTM deployers on Era.
     // solhint-disable-next-line code-complexity
     function _gatewayCTMEraFactoryDependencies() private returns (bytes[] memory dependencies) {
-        uint256 totalDependencies = 27;
+        uint256 totalDependencies = 28;
         dependencies = new bytes[](totalDependencies);
         uint256 idx = 0;
 
@@ -935,6 +910,11 @@ library GatewayCTMDeployerHelper {
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Committer.sol", "CommitterFacet");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "DiamondInit.sol", "DiamondInit");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "L1GenesisUpgrade.sol", "L1GenesisUpgrade");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
+            false,
+            "GatewayGenesisRegistry.sol",
+            "GatewayGenesisRegistry"
+        );
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Multicall3.sol", "Multicall3");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "DiamondProxy.sol", "DiamondProxy");
     }
