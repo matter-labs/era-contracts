@@ -61,7 +61,7 @@ contract AtomicFlowManagerRecoverTest is Test {
 
     /// @dev Builds a single-call bundle. `destBaseTokenAssetId` selects the refund path; `value` marks it
     /// as a value-carrying leg.
-    function _bundle(bytes32 _destBaseTokenAssetId, uint256 _value) internal pure returns (InteropBundle memory b) {
+    function _bundle(bytes32 _destBaseTokenAssetId, uint256 _value) internal view returns (InteropBundle memory b) {
         InteropCall[] memory calls = new InteropCall[](1);
         calls[0] = InteropCall({
             version: INTEROP_CALL_VERSION,
