@@ -541,6 +541,11 @@
                 "name": "forceDeploymentsData",
                 "type": "bytes",
                 "internalType": "bytes"
+              },
+              {
+                "name": "newChainFacetData",
+                "type": "bytes",
+                "internalType": "bytes"
               }
             ]
           },
@@ -587,6 +592,19 @@
         "name": "",
         "type": "address",
         "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "newChainFacetData",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
     "stateMutability": "view"
@@ -751,6 +769,11 @@
             "name": "forceDeploymentsData",
             "type": "bytes",
             "internalType": "bytes"
+          },
+          {
+            "name": "newChainFacetData",
+            "type": "bytes",
+            "internalType": "bytes"
           }
         ]
       }
@@ -838,6 +861,11 @@
         "name": "_verifier",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "_upgradeFacetData",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
     "outputs": [],
@@ -1129,6 +1157,25 @@
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "upgradeFacetData",
+    "inputs": [
+      {
+        "name": "_protocolVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
     "stateMutability": "view"

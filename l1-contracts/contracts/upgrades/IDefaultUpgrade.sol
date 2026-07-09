@@ -10,4 +10,8 @@ interface IDefaultUpgrade {
     function upgradeInner(ProposedUpgrade calldata _upgrade) external returns (bytes32);
 
     function patchUpgrade(uint256 _newProtocolVersion) external returns (bytes32);
+
+    /// @notice Registry-driven upgrade: the executor composes the `ProposedUpgrade` on-chain from
+    ///         the pinned registry, so the committed cut carries only `(registry, timestamp)`.
+    function upgradeFromRegistry(address _registry, uint256 _upgradeTimestamp) external returns (bytes32);
 }

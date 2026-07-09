@@ -124,12 +124,12 @@ abstract contract GatewayCTMDeployerCTMBase {
             selectors: new bytes4[](0)
         });
 
-        // Only system contract hashes are initialized here; verifier is fetched from CTM on-chain.
+        // Only system contract hashes are initialized here; verifier and facet set are read from
+        // the CTM on-chain (the facet set via `newChainFacetData`, stored below).
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
             l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
-            l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash,
-            facets: facetInstallations
+            l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
@@ -146,7 +146,8 @@ abstract contract GatewayCTMDeployerCTMBase {
             genesisIndexRepeatedStorageChanges: uint64(baseConfig.genesisRollupLeafIndex),
             genesisBatchCommitment: baseConfig.genesisBatchCommitment,
             diamondCut: diamondCut,
-            forceDeploymentsData: baseConfig.forceDeploymentsData
+            forceDeploymentsData: baseConfig.forceDeploymentsData,
+            newChainFacetData: abi.encode(facetInstallations)
         });
 
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({

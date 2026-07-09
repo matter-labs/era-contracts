@@ -75,8 +75,9 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         }
 
         // Facet swaps are applied first, mirroring the legacy path where the outer cut's
-        // `facetCuts` execute before this init delegatecall runs.
-        _upgradeFacets(_proposedUpgrade.facetSwaps);
+        // `facetCuts` execute before this init delegatecall runs. The swap plan is read from the
+        // CTM by the new protocol version (like the verifier below), not carried in the cut.
+        _upgradeFacets(IChainTypeManager(s.chainTypeManager).upgradeFacetData(_proposedUpgrade.newProtocolVersion));
 
         // If settlement layer is 0, it means that this diamond proxy is located on the settlement layer.
         bool isOnSettlementLayer = s.settlementLayer == address(0);
@@ -117,15 +118,20 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         emit UpgradeComplete(_proposedUpgrade.newProtocolVersion, txHash, _proposedUpgrade);
     }
 
-    /// @notice Applies the proposed facet swaps to the diamond this contract is delegatecalled
-    ///         into. A no-op when the plan is empty (the legacy path, where facet changes ride in
-    ///         the outer diamond cut's `facetCuts`).
+    /// @notice Applies the CTM-supplied facet-swap plan to the diamond this contract is
+    ///         delegatecalled into. `_facetData` is the abi-encoded `UpgradeFacetSwap[]` the CTM
+    ///         stores per protocol version; empty means no facet changes (patch upgrades, genesis
+    ///         upgrades) — guarded, since decoding empty bytes would revert.
     /// @dev Selector lists are resolved here, at execution time: a pinned non-empty list wins
     ///      (bootstrap override for facets predating `ISelfDescribingFacet`), otherwise the
     ///      facet's own `selectors()` is read. Facet bytecode is immutable, so every execution of
-    ///      the same plan produces the same cut — which keeps the committed upgrade-cut hash
-    ///      recomposable for the whole upgrade window without carting selector lists around.
-    function _upgradeFacets(UpgradeFacetSwap[] memory _facetSwaps) internal {
+    ///      the same plan produces the same cut — which keeps the plan recomposable for the whole
+    ///      upgrade window without carting selector lists around.
+    function _upgradeFacets(bytes memory _facetData) internal {
+        if (_facetData.length == 0) {
+            return;
+        }
+        UpgradeFacetSwap[] memory _facetSwaps = abi.decode(_facetData, (UpgradeFacetSwap[]));
         uint256 swapsLength = _facetSwaps.length;
         if (swapsLength == 0) {
             return;

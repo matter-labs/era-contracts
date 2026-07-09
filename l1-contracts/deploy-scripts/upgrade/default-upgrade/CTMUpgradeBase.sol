@@ -15,11 +15,7 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 import {PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
-import {
-    ProposedUpgrade,
-    ProposedUpgradeLib,
-    UpgradeFacetSwap
-} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
+import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {DeployCTMScript} from "../../ctm/DeployCTM.s.sol";
 import {FacetCutsLib} from "./FacetCutsLib.sol";
@@ -169,8 +165,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: encodePostUpgradeCalldata(_stateTransition),
             upgradeTimestamp: 0,
-            newProtocolVersion: _chainCreationParams.latestProtocolVersion,
-            facetSwaps: new UpgradeFacetSwap[](0)
+            newProtocolVersion: _chainCreationParams.latestProtocolVersion
         });
     }
 

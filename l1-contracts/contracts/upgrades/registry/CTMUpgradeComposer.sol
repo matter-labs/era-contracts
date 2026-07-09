@@ -69,9 +69,9 @@ library CTMUpgradeComposer {
         }
     }
 
-    /// @notice Builds the diamond cut that upgrades an existing chain: no `facetCuts` of its own —
-    ///         facet swaps ride inside the init calldata's `ProposedUpgrade.facetSwaps` and are
-    ///         applied by `BaseZkSyncUpgrade` itself, inside the diamond's context.
+    /// @notice Builds the diamond cut that upgrades an existing chain: no `facetCuts` of its own.
+    ///         The facet-swap plan (see `buildFacetSwapPlan`) is stored in the CTM per version and
+    ///         read back by `BaseZkSyncUpgrade` at execution time — it is not carried in the cut.
     function buildUpgradeCutData(
         address _initAddress,
         bytes memory _initCalldata
@@ -137,11 +137,17 @@ library CTMUpgradeComposer {
             proposedUpgrade.evmEmulatorHash
         ) = _registry.baseSystemContractHashes(newVersion);
         proposedUpgrade.upgradeTimestamp = _upgradeTimestamp;
-        proposedUpgrade.facetSwaps = buildFacetSwapPlan(_registry);
+    }
+
+    /// @notice The abi-encoded facet-swap plan for the registry's new version, in the shape the
+    ///         CTM stores (`upgradeFacetData`) and `BaseZkSyncUpgrade` decodes.
+    function buildUpgradeFacetData(ICTMRegistry _registry) internal view returns (bytes memory) {
+        return abi.encode(buildFacetSwapPlan(_registry));
     }
 
     /// @notice Builds the `ChainCreationParams` for chains created at the registry's new protocol
-    ///         version. The chain-creation diamond cut installs the same facet set the upgrade cut
+    ///         version. The facet set new chains install (`newChainFacetData`) is stored in the CTM
+    ///         and read back by `DiamondInit`, exactly the same set the upgrade path's swap plan
     ///         produces on existing chains — both derive from the same registry constants, so they
     ///         cannot disagree.
     function buildChainCreationParams(ICTMRegistry _registry) internal view returns (ChainCreationParams memory) {
@@ -160,29 +166,37 @@ library CTMUpgradeComposer {
                 genesisIndexRepeatedStorageChanges: genesisIndexRepeatedStorageChanges,
                 genesisBatchCommitment: genesisBatchCommitment,
                 diamondCut: _buildChainCreationCut(_registry, newVersion),
-                forceDeploymentsData: _registry.fixedForceDeploymentsData(newVersion)
+                forceDeploymentsData: _registry.fixedForceDeploymentsData(newVersion),
+                newChainFacetData: buildNewChainFacetData(_registry)
             });
     }
 
-    /// @dev The initial cut of a new chain: no `facetCuts` — `DiamondInit` installs the new
-    ///      facet set itself from the `FacetInstallation` list in its init calldata, composed
-    ///      here from the same registry rows the upgrade path uses (no drift by construction).
-    ///      Selector lists ride along only when the registry pins them (bootstrap override);
-    ///      empty means DiamondInit reads the facet's own `selectors()` at execution time.
-    function _buildChainCreationCut(
-        ICTMRegistry _registry,
-        uint256 _newVersion
-    ) private view returns (Diamond.DiamondCutData memory) {
-        CTMContract[] memory facets = _registry.facetList(_newVersion);
+    /// @notice The abi-encoded full facet install set for the registry's new version, in the shape
+    ///         the CTM stores (`newChainFacetData`) and `DiamondInit` decodes. Selector lists ride
+    ///         along only when the registry pins them (bootstrap override); empty means DiamondInit
+    ///         reads the facet's own `selectors()` at execution time.
+    function buildNewChainFacetData(ICTMRegistry _registry) internal view returns (bytes memory) {
+        uint256 newVersion = _registry.newProtocolVersion();
+        CTMContract[] memory facets = _registry.facetList(newVersion);
         uint256 facetsLength = facets.length;
         FacetInstallation[] memory installations = new FacetInstallation[](facetsLength);
         for (uint256 i = 0; i < facetsLength; ++i) {
             installations[i] = FacetInstallation({
-                facet: _registry.ctmAddress(facets[i], _newVersion),
+                facet: _registry.ctmAddress(facets[i], newVersion),
                 isFreezable: _registry.facetIsFreezable(facets[i]),
-                selectors: _registry.facetSelectors(facets[i], _newVersion)
+                selectors: _registry.facetSelectors(facets[i], newVersion)
             });
         }
+        return abi.encode(installations);
+    }
+
+    /// @dev The initial cut of a new chain: no `facetCuts` (DiamondInit installs the facet set it
+    ///      reads from the CTM) and no facets in the init calldata — only the chain-independent
+    ///      base-system-contract hashes, passed through opaquely by the CTM.
+    function _buildChainCreationCut(
+        ICTMRegistry _registry,
+        uint256 _newVersion
+    ) private view returns (Diamond.DiamondCutData memory) {
         (bytes32 bootloaderHash, bytes32 defaultAccountHash, bytes32 evmEmulatorHash) = _registry
             .baseSystemContractHashes(_newVersion);
 
@@ -194,8 +208,7 @@ library CTMUpgradeComposer {
                     InitializeDataNewChain({
                         l2BootloaderBytecodeHash: bootloaderHash,
                         l2DefaultAccountBytecodeHash: defaultAccountHash,
-                        l2EvmEmulatorBytecodeHash: evmEmulatorHash,
-                        facets: installations
+                        l2EvmEmulatorBytecodeHash: evmEmulatorHash
                     })
                 )
             });

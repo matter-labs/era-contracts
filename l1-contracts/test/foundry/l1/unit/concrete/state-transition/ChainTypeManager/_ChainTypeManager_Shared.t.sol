@@ -199,7 +199,8 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: forceDeploymentsData
+            forceDeploymentsData: forceDeploymentsData,
+            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
         });
 
         ChainTypeManagerInitializeData memory ctmInitializeDataNoGovernor = ChainTypeManagerInitializeData({
@@ -242,7 +243,14 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
 
         bytes memory initCalldata = abi.encode(initializeData);
 
-        return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
+        // No facetCuts: facets are installed by DiamondInit from the CTM's `newChainFacetData`
+        // (see the ChainCreationParams built with `Utils.encodeFacetInstallations(facetCuts)`).
+        return
+            Diamond.DiamondCutData({
+                facetCuts: new Diamond.FacetCut[](0),
+                initAddress: _diamondInit,
+                initCalldata: initCalldata
+            });
     }
 
     function getDiamondCutDataWithCustomFacets(

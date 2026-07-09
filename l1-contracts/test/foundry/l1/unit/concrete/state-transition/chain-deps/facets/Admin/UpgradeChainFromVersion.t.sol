@@ -236,6 +236,13 @@ contract UpgradeChainFromVersionTest is AdminTest {
             abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, newProtocolVersion),
             abi.encode(mockVerifier)
         );
+        // DefaultUpgrade also reads the facet-swap plan from the CTM; this upgrade changes no
+        // facets, so return an empty plan.
+        vm.mockCall(
+            chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.upgradeFacetData.selector),
+            abi.encode(bytes(""))
+        );
 
         // Set upgrade timestamp to 1000, warp to exactly that time
         uint256 upgradeTimestamp = 1000;

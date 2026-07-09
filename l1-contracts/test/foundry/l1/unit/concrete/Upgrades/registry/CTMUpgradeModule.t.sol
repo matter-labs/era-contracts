@@ -14,7 +14,6 @@ import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
-import {ProposedUpgrade} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {HashMismatch} from "contracts/common/L1ContractErrors.sol";
 
@@ -103,16 +102,14 @@ contract CTMUpgradeModuleTest is ChainTypeManagerTest {
         ctmRegistry.setGenesis(makeAddr("genesisUpgrade"), bytes32(uint256(1)), bytes32(uint256(2)), 54);
     }
 
-    /// @dev Recomposes the cut exactly as the module does, for hash assertions.
+    /// @dev Recomposes the cut exactly as the module does, for hash assertions. The committed cut
+    ///      carries only `(registry, timestamp)`; the executor composes the `ProposedUpgrade` from
+    ///      the registry at execution time.
     function _expectedUpgradeCut(uint256 _upgradeTimestamp) internal view returns (Diamond.DiamondCutData memory) {
-        ProposedUpgrade memory proposedUpgrade = CTMUpgradeComposer.buildProposedUpgrade(
-            ICTMRegistry(address(ctmRegistry)),
-            _upgradeTimestamp
-        );
         return
             CTMUpgradeComposer.buildUpgradeCutData(
                 ctmRegistry.ctmAddress(CTMContract.DefaultUpgrade, newVersion),
-                abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade))
+                abi.encodeCall(IDefaultUpgrade.upgradeFromRegistry, (address(ctmRegistry), _upgradeTimestamp))
             );
     }
 

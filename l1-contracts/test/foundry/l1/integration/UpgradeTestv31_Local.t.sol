@@ -79,8 +79,7 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
             upgradeTimestamp: 0,
-            newProtocolVersion: chainCreationParams.latestProtocolVersion,
-            facetSwaps: new UpgradeFacetSwap[](0)
+            newProtocolVersion: chainCreationParams.latestProtocolVersion
         });
     }
 }

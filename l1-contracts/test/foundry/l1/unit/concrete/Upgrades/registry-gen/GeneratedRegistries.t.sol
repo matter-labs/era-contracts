@@ -10,7 +10,7 @@ import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
-import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {FacetInstallation, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ProposedUpgrade, UpgradeFacetSwap} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
@@ -200,10 +200,9 @@ contract GeneratedRegistriesTest is Test {
             bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000da0))
         );
         assertEq(proposedUpgrade.evmEmulatorHash, bytes32(0));
-        // The facet-swap plan is embedded: BaseZkSyncUpgrade applies it inside the diamond.
-        assertEq(proposedUpgrade.facetSwaps.length, 3);
-        assertEq(proposedUpgrade.facetSwaps[0].oldFacet, address(0xF101));
-        assertEq(proposedUpgrade.facetSwaps[2].newFacet, address(0xF203));
+        // The facet-swap plan is no longer in the ProposedUpgrade; it is composed separately via
+        // buildFacetSwapPlan (asserted in test_buildFacetSwapPlan_plansExactlyThePlanRows) and
+        // stored in the CTM, read back by BaseZkSyncUpgrade at execution.
     }
 
     function test_buildChainCreationParams_installsFullNewFacetSet() public view {
@@ -215,8 +214,9 @@ contract GeneratedRegistriesTest is Test {
         assertEq(params.genesisIndexRepeatedStorageChanges, 54);
         assertEq(params.forceDeploymentsData, hex"f1f2");
         assertEq(params.diamondCut.initAddress, address(0xF204)); // DiamondInit
-        // The genesis cut carries no facet cuts of its own: DiamondInit installs the facets
-        // itself, from the FacetInstallation list in its init calldata.
+        // The genesis cut carries no facet cuts and no facets in its init calldata: DiamondInit
+        // reads the facet set from the CTM's `newChainFacetData` (below); the cut's init calldata
+        // holds only the base-system-contract hashes.
         assertEq(params.diamondCut.facetCuts.length, 0);
         InitializeDataNewChain memory newChainData = abi.decode(
             params.diamondCut.initCalldata,
@@ -226,15 +226,16 @@ contract GeneratedRegistriesTest is Test {
             newChainData.l2BootloaderBytecodeHash,
             bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000b00))
         );
-        // The chain-creation facet set equals the post-upgrade facet set (no drift by
-        // construction): AdminFacet(new) + GettersFacet + ExecutorFacet, with the registry's
+        // The facet set stored per version in the CTM equals the post-upgrade facet set (no drift
+        // by construction): AdminFacet(new) + GettersFacet + ExecutorFacet, with the registry's
         // pinned selector lists riding along.
-        assertEq(newChainData.facets.length, 3);
-        assertEq(newChainData.facets[0].facet, address(0xF201));
-        assertEq(newChainData.facets[1].facet, address(0xF102));
-        assertEq(newChainData.facets[2].facet, address(0xF203));
-        assertTrue(newChainData.facets[2].isFreezable);
-        assertEq(newChainData.facets[0].selectors.length, 2);
+        FacetInstallation[] memory facets = abi.decode(params.newChainFacetData, (FacetInstallation[]));
+        assertEq(facets.length, 3);
+        assertEq(facets[0].facet, address(0xF201));
+        assertEq(facets[1].facet, address(0xF102));
+        assertEq(facets[2].facet, address(0xF203));
+        assertTrue(facets[2].isFreezable);
+        assertEq(facets[0].selectors.length, 2);
     }
 
     /*//////////////////////////////////////////////////////////////

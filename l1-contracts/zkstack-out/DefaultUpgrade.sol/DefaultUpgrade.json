@@ -175,40 +175,32 @@
             "name": "newProtocolVersion",
             "type": "uint256",
             "internalType": "uint256"
-          },
-          {
-            "name": "facetSwaps",
-            "type": "tuple[]",
-            "internalType": "struct UpgradeFacetSwap[]",
-            "components": [
-              {
-                "name": "oldFacet",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "newFacet",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "isFreezable",
-                "type": "bool",
-                "internalType": "bool"
-              },
-              {
-                "name": "oldSelectors",
-                "type": "bytes4[]",
-                "internalType": "bytes4[]"
-              },
-              {
-                "name": "newSelectors",
-                "type": "bytes4[]",
-                "internalType": "bytes4[]"
-              }
-            ]
           }
         ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "upgradeFromRegistry",
+    "inputs": [
+      {
+        "name": "_registry",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_upgradeTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [
@@ -532,38 +524,6 @@
             "name": "newProtocolVersion",
             "type": "uint256",
             "internalType": "uint256"
-          },
-          {
-            "name": "facetSwaps",
-            "type": "tuple[]",
-            "internalType": "struct UpgradeFacetSwap[]",
-            "components": [
-              {
-                "name": "oldFacet",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "newFacet",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "isFreezable",
-                "type": "bool",
-                "internalType": "bool"
-              },
-              {
-                "name": "oldSelectors",
-                "type": "bytes4[]",
-                "internalType": "bytes4[]"
-              },
-              {
-                "name": "newSelectors",
-                "type": "bytes4[]",
-                "internalType": "bytes4[]"
-              }
-            ]
           }
         ]
       }

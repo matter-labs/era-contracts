@@ -31,6 +31,10 @@ struct ChainTypeManagerInitializeData {
 /// @param genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for the genesis batch
 /// @param genesisBatchCommitment The zk-proof commitment for the genesis batch
 /// @param diamondCut The diamond cut for the first upgrade transaction on the newly deployed chain
+/// @param newChainFacetData The abi-encoded `FacetInstallation[]` a chain created at this protocol
+///        version installs. Stored per version in the CTM and read back by `DiamondInit` at genesis
+///        (the same way the verifier is stored per version and read at init), so the committed
+///        genesis cut no longer carries the facet set.
 // solhint-disable-next-line gas-struct-packing
 struct ChainCreationParams {
     address genesisUpgrade;
@@ -39,6 +43,7 @@ struct ChainCreationParams {
     bytes32 genesisBatchCommitment;
     Diamond.DiamondCutData diamondCut;
     bytes forceDeploymentsData;
+    bytes newChainFacetData;
 }
 
 interface IChainTypeManager {
@@ -132,6 +137,16 @@ interface IChainTypeManager {
 
     function setProtocolVersionVerifier(uint256 _protocolVersion, address _verifier) external;
 
+    /// @notice The abi-encoded `FacetInstallation[]` a newly created chain installs, for the
+    ///         current protocol version. Read by `DiamondInit` at genesis; a single value updated
+    ///         by `setChainCreationParams`, parallel to `initialCutHash`.
+    function newChainFacetData() external view returns (bytes memory);
+
+    /// @notice The abi-encoded `UpgradeFacetSwap[]` plan taking a chain to `_protocolVersion` from
+    ///         its predecessor. Read by the upgrade contract; empty for versions with no facet
+    ///         changes (e.g. patch upgrades).
+    function upgradeFacetData(uint256 _protocolVersion) external view returns (bytes memory);
+
     function getProtocolVersion(uint256 _chainId) external view returns (uint256);
 
     function serverNotifierAddress() external view returns (address);
@@ -163,7 +178,8 @@ interface IChainTypeManager {
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion,
-        address _verifier
+        address _verifier,
+        bytes calldata _upgradeFacetData
     ) external;
 
     function createNewPatchUpgrade(

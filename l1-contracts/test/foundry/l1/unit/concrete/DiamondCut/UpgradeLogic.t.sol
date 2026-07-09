@@ -107,8 +107,7 @@ contract UpgradeLogicTest is DiamondCutTest {
         InitializeDataNewChain memory newChainParams = InitializeDataNewChain({
             l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
             l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-            l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-            facets: new FacetInstallation[](0)
+            l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
         });
 
         bytes memory diamondInitCalldata = abi.encodeCall(diamondInit.initialize, (params, abi.encode(newChainParams)));

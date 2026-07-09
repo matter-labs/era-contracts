@@ -7,7 +7,6 @@ import {ICTMRegistry} from "./ICTMRegistry.sol";
 import {CTMUpgradeComposer} from "./CTMUpgradeComposer.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
-import {ProposedUpgrade} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
 import {IDefaultUpgrade} from "../IDefaultUpgrade.sol";
 
 /// @title CTMUpgradeModule
@@ -59,7 +58,10 @@ contract CTMUpgradeModule {
             _oldProtocolVersion: oldProtocolVersion,
             _oldProtocolVersionDeadline: _oldProtocolVersionDeadline,
             _newProtocolVersion: newProtocolVersion,
-            _verifier: _registry.verifier(newProtocolVersion)
+            _verifier: _registry.verifier(newProtocolVersion),
+            // The facet-swap plan is stored in CTM state (read back by the upgrade contract at
+            // execution), not carried in the committed cut — same model as the verifier above.
+            _upgradeFacetData: CTMUpgradeComposer.buildUpgradeFacetData(_registry)
         });
         ctm.setChainCreationParams(CTMUpgradeComposer.buildChainCreationParams(_registry));
 
@@ -85,18 +87,20 @@ contract CTMUpgradeModule {
         emit ChainUpgradeApplied(address(ctm), _chainId, _registry.newProtocolVersion());
     }
 
-    /// @dev Composes the full upgrade cut: a `DefaultUpgrade.upgrade(proposedUpgrade)` init
-    ///      delegatecall embedding the facet-swap plan and the L2 protocol upgrade transaction
-    ///      (no outer `facetCuts` — the upgrade contract applies the swaps itself).
+    /// @dev Composes the upgrade cut: a `DefaultUpgrade.upgradeFromRegistry(registry, timestamp)`
+    ///      init delegatecall (no outer `facetCuts` — the upgrade contract applies the facet swaps
+    ///      itself). The `ProposedUpgrade` is NOT embedded here: the executor composes it on-chain
+    ///      from the same registry at execution time, so the committed cut carries only the registry
+    ///      address and timestamp. Both remain chain-independent, so a single cut is committed once
+    ///      and applied to every chain; per-chain L2-tx arguments are injected in the executor.
     function _buildUpgradeCut(
         ICTMRegistry _registry,
         uint256 _upgradeTimestamp
     ) private view returns (Diamond.DiamondCutData memory) {
-        ProposedUpgrade memory proposedUpgrade = CTMUpgradeComposer.buildProposedUpgrade(_registry, _upgradeTimestamp);
         return
             CTMUpgradeComposer.buildUpgradeCutData(
                 _registry.ctmAddress(CTMContract.DefaultUpgrade, _registry.newProtocolVersion()),
-                abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade))
+                abi.encodeCall(IDefaultUpgrade.upgradeFromRegistry, (address(_registry), _upgradeTimestamp))
             );
     }
 }

@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
+import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
@@ -32,7 +33,8 @@ contract SetChainCreationParamsTest is ChainTypeManagerTest {
             genesisIndexRepeatedStorageChanges: genesisIndexRepeatedStorageChanges,
             genesisBatchCommitment: genesisBatchCommitment,
             diamondCut: newDiamondCutData,
-            forceDeploymentsData: bytes("")
+            forceDeploymentsData: bytes(""),
+            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
         });
 
         vm.prank(governor);

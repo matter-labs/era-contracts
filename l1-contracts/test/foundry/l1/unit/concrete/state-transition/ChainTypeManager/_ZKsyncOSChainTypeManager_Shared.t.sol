@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
+import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
@@ -54,7 +55,8 @@ contract ZKsyncOSChainTypeManagerSharedTest is ChainTypeManagerTest {
             // ZKsyncOSChainTypeManager requires the genesis batch commitment to be exactly 1.
             genesisBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(diamondInit),
-            forceDeploymentsData: forceDeploymentsData
+            forceDeploymentsData: forceDeploymentsData,
+            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
         });
 
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({

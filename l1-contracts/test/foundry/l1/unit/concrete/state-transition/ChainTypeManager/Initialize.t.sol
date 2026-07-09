@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {
     IChainTypeManager,
@@ -59,7 +60,8 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: bytes("")
+            forceDeploymentsData: bytes(""),
+            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
         });
 
         _deployCtmWithParams(chainCreationParams, GenesisUpgradeZero.selector);
@@ -72,7 +74,8 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: bytes("")
+            forceDeploymentsData: bytes(""),
+            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
         });
 
         _deployCtmWithParams(chainCreationParams, GenesisBatchHashZero.selector);
@@ -85,7 +88,8 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0)),
             diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: bytes("")
+            forceDeploymentsData: bytes(""),
+            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
         });
 
         _deployCtmWithParams(chainCreationParams, GenesisBatchCommitmentZero.selector);

@@ -691,8 +691,23 @@ library GatewayCTMDeployerHelper {
         Facets memory facets,
         GatewayCTMDeployerConfig memory baseConfig
     ) private pure returns (bytes memory) {
-        // Mirrors GatewayCTMDeployerCTMBase: no facet cuts and no selector lists — DiamondInit
-        // installs the self-describing facets itself on the chain where the cut runs.
+        DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
+            l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
+            l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
+            l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
+        });
+        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
+            facetCuts: new Diamond.FacetCut[](0),
+            initAddress: facets.diamondInit,
+            initCalldata: abi.encode(initializeData)
+        });
+        return abi.encode(diamondCut);
+    }
+
+    /// @notice The abi-encoded `FacetInstallation[]` the CTM stores as `newChainFacetData` and
+    ///         DiamondInit reads at genesis. Mirrors GatewayCTMDeployerCTMBase: no selector lists,
+    ///         since the deployed facets are self-describing.
+    function _buildFacetInstallationsEncoded(Facets memory facets) private pure returns (bytes memory) {
         FacetInstallation[] memory facetInstallations = new FacetInstallation[](6);
         facetInstallations[0] = FacetInstallation({
             facet: facets.adminFacet,
@@ -724,18 +739,7 @@ library GatewayCTMDeployerHelper {
             isFreezable: true,
             selectors: new bytes4[](0)
         });
-        DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
-            l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
-            l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash,
-            facets: facetInstallations
-        });
-        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
-            facetCuts: new Diamond.FacetCut[](0),
-            initAddress: facets.diamondInit,
-            initCalldata: abi.encode(initializeData)
-        });
-        return abi.encode(diamondCut);
+        return abi.encode(facetInstallations);
     }
 
     function _buildCTMProxyConstructorArgs(
@@ -755,7 +759,8 @@ library GatewayCTMDeployerHelper {
             genesisIndexRepeatedStorageChanges: uint64(baseConfig.genesisRollupLeafIndex),
             genesisBatchCommitment: baseConfig.genesisBatchCommitment,
             diamondCut: diamondCut,
-            forceDeploymentsData: baseConfig.forceDeploymentsData
+            forceDeploymentsData: baseConfig.forceDeploymentsData,
+            newChainFacetData: _buildFacetInstallationsEncoded(config.facets)
         });
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
             owner: baseConfig.aliasedGovernanceAddress,

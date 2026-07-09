@@ -34,8 +34,7 @@ contract BaseUpgrade is Test {
     function _prepareEmptyProposedUpgrade() internal {
         protocolVersion = SemVer.packSemVer(0, 1, 0);
 
-        // Assigned field by field: whole-struct memory->storage assignment is unsupported in
-        // legacy codegen now that ProposedUpgrade contains a dynamic struct array (facetSwaps).
+        // Assigned field by field into the storage struct.
         proposedUpgrade.l2ProtocolUpgradeTx = l2CanonicalTransaction;
         proposedUpgrade.bootloaderHash = bytes32(0);
         proposedUpgrade.defaultAccountHash = bytes32(0);
@@ -50,7 +49,6 @@ contract BaseUpgrade is Test {
         proposedUpgrade.postUpgradeCalldata = new bytes(0);
         proposedUpgrade.upgradeTimestamp = 0;
         proposedUpgrade.newProtocolVersion = protocolVersion;
-        delete proposedUpgrade.facetSwaps;
     }
 
     function _prepareProposedUpgrade() internal {
@@ -91,8 +89,7 @@ contract BaseUpgrade is Test {
             reservedDynamic: new bytes(0)
         });
 
-        // Assigned field by field: whole-struct memory->storage assignment is unsupported in
-        // legacy codegen now that ProposedUpgrade contains a dynamic struct array (facetSwaps).
+        // Assigned field by field into the storage struct.
         proposedUpgrade.l2ProtocolUpgradeTx = l2CanonicalTransaction;
         proposedUpgrade.bootloaderHash = bytes32(0x01000121a363b3fbec270986067c1b553bf540c30a6f186f45313133ff1a1019);
         proposedUpgrade.defaultAccountHash = bytes32(
@@ -109,7 +106,6 @@ contract BaseUpgrade is Test {
         proposedUpgrade.postUpgradeCalldata = postUpgradeCalldata;
         proposedUpgrade.upgradeTimestamp = 0;
         proposedUpgrade.newProtocolVersion = protocolVersion;
-        delete proposedUpgrade.facetSwaps;
     }
 
     // add this to be excluded from coverage report

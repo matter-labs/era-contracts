@@ -330,8 +330,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         InitializeDataNewChain memory newChainParams = InitializeDataNewChain({
             l2BootloaderBytecodeHash: dummyHash,
             l2DefaultAccountBytecodeHash: dummyHash,
-            l2EvmEmulatorBytecodeHash: dummyHash,
-            facets: new FacetInstallation[](0)
+            l2EvmEmulatorBytecodeHash: dummyHash
         });
         mockDiamondInitInteropCenterCallsWithAddress(
             address(dummyBridgehub),

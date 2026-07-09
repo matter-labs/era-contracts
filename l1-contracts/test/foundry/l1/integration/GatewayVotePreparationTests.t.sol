@@ -16,7 +16,11 @@ import {
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {IDiamondInit, InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {
+    IDiamondInit,
+    InitializeData,
+    FacetInstallation
+} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
@@ -204,10 +208,49 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
             abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector),
             abi.encode(makeAddr("mockVerifier"))
         );
+        // DiamondInit reads the facet set from the CTM (not the cut) and installs it — reverting
+        // if any facet lacks code, which is what this test checks. Mock the six deployed facets
+        // (self-describing: empty pinned selectors) exactly as the gateway deployer stores them.
+        FacetInstallation[] memory facetInstallations = new FacetInstallation[](6);
+        facetInstallations[0] = FacetInstallation({
+            facet: contracts.stateTransition.facets.adminFacet,
+            isFreezable: false,
+            selectors: new bytes4[](0)
+        });
+        facetInstallations[1] = FacetInstallation({
+            facet: contracts.stateTransition.facets.gettersFacet,
+            isFreezable: false,
+            selectors: new bytes4[](0)
+        });
+        facetInstallations[2] = FacetInstallation({
+            facet: contracts.stateTransition.facets.mailboxFacet,
+            isFreezable: true,
+            selectors: new bytes4[](0)
+        });
+        facetInstallations[3] = FacetInstallation({
+            facet: contracts.stateTransition.facets.executorFacet,
+            isFreezable: true,
+            selectors: new bytes4[](0)
+        });
+        facetInstallations[4] = FacetInstallation({
+            facet: contracts.stateTransition.facets.migratorFacet,
+            isFreezable: false,
+            selectors: new bytes4[](0)
+        });
+        facetInstallations[5] = FacetInstallation({
+            facet: contracts.stateTransition.facets.committerFacet,
+            isFreezable: true,
+            selectors: new bytes4[](0)
+        });
+        vm.mockCall(
+            mockCTM,
+            abi.encodeWithSelector(IChainTypeManager.newChainFacetData.selector),
+            abi.encode(abi.encode(facetInstallations))
+        );
 
         // Build full initCalldata: the chain-specific head plus the committed cut's
-        // chain-independent tail (abi-encoded InitializeDataNewChain, incl. the facets
-        // DiamondInit installs itself), exactly as ChainTypeManagerBase composes it.
+        // chain-independent tail (abi-encoded InitializeDataNewChain), exactly as
+        // ChainTypeManagerBase composes it.
         // Use L2_BRIDGEHUB_ADDR as bridgehub so initialize() takes the L2 branch
         // (sets nativeTokenVault/assetTracker from L2 constants, no external calls).
         diamondCut.initCalldata = abi.encodeCall(

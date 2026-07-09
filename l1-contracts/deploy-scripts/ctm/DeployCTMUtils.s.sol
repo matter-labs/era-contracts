@@ -281,7 +281,10 @@ abstract contract DeployCTMUtils is DeployUtils {
                 genesisIndexRepeatedStorageChanges: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex),
                 genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
                 diamondCut: diamondCut,
-                forceDeploymentsData: generatedData.forceDeploymentsData
+                forceDeploymentsData: generatedData.forceDeploymentsData,
+                // The facet set is stored in the CTM per version and read by DiamondInit at
+                // genesis (not carried in the cut) — see ChainCreationParams.newChainFacetData.
+                newChainFacetData: abi.encode(getChainCreationFacetInstallations(stateTransition))
             });
     }
 
@@ -317,8 +320,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             DiamondInitializeDataNewChain({
                 l2BootloaderBytecodeHash: config.contracts.chainCreationParams.bootloaderHash,
                 l2DefaultAccountBytecodeHash: config.contracts.chainCreationParams.defaultAAHash,
-                l2EvmEmulatorBytecodeHash: config.contracts.chainCreationParams.evmEmulatorHash,
-                facets: getChainCreationFacetInstallations(stateTransition)
+                l2EvmEmulatorBytecodeHash: config.contracts.chainCreationParams.evmEmulatorHash
             });
     }
 

@@ -98,6 +98,14 @@ contract UtilsCallMockerTest is Test {
             abi.encodeWithSelector(IChainTypeManager.PERMISSIONLESS_VALIDATOR.selector),
             abi.encode(permissionlessValidator)
         );
+        // DiamondInit reads the facet set from the CTM and installs it. These fixtures install
+        // their facets via the diamond cut's own `facetCuts`, so the CTM returns an empty set
+        // (DiamondInit decodes it to a zero-length array and installs nothing further).
+        vm.mockCall(
+            chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.newChainFacetData.selector),
+            abi.encode(bytes(""))
+        );
     }
 
     /// @notice Mocks the CTM's protocolVersionVerifier call for DiamondInit
@@ -108,6 +116,14 @@ contract UtilsCallMockerTest is Test {
             DEFAULT_CHAIN_TYPE_MANAGER,
             abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, DEFAULT_PROTOCOL_VERSION),
             abi.encode(verifier)
+        );
+        // DiamondInit also reads the facet set from the CTM. These direct-diamond fixtures install
+        // their facets via the cut's own `facetCuts`, so the CTM returns an empty set (DiamondInit
+        // decodes it to a zero-length array and installs nothing further).
+        vm.mockCall(
+            DEFAULT_CHAIN_TYPE_MANAGER,
+            abi.encodeWithSelector(IChainTypeManager.newChainFacetData.selector),
+            abi.encode(bytes(""))
         );
     }
 

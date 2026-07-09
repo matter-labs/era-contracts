@@ -528,8 +528,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             l1ContractsUpgradeCalldata: hex"",
             postUpgradeCalldata: hex"",
             upgradeTimestamp: 0,
-            newProtocolVersion: newProtocolVersion,
-            facetSwaps: new UpgradeFacetSwap[](0)
+            newProtocolVersion: newProtocolVersion
         });
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),

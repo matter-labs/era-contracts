@@ -7,7 +7,6 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgradeGenesis} from "./BaseZkSyncUpgradeGenesis.sol";
 import {ProposedUpgrade} from "./IDefaultUpgrade.sol";
-import {UpgradeFacetSwap} from "../state-transition/libraries/ProposedUpgradeLib.sol";
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {IL2GenesisUpgrade} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
@@ -108,8 +107,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: new bytes(0),
             upgradeTimestamp: 0,
-            newProtocolVersion: _protocolVersion,
-            facetSwaps: new UpgradeFacetSwap[](0)
+            newProtocolVersion: _protocolVersion
         });
 
         Diamond.FacetCut[] memory emptyArray;

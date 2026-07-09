@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
 import {
@@ -23,7 +24,8 @@ contract initializingCTMOwnerZeroTest is ChainTypeManagerTest {
             genesisIndexRepeatedStorageChanges: 1,
             genesisBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: bytes("")
+            forceDeploymentsData: bytes(""),
+            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
         });
 
         ChainTypeManagerInitializeData memory ctmInitializeDataNoOwner = ChainTypeManagerInitializeData({

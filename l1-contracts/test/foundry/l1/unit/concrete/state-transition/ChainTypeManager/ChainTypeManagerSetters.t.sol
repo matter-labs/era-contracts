@@ -203,7 +203,8 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
             0,
             block.timestamp + 1 days,
             oldProtocolVersion,
-            testnetVerifier
+            testnetVerifier,
+            new bytes(0)
         );
 
         vm.prank(governor);
