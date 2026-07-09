@@ -214,6 +214,17 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         }
     }
 
+    /// @notice The address the freshly deployed (ZKsync OS) verifier's ownership
+    ///         is initially transferred to. For a fresh CTM deployment that is
+    ///         governance directly (`config.ownerAddress`). An upgrade flow that
+    ///         cannot hand ownership to governance in one step (e.g. because the
+    ///         verifier must first be accepted by an intermediate admin) overrides
+    ///         this to route through that admin. Era verifiers are not Ownable, so
+    ///         the value is unused for them.
+    function verifierInitialOwner() internal view virtual returns (address) {
+        return config.ownerAddress;
+    }
+
     function deployVerifiers() internal {
         (, string memory fflonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierFflonk);
         (, string memory plonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierPlonk);
@@ -226,16 +237,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
         ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, false);
 
-        // ZKsync OS dual verifiers are Ownable2Step. Instead of transferring the
-        // fresh verifier straight to governance (PUH) — which routes ownership
-        // through the deployer — hand it to the ecosystem ChainAdmin
-        // (`Bridgehub.admin()`), which then accepts it and forwards it to
-        // governance via a ChainAdmin multicall (see `prepareVerifierHandoverCall`
-        // in DefaultCTMUpgrade). Era verifiers are not Ownable, so this is a no-op
-        // for them and `config.ownerAddress` is passed through unused.
-        address verifierOwner = config.isZKsyncOS
-            ? L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).admin()
-            : config.ownerAddress;
         // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
         vm.startBroadcast(getDeployerAddress());
         // Called as library (not through vms) to preserve msg.sender
@@ -243,7 +244,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.stateTransition.verifiers.verifier,
             ctmAddresses.stateTransition.verifiers.verifierFflonk,
             ctmAddresses.stateTransition.verifiers.verifierPlonk,
-            verifierOwner,
+            verifierInitialOwner(),
             config.isZKsyncOS
         );
         vm.stopBroadcast();

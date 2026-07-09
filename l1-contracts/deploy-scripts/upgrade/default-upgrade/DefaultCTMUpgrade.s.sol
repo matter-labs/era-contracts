@@ -555,6 +555,21 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         vm.writeToml(ctmAdminCallsSerialized, upgradeConfig.outputPath, ".ctm_admin_calls");
     }
 
+    /// @notice Overrides the base verifier-owner hook for the v31 upgrade flow.
+    /// @dev In the v31 upgrade the freshly deployed ZKsync OS dual verifier can't
+    ///      be handed to governance (PUH) in one step — it must first be accepted
+    ///      by an intermediate admin — so it is transferred to the ecosystem
+    ///      ChainAdmin (`Bridgehub.admin()`), which then accepts it and forwards
+    ///      it to governance via `prepareVerifierHandoverCall`. A fresh
+    ///      `DeployCTM` deployment keeps the base behaviour (transfer straight to
+    ///      governance). Era verifiers are not Ownable, so the value is unused.
+    function verifierInitialOwner() internal view override returns (address) {
+        if (config.isZKsyncOS) {
+            return L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).admin();
+        }
+        return config.ownerAddress;
+    }
+
     /// @notice Build the ChainAdmin multicall that hands the freshly deployed
     ///         ZKsync OS dual verifier from the ecosystem ChainAdmin
     ///         (`Bridgehub.admin()`, its pending owner set at deploy time) to
@@ -570,7 +585,18 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         // Same source as the deploy-time transfer in `DeployCTM.deployVerifiers`,
         // so the ChainAdmin here matches the verifier's pending owner exactly.
         chainAdmin = L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).admin();
-        if (chainAdmin == address(0) || IOwnable(verifier).pendingOwner() != chainAdmin) {
+        if (chainAdmin == address(0)) {
+            return (new Call[](0), address(0));
+        }
+        if (IOwnable(verifier).pendingOwner() != chainAdmin) {
+            // Not pending to the ecosystem ChainAdmin: only acceptable if the
+            // verifier is already owned by governance (the handover already
+            // completed, e.g. on a re-run). Any other state is a misconfiguration
+            // — fail loudly rather than silently skipping the handover.
+            require(
+                IOwnable(verifier).owner() == config.ownerAddress,
+                "verifier is neither pending to the ecosystem ChainAdmin nor owned by governance"
+            );
             return (new Call[](0), address(0));
         }
         calls = new Call[](2);
@@ -630,6 +656,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             calls[0] = upgradeCall;
             calls[1] = Call({target: serverNotifier, data: abi.encodeCall(IOwnable.acceptOwnership, ()), value: 0});
         } else {
+            // No pending transfer to the ChainAdmin: the ServerNotifier must
+            // already be owned by it (a prior upgrade completed the transfer);
+            // any other state is unexpected — fail loudly rather than emitting a
+            // half-configured multicall.
+            require(
+                IOwnable(serverNotifier).owner() == chainAdmin,
+                "ServerNotifier is neither pending to nor owned by the ChainAdmin"
+            );
             calls = new Call[](1);
             calls[0] = upgradeCall;
         }
