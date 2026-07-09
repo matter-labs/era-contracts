@@ -132,16 +132,15 @@ library AddressIntrospector {
 
     function _getBridgesDeployedAddressesInternal(
         address _assetRouter,
-        bool isV29
+        bool isPreV32
     ) private view returns (BridgesDeployedAddresses memory info) {
         L1AssetRouter assetRouter = L1AssetRouter(_assetRouter);
 
         address l1NullifierProxy = address(assetRouter.L1_NULLIFIER());
         address l1NativeTokenVaultProxy = address(assetRouter.nativeTokenVault());
-        // FIXME: this version gate is wrong. The L1 interop handler did not exist through v31 (it is introduced
-        // in this upgrade), but this only special-cases v29 — so for a v30/v31 nullifier it will still call
-        // `l1InteropHandler()`, which does not exist yet. Gate on "pre-interop-handler" (<= v31) instead of just v29.
-        address l1InteropHandlerProxy = isV29 ? address(0) : assetRouter.L1_NULLIFIER().l1InteropHandler();
+        // The L1 interop handler is introduced in v32, so it does not exist on any earlier version (v29/v30/v31);
+        // the nullifier only exposes `l1InteropHandler()` from v32 onward. Skip the call for pre-v32 deployments.
+        address l1InteropHandlerProxy = isPreV32 ? address(0) : assetRouter.L1_NULLIFIER().l1InteropHandler();
 
         require(l1NativeTokenVaultProxy != address(0), "NativeTokenVault address is zero");
         NativeTokenVaultBase ntv = NativeTokenVaultBase(l1NativeTokenVaultProxy);
