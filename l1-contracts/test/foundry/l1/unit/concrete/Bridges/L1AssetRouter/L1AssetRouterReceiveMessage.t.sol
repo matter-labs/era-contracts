@@ -6,9 +6,22 @@ import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {PayloadTooShort, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+
+/// @notice Native-token-vault stand-in whose `bridgeMint` always reverts with a sentinel error. Registered as the
+/// asset handler so a `finalizeDeposit` reverts deterministically, letting us assert that `receiveMessage` bubbles
+/// the inner revert reason.
+contract MockRevertingAssetHandler {
+    error HandlerReverted();
+
+    function bridgeMint(uint256, bytes32, bytes calldata) external payable {
+        revert HandlerReverted();
+    }
+}
 
 /// @title L1AssetRouterReceiveMessageTest
 /// @notice Unit tests for the interop entry points of `L1AssetRouter` (via the unified `AssetRouterBase.receiveMessage`):
@@ -76,5 +89,32 @@ contract L1AssetRouterReceiveMessageTest is Test {
     function test_finalizeDeposit_RevertWhen_NotSelf() public {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
         router.finalizeDeposit(SOURCE_CHAIN_ID, bytes32(0), hex"");
+    }
+
+    /// @notice The interop payload must be at least a 4-byte selector.
+    function test_receiveMessage_RevertWhen_PayloadTooShort() public {
+        bytes memory sender = InteroperableAddress.formatEvmV1(SOURCE_CHAIN_ID, L2_ASSET_ROUTER_ADDR);
+        vm.prank(interopHandler);
+        vm.expectRevert(PayloadTooShort.selector);
+        router.receiveMessage(bytes32(0), sender, hex"12345678"); // exactly 4 bytes; the check requires > 4
+    }
+
+    /// @notice Regression: `receiveMessage` bubbles the inner `finalizeDeposit` revert verbatim instead of masking
+    /// it, so callers can react to the specific reason (the token-balance-migration flow retries withdrawals on
+    /// `InsufficientChainBalance`). Here the registered handler reverts with a sentinel that must propagate.
+    function test_receiveMessage_BubblesInnerRevert() public {
+        MockRevertingAssetHandler ntv = new MockRevertingAssetHandler();
+        vm.prank(owner);
+        router.setNativeTokenVault(INativeTokenVaultBase(address(ntv)));
+
+        bytes memory payload = abi.encodeCall(
+            AssetRouterBase.finalizeDeposit,
+            (SOURCE_CHAIN_ID, router.ETH_TOKEN_ASSET_ID(), hex"")
+        );
+        bytes memory sender = InteroperableAddress.formatEvmV1(SOURCE_CHAIN_ID, L2_ASSET_ROUTER_ADDR);
+
+        vm.prank(interopHandler);
+        vm.expectRevert(MockRevertingAssetHandler.HandlerReverted.selector);
+        router.receiveMessage(bytes32(0), sender, payload);
     }
 }

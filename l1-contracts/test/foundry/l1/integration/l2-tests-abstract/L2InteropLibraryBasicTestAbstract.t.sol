@@ -154,6 +154,39 @@ abstract contract L2InteropLibraryBasicTestAbstract is L2InteropTestUtils {
     // An L2->L1 bundle must be exactly one indirect, zero-value call. These assert the send-time guards that
     // `InteropCenter` enforces for an L1 destination (the checks had no direct coverage before).
 
+    /// @notice Happy path: a single-call token withdrawal to L1 sends successfully and emits `InteropBundleSent`.
+    /// The L1 destination is not registered as an interop chain, so this also exercises the L1 base-token asset-ID
+    /// branch on the send side.
+    function test_sendToken_ToL1_Succeeds() public {
+        address l2TokenAddress = initializeTokenByDeposit();
+        vm.deal(address(this), 1000 ether);
+        vm.recordLogs();
+
+        bytes32 bundleHash = InteropLibrary.sendToken(
+            L1_CHAIN_ID,
+            l2TokenAddress,
+            100,
+            address(this),
+            UNBUNDLER_ADDRESS,
+            false,
+            bytes32(0)
+        );
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        assertTrue(bundleHash != bytes32(0), "L1-destined bundle should return a non-zero hash");
+        bool foundBundle;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (
+                logs[i].emitter == L2_INTEROP_CENTER_ADDR &&
+                logs[i].topics[0] == IInteropCenter.InteropBundleSent.selector
+            ) {
+                foundBundle = true;
+                break;
+            }
+        }
+        assertTrue(foundBundle, "InteropBundleSent should be emitted for the L1-destined bundle");
+    }
+
     /// @notice A bundle to L1 with more than one call is rejected: an L1-destined bundle is a single call.
     function test_sendBundle_RevertWhen_MultiCallToL1() public {
         InteropCallStarter[] memory calls = new InteropCallStarter[](2);

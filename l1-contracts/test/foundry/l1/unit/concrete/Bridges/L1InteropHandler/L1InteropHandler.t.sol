@@ -8,6 +8,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
 import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -25,7 +26,14 @@ import {
 } from "contracts/common/Messaging.sol";
 
 import {SlotOccupied} from "contracts/common/L1ContractErrors.sol";
-import {BundleAlreadyProcessed, WrongDestinationBaseTokenAssetId} from "contracts/interop/InteropErrors.sol";
+import {
+    BundleAlreadyProcessed,
+    EmptyBundle,
+    MessageNotIncluded,
+    UnauthorizedMessageSender,
+    WrongDestinationBaseTokenAssetId,
+    WrongSourceChainId
+} from "contracts/interop/InteropErrors.sol";
 import {InteropWithdrawalNonZeroValue} from "contracts/bridge/L1BridgeContractErrors.sol";
 
 /// @notice Minimal `MessageRoot` stub whose inclusion proof always succeeds, so the handler's `executeBundle`
@@ -177,6 +185,80 @@ contract L1InteropHandlerTest is Test {
             abi.encodeWithSelector(WrongDestinationBaseTokenAssetId.selector, bundleHash, _ethAssetId(), wrongAssetId)
         );
         handler.executeBundle(bundle, proof);
+    }
+
+    /// @notice A bundle whose inclusion proof does not verify is rejected.
+    function test_ExecuteBundle_RevertWhen_MessageNotIncluded() public {
+        (bytes memory bundle, MessageInclusionProof memory proof) = _buildBundle(
+            address(recipient),
+            0,
+            _ethAssetId(),
+            hex""
+        );
+        // Force the MessageRoot inclusion proof to fail.
+        vm.mockCall(
+            messageRoot,
+            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
+            abi.encode(false)
+        );
+        vm.expectRevert(MessageNotIncluded.selector);
+        handler.executeBundle(bundle, proof);
+    }
+
+    /// @notice The bundle's source chain must match the proof's chain.
+    function test_ExecuteBundle_RevertWhen_WrongSourceChainId() public {
+        (bytes memory bundle, MessageInclusionProof memory proof) = _buildBundle(
+            address(recipient),
+            0,
+            _ethAssetId(),
+            hex""
+        );
+        proof.chainId = SOURCE_CHAIN_ID + 1; // no longer matches bundle.sourceChainId
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(SOURCE_CHAIN_ID, bundle);
+        vm.expectRevert(
+            abi.encodeWithSelector(WrongSourceChainId.selector, bundleHash, SOURCE_CHAIN_ID, SOURCE_CHAIN_ID + 1)
+        );
+        handler.executeBundle(bundle, proof);
+    }
+
+    /// @notice Only messages emitted by the canonical L2 InteropCenter are accepted.
+    function test_ExecuteBundle_RevertWhen_UnauthorizedMessageSender() public {
+        (bytes memory bundle, MessageInclusionProof memory proof) = _buildBundle(
+            address(recipient),
+            0,
+            _ethAssetId(),
+            hex""
+        );
+        address badSender = makeAddr("notInteropCenter");
+        proof.message.sender = badSender;
+        vm.expectRevert(abi.encodeWithSelector(UnauthorizedMessageSender.selector, L2_INTEROP_CENTER_ADDR, badSender));
+        handler.executeBundle(bundle, proof);
+    }
+
+    /// @notice An empty bundle is rejected with a clean error rather than an abi.decode panic.
+    function test_ExecuteBundle_RevertWhen_EmptyBundle() public {
+        (, MessageInclusionProof memory proof) = _buildBundle(address(recipient), 0, _ethAssetId(), hex"");
+        vm.expectRevert(EmptyBundle.selector);
+        handler.executeBundle(hex"", proof);
+    }
+
+    /// @notice A bundle can be verified first and executed in a second call: `executeBundle` skips re-verification
+    /// once the bundle is already `Verified`.
+    function test_VerifyThenExecuteBundle() public {
+        (bytes memory bundle, MessageInclusionProof memory proof) = _buildBundle(
+            address(recipient),
+            0,
+            _ethAssetId(),
+            hex""
+        );
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(SOURCE_CHAIN_ID, bundle);
+
+        handler.verifyBundle(bundle, proof);
+        assertTrue(handler.bundleStatus(bundleHash) == BundleStatus.Verified, "bundle should be verified");
+
+        handler.executeBundle(bundle, proof);
+        assertTrue(handler.bundleStatus(bundleHash) == BundleStatus.FullyExecuted, "bundle should be fully executed");
+        assertEq(recipient.callCount(), 1, "recipient should be called exactly once");
     }
 
     /*//////////////////////////////////////////////////////////////
