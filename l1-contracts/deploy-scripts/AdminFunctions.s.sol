@@ -43,8 +43,16 @@ import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {TransitionaryOwner} from "contracts/governance/TransitionaryOwner.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
+
+/// @dev CREATE2 salt for the ecosystem `TransitionaryOwner`. Fixed (not
+///      per-regen): the TransitionaryOwner is a fresh, single-purpose contract
+///      whose address should be stable for a given governance address, and its
+///      init code already varies with the governance ctor arg so there is no
+///      cross-env collision.
+bytes32 constant TRANSITIONARY_OWNER_SALT = keccak256("v31:transitionary-owner");
 
 /// @dev Protocol version threshold (packed `major << 32`) at which the Admin
 ///      facet's `upgradeChainFromVersion` gained the leading `address _chainAddress`
@@ -307,6 +315,21 @@ contract AdminFunctions is Script, IAdminFunctions {
         address _governance,
         OwnerWrap[] memory _wraps
     ) public {
+        // Deploy (or reuse) the ecosystem TransitionaryOwner. Every target's
+        // ownership is routed through it: the current owner transfers the target
+        // to the TransitionaryOwner, which then accepts it and forwards ownership
+        // to `_governance`. The TransitionaryOwner is trustless — it can only
+        // forward to its immutable GOVERNANCE_ADDRESS — so the deployer never
+        // persists as an owner. Governance finishes the handover via the deferred
+        // stage-0 acceptOwnership() calls collected below. End state per target:
+        // owner == TransitionaryOwner, pendingOwner == _governance.
+        address transitionaryOwner = Utils.deployViaCreate2(
+            abi.encodePacked(type(TransitionaryOwner).creationCode, abi.encode(_governance)),
+            TRANSITIONARY_OWNER_SALT,
+            Utils.DETERMINISTIC_CREATE2_ADDRESS
+        );
+        _saveTransitionaryOwner(transitionaryOwner);
+
         Call[] memory acceptCalls = new Call[](_targets.length);
         uint256 acceptCount = 0;
 
@@ -318,9 +341,44 @@ contract AdminFunctions is Script, IAdminFunctions {
 
             Ownable2Step ownable = Ownable2Step(target);
             address owner = ownable.owner();
-            if (owner != _governance && ownable.pendingOwner() != _governance) {
-                _issueAsOwner(owner, target, abi.encodeCall(Ownable2Step.transferOwnership, (_governance)), _wraps);
+            // Already fully governance-owned (e.g. a re-run after governance accepted).
+            if (owner == _governance) {
+                continue;
             }
+            if (owner == transitionaryOwner || owner.code.length == 0) {
+                // Deployer-temp-owned (the current owner is an EOA — the deployer),
+                // or already routed through the TransitionaryOwner on a re-run.
+                // Route ownership through the TransitionaryOwner so the deployer
+                // never persists as an owner: transfer to it (if not already
+                // pending), then have it accept + forward to governance.
+                if (owner != transitionaryOwner) {
+                    if (ownable.pendingOwner() != transitionaryOwner) {
+                        _issueAsOwner(
+                            owner,
+                            target,
+                            abi.encodeCall(Ownable2Step.transferOwnership, (transitionaryOwner)),
+                            _wraps
+                        );
+                    }
+                    // Callable by anyone; accepts ownership and forwards it to governance.
+                    vm.broadcast(Utils.getBroadcasterAddress());
+                    TransitionaryOwner(transitionaryOwner).claimOwnershipAndGiveToGovernance(target);
+                }
+            } else {
+                // The current owner is a contract (e.g. the legacy Governance):
+                // this is not a deployer-temp-owned contract, so keep the existing
+                // direct transfer to governance through its wrapper (the legacy-Gov
+                // ceremony). No TransitionaryOwner hop.
+                if (ownable.pendingOwner() != _governance) {
+                    _issueAsOwner(
+                        owner,
+                        target,
+                        abi.encodeCall(Ownable2Step.transferOwnership, (_governance)),
+                        _wraps
+                    );
+                }
+            }
+            // Defer the stage-0 governance acceptOwnership once pending == governance.
             if (ownable.pendingOwner() == _governance) {
                 acceptCalls[acceptCount++] = Call({
                     target: target,
@@ -331,6 +389,16 @@ contract AdminFunctions is Script, IAdminFunctions {
         }
 
         _savePreGovernanceAuxAcceptOwnershipCalls(acceptCalls, acceptCount);
+    }
+
+    /// Persist the deployed TransitionaryOwner address so `upgrade-prepare-all`
+    /// can fold it into the merged `ecosystem.toml` (consumed by PUVT + the
+    /// transaction simulator). Always written so the Rust side can read it
+    /// unconditionally.
+    function _saveTransitionaryOwner(address _transitionaryOwner) private {
+        string memory toml = vm.serializeAddress("transitionary_owner", "addr", _transitionaryOwner);
+        string memory path = string.concat(vm.projectRoot(), "/script-out/transitionary-owner.toml");
+        vm.writeToml(toml, path);
     }
 
     /// Helper: read the EIP-1967 admin slot of `_proxy`, and if its single-step

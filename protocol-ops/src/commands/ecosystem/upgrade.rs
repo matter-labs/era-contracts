@@ -744,6 +744,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // the governance ceremony — folded into stage 0 below, alongside the
     // PUH/Guardians redeploy calls.
     let pre_gov_accept_calls = read_pre_governance_accept_ownership_calls(&contracts_path)?;
+    let transitionary_owner = read_transitionary_owner(&contracts_path)?;
 
     // Phase 1b on the same fork: redeploy ProtocolUpgradeHandler + Guardians
     // and capture the stage-0 governance calls that wire them into the live
@@ -817,6 +818,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             puh_outcome.as_ref(),
             &prepared.new_gateway_tomls,
             inputs.zk_token_asset_id,
+            transitionary_owner,
             &merged_path,
         )?;
         logger::info(format!(
@@ -953,6 +955,7 @@ fn write_merged_ecosystem_toml(
     zk_governance: Option<&crate::commands::ecosystem::zk_governance::ZkGovernanceOutcome>,
     new_gateway_tomls: &[PathBuf],
     zk_token_asset_id: B256,
+    transitionary_owner: Option<Address>,
     dst: &Path,
 ) -> anyhow::Result<()> {
     use alloy::primitives::{keccak256, U256};
@@ -1220,6 +1223,17 @@ fn write_merged_ecosystem_toml(
         );
         doc.insert("zk_governance".into(), Value::Table(table));
     }
+    if let Some(transitionary_owner) = transitionary_owner {
+        // Ecosystem TransitionaryOwner that temporarily holds ownership of the
+        // deployer-deployed Ownable2Step contracts (owner == this, pendingOwner ==
+        // governance) until governance accepts. Consumed by PUVT + the simulator.
+        let mut table = Table::new();
+        table.insert(
+            "addr".into(),
+            Value::String(format!("{transitionary_owner:#x}")),
+        );
+        doc.insert("transitionary_owner".into(), Value::Table(table));
+    }
     if let Some(body) = misc_body {
         doc.insert("misc".into(), Value::Table(body));
     }
@@ -1257,6 +1271,28 @@ fn write_merged_ecosystem_toml(
 /// helpers. Returns an empty vector when files don't exist (e.g. a prior regen
 /// without these steps) — the merge step then has nothing to fold and the
 /// behavior matches the pre-refactor "no extra stage-0 calls" path.
+/// Read the ecosystem TransitionaryOwner address emitted by the aux ownership
+/// step (`script-out/transitionary-owner.toml`, key `addr`). Returns `None` when
+/// the file doesn't exist (e.g. a regen without the aux step).
+fn read_transitionary_owner(contracts_path: &Path) -> anyhow::Result<Option<Address>> {
+    let path = contracts_path
+        .join("script-out")
+        .join("transitionary-owner.toml");
+    if !path.exists() {
+        return Ok(None);
+    }
+    let raw = fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+    let parsed: toml::Table =
+        toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
+    let addr = parsed
+        .get("addr")
+        .and_then(|v| v.as_str())
+        .with_context(|| format!("missing addr in {}", path.display()))?;
+    Ok(Some(addr.parse().with_context(|| {
+        format!("invalid transitionary owner addr {addr}")
+    })?))
+}
+
 pub(super) fn read_pre_governance_accept_ownership_calls(
     contracts_path: &Path,
 ) -> anyhow::Result<Vec<crate::common::governance_calls::GovernanceCall>> {

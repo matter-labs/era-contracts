@@ -214,17 +214,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         }
     }
 
-    /// @notice The address the freshly deployed (ZKsync OS) verifier's ownership
-    ///         is initially transferred to. For a fresh CTM deployment that is
-    ///         governance directly (`config.ownerAddress`). An upgrade flow that
-    ///         cannot hand ownership to governance in one step (e.g. because the
-    ///         verifier must first be accepted by an intermediate admin) overrides
-    ///         this to route through that admin. Era verifiers are not Ownable, so
-    ///         the value is unused for them.
-    function verifierInitialOwner() internal view virtual returns (address) {
-        return config.ownerAddress;
-    }
-
     function deployVerifiers() internal {
         (, string memory fflonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierFflonk);
         (, string memory plonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierPlonk);
@@ -244,7 +233,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.stateTransition.verifiers.verifier,
             ctmAddresses.stateTransition.verifiers.verifierFflonk,
             ctmAddresses.stateTransition.verifiers.verifierPlonk,
-            verifierInitialOwner(),
+            config.ownerAddress,
             config.isZKsyncOS
         );
         vm.stopBroadcast();

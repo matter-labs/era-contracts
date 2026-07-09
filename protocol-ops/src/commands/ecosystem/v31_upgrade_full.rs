@@ -198,30 +198,6 @@ impl<'a> V31UpgradeFull<'a> {
                     .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
                     .with_wallet(deployer),
             )?;
-
-            // ZKsync OS verifier ownership handover (accept + forward to governance)
-            // as its own ChainAdmin.multicall, routed through `Bridgehub.admin()`.
-            if let (Some(vh_hex), Some(vh_admin)) = (
-                admin_calls.verifier_handover.as_ref(),
-                admin_calls.verifier_handover_chain_admin,
-            ) {
-                let vh_calls = hex::decode(vh_hex.trim_start_matches("0x")).with_context(|| {
-                    format!("invalid verifier_handover hex in {}", entry.toml.display())
-                })?;
-                logger::step(format!(
-                    "Running v31 verifier ownership handover for {:#x}",
-                    entry.proxy
-                ));
-                runner.run(
-                    runner
-                        .script_call(AdminFunctionsAbi::executeChainAdminMulticallCall {
-                            _callsToExecute: Bytes::from(vh_calls),
-                            _chainAdmin: vh_admin,
-                        })
-                        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
-                        .with_wallet(deployer),
-                )?;
-            }
         }
         Ok(())
     }
@@ -417,13 +393,6 @@ struct CtmAdminCalls {
     /// `server_notifier_upgrade` multicall.
     chain_admin: Address,
     server_notifier_upgrade: String,
-    /// ZKsync OS verifier ownership handover: a separate ChainAdmin multicall
-    /// (`Bridgehub.admin()`) that accepts the verifier and forwards it to
-    /// governance. Absent for Era / when no handover is needed.
-    #[serde(default)]
-    verifier_handover_chain_admin: Option<Address>,
-    #[serde(default)]
-    verifier_handover: Option<String>,
 }
 
 fn read_ctm_admin_calls(path: &Path) -> anyhow::Result<CtmAdminCalls> {

@@ -535,17 +535,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         vm.serializeAddress("ctm_admin_calls", "chain_admin", chainAdmin);
         vm.serializeAddress("ctm_admin_calls", "chain_admin_owner", chainAdminOwner);
 
-        // ZKsync OS dual verifier ownership handover, routed through the ecosystem
-        // ChainAdmin (`Bridgehub.admin()`): the deployer transferred the freshly
-        // deployed verifier to that ChainAdmin (see `DeployCTM.deployVerifiers`);
-        // here the ChainAdmin accepts it and forwards it to governance (PUH). PUH
-        // then accepts in stage 0 (the aux deferred-accept block). Empty for Era.
-        (Call[] memory verifierHandover, address verifierChainAdmin) = prepareVerifierHandoverCall();
-        if (verifierHandover.length > 0) {
-            vm.serializeAddress("ctm_admin_calls", "verifier_handover_chain_admin", verifierChainAdmin);
-            vm.serializeBytes("ctm_admin_calls", "verifier_handover", abi.encode(verifierHandover));
-        }
-
         string memory ctmAdminCallsSerialized = vm.serializeBytes(
             "ctm_admin_calls",
             "server_notifier_upgrade",
@@ -553,59 +542,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         );
 
         vm.writeToml(ctmAdminCallsSerialized, upgradeConfig.outputPath, ".ctm_admin_calls");
-    }
-
-    /// @notice Overrides the base verifier-owner hook for the v31 upgrade flow.
-    /// @dev In the v31 upgrade the freshly deployed ZKsync OS dual verifier can't
-    ///      be handed to governance (PUH) in one step — it must first be accepted
-    ///      by an intermediate admin — so it is transferred to the ecosystem
-    ///      ChainAdmin (`Bridgehub.admin()`), which then accepts it and forwards
-    ///      it to governance via `prepareVerifierHandoverCall`. A fresh
-    ///      `DeployCTM` deployment keeps the base behaviour (transfer straight to
-    ///      governance). Era verifiers are not Ownable, so the value is unused.
-    function verifierInitialOwner() internal view override returns (address) {
-        if (config.isZKsyncOS) {
-            return L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).admin();
-        }
-        return config.ownerAddress;
-    }
-
-    /// @notice Build the ChainAdmin multicall that hands the freshly deployed
-    ///         ZKsync OS dual verifier from the ecosystem ChainAdmin
-    ///         (`Bridgehub.admin()`, its pending owner set at deploy time) to
-    ///         governance (PUH): `acceptOwnership()` then `transferOwnership(PUH)`.
-    ///         PUH accepts in stage 0. Returns `(empty, address(0))` for Era (its
-    ///         verifier is not Ownable) or when the deploy-time transfer to the
-    ///         ChainAdmin hasn't landed (guards against a reverting accept).
-    function prepareVerifierHandoverCall() public virtual returns (Call[] memory calls, address chainAdmin) {
-        if (!config.isZKsyncOS) {
-            return (new Call[](0), address(0));
-        }
-        address verifier = ctmAddresses.stateTransition.verifiers.verifier;
-        // Same source as the deploy-time transfer in `DeployCTM.deployVerifiers`,
-        // so the ChainAdmin here matches the verifier's pending owner exactly.
-        chainAdmin = L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).admin();
-        if (chainAdmin == address(0)) {
-            return (new Call[](0), address(0));
-        }
-        if (IOwnable(verifier).pendingOwner() != chainAdmin) {
-            // Not pending to the ecosystem ChainAdmin: only acceptable if the
-            // verifier is already owned by governance (the handover already
-            // completed, e.g. on a re-run). Any other state is a misconfiguration
-            // — fail loudly rather than silently skipping the handover.
-            require(
-                IOwnable(verifier).owner() == config.ownerAddress,
-                "verifier is neither pending to the ecosystem ChainAdmin nor owned by governance"
-            );
-            return (new Call[](0), address(0));
-        }
-        calls = new Call[](2);
-        calls[0] = Call({target: verifier, data: abi.encodeCall(IOwnable.acceptOwnership, ()), value: 0});
-        calls[1] = Call({
-            target: verifier,
-            data: abi.encodeCall(IOwnable.transferOwnership, (config.ownerAddress)),
-            value: 0
-        });
     }
 
     function prepareDefaultTestUpgradeCalls() public {

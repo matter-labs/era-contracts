@@ -165,6 +165,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         // so one salt is collision-free.
         expected_salts.push(keccak256(GOV_SALT_SEED));
     }
+    // The ecosystem TransitionaryOwner (aux ownership step) is deployed via
+    // CREATE2 with this fixed seed — see `TRANSITIONARY_OWNER_SALT` in
+    // `AdminFunctions.s.sol`. Declare it so its deployment passes the salt check.
+    expected_salts.push(keccak256(b"v31:transitionary-owner"));
 
     let transactions_log_path = match args.transactions_log.clone() {
         Some(path) => path,
