@@ -105,6 +105,35 @@ contract MessageHashingTest is Test {
         assertEq(leafHash1, leafHash2);
     }
 
+    /// @dev The `l1Timestamp` (added for atomic interop) is folded into the batch leaf preimage, which is
+    /// what makes a batch's settlement timestamp provable via the same inclusion proof. A non-zero value
+    /// must be part of the hash and must change the leaf versus the zero-timestamp variant.
+    function test_batchLeafHash_bindsL1Timestamp() public pure {
+        bytes32 batchRoot = keccak256("batchRoot");
+        uint256 batchNumber = 100;
+        uint256 l1Timestamp = 1_700_000_000;
+
+        bytes32 leafHash = MessageHashing.batchLeafHash(batchRoot, batchNumber, l1Timestamp);
+
+        assertEq(leafHash, keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber, l1Timestamp)));
+        assertTrue(leafHash != MessageHashing.batchLeafHash(batchRoot, batchNumber, 0));
+    }
+
+    /// @dev Distinct settlement timestamps for the same batch must yield distinct leaves, so a timestamp
+    /// cannot be swapped without breaking the leaf (and therefore the reconstructed aggregated root).
+    function testFuzz_batchLeafHash_distinctTimestampsDistinctLeaf(
+        bytes32 batchRoot,
+        uint256 batchNumber,
+        uint256 t1,
+        uint256 t2
+    ) public pure {
+        vm.assume(t1 != t2);
+        assertTrue(
+            MessageHashing.batchLeafHash(batchRoot, batchNumber, t1) !=
+                MessageHashing.batchLeafHash(batchRoot, batchNumber, t2)
+        );
+    }
+
     // ============ chainIdLeafHash Tests ============
 
     function test_chainIdLeafHash_basicValues() public pure {

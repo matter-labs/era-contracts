@@ -217,6 +217,42 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
     }
 
+    /// @notice Atomic interop is deployed on ecosystems where every chain settles directly on L1 (no
+    /// gateway). The former `ChainsSettlingOnL1` guard was removed, so registering two chains that both
+    /// settle on L1 must now SUCCEED. This is the positive replacement for the deleted
+    /// `revertWhen_chainsSettleOnL1` test (keeps coverage on the both-on-L1 branch of `_checkSettlementLayers`).
+    /// Uses the same `stdstore` settlement-layer override pattern as `setUp` and the mismatch test above.
+    function test_chainRegistrationSender_succeedsWhenBothChainsSettleOnL1() public {
+        // Override both chains' settlement layer to L1 (block.chainid).
+        stdstore
+            .target(address(addresses.bridgehub))
+            .sig("settlementLayer(uint256)")
+            .with_key(zkChainIds[0])
+            .checked_write(block.chainid);
+        stdstore
+            .target(address(addresses.bridgehub))
+            .sig("settlementLayer(uint256)")
+            .with_key(zkChainIds[1])
+            .checked_write(block.chainid);
+
+        assertFalse(
+            addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
+            "Chain should not be registered before calling registerChain"
+        );
+
+        vm.recordLogs();
+        addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        // Storage: registration succeeds (no ChainsSettlingOnL1 revert).
+        assertTrue(
+            addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
+            "Chain should be registered when both chains settle on L1"
+        );
+        // Event: the registration service transaction was queued.
+        logs.requireOne(NEW_PRIORITY_REQUEST_SIGNATURE);
+    }
+
     // add this to be excluded from coverage report
     function test() internal override {}
 }
