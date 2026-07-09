@@ -20,16 +20,16 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0xDc318581458BDddb5eE7357105fb4B6F7b8f2B73",
+      "ctmProxy": "0x8Eb2F1327fF2d46d7d2CCd012B11Fe604798CF7b",
       "verifierNew": "0x71089Ba41e478702e1904692385Be3972B2cBf9e",
       "contracts": {
         "DefaultUpgrade": {
           "new": "0x1780bCf4103D3F501463AD3414c7f4b654bb7aFd",
-          "newCodehash": "0xe3cc5d71abdf22668deb5a9a1dd47d0d4a021bf560609b812eb3a67fae64b97a"
+          "newCodehash": "0xb6168846e24a0483b17a10f409fa4d4f4e8b0687f229becfb3bcc3606bbc9adc"
         },
         "DiamondInit": {
           "new": "0x5133BBdfCCa3Eb4F739D599ee4eC45cBCD0E16c5",
-          "newCodehash": "0x5728a83e784ce5f4693b90397a1e25c2983e5ccfe11959b501261e228f3e6ec3"
+          "newCodehash": "0x3dccd987a1cb97be1665ef206a18eecaa07e15c4f3f5ce793ed9ca3aec500f26"
         }
       },
       "facets": {
@@ -128,7 +128,7 @@
         "fixedForceDeploymentsData": "0xf1f2"
       },
       "genesis": {
-        "genesisUpgrade": "0x7b1F09CbdfD4A7e6c34D0F6370944f76B8c7Ca8C",
+        "genesisUpgrade": "0xda2f0cC90FDB3a22F1E517Ba7aaaB926eb125344",
         "batchHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
         "batchCommitment": "0x0000000000000000000000000000000000000000000000000000000000000001",
         "indexRepeatedStorageChanges": 54

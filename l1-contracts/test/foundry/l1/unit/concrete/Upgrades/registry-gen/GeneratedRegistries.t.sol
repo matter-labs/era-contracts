@@ -6,6 +6,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {CoreContract, CTMContract, EcosystemContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/CTMUpgradeComposer.sol";
+import {RegistryFacetReader} from "contracts/upgrades/registry/RegistryFacetReader.sol";
 import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
@@ -108,7 +109,7 @@ contract GeneratedRegistriesTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_buildFacetSwapPlan_plansExactlyThePlanRows() public view {
-        UpgradeFacetSwap[] memory plan = CTMUpgradeComposer.buildFacetSwapPlan(ICTMRegistry(address(ctmRegistry)));
+        UpgradeFacetSwap[] memory plan = RegistryFacetReader.facetSwapPlan(ICTMRegistry(address(ctmRegistry)));
 
         // The plan is exactly the old-side rows, in row order: AdminFacet changes address
         // (swap), MailboxFacet is removed, ExecutorFacet is added. GettersFacet is unchanged
@@ -205,7 +206,7 @@ contract GeneratedRegistriesTest is Test {
         // stored in the CTM, read back by BaseZkSyncUpgrade at execution.
     }
 
-    function test_buildChainCreationParams_installsFullNewFacetSet() public view {
+    function test_buildChainCreationParams_pinsRegistryAndBaseHashes() public view {
         ChainCreationParams memory params = CTMUpgradeComposer.buildChainCreationParams(
             ICTMRegistry(address(ctmRegistry))
         );
@@ -215,8 +216,8 @@ contract GeneratedRegistriesTest is Test {
         assertEq(params.forceDeploymentsData, hex"f1f2");
         assertEq(params.diamondCut.initAddress, address(0xF204)); // DiamondInit
         // The genesis cut carries no facet cuts and no facets in its init calldata: DiamondInit
-        // reads the facet set from the CTM's `newChainFacetData` (below); the cut's init calldata
-        // holds only the base-system-contract hashes.
+        // reads the facet set from the pinned registry. The cut's init calldata holds only the
+        // base-system-contract hashes.
         assertEq(params.diamondCut.facetCuts.length, 0);
         InitializeDataNewChain memory newChainData = abi.decode(
             params.diamondCut.initCalldata,
@@ -226,10 +227,15 @@ contract GeneratedRegistriesTest is Test {
             newChainData.l2BootloaderBytecodeHash,
             bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000b00))
         );
-        // The facet set stored per version in the CTM equals the post-upgrade facet set (no drift
-        // by construction): AdminFacet(new) + GettersFacet + ExecutorFacet, with the registry's
-        // pinned selector lists riding along.
-        FacetInstallation[] memory facets = abi.decode(params.newChainFacetData, (FacetInstallation[]));
+        // The registry pinned for genesis is the registry itself — DiamondInit reads the facet
+        // set straight from it (the same set the upgrade path's swap plan produces).
+        assertEq(params.registry, address(ctmRegistry));
+
+        // And that facet set (read via the shared reader) is AdminFacet(new) + GettersFacet +
+        // ExecutorFacet, with the registry's pinned selector lists.
+        FacetInstallation[] memory facets = RegistryFacetReader.newChainInstallations(
+            ICTMRegistry(address(ctmRegistry))
+        );
         assertEq(facets.length, 3);
         assertEq(facets[0].facet, address(0xF201));
         assertEq(facets[1].facet, address(0xF102));

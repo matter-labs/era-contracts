@@ -24,6 +24,8 @@ import {
 import {ISelfDescribingFacet} from "../chain-interfaces/ISelfDescribingFacet.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../IChainTypeManager.sol";
+import {ICTMRegistry} from "../../upgrades/registry/ICTMRegistry.sol";
+import {RegistryFacetReader} from "../../upgrades/registry/RegistryFacetReader.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
 import {EmptyAssetId, EmptyBytes32, ZeroAddress} from "../../common/L1ContractErrors.sol";
@@ -83,9 +85,13 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         // cut — they are read from the CTM by protocol version, mirroring how the verifier is
         // fetched below. Selector lists come from each facet's own bytecode at execution time.
         // Facets are installed here, by the init itself. Their addresses are NOT in the committed
-        // cut — they are read from the CTM by protocol version, mirroring how the verifier is
-        // fetched below. Selector lists come from each facet's own bytecode at execution time.
-        _installFacets(IChainTypeManager(_initializeData.chainTypeManager).newChainFacetData());
+        // cut — the CTM pins the genesis registry (like the verifier, fetched below), and the
+        // facet set is read straight from that registry. Selector lists come from each facet's own
+        // bytecode at execution time.
+        address genesisRegistry = IChainTypeManager(_initializeData.chainTypeManager).genesisRegistry();
+        if (genesisRegistry != address(0)) {
+            _installFacets(RegistryFacetReader.newChainInstallations(ICTMRegistry(genesisRegistry)));
+        }
 
         if (!IS_ZKSYNC_OS) {
             if (newChainData.l2BootloaderBytecodeHash == bytes32(0)) {
@@ -159,17 +165,11 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 
-    /// @dev Adds every facet in the CTM-supplied set to the diamond this contract is
-    ///      delegatecalled into. `_facetData` is the abi-encoded `FacetInstallation[]` the CTM
-    ///      stores per protocol version; empty means no facets (guarded — decoding empty bytes
-    ///      would revert). Selector lists resolve at execution time: a pinned non-empty list wins,
-    ///      otherwise the facet's own `ISelfDescribingFacet.selectors()` is read (its immutable
-    ///      bytecode is the single source of truth for what it serves).
-    function _installFacets(bytes memory _facetData) private {
-        if (_facetData.length == 0) {
-            return;
-        }
-        FacetInstallation[] memory _facets = abi.decode(_facetData, (FacetInstallation[]));
+    /// @dev Adds every facet in the registry-supplied set to the diamond this contract is
+    ///      delegatecalled into. Selector lists resolve at execution time: a pinned non-empty list
+    ///      wins, otherwise the facet's own `ISelfDescribingFacet.selectors()` is read (its
+    ///      immutable bytecode is the single source of truth for what it serves).
+    function _installFacets(FacetInstallation[] memory _facets) private {
         uint256 facetsLength = _facets.length;
         if (facetsLength == 0) {
             return;

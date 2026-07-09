@@ -558,23 +558,6 @@ library Utils {
             });
     }
 
-    /// @dev Converts fixture facet cuts into the abi-encoded `FacetInstallation[]` the CTM stores
-    ///      as `newChainFacetData` and `DiamondInit` reads at genesis. Selector lists carry over
-    ///      verbatim (pinned), so fixtures keep their explicit selectors without the facets having
-    ///      to self-describe.
-    function encodeFacetInstallations(Diamond.FacetCut[] memory _facetCuts) internal pure returns (bytes memory) {
-        uint256 length = _facetCuts.length;
-        FacetInstallation[] memory installations = new FacetInstallation[](length);
-        for (uint256 i = 0; i < length; ++i) {
-            installations[i] = FacetInstallation({
-                facet: _facetCuts[i].facet,
-                isFreezable: _facetCuts[i].isFreezable,
-                selectors: _facetCuts[i].selectors
-            });
-        }
-        return abi.encode(installations);
-    }
-
     function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address bridgehub) public returns (address) {
         DiamondInit diamondInit = new DiamondInit(false);
         bytes memory diamondInitData = abi.encodeCall(

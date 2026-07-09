@@ -8,6 +8,8 @@ import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ISelfDescribingFacet} from "../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
+import {ICTMRegistry} from "./registry/ICTMRegistry.sol";
+import {RegistryFacetReader} from "./registry/RegistryFacetReader.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
@@ -75,9 +77,15 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         }
 
         // Facet swaps are applied first, mirroring the legacy path where the outer cut's
-        // `facetCuts` execute before this init delegatecall runs. The swap plan is read from the
-        // CTM by the new protocol version (like the verifier below), not carried in the cut.
-        _upgradeFacets(IChainTypeManager(s.chainTypeManager).upgradeFacetData(_proposedUpgrade.newProtocolVersion));
+        // `facetCuts` execute before this init delegatecall runs. The CTM pins the upgrade
+        // registry for the new version (like the verifier below); the swap plan is read straight
+        // from that registry. Zero means no facet changes (patch, or the legacy in-cut path).
+        address upgradeRegistry = IChainTypeManager(s.chainTypeManager).upgradeRegistryForVersion(
+            _proposedUpgrade.newProtocolVersion
+        );
+        if (upgradeRegistry != address(0)) {
+            _upgradeFacets(RegistryFacetReader.facetSwapPlan(ICTMRegistry(upgradeRegistry)));
+        }
 
         // If settlement layer is 0, it means that this diamond proxy is located on the settlement layer.
         bool isOnSettlementLayer = s.settlementLayer == address(0);
@@ -118,20 +126,14 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         emit UpgradeComplete(_proposedUpgrade.newProtocolVersion, txHash, _proposedUpgrade);
     }
 
-    /// @notice Applies the CTM-supplied facet-swap plan to the diamond this contract is
-    ///         delegatecalled into. `_facetData` is the abi-encoded `UpgradeFacetSwap[]` the CTM
-    ///         stores per protocol version; empty means no facet changes (patch upgrades, genesis
-    ///         upgrades) — guarded, since decoding empty bytes would revert.
+    /// @notice Applies the registry-supplied facet-swap plan to the diamond this contract is
+    ///         delegatecalled into. An empty plan is a no-op.
     /// @dev Selector lists are resolved here, at execution time: a pinned non-empty list wins
     ///      (bootstrap override for facets predating `ISelfDescribingFacet`), otherwise the
     ///      facet's own `selectors()` is read. Facet bytecode is immutable, so every execution of
     ///      the same plan produces the same cut — which keeps the plan recomposable for the whole
     ///      upgrade window without carting selector lists around.
-    function _upgradeFacets(bytes memory _facetData) internal {
-        if (_facetData.length == 0) {
-            return;
-        }
-        UpgradeFacetSwap[] memory _facetSwaps = abi.decode(_facetData, (UpgradeFacetSwap[]));
+    function _upgradeFacets(UpgradeFacetSwap[] memory _facetSwaps) internal {
         uint256 swapsLength = _facetSwaps.length;
         if (swapsLength == 0) {
             return;

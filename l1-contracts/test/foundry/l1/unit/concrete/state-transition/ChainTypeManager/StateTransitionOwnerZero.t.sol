@@ -25,7 +25,7 @@ contract initializingCTMOwnerZeroTest is ChainTypeManagerTest {
             genesisBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: bytes(""),
-            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
+            registry: address(0)
         });
 
         ChainTypeManagerInitializeData memory ctmInitializeDataNoOwner = ChainTypeManagerInitializeData({

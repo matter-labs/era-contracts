@@ -42,8 +42,8 @@ struct InitializeData {
 
 /// @notice The chain-independent half of the initialization data, committed in the
 ///         chain-creation diamond cut's init calldata (abi-encoded).
-/// @dev The facet set is NOT here — `DiamondInit` reads it from the CTM by protocol version
-///      (`IChainTypeManager.newChainFacetData`), the same way it reads the verifier, so the
+/// @dev The facet set is NOT here — `DiamondInit` reads it from the registry the CTM pins per protocol version
+///      (`IChainTypeManager.genesisRegistry`), the same way it reads the verifier, so the
 ///      committed cut carries no facet addresses.
 /// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
 /// @param l2DefaultAccountBytecodeHash The hash of default account L2 bytecode

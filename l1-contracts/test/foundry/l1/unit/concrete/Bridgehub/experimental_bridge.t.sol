@@ -1376,7 +1376,7 @@ contract ExperimentalBridgeTest is Test {
             genesisIndexRepeatedStorageChanges: uint64(0x01),
             genesisBatchCommitment: bytes32(uint256(0x01)),
             forceDeploymentsData: bytes(""),
-            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
+            registry: address(0)
         });
 
         mockCTM.setChainCreationParams(params);

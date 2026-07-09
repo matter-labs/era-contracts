@@ -208,44 +208,14 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
             abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector),
             abi.encode(makeAddr("mockVerifier"))
         );
-        // DiamondInit reads the facet set from the CTM (not the cut) and installs it — reverting
-        // if any facet lacks code, which is what this test checks. Mock the six deployed facets
-        // (self-describing: empty pinned selectors) exactly as the gateway deployer stores them.
-        FacetInstallation[] memory facetInstallations = new FacetInstallation[](6);
-        facetInstallations[0] = FacetInstallation({
-            facet: contracts.stateTransition.facets.adminFacet,
-            isFreezable: false,
-            selectors: new bytes4[](0)
-        });
-        facetInstallations[1] = FacetInstallation({
-            facet: contracts.stateTransition.facets.gettersFacet,
-            isFreezable: false,
-            selectors: new bytes4[](0)
-        });
-        facetInstallations[2] = FacetInstallation({
-            facet: contracts.stateTransition.facets.mailboxFacet,
-            isFreezable: true,
-            selectors: new bytes4[](0)
-        });
-        facetInstallations[3] = FacetInstallation({
-            facet: contracts.stateTransition.facets.executorFacet,
-            isFreezable: true,
-            selectors: new bytes4[](0)
-        });
-        facetInstallations[4] = FacetInstallation({
-            facet: contracts.stateTransition.facets.migratorFacet,
-            isFreezable: false,
-            selectors: new bytes4[](0)
-        });
-        facetInstallations[5] = FacetInstallation({
-            facet: contracts.stateTransition.facets.committerFacet,
-            isFreezable: true,
-            selectors: new bytes4[](0)
-        });
+        // The Gateway cut carries its facets in-cut (with config selectors); the CTM pins no
+        // genesis registry, so DiamondInit sees a zero address and installs nothing further —
+        // the facets are added (and their code validated) by the outer cut, which is what this
+        // test checks.
         vm.mockCall(
             mockCTM,
-            abi.encodeWithSelector(IChainTypeManager.newChainFacetData.selector),
-            abi.encode(abi.encode(facetInstallations))
+            abi.encodeWithSelector(IChainTypeManager.genesisRegistry.selector),
+            abi.encode(address(0))
         );
 
         // Build full initCalldata: the chain-specific head plus the committed cut's

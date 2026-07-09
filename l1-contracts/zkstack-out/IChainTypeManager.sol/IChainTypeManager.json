@@ -320,6 +320,19 @@
   },
   {
     "type": "function",
+    "name": "genesisRegistry",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getChainAdmin",
     "inputs": [
       {
@@ -543,9 +556,9 @@
                 "internalType": "bytes"
               },
               {
-                "name": "newChainFacetData",
-                "type": "bytes",
-                "internalType": "bytes"
+                "name": "registry",
+                "type": "address",
+                "internalType": "address"
               }
             ]
           },
@@ -592,19 +605,6 @@
         "name": "",
         "type": "address",
         "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "newChainFacetData",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes",
-        "internalType": "bytes"
       }
     ],
     "stateMutability": "view"
@@ -771,9 +771,9 @@
             "internalType": "bytes"
           },
           {
-            "name": "newChainFacetData",
-            "type": "bytes",
-            "internalType": "bytes"
+            "name": "registry",
+            "type": "address",
+            "internalType": "address"
           }
         ]
       }
@@ -863,9 +863,9 @@
         "internalType": "address"
       },
       {
-        "name": "_upgradeFacetData",
-        "type": "bytes",
-        "internalType": "bytes"
+        "name": "_registry",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -1163,7 +1163,7 @@
   },
   {
     "type": "function",
-    "name": "upgradeFacetData",
+    "name": "upgradeRegistryForVersion",
     "inputs": [
       {
         "name": "_protocolVersion",
@@ -1174,8 +1174,8 @@
     "outputs": [
       {
         "name": "",
-        "type": "bytes",
-        "internalType": "bytes"
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "view"

@@ -112,18 +112,19 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev Emergency verifier changes still require a chain upgrade (diamond cut).
     mapping(uint256 protocolVersion => address) public protocolVersionVerifier;
 
-    /// @dev The abi-encoded `FacetInstallation[]` a newly created chain installs, for the CURRENT
-    /// protocol version. Read by `DiamondInit` at genesis. A single value (not version-keyed),
-    /// parallel to `initialCutHash`: new chains are always created at the current version, and it
-    /// is updated by `setChainCreationParams` exactly as `initialCutHash` is. Stored as an opaque
-    /// blob so this size-constrained contract carries no codec for the nested facet types.
-    bytes public newChainFacetData;
+    /// @dev The CTM registry a newly created chain reads its facet set from, for the CURRENT
+    /// protocol version. A single value, parallel to `initialCutHash`: new chains are always
+    /// created at the current version, and it is updated by `setChainCreationParams`.
+    /// `DiamondInit` reads it at genesis and fetches the facet set directly from the registry
+    /// (see `RegistryFacetReader`). Zero means "no registry" — the legacy path, where facets
+    /// ride in the diamond cut's own `facetCuts` instead.
+    address public genesisRegistry;
 
-    /// @dev The abi-encoded `UpgradeFacetSwap[]` plan taking a chain to a protocol version from its
-    /// predecessor. Read by the upgrade contract (`BaseZkSyncUpgrade`) to perform the facet swaps;
-    /// empty for versions with no facet changes. Version-keyed, parallel to `upgradeCutHash`, since
-    /// chains upgrade to specific versions at different times. Opaque blob for the same reason.
-    mapping(uint256 protocolVersion => bytes) public upgradeFacetData;
+    /// @dev The CTM registry the upgrade contract reads the facet-swap plan from when a chain
+    /// upgrades TO a protocol version. Version-keyed, parallel to `upgradeCutHash`, since chains
+    /// upgrade at different times. Set by `setNewVersionUpgrade`; zero for versions with no facet
+    /// changes (patch upgrades, or the legacy in-cut path).
+    mapping(uint256 protocolVersion => address registry) public upgradeRegistryForVersion;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -265,9 +266,9 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         storedBatchZero = keccak256(abi.encode(batchZero));
         bytes32 newInitialCutHash = keccak256(abi.encode(_chainCreationParams.diamondCut));
         initialCutHash = newInitialCutHash;
-        // The facet set new chains install, read back by DiamondInit at genesis. Single value,
+        // The registry DiamondInit reads the genesis facet set from — single current value,
         // updated here just like `initialCutHash` above.
-        newChainFacetData = _chainCreationParams.newChainFacetData;
+        genesisRegistry = _chainCreationParams.registry;
         bytes32 forceDeploymentHash = keccak256(abi.encode(_chainCreationParams.forceDeploymentsData));
         initialForceDeploymentHash = forceDeploymentHash;
         newChainCreationParamsBlock[protocolVersion] = block.number;
@@ -368,7 +369,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion,
         address _verifier,
-        bytes calldata _upgradeFacetData
+        address _registry
     ) external onlyOwner {
         _setNewVersionUpgrade({
             _cutData: _cutData,
@@ -376,7 +377,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             _oldProtocolVersionDeadline: _oldProtocolVersionDeadline,
             _newProtocolVersion: _newProtocolVersion,
             _verifier: _verifier,
-            _upgradeFacetData: _upgradeFacetData
+            _registry: _registry
         });
     }
 
@@ -425,9 +426,8 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             initCalldata: upgradeCalldata
         });
 
-        // For patch upgrades, chain creation params don't change — carry forward from the old
-        // version. `newChainFacetData` is a single current value (like `initialCutHash`) and a
-        // patch changes no facets, so it needs no update here.
+        // For patch upgrades, chain creation params don't change — `genesisRegistry` stays as-is
+        // (a patch changes no facets, so new chains at the patch version install the same set).
         newChainCreationParamsBlock[_newProtocolVersion] = newChainCreationParamsBlock[_oldProtocolVersion];
 
         _setNewVersionUpgrade({
@@ -436,8 +436,9 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             _oldProtocolVersionDeadline: _oldProtocolVersionDeadline,
             _newProtocolVersion: _newProtocolVersion,
             _verifier: _verifier,
-            // A patch upgrade changes no facets: the upgrade contract's facet-swap plan is empty.
-            _upgradeFacetData: ""
+            // A patch upgrade changes no facets: no upgrade registry (the upgrade contract reads
+            // a zero address and performs no cut).
+            _registry: address(0)
         });
     }
 
@@ -454,7 +455,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion,
         address _verifier,
-        bytes memory _upgradeFacetData
+        address _registry
     ) internal {
         // Migrations must be paused before setting new version upgrades
         if (!IChainAssetHandlerBase(IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()).migrationPaused()) {
@@ -471,9 +472,9 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
         setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
         _setProtocolVersionVerifier(_newProtocolVersion, _verifier);
-        // The facet-swap plan the upgrade contract applies when a chain upgrades to the new
-        // version, read back from CTM state (like the verifier) rather than committed in the cut.
-        upgradeFacetData[_newProtocolVersion] = _upgradeFacetData;
+        // The registry the upgrade contract reads the facet-swap plan from when a chain upgrades
+        // to the new version — pinned in CTM state like the verifier, not committed in the cut.
+        upgradeRegistryForVersion[_newProtocolVersion] = _registry;
         // Emit event with backward compatible hack.
         emit NewUpgradeCutData(_newProtocolVersion, _cutData);
     }

@@ -657,9 +657,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
                     deadline,
                     newProtocolVersion,
                     ctmAddresses.stateTransition.verifiers.verifier,
-                    // Legacy pipeline: facet changes ride in the cut's own facetCuts, so the
-                    // CTM-stored swap plan is empty (BaseZkSyncUpgrade reads it and no-ops).
-                    new bytes(0)
+                    // Legacy pipeline: facet changes ride in the cut's own facetCuts, so no
+                    // upgrade registry is pinned (BaseZkSyncUpgrade reads a zero address, no-op).
+                    address(0)
                 )
             ),
             value: 0

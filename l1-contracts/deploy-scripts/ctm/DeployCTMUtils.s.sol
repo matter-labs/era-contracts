@@ -174,41 +174,6 @@ abstract contract DeployCTMUtils is DeployUtils {
     /// are left empty: every production facet self-describes (ISelfDescribingFacet.selectors()),
     /// and DiamondInit reads them at execution time on the chain where the cut runs — which is
     /// exactly what makes this shape work on Gateway, where we cannot query selectors from here.
-    function getChainCreationFacetInstallations(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual returns (FacetInstallation[] memory facets) {
-        facets = new FacetInstallation[](6);
-        facets[0] = FacetInstallation({
-            facet: stateTransition.facets.adminFacet,
-            isFreezable: false,
-            selectors: new bytes4[](0)
-        });
-        facets[1] = FacetInstallation({
-            facet: stateTransition.facets.gettersFacet,
-            isFreezable: false,
-            selectors: new bytes4[](0)
-        });
-        facets[2] = FacetInstallation({
-            facet: stateTransition.facets.mailboxFacet,
-            isFreezable: true,
-            selectors: new bytes4[](0)
-        });
-        facets[3] = FacetInstallation({
-            facet: stateTransition.facets.executorFacet,
-            isFreezable: true,
-            selectors: new bytes4[](0)
-        });
-        facets[4] = FacetInstallation({
-            facet: stateTransition.facets.migratorFacet,
-            isFreezable: false,
-            selectors: new bytes4[](0)
-        });
-        facets[5] = FacetInstallation({
-            facet: stateTransition.facets.committerFacet,
-            isFreezable: true,
-            selectors: new bytes4[](0)
-        });
-    }
 
     /// @notice The six facet Add-cuts of the legacy upgrade pipeline, with explicit selector
     /// lists read from the compiled artifacts. Kept only for this banner-marked pipeline: the
@@ -261,8 +226,12 @@ abstract contract DeployCTMUtils is DeployUtils {
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
         DiamondInitializeDataNewChain memory initializeData = getInitializeData(stateTransition);
 
+        // This base deploy path pins no registry (`registry == address(0)` below), so the facet
+        // set rides in the cut's own `facetCuts` — DiamondInit sees no genesis registry and
+        // installs nothing further. Registry-driven deploys instead set a registry and leave
+        // `facetCuts` empty.
         diamondCut = Diamond.DiamondCutData({
-            facetCuts: new Diamond.FacetCut[](0),
+            facetCuts: getLegacyChainCreationFacetCuts(stateTransition),
             initAddress: stateTransition.facets.diamondInit,
             initCalldata: abi.encode(initializeData)
         });
@@ -282,9 +251,8 @@ abstract contract DeployCTMUtils is DeployUtils {
                 genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
                 diamondCut: diamondCut,
                 forceDeploymentsData: generatedData.forceDeploymentsData,
-                // The facet set is stored in the CTM per version and read by DiamondInit at
-                // genesis (not carried in the cut) — see ChainCreationParams.newChainFacetData.
-                newChainFacetData: abi.encode(getChainCreationFacetInstallations(stateTransition))
+                // Legacy base deploy: facets ride in the cut, no registry pinned.
+                registry: address(0)
             });
     }
 

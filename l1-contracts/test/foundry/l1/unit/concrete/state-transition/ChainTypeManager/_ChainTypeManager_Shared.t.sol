@@ -200,7 +200,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             genesisBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: forceDeploymentsData,
-            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
+            registry: address(0)
         });
 
         ChainTypeManagerInitializeData memory ctmInitializeDataNoGovernor = ChainTypeManagerInitializeData({
@@ -243,14 +243,10 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
 
         bytes memory initCalldata = abi.encode(initializeData);
 
-        // No facetCuts: facets are installed by DiamondInit from the CTM's `newChainFacetData`
-        // (see the ChainCreationParams built with `Utils.encodeFacetInstallations(facetCuts)`).
-        return
-            Diamond.DiamondCutData({
-                facetCuts: new Diamond.FacetCut[](0),
-                initAddress: _diamondInit,
-                initCalldata: initCalldata
-            });
+        // The fixture pins no registry (`ChainCreationParams.registry == address(0)`), so the
+        // facet set rides in the cut's own `facetCuts` — DiamondInit sees no genesis registry and
+        // installs nothing further.
+        return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
     }
 
     function getDiamondCutDataWithCustomFacets(

@@ -208,13 +208,8 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
         InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain();
         bytes memory initCalldata = abi.encode(initializeData);
-        // No facetCuts: DiamondInit installs facets from the CTM's `newChainFacetData`.
-        return
-            Diamond.DiamondCutData({
-                facetCuts: new Diamond.FacetCut[](0),
-                initAddress: _diamondInit,
-                initCalldata: initCalldata
-            });
+        // No registry pinned: facets ride in the cut's own `facetCuts`, DiamondInit skips.
+        return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
     }
 
     // ============================================================
@@ -243,7 +238,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             genesisBatchCommitment: bytes32(uint256(0x02)), // Invalid: should be 1
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: forceDeploymentsData,
-            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
+            registry: address(0)
         });
 
         vm.startPrank(address(bridgehub));
@@ -273,7 +268,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             genesisBatchCommitment: bytes32(0), // Invalid: should be 1
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: forceDeploymentsData,
-            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
+            registry: address(0)
         });
 
         vm.startPrank(address(bridgehub));
@@ -307,7 +302,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             genesisBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: forceDeploymentsData,
-            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
+            registry: address(0)
         });
 
         vm.startPrank(address(bridgehub));
@@ -341,7 +336,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             genesisBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: forceDeploymentsData,
-            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
+            registry: address(0)
         });
 
         vm.startPrank(address(bridgehub));
@@ -375,7 +370,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             genesisBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: forceDeploymentsData,
-            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
+            registry: address(0)
         });
 
         chainContractAddress = _deployChainTypeManager(chainCreationParams);
@@ -395,7 +390,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             oldProtocolVersionDeadline,
             newProtocolVersion,
             testnetVerifier,
-            new bytes(0)
+            address(0)
         );
 
         // Verify that the protocol version deadline was set
@@ -414,7 +409,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             genesisBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: forceDeploymentsData,
-            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
+            registry: address(0)
         });
 
         chainContractAddress = _deployChainTypeManager(chainCreationParams);
@@ -433,7 +428,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             oldProtocolVersionDeadline,
             newProtocolVersion,
             testnetVerifier,
-            new bytes(0)
+            address(0)
         );
     }
 
@@ -449,7 +444,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             genesisBatchCommitment: bytes32(uint256(0x01)), // Valid: exactly 1
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: forceDeploymentsData,
-            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
+            registry: address(0)
         });
 
         chainContractAddress = _deployChainTypeManager(chainCreationParams);
@@ -473,7 +468,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             genesisBatchCommitment: commitment,
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: forceDeploymentsData,
-            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
+            registry: address(0)
         });
 
         vm.startPrank(address(bridgehub));

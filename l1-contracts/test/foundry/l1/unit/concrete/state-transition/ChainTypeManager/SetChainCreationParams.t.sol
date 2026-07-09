@@ -34,7 +34,7 @@ contract SetChainCreationParamsTest is ChainTypeManagerTest {
             genesisBatchCommitment: genesisBatchCommitment,
             diamondCut: newDiamondCutData,
             forceDeploymentsData: bytes(""),
-            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
+            registry: address(0)
         });
 
         vm.prank(governor);

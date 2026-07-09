@@ -21,7 +21,7 @@ library ZKsyncOSCTMRegistryV32Data {
     }
 
     function ctmProxy() internal pure returns (address) {
-        return address(uint160(0x00dc318581458bdddb5ee7357105fb4b6f7b8f2b73));
+        return address(uint160(0x008eb2f1327ff2d46d7d2ccd012b11fe604798cf7b));
     }
 
     function ctmAddressRows() internal pure returns (CTMRegistryBase.AddressRow[] memory rows) {
@@ -242,7 +242,7 @@ library ZKsyncOSCTMRegistryV32Data {
         )
     {
         return (
-            address(uint160(0x007b1f09cbdfd4a7e6c34d0f6370944f76b8c7ca8c)),
+            address(uint160(0x00da2f0cc90fdb3a22f1e517ba7aaab926eb125344)),
             0x0000000000000000000000000000000000000000000000000000000000000001,
             0x0000000000000000000000000000000000000000000000000000000000000001,
             54
@@ -254,12 +254,12 @@ library ZKsyncOSCTMRegistryV32Data {
         uint256 i = 0;
         pins[i] = CTMRegistryBase.CodehashPin({
             target: address(uint160(0x001780bcf4103d3f501463ad3414c7f4b654bb7afd)),
-            expectedCodehash: 0xe3cc5d71abdf22668deb5a9a1dd47d0d4a021bf560609b812eb3a67fae64b97a
+            expectedCodehash: 0xb6168846e24a0483b17a10f409fa4d4f4e8b0687f229becfb3bcc3606bbc9adc
         }); // DefaultUpgrade @ 0.32.0
         ++i;
         pins[i] = CTMRegistryBase.CodehashPin({
             target: address(uint160(0x005133bbdfcca3eb4f739d599ee4ec45cbcd0e16c5)),
-            expectedCodehash: 0x5728a83e784ce5f4693b90397a1e25c2983e5ccfe11959b501261e228f3e6ec3
+            expectedCodehash: 0x3dccd987a1cb97be1665ef206a18eecaa07e15c4f3f5ce793ed9ca3aec500f26
         }); // DiamondInit @ 0.32.0
         ++i;
         pins[i] = CTMRegistryBase.CodehashPin({

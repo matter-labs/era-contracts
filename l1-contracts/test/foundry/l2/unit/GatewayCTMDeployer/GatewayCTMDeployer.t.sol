@@ -175,6 +175,12 @@ contract GatewayCTMDeployerTest is Test {
             l1ChainId: 1,
             testnetVerifier: true,
             isZKsyncOS: false,
+            adminSelectors: _sampleSelectors(0x10),
+            executorSelectors: _sampleSelectors(0x20),
+            mailboxSelectors: _sampleSelectors(0x30),
+            gettersSelectors: _sampleSelectors(0x40),
+            migratorSelectors: _sampleSelectors(0x50),
+            committerSelectors: _sampleSelectors(0x60),
             bootloaderHash: bytes32(uint256(0xabc)),
             defaultAccountHash: bytes32(uint256(0xdef)),
             evmEmulatorHash: bytes32(uint256(0xdef)),
@@ -188,6 +194,13 @@ contract GatewayCTMDeployerTest is Test {
         deployerConfig = config;
 
         _predeployContracts();
+    }
+
+    /// @dev Two distinct sample selectors per facet, so the genesis cut is well-formed.
+    function _sampleSelectors(uint32 _base) private pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](2);
+        selectors[0] = bytes4(_base);
+        selectors[1] = bytes4(_base + 1);
     }
 
     // It is more a smoke test that indeed the deployment works

@@ -240,8 +240,8 @@ contract UpgradeChainFromVersionTest is AdminTest {
         // facets, so return an empty plan.
         vm.mockCall(
             chainTypeManager,
-            abi.encodeWithSelector(IChainTypeManager.upgradeFacetData.selector),
-            abi.encode(bytes(""))
+            abi.encodeWithSelector(IChainTypeManager.upgradeRegistryForVersion.selector),
+            abi.encode(address(0))
         );
 
         // Set upgrade timestamp to 1000, warp to exactly that time

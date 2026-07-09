@@ -59,9 +59,10 @@ contract CTMUpgradeModule {
             _oldProtocolVersionDeadline: _oldProtocolVersionDeadline,
             _newProtocolVersion: newProtocolVersion,
             _verifier: _registry.verifier(newProtocolVersion),
-            // The facet-swap plan is stored in CTM state (read back by the upgrade contract at
-            // execution), not carried in the committed cut — same model as the verifier above.
-            _upgradeFacetData: CTMUpgradeComposer.buildUpgradeFacetData(_registry)
+            // The CTM pins this registry for the new version; the upgrade contract reads the
+            // facet-swap plan straight from it at execution — same model as the verifier above,
+            // nothing copied into CTM state.
+            _registry: address(_registry)
         });
         ctm.setChainCreationParams(CTMUpgradeComposer.buildChainCreationParams(_registry));
 

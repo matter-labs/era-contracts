@@ -56,7 +56,7 @@ contract ZKsyncOSChainTypeManagerSharedTest is ChainTypeManagerTest {
             genesisBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(diamondInit),
             forceDeploymentsData: forceDeploymentsData,
-            newChainFacetData: Utils.encodeFacetInstallations(facetCuts)
+            registry: address(0)
         });
 
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({

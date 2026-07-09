@@ -117,6 +117,14 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
             isZKsyncOS: config.isZKsyncOS,
+            // Selectors are computed off-chain here so the Gateway genesis cut is reproducible for
+            // CREATE2 address calculation (the facets are not yet deployed at that point).
+            adminSelectors: Utils.getAllSelectorsForFacet("Admin"),
+            executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
+            mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
+            gettersSelectors: Utils.getAllSelectorsForFacet("Getters"),
+            migratorSelectors: Utils.getAllSelectorsForFacet("Migrator"),
+            committerSelectors: Utils.getAllSelectorsForFacet("Committer"),
             bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
             defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,
             evmEmulatorHash: config.contracts.chainCreationParams.evmEmulatorHash,

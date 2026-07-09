@@ -5,11 +5,11 @@ pragma solidity 0.8.28;
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
 
-/// @notice One planned facet swap. The CTM stores the abi-encoded `UpgradeFacetSwap[]` plan per
-///         protocol version (`IChainTypeManager.upgradeFacetData`); `BaseZkSyncUpgrade` reads it
-///         at execution time and applies it itself (it already runs inside the diamond's context),
-///         so the committed upgrade cut needs no `facetCuts` and selector lists are never passed
-///         around between contracts.
+/// @notice One planned facet swap. The CTM pins the upgrade registry per protocol version
+///         (`IChainTypeManager.upgradeRegistryForVersion`); `BaseZkSyncUpgrade` reads the plan
+///         straight from that registry (via `RegistryFacetReader`) at execution time and applies
+///         it itself (it already runs inside the diamond's context), so the committed upgrade cut
+///         needs no `facetCuts` and selector lists are never passed around between contracts.
 /// @param oldFacet The facet currently serving selectors, or zero for a pure addition.
 /// @param newFacet The facet serving them after the upgrade, or zero for a pure removal.
 /// @param isFreezable Whether the new facet's selectors can be frozen.
