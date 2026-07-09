@@ -42,9 +42,9 @@ import {InvalidSelector, Unauthorized} from "../../common/L1ContractErrors.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Shared entry-point logic for executing, verifying and unbundling interop bundles. Both the L2 system
-/// contract (`InteropHandler`) and the L1-side `L1InteropHandler` inherit this base and provide the environment
-/// specific behaviour (message-inclusion verification, settlement-layer gating, base-token value handling, and the
-/// post-execution accounting message) via the virtual hooks below.
+/// contract (`L2InteropHandler`) and the L1-side `L1InteropHandler` inherit this base and provide the environment
+/// specific behaviour (message-inclusion verification, settlement-layer gating, and base-token value handling) via
+/// the virtual hooks below.
 abstract contract InteropHandlerBase is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
     /// @notice The chain ID of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
@@ -74,10 +74,6 @@ abstract contract InteropHandlerBase is IInteropHandler, IERC7786Recipient, Reen
     /// their transfer data, not as call value).
     function _handleCallValue(uint256 _value, uint256 _sourceChainId) internal virtual;
 
-    /// @notice Hook invoked after a call in the bundle executed successfully.
-    /// @dev L2 emits an L2->L1 message so the asset tracker can move balances; L1 does nothing.
-    function _afterCallExecuted(bytes32 _destinationBaseTokenAssetId, InteropCall memory _interopCall) internal virtual;
-
     /// @notice The base-token asset ID expected as the bundle's destination base token on this layer.
     function _expectedDestinationBaseTokenAssetId() internal view virtual returns (bytes32);
 
@@ -87,8 +83,8 @@ abstract contract InteropHandlerBase is IInteropHandler, IERC7786Recipient, Reen
 
     /// @inheritdoc IInteropHandler
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
-        // Interop claiming requires the chain to settle on a layer that can process the execution confirmation and
-        // move balances from pendingInteropBalance to chainBalance. See the concrete implementations for details.
+        // Interop claiming requires the chain to settle on a layer that can process the execution confirmation.
+        // See the concrete implementations for details.
         _settlementGuard();
 
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
@@ -291,9 +287,6 @@ abstract contract InteropHandlerBase is IInteropHandler, IERC7786Recipient, Reen
                 payload: interopCall.data
             }); // attributes are not supported yet
             require(selector == IERC7786Recipient.receiveMessage.selector, InvalidSelector(selector));
-
-            // Environment-specific post-execution accounting (e.g. GWAssetTracker notification on L2).
-            _afterCallExecuted(_interopBundle.destinationBaseTokenAssetId, interopCall);
         }
     }
 
@@ -304,9 +297,10 @@ abstract contract InteropHandlerBase is IInteropHandler, IERC7786Recipient, Reen
     /// That message gets sent to L1 by origin chain in InteropCenter contract, and is picked up and included in receiving chain by sequencer.
     function _verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bytes32 _bundleHash) internal {
         // Verify that the message came from the legitimate InteropCenter.
-        // It is expected that all allowed messages have gone through the GWAssetTracker which
-        // ensured that if the `L2_INTEROP_CENTER_ADDR` is the sender of the message, then the message
-        // corresponds to a bundle with the valid balance changes.
+        // The bundle is authenticated solely by message inclusion plus the sender being the
+        // canonical `L2_INTEROP_CENTER_ADDR`. Asset correctness across chains is guaranteed by ZK
+        // proofs (assuming proofs are correct and chains are not malicious), so no on-chain
+        // per-chain balance reconciliation is performed here.
         require(
             _proof.message.sender == L2_INTEROP_CENTER_ADDR,
             UnauthorizedMessageSender(L2_INTEROP_CENTER_ADDR, _proof.message.sender)

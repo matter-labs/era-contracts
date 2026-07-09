@@ -7,14 +7,12 @@ import {
     L2_NATIVE_TOKEN_VAULT,
     L2_MESSAGE_VERIFICATION,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
-    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
     L2_COMPLEX_UPGRADER_ADDR
 } from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {InteropHandlerBase} from "./InteropHandlerBase.sol";
-import {InteropCall, InteropCallExecutedMessage, MessageInclusionProof} from "../../common/Messaging.sol";
+import {MessageInclusionProof} from "../../common/Messaging.sol";
 import {CannotClaimInteropOnL1Settlement} from "../InteropErrors.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
-import {IAssetTrackerDataEncoding} from "../../bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 
 /// @title L2InteropHandler
 /// @author Matter Labs
@@ -71,36 +69,8 @@ contract L2InteropHandler is InteropHandlerBase {
     }
 
     /// @inheritdoc InteropHandlerBase
-    function _afterCallExecuted(
-        bytes32 _destinationBaseTokenAssetId,
-        InteropCall memory _interopCall
-    ) internal override {
-        _sendCallExecutedMessage(_destinationBaseTokenAssetId, _interopCall);
-    }
-
-    /// @inheritdoc InteropHandlerBase
     function _expectedDestinationBaseTokenAssetId() internal view override returns (bytes32) {
         return L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID();
-    }
-
-    /// @notice Sends an L2→L1 message for a single successfully executed interop call.
-    /// @dev Called inside `_executeCalls` for each executed call so GWAssetTracker can move the call's
-    /// balances from pendingInteropBalance to chainBalance during the next settlement.
-    /// @param _destinationBaseTokenAssetId Asset ID of the destination chain's base token.
-    /// @param _interopCall The interop call that was executed.
-    function _sendCallExecutedMessage(bytes32 _destinationBaseTokenAssetId, InteropCall memory _interopCall) internal {
-        // slither-disable-next-line unused-return
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
-            abi.encodeCall(
-                IAssetTrackerDataEncoding.receiveInteropCallExecuted,
-                (
-                    InteropCallExecutedMessage({
-                        destinationBaseTokenAssetId: _destinationBaseTokenAssetId,
-                        interopCall: _interopCall
-                    })
-                )
-            )
-        );
     }
 
     /// @notice Allows the contract to receive native ETH from L2_BASE_TOKEN_HOLDER.

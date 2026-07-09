@@ -19,6 +19,7 @@ import {
   L2_BOOTLOADER_ADDR,
   L2_ASSET_ROUTER_ADDR,
   L2_INTEROP_HANDLER_ADDR,
+  L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../core/const";
 import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
 import { buildMockInteropProof, impersonateAndRun } from "../core/utils";
@@ -126,6 +127,11 @@ export interface SendAndExecuteTokenInteropParams {
 
 export async function sendAndExecuteTokenInterop(params: SendAndExecuteTokenInteropParams): Promise<string> {
   await approveTokenForNtv(params.sendProvider, params.sourceTokenAddress, params.amount);
+  // Ensure the source token is registered in the NTV so the asset router can bridge-burn it.
+  // Under the new trust model interop eligibility only requires NTV registration; no on-chain
+  // balance migration to the Gateway is needed. A token bridged in from another chain is already
+  // registered (during its bridgeMint), so this is a no-op for those.
+  await registerL2NativeTokenIfNeeded(params.sendProvider, params.sourceTokenAddress);
   const fee = await getInteropProtocolFee(params.sendProvider);
 
   const destTokenBefore = await getTokenAddressForAsset(params.receiveProvider, params.assetId);
@@ -152,6 +158,20 @@ export async function sendAndExecuteTokenInterop(params: SendAndExecuteTokenInte
   const recipientAfter = await getTokenBalance(params.receiveProvider, destTokenAfter, params.recipientAddress);
   expectBalanceDelta(recipientBefore, recipientAfter, params.amount, `${params.label}: recipient token`);
   return destTokenAfter;
+}
+
+/** Registers a chain-native token in the L2NativeTokenVault if it is not already registered. */
+export async function registerL2NativeTokenIfNeeded(
+  provider: providers.JsonRpcProvider,
+  tokenAddress: string
+): Promise<void> {
+  const wallet = new Wallet(getInteropSourcePrivateKey(), provider);
+  const ntv = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), wallet);
+  const registeredAssetId: string = await ntv.assetId(tokenAddress);
+  if (registeredAssetId === ethers.constants.HashZero) {
+    const tx = await ntv.registerToken(tokenAddress, { gasLimit: 500_000 });
+    await tx.wait();
+  }
 }
 
 // ── InteropCenter.sendBundle wrapper ───────────────────────────

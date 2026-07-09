@@ -226,8 +226,7 @@ export function applyL1ToL2Alias(l1Address: string): string {
  * Build the merkle proof for withdrawal finalization.
  *
  * DummyL1MessageRoot bypasses verification, but getProofData() still parses the
- * proof structure to extract settlementLayerChainId (used by L1AssetTracker to
- * update the correct chainBalance).
+ * proof structure to extract settlementLayerChainId.
  *
  * For direct settlement (chain on L1): old format → settlementLayerChainId = 0
  * For gateway settlement: new format → settlementLayerChainId = GW chain ID

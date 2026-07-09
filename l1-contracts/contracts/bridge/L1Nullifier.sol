@@ -9,9 +9,8 @@ import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
-import {IL1InteropHandler} from "../interop/interop-handler/IL1InteropHandler.sol";
 
-import {ConfirmTransferResultData, L2Log, TxStatus} from "../common/Messaging.sol";
+import {ConfirmTransferResultData, TxStatus} from "../common/Messaging.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
@@ -25,7 +24,6 @@ import {
     ZeroAddress
 } from "../common/L1ContractErrors.sol";
 import {NativeTokenVaultAlreadySet} from "./L1BridgeContractErrors.sol";
-import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
 
 /// @author Matter Labs
@@ -253,26 +251,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _status: _confirmTransferResultData._txStatus
             });
             require(proofValid, InvalidProof());
-            L2Log memory l2Log = MessageHashing.getL2LogFromL1ToL2Transaction(
-                _confirmTransferResultData._l2TxNumberInBatch,
-                _confirmTransferResultData._l2TxHash,
-                _confirmTransferResultData._txStatus
-            );
-
-            bytes32 leaf = MessageHashing.getLeafHashFromLog(l2Log);
-            ProofData memory proofData = MESSAGE_ROOT.getProofData({
-                _chainId: _confirmTransferResultData._chainId,
-                _batchNumber: _confirmTransferResultData._l2BatchNumber,
-                _leafProofMask: _confirmTransferResultData._l2MessageIndex,
-                _leaf: leaf,
-                _proof: _confirmTransferResultData._merkleProof
-            });
-            // Record the settlement layer on the L1 interop handler, which owns the transient slot that the
-            // `L1AssetTracker` reads while attributing this failed-deposit claim.
-            IL1InteropHandler(l1InteropHandler).setTransientSettlementLayer(
-                proofData.settlementLayerChainId,
-                _confirmTransferResultData._l2BatchNumber
-            );
         }
 
         {

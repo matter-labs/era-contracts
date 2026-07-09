@@ -28,6 +28,7 @@ import {
   getZkTokenAssetId,
   getZkTokenAddress,
   deployDummyInteropRecipient,
+  registerL2NativeTokenIfNeeded,
 } from "../../src/helpers/interop-helpers";
 import {
   captureBalance,
@@ -122,6 +123,9 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     console.log(`   Fixed ZK interop fee: ${zkInteropFee.toString()}`);
 
     sourceTokenAddress = state.testTokens[sourceChainId];
+    // The pre-generated states carry no NTV registrations (the balance-migration setup
+    // that used to register test tokens was removed), so register on demand.
+    await registerL2NativeTokenIfNeeded(sourceProvider, sourceTokenAddress);
     sourceAssetId = await getAssetIdForToken(sourceProvider, sourceTokenAddress);
     const zkTokenAssetId = state.zkToken?.assetId || (await getZkTokenAssetId(sourceProvider));
     if (zkTokenAssetId === ethers.constants.HashZero) {
@@ -451,6 +455,9 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
       return;
     }
 
+    // Register the destination chain's native test token on demand (the pre-generated
+    // states carry no NTV registrations after the balance-migration setup removal).
+    await registerL2NativeTokenIfNeeded(destProvider, destTestToken);
     const bridgedAssetId = await getAssetIdForToken(destProvider, destTestToken);
 
     // Resolve the bridged token address on the source chain

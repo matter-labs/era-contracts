@@ -263,11 +263,6 @@
                     "name": "chainRegistrationSender",
                     "type": "address",
                     "internalType": "address"
-                  },
-                  {
-                    "name": "assetTracker",
-                    "type": "address",
-                    "internalType": "address"
                   }
                 ]
               },
@@ -298,11 +293,6 @@
                   },
                   {
                     "name": "chainRegistrationSender",
-                    "type": "address",
-                    "internalType": "address"
-                  },
-                  {
-                    "name": "assetTracker",
                     "type": "address",
                     "internalType": "address"
                   }
@@ -485,11 +475,6 @@
                 "name": "chainRegistrationSender",
                 "type": "address",
                 "internalType": "address"
-              },
-              {
-                "name": "assetTracker",
-                "type": "address",
-                "internalType": "address"
               }
             ]
           },
@@ -520,11 +505,6 @@
               },
               {
                 "name": "chainRegistrationSender",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "assetTracker",
                 "type": "address",
                 "internalType": "address"
               }

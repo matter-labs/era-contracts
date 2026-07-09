@@ -9,7 +9,6 @@ import { runForgeScript } from "../core/forge";
 import {
   ANVIL_DEFAULT_ACCOUNT_ADDR,
   ANVIL_DEFAULT_PRIVATE_KEY,
-  GW_ASSET_TRACKER_ADDR,
   INITIAL_BASE_TOKEN_HOLDER_BALANCE,
   INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
@@ -83,7 +82,7 @@ export type V31UpgradeScenario = {
   targetRoles: ChainRole[];
   clearGenesisUpgradeTxHash?: boolean;
   seedBatchCounters?: boolean;
-  transferL1AssetTrackerOwnership?: boolean;
+  transferL1ChainAssetHandlerOwnership?: boolean;
 };
 
 // ── Main entry point ─────────────────────────────────────────────────
@@ -230,7 +229,7 @@ async function transferL1Ownership(
     bridgehub: string;
     l1SharedBridge: string;
     l1NativeTokenVault: string;
-    l1AssetTracker: string;
+    l1ChainAssetHandler?: string;
   },
   ctmAddresses: { chainTypeManager: string },
   scenario: V31UpgradeScenario
@@ -240,10 +239,11 @@ async function transferL1Ownership(
   await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1SharedBridge);
   await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1NativeTokenVault);
   await transferOwnership2Step(provider, defaultSigner, gov, ctmAddresses.chainTypeManager);
-  // The l1AssetTracker address points to the old L1ChainAssetHandler in pre-v31 states.
-  // Governance needs ownership for pauseMigration() in stage 0.
-  if (scenario.transferL1AssetTrackerOwnership) {
-    await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1AssetTracker);
+  // The pre-v31 chain states record the old L1ChainAssetHandler proxy (the v31 ecosystem
+  // upgrade reuses this proxy in place). Governance must own it to run the stage-0
+  // pauseMigration() governance call.
+  if (scenario.transferL1ChainAssetHandlerOwnership && l1Addresses.l1ChainAssetHandler) {
+    await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1ChainAssetHandler);
   }
 }
 
@@ -1421,7 +1421,6 @@ function buildAddressToContract(isZKsyncOS: boolean): ReadonlyMap<string, Contra
     [L2_INTEROP_HANDLER_ADDR.toLowerCase(), "L2InteropHandler"],
     [L2_BASE_TOKEN_HOLDER_ADDR.toLowerCase(), "BaseTokenHolder"],
     [L2_WRAPPED_BASE_TOKEN_IMPL_ADDR.toLowerCase(), "L2WrappedBaseToken"],
-    [GW_ASSET_TRACKER_ADDR.toLowerCase(), "GWAssetTracker"],
     [L2_MESSAGE_VERIFICATION_ADDR.toLowerCase(), "L2MessageVerification"],
     [L2_INTEROP_ROOT_STORAGE_ADDR.toLowerCase(), "L2InteropRootStorage"],
   ];

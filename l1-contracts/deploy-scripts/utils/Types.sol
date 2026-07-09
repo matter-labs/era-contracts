@@ -16,7 +16,6 @@ struct BridgehubContracts {
     address ctmDeploymentTracker;
     address chainAssetHandler;
     address chainRegistrationSender;
-    address assetTracker;
 }
 
 struct BridgehubAddresses {

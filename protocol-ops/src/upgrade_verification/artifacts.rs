@@ -310,7 +310,7 @@ mod tests {
             stage2_calls = "0x"
 
             [core]
-            asset_tracker_proxy_addr = "0x0000000000000000000000000000000000000001"
+            deployer_addr = "0x0000000000000000000000000000000000000001"
 
             [core.upgrade_addresses]
             native_token_vault_implementation_addr = "0x0000000000000000000000000000000000000002"
@@ -335,7 +335,7 @@ mod tests {
         assert_eq!(a.ctms[0].chain_upgrade_diamond_cut, "0xabcd");
         assert!(a.core.get("state_transition").is_none());
         assert!(a.core.get("upgrade_addresses").is_some());
-        assert!(a.core.get("asset_tracker_proxy_addr").is_some());
+        assert!(a.core.get("deployer_addr").is_some());
     }
 
     #[test]

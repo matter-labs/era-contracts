@@ -42,14 +42,14 @@ use super::helpers::{
     required_ctm_address, verify_call_by_address, verify_call_by_name,
 };
 use super::{
-    initializeL1V31UpgradeCall, setAssetTrackerCall, setChainCreationParamsCall,
-    upgradeAndCallCall, upgradeCall, CallList, GovernanceStage1Calls,
+    initializeL1V31UpgradeCall, setChainCreationParamsCall, upgradeAndCallCall, upgradeCall,
+    CallList, GovernanceStage1Calls,
 };
 
 /// Number of generated ecosystem-wide stage-1 calls before any per-CTM block.
 /// On stage, PUVT additionally requires one leading `pauseMigration()` call
 /// because stage1 is executed through the emergency-upgrade path.
-const STAGE1_GENERATED_PREFIX_LEN: usize = 11;
+const STAGE1_GENERATED_PREFIX_LEN: usize = 9;
 const STAGE1_PER_CTM_LEN: usize = 6;
 
 /// Index of the per-CTM `ChainTypeManager` proxy upgrade within the
@@ -71,7 +71,7 @@ fn stage1_call_offset(verifiers: &Verifiers) -> usize {
 
 impl GovernanceStage1Calls {
     /// Stage 1 — proxy impl swaps for the 7 core contracts (incl. MessageRoot
-    /// reinit), AssetTracker ownership handoff, NTV wiring, ChainAssetHandler
+    /// reinit), ChainRegistrationSender ownership handoff, ChainAssetHandler
     /// address refresh, then per-CTM: timer checkDeadline, migrations-paused
     /// sanity, CTM impl swap, `setChainCreationParams`, `setNewVersionUpgrade`,
     /// VT impl swap.
@@ -98,9 +98,6 @@ impl GovernanceStage1Calls {
         result: &mut VerificationResult,
     ) -> anyhow::Result<()> {
         result.print_info("== Gov stage 1 calls ===");
-
-        const ACCEPT_ASSET_TRACKER_OWNERSHIP: usize = 8;
-        const SET_ASSET_TRACKER: usize = 9;
 
         let call_offset = stage1_call_offset(verifiers);
         let mut errors = 0;
@@ -139,12 +136,8 @@ impl GovernanceStage1Calls {
             (6, "transparent_proxy_admin", "upgrade(address,address)"),
             // Accept ChainRegistrationSender ownership.
             (7, "chain_registration_sender_proxy", "acceptOwnership()"),
-            // Accept AssetTracker ownership.
-            (8, "asset_tracker_proxy", "acceptOwnership()"),
-            // Wire AssetTracker into NativeTokenVault.
-            (9, "native_token_vault", "setAssetTracker(address)"),
             // Cache MessageRoot / AssetRouter inside L1ChainAssetHandler.
-            (10, "chain_asset_handler_proxy", "setAddresses()"),
+            (8, "chain_asset_handler_proxy", "setAddresses()"),
         ] {
             errors += verify_call_by_name(
                 &self.calls,
@@ -289,33 +282,6 @@ impl GovernanceStage1Calls {
                 errors += 1;
             }
             std::cmp::Ordering::Equal => {}
-        }
-
-        // The accepted AssetTracker proxy must be the one wired into NativeTokenVault.
-        if let (Some(accept_call), Some(set_asset_tracker_call)) = (
-            self.calls
-                .elems
-                .get(call_offset + ACCEPT_ASSET_TRACKER_OWNERSHIP),
-            self.calls.elems.get(call_offset + SET_ASSET_TRACKER),
-        ) {
-            match setAssetTrackerCall::abi_decode(&set_asset_tracker_call.data) {
-                Ok(decoded) if decoded._l1AssetTracker == accept_call.target => {
-                    result.report_ok(
-                        "AssetTracker ownership target matches setAssetTracker argument",
-                    );
-                }
-                Ok(decoded) => {
-                    result.report_error(&format!(
-                        "AssetTracker target mismatch: acceptOwnership targets {}, but setAssetTracker uses {}",
-                        accept_call.target, decoded._l1AssetTracker
-                    ));
-                    errors += 1;
-                }
-                Err(err) => {
-                    result.report_error(&format!("Failed to decode setAssetTracker call: {err}"));
-                    errors += 1;
-                }
-            }
         }
 
         if errors > 0 {

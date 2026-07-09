@@ -41,6 +41,7 @@ import {
   deployRevertingContract,
   deployDummyInteropRecipient,
   getInteropExecutionData,
+  registerL2NativeTokenIfNeeded,
 } from "../../src/helpers/interop-helpers";
 import type { CallStarter, InteropSendResult } from "../../src/helpers/interop-helpers";
 import {
@@ -126,6 +127,9 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     }
 
     sourceTokenAddress = state.testTokens[sourceChainId];
+    // The pre-generated states carry no NTV registrations (the balance-migration setup
+    // that used to register test tokens was removed), so register on demand.
+    await registerL2NativeTokenIfNeeded(sourceProvider, sourceTokenAddress);
     sourceAssetId = await getAssetIdForToken(sourceProvider, sourceTokenAddress);
 
     if (getInteropSourceAddress().toLowerCase() === getInteropUnbundlerAddress().toLowerCase()) {

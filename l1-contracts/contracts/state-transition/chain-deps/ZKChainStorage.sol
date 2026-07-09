@@ -230,14 +230,15 @@ struct ZKChainStorage {
     /// @dev STORAGE SLOT: 59
     bytes32 precommitmentForTheLatestBatch;
     /// @dev ZKsync OS flag, if `true` state transition is done with ZKsync OS, otherwise Era VM
-    /// @dev STORAGE SLOT: 60 (packed: bool + enum + address — shares with l2DACommitmentScheme + assetTracker)
+    /// @dev STORAGE SLOT: 60 (packed: bool + enum + address — shares with l2DACommitmentScheme + __DEPRECATED_assetTracker)
     bool zksyncOS;
     /// @dev The scheme of L2 DA commitment. Different L1 validators may use different schemes.
-    /// @dev STORAGE SLOT: 60 (packed with zksyncOS + assetTracker)
+    /// @dev STORAGE SLOT: 60 (packed with zksyncOS + __DEPRECATED_assetTracker)
     L2DACommitmentScheme l2DACommitmentScheme;
-    /// @dev The address of the asset tracker
+    /// @dev Deprecated: previously held the address of the asset tracker, which has been removed.
+    /// The slot is retained (and kept packed) to preserve the storage layout of all following slots.
     /// @dev STORAGE SLOT: 60 (packed with zksyncOS + l2DACommitmentScheme)
-    address assetTracker;
+    address __DEPRECATED_assetTracker;
     /// @dev The address of the native token vault
     /// @dev STORAGE SLOT: 61
     address nativeTokenVault;
