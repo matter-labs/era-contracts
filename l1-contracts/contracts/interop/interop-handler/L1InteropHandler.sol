@@ -28,8 +28,9 @@ contract L1InteropHandler is InteropHandlerBase, IL1InteropHandler {
     IMessageRootBase public immutable MESSAGE_ROOT;
 
     /// @dev Address of the L1 nullifier, the only contract allowed to record the transient settlement layer
-    /// for its failed-deposit recovery flow.
-    address public override l1Nullifier;
+    /// for its failed-deposit recovery flow. Fixed at deployment: the nullifier proxy is deployed before this
+    /// handler, so its address is known when the implementation is constructed.
+    address public immutable override l1Nullifier;
 
     /// @notice Checks that the message sender is the L1 nullifier.
     modifier onlyNullifier() {
@@ -39,22 +40,18 @@ contract L1InteropHandler is InteropHandlerBase, IL1InteropHandler {
 
     /// @dev Contract is expected to be used as a proxy implementation.
     /// @dev Locking the reentrancy guard in the constructor prevents the implementation from being initialized.
-    constructor(IMessageRootBase _messageRoot) reentrancyGuardInitializer {
+    /// @param _messageRoot The MessageRoot used to prove message inclusion.
+    /// @param _l1Nullifier The address of the L1 nullifier.
+    constructor(IMessageRootBase _messageRoot, address _l1Nullifier) reentrancyGuardInitializer {
+        require(_l1Nullifier != address(0), Unauthorized(_l1Nullifier));
         MESSAGE_ROOT = _messageRoot;
+        l1Nullifier = _l1Nullifier;
     }
 
     /// @notice Initializes the contract behind its proxy.
     /// @param _l1ChainId The chain ID of L1.
-    /// @param _l1Nullifier The address of the L1 nullifier.
-    function initialize(uint256 _l1ChainId, address _l1Nullifier) external reentrancyGuardInitializer {
-        require(_l1Nullifier != address(0), Unauthorized(_l1Nullifier));
+    function initialize(uint256 _l1ChainId) external reentrancyGuardInitializer {
         L1_CHAIN_ID = _l1ChainId;
-        l1Nullifier = _l1Nullifier;
-    }
-
-    /// @notice Not supported on L1: the L1 interop handler is initialized via `initialize` behind a proxy.
-    function initL2(uint256) external view {
-        revert Unauthorized(msg.sender);
     }
 
     /// @inheritdoc InteropHandlerBase

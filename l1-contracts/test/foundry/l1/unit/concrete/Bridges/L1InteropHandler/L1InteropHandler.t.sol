@@ -26,11 +26,11 @@ contract L1InteropHandlerTest is Test {
     uint256 internal constant L1_CHAIN_ID = 1;
 
     function setUp() public {
-        handlerImpl = new L1InteropHandler(IMessageRootBase(messageRoot));
+        handlerImpl = new L1InteropHandler(IMessageRootBase(messageRoot), nullifier);
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(handlerImpl),
             proxyAdmin,
-            abi.encodeWithSelector(L1InteropHandler.initialize.selector, L1_CHAIN_ID, nullifier)
+            abi.encodeWithSelector(L1InteropHandler.initialize.selector, L1_CHAIN_ID)
         );
         handler = L1InteropHandler(address(proxy));
     }
@@ -45,26 +45,16 @@ contract L1InteropHandlerTest is Test {
         assertEq(address(handler.MESSAGE_ROOT()), messageRoot, "MESSAGE_ROOT mismatch");
     }
 
-    function test_Initialize_RevertWhen_ZeroNullifier() public {
-        L1InteropHandler impl = new L1InteropHandler(IMessageRootBase(messageRoot));
+    function test_Constructor_RevertWhen_ZeroNullifier() public {
+        // The nullifier is an immutable set in the constructor, so a zero address is rejected at deployment.
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(0)));
-        new TransparentUpgradeableProxy(
-            address(impl),
-            proxyAdmin,
-            abi.encodeWithSelector(L1InteropHandler.initialize.selector, L1_CHAIN_ID, address(0))
-        );
+        new L1InteropHandler(IMessageRootBase(messageRoot), address(0));
     }
 
     function test_Initialize_RevertWhen_CalledTwice() public {
         // The `reentrancyGuardInitializer` modifier rejects the second init with `SlotOccupied`.
         vm.expectRevert(SlotOccupied.selector);
-        handler.initialize(L1_CHAIN_ID, nullifier);
-    }
-
-    function test_InitL2_Reverts() public {
-        // initL2 is the L2 system-contract entry point and is not usable on L1.
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        handler.initL2(L1_CHAIN_ID);
+        handler.initialize(L1_CHAIN_ID);
     }
 
     /*//////////////////////////////////////////////////////////////

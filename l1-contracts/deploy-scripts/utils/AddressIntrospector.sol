@@ -149,7 +149,9 @@ library AddressIntrospector {
 
         address l1NullifierProxy = address(assetRouter.L1_NULLIFIER());
         address l1NativeTokenVaultProxy = address(assetRouter.nativeTokenVault());
-        // The interop handler did not exist on v29; the nullifier exposes it only post-upgrade.
+        // FIXME: this version gate is wrong. The L1 interop handler did not exist through v31 (it is introduced
+        // in this upgrade), but this only special-cases v29 — so for a v30/v31 nullifier it will still call
+        // `l1InteropHandler()`, which does not exist yet. Gate on "pre-interop-handler" (<= v31) instead of just v29.
         address l1InteropHandlerProxy = isV29 ? address(0) : assetRouter.L1_NULLIFIER().l1InteropHandler();
 
         require(l1NativeTokenVaultProxy != address(0), "NativeTokenVault address is zero");

@@ -6,6 +6,11 @@
         "name": "_messageRoot",
         "type": "address",
         "internalType": "contract IMessageRootBase"
+      },
+      {
+        "name": "_l1Nullifier",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "nonpayable"
@@ -161,30 +166,12 @@
   },
   {
     "type": "function",
-    "name": "initL2",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "initialize",
     "inputs": [
       {
         "name": "_l1ChainId",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "_l1Nullifier",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "outputs": [],

@@ -41,8 +41,4 @@ interface IInteropHandler {
 
     /// @notice Tracks the individual call statuses within a bundle.
     function callStatus(bytes32 bundleHash, uint256 callIndex) external view returns (CallStatus);
-
-    /// @notice Initializes the reentrancy guard.
-    /// @param _l1ChainId The chain ID of L1.
-    function initL2(uint256 _l1ChainId) external;
 }
