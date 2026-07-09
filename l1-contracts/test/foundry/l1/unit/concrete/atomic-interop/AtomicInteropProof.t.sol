@@ -83,7 +83,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     }
 
     /// @dev Boundary: `l1Timestamp == deadline` is in time (the check is strictly `>`).
-    function test_verifyInclusion_boundary_timestampEqualsDeadline_passes() public {
+    function test_verifyInclusion_allowsBatchSettledAtDeadline() public {
         ImtProof memory proof = _inclusionProof(
             SOURCE_CHAIN_ID,
             BATCH_N,
