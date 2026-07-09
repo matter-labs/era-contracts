@@ -275,7 +275,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// @dev A value that is present in the tree cannot also be given a valid non-inclusion proof: its
     /// predecessor leaf's `nextValue` equals the value, so the engine rejects the bracketing claim. This is
     /// the library-level guarantee that a leg cannot be simultaneously finalizable (included in time) and
-    /// refundable (proven absent). The full cross-chain force-refund guard lives in PR2 (authorizeRefund).
+    /// refundable (proven absent). Source-chain binding is enforced by the manager-level refund path.
     function test_includedValueCannotBeProvenAbsent() public {
         // Sanity: the committed value verifies as included in time.
         ImtProof memory inclusion =

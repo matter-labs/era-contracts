@@ -48,9 +48,9 @@ contract AtomicInteropProofWrapper {
     }
 }
 
-/// @notice Shared fixtures + on-chain proof builders for the {AtomicInteropProof} unit tests (PR1).
+/// @notice Shared fixtures + on-chain proof builders for the {AtomicInteropProof} unit tests.
 ///
-/// Design (mirrors the plan's PR1 harness decision):
+/// Design:
 ///   - A REAL {L2InteropCommitmentTree} is the IMT oracle: we insert commit values through the real
 ///     `insert` path and read `root()`/`leafAt`/`merklePath` to assemble genuine inclusion /
 ///     non-inclusion `ImtProof`s. No second (off-chain) IMT implementation is maintained, so on-chain
