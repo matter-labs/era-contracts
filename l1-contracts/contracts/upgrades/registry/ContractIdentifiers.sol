@@ -41,7 +41,6 @@ enum CoreContract {
     L2WrappedBaseToken,
     L2MessageVerification,
     L2InteropRootStorage,
-    GWAssetTracker,
     BeaconProxy,
     L2V31Upgrade,
     L2SharedBridgeLegacy,

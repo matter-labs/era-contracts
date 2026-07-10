@@ -24,13 +24,8 @@ import {RegistryFacetReader} from "../../upgrades/registry/RegistryFacetReader.s
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
 import {EmptyAssetId, EmptyBytes32, ZeroAddress} from "../../common/L1ContractErrors.sol";
-import {
-    L2_ASSET_TRACKER_ADDR,
-    L2_BRIDGEHUB_ADDR,
-    L2_NATIVE_TOKEN_VAULT_ADDR
-} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
-import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FeeParams} from "../../state-transition/chain-deps/ZKChainStorage.sol";
 
@@ -116,13 +111,10 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.chainTypeManager = msg.sender;
         if (bridgehub == L2_BRIDGEHUB_ADDR) {
             s.nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
-            s.assetTracker = L2_ASSET_TRACKER_ADDR;
         } else {
-            address nativeTokenVault = address(
+            s.nativeTokenVault = address(
                 IL1AssetRouter(address(IBridgehubBase(bridgehub).assetRouter())).nativeTokenVault()
             );
-            s.nativeTokenVault = nativeTokenVault;
-            s.assetTracker = address(IL1NativeTokenVault(nativeTokenVault).l1AssetTracker());
         }
         s.baseTokenAssetId = baseTokenAssetId;
         s.protocolVersion = protocolVersion;

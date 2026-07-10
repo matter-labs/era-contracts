@@ -19,6 +19,7 @@ import {
   L2_BOOTLOADER_ADDR,
   L2_ASSET_ROUTER_ADDR,
   L2_INTEROP_HANDLER_ADDR,
+  L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../core/const";
 import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
 import { buildMockInteropProof, impersonateAndRun } from "../core/utils";
@@ -66,6 +67,32 @@ export function useFixedFeeAttr(useFixedFee: boolean): string {
   return erc7786Iface.encodeFunctionData("useFixedFee", [useFixedFee]);
 }
 
+/** Encode an interopBundleSalt bundle attribute. */
+export function interopBundleSaltAttr(salt: string): string {
+  return erc7786Iface.encodeFunctionData("interopBundleSalt", [salt]);
+}
+
+/** Selector of the interopBundleSalt bundle attribute, used to detect whether a salt was already supplied. */
+const INTEROP_BUNDLE_SALT_SELECTOR = erc7786Iface.getSighash("interopBundleSalt");
+
+/**
+ * Ensure the bundle attributes carry an `interopBundleSalt` attribute.
+ *
+ * The InteropCenter derives the bundle hash from `keccak256(msg.sender, salt)` and rejects a (sender, salt)
+ * pair that has already been used (`InteropBundleSaltAlreadyUsed`). Since the test harness sends many bundles
+ * from the same source wallet, we attach a fresh random salt whenever the caller did not provide one, so that
+ * each bundle gets a unique hash (mirroring the previously auto-incremented interop nonce). If the caller already
+ * supplied a salt attribute, it is left untouched.
+ */
+function ensureUniqueBundleSalt(attributes: string[]): string[] {
+  const hasSalt = attributes.some((attr) => attr.slice(0, 10).toLowerCase() === INTEROP_BUNDLE_SALT_SELECTOR);
+  if (hasSalt) {
+    return attributes;
+  }
+  const salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+  return [...attributes, interopBundleSaltAttr(salt)];
+}
+
 // ── Token transfer data encoding ───────────────────────────────
 
 /**
@@ -91,6 +118,11 @@ export interface SendAndExecuteTokenInteropParams {
 
 export async function sendAndExecuteTokenInterop(params: SendAndExecuteTokenInteropParams): Promise<string> {
   await approveTokenForNtv(params.sendProvider, params.sourceTokenAddress, params.amount);
+  // Ensure the source token is registered in the NTV so the asset router can bridge-burn it.
+  // Under the new trust model interop eligibility only requires NTV registration; no on-chain
+  // balance migration to the Gateway is needed. A token bridged in from another chain is already
+  // registered (during its bridgeMint), so this is a no-op for those.
+  await registerL2NativeTokenIfNeeded(params.sendProvider, params.sourceTokenAddress);
   const fee = await getInteropProtocolFee(params.sendProvider);
 
   const destTokenBefore = await getTokenAddressForAsset(params.receiveProvider, params.assetId);
@@ -117,6 +149,20 @@ export async function sendAndExecuteTokenInterop(params: SendAndExecuteTokenInte
   const recipientAfter = await getTokenBalance(params.receiveProvider, destTokenAfter, params.recipientAddress);
   expectBalanceDelta(recipientBefore, recipientAfter, params.amount, `${params.label}: recipient token`);
   return destTokenAfter;
+}
+
+/** Registers a chain-native token in the L2NativeTokenVault if it is not already registered. */
+export async function registerL2NativeTokenIfNeeded(
+  provider: providers.JsonRpcProvider,
+  tokenAddress: string
+): Promise<void> {
+  const wallet = new Wallet(getInteropSourcePrivateKey(), provider);
+  const ntv = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), wallet);
+  const registeredAssetId: string = await ntv.assetId(tokenAddress);
+  if (registeredAssetId === ethers.constants.HashZero) {
+    const tx = await ntv.registerToken(tokenAddress, { gasLimit: 500_000 });
+    await tx.wait();
+  }
 }
 
 // ── InteropCenter.sendBundle wrapper ───────────────────────────
@@ -161,7 +207,7 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
   const tx = await interopCenter.sendBundle(
     destinationChainIdBytes,
     options.callStarters,
-    options.bundleAttributes || [],
+    ensureUniqueBundleSalt(options.bundleAttributes || []),
     {
       gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
       value: options.value || 0,
@@ -215,7 +261,7 @@ export async function simulateInteropBundle(options: SendBundleOptions): Promise
   await interopCenter.callStatic.sendBundle(
     destinationChainIdBytes,
     options.callStarters,
-    options.bundleAttributes || [],
+    ensureUniqueBundleSalt(options.bundleAttributes || []),
     {
       gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
       value: options.value || 0,
@@ -242,10 +288,15 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
   const wallet = new Wallet(getInteropSourcePrivateKey(), options.sourceProvider);
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
 
-  const tx = await interopCenter.sendMessage(options.recipient, options.payload, options.attributes, {
-    gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
-    value: options.value || 0,
-  });
+  const tx = await interopCenter.sendMessage(
+    options.recipient,
+    options.payload,
+    ensureUniqueBundleSalt(options.attributes),
+    {
+      gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
+      value: options.value || 0,
+    }
+  );
   const receipt = await tx.wait();
 
   // Extract InteropBundleSent event

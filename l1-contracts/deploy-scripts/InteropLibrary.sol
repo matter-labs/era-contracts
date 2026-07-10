@@ -53,15 +53,19 @@ library InteropLibrary {
     }
 
     /// @notice Build a single InteropCallStarter with provided attributes for sending a call.
+    /// @param salt Salt mixed into the bundle's `interopBundleSalt`. Provide a random value: it keeps the bundle hash
+    ///             unpredictable and thus preserves the bundle's privacy. `bytes32(0)` is allowed but discouraged —
+    ///             since each salt must be unique per sender (enforced by InteropCenter), a sender can use it at most once.
     function buildCall(
         uint256 destinationChainId,
         address target,
         address executionAddress,
         address unbundlerAddress,
-        bytes memory data
+        bytes memory data,
+        bytes32 salt
     ) internal pure returns (InteropCallStarter memory, bytes[] memory) {
         bytes[] memory callAttributes = buildCallAttributes(false);
-        bytes[] memory bundleAttributes = buildBundleAttributes(executionAddress, unbundlerAddress, false);
+        bytes[] memory bundleAttributes = buildBundleAttributes(executionAddress, unbundlerAddress, false, salt);
 
         return (
             InteropCallStarter({
@@ -115,31 +119,29 @@ library InteropLibrary {
             });
     }
 
-    /// @notice Bundle-level attributes.
-    function buildBundleAttributes(
-        address unbundlerAddress,
-        bool useFixedFee
-    ) internal pure returns (bytes[] memory attrs) {
-        attrs = new bytes[](2);
-        attrs[0] = abi.encodeCall(
-            IERC7786Attributes.unbundlerAddress,
-            (InteroperableAddress.formatEvmV1(unbundlerAddress))
-        );
-        attrs[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (useFixedFee));
-    }
-
-    /// @notice Build bundle attributes with execution address, unbundler address, and fee type.
+    /// @notice Build bundle attributes with execution address, unbundler address, fee type, and a salt.
     /// @param executionAddress     Optional executor (EOA/contract) on destination chain
     /// @param unbundlerAddress     Unbundler address on destination chain
     /// @param useFixedFee          Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
+    /// @param salt                 Salt mixed into the bundle's `interopBundleSalt`. It must be supplied explicitly, as
+    ///                             there is intentionally no salt-less overload — callers cannot create a bundle without
+    ///                             consciously choosing a salt. Provide a random value: it keeps the bundle hash
+    ///                             unpredictable and thus preserves the bundle's privacy. Each salt must be unique per
+    ///                             sender (enforced by InteropCenter): a sender must pass a distinct salt for every
+    ///                             bundle it sends, regardless of whether the bundle contents differ — reusing a salt
+    ///                             reverts. `bytes32(0)` is allowed but discouraged: because used salts must be unique
+    ///                             per sender, a sender can use `bytes32(0)` at most once (when passed, the salt
+    ///                             attribute is simply omitted).
     function buildBundleAttributes(
         address executionAddress,
         address unbundlerAddress,
-        bool useFixedFee
+        bool useFixedFee,
+        bytes32 salt
     ) internal pure returns (bytes[] memory) {
         uint256 length = 1; // Always include useFixedFee
         if (executionAddress != address(0)) ++length;
         if (unbundlerAddress != address(0)) ++length;
+        if (salt != bytes32(0)) ++length;
         bytes[] memory attributes = new bytes[](length);
         uint attributesPointer = 0;
         if (executionAddress != address(0)) {
@@ -155,7 +157,25 @@ library InteropLibrary {
             );
         }
         attributes[attributesPointer++] = abi.encodeCall(IERC7786Attributes.useFixedFee, (useFixedFee));
+        if (salt != bytes32(0)) {
+            attributes[attributesPointer++] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (salt));
+        }
         return attributes;
+    }
+
+    /// @notice Appends an `interopBundleSalt` attribute to an existing bundle attributes array.
+    /// @dev Prefer passing the salt directly to {buildBundleAttributes}/the senders. This helper remains useful when a
+    ///      single base attributes array is reused to send several bundles, each needing a distinct salt so that every
+    ///      bundle hash is unique (enforced by InteropCenter).
+    function withInteropBundleSalt(
+        bytes[] memory _attributes,
+        bytes32 _salt
+    ) internal pure returns (bytes[] memory attrs) {
+        attrs = new bytes[](_attributes.length + 1);
+        for (uint256 i = 0; i < _attributes.length; ++i) {
+            attrs[i] = _attributes[i];
+        }
+        attrs[_attributes.length] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (_salt));
     }
 
     /// @notice Build a call-level 7786 attributes array.
@@ -181,6 +201,10 @@ library InteropLibrary {
     /// @param  recipient           Recipient on destination chain
     /// @param  unbundlerAddress     Address authorized to unbundle and execute the bundle on the  destination chain.
     /// @param  useFixedFee         Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
+    /// @param  salt                Salt mixed into the bundle's `interopBundleSalt`. Provide a random value to keep the
+    ///                             bundle hash unpredictable and preserve the bundle's privacy. `bytes32(0)` is allowed
+    ///                             but discouraged — each salt must be unique per sender (enforced by InteropCenter), so
+    ///                             a sender can use `bytes32(0)` at most once.
     /// @return bundleHash Hash of the sent bundle
     function sendToken(
         uint256 destinationChainId,
@@ -188,7 +212,8 @@ library InteropLibrary {
         uint256 amount,
         address recipient,
         address unbundlerAddress,
-        bool useFixedFee
+        bool useFixedFee,
+        bytes32 salt
     ) internal returns (bytes32 bundleHash) {
         if (recipient == address(0)) {
             revert ZeroAddress();
@@ -211,7 +236,7 @@ library InteropLibrary {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = buildSecondBridgeCall(secondBridgeCalldata, L2_ASSET_ROUTER_ADDR); // Using the default address as second bridge.
 
-        bytes[] memory bundleAttrs = buildBundleAttributes(address(0), unbundlerAddress, useFixedFee);
+        bytes[] memory bundleAttrs = buildBundleAttributes(address(0), unbundlerAddress, useFixedFee, salt);
 
         return L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(destinationChainId), calls, bundleAttrs);
     }
@@ -227,6 +252,10 @@ library InteropLibrary {
     /// @param executionAddress     Default executor used whenever a corresponding entry in `executionAddresses` is address(0).
     /// @param unbundlerAddress     Address authorized to unbundle and execute the bundle on the  destination chain.
     /// @param useFixedFee          Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
+    /// @param salt                 Salt mixed into the bundle's `interopBundleSalt`. Provide a random value to keep the
+    ///                             bundle hash unpredictable and preserve the bundle's privacy. `bytes32(0)` is allowed
+    ///                             but discouraged — each salt must be unique per sender (enforced by InteropCenter), so
+    ///                             a sender can use `bytes32(0)` at most once.
     /// @return bundleHash Hash of the sent bundle
     function sendDirectCallBundle(
         uint256 destination,
@@ -234,7 +263,8 @@ library InteropLibrary {
         bytes[] memory dataArray,
         address executionAddress,
         address unbundlerAddress,
-        bool useFixedFee
+        bool useFixedFee,
+        bytes32 salt
     ) internal returns (bytes32 bundleHash) {
         if (targets.length != dataArray.length) {
             revert ArgumentsLengthNotIdentical();
@@ -249,7 +279,7 @@ library InteropLibrary {
             calls[i] = buildBundleCall(targets[i], dataArray[i]);
         }
 
-        bytes[] memory bundleAttrs = buildBundleAttributes(executionAddress, unbundlerAddress, useFixedFee);
+        bytes[] memory bundleAttrs = buildBundleAttributes(executionAddress, unbundlerAddress, useFixedFee, salt);
 
         return L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(destination), calls, bundleAttrs);
     }
@@ -259,13 +289,18 @@ library InteropLibrary {
     /// @param  target            Address that will be called on destination chain
     /// @param  executionAddress  If necessary, custom execution address can be specified. If 0 address is passed, then default executor will be used
     /// @param  data              Data which will be passed to the target
+    /// @param  salt              Salt mixed into the bundle's `interopBundleSalt`. Provide a random value to keep the
+    ///                           bundle hash unpredictable and preserve the bundle's privacy. `bytes32(0)` is allowed
+    ///                           but discouraged — each salt must be unique per sender (enforced by InteropCenter), so
+    ///                           a sender can use `bytes32(0)` at most once.
     /// @return sendId Hash of the sent bundle containing a single call
     function sendDirectCall(
         uint256 destination,
         address target,
         bytes memory data,
         address executionAddress,
-        address unbundlerAddress
+        address unbundlerAddress,
+        bytes32 salt
     ) internal returns (bytes32 sendId) {
         if (target == address(0)) {
             revert ZeroAddress();
@@ -278,7 +313,8 @@ library InteropLibrary {
             target: target,
             executionAddress: executionAddress,
             unbundlerAddress: unbundlerAddress,
-            data: data
+            data: data,
+            salt: salt
         });
 
         bytes[] memory mergedAttributes = _concatBytesArrays(calls[0].callAttributes, bundleAttributes);
@@ -293,13 +329,18 @@ library InteropLibrary {
     /// @param  unbundlerAddress        Address authorized to unbundle and execute the bundle on the  destination chain.
     /// @param  amount                  Amount to transfer
     /// @param  useFixedFee             Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
+    /// @param  salt                    Salt mixed into the bundle's `interopBundleSalt`. Provide a random value to keep
+    ///                                 the bundle hash unpredictable and preserve the bundle's privacy. `bytes32(0)` is
+    ///                                 allowed but discouraged — each salt must be unique per sender (enforced by
+    ///                                 InteropCenter), so a sender can use `bytes32(0)` at most once.
     /// @return bundleHash Hash of the sent bundle
     function sendNative(
         uint256 destinationChainId,
         address recipient,
         address unbundlerAddress,
         uint256 amount,
-        bool useFixedFee
+        bool useFixedFee,
+        bytes32 salt
     ) internal returns (bytes32 bundleHash) {
         if (recipient == address(0)) {
             revert ZeroAddress();
@@ -310,7 +351,7 @@ library InteropLibrary {
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = buildSendDestinationChainBaseTokenCall(destinationChainId, recipient, amount);
-        bytes[] memory bundleAttributes = buildBundleAttributes(address(0), unbundlerAddress, useFixedFee);
+        bytes[] memory bundleAttributes = buildBundleAttributes(address(0), unbundlerAddress, useFixedFee, salt);
 
         return
             L2_INTEROP_CENTER.sendBundle{value: amount}(

@@ -9,7 +9,7 @@ import {
     NotL1,
     TotalPriorityTxsIsZero
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
+import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 
 contract PauseDepositsTest is MigratorTest {
     event DepositsPaused(uint256 chainId, uint256 pausedDepositsTimestamp);
@@ -91,10 +91,8 @@ contract PauseDepositsTest is MigratorTest {
         // This should trigger the TotalPriorityTxsIsZero error on line 340
         address admin = utilsFacet.util_getAdmin();
         address settlementLayer = makeAddr("settlementLayer");
-        address assetTracker = makeAddr("assetTracker");
 
         utilsFacet.util_setSettlementLayer(settlementLayer);
-        utilsFacet.util_setAssetTracker(assetTracker);
 
         // Priority tree is at slot 51, nextLeafIndex (totalPriorityTxs) is within the tree struct
         // With default initialization, totalPriorityTxs should be 0
@@ -110,20 +108,20 @@ contract PauseDepositsTest is MigratorTest {
         uint256 chainId = utilsFacet.util_getChainId();
         address admin = utilsFacet.util_getAdmin();
         address settlementLayer = makeAddr("settlementLayer");
-        address assetTracker = makeAddr("assetTracker");
+        address chainAssetHandler = makeAddr("chainAssetHandler");
 
         utilsFacet.util_setSettlementLayer(settlementLayer);
-        utilsFacet.util_setAssetTracker(assetTracker);
+        dummyBridgehub.setChainAssetHandler(chainAssetHandler);
 
         // Fake a deposit by extending the priority tree so `getTotalPriorityTxs` returns non-zero
         // The priorityTree sits at slot 51 of ZKChainStorage
         bytes32 slot = bytes32(uint256(51));
         vm.store(address(migratorFacet), slot, bytes32(uint256(1)));
 
-        // Mock the requestPauseDepositsForChainOnGateway call
+        // Mock the requestPauseDepositsForChainOnGateway call routed via the chain asset handler
         vm.mockCall(
-            assetTracker,
-            abi.encodeWithSelector(IL1AssetTracker.requestPauseDepositsForChainOnGateway.selector, chainId),
+            chainAssetHandler,
+            abi.encodeWithSelector(IL1ChainAssetHandler.requestPauseDepositsForChainOnGateway.selector, chainId),
             abi.encode()
         );
 

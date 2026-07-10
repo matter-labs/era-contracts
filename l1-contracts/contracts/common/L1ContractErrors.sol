@@ -178,14 +178,10 @@ error InvalidChainId();
 error InvalidDAForPermanentRollup();
 // 0x4fbe5dba
 error InvalidDelay();
-// 0x075aaa80
-error InvalidInteropCalldata(bytes4);
 // 0x3f98a77e
 error InvalidL2DACommitmentScheme(L2DACommitmentScheme);
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
-// 0x6eca2e4b
-error InvalidMessage();
 // 0xa1ec1876
 error InvalidMessageRoot(bytes32 expectedMessageRoot, bytes32 providedMessageRoot);
 // 0xd08a97e6
@@ -368,8 +364,6 @@ error ProtocolIdNotGreater();
 error PubdataGreaterThanLimit(uint256 limit, uint256 length);
 // 0x63c36549
 error QueueIsEmpty();
-// 0x0a6c1a5c
-error ReconstructionMismatch(bytes32, bytes32);
 // 0xab143c06
 error Reentrancy();
 // 0x1f20dafa

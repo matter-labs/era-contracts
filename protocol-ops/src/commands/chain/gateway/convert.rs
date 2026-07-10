@@ -173,7 +173,6 @@ pub struct VotePrepareInputs<'a> {
     pub ctm_representative_chain_id: u64,
     pub vote_preparation_toml: &'a str,
     pub refund_recipient: Address,
-    pub gateway_settlement_fee: U256,
     /// Pre-resolved `force_deployments_data` (raw bytes — not 0x-prefixed
     /// hex). When `Some`, `stage_vote_prepare` skips the on-chain dump and
     /// uses this value directly. Required on pre-v31 ecosystems where the
@@ -239,7 +238,6 @@ testnet_verifier = {testnet_verifier}
 is_zk_sync_os = {zksync_os}
 refund_recipient = "{refund:#x}"
 gateway_chain_id = {gw}
-gateway_settlement_fee = {fee}
 force_deployments_data = "{fd}"
 
 # Not used by the gateway flow but required by the parent config parser (overridden from on-chain state)
@@ -274,7 +272,6 @@ validator_timelock_execution_delay = 0
             v
         },
         gw = chain_id,
-        fee = inputs.gateway_settlement_fee,
         fd = force_deployments_data,
         gw_create2_salt = inputs
             .create2_salt
@@ -486,10 +483,6 @@ pub struct ConvertArgs {
     /// fs_permissions.
     #[clap(long, default_value = "script-out/gateway-vote-preparation.toml")]
     pub vote_preparation_toml: String,
-
-    /// Fee charged by the gateway for settlement (in wei, default: 1 gwei).
-    #[clap(long, default_value = "1000000000")]
-    pub gateway_settlement_fee: u64,
 }
 
 pub async fn run_convert(args: ConvertArgs) -> anyhow::Result<()> {
@@ -524,7 +517,6 @@ pub async fn run_convert(args: ConvertArgs) -> anyhow::Result<()> {
             ctm_representative_chain_id: args.ctm_representative_chain_id,
             vote_preparation_toml: &args.vote_preparation_toml,
             refund_recipient: args.gateway_deployer,
-            gateway_settlement_fee: U256::from(args.gateway_settlement_fee),
             // CLI flow runs against a chain already on the latest version,
             // so the on-chain dump works — no override needed.
             force_deployments_data_override: None,

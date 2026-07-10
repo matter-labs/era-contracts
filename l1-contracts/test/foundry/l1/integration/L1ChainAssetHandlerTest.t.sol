@@ -37,7 +37,6 @@ import {NotAssetRouter, MigrationPaused} from "contracts/common/L1ContractErrors
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
@@ -99,13 +98,6 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
             abi.encode(10)
         );
 
-        bytes32 ethAssetId = 0x8df3463b1850eb1d8d1847743ea155aef6b16074db8ba81d897dc30554fb2085;
-        stdstore
-            .target(address(ecosystemAddresses.bridgehub.proxies.assetTracker))
-            .sig(IAssetTrackerBase.chainBalance.selector)
-            .with_key(eraZKChainId)
-            .with_key(ETH_TOKEN_ASSET_ID)
-            .checked_write(100);
         vm.prank(Ownable2StepUpgradeable(addresses.l1NativeTokenVault).pendingOwner());
         Ownable2StepUpgradeable(addresses.l1NativeTokenVault).acceptOwnership();
 

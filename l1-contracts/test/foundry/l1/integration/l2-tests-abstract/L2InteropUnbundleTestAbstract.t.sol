@@ -26,7 +26,7 @@ abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
 
-        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100, false);
+        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100, false, bytes32(0));
         Vm.Log[] memory logs1 = vm.getRecordedLogs();
 
         // Verify the first bundle emission
@@ -77,7 +77,8 @@ abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
             L2_INTEROP_HANDLER_ADDR,
             abi.encodeCall(L2_INTEROP_HANDLER.unbundleBundle, (bundle, callStatuses)),
             UNBUNDLER_ADDRESS,
-            UNBUNDLER_ADDRESS
+            UNBUNDLER_ADDRESS,
+            bytes32(0)
         );
         Vm.Log[] memory logs2 = vm.getRecordedLogs();
 

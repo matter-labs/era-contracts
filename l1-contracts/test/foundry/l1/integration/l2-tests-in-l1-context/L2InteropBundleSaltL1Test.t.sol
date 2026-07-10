@@ -8,26 +8,17 @@ import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
-import {L2InteropDestinationChainRegressionTestAbstract} from "../l2-tests-abstract/L2InteropDestinationChainRegressionTestAbstract.t.sol";
+import {L2InteropBundleSaltTestAbstract} from "../l2-tests-abstract/L2InteropBundleSaltTestAbstract.t.sol";
 
 import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
-import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
-/// @title L2InteropDestinationChainRegressionL1Test
-/// @notice L1 context test for unregistered destination chain check regression (PR #1811)
-/// @dev Tests that InteropCenter properly rejects bundles sent to unregistered destination chains.
-contract L2InteropDestinationChainRegressionL1Test is
-    Test,
-    SharedL2ContractL1Deployer,
-    L2InteropDestinationChainRegressionTestAbstract
-{
-    function setUp() public override(SharedL2ContractDeployer, L2InteropDestinationChainRegressionTestAbstract) {
-        L2InteropDestinationChainRegressionTestAbstract.setUp();
-    }
-
+contract L2InteropBundleSaltL1Test is Test, SharedL2ContractL1Deployer, L2InteropBundleSaltTestAbstract {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}
+
+    function setUp() public virtual override(SharedL2ContractDeployer) {
+        SharedL2ContractDeployer.setUp();
+    }
 
     function initSystemContracts(
         SystemContractsArgs memory _args

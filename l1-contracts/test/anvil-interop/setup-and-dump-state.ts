@@ -29,7 +29,6 @@ async function main(): Promise<void> {
     // - timestamp 1 = fixed genesis timestamp
     // - dumpStatePaths = Anvil will dump state to these files on exit
     // This ensures state is fully deterministic regardless of wall clock.
-    // TBM is included so pregenerated state is ready for tests without re-running TBM.
     const { l1Addresses, ctmAddresses, chainAddresses } = await runner.deployAndSetupWithTBM(anvilManager, {
       startChainOptions: { blockTime: 1, timestamp: 1, dumpStatePaths },
     });
@@ -37,7 +36,6 @@ async function main(): Promise<void> {
     const stateAfterSetup = runner.loadState();
     const testTokens = stateAfterSetup.testTokens;
     const customBaseTokens = stateAfterSetup.customBaseTokens;
-    const tbmAccountingSnapshots = stateAfterSetup.tbmAccountingSnapshots;
     const zkToken = stateAfterSetup.zkToken;
 
     // Stop all chains — this triggers Anvil's --dump-state file writes.
@@ -50,7 +48,6 @@ async function main(): Promise<void> {
       chainAddresses,
       testTokens,
       customBaseTokens,
-      tbmAccountingSnapshots,
       zkToken,
     };
     fs.writeFileSync(path.join(stateDir, "addresses.json"), JSON.stringify(addresses, null, 2));

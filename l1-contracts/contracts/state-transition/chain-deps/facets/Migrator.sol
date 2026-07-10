@@ -46,7 +46,6 @@ import {
     RemovingPermanentRestriction
 } from "../../../common/L1ContractErrors.sol";
 import {OnlyGateway} from "../../../core/bridgehub/L1BridgehubErrors.sol";
-import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 import {TxStatus} from "../../../common/Messaging.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -122,7 +121,9 @@ contract MigratorFacet is ZKChainBase, IMigrator, ISelfDescribingFacet {
         s.pausedDepositsTimestamp = timestamp;
         if (s.settlementLayer != address(0)) {
             require(totalPriorityTxs != 0, TotalPriorityTxsIsZero());
-            IL1AssetTracker(s.assetTracker).requestPauseDepositsForChainOnGateway(s.chainId);
+            IL1ChainAssetHandler(IL1Bridgehub(s.bridgehub).chainAssetHandler()).requestPauseDepositsForChainOnGateway(
+                s.chainId
+            );
         }
         emit DepositsPaused(s.chainId, timestamp);
     }

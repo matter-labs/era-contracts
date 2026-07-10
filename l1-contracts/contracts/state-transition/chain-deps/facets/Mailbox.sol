@@ -13,7 +13,6 @@ import {IEIP7702Checker} from "../../chain-interfaces/IEIP7702Checker.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {
-    BalanceChange,
     BridgehubL2TransactionRequest,
     L2CanonicalTransaction,
     L2Log,
@@ -53,9 +52,6 @@ import {DepositsPaused, NotL1, NotSettlementLayer, NotZKChain} from "../../L1Sta
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 import {IMessageVerification, MessageVerification} from "../../../common/MessageVerification.sol";
-import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
-import {BALANCE_CHANGE_VERSION} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
-import {INativeTokenVaultBase} from "../../../bridge/ntv/INativeTokenVaultBase.sol";
 import {OnlyGateway} from "../../../core/bridgehub/L1BridgehubErrors.sol";
 import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAssetHandler.sol";
 
@@ -296,12 +292,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, ISelfDe
 
     /// @inheritdoc IMailboxImpl
     // slither-disable-next-line reentrancy-no-eth
-    function requestL2TransactionToGatewayMailboxWithBalanceChange(
+    function requestL2TransactionToGatewayMailbox(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp,
-        uint256 _baseTokenAmount,
-        bool _getBalanceChange
+        uint64 _expirationTimestamp
     ) public override onlyL1 returns (bytes32 canonicalTxHash) {
         if (!IBridgehubBase(s.bridgehub).whitelistedSettlementLayers(s.chainId)) {
             revert NotSettlementLayer();
@@ -314,45 +308,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, ISelfDe
         }
         // Note during the upgrade to V31 no chain will be on GW.
 
-        bytes32 baseTokenAssetId = IBridgehubBase(s.bridgehub).baseTokenAssetId(_chainId);
-        if (_baseTokenAmount > 0 && baseTokenAssetId == bytes32(0)) {
-            revert InvalidChainId();
-        }
-
-        BalanceChange memory balanceChange;
-        if (_getBalanceChange) {
-            IL1AssetTracker assetTracker = IL1AssetTracker(s.assetTracker);
-            INativeTokenVaultBase nativeTokenVault = INativeTokenVaultBase(s.nativeTokenVault);
-
-            (bytes32 assetId, uint256 amount) = (assetTracker.consumeBalanceChange(s.chainId, _chainId));
-            uint256 tokenOriginChainId = nativeTokenVault.originChainId(assetId);
-            address originToken = nativeTokenVault.originToken(assetId);
-            balanceChange = BalanceChange({
-                version: BALANCE_CHANGE_VERSION,
-                baseTokenAssetId: baseTokenAssetId,
-                baseTokenAmount: _baseTokenAmount,
-                assetId: assetId,
-                amount: amount,
-                tokenOriginChainId: tokenOriginChainId,
-                originToken: originToken
-            });
-        } else {
-            balanceChange = BalanceChange({
-                version: BALANCE_CHANGE_VERSION,
-                baseTokenAssetId: baseTokenAssetId,
-                baseTokenAmount: _baseTokenAmount,
-                assetId: bytes32(0),
-                amount: 0,
-                tokenOriginChainId: 0,
-                originToken: address(0)
-            });
-        }
-
         BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest({
             _chainId: _chainId,
             _canonicalTxHash: _canonicalTxHash,
-            _expirationTimestamp: _expirationTimestamp,
-            _balanceChange: balanceChange
+            _expirationTimestamp: _expirationTimestamp
         });
         canonicalTxHash = _requestL2TransactionFree(wrappedRequest);
     }
@@ -370,13 +329,12 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, ISelfDe
     function _wrapRequest(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp,
-        BalanceChange memory _balanceChange
+        uint64 _expirationTimestamp
     ) internal pure returns (BridgehubL2TransactionRequest memory) {
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encodeCall(
-            IInteropCenter.forwardTransactionOnGatewayWithBalanceChange,
-            (_chainId, _canonicalTxHash, _expirationTimestamp, _balanceChange)
+            IInteropCenter.forwardTransactionOnGateway,
+            (_chainId, _canonicalTxHash, _expirationTimestamp)
         );
         return
             BridgehubL2TransactionRequest({
@@ -418,12 +376,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, ISelfDe
 
         if (s.settlementLayer != address(0)) {
             // slither-disable-next-line unused-return
-            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
+            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailbox({
                 _chainId: s.chainId,
                 _canonicalTxHash: canonicalTxHash,
-                _expirationTimestamp: 0,
-                _baseTokenAmount: 0,
-                _getBalanceChange: false
+                _expirationTimestamp: 0
             });
         }
     }
@@ -506,16 +462,11 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, ISelfDe
 
         _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash);
         if (s.settlementLayer != address(0)) {
-            address assetRouter = address(IBridgehubBase(s.bridgehub).assetRouter());
-            bool getBalanceChange = _params.request.sender == AddressAliasHelper.applyL1ToL2Alias(assetRouter);
-
             // slither-disable-next-line unused-return
-            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
+            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailbox({
                 _chainId: s.chainId,
                 _canonicalTxHash: canonicalTxHash,
-                _expirationTimestamp: 0,
-                _baseTokenAmount: _params.request.mintValue,
-                _getBalanceChange: getBalanceChange
+                _expirationTimestamp: 0
             });
         }
     }
@@ -685,10 +636,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, ISelfDe
     ///      0x18b7fc22 proveL2MessageInclusionShared(uint256,uint256,uint256,(uint16,address,bytes),bytes32[])
     ///      0xd07b90d1 requestL2ServiceTransaction(address,bytes)
     ///      0xeb672419 requestL2Transaction(address,uint256,bytes,uint256,uint256,bytes[],address)
-    ///      0x07f10660 requestL2TransactionToGatewayMailboxWithBalanceChange(uint256,bytes32,uint64,uint256,bool)
+    ///      0xd0772551 requestL2TransactionToGatewayMailbox(uint256,bytes32,uint64)
     function selectors() public pure returns (bytes4[] memory result) {
         bytes
-            memory packed = hex"12f43dabddcc9eec60da3e836c0960f9b473318e685143b9042901c7da24b3ee7efda2ae79cf6165353d7128263b7f8ee896760de4948f4318b7fc22d07b90d1eb67241907f10660";
+            memory packed = hex"12f43dabddcc9eec60da3e836c0960f9b473318e685143b9042901c7da24b3ee7efda2ae79cf6165353d7128263b7f8ee896760de4948f4318b7fc22d07b90d1eb672419d0772551";
         uint256 count = packed.length / 4;
         result = new bytes4[](count);
         for (uint256 i = 0; i < count; ++i) {

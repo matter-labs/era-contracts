@@ -15,7 +15,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {GW_ASSET_TRACKER_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 abstract contract DeployIntegrationUtils is Script, DeployCTMUtils {
     function test() internal virtual override {}
