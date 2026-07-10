@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROMPT_FILE="$SCRIPT_DIR/review-prompt.md"
+PROMPT_FILE="$SCRIPT_DIR/PROMPT.md"
 
 usage() {
     cat <<EOF
@@ -48,5 +48,5 @@ PROMPT="$(
 if [[ "$TOOL" == "codex" ]]; then
     exec codex exec "$@" <<<"$PROMPT"
 else
-    exec claude -p "$PROMPT" "$@"
+    exec claude -p --verbose "$PROMPT" "$@"
 fi
