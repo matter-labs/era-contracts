@@ -32,10 +32,6 @@ interface IInteropHandlerBase {
     /// @param _callStatus Array of desired statuses per call.
     function unbundleBundle(bytes memory _bundle, CallStatus[] calldata _callStatus) external;
 
-    /// @notice The chain ID of L1. This contract can be deployed on multiple layers, but this value is still equal to the
-    /// L1 that is at the most base layer.
-    function L1_CHAIN_ID() external view returns (uint256);
-
     /// @notice Tracks the processing status of a bundle by its hash.
     function bundleStatus(bytes32 bundleHash) external view returns (BundleStatus);
 

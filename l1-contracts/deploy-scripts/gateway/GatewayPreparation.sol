@@ -17,8 +17,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
-import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {InteropLibrary} from "../InteropLibrary.sol";
 import {L2_BRIDGEHUB_ADDRESS, Utils} from "../utils/Utils.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -34,7 +33,6 @@ import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
 import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
@@ -467,18 +465,11 @@ contract GatewayPreparation is Script {
             // L2AssetRouter.withdraw). The gateway-side ChainAdmin multicall invokes the InteropCenter.
             // Each (sender, salt) pair may be used only once by the InteropCenter; derive the salt from the
             // migration content so distinct migrations get distinct salts deterministically.
-            bytes[] memory bundleAttributes = new bytes[](1);
-            bundleAttributes[0] = abi.encodeCall(
-                IERC7786Attributes.interopBundleSalt,
-                (keccak256(abi.encodePacked("ctm-migration-withdrawal", ctmAssetId, bridgehubBurnData)))
-            );
-            bytes memory data = abi.encodeCall(
-                IInteropCenter.sendBundle,
-                (
-                    InteroperableAddress.formatEvmV1(l1ChainId),
-                    DataEncoding.encodeInteropWithdrawalCallStarters(ctmAssetId, bridgehubBurnData),
-                    bundleAttributes
-                )
+            bytes memory data = InteropLibrary.encodeWithdrawalSendBundleCalldata(
+                l1ChainId,
+                ctmAssetId,
+                bridgehubBurnData,
+                keccak256(abi.encodePacked("ctm-migration-withdrawal", ctmAssetId, bridgehubBurnData))
             );
 
             Call[] memory calls = new Call[](1);

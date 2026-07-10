@@ -419,7 +419,7 @@ library L2GenesisForceDeploymentsHelper {
             _isZKsyncOS && !_isGenesisUpgrade
         );
 
-        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2();
 
         InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
             _fixedForceDeploymentsData.l1ChainId,

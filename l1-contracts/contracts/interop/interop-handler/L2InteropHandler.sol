@@ -26,11 +26,10 @@ contract L2InteropHandler is InteropHandlerBase {
         _;
     }
 
-    /// @notice Initializes the reentrancy guard and records the L1 chain ID. Called by the complex upgrader.
-    /// @param _l1ChainId The chain ID of L1.
-    function initL2(uint256 _l1ChainId) public reentrancyGuardInitializer onlyUpgrader {
-        L1_CHAIN_ID = _l1ChainId;
-    }
+    /// @notice Locks the reentrancy guard. Called once by the complex upgrader during genesis/upgrade.
+    /// @dev The handler holds no configurable state; this only locks the guard (which also prevents a second
+    /// initialization via `SlotOccupied`).
+    function initL2() public reentrancyGuardInitializer onlyUpgrader {}
 
     /// @inheritdoc InteropHandlerBase
     function _proveInclusion(MessageInclusionProof memory _proof) internal override returns (bool) {

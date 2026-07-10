@@ -332,6 +332,7 @@ error OperationMustBeReady();
 error OriginChainIdNotFound();
 // 0x97da9c1c
 error PayloadTooShort();
+error InteropSenderChainIdMismatch(uint256 senderChainId, uint256 payloadSourceChainId);
 // 0x688c63e5
 error PrecommitmentMismatch(uint256 batchNumber, bytes32 expected, bytes32 found);
 // 0x9b48e060

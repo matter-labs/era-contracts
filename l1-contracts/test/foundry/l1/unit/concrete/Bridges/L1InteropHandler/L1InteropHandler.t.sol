@@ -82,7 +82,6 @@ contract L1InteropHandlerTest is Test {
     address internal messageRoot;
     MockInteropRecipient internal recipient;
 
-    uint256 internal constant L1_CHAIN_ID = 1;
     uint256 internal constant SOURCE_CHAIN_ID = 271;
 
     function setUp() public {
@@ -92,7 +91,7 @@ contract L1InteropHandlerTest is Test {
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(handlerImpl),
             proxyAdmin,
-            abi.encodeWithSelector(L1InteropHandler.initialize.selector, L1_CHAIN_ID)
+            abi.encodeWithSelector(L1InteropHandler.initialize.selector)
         );
         handler = L1InteropHandler(address(proxy));
     }
@@ -102,14 +101,13 @@ contract L1InteropHandlerTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_Initialize_SetsState() public view {
-        assertEq(handler.L1_CHAIN_ID(), L1_CHAIN_ID, "L1_CHAIN_ID mismatch");
         assertEq(address(handler.MESSAGE_ROOT()), messageRoot, "MESSAGE_ROOT mismatch");
     }
 
     function test_Initialize_RevertWhen_CalledTwice() public {
         // The `reentrancyGuardInitializer` modifier rejects the second init with `SlotOccupied`.
         vm.expectRevert(SlotOccupied.selector);
-        handler.initialize(L1_CHAIN_ID);
+        handler.initialize();
     }
 
     /*//////////////////////////////////////////////////////////////

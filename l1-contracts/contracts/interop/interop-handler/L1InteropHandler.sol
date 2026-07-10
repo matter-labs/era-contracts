@@ -19,6 +19,11 @@ import {InteropWithdrawalNonZeroValue} from "../../bridge/L1BridgeContractErrors
 /// on L1 via ERC-7786 `receiveMessage`. The target and payload are general: the canonical use is an L2 -> L1
 /// withdrawal (the call targets the L1 asset router's `finalizeDeposit`), but any single such call is allowed.
 /// @dev Deployed behind a proxy on L1.
+/// @dev Withdrawal pausability is intentionally NOT enforced here. Previously `L1Nullifier.finalizeDeposit`
+/// carried a `whenNotPaused` gate; in the current design that responsibility lives at the asset-handler layer,
+/// where funds are actually released — `NativeTokenVaultBase.bridgeMint` is `whenNotPaused`, so pausing the
+/// asset router / NTV halts the release of every withdrawal routed through this handler. Keeping the handler
+/// itself stateless and pauseless (no Ownable/Pausable) avoids a second, redundant pause switch.
 contract L1InteropHandler is InteropHandlerBase {
     /// @dev MessageRoot smart contract that is used to prove message inclusion.
     IMessageRootBase public immutable MESSAGE_ROOT;
@@ -31,10 +36,10 @@ contract L1InteropHandler is InteropHandlerBase {
     }
 
     /// @notice Initializes the contract behind its proxy.
-    /// @param _l1ChainId The chain ID of L1.
-    function initialize(uint256 _l1ChainId) external reentrancyGuardInitializer {
-        L1_CHAIN_ID = _l1ChainId;
-    }
+    /// @dev Only locks the reentrancy guard: it doubles as one-time initialization protection (a second call
+    /// reverts with `SlotOccupied`). The handler holds no configurable state — the L1 chain id it operates on
+    /// is simply `block.chainid`.
+    function initialize() external reentrancyGuardInitializer {}
 
     /// @inheritdoc InteropHandlerBase
     /// @dev Proves the bundle's inclusion via the L1 MessageRoot.

@@ -39,10 +39,7 @@ import {BridgehubBurnCTMAssetData, IBridgehubBase} from "contracts/core/bridgehu
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
-import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
+import {InteropLibrary} from "./InteropLibrary.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -1228,18 +1225,11 @@ contract AdminFunctions is Script, IAdminFunctions {
         {
             // Each (sender, salt) pair may be used only once by the InteropCenter; derive the salt from the
             // migration content so distinct migrations get distinct salts deterministically.
-            bytes[] memory bundleAttributes = new bytes[](1);
-            bundleAttributes[0] = abi.encodeCall(
-                IERC7786Attributes.interopBundleSalt,
-                (keccak256(abi.encodePacked("ctm-migration-withdrawal", ctmAssetId, bridgehubBurnData)))
-            );
-            l2Calldata = abi.encodeCall(
-                IInteropCenter.sendBundle,
-                (
-                    InteroperableAddress.formatEvmV1(block.chainid),
-                    DataEncoding.encodeInteropWithdrawalCallStarters(ctmAssetId, bridgehubBurnData),
-                    bundleAttributes
-                )
+            l2Calldata = InteropLibrary.encodeWithdrawalSendBundleCalldata(
+                block.chainid,
+                ctmAssetId,
+                bridgehubBurnData,
+                keccak256(abi.encodePacked("ctm-migration-withdrawal", ctmAssetId, bridgehubBurnData))
             );
         }
 

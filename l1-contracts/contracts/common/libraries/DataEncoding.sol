@@ -246,13 +246,18 @@ library DataEncoding {
         transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
     }
 
-    /// @notice Builds the single indirect-call `InteropCallStarter` for an L2->L1 asset withdrawal.
+    /// @notice Builds the single indirect-call `InteropCallStarter` for an L2->L1 withdrawal of a registered,
+    /// NON-base-token asset (an ERC20 or the CTM/ZK asset).
     /// @dev An L2->L1 withdrawal is a single-call interop bundle whose one call is an indirect call to the
     /// L2 AssetRouter carrying the bridgehub-deposit payload for the withdrawn asset; on L1 it is executed
     /// by `L1InteropHandler.executeBundle`. Callers pass the resulting array to `InteropCenter.sendBundle`
-    /// (directly, or ABI-encoded for an admin L1->L2 transaction). No value rides the bundle (`indirectCall`
-    /// and `interopCallValue` are both zero); the withdrawn amount is carried inside `_transferData`.
-    /// @param _assetId The asset being withdrawn (ERC20 assetId, base-token assetId, or CTM assetId).
+    /// (directly, or ABI-encoded for an admin L1->L2 transaction). Both the `indirectCall` message value and
+    /// `interopCallValue` are zero, so NO base-token value rides the bundle; the withdrawn amount is carried
+    /// inside `_transferData` and released by the asset handler on L1. This is exactly why the helper cannot be
+    /// used to withdraw the chain's base token: a base-token withdrawal must actually move value, which goes
+    /// through the InteropCenter's value-carrying path (`InteropCenter._ensureCorrectTotalValue`), not this
+    /// zero-value indirect call.
+    /// @param _assetId The asset being withdrawn — an ERC20 assetId or the CTM/ZK assetId, NOT a base-token assetId.
     /// @param _transferData The bridgehub-burn/transfer data for the asset.
     function encodeInteropWithdrawalCallStarters(
         bytes32 _assetId,

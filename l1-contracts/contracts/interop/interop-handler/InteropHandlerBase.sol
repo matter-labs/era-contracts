@@ -45,10 +45,6 @@ import {InvalidSelector, Unauthorized} from "../../common/L1ContractErrors.sol";
 /// contract (`L2InteropHandler`) and the L1-side `L1InteropHandler` inherit this base and provide the environment
 /// specific behaviour (message-inclusion verification and base-token value handling) via the virtual hooks below.
 abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, ReentrancyGuard {
-    /// @notice The chain ID of L1. This contract can be deployed on multiple layers, but this value is still equal to the
-    /// L1 that is at the most base layer.
-    uint256 public L1_CHAIN_ID;
-
     /// @notice Tracks the processing status of a bundle by its hash.
     mapping(bytes32 bundleHash => BundleStatus bundleStatus) public bundleStatus;
 

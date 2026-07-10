@@ -73,8 +73,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         public
         override depositHappened;
 
-    /// @dev Deprecated. Withdrawal replay protection now lives in `L1InteropHandler.isWithdrawalFinalized`.
-    /// Retained ONLY to preserve the upgradeable storage layout; no longer read or written.
+    /// @dev Deprecated. Withdrawal replay protection now lives in the interop handler's `bundleStatus`
+    /// mapping (a bundle can be executed at most once). Retained ONLY to preserve the upgradeable storage
+    /// layout; no longer read or written.
     // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized)))
         internal __DEPRECATED_isWithdrawalFinalized;
@@ -101,9 +102,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Address of native token vault.
     IL1NativeTokenVault public l1NativeTokenVault;
 
-    /// @dev Address of the L1 interop handler that finalizes L2 -> L1 withdrawals. This contract records the
-    /// transient settlement layer on it while confirming failed-deposit recovery so the `L1AssetTracker` can read a
-    /// single, consistent source for both flows.
+    /// @dev Address of the L1 interop handler that finalizes L2 -> L1 withdrawals (via `executeBundle`).
+    /// Exposed on the nullifier so deploy scripts and other bridge contracts can discover the handler.
     address public l1InteropHandler;
 
     /// @notice Checks that the message sender is the asset router..

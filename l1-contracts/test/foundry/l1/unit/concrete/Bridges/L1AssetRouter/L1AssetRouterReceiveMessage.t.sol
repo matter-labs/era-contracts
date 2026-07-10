@@ -10,7 +10,7 @@ import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {PayloadTooShort, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {InteropSenderChainIdMismatch, PayloadTooShort, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Native-token-vault stand-in whose `bridgeMint` always reverts with a sentinel error. Registered as the
 /// asset handler so a `finalizeDeposit` reverts deterministically, letting us assert that `receiveMessage` bubbles
@@ -91,12 +91,30 @@ contract L1AssetRouterReceiveMessageTest is Test {
         router.finalizeDeposit(SOURCE_CHAIN_ID, bytes32(0), hex"");
     }
 
-    /// @notice The interop payload must be at least a 4-byte selector.
+    /// @notice The interop payload must be long enough to hold a `finalizeDeposit` selector plus its first
+    /// (`_sourceChainId`) word — at least 4 + 32 bytes.
     function test_receiveMessage_RevertWhen_PayloadTooShort() public {
         bytes memory sender = InteroperableAddress.formatEvmV1(SOURCE_CHAIN_ID, L2_ASSET_ROUTER_ADDR);
         vm.prank(interopHandler);
         vm.expectRevert(PayloadTooShort.selector);
-        router.receiveMessage(bytes32(0), sender, hex"12345678"); // exactly 4 bytes; the check requires > 4
+        router.receiveMessage(bytes32(0), sender, hex"12345678"); // 4 bytes; the check requires >= 36
+    }
+
+    /// @notice The authenticated interop-message sender chain id must match the `_sourceChainId` the deposit is
+    /// finalized under. A payload whose `_sourceChainId` differs from the sender's chain id is rejected.
+    function test_receiveMessage_RevertWhen_SenderChainIdMismatch() public {
+        uint256 payloadSourceChainId = SOURCE_CHAIN_ID + 1;
+        bytes memory payload = abi.encodeCall(
+            AssetRouterBase.finalizeDeposit,
+            (payloadSourceChainId, router.ETH_TOKEN_ASSET_ID(), hex"")
+        );
+        bytes memory sender = InteroperableAddress.formatEvmV1(SOURCE_CHAIN_ID, L2_ASSET_ROUTER_ADDR);
+
+        vm.prank(interopHandler);
+        vm.expectRevert(
+            abi.encodeWithSelector(InteropSenderChainIdMismatch.selector, SOURCE_CHAIN_ID, payloadSourceChainId)
+        );
+        router.receiveMessage(bytes32(0), sender, payload);
     }
 
     /// @notice Regression: `receiveMessage` bubbles the inner `finalizeDeposit` revert verbatim instead of masking

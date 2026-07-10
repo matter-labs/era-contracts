@@ -449,7 +449,8 @@ contract InteropCenter is
         bytes[][] memory _originalCallAttributes
     ) internal returns (bytes32 bundleHash) {
         // Note: no gateway-mode requirement here — interop bundles may be sent by chains settling
-        // directly on L1 (see the receive-side restriction in the interop handler instead).
+        // directly on L1. Cross-layer correctness is enforced by the message-inclusion proof on the
+        // receiving side, not by any gateway-mode or settlement-layer check here.
 
         // Ensure the sender has not already used this salt. Since `interopBundleSalt` (and thus the bundle hash) is
         // derived from `msg.sender` and the user-provided salt, enforcing a unique salt per sender guarantees that

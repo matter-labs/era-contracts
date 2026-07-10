@@ -14,6 +14,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {InteropWithdrawalBundleEncoder} from "test-utils/InteropWithdrawalBundleEncoder.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
+import {InsufficientChainBalance} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 
 import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -88,8 +89,12 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
         _mockWithdrawalProof();
 
         if (beforeBridgeBalance < _amountToWithdraw) {
-            // Not enough escrowed balance in the vault -> releasing the withdrawal reverts.
-            vm.expectRevert();
+            // Not enough escrowed balance in the vault: the L1 NTV decreases the chain balance before releasing
+            // funds (`_handleBridgeFromChain`), so the shortfall surfaces as `InsufficientChainBalance` — bubbled
+            // up verbatim through the asset-router self-call and the interop handler.
+            vm.expectRevert(
+                abi.encodeWithSelector(InsufficientChainBalance.selector, currentChainId, assetId, _amountToWithdraw)
+            );
             addresses.l1InteropHandler.executeBundle(bundle, proof);
             return;
         }

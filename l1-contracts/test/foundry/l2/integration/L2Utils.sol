@@ -190,7 +190,7 @@ library L2Utils {
         forceDeployWithoutConstructor("L2InteropHandler", L2_INTEROP_HANDLER_ADDR);
         L2InteropHandler interopHandler = L2InteropHandler(L2_INTEROP_HANDLER_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        interopHandler.initL2(_args.l1ChainId);
+        interopHandler.initL2();
     }
 
     function forceDeployL2AssetTracker(SystemContractsArgs memory _args) internal {
