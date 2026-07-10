@@ -45,6 +45,11 @@ import {InvalidSelector, Unauthorized} from "../../common/L1ContractErrors.sol";
 /// contract (`L2InteropHandler`) and the L1-side `L1InteropHandler` inherit this base and provide the environment
 /// specific behaviour (message-inclusion verification and base-token value handling) via the virtual hooks below.
 abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, ReentrancyGuard {
+    /// @dev Deprecated. This slot previously held the L1 chain id, which is no longer used (the handler operates
+    /// on `block.chainid`). Retained — not removed — to preserve the upgradeable storage layout.
+    // slither-disable-next-line uninitialized-state
+    uint256 internal __DEPRECATED_L1_CHAIN_ID;
+
     /// @notice Tracks the processing status of a bundle by its hash.
     mapping(bytes32 bundleHash => BundleStatus bundleStatus) public bundleStatus;
 

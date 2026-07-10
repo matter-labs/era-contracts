@@ -34,19 +34,22 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IL1Bridgehub public immutable override BRIDGE_HUB;
 
-    /// @dev Era's chainID
-    uint256 internal immutable ERA_CHAIN_ID;
+    /// @dev Deprecated. Era's chainID — no longer read after legacy bridging was removed. Kept (not removed) as an
+    /// immutable so the constructor ABI stays stable; it holds no storage slot.
+    uint256 internal immutable __DEPRECATED_ERA_CHAIN_ID;
 
-    /// @dev The address of ZKsync Era diamond proxy contract.
-    address internal immutable ERA_DIAMOND_PROXY;
+    /// @dev Deprecated. The address of ZKsync Era diamond proxy — no longer read after legacy bridging was removed.
+    /// Kept (not removed) as an immutable so the constructor ABI stays stable; it holds no storage slot.
+    address internal immutable __DEPRECATED_ERA_DIAMOND_PROXY;
 
     /// @dev MessageRoot smart contract that is used to prove message inclusion.
     IMessageRootBase public immutable MESSAGE_ROOT;
 
-    /// @dev Stores the first batch number on the ZKsync Era Diamond Proxy that was settled after Diamond proxy upgrade.
-    /// This variable is used to differentiate between pre-upgrade and post-upgrade Eth withdrawals. Withdrawals from batches older
-    /// than this value are considered to have been finalized prior to the upgrade and handled separately.
-    uint256 internal eraPostDiamondUpgradeFirstBatch;
+    /// @dev Deprecated. Previously stored the first Era batch settled after the Diamond proxy upgrade, used to split
+    /// pre/post-upgrade ETH withdrawals. Unused after legacy bridging was removed. Retained — not removed — to
+    /// preserve the upgradeable storage layout.
+    // slither-disable-next-line uninitialized-state
+    uint256 internal __DEPRECATED_eraPostDiamondUpgradeFirstBatch;
 
     /// @dev Deprecated legacy-bridge slots, retained ONLY to preserve the upgradeable storage layout.
     /// Formerly: eraPostLegacyBridgeUpgradeFirstBatch, eraLegacyBridgeLastDepositBatch,
@@ -123,8 +126,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
         MESSAGE_ROOT = _messageRoot;
-        ERA_CHAIN_ID = _eraChainId;
-        ERA_DIAMOND_PROXY = _eraDiamondProxy;
+        // Assigned only to satisfy the immutable-initialization requirement and keep the constructor ABI stable;
+        // these values are no longer read (see the deprecated declarations above).
+        __DEPRECATED_ERA_CHAIN_ID = _eraChainId;
+        __DEPRECATED_ERA_DIAMOND_PROXY = _eraDiamondProxy;
     }
 
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy.
@@ -138,8 +143,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     ) external reentrancyGuardInitializer initializer {
         require(_owner != address(0), ZeroAddress());
         _transferOwnership(_owner);
-        if (eraPostDiamondUpgradeFirstBatch == 0) {
-            eraPostDiamondUpgradeFirstBatch = _eraPostDiamondUpgradeFirstBatch;
+        // Written only to keep the initializer ABI stable; the value is no longer read (deprecated field).
+        if (__DEPRECATED_eraPostDiamondUpgradeFirstBatch == 0) {
+            __DEPRECATED_eraPostDiamondUpgradeFirstBatch = _eraPostDiamondUpgradeFirstBatch;
         }
     }
 
