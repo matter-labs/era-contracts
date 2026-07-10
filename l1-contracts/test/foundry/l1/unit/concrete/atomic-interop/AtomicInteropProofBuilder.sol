@@ -71,11 +71,20 @@ abstract contract AtomicInteropProofBuilder is Test {
     AtomicInteropProofWrapper internal proofLib;
     L2InteropCommitmentTree internal tree;
 
-    /// @dev Deploys the wrapper + a fresh commitment tree, mocks the messenger, and seeds the tree.
-    function _setUpAtomicFixtures() internal {
+    /// @dev Deploys the wrapper + the commitment tree (at its canonical address, so collaborators that
+    /// reference it by that fixed address — e.g. `AtomicFlowManager.commitmentTree()` — resolve to this
+    /// instance) and mocks the messenger. Leaves the tree UN-initialized so callers that exercise
+    /// `initialize` itself start from a clean slate.
+    function _deployAtomicFixtures() internal {
         proofLib = new AtomicInteropProofWrapper();
-        tree = new L2InteropCommitmentTree();
+        vm.etch(L2_INTEROP_COMMITMENT_TREE_ADDR, address(new L2InteropCommitmentTree()).code);
+        tree = L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR);
         _mockMessenger();
+    }
+
+    /// @dev `_deployAtomicFixtures` plus the one-shot seed, for callers that need a ready-to-use tree.
+    function _setUpAtomicFixtures() internal {
+        _deployAtomicFixtures();
         // Seeds the `{0,0,0}` head leaf at index 0 (and publishes the seed root via the mocked messenger).
         tree.initialize();
     }
