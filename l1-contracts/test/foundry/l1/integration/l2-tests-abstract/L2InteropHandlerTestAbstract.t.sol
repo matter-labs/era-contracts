@@ -430,12 +430,9 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     }
 
     /// @notice Test that verifyBundle works while settling on L1.
-    /// @dev Bundle verification is not restricted to gateway mode.
+    /// @dev Bundle verification is not restricted to gateway mode. The handler no longer stores the L1 chain
+    /// id, so no handler state needs to be prepared for this scenario — only the settlement-layer mock below.
     function test_verifyBundleWorksWhenSettlingOnL1() public {
-        // Set the L1_CHAIN_ID storage variable in L2InteropHandler
-        // (The test setup doesn't call initL2, so L1_CHAIN_ID is uninitialized at slot 0)
-        vm.store(L2_INTEROP_HANDLER_ADDR, bytes32(0), bytes32(uint256(L1_CHAIN_ID)));
-
         InteropBundle memory interopBundle = getInteropBundle(1);
         bytes memory bundle = abi.encode(interopBundle);
         MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);

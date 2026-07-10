@@ -36,7 +36,7 @@ import {
     InvalidInteropBundleVersion,
     InvalidInteropCallVersion
 } from "../InteropErrors.sol";
-import {InvalidSelector, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {InvalidSelector, PayloadTooShort, Unauthorized} from "../../common/L1ContractErrors.sol";
 
 /// @title InteropHandlerBase
 /// @author Matter Labs
@@ -341,6 +341,8 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         // This is the only way receiveMessage can be invoked on InteropHandler by itself.
         require(msg.sender == address(this), Unauthorized(msg.sender));
 
+        // Revert cleanly on a payload too short to carry a selector, instead of the slice-out-of-bounds panic.
+        require(payload.length >= 4, PayloadTooShort());
         bytes4 selector = bytes4(payload[:4]);
 
         (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
@@ -372,7 +374,7 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         );
 
         // Decode the bundle to get execution permissions
-        (InteropBundle memory interopBundle, , ) = _getBundleData(bundle);
+        (InteropBundle memory interopBundle, bytes32 bundleHash, ) = _getBundleData(bundle);
 
         // If the execution address is not specified then the execution is permissionless.
         if (interopBundle.bundleAttributes.executionAddress.length != 0) {
@@ -383,7 +385,7 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
             // Verify sender has execution permission
             require(
                 (executionChainId == senderChainId || executionChainId == 0) && executionAddress == senderAddress,
-                ExecutingNotAllowed(keccak256(bundle), sender, interopBundle.bundleAttributes.executionAddress)
+                ExecutingNotAllowed(bundleHash, sender, interopBundle.bundleAttributes.executionAddress)
             );
         }
 
@@ -409,7 +411,7 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         (bytes memory bundle, CallStatus[] memory providedCallStatus) = abi.decode(payload[4:], (bytes, CallStatus[]));
 
         // Decode the bundle to get unbundling permissions
-        (InteropBundle memory interopBundle, , ) = _getBundleData(bundle);
+        (InteropBundle memory interopBundle, bytes32 bundleHash, ) = _getBundleData(bundle);
 
         (uint256 unbundlerChainId, address unbundlerAddress) = InteroperableAddress.parseEvmV1(
             interopBundle.bundleAttributes.unbundlerAddress
@@ -418,7 +420,7 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         // Verify sender has unbundling permission
         require(
             (unbundlerChainId == senderChainId || unbundlerChainId == 0) && unbundlerAddress == senderAddress,
-            UnbundlingNotAllowed(keccak256(bundle), sender, interopBundle.bundleAttributes.unbundlerAddress)
+            UnbundlingNotAllowed(bundleHash, sender, interopBundle.bundleAttributes.unbundlerAddress)
         );
 
         this.unbundleBundle(bundle, providedCallStatus);
