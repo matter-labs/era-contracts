@@ -74,18 +74,19 @@ abstract contract L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract
     }
 
     /// @notice Test that receiveMessage does not revert with Unauthorized when called by L2InteropHandler
-    /// @dev We craft a payload with a deliberately wrong selector. Reaching the InvalidSelector
-    ///      revert at L2AssetRouter.receiveMessage:251 is causally downstream of:
-    ///        - the onlyL2InteropHandler gate at line 226, and
-    ///        - the secondary sender-address Unauthorized check at line 244.
+    /// @dev We craft a payload with a deliberately wrong selector. Reaching the InvalidSelector revert in
+    ///      `AssetRouterBase.receiveMessage` is causally downstream of:
+    ///        - the `msg.sender == _interopHandler()` gate, and
+    ///        - the `_isValidInteropSender` sender validation.
     ///      Therefore an InvalidSelector revert proves the access-control gate is open for L2InteropHandler.
     function test_regression_receiveMessageAllowedForInteropHandler() public {
         bytes4 bogusSelector = bytes4(0xdeadbeef);
 
-        // Sender bytes that pass the L244 check: senderChainId != L1_CHAIN_ID and senderAddress == address(this).
+        // Sender bytes that pass `_isValidInteropSender`: senderChainId != L1_CHAIN_ID and
+        // senderAddress == address(this).
         bytes memory sender = InteroperableAddress.formatEvmV1(block.chainid + 1, L2_ASSET_ROUTER_ADDR);
 
-        // Payload with a non-finalizeDeposit selector so the L251 selector check is the deterministic next failure.
+        // Payload with a non-finalizeDeposit selector so the selector check is the deterministic next failure.
         bytes memory payload = abi.encodeWithSelector(
             bogusSelector,
             block.chainid + 1, // originChainId (different from L1 and current chain)

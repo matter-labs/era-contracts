@@ -345,7 +345,8 @@ contract InteropCenter is
     /// @dev The InteropCenter only runs on L2s (never on L1 itself). Destinations may be:
     ///      - another L2 (the classic L2->L2 interop), or
     ///      - L1, but only for a single-call bundle (canonically an L2->L1 asset withdrawal). Multi-call
-    ///        bundles to L1 are not supported; an L1-destined bundle is exactly one indirect, zero-value call.
+    ///        bundles to L1 are not supported; an L1-destined bundle is exactly one zero-value call
+    ///        (direct or indirect).
     /// @dev The destination must not be this chain itself: a chain can end up registered for interop on
     ///      its own Bridgehub, and a self-destination bundle would burn value into a self-bridging
     ///      accounting path that is not supported.

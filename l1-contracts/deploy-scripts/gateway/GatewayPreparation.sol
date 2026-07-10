@@ -507,8 +507,6 @@ contract GatewayPreparation is Script {
         initializeConfig();
 
         L1Nullifier l1Nullifier = L1Nullifier(config.l1NullifierProxy);
-        IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehub);
-        bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
         address l1InteropHandlerAddr = l1Nullifier.l1InteropHandler();
         vm.broadcast();
         IInteropHandlerBase(l1InteropHandlerAddr).executeBundle(

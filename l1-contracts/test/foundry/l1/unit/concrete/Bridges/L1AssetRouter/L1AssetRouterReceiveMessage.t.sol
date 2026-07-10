@@ -10,7 +10,12 @@ import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {InteropSenderChainIdMismatch, PayloadTooShort, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {
+    InteropSenderChainIdMismatch,
+    InvalidSelector,
+    PayloadTooShort,
+    Unauthorized
+} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Native-token-vault stand-in whose `bridgeMint` always reverts with a sentinel error. Registered as the
 /// asset handler so a `finalizeDeposit` reverts deterministically, letting us assert that `receiveMessage` bubbles
@@ -98,6 +103,19 @@ contract L1AssetRouterReceiveMessageTest is Test {
         vm.prank(interopHandler);
         vm.expectRevert(PayloadTooShort.selector);
         router.receiveMessage(bytes32(0), sender, hex"12345678"); // 4 bytes; the check requires >= 36
+    }
+
+    /// @notice Only a `finalizeDeposit` payload may ride through the interop system: a long-enough payload
+    /// carrying any other selector is rejected.
+    function test_receiveMessage_RevertWhen_InvalidSelector() public {
+        bytes4 bogusSelector = bytes4(0xdeadbeef);
+        // Well-formed length (selector + args), wrong selector.
+        bytes memory payload = abi.encodeWithSelector(bogusSelector, SOURCE_CHAIN_ID, bytes32(0), hex"");
+        bytes memory sender = InteroperableAddress.formatEvmV1(SOURCE_CHAIN_ID, L2_ASSET_ROUTER_ADDR);
+
+        vm.prank(interopHandler);
+        vm.expectRevert(abi.encodeWithSelector(InvalidSelector.selector, bogusSelector));
+        router.receiveMessage(bytes32(0), sender, payload);
     }
 
     /// @notice The authenticated interop-message sender chain id must match the `_sourceChainId` the deposit is

@@ -65,7 +65,7 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
 
     /// @inheritdoc InteropHandlerBase
     /// @dev Proves the bundle's inclusion via the L1 MessageRoot.
-    function _proveInclusion(MessageInclusionProof memory _proof) internal override returns (bool) {
+    function _proveInclusion(MessageInclusionProof memory _proof) internal view override returns (bool) {
         return
             MESSAGE_ROOT.proveL2MessageInclusionShared({
                 _chainId: _proof.chainId,

@@ -261,8 +261,10 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
     /// @param _transferData The data used to finalize the withdrawal, it includes the data needed for the asset handler (e.g. NativeTokenVault).
     /// @dev Important note is that chains can be potentially malicious and provide arbitrary data here, so in case
     /// a piece of data affects other chains than the `_sourceChainId`, special care needs to be applied for validation.
-    /// @dev We have both the legacy finalizeWithdrawal and the new finalizeDeposit functions,
-    /// finalizeDeposit uses the new format. On the L2 we have finalizeDeposit with new and old formats both.
+    /// @dev This is the single (new-format) finalization entry point — the legacy `finalizeWithdrawal` path and
+    /// old message format were removed. Cross-chain messages reach it only through the interop
+    /// `receiveMessage` self-call above; on L2 it is additionally callable by the aliased asset-router
+    /// counterpart for L1 -> L2 deposit finalization.
     function finalizeDeposit(
         uint256 _sourceChainId,
         bytes32 _assetId,
