@@ -495,6 +495,7 @@ contract ${name} is CTMRegistryBase {
         return ${name}Data.l2DeploymentRows();
     }
 
+    // slither-disable-next-line unused-return
     function _l2UpgradeDelegate() internal pure override returns (address, bytes memory) {
         return ${name}Data.l2UpgradeDelegate();
     }
@@ -503,6 +504,7 @@ contract ${name} is CTMRegistryBase {
         return ${name}Data.factoryDepHashes();
     }
 
+    // slither-disable-next-line unused-return
     function _baseSystemContractHashes() internal pure override returns (bytes32, bytes32, bytes32) {
         return ${name}Data.baseSystemContractHashes();
     }
@@ -511,6 +513,7 @@ contract ${name} is CTMRegistryBase {
         return ${name}Data.fixedForceDeploymentsData();
     }
 
+    // slither-disable-next-line unused-return
     function _genesisParams() internal pure override returns (address, bytes32, bytes32, uint64) {
         return ${name}Data.genesisParams();
     }

@@ -42,7 +42,6 @@ contract CoreUpgrade_v32 is Script, DefaultCoreUpgrade {
         coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier", false);
         coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter", false);
         coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault", false);
-        coreAddresses.bridgehub.implementations.assetTracker = deploySimpleContract("L1AssetTracker", false);
         coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract(
             "CTMDeploymentTracker",
             false

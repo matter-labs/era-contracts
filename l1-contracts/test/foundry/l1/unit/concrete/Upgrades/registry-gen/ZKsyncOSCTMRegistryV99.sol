@@ -48,6 +48,7 @@ contract ZKsyncOSCTMRegistryV99 is CTMRegistryBase {
         return ZKsyncOSCTMRegistryV99Data.l2DeploymentRows();
     }
 
+    // slither-disable-next-line unused-return
     function _l2UpgradeDelegate() internal pure override returns (address, bytes memory) {
         return ZKsyncOSCTMRegistryV99Data.l2UpgradeDelegate();
     }
@@ -56,6 +57,7 @@ contract ZKsyncOSCTMRegistryV99 is CTMRegistryBase {
         return ZKsyncOSCTMRegistryV99Data.factoryDepHashes();
     }
 
+    // slither-disable-next-line unused-return
     function _baseSystemContractHashes() internal pure override returns (bytes32, bytes32, bytes32) {
         return ZKsyncOSCTMRegistryV99Data.baseSystemContractHashes();
     }
@@ -64,6 +66,7 @@ contract ZKsyncOSCTMRegistryV99 is CTMRegistryBase {
         return ZKsyncOSCTMRegistryV99Data.fixedForceDeploymentsData();
     }
 
+    // slither-disable-next-line unused-return
     function _genesisParams() internal pure override returns (address, bytes32, bytes32, uint64) {
         return ZKsyncOSCTMRegistryV99Data.genesisParams();
     }
