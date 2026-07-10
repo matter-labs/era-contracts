@@ -303,4 +303,46 @@ contract DataEncodingTest is Test {
             "interop call value must be zero"
         );
     }
+
+    /// @notice The base-token withdrawal encoder produces the same single indirect call to the L2 AssetRouter,
+    /// but with the withdrawn amount riding as the `indirectCall` message value (burned from the `sendBundle`
+    /// transaction value). `interopCallValue` must stay zero — destination-side call value is rejected for L1
+    /// destinations by the InteropCenter.
+    function test_encodeInteropBaseTokenWithdrawalCallStarters_carriesAmountAsIndirectCallValue() public pure {
+        bytes32 assetId = keccak256("base-token-asset");
+        bytes memory transferData = hex"c0ffee";
+        uint256 amount = 12 ether;
+
+        InteropCallStarter[] memory starters = DataEncoding.encodeInteropBaseTokenWithdrawalCallStarters(
+            assetId,
+            transferData,
+            amount
+        );
+
+        assertEq(starters.length, 1, "withdrawal must be a single call");
+
+        InteropCallStarter memory starter = starters[0];
+        assertEq(
+            starter.to,
+            InteroperableAddress.formatEvmV1(L2_ASSET_ROUTER_ADDR),
+            "call must target the L2 AssetRouter"
+        );
+        assertEq(
+            starter.data,
+            DataEncoding.encodeAssetRouterBridgehubDepositData(assetId, transferData),
+            "call data must be the bridgehub-deposit payload"
+        );
+
+        assertEq(starter.callAttributes.length, 2, "exactly two call attributes");
+        assertEq(
+            starter.callAttributes[0],
+            abi.encodeCall(IERC7786Attributes.indirectCall, (amount)),
+            "withdrawn amount must ride as the indirect-call message value"
+        );
+        assertEq(
+            starter.callAttributes[1],
+            abi.encodeCall(IERC7786Attributes.interopCallValue, (0)),
+            "interop call value must be zero"
+        );
+    }
 }
