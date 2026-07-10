@@ -885,11 +885,6 @@
   },
   {
     "type": "error",
-    "name": "DirectCallToL1NotSupported",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "FeeWithdrawalFailed",
     "inputs": []
   },

@@ -14,15 +14,14 @@ import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {
     CannotInitiateInteropOnL1,
-    DirectCallToL1NotSupported,
     InteropToSelfNotSupported,
     MultiCallToL1NotSupported,
     NonZeroValueToL1NotSupported
 } from "contracts/interop/InteropErrors.sol";
 
-/// @notice `InteropCenter` send-time destination constraints: an L2->L1 bundle must be exactly one indirect,
-/// zero-value call, interop can never be initiated from L1 itself, and a bundle/message can never target the
-/// sending chain itself.
+/// @notice `InteropCenter` send-time destination constraints: an L2->L1 bundle must be exactly one zero-value
+/// call (direct or indirect), interop can never be initiated from L1 itself, and a bundle/message can never
+/// target the sending chain itself.
 /// @dev Kept in its own abstract (mixed into `L2InteropCenterTestAbstract`, i.e. the L1-context runner) rather than
 /// in `L2InteropLibraryBasicTestAbstract`, because that abstract is also inherited by the zksync `L2InteropLibraryTest`
 /// and the extra test code would push that contract over EraVM's 65536-instruction bytecode limit. These checks are
@@ -70,12 +69,33 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
         l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, _l1BundleAttributes());
     }
 
-    /// @notice A direct (non-indirect) call to L1 is rejected: L1 calls must be indirect (asset-router routed).
-    function test_sendBundle_RevertWhen_DirectCallToL1() public {
+    /// @notice A single DIRECT zero-value call to L1 is allowed: a plain L2->L1 message needing no asset-router
+    /// routing. (The receive side is covered by the L1InteropHandler unit test finalizing an arbitrary single
+    /// call via ERC-7786 `receiveMessage`.)
+    function test_sendBundle_DirectCallToL1_Succeeds() public {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = _l1CallStarter(false, 0);
-        vm.expectRevert(DirectCallToL1NotSupported.selector);
-        l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, _l1BundleAttributes());
+
+        vm.recordLogs();
+        bytes32 bundleHash = l2InteropCenter.sendBundle(
+            InteroperableAddress.formatEvmV1(L1_CHAIN_ID),
+            calls,
+            _l1BundleAttributes()
+        );
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        assertTrue(bundleHash != bytes32(0), "direct L1-destined bundle should return a non-zero hash");
+        bool foundBundle;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (
+                logs[i].emitter == L2_INTEROP_CENTER_ADDR &&
+                logs[i].topics[0] == IInteropCenter.InteropBundleSent.selector
+            ) {
+                foundBundle = true;
+                break;
+            }
+        }
+        assertTrue(foundBundle, "InteropBundleSent should be emitted for the direct L1-destined call");
     }
 
     /// @notice An L1 call carrying non-zero destination-side value is rejected: the amount must ride in the payload.
@@ -83,6 +103,15 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
         uint256 callValue = 5;
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = _l1CallStarter(true, callValue);
+        vm.expectRevert(abi.encodeWithSelector(NonZeroValueToL1NotSupported.selector, callValue));
+        l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, _l1BundleAttributes());
+    }
+
+    /// @notice The zero-value rule applies to DIRECT L1 calls as well.
+    function test_sendBundle_RevertWhen_DirectCallToL1WithValue() public {
+        uint256 callValue = 7;
+        InteropCallStarter[] memory calls = new InteropCallStarter[](1);
+        calls[0] = _l1CallStarter(false, callValue);
         vm.expectRevert(abi.encodeWithSelector(NonZeroValueToL1NotSupported.selector, callValue));
         l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, _l1BundleAttributes());
     }
