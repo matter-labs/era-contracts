@@ -28,7 +28,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
-import {FacetInstallation, InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {FacetInstallation} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
@@ -308,20 +308,9 @@ contract ExecutorTest is UtilsCallMockerTest {
             commitment: bytes32("")
         });
 
-        InitializeData memory params = InitializeData({
-            // TODO REVIEW
-            chainId: l2ChainId,
-            bridgehub: address(dummyBridgehub),
-            interopCenter: interopCenter,
-            chainTypeManager: address(chainTypeManager),
-            protocolVersion: 0,
-            admin: owner,
-            validatorTimelock: address(validatorTimelock),
-            baseTokenAssetId: baseTokenAssetId,
-            storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo))
-        });
-        // verifier and base system contract hashes are fetched from the CTM / its genesis
-        // registry (both mocked below)
+        // Everything but (chainId, admin) is fetched from the CTM / its genesis registry /
+        // the bridgehub — all mocked below; this fixture's validator timelock and genesis
+        // batch hash differ from the mocker defaults, so they are overridden explicitly.
         mockDiamondInitInteropCenterCallsWithAddress(
             address(dummyBridgehub),
             address(0),
@@ -329,8 +318,15 @@ contract ExecutorTest is UtilsCallMockerTest {
             address(chainTypeManager),
             address(permissionlessValidator)
         );
+        mockCtmDerivedInitValues(
+            address(chainTypeManager),
+            address(dummyBridgehub),
+            baseTokenAssetId,
+            address(validatorTimelock),
+            keccak256(abi.encode(genesisStoredBatchInfo))
+        );
 
-        bytes memory diamondInitData = abi.encodeCall(diamondInit.initialize, (params));
+        bytes memory diamondInitData = abi.encodeCall(diamondInit.initialize, (l2ChainId, owner));
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](5);
         facetCuts[0] = Diamond.FacetCut({
@@ -371,6 +367,8 @@ contract ExecutorTest is UtilsCallMockerTest {
         });
 
         uint256 chainId = block.chainid;
+        // DiamondInit treats the proxy deployer as the CTM.
+        vm.prank(address(chainTypeManager));
         DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
 
         executor = TestExecutor(address(diamondProxy));

@@ -15,7 +15,7 @@ import {
     DEFAULT_PUBDATA_PRICING_MODE,
     DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT
 } from "../../common/Config.sol";
-import {FacetInstallation, IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol";
+import {FacetInstallation, IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
 import {ISelfDescribingFacet} from "../chain-interfaces/ISelfDescribingFacet.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../IChainTypeManager.sol";
@@ -49,24 +49,34 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
     }
 
     /// @notice ZK chain diamond contract initialization
+    /// @dev `_chainId` and `_admin` are the ONLY per-chain inputs. The ChainTypeManager is
+    ///      `msg.sender`: the CTM is the one deploying the diamond proxy (`_deployNewChain`, for
+    ///      both chain creation and migration mint), and the proxy constructor delegatecalls
+    ///      into this init, preserving the sender. Everything else — bridgehub, protocol
+    ///      version, validator timelock, genesis batch hash, base token asset id, facet set,
+    ///      verifier and base system contract hashes — is read from the CTM and the genesis
+    ///      registry / bridgehub it points at.
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
     /// initializer
-    function initialize(
-        InitializeData calldata _initializeData
-    ) public virtual reentrancyGuardInitializer returns (bytes32) {
-        if (_initializeData.admin == address(0)) {
+    function initialize(uint256 _chainId, address _admin) public virtual reentrancyGuardInitializer returns (bytes32) {
+        IChainTypeManager ctm = IChainTypeManager(msg.sender);
+        address bridgehub = ctm.BRIDGE_HUB();
+        uint256 protocolVersion = ctm.protocolVersion();
+        address validatorTimelock = ctm.validatorTimelockPostV29();
+        // Registered by the bridgehub before it calls into the CTM, in both the chain-creation
+        // and the migration-mint flow.
+        bytes32 baseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(_chainId);
+
+        if (_admin == address(0)) {
             revert ZeroAddress();
         }
-        if (_initializeData.validatorTimelock == address(0)) {
+        if (validatorTimelock == address(0)) {
             revert ZeroAddress();
         }
-        if (_initializeData.bridgehub == address(0)) {
+        if (bridgehub == address(0)) {
             revert ZeroAddress();
         }
-        if (_initializeData.chainTypeManager == address(0)) {
-            revert ZeroAddress();
-        }
-        if (_initializeData.baseTokenAssetId == bytes32(0)) {
+        if (baseTokenAssetId == bytes32(0)) {
             revert EmptyAssetId();
         }
 
@@ -75,7 +85,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         // the init itself (their selector lists come from each facet's own bytecode at execution
         // time), and the base system contract hashes are pinned per protocol version, so the
         // registry reverts if the CTM's protocol version disagrees with the registry's pin.
-        address genesisRegistry = IChainTypeManager(_initializeData.chainTypeManager).genesisRegistry();
+        address genesisRegistry = ctm.genesisRegistry();
         if (genesisRegistry == address(0)) {
             revert ZeroAddress();
         }
@@ -85,7 +95,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
             bytes32 l2BootloaderBytecodeHash,
             bytes32 l2DefaultAccountBytecodeHash,
             bytes32 l2EvmEmulatorBytecodeHash
-        ) = IGenesisFacetRegistry(genesisRegistry).baseSystemContractHashes(_initializeData.protocolVersion);
+        ) = IGenesisFacetRegistry(genesisRegistry).baseSystemContractHashes(protocolVersion);
 
         if (!IS_ZKSYNC_OS) {
             if (l2BootloaderBytecodeHash == bytes32(0)) {
@@ -101,41 +111,38 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
             }
         }
 
-        s.chainId = _initializeData.chainId;
-        s.bridgehub = _initializeData.bridgehub;
-        s.chainTypeManager = _initializeData.chainTypeManager;
-        if (_initializeData.bridgehub == L2_BRIDGEHUB_ADDR) {
+        s.chainId = _chainId;
+        s.bridgehub = bridgehub;
+        s.chainTypeManager = msg.sender;
+        if (bridgehub == L2_BRIDGEHUB_ADDR) {
             s.nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
             s.assetTracker = L2_ASSET_TRACKER_ADDR;
         } else {
             address nativeTokenVault = address(
-                IL1AssetRouter(address(IBridgehubBase(_initializeData.bridgehub).assetRouter())).nativeTokenVault()
+                IL1AssetRouter(address(IBridgehubBase(bridgehub).assetRouter())).nativeTokenVault()
             );
             s.nativeTokenVault = nativeTokenVault;
             s.assetTracker = address(IL1NativeTokenVault(nativeTokenVault).l1AssetTracker());
         }
-        s.baseTokenAssetId = _initializeData.baseTokenAssetId;
-        s.protocolVersion = _initializeData.protocolVersion;
+        s.baseTokenAssetId = baseTokenAssetId;
+        s.protocolVersion = protocolVersion;
 
         // Fetch verifier from CTM based on protocol version to keep CTM as the single source of truth
         // and avoid including the verifier address in the diamond cut init calldata.
-        address verifier = IChainTypeManager(_initializeData.chainTypeManager).protocolVersionVerifier(
-            _initializeData.protocolVersion
-        );
+        address verifier = ctm.protocolVersionVerifier(protocolVersion);
         if (verifier == address(0)) {
             revert ZeroAddress();
         }
         s.verifier = IVerifier(verifier);
-        s.admin = _initializeData.admin;
-        s.validators[_initializeData.validatorTimelock] = true;
+        s.admin = _admin;
+        s.validators[validatorTimelock] = true;
 
-        s.storedBatchHashes[0] = _initializeData.storedBatchZero;
+        s.storedBatchHashes[0] = ctm.storedBatchZero();
         s.l2BootloaderBytecodeHash = l2BootloaderBytecodeHash;
         s.l2DefaultAccountBytecodeHash = l2DefaultAccountBytecodeHash;
         s.l2EvmEmulatorBytecodeHash = l2EvmEmulatorBytecodeHash;
         s.priorityTxMaxGasLimit = DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT;
-        s.priorityModeInfo.permissionlessValidator = IChainTypeManager(_initializeData.chainTypeManager)
-            .PERMISSIONLESS_VALIDATOR();
+        s.priorityModeInfo.permissionlessValidator = ctm.PERMISSIONLESS_VALIDATOR();
         s.feeParams = FeeParams({
             pubdataPricingMode: DEFAULT_PUBDATA_PRICING_MODE,
             batchOverheadL1Gas: DEFAULT_BATCH_OVERHEAD_L1_GAS,

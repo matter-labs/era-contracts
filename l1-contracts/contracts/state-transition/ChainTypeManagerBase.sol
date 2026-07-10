@@ -9,7 +9,7 @@ import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
 import {IAdmin} from "./chain-interfaces/IAdmin.sol";
 import {IMigrator} from "./chain-interfaces/IMigrator.sol";
-import {IDiamondInit, InitializeData} from "./chain-interfaces/IDiamondInit.sol";
+import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "./IChainTypeManager.sol";
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
@@ -599,12 +599,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
     /// @notice deploys a full set of chains contracts
     /// @param _chainId the chain's id
-    /// @param _baseTokenAssetId the base token asset id used to pay for gas fees
     /// @param _admin the chain's admin address
     /// @param _diamondCut the diamond cut data that initializes the chains Diamond Proxy
     function _deployNewChain(
         uint256 _chainId,
-        bytes32 _baseTokenAssetId,
         address _admin,
         bytes memory _diamondCut
     ) internal returns (address zkChainAddress) {
@@ -623,26 +621,11 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             }
         }
 
-        // Only the chain-specific data is passed to DiamondInit; everything chain-independent
-        // (facet set, verifier, base system contract hashes) is read by DiamondInit from the
-        // genesis registry this CTM pins. The committed cut's own `initCalldata` is empty and is
-        // replaced here wholesale.
-        diamondCut.initCalldata = abi.encodeCall(
-            IDiamondInit.initialize,
-            (
-                InitializeData({
-                    chainId: _chainId,
-                    bridgehub: BRIDGE_HUB,
-                    interopCenter: INTEROP_CENTER,
-                    chainTypeManager: address(this),
-                    protocolVersion: protocolVersion,
-                    admin: _admin,
-                    validatorTimelock: validatorTimelockPostV29,
-                    baseTokenAssetId: _baseTokenAssetId,
-                    storedBatchZero: storedBatchZero
-                })
-            )
-        );
+        // Only the two per-chain values are passed to DiamondInit; everything else it reads
+        // back from this CTM (it is `msg.sender` during the proxy construction below) and from
+        // the genesis registry / bridgehub this CTM points at. The committed cut's own
+        // `initCalldata` is empty and is replaced here wholesale.
+        diamondCut.initCalldata = abi.encodeCall(IDiamondInit.initialize, (_chainId, _admin));
         // deploy zkChainContract
         // slither-disable-next-line reentrancy-no-eth
         DiamondProxy zkChainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
@@ -658,8 +641,12 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @param _initData the diamond cut data, force deployments and factoryDeps encoded
     /// @param _factoryDeps the factory dependencies used for the genesis upgrade
     /// that initializes the chains Diamond Proxy
+    /// @dev The base token asset id stays in the (bridgehub-facing) signature for compatibility
+    /// but is not consumed here: DiamondInit reads it from the bridgehub, which registers it
+    /// before this call.
     function createNewChain(
         uint256 _chainId,
+        // solhint-disable-next-line no-unused-vars
         bytes32 _baseTokenAssetId,
         address _admin,
         bytes calldata _initData,
@@ -667,8 +654,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     ) external onlyBridgehub returns (address zkChainAddress) {
         (bytes memory _diamondCut, bytes memory _forceDeploymentData) = abi.decode(_initData, (bytes, bytes));
 
-        // solhint-disable-next-line func-named-parameters
-        zkChainAddress = _deployNewChain(_chainId, _baseTokenAssetId, _admin, _diamondCut);
+        zkChainAddress = _deployNewChain(_chainId, _admin, _diamondCut);
 
         {
             // check input
@@ -731,7 +717,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         uint256 _chainId,
         bytes calldata _ctmData
     ) external override onlyChainAssetHandler returns (address chainAddress) {
-        (bytes32 _baseTokenAssetId, address _admin, uint256 _protocolVersion, bytes memory _diamondCut) = abi.decode(
+        // The base token asset id stays in the burn-side encoding for compatibility but is not
+        // consumed here: DiamondInit reads it from the bridgehub, which registers it before this
+        // call (see `BridgehubBase.forwardedBridgeMint`).
+        (, address _admin, uint256 _protocolVersion, bytes memory _diamondCut) = abi.decode(
             _ctmData,
             (bytes32, address, uint256, bytes)
         );
@@ -741,12 +730,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         if (_protocolVersion != protocolVersion) {
             revert OutdatedProtocolVersion(protocolVersion, _protocolVersion);
         }
-        chainAddress = _deployNewChain({
-            _chainId: _chainId,
-            _baseTokenAssetId: _baseTokenAssetId,
-            _admin: _admin,
-            _diamondCut: _diamondCut
-        });
+        chainAddress = _deployNewChain({_chainId: _chainId, _admin: _admin, _diamondCut: _diamondCut});
     }
 
     /// @notice Called by the bridgehub during the failed migration of a chain.

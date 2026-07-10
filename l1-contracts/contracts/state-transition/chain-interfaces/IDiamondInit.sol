@@ -16,34 +16,13 @@ struct FacetInstallation {
     bytes4[] selectors;
 }
 
-/// @notice The chain-specific initialization data, filled in by the CTM. This is ALL the calldata
-///         `DiamondInit` takes: everything chain-independent (facet set, verifier, base system
-///         contract hashes) is read from the genesis registry the CTM pins per protocol version.
-/// @param chainId the id of the chain
-/// @param bridgehub the address of the bridgehub contract
-/// @param chainTypeManager contract's address
-/// @param protocolVersion initial protocol version
-/// @param validatorTimelock address of the validator timelock that delays execution
-/// @param admin address who can manage the contract
-/// @param baseTokenAssetId asset id of the base token of the chain
-/// @param storedBatchZero hash of the initial genesis batch
-// solhint-disable-next-line gas-struct-packing
-struct InitializeData {
-    uint256 chainId;
-    address bridgehub;
-    address interopCenter;
-    address chainTypeManager;
-    uint256 protocolVersion;
-    address admin;
-    address validatorTimelock;
-    bytes32 baseTokenAssetId;
-    bytes32 storedBatchZero;
-}
-
 interface IDiamondInit {
-    /// @param _initData The chain-specific data, filled in by the ChainTypeManager. Everything
-    ///        else — the facet set, the verifier and the base system contract hashes — is read
-    ///        from the genesis registry the CTM pins (`IChainTypeManager.genesisRegistry`), so
-    ///        the committed chain-creation cut carries no init payload at all.
-    function initialize(InitializeData calldata _initData) external returns (bytes32);
+    /// @notice ZK chain diamond contract initialization.
+    /// @dev The two arguments are the ONLY per-chain data a chain is created with; everything
+    ///      else is read from the ChainTypeManager — which is simply `msg.sender`, since the CTM
+    ///      is the one deploying the diamond proxy (and delegatecall preserves the sender) — and
+    ///      from the genesis registry / bridgehub it points at.
+    /// @param _chainId The chain id of the new chain.
+    /// @param _admin The address to be set as the chain's admin.
+    function initialize(uint256 _chainId, address _admin) external returns (bytes32);
 }

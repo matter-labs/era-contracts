@@ -22,7 +22,8 @@ import {
     VerifierParams
 } from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
-import {FacetInstallation, InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {FacetInstallation} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {
     IExecutor,
     SystemLogKey,
@@ -51,11 +52,22 @@ address constant TEST_ROLLUP_DA_MANAGER_OWNER = address(0x1234567890DEADBEEF);
 uint256 constant EVENT_INDEX = 0;
 
 library Utils {
+    Vm internal constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
+
     /// @dev The genesis-registry address the mocked CTM fixtures return; the registry itself is
     ///      mocked too (see `UtilsCallMocker`), pinning no facets and these base system hashes.
     address internal constant TEST_GENESIS_REGISTRY = address(0x9E8E5157A9);
     bytes32 internal constant TEST_BASE_SYSTEM_CONTRACT_HASH =
         0x0100000000000000000000000000000000000000000000000000000000000000;
+
+    /// @dev DiamondInit derives everything but (chainId, admin) from the CTM — which is simply
+    ///      `msg.sender` during the diamond proxy construction. Direct-diamond fixtures prank as
+    ///      this fake CTM and mock its getters (see `UtilsCallMocker`).
+    address internal constant TEST_CHAIN_TYPE_MANAGER = address(0x1234567890876543567890);
+    uint256 internal constant TEST_CHAIN_ID = 1;
+    address internal constant TEST_CHAIN_ADMIN = address(0x32149872498357874258787);
+    address internal constant TEST_VALIDATOR_TIMELOCK = address(0x85430237648403822345345);
+    bytes32 internal constant TEST_BASE_TOKEN_ASSET_ID = bytes32(uint256(0x923645439232223445));
 
     function packBatchTimestampAndBlockTimestamp(
         uint256 batchTimestamp,
@@ -536,24 +548,9 @@ library Utils {
         return IVerifier(testnetVerifier);
     }
 
-    function makeInitializeData(address bridgehub) public pure returns (InitializeData memory) {
-        return
-            InitializeData({
-                chainId: 1,
-                bridgehub: bridgehub,
-                chainTypeManager: address(0x1234567890876543567890),
-                interopCenter: address(0x1234567890876543567890),
-                protocolVersion: 0,
-                admin: address(0x32149872498357874258787),
-                validatorTimelock: address(0x85430237648403822345345),
-                baseTokenAssetId: bytes32(uint256(0x923645439232223445)),
-                storedBatchZero: bytes32(0)
-            });
-    }
-
-    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address bridgehub) public returns (address) {
+    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address) public returns (address) {
         DiamondInit diamondInit = new DiamondInit(false);
-        bytes memory diamondInitData = abi.encodeCall(diamondInit.initialize, (makeInitializeData(bridgehub)));
+        bytes memory diamondInitData = abi.encodeCall(diamondInit.initialize, (TEST_CHAIN_ID, TEST_CHAIN_ADMIN));
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -562,6 +559,9 @@ library Utils {
         });
 
         uint256 chainId = block.chainid;
+        // DiamondInit treats the proxy deployer as the CTM; callers must have mocked the fake
+        // CTM's getters beforehand (UtilsCallMocker).
+        vm.prank(TEST_CHAIN_TYPE_MANAGER);
         DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
         return address(diamondProxy);
     }

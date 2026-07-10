@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
-import {DiamondInit, FacetInstallation, InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.sol";
+import {DiamondInit, FacetInstallation} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -86,19 +86,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             selectors: Utils.getGettersSelectors()
         });
 
-        InitializeData memory params = InitializeData({
-            // TODO REVIEW
-            chainId: 1,
-            bridgehub: address(dummyBridgehub),
-            chainTypeManager: chainTypeManager,
-            interopCenter: interopCenter,
-            protocolVersion: 0,
-            admin: admin,
-            validatorTimelock: makeAddr("validatorTimelock"),
-            baseTokenAssetId: baseTokenAssetId,
-            storedBatchZero: bytes32(0)
-        });
-        bytes memory diamondInitCalldata = abi.encodeCall(diamondInit.initialize, (params));
+        bytes memory diamondInitCalldata = abi.encodeCall(diamondInit.initialize, (uint256(1), admin));
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -107,9 +95,18 @@ contract UpgradeLogicTest is DiamondCutTest {
         });
 
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), baseTokenAssetId);
-        // The fixture's CTM is a real (Dummy)EraChainTypeManager whose genesis registry pointer
-        // is unset; DiamondInit requires one, so mock the pointer + registry here.
+        // The fixture's CTM is a real (Dummy)EraChainTypeManager whose genesis registry pointer,
+        // BRIDGE_HUB immutable and validator timelock are unset; DiamondInit derives all of them
+        // from the CTM (= the proxy deployer, hence the prank), so mock them here.
         mockGenesisRegistry(chainTypeManager);
+        mockCtmDerivedInitValues(
+            chainTypeManager,
+            address(dummyBridgehub),
+            baseTokenAssetId,
+            makeAddr("validatorTimelock"),
+            bytes32(0)
+        );
+        vm.prank(chainTypeManager);
         diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
         proxyAsAdmin = AdminFacet(address(diamondProxy));
         proxyAsGetters = GettersFacet(address(diamondProxy));

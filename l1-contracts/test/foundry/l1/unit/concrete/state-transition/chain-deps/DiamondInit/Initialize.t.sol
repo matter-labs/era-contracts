@@ -11,121 +11,120 @@ import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.s
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 import {IGenesisFacetRegistry} from "contracts/upgrades/registry/IGenesisFacetRegistry.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {EmptyAssetId, EmptyBytes32, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract InitializeTest is DiamondInitTest {
+    /// @dev Builds the standard genesis cut. Kept separate from the deploy so revert tests can
+    ///      place `vm.expectRevert` directly before the proxy creation.
+    function _buildCut(uint256 _chainId, address _admin) internal returns (Diamond.DiamondCutData memory) {
+        return
+            Diamond.DiamondCutData({
+                facetCuts: facetCuts,
+                initAddress: address(new DiamondInit(false)),
+                initCalldata: abi.encodeCall(DiamondInit.initialize, (_chainId, _admin))
+            });
+    }
+
+    /// @dev Deploys the diamond pranked as the fake CTM — DiamondInit treats the proxy deployer
+    ///      (msg.sender) as the CTM.
+    function _deployDiamondAsCtm(Diamond.DiamondCutData memory _cut) internal returns (address) {
+        vm.prank(Utils.TEST_CHAIN_TYPE_MANAGER);
+        return address(new DiamondProxy(block.chainid, _cut));
+    }
+
     function test_revertWhen_verifierIsZeroAddress() public {
         // Mock CTM to return zero address for verifier
         vm.mockCall(
-            initializeData.chainTypeManager,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, initializeData.protocolVersion),
+            Utils.TEST_CHAIN_TYPE_MANAGER,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, uint256(0)),
             abi.encode(address(0))
         );
 
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
-        });
+        Diamond.DiamondCutData memory cut = _buildCut(Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN);
 
         vm.expectRevert(ZeroAddress.selector);
-        new DiamondProxy(block.chainid, diamondCutData);
+
+        _deployDiamondAsCtm(cut);
     }
 
     function test_revertWhen_governorIsZeroAddress() public {
-        initializeData.admin = address(0);
-
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
-        });
-
+        Diamond.DiamondCutData memory cut = _buildCut(Utils.TEST_CHAIN_ID, address(0));
         vm.expectRevert(ZeroAddress.selector);
-        new DiamondProxy(block.chainid, diamondCutData);
+        _deployDiamondAsCtm(cut);
     }
 
     function test_revertWhen_validatorTimelockIsZeroAddress() public {
-        initializeData.validatorTimelock = address(0);
+        vm.mockCall(
+            Utils.TEST_CHAIN_TYPE_MANAGER,
+            abi.encodeWithSelector(IChainTypeManager.validatorTimelockPostV29.selector),
+            abi.encode(address(0))
+        );
 
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
-        });
+        Diamond.DiamondCutData memory cut = _buildCut(Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN);
 
         vm.expectRevert(ZeroAddress.selector);
-        new DiamondProxy(block.chainid, diamondCutData);
+
+        _deployDiamondAsCtm(cut);
     }
 
     function test_revertWhen_bridgehubAddressIsZero() public {
-        initializeData.bridgehub = address(0);
+        vm.mockCall(
+            Utils.TEST_CHAIN_TYPE_MANAGER,
+            abi.encodeWithSelector(IChainTypeManager.BRIDGE_HUB.selector),
+            abi.encode(address(0))
+        );
+        // The zero bridgehub is also where the asset id would be read from; mock it non-zero so
+        // the test pins the bridgehub check specifically.
+        vm.mockCall(
+            address(0),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
+            abi.encode(Utils.TEST_BASE_TOKEN_ASSET_ID)
+        );
 
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
-        });
-
-        vm.expectRevert(ZeroAddress.selector);
-        new DiamondProxy(block.chainid, diamondCutData);
-    }
-
-    function test_revertWhen_chainTypeManagerAddressIsZero() public {
-        initializeData.chainTypeManager = address(0);
-
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
-        });
+        Diamond.DiamondCutData memory cut = _buildCut(Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN);
 
         vm.expectRevert(ZeroAddress.selector);
-        new DiamondProxy(block.chainid, diamondCutData);
+
+        _deployDiamondAsCtm(cut);
     }
 
     function test_revertWhen_baseTokenAssetIdIsZero() public {
-        initializeData.baseTokenAssetId = bytes32(0);
+        vm.mockCall(
+            address(dummyBridgehub),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
+            abi.encode(bytes32(0))
+        );
 
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
-        });
+        Diamond.DiamondCutData memory cut = _buildCut(Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN);
 
         vm.expectRevert(EmptyAssetId.selector);
-        new DiamondProxy(block.chainid, diamondCutData);
+
+        _deployDiamondAsCtm(cut);
     }
 
     function test_valuesCorrectWhenSuccessfulInit() public {
         // Mock CTM to return testnetVerifier for this protocol version
         vm.mockCall(
-            initializeData.chainTypeManager,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, initializeData.protocolVersion),
+            Utils.TEST_CHAIN_TYPE_MANAGER,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, uint256(0)),
             abi.encode(testnetVerifier)
         );
 
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
-        });
+        UtilsFacet utilsFacet = UtilsFacet(_deployDiamondAsCtm(_buildCut(Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN)));
 
-        DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
-        UtilsFacet utilsFacet = UtilsFacet(address(diamondProxy));
-
-        assertEq(utilsFacet.util_getChainId(), initializeData.chainId);
-        assertEq(utilsFacet.util_getBridgehub(), initializeData.bridgehub);
-        assertEq(utilsFacet.util_getChainTypeManager(), initializeData.chainTypeManager);
-        assertEq(utilsFacet.util_getBaseTokenAssetId(), initializeData.baseTokenAssetId);
-        assertEq(utilsFacet.util_getProtocolVersion(), initializeData.protocolVersion);
+        assertEq(utilsFacet.util_getChainId(), Utils.TEST_CHAIN_ID);
+        assertEq(utilsFacet.util_getBridgehub(), address(dummyBridgehub));
+        assertEq(utilsFacet.util_getChainTypeManager(), Utils.TEST_CHAIN_TYPE_MANAGER);
+        assertEq(utilsFacet.util_getBaseTokenAssetId(), Utils.TEST_BASE_TOKEN_ASSET_ID);
+        assertEq(utilsFacet.util_getProtocolVersion(), 0);
 
         // Verifier is now fetched from CTM
         assertEq(address(utilsFacet.util_getVerifier()), testnetVerifier);
-        assertEq(utilsFacet.util_getAdmin(), initializeData.admin);
-        assertEq(utilsFacet.util_getValidator(initializeData.validatorTimelock), true);
+        assertEq(utilsFacet.util_getAdmin(), Utils.TEST_CHAIN_ADMIN);
+        assertEq(utilsFacet.util_getValidator(Utils.TEST_VALIDATOR_TIMELOCK), true);
 
-        assertEq(utilsFacet.util_getStoredBatchHashes(0), initializeData.storedBatchZero);
+        assertEq(utilsFacet.util_getStoredBatchHashes(0), bytes32(0));
         // The base system contract hashes are no longer passed in calldata: DiamondInit reads
         // them from the genesis registry the CTM pins (mocked in UtilsCallMocker).
         assertEq(utilsFacet.util_getL2BootloaderBytecodeHash(), Utils.TEST_BASE_SYSTEM_CONTRACT_HASH);
@@ -137,19 +136,16 @@ contract InitializeTest is DiamondInitTest {
     ///         fail loudly.
     function test_revertWhen_genesisRegistryIsZeroAddress() public {
         vm.mockCall(
-            initializeData.chainTypeManager,
+            Utils.TEST_CHAIN_TYPE_MANAGER,
             abi.encodeWithSelector(IChainTypeManager.genesisRegistry.selector),
             abi.encode(address(0))
         );
 
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
-        });
+        Diamond.DiamondCutData memory cut = _buildCut(Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN);
 
         vm.expectRevert(ZeroAddress.selector);
-        new DiamondProxy(block.chainid, diamondCutData);
+
+        _deployDiamondAsCtm(cut);
     }
 
     /// @notice On Era (non-ZKsync-OS) chains the registry must pin non-zero base system contract
@@ -161,13 +157,10 @@ contract InitializeTest is DiamondInitTest {
             abi.encode(bytes32(0), Utils.TEST_BASE_SYSTEM_CONTRACT_HASH, Utils.TEST_BASE_SYSTEM_CONTRACT_HASH)
         );
 
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
-        });
+        Diamond.DiamondCutData memory cut = _buildCut(Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN);
 
         vm.expectRevert(EmptyBytes32.selector);
-        new DiamondProxy(block.chainid, diamondCutData);
+
+        _deployDiamondAsCtm(cut);
     }
 }

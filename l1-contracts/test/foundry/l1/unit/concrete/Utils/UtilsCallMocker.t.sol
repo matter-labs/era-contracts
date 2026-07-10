@@ -63,6 +63,20 @@ contract UtilsCallMockerTest is Test {
         address chainTypeManager,
         address permissionlessValidator
     ) public {
+        // DiamondInit derives everything but (chainId, admin) from the CTM (= the proxy
+        // deployer) and the bridgehub; some fixtures pass a zero asset id, which DiamondInit
+        // rejects, so substitute the shared test constant.
+        if (baseTokenAssetId == bytes32(0)) {
+            baseTokenAssetId = Utils.TEST_BASE_TOKEN_ASSET_ID;
+        }
+        mockCtmDerivedInitValues(
+            chainTypeManager,
+            bridgehub,
+            baseTokenAssetId,
+            Utils.TEST_VALIDATOR_TIMELOCK,
+            bytes32(0)
+        );
+
         address assetTracker = makeAddr("assetTracker");
         address nativeTokenVault = makeAddr("nativeTokenVault");
         if (assetRouter == address(0)) {
@@ -101,6 +115,45 @@ contract UtilsCallMockerTest is Test {
             abi.encode(permissionlessValidator)
         );
         mockGenesisRegistry(chainTypeManager);
+    }
+
+    /// @notice Mocks the CTM getters DiamondInit derives its initialization values from — the
+    ///         CTM is `msg.sender` during the diamond proxy construction, so direct-diamond
+    ///         fixtures prank as `chainTypeManager` and mock these on it. Also mocks the
+    ///         bridgehub's `baseTokenAssetId` lookup (selector-only: any chain id).
+    /// @dev Call again with different values to override (later mocks win).
+    function mockCtmDerivedInitValues(
+        address chainTypeManager,
+        address bridgehub,
+        bytes32 baseTokenAssetId,
+        address validatorTimelock,
+        bytes32 storedBatchZero
+    ) public {
+        vm.mockCall(
+            chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.BRIDGE_HUB.selector),
+            abi.encode(bridgehub)
+        );
+        vm.mockCall(
+            chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
+            abi.encode(uint256(0))
+        );
+        vm.mockCall(
+            chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.validatorTimelockPostV29.selector),
+            abi.encode(validatorTimelock)
+        );
+        vm.mockCall(
+            chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.storedBatchZero.selector),
+            abi.encode(storedBatchZero)
+        );
+        vm.mockCall(
+            bridgehub,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
+            abi.encode(baseTokenAssetId)
+        );
     }
 
     /// @notice Mocks the CTM's genesis registry pointer and the registry itself for DiamondInit.
@@ -147,7 +200,7 @@ contract UtilsCallMockerTest is Test {
 
     /// @notice Mocks the CTM's protocolVersionVerifier call for DiamondInit
     /// @dev The chainTypeManager address (0x1234567890876543567890) and protocolVersion (0)
-    ///      match the values used in Utils.makeInitializeData()
+    ///      match Utils.TEST_CHAIN_TYPE_MANAGER, which direct-diamond fixtures prank as.
     function mockChainTypeManagerVerifier(address verifier) public {
         vm.mockCall(
             DEFAULT_CHAIN_TYPE_MANAGER,

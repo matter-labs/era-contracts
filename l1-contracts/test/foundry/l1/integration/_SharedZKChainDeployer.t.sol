@@ -12,7 +12,8 @@ import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {IDiamondInit, InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 
@@ -241,25 +242,18 @@ contract ZKChainDeployer is L1ContractDeployer {
             ecosystemConfig.contracts.diamondCutData,
             (Diamond.DiamondCutData)
         );
-        // Composed exactly as ChainTypeManagerBase._deployNewChain does: only the
-        // chain-specific data — DiamondInit reads the facet set and base system contract
-        // hashes from the genesis registry the CTM pins.
-        diamondCut.initCalldata = abi.encodeCall(
-            IDiamondInit.initialize,
-            (
-                InitializeData({
-                    chainId: _chainId,
-                    bridgehub: _bridgehub,
-                    interopCenter: _interopCenter,
-                    chainTypeManager: _chainTypeManager,
-                    protocolVersion: _protocolVersion,
-                    admin: _admin,
-                    validatorTimelock: address(0x1337),
-                    baseTokenAssetId: _baseTokenAssetId,
-                    storedBatchZero: _storedBatchZero
-                })
-            )
+        // Composed exactly as ChainTypeManagerBase._deployNewChain does: only (chainId, admin).
+        // DiamondInit reads everything else from the CTM — msg.sender during the proxy
+        // construction, hence the prank — and from the genesis registry / bridgehub it points
+        // at. The bridgehub's asset-id lookup is mocked since this helper bypasses
+        // `Bridgehub.createNewChain` (which is what registers it).
+        diamondCut.initCalldata = abi.encodeCall(IDiamondInit.initialize, (_chainId, _admin));
+        vm.mockCall(
+            _bridgehub,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, _chainId),
+            abi.encode(_baseTokenAssetId)
         );
+        vm.prank(_chainTypeManager);
         DiamondProxy hyperchainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
         return address(hyperchainContract);
     }

@@ -16,11 +16,8 @@ import {
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {
-    IDiamondInit,
-    InitializeData,
-    FacetInstallation
-} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {IDiamondInit, FacetInstallation} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {GenesisRegistry} from "contracts/state-transition/chain-deps/GenesisRegistry.sol";
 import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
@@ -198,7 +195,8 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         _simulateCreate2(create2Factory, directCalldata.genesisUpgradeCalldata, "GenesisUpgrade");
         _simulateCreate2(create2Factory, directCalldata.multicall3Calldata, "Multicall3");
 
-        // Mock the CTM calls that DiamondInit.initialize() makes
+        // Mock the CTM calls that DiamondInit.initialize() makes. The CTM is `msg.sender`
+        // during the proxy construction, so the deploy below pranks as this mock.
         address mockCTM = address(0xC7A1);
         vm.mockCall(
             mockCTM,
@@ -209,6 +207,33 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
             mockCTM,
             abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector),
             abi.encode(makeAddr("mockVerifier"))
+        );
+        vm.mockCall(
+            mockCTM,
+            abi.encodeWithSelector(IChainTypeManager.BRIDGE_HUB.selector),
+            abi.encode(L2_BRIDGEHUB_ADDR)
+        );
+        vm.mockCall(
+            mockCTM,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
+            abi.encode(config.protocolVersion)
+        );
+        vm.mockCall(
+            mockCTM,
+            abi.encodeWithSelector(IChainTypeManager.validatorTimelockPostV29.selector),
+            abi.encode(address(0x1337))
+        );
+        vm.mockCall(
+            mockCTM,
+            abi.encodeWithSelector(IChainTypeManager.storedBatchZero.selector),
+            abi.encode(bytes32(uint256(1)))
+        );
+        // The L2 bridgehub built-in has no code in this test; etch a stub so it can be mocked.
+        vm.etch(L2_BRIDGEHUB_ADDR, hex"00");
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
+            abi.encode(keccak256("baseTokenAssetId"))
         );
         // The Gateway cut is empty (no facets, no init payload): DiamondInit installs the
         // facet set it reads from the genesis registry the CTM pins and self-describes each
@@ -222,28 +247,15 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
             abi.encode(_deployGatewayGenesisRegistry(contracts, config))
         );
 
-        // Build the initCalldata exactly as ChainTypeManagerBase composes it: only the
-        // chain-specific data — everything else is read from the registry.
-        // Use L2_BRIDGEHUB_ADDR as bridgehub so initialize() takes the L2 branch
+        // Build the initCalldata exactly as ChainTypeManagerBase composes it: only
+        // (chainId, admin) — everything else is read from the mocked CTM and the registry.
+        // BRIDGE_HUB is mocked to L2_BRIDGEHUB_ADDR so initialize() takes the L2 branch
         // (sets nativeTokenVault/assetTracker from L2 constants, no external calls).
-        diamondCut.initCalldata = abi.encodeCall(
-            IDiamondInit.initialize,
-            (
-                InitializeData({
-                    chainId: GATEWAY_CHAIN_ID,
-                    bridgehub: L2_BRIDGEHUB_ADDR,
-                    interopCenter: L2_INTEROP_CENTER_ADDR,
-                    chainTypeManager: mockCTM,
-                    protocolVersion: config.protocolVersion,
-                    admin: address(0xAD01),
-                    validatorTimelock: address(0x1337),
-                    baseTokenAssetId: keccak256("baseTokenAssetId"),
-                    storedBatchZero: bytes32(uint256(1))
-                })
-            )
-        );
+        diamondCut.initCalldata = abi.encodeCall(IDiamondInit.initialize, (GATEWAY_CHAIN_ID, address(0xAD01)));
 
-        // Deploy the DiamondProxy with real facets - validates all facets have code AND runs initialize()
+        // Deploy the DiamondProxy with real facets - validates all facets have code AND runs
+        // initialize(), pranked as the CTM (the real flow's deployer).
+        vm.prank(mockCTM);
         new DiamondProxy(GATEWAY_CHAIN_ID, diamondCut);
     }
 
