@@ -28,8 +28,8 @@ library CoreRegistryV32Data {
         uint256 i = 0;
         rows[i] = CoreRegistryBase.EcosystemContractRow({
             key: EcosystemContract.MessageRoot,
-            proxy: address(uint160(0x004a02a75c31b433fc8d87f510500b90e0fa7e0254)),
-            implNew: address(uint160(0x00ef31027350be2c7439c1b0be022d49421488b72c))
+            proxy: address(uint160(0x00eebd607623e9baf752df115d89d82b6391fec9aa)),
+            implNew: address(uint160(0x00ad523115cd35a8d4e60b3c0953e0e0ac10418309))
         }); // MessageRoot
         ++i;
     }
@@ -38,8 +38,8 @@ library CoreRegistryV32Data {
         pins = new CoreRegistryBase.CodehashPin[](1);
         uint256 i = 0;
         pins[i] = CoreRegistryBase.CodehashPin({
-            target: address(uint160(0x00ef31027350be2c7439c1b0be022d49421488b72c)),
-            expectedCodehash: 0x38a76dd3fa4cc1b89fd4fb2add08c18b50a7187c8f229f129a78af31070ccaa4
+            target: address(uint160(0x00ad523115cd35a8d4e60b3c0953e0e0ac10418309)),
+            expectedCodehash: 0xd64f41869617d844a8b103a5ebcdd01ab4918fd422f4a856b47e0082eef0c9ed
         }); // MessageRoot implNew
         ++i;
     }

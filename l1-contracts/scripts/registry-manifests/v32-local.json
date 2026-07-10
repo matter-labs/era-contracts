@@ -10,9 +10,9 @@
     },
     "contracts": {
       "MessageRoot": {
-        "proxy": "0x4A02a75C31b433fc8D87F510500b90e0fa7E0254",
-        "implNew": "0xeF31027350Be2c7439C1b0BE022d49421488b72C",
-        "implNewCodehash": "0x38a76dd3fa4cc1b89fd4fb2add08c18b50a7187c8f229f129a78af31070ccaa4"
+        "proxy": "0xEeBD607623e9Baf752DF115d89d82b6391feC9aa",
+        "implNew": "0xAD523115cd35a8d4E60B3C0953E0E0ac10418309",
+        "implNewCodehash": "0xd64f41869617d844a8b103a5ebcdd01ab4918fd422f4a856b47e0082eef0c9ed"
       }
     }
   },
@@ -20,16 +20,16 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0x3Ca619F499f80f640a8C5b177459d7a06811bC66",
-      "verifierNew": "0xC66AB83418C20A65C3f8e83B3d11c8C3a6097b6F",
+      "ctmProxy": "0x2Ed7Fa601037FC1a7F295aee9B4ADf79fE8ccf6d",
+      "verifierNew": "0xaB7B4c595d3cE8C85e16DA86630f2fc223B05057",
       "contracts": {
         "DefaultUpgrade": {
-          "new": "0x71089Ba41e478702e1904692385Be3972B2cBf9e",
-          "newCodehash": "0xb6168846e24a0483b17a10f409fa4d4f4e8b0687f229becfb3bcc3606bbc9adc"
+          "new": "0xddE78e6202518FF4936b5302cC2891ec180E8bFf",
+          "newCodehash": "0x5faf1d86a01c82bee946ad7c5ec15ced0660650a4778dae50f4c5a0cc056a1d9"
         },
         "DiamondInit": {
-          "new": "0x8F4ec854Dd12F1fe79500a1f53D0cbB30f9b6134",
-          "newCodehash": "0x50ac16b61a21d779d4991f3709291e9f9fd212263c7a629e6dd749ce5f98bfb6"
+          "new": "0xB06c856C8eaBd1d8321b687E188204C1018BC4E5",
+          "newCodehash": "0x1c11c008864151015433b20dd022626e5f271bc21db03693c82be87aaac46f6b"
         }
       },
       "facets": {
@@ -46,55 +46,55 @@
           },
           {
             "name": "ExecutorFacet",
-            "oldAddress": "0xD94e56e0C17BD1e0eB67CA231996079BAE2F7A9A",
+            "oldAddress": "0x860BD61Cd9206a6492b6947342c19E045C353510",
             "selectors": []
           },
           {
             "name": "MigratorFacet",
-            "oldAddress": "0x1f3278a574430D5b79a7B8d507eB7126BA2C584D",
+            "oldAddress": "0x7c413EaaF1aC4fC0cD39D44c307b9A20985416F9",
             "selectors": []
           },
           {
             "name": "CommitterFacet",
-            "oldAddress": "0x353Fc44dFe46c4ADa74A563f89923a65350c5741",
+            "oldAddress": "0x6BAA73ed8dbEA5Ef75193d005b91A0b5Bdf8aDD1",
             "selectors": []
           }
         ],
         "installed": [
           {
             "name": "AdminFacet",
-            "address": "0x413b1AfCa96a3df5A686d8BFBF93d30688a7f7D9",
+            "address": "0xaca81583840B1bf2dDF6CDe824ada250C1936B4D",
             "codehash": "0xe8e31854a39f59042ebdf56730808bd85eabdff0c2a16bd8e67afbccb7425836",
             "selectors": []
           },
           {
             "name": "GettersFacet",
-            "address": "0x02df3a3F960393F5B349E40A599FEda91a7cc1A7",
+            "address": "0x70bDA08DBe07363968e9EE53d899dFE48560605B",
             "codehash": "0x6eb8cfdb1a91fd28763e291cfe354d2bedbd8cbf7bbc01b1c30b60329c4f33f5",
             "selectors": []
           },
           {
             "name": "ExecutorFacet",
-            "address": "0x821f3361D454cc98b7555221A06Be563a7E2E0A6",
-            "codehash": "0x941916e9669e766aedaf2f02c36405ab1a12393c8d7badd54607ca300a9048aa",
+            "address": "0x26B862f640357268Bd2d9E95bc81553a2Aa81D7E",
+            "codehash": "0x44eafc4ee037764abdaf3c51b011ad76b212bed96171391036b5fa825b16674e",
             "selectors": []
           },
           {
             "name": "MigratorFacet",
-            "address": "0x1780bCf4103D3F501463AD3414c7f4b654bb7aFd",
-            "codehash": "0xb46bf0e9faf014f7ae48b518a854de07f262a5f7cfdcd4bc51404f56e0b87e2e",
+            "address": "0xA56F946D6398Dd7d9D4D9B337Cf9E0F68982ca5B",
+            "codehash": "0x0cb6b357a2495ebad9edbde1e8aed66c507e5c57376b1ca0c10fe06907be1305",
             "selectors": []
           },
           {
             "name": "CommitterFacet",
-            "address": "0x5133BBdfCCa3Eb4F739D599ee4eC45cBCD0E16c5",
-            "codehash": "0xa528dfec9924d790b1a385a90a7313c3fcfa70f1916af8791d772a9950b55d6f",
+            "address": "0x5D42EBdBBa61412295D7b0302d6F50aC449Ddb4F",
+            "codehash": "0xd4c360992416dd82f883f8e7eb3fb160326825598f56f93ded25035e2b63bfd9",
             "selectors": []
           },
           {
             "name": "MailboxFacet",
-            "address": "0xCf8F444A5Bf4F7dE2e2BC572C5Ba90245b2d3d89",
-            "codehash": "0x5b57e0c10904fb14593ff53e21abe0767c32b6842756dafa7ea76dbf2a22ff58",
+            "address": "0x7154413e65c9715DFbdcA2F1bc7aD5d0bBeD539f",
+            "codehash": "0x7097bc045e3c90a9c6f7bc485d69e95582eb40c41a5762b66c99d4d3024c5da0",
             "selectors": []
           }
         ]

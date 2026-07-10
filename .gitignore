@@ -13,6 +13,8 @@ contracts-preprocessed/
 era_test_node.log*
 foundry.lock
 node_modules/
+# also match node_modules symlinks (worktrees link them to the main checkout)
+node_modules
 out/
 target/
 work/
