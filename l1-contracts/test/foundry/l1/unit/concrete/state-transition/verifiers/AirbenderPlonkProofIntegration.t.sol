@@ -127,7 +127,7 @@ contract AirbenderPlonkProofIntegrationTest is Test {
     /// contract with `tools/verifier-gen/regenerate-airbender-verifier.sh` and
     /// update this pin whenever that release moves.
     function test_airbenderVerifierPlonk_vkHashIsPinned() public view {
-        bytes32 expected = 0xaa199f9ed1cd9d196ce6cea06cf8d0a25da529b29d527aae6b945779bbf70dc1;
+        bytes32 expected = 0x0a8767988d132af0d2329031432e8103749b8345f72f11c034983f0f9144558a;
         assertEq(airbenderVerifier.verificationKeyHash(), expected, "VK hash drifted from codegen output");
     }
 
