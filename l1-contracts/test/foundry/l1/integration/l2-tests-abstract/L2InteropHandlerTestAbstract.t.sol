@@ -310,7 +310,9 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             data: abi.encodeCall(
                 AssetRouterBase.finalizeDeposit,
                 (
-                    L1_CHAIN_ID,
+                    // Must equal the bundle's `sourceChainId`: the asset router enforces that the interop-message
+                    // sender chain matches the `finalizeDeposit` source chain (InteropSenderChainIdMismatch).
+                    ERA_CHAIN_ID,
                     assetId,
                     DataEncoding.encodeBridgeMintData(
                         depositor,
@@ -331,7 +333,9 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             data: abi.encodeCall(
                 AssetRouterBase.finalizeDeposit,
                 (
-                    L1_CHAIN_ID,
+                    // Must equal the bundle's `sourceChainId`: the asset router enforces that the interop-message
+                    // sender chain matches the `finalizeDeposit` source chain (InteropSenderChainIdMismatch).
+                    ERA_CHAIN_ID,
                     assetId,
                     DataEncoding.encodeBridgeMintData(
                         depositor,
@@ -352,7 +356,9 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             data: abi.encodeCall(
                 AssetRouterBase.finalizeDeposit,
                 (
-                    L1_CHAIN_ID,
+                    // Must equal the bundle's `sourceChainId`: the asset router enforces that the interop-message
+                    // sender chain matches the `finalizeDeposit` source chain (InteropSenderChainIdMismatch).
+                    ERA_CHAIN_ID,
                     assetId,
                     DataEncoding.encodeBridgeMintData(
                         depositor,
