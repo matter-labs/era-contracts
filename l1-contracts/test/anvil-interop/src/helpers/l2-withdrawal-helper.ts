@@ -5,18 +5,11 @@ import { getAbi } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   ETH_TOKEN_ADDRESS,
-  INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
-  FINALIZE_DEPOSIT_SIG,
 } from "../core/const";
-import {
-  encodeAssetRouterBridgehubDepositData,
-  encodeBridgeBurnData,
-  encodeBridgeMintData,
-  encodeNtvAssetId,
-} from "../core/data-encoding";
+import { encodeAssetRouterBridgehubDepositData, encodeBridgeBurnData, encodeNtvAssetId } from "../core/data-encoding";
 import type { CoreDeployedAddresses } from "../core/types";
 import { indirectCallAttr, interopCallValueAttr, sendInteropBundle } from "./interop-helpers";
 import { encodeEvmAddress } from "./erc7930";
@@ -39,26 +32,19 @@ export interface WithdrawETHResult {
 /**
  * A withdrawal that has been initiated on L2 but not yet finalised on L1.
  *
- * Carries everything needed to either finalise it (when the L1 state allows) or
- * assert that finalisation reverts (when it does not — e.g. before reverse TBM
- * has restored the chain's L1 `chainBalance`).
+ * Carries the exact interop bundle the L2 InteropCenter emitted for this withdrawal (captured from the
+ * `InteropBundleSent` event during initiation) plus the metadata needed to assert the finalisation outcome.
+ * Reusing that real bundle — rather than reconstructing one — means the L1 finalisation runs on the same
+ * bytes the L2 send produced; only the message-inclusion proof is mocked.
  */
 export interface PendingWithdrawal {
   l2TxHash: string;
   chainId: number;
-  assetId: string;
   amount: BigNumber;
   l1Recipient: string;
   tokenAddress: string;
-  originalCaller: string;
-  /**
-   * ERC20 metadata bytes that the L2 NTV injects into the withdrawal message
-   * via `_getERC20Metadata` / `getERC20Getters`. Empty for base-token (ETH)
-   * withdrawals; required for ERC20 withdrawals so that `L1Nullifier.finalizeDeposit`
-   * can call `DataEncoding.decodeTokenData(erc20Metadata)` without reverting
-   * with `EmptyData()`.
-   */
-  erc20Metadata: string;
+  /** ABI-encoded `InteropBundle` emitted by the L2 InteropCenter, reused verbatim for `executeBundle` on L1. */
+  bundleData: string;
 }
 
 export interface InitiateWithdrawalParams {
@@ -133,12 +119,10 @@ export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): P
   return {
     l2TxHash: sendResult.txHash,
     chainId,
-    assetId: l1EthAssetId,
     amount,
     l1Recipient,
     tokenAddress: ETH_TOKEN_ADDRESS,
-    originalCaller: l2Wallet.address,
-    erc20Metadata: "0x",
+    bundleData: sendResult.bundleData,
   };
 }
 
@@ -176,13 +160,6 @@ export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalPar
   const approveTx = await erc20.approve(L2_NATIVE_TOKEN_VAULT_ADDR, amount, { gasLimit: 500_000 });
   await approveTx.wait();
 
-  // Capture the exact ERC20 metadata bytes that the L2 NTV injects into the
-  // withdrawal message via `_getERC20Metadata` / `getERC20Getters`. Reading
-  // from the NTV view matches what the on-chain burn will emit, so the
-  // reconstructed L1 finalisation message round-trips correctly.
-  const l2Ntv = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), l2Provider);
-  const erc20Metadata: string = await l2Ntv.getERC20Getters(l2TokenAddress, tokenOriginChainId);
-
   // Build the indirect-call bundle targeting the L2 AssetRouter. The burn data
   // is `abi.encode(amount, l1Receiver, l2TokenAddress)`, wrapped as the
   // bridgehub-deposit payload the AssetRouter expects.
@@ -213,17 +190,16 @@ export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalPar
   return {
     l2TxHash: sendResult.txHash,
     chainId,
-    assetId,
     amount,
     l1Recipient,
     tokenAddress: l2TokenAddress,
-    originalCaller: l2Wallet.address,
-    erc20Metadata,
+    bundleData: sendResult.bundleData,
   };
 }
 
 /**
- * Finalise a pending withdrawal on L1 via the real `L1Nullifier.finalizeDeposit`.
+ * Finalise a pending withdrawal on L1 via the real `L1InteropHandler.executeBundle`
+ * (the nullifier points to the handler, which re-invokes the L1 asset router's `finalizeDeposit`).
  *
  * Returns `{ success: true, txHash }` if the L1 tx lands, otherwise
  * `{ success: false, errorMessage, revertData }` — callers can drive the
@@ -240,76 +216,26 @@ export async function finalizeWithdrawalOnL1(
 
   const settlementLayerChainId = await getSettlementLayerChainId(l1Provider, l1Addresses.bridgehub, pending.chainId);
 
-  const isBaseToken = pending.tokenAddress === ETH_TOKEN_ADDRESS;
-
-  // Both base-token (ETH) and ERC20 withdrawals go through the InteropCenter: the L1 finalization
-  // message is a single-call InteropBundle emitted by the L2 InteropCenter, wrapping the asset-router
-  // `finalizeDeposit` call targeting the L1 AssetRouter (raw asset-router messages are no longer
-  // accepted by the L1Nullifier). Under the mock proof we reconstruct that bundle here. The base-token
-  // burn data carries an empty original caller / origin token / metadata.
-  const transferData = isBaseToken
-    ? encodeBridgeMintData(
-        ethers.constants.AddressZero,
-        pending.l1Recipient,
-        ethers.constants.AddressZero,
-        pending.amount,
-        "0x"
-      )
-    : encodeBridgeMintData(
-        pending.originalCaller,
-        pending.l1Recipient,
-        pending.tokenAddress,
-        pending.amount,
-        pending.erc20Metadata
-      );
-  const selector = ethers.utils.id(FINALIZE_DEPOSIT_SIG).slice(0, 10);
-  const finalizeCalldata = ethers.utils.hexConcat([
-    selector,
-    ethers.utils.defaultAbiCoder.encode(
-      ["uint256", "bytes32", "bytes"],
-      [pending.chainId, pending.assetId, transferData]
-    ),
-  ]);
-  const l1ChainId = (await l1Provider.getNetwork()).chainId;
   const l1Wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
-  // Withdrawal finalization now runs through the L1 interop handler's generic `executeBundle` (symmetric to the
+  // Withdrawal finalization runs through the L1 interop handler's generic `executeBundle` (symmetric to the
   // L2 InteropHandler), which the nullifier points to.
   const l1Nullifier = new Contract(l1Addresses.l1NullifierProxy, getAbi("L1Nullifier"), l1Provider);
   const interopHandlerAddress = await l1Nullifier.l1InteropHandler();
   const l1InteropHandler = new Contract(interopHandlerAddress, getAbi("L1InteropHandler"), l1Wallet);
-  // The bundle's destination base token asset ID must be L1's ETH asset ID (validated by the handler); it matches
-  // what the L2 InteropCenter sets when emitting an L1-destined bundle.
-  const l1AssetRouter = new Contract(l1Addresses.l1SharedBridge, getAbi("L1AssetRouter"), l1Provider);
-  const destinationBaseTokenAssetId = await l1AssetRouter.ETH_TOKEN_ASSET_ID();
+
+  // Reuse the exact bundle the L2 InteropCenter emitted for this withdrawal (captured from the
+  // `InteropBundleSent` event during initiation). It already carries the correct source/destination chain ids,
+  // the L1 ETH destination base-token assetId, the InteropCenter-assigned salt (so distinct withdrawals never
+  // collide into the same bundle hash), and the single call targeting the L1 asset router's `finalizeDeposit`.
+  // Only the message-inclusion proof below is mocked.
+  const bundle = pending.bundleData;
 
   const l2BatchNumber = ++finalizationCounter;
-  // Real bundles carry the salt assigned by the L2 InteropCenter (keccak256(sender, nonce)); under the mocked
-  // inclusion proof we only need a unique salt per finalization so that identical withdrawals do not collide
-  // into the same bundle hash (`BundleAlreadyProcessed`).
-  const interopBundleSalt = ethers.utils.keccak256(
-    ethers.utils.defaultAbiCoder.encode(["string", "uint256"], ["anvil-withdrawal-salt", l2BatchNumber])
-  );
-
-  // Field order mirrors `InteropBundle` / `InteropCall` in contracts/common/Messaging.sol. Only the fields
-  // checked while executing (destinationChainId, destinationBaseTokenAssetId, the single call's
-  // to/from/value/data) and the uniqueness-providing salt carry meaning; the rest are placeholder values.
-  const interopBundle = [
-    "0x01", // version
-    pending.chainId, // sourceChainId
-    l1ChainId, // destinationChainId
-    destinationBaseTokenAssetId, // destinationBaseTokenAssetId
-    interopBundleSalt, // interopBundleSalt
-    [["0x01", false, l1Addresses.l1SharedBridge, L2_ASSET_ROUTER_ADDR, 0, finalizeCalldata]], // calls
-    // bundleAttributes (executionAddress, unbundlerAddress, useFixedFee, salt) — the attribute-level salt is a
-    // placeholder here; the reconstruction's uniqueness comes from `interopBundleSalt` above.
-    ["0x", "0x", false, ethers.constants.HashZero],
-  ];
-  const bundle = ethers.utils.defaultAbiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
   const l2Sender = INTEROP_CENTER_ADDR;
 
   const merkleProof = buildWithdrawalMerkleProof(settlementLayerChainId);
   // MessageInclusionProof: the handler substitutes `message.data` with the bundle while proving inclusion, so the
-  // data field is a placeholder here.
+  // data field is a placeholder here. The batch number only needs to be unique per finalization under the mock.
   const proof = [pending.chainId, l2BatchNumber, 0, [0, l2Sender, "0x"], merkleProof];
 
   console.log(

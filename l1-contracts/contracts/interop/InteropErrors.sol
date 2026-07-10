@@ -17,8 +17,6 @@ error CannotInitiateInteropOnL1(uint256 destinationChainId);
 error CanNotUnbundle(bytes32 bundleHash);
 // 0x2d159f39
 error DestinationChainNotRegistered(uint256 destinationChainId);
-// 0x43f0659c
-error DirectCallToL1NotSupported();
 // 0x558c44fc
 error EmptyBundle();
 // 0xe845be4c

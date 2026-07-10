@@ -19,6 +19,7 @@ import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/br
 import {
     AssetHandlerDoesNotExist,
     AssetIdNotSupported,
+    InteropSenderChainIdMismatch,
     InvalidSelector,
     PayloadTooShort,
     Unauthorized,
@@ -220,11 +221,25 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
         require(_isValidInteropSender(senderChainId, senderAddress), Unauthorized(senderAddress));
 
-        // Only a `finalizeDeposit` call may be executed through the interop system.
-        require(payload.length > 4, PayloadTooShort());
+        // Only a `finalizeDeposit` call may be executed through the interop system. Its ABI layout is
+        // `finalizeDeposit(uint256 _sourceChainId, bytes32 _assetId, bytes _transferData)`, so the first word
+        // after the 4-byte selector is `_sourceChainId`.
+        require(payload.length >= 4 + 32, PayloadTooShort());
         require(
             bytes4(payload[0:4]) == AssetRouterBase.finalizeDeposit.selector,
             InvalidSelector(bytes4(payload[0:4]))
+        );
+
+        // The chain id of the interop message sender (authenticated via the ERC-7930 `sender` and, on the
+        // receiving side, the message-inclusion proof) MUST equal the `_sourceChainId` the deposit will be
+        // finalized under. Under the honest-proof trust model these are always equal (both are the origin
+        // chain), but we enforce it explicitly so a payload can never finalize a deposit under a chain id
+        // other than the one whose message inclusion was proven — the security of asset accounting depends
+        // on this equality.
+        uint256 payloadSourceChainId = uint256(bytes32(payload[4:36]));
+        require(
+            senderChainId == payloadSourceChainId,
+            InteropSenderChainIdMismatch(senderChainId, payloadSourceChainId)
         );
 
         // slither-disable-next-line arbitrary-send-eth

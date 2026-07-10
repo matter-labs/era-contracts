@@ -128,7 +128,7 @@ library L2UtilsBase {
             address interopHandler = address(new L2InteropHandler());
             vm.etch(L2_INTEROP_HANDLER_ADDR, interopHandler.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            L2InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(_args.l1ChainId);
+            L2InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2();
 
             address l2AssetTrackerAddress = address(new L2AssetTracker());
             vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);

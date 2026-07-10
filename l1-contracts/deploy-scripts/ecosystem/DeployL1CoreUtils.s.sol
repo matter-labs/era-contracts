@@ -130,13 +130,7 @@ contract DeployL1CoreUtils is DeployUtils {
                     coreAddresses.bridgehub.proxies.messageRoot
                 );
         } else if (compareStrings(contractName, "L1Nullifier")) {
-            return
-                abi.encode(
-                    coreAddresses.bridgehub.proxies.bridgehub,
-                    coreAddresses.bridgehub.proxies.messageRoot,
-                    config.eraChainId,
-                    config.eraDiamondProxyAddress
-                );
+            return abi.encode(coreAddresses.bridgehub.proxies.bridgehub, coreAddresses.bridgehub.proxies.messageRoot);
         } else if (compareStrings(contractName, "L1InteropHandler")) {
             return abi.encode(coreAddresses.bridgehub.proxies.messageRoot);
         } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
@@ -212,9 +206,9 @@ contract DeployL1CoreUtils is DeployUtils {
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
                 return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1Nullifier")) {
-                return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1));
+                return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1InteropHandler")) {
-                return abi.encodeCall(L1InteropHandler.initialize, (config.l1ChainId));
+                return abi.encodeCall(L1InteropHandler.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1AssetRouter")) {
                 return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1NativeTokenVault")) {

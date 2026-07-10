@@ -41,7 +41,6 @@ import {
     AttributeViolatesRestriction,
     CannotInitiateInteropOnL1,
     DestinationChainNotRegistered,
-    DirectCallToL1NotSupported,
     IndirectCallValueMismatch,
     InteropBundleSaltAlreadyUsed,
     InteroperableAddressChainReferenceNotEmpty,
@@ -351,8 +350,8 @@ contract InteropCenter is
     ///      its own Bridgehub, and a self-destination bundle would burn value into a self-bridging
     ///      accounting path that is not supported.
     /// @dev The remaining destination-dependent requirements are enforced in `_sendBundle` once the call
-    ///      attributes have been parsed: for an L1 destination each call must be an indirect call with
-    ///      zero interopCallValue, and non-L1 destinations are checked against the Bridgehub registry
+    ///      attributes have been parsed: for an L1 destination the single call (direct or indirect) must
+    ///      carry zero interopCallValue, and non-L1 destinations are checked against the Bridgehub registry
     ///      (`DestinationChainNotRegistered`).
     /// @param _destinationChainId Destination chain ID.
     /// @param _callCount Number of calls in the bundle.
@@ -449,7 +448,8 @@ contract InteropCenter is
         bytes[][] memory _originalCallAttributes
     ) internal returns (bytes32 bundleHash) {
         // Note: no gateway-mode requirement here — interop bundles may be sent by chains settling
-        // directly on L1 (see the receive-side restriction in the interop handler instead).
+        // directly on L1. Cross-layer correctness is enforced by the message-inclusion proof on the
+        // receiving side, not by any gateway-mode or settlement-layer check here.
 
         // Ensure the sender has not already used this salt. Since `interopBundleSalt` (and thus the bundle hash) is
         // derived from `msg.sender` and the user-provided salt, enforcing a unique salt per sender guarantees that
@@ -496,11 +496,11 @@ contract InteropCenter is
         for (uint256 i = 0; i < callStartersLength; ++i) {
             if (_destinationChainId == L1_CHAIN_ID) {
                 // An L1-destined call is executed by the L1InteropHandler, which invokes ERC-7786
-                // `receiveMessage` on the call target. The target is general (the canonical case is an
-                // L2->L1 withdrawal targeting the L1 asset router's `finalizeDeposit`), but the call must be
-                // indirect with no destination-side value. Rejecting direct/value-bearing calls at send time
-                // prevents burned funds from ending up in an unfinalizable bundle.
-                require(_callStarters[i].callAttributes.indirectCall, DirectCallToL1NotSupported());
+                // `receiveMessage` on the call target. The target is general and the call may be direct
+                // (a plain L2->L1 message) or indirect (asset-router routed — the canonical case is an
+                // L2->L1 withdrawal targeting the L1 asset router's `finalizeDeposit`). The call must
+                // carry no destination-side value: rejecting value-bearing calls at send time prevents
+                // burned funds from ending up in an unfinalizable bundle.
                 require(
                     _callStarters[i].callAttributes.interopCallValue == 0,
                     NonZeroValueToL1NotSupported(_callStarters[i].callAttributes.interopCallValue)

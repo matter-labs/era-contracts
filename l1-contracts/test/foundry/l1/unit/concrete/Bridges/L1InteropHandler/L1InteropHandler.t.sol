@@ -17,6 +17,7 @@ import {L2_INTEROP_CENTER_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-
 import {
     BundleAttributes,
     BundleStatus,
+    CallStatus,
     InteropBundle,
     InteropCall,
     INTEROP_BUNDLE_VERSION,
@@ -79,10 +80,10 @@ contract L1InteropHandlerTest is Test {
     L1InteropHandler internal handlerImpl;
 
     address internal proxyAdmin = makeAddr("proxyAdmin");
+    address internal owner = makeAddr("owner");
     address internal messageRoot;
     MockInteropRecipient internal recipient;
 
-    uint256 internal constant L1_CHAIN_ID = 1;
     uint256 internal constant SOURCE_CHAIN_ID = 271;
 
     function setUp() public {
@@ -92,7 +93,7 @@ contract L1InteropHandlerTest is Test {
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(handlerImpl),
             proxyAdmin,
-            abi.encodeWithSelector(L1InteropHandler.initialize.selector, L1_CHAIN_ID)
+            abi.encodeWithSelector(L1InteropHandler.initialize.selector, owner)
         );
         handler = L1InteropHandler(address(proxy));
     }
@@ -102,14 +103,81 @@ contract L1InteropHandlerTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_Initialize_SetsState() public view {
-        assertEq(handler.L1_CHAIN_ID(), L1_CHAIN_ID, "L1_CHAIN_ID mismatch");
         assertEq(address(handler.MESSAGE_ROOT()), messageRoot, "MESSAGE_ROOT mismatch");
+        assertEq(handler.owner(), owner, "owner mismatch");
+        assertFalse(handler.paused(), "handler must start unpaused");
     }
 
     function test_Initialize_RevertWhen_CalledTwice() public {
         // The `reentrancyGuardInitializer` modifier rejects the second init with `SlotOccupied`.
         vm.expectRevert(SlotOccupied.selector);
-        handler.initialize(L1_CHAIN_ID);
+        handler.initialize(owner);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            PAUSABILITY
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Only the owner may pause/unpause withdrawal processing.
+    function test_Pause_RevertWhen_NotOwner() public {
+        vm.expectRevert("Ownable: caller is not the owner");
+        handler.pause();
+    }
+
+    /// @notice While paused, `executeBundle` (withdrawal finalization) is blocked; unpausing restores it and
+    /// the very same bundle then finalizes.
+    function test_ExecuteBundle_RevertWhen_Paused_ThenSucceedsAfterUnpause() public {
+        (bytes memory bundle, MessageInclusionProof memory proof) = _buildBundle(
+            address(recipient),
+            0,
+            _ethAssetId(),
+            hex"c0ffee"
+        );
+
+        vm.prank(owner);
+        handler.pause();
+        assertTrue(handler.paused(), "pause must take effect");
+
+        vm.expectRevert("Pausable: paused");
+        handler.executeBundle(bundle, proof);
+
+        vm.prank(owner);
+        handler.unpause();
+
+        handler.executeBundle(bundle, proof);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(SOURCE_CHAIN_ID, bundle);
+        assertTrue(
+            handler.bundleStatus(bundleHash) == BundleStatus.FullyExecuted,
+            "bundle must finalize after unpause"
+        );
+        assertEq(recipient.callCount(), 1, "recipient must be called exactly once");
+    }
+
+    /// @notice `unbundleBundle` also executes calls, so it is blocked while paused (checked before any decoding).
+    function test_UnbundleBundle_RevertWhen_Paused() public {
+        vm.prank(owner);
+        handler.pause();
+
+        vm.expectRevert("Pausable: paused");
+        handler.unbundleBundle(hex"", new CallStatus[](0));
+    }
+
+    /// @notice `verifyBundle` stays usable while paused: it only records message inclusion and moves no assets,
+    /// so verification can proceed during an emergency pause (execution of the verified bundle stays blocked).
+    function test_VerifyBundle_SucceedsWhen_Paused() public {
+        (bytes memory bundle, MessageInclusionProof memory proof) = _buildBundle(
+            address(recipient),
+            0,
+            _ethAssetId(),
+            hex"c0ffee"
+        );
+
+        vm.prank(owner);
+        handler.pause();
+
+        handler.verifyBundle(bundle, proof);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(SOURCE_CHAIN_ID, bundle);
+        assertTrue(handler.bundleStatus(bundleHash) == BundleStatus.Verified, "bundle must verify while paused");
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -176,8 +176,8 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
     function setL1NativeTokenVaultParams() internal {
         IL1AssetRouter sharedBridge = IL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
         IL1Nullifier l1Nullifier = IL1Nullifier(coreAddresses.bridges.proxies.l1Nullifier);
-        // The L1 interop handler learns its nullifier at initialization; here we only point the nullifier and the
-        // asset router at the handler.
+        // Wire the shared bridge and nullifier to the native token vault, then point both the nullifier and the
+        // asset router at the L1 interop handler.
         vm.broadcast(getDeployerAddress());
         sharedBridge.setNativeTokenVault(INativeTokenVaultBase(coreAddresses.bridges.proxies.l1NativeTokenVault));
         vm.broadcast(getDeployerAddress());
@@ -208,7 +208,8 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         IL1Nullifier l1Nullifier = IL1Nullifier(coreAddresses.bridges.proxies.l1Nullifier);
         IOwnable(address(l1Nullifier)).transferOwnership(coreAddresses.shared.governance);
 
-        // The L1 interop handler is not Ownable (symmetric with the L2 L2InteropHandler); nothing to transfer.
+        // The L1 interop handler's owner can pause/unpause withdrawal finalization.
+        IOwnable(coreAddresses.bridges.proxies.l1InteropHandler).transferOwnership(coreAddresses.shared.governance);
 
         ICTMDeploymentTracker ctmDeploymentTracker = ICTMDeploymentTracker(
             coreAddresses.bridgehub.proxies.ctmDeploymentTracker

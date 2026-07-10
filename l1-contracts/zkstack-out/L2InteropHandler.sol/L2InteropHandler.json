@@ -5,19 +5,6 @@
   },
   {
     "type": "function",
-    "name": "L1_CHAIN_ID",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "bundleStatus",
     "inputs": [
       {
@@ -124,13 +111,7 @@
   {
     "type": "function",
     "name": "initL2",
-    "inputs": [
-      {
-        "name": "_l1ChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
+    "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -422,6 +403,11 @@
   {
     "type": "error",
     "name": "MessageNotIncluded",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PayloadTooShort",
     "inputs": []
   },
   {
