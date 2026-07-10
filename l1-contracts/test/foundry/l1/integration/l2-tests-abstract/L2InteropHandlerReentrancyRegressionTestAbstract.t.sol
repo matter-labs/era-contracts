@@ -202,13 +202,15 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         L2_INTEROP_HANDLER.executeBundle(encodedOuterBundle, outerProof);
 
         assertTrue(
-            L2_INTEROP_HANDLER.bundleStatus(InteropDataEncoding.encodeInteropBundleHash(sourceChainId, encodedOuterBundle)) ==
-                BundleStatus.FullyExecuted,
+            L2_INTEROP_HANDLER.bundleStatus(
+                InteropDataEncoding.encodeInteropBundleHash(sourceChainId, encodedOuterBundle)
+            ) == BundleStatus.FullyExecuted,
             "outer bundle must be fully executed"
         );
         assertTrue(
-            L2_INTEROP_HANDLER.bundleStatus(InteropDataEncoding.encodeInteropBundleHash(sourceChainId, encodedInnerBundle)) ==
-                BundleStatus.FullyExecuted,
+            L2_INTEROP_HANDLER.bundleStatus(
+                InteropDataEncoding.encodeInteropBundleHash(sourceChainId, encodedInnerBundle)
+            ) == BundleStatus.FullyExecuted,
             "nested bundle must be fully executed through the self-call"
         );
     }
@@ -289,13 +291,15 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         L2_INTEROP_HANDLER.executeBundle(encodedOuterBundle, outerProof);
 
         assertTrue(
-            L2_INTEROP_HANDLER.bundleStatus(InteropDataEncoding.encodeInteropBundleHash(sourceChainId, encodedOuterBundle)) ==
-                BundleStatus.FullyExecuted,
+            L2_INTEROP_HANDLER.bundleStatus(
+                InteropDataEncoding.encodeInteropBundleHash(sourceChainId, encodedOuterBundle)
+            ) == BundleStatus.FullyExecuted,
             "outer bundle must be fully executed"
         );
         assertTrue(
-            L2_INTEROP_HANDLER.bundleStatus(InteropDataEncoding.encodeInteropBundleHash(sourceChainId, encodedInnerBundle)) ==
-                BundleStatus.Verified,
+            L2_INTEROP_HANDLER.bundleStatus(
+                InteropDataEncoding.encodeInteropBundleHash(sourceChainId, encodedInnerBundle)
+            ) == BundleStatus.Verified,
             "nested bundle must be verified through the self-call"
         );
     }
@@ -303,7 +307,10 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
     /// @param chainId The ERC-7930 chain id of the execution/unbundler address (the destination chain for
     /// directly executed bundles; the SOURCE chain for bundles executed through the interop-message self-call,
     /// whose authorized sender carries the source chain id).
-    function _createBundleAttributes(uint256 chainId, address executor) internal pure returns (BundleAttributes memory) {
+    function _createBundleAttributes(
+        uint256 chainId,
+        address executor
+    ) internal pure returns (BundleAttributes memory) {
         return
             BundleAttributes({
                 executionAddress: InteroperableAddress.formatEvmV1(chainId, executor),
