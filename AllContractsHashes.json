@@ -2333,10 +2333,10 @@
     "contractName": "l1-contracts/UpgradeExecutor",
     "zkBytecodeHash": "0x01000105f8c90e701a471bb191ce3f48f3dd8231d19f073fa48c223017568537",
     "zkBytecodePath": "/l1-contracts/zkout/UpgradeExecutor.sol/UpgradeExecutor.json",
-    "evmBytecodeHash": "0x72251b9283617ab7146e742217bc4cb22e23f5b06eb5fba19eff2c833cb522f4",
+    "evmBytecodeHash": "0xdb2cb31c067e4f0bc1a9b06de787fb7c0d541d7ea6ee6e0aa0968fe8c02f2217",
     "evmBytecodePath": "/l1-contracts/out/UpgradeExecutor.sol/UpgradeExecutor.json",
-    "evmDeployedBytecodeHash": "0x221bea4670d1c40488098315077f3fd6d7f01eb6e1f9fb4a238f449b20dbae4d",
-    "evmDeployedBytecodeBlakeHash": "0x751ef4346c0cf997ba43703263c401f17165c463ac915bcb1b5eb946d4959bcd",
+    "evmDeployedBytecodeHash": "0x6b404da6f084bd7bbbde9300974f181c06370ee9b462816a5bcccbac7c07b953",
+    "evmDeployedBytecodeBlakeHash": "0x489bf6ddf5d20bdd30bee2470c4e5daff5e3ba2ab05bbf488bf1502c5b5a1912",
     "evmDeployedBytecodeLength": 2909
   },
   {

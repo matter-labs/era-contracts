@@ -45,8 +45,8 @@ contract UpgradeExecutor is IUpgradeExecutor, Ownable2Step {
         bool success;
         // The controlled delegatecall is the entire point of this contract: the owner
         // (governance) points it at an audited, stateless upgrade module.
-        // slither-disable-next-line controlled-delegatecall
         // solhint-disable-next-line avoid-low-level-calls
+        // slither-disable-next-line controlled-delegatecall
         (success, returnData) = _module.delegatecall(_data);
         if (!success) {
             // Propagate an error if the module reverts.
