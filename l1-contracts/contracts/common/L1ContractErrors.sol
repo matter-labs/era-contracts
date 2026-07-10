@@ -151,6 +151,22 @@ error GenesisUpgradeZero();
 error HashedLogIsDefault();
 // 0x0b08d5be
 error HashMismatch(bytes32 expected, bytes32 actual);
+// 0xf11438d9
+error IMTAlreadyInitialized();
+// 0x62f8ffe2
+error IMTLeafValueMismatch(uint256 expectedValue, uint256 actualValue);
+// 0x037dc2ed
+error IMTLowLeafIndexOutOfBounds(uint256 lowLeafIndex, uint256 leafCount);
+// 0xd87e0e66
+error IMTLowLeafNextTooSmall(uint256 lowNextValue, uint256 newValue);
+// 0x74470b8f
+error IMTLowLeafValueTooLarge(uint256 lowValue, uint256 newValue);
+// 0xae48798a
+error IMTNotInitialized();
+// 0x68051076
+error IMTValueAlreadyExists(uint256 value);
+// 0xbd1de53d
+error IMTValueZero();
 // 0xd7d93e1f
 error IncorrectBatchBounds(
     uint256 processFromExpected,
@@ -164,6 +180,8 @@ error IncorrectBatchChainId(uint256, uint256);
 error IncorrectBridgeHubAddress(address bridgehub);
 // 0x03eb8b54
 error InsufficientFunds(uint256 required, uint256 actual);
+// 0xd70c44f6
+error InteropSenderChainIdMismatch(uint256 senderChainId, uint256 payloadSourceChainId);
 // 0x9bf8b9aa
 error InvalidBatchNumber(uint256 provided, uint256 expected);
 // 0xd438e1fa
@@ -210,22 +228,6 @@ error InvalidThreshold(uint256 max, uint256 got);
 error InvalidTxCountInPriorityMode(uint256 l2TxCount, uint256 l1TxCount);
 // 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
-// 0xf11438d9
-error IMTAlreadyInitialized();
-// 0x037dc2ed
-error IMTLowLeafIndexOutOfBounds(uint256 lowLeafIndex, uint256 leafCount);
-// 0xd87e0e66
-error IMTLowLeafNextTooSmall(uint256 lowNextValue, uint256 newValue);
-// 0x74470b8f
-error IMTLowLeafValueTooLarge(uint256 lowValue, uint256 newValue);
-// 0x62f8ffe2
-error IMTLeafValueMismatch(uint256 expectedValue, uint256 actualValue);
-// 0xae48798a
-error IMTNotInitialized();
-// 0x68051076
-error IMTValueAlreadyExists(uint256 value);
-// 0xbd1de53d
-error IMTValueZero();
 // 0xfb5c22e6
 error L2TimestampTooBig();
 // 0xe37d2c02
@@ -332,7 +334,6 @@ error OperationMustBeReady();
 error OriginChainIdNotFound();
 // 0x97da9c1c
 error PayloadTooShort();
-error InteropSenderChainIdMismatch(uint256 senderChainId, uint256 payloadSourceChainId);
 // 0x688c63e5
 error PrecommitmentMismatch(uint256 batchNumber, bytes32 expected, bytes32 found);
 // 0x9b48e060
