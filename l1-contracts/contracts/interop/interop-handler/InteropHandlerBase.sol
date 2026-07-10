@@ -73,12 +73,20 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
     /// @notice The base-token asset ID expected as the bundle's destination base token on this layer.
     function _expectedDestinationBaseTokenAssetId() internal view virtual returns (bytes32);
 
+    /// @notice Guard invoked by the call-executing entry points (`executeBundle` and `unbundleBundle`).
+    /// @dev On L1 this enforces the pausable check, so withdrawals can be halted; on L2 it is a no-op (the L2
+    /// system contract is not pausable). `verifyBundle` is intentionally not guarded: it only records that a
+    /// bundle message was included and moves no assets.
+    function _ensureNotPaused() internal view virtual {}
+
     /*//////////////////////////////////////////////////////////////
                             Public entry points
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IInteropHandlerBase
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
+        _ensureNotPaused();
+
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
@@ -155,6 +163,8 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
 
     /// @inheritdoc IInteropHandlerBase
     function unbundleBundle(bytes memory _bundle, CallStatus[] calldata _providedCallStatus) public {
+        _ensureNotPaused();
+
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 

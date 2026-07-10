@@ -2,6 +2,9 @@
 
 pragma solidity 0.8.28;
 
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
+
 import {InteropHandlerBase} from "./InteropHandlerBase.sol";
 
 import {MessageInclusionProof} from "../../common/Messaging.sol";
@@ -9,6 +12,7 @@ import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
 import {InteropWithdrawalNonZeroValue} from "../../bridge/L1BridgeContractErrors.sol";
+import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 
 /// @title L1InteropHandler
 /// @author Matter Labs
@@ -19,27 +23,44 @@ import {InteropWithdrawalNonZeroValue} from "../../bridge/L1BridgeContractErrors
 /// on L1 via ERC-7786 `receiveMessage`. The target and payload are general: the canonical use is an L2 -> L1
 /// withdrawal (the call targets the L1 asset router's `finalizeDeposit`), but any single such call is allowed.
 /// @dev Deployed behind a proxy on L1.
-/// @dev Withdrawal pausability is intentionally NOT enforced here. Previously `L1Nullifier.finalizeDeposit`
-/// carried a `whenNotPaused` gate; in the current design that responsibility lives at the asset-handler layer,
-/// where funds are actually released — `NativeTokenVaultBase.bridgeMint` is `whenNotPaused`, so pausing the
-/// asset router / NTV halts the release of every withdrawal routed through this handler. Keeping the handler
-/// itself stateless and pauseless (no Ownable/Pausable) avoids a second, redundant pause switch.
-contract L1InteropHandler is InteropHandlerBase {
+/// @dev Pausable so that withdrawals can be halted: previously `L1Nullifier.finalizeDeposit` carried the
+/// `whenNotPaused` gate for withdrawal finalization; that gate now lives here, on the call-executing entry
+/// points (`executeBundle`/`unbundleBundle`) of the handler that replaced it.
+contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @dev MessageRoot smart contract that is used to prove message inclusion.
     IMessageRootBase public immutable MESSAGE_ROOT;
 
     /// @dev Contract is expected to be used as a proxy implementation.
-    /// @dev Locking the reentrancy guard in the constructor prevents the implementation from being initialized.
+    /// @dev Locking the reentrancy guard (and disabling the OZ initializers) in the constructor prevents the
+    /// implementation from being initialized.
     /// @param _messageRoot The MessageRoot used to prove message inclusion.
     constructor(IMessageRootBase _messageRoot) reentrancyGuardInitializer {
+        _disableInitializers();
         MESSAGE_ROOT = _messageRoot;
     }
 
     /// @notice Initializes the contract behind its proxy.
-    /// @dev Only locks the reentrancy guard: it doubles as one-time initialization protection (a second call
-    /// reverts with `SlotOccupied`). The handler holds no configurable state — the L1 chain id it operates on
-    /// is simply `block.chainid`.
-    function initialize() external reentrancyGuardInitializer {}
+    /// @param _owner The owner that can pause/unpause withdrawal processing.
+    function initialize(address _owner) external reentrancyGuardInitializer initializer {
+        require(_owner != address(0), ZeroAddress());
+        _transferOwnership(_owner);
+    }
+
+    /// @notice Pauses bundle execution/unbundling — i.e. halts L2 -> L1 withdrawal finalization.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice Resumes bundle execution/unbundling.
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    /// @inheritdoc InteropHandlerBase
+    /// @dev Blocks `executeBundle`/`unbundleBundle` while paused, halting withdrawal finalization.
+    function _ensureNotPaused() internal view override {
+        _requireNotPaused();
+    }
 
     /// @inheritdoc InteropHandlerBase
     /// @dev Proves the bundle's inclusion via the L1 MessageRoot.
