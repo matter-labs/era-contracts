@@ -189,9 +189,11 @@ contract AtomicFlowManager is IAtomicFlowManager {
 
     /// @dev Reverses every recoverable call embedded in `_bundle`, re-crediting the original depositor.
     /// Each call's target (`InteropCall.to`) owns its own reversal via {IAtomicRecoverable.recoverAtomicCall}:
-    /// the manager is agnostic to the call/encoding format and simply forwards `(destinationChainId, data)`
-    /// to every target, counting the ones that report a recovery. Targets must return `false` (not revert)
-    /// for calls they do not recognise.
+    /// the manager is agnostic to the call/encoding format and simply forwards `(destinationChainId, from,
+    /// data)` to every target, counting the ones that report a recovery. `from` (`InteropCall.from`) lets a
+    /// target check the call's provenance — that it was produced by the target's own burn path — so a
+    /// forged, never-burned call cannot be recovered. Targets must return `false` (not revert) for calls
+    /// they do not recognise.
     ///
     /// Recovery is best-effort by design. An atomic bundle may mix fund-moving calls (e.g. asset-router
     /// deposits, which re-mint to the depositor) with calls that move no funds and have nothing to reverse
@@ -210,7 +212,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
         uint256 recovered = 0;
         for (uint256 i = 0; i < callsLen; ++i) {
             InteropCall memory c = _bundle.calls[i];
-            if (IAtomicRecoverable(c.to).recoverAtomicCall(destChainId, c.data)) {
+            if (IAtomicRecoverable(c.to).recoverAtomicCall(destChainId, c.from, c.data)) {
                 ++recovered;
             }
         }

@@ -317,11 +317,23 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// call: re-credits the burned asset to the original depositor (the burn's `originalCaller`) on the
     /// burn's destination chain, swapping the receiver to the depositor. Returns `false` for any other
     /// call so the {AtomicFlowManager} can skip non-recoverable bundle calls without reverting.
+    /// @dev Provenance gate: only a `finalizeDeposit` produced by this router's own `initiateIndirectCall`
+    /// is backed by a real source burn. That path pins `InteropCall.from` to this router (all system asset
+    /// routers share one address), whereas a direct or forged call carries an unrelated `from`. We refuse
+    /// to recover a call whose `_sender` is not this router, so a never-burned call cannot re-credit funds
+    /// on timeout — the mirror of the destination-side `_validateAssetRouterCounterpart` check that gates
+    /// the mint. Returning `false` (not reverting) keeps recovery best-effort for mixed bundles.
     function recoverAtomicCall(
         uint256 _destChainId,
+        address _sender,
         bytes calldata _callData
     ) external onlyAtomicFlowManager nonReentrant returns (bool recovered) {
         if (_callData.length < 4 || bytes4(_callData[:4]) != AssetRouterBase.finalizeDeposit.selector) {
+            return false;
+        }
+
+        // Reject calls not produced by this router's burn path (no backing burn to reverse).
+        if (_sender != address(this)) {
             return false;
         }
 
