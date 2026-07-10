@@ -8,10 +8,8 @@ import {console2 as console} from "forge-std/Script.sol";
 
 import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {
-    FacetInstallation,
-    InitializeDataNewChain as DiamondInitializeDataNewChain
-} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {GenesisRegistry} from "contracts/state-transition/chain-deps/GenesisRegistry.sol";
+import {CTMContract as RegistryCTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -119,6 +117,71 @@ abstract contract DeployCTMUtils is DeployUtils {
         ctmAddresses.stateTransition.facets.migratorFacet = deploySimpleContract("MigratorFacet", false);
         ctmAddresses.stateTransition.facets.committerFacet = deploySimpleContract("CommitterFacet", false);
         ctmAddresses.stateTransition.facets.diamondInit = deploySimpleContract("DiamondInit", false);
+        ctmAddresses.stateTransition.genesisRegistry = deployGenesisRegistry();
+    }
+
+    /// @notice Deploys the storage-backed genesis registry and pins the freshly deployed facet
+    /// set plus the base system contract hashes into it. The chain-creation params point at it
+    /// (`ChainCreationParams.registry`), and `DiamondInit` reads everything chain-independent
+    /// from there — the committed genesis cut carries no facets and no init payload.
+    /// @dev Plain CREATE, not CREATE2: the registry has no constructor args, so a CREATE2 deploy
+    /// with the shared salt would land every run (Era CTM, ZKsyncOS CTM, later upgrades) on the
+    /// same, already-initialized address. A deterministic address buys nothing here — the CTM
+    /// stores the pointer.
+    function deployGenesisRegistry() internal returns (address) {
+        if (!config.isZKsyncOS) {
+            require(config.contracts.chainCreationParams.bootloaderHash != bytes32(0), "bootloader hash is zero");
+            require(
+                config.contracts.chainCreationParams.defaultAAHash != bytes32(0),
+                "default account abstraction hash is zero"
+            );
+            require(config.contracts.chainCreationParams.evmEmulatorHash != bytes32(0), "EVM emulator hash is zero");
+        }
+
+        RegistryCTMContract[] memory facetIds = new RegistryCTMContract[](6);
+        address[] memory facetAddresses = new address[](6);
+        bool[] memory freezable = new bool[](6);
+
+        facetIds[0] = RegistryCTMContract.AdminFacet;
+        facetAddresses[0] = ctmAddresses.stateTransition.facets.adminFacet;
+        freezable[0] = false;
+
+        facetIds[1] = RegistryCTMContract.GettersFacet;
+        facetAddresses[1] = ctmAddresses.stateTransition.facets.gettersFacet;
+        freezable[1] = false;
+
+        facetIds[2] = RegistryCTMContract.MailboxFacet;
+        facetAddresses[2] = ctmAddresses.stateTransition.facets.mailboxFacet;
+        freezable[2] = true;
+
+        facetIds[3] = RegistryCTMContract.ExecutorFacet;
+        facetAddresses[3] = ctmAddresses.stateTransition.facets.executorFacet;
+        freezable[3] = true;
+
+        facetIds[4] = RegistryCTMContract.MigratorFacet;
+        facetAddresses[4] = ctmAddresses.stateTransition.facets.migratorFacet;
+        freezable[4] = false;
+
+        facetIds[5] = RegistryCTMContract.CommitterFacet;
+        facetAddresses[5] = ctmAddresses.stateTransition.facets.committerFacet;
+        freezable[5] = true;
+
+        vm.broadcast(getBroadcasterAddress());
+        GenesisRegistry registry = new GenesisRegistry();
+
+        vm.broadcast(getBroadcasterAddress());
+        registry.initialize(
+            config.contracts.chainCreationParams.latestProtocolVersion,
+            facetIds,
+            facetAddresses,
+            freezable,
+            config.contracts.chainCreationParams.bootloaderHash,
+            config.contracts.chainCreationParams.defaultAAHash,
+            config.contracts.chainCreationParams.evmEmulatorHash
+        );
+
+        console.log("GenesisRegistry deployed at:", address(registry));
+        return address(registry);
     }
 
     function chainCreationParamsPath(bool _isZKsyncOS) internal virtual returns (string memory) {
@@ -170,70 +233,16 @@ abstract contract DeployCTMUtils is DeployUtils {
         return ChainCreationParamsLib.getChainCreationParams(_config, config.isZKsyncOS);
     }
 
-    /// @notice The six facets of a new chain, installed by DiamondInit itself. Selector lists
-    /// are left empty: every production facet self-describes (ISelfDescribingFacet.selectors()),
-    /// and DiamondInit reads them at execution time on the chain where the cut runs — which is
-    /// exactly what makes this shape work on Gateway, where we cannot query selectors from here.
-
-    /// @notice The six facet Add-cuts of the legacy upgrade pipeline, with explicit selector
-    /// lists read from the compiled artifacts. Kept only for this banner-marked pipeline: the
-    /// registry-driven path carries facet addresses and lets the diamond-side code read
-    /// selectors from the facets themselves.
-    function getLegacyChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal returns (Diamond.FacetCut[] memory facetCuts) {
-        facetCuts = new Diamond.FacetCut[](6);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: stateTransition.facets.adminFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(ctmAddresses.stateTransition.facets.adminFacet.code)
-        });
-        facetCuts[1] = Diamond.FacetCut({
-            facet: stateTransition.facets.gettersFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(ctmAddresses.stateTransition.facets.gettersFacet.code)
-        });
-        facetCuts[2] = Diamond.FacetCut({
-            facet: stateTransition.facets.mailboxFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectors(ctmAddresses.stateTransition.facets.mailboxFacet.code)
-        });
-        facetCuts[3] = Diamond.FacetCut({
-            facet: stateTransition.facets.executorFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectors(ctmAddresses.stateTransition.facets.executorFacet.code)
-        });
-        facetCuts[4] = Diamond.FacetCut({
-            facet: stateTransition.facets.migratorFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(ctmAddresses.stateTransition.facets.migratorFacet.code)
-        });
-        facetCuts[5] = Diamond.FacetCut({
-            facet: stateTransition.facets.committerFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectors(ctmAddresses.stateTransition.facets.committerFacet.code)
-        });
-    }
-
     function getChainCreationDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
-        DiamondInitializeDataNewChain memory initializeData = getInitializeData(stateTransition);
-
-        // This base deploy path pins no registry (`registry == address(0)` below), so the facet
-        // set rides in the cut's own `facetCuts` — DiamondInit sees no genesis registry and
-        // installs nothing further. Registry-driven deploys instead set a registry and leave
-        // `facetCuts` empty.
+        // The committed genesis cut is only the DiamondInit address: no `facetCuts` and no init
+        // payload. `DiamondInit` reads the facet set and the base system contract hashes from
+        // the genesis registry pinned in `ChainCreationParams.registry` below.
         diamondCut = Diamond.DiamondCutData({
-            facetCuts: getLegacyChainCreationFacetCuts(stateTransition),
+            facetCuts: new Diamond.FacetCut[](0),
             initAddress: stateTransition.facets.diamondInit,
-            initCalldata: abi.encode(initializeData)
+            initCalldata: ""
         });
     }
 
@@ -241,6 +250,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (ChainCreationParams memory) {
         require(generatedData.forceDeploymentsData.length != 0, "force deployments data is empty");
+        require(stateTransition.genesisRegistry != address(0), "genesis registry is not deployed");
         Diamond.DiamondCutData memory diamondCut = getChainCreationDiamondCutData(stateTransition);
         config.contracts.diamondCutData = abi.encode(diamondCut);
         return
@@ -251,8 +261,7 @@ abstract contract DeployCTMUtils is DeployUtils {
                 genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
                 diamondCut: diamondCut,
                 forceDeploymentsData: generatedData.forceDeploymentsData,
-                // Legacy base deploy: facets ride in the cut, no registry pinned.
-                registry: address(0)
+                registry: stateTransition.genesisRegistry
             });
     }
 
@@ -268,27 +277,6 @@ abstract contract DeployCTMUtils is DeployUtils {
                 protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
                 verifier: stateTransition.verifiers.verifier,
                 serverNotifier: stateTransition.proxies.serverNotifier
-            });
-    }
-
-    function getInitializeData(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal returns (DiamondInitializeDataNewChain memory) {
-        require(stateTransition.verifiers.verifier != address(0), "verifier is zero");
-        if (!config.isZKsyncOS) {
-            require(config.contracts.chainCreationParams.bootloaderHash != bytes32(0), "bootloader hash is zero");
-            require(
-                config.contracts.chainCreationParams.defaultAAHash != bytes32(0),
-                "default account abstraction hash is zero"
-            );
-            require(config.contracts.chainCreationParams.evmEmulatorHash != bytes32(0), "EVM emulator hash is zero");
-        }
-
-        return
-            DiamondInitializeDataNewChain({
-                l2BootloaderBytecodeHash: config.contracts.chainCreationParams.bootloaderHash,
-                l2DefaultAccountBytecodeHash: config.contracts.chainCreationParams.defaultAAHash,
-                l2EvmEmulatorBytecodeHash: config.contracts.chainCreationParams.evmEmulatorHash
             });
     }
 

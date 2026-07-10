@@ -12,6 +12,8 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {IGenesisFacetRegistry} from "contracts/upgrades/registry/IGenesisFacetRegistry.sol";
+import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
@@ -98,13 +100,48 @@ contract UtilsCallMockerTest is Test {
             abi.encodeWithSelector(IChainTypeManager.PERMISSIONLESS_VALIDATOR.selector),
             abi.encode(permissionlessValidator)
         );
-        // DiamondInit reads the genesis registry pointer from the CTM. These fixtures install
-        // their facets via the diamond cut's own `facetCuts`, so the CTM pins no registry
-        // (DiamondInit sees a zero address and installs nothing further).
+        mockGenesisRegistry(chainTypeManager);
+    }
+
+    /// @notice Mocks the CTM's genesis registry pointer and the registry itself for DiamondInit.
+    function mockGenesisRegistry(address chainTypeManager) public {
         vm.mockCall(
             chainTypeManager,
             abi.encodeWithSelector(IChainTypeManager.genesisRegistry.selector),
-            abi.encode(address(0))
+            abi.encode(Utils.TEST_GENESIS_REGISTRY)
+        );
+        mockGenesisRegistryContract();
+    }
+
+    /// @notice Mocks the genesis registry at `Utils.TEST_GENESIS_REGISTRY` for DiamondInit.
+    /// @dev The registry is mocked rather than deployed on purpose: these fixtures isolate the
+    ///      diamond from the CTM (which is itself mocked or initialized at protocol version 0,
+    ///      which a real `GenesisRegistry` cannot pin) and install their facets via the cut's
+    ///      own `facetCuts`, often with hand-picked selector subsets. The mocked registry
+    ///      therefore pins NO facets (empty list, so DiamondInit installs nothing further) and
+    ///      only serves the base system contract hashes DiamondInit reads at genesis.
+    function mockGenesisRegistryContract() public {
+        address genesisRegistry = Utils.TEST_GENESIS_REGISTRY;
+        // Selector-only matches: the fixtures use several protocol versions, and the registry
+        // answers all of them identically.
+        vm.mockCall(
+            genesisRegistry,
+            abi.encodeWithSelector(IGenesisFacetRegistry.newProtocolVersion.selector),
+            abi.encode(uint256(0))
+        );
+        vm.mockCall(
+            genesisRegistry,
+            abi.encodeWithSelector(IGenesisFacetRegistry.facetList.selector),
+            abi.encode(new CTMContract[](0))
+        );
+        vm.mockCall(
+            genesisRegistry,
+            abi.encodeWithSelector(IGenesisFacetRegistry.baseSystemContractHashes.selector),
+            abi.encode(
+                Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                Utils.TEST_BASE_SYSTEM_CONTRACT_HASH
+            )
         );
     }
 
@@ -117,14 +154,7 @@ contract UtilsCallMockerTest is Test {
             abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, DEFAULT_PROTOCOL_VERSION),
             abi.encode(verifier)
         );
-        // DiamondInit also reads the genesis registry pointer from the CTM. These direct-diamond
-        // fixtures install their facets via the cut's own `facetCuts`, so the CTM pins no registry
-        // (DiamondInit sees a zero address and installs nothing further).
-        vm.mockCall(
-            DEFAULT_CHAIN_TYPE_MANAGER,
-            abi.encodeWithSelector(IChainTypeManager.genesisRegistry.selector),
-            abi.encode(address(0))
-        );
+        mockGenesisRegistry(DEFAULT_CHAIN_TYPE_MANAGER);
     }
 
     function test() internal virtual {}

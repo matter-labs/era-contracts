@@ -9,7 +9,7 @@ import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
 import {IAdmin} from "./chain-interfaces/IAdmin.sol";
 import {IMigrator} from "./chain-interfaces/IMigrator.sol";
-import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
+import {IDiamondInit, InitializeData} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "./IChainTypeManager.sol";
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
@@ -623,32 +623,26 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             }
         }
 
-        // Construct init data: the committed cut's initCalldata is the chain-independent tail
-        // (the abi-encoded `InitializeDataNewChain`, including the facets DiamondInit installs
-        // itself). It is passed through OPAQUELY — DiamondInit decodes it — so this
-        // (size-constrained) contract carries no codecs for the nested types; only the CTM-known,
-        // chain-specific head is filled in here. The encoding of
-        // `initialize(InitializeData, bytes)` is assembled by hand: the 9-word static struct is
-        // inline, followed by the `bytes` offset word (10 * 32), its length, and the (already
-        // 32-byte-padded, being abi.encode output) tail itself.
-        bytes memory initData;
-        // solhint-disable-next-line func-named-parameters
-        initData = bytes.concat(
-            IDiamondInit.initialize.selector,
-            bytes32(_chainId),
-            bytes32(uint256(uint160(BRIDGE_HUB))),
-            bytes32(uint256(uint160(INTEROP_CENTER))),
-            bytes32(uint256(uint160(address(this)))),
-            bytes32(protocolVersion),
-            bytes32(uint256(uint160(_admin))),
-            bytes32(uint256(uint160(validatorTimelockPostV29))),
-            _baseTokenAssetId,
-            storedBatchZero,
-            bytes32(uint256(10 * 32)),
-            bytes32(diamondCut.initCalldata.length),
-            diamondCut.initCalldata
+        // Only the chain-specific data is passed to DiamondInit; everything chain-independent
+        // (facet set, verifier, base system contract hashes) is read by DiamondInit from the
+        // genesis registry this CTM pins. The committed cut's own `initCalldata` is empty and is
+        // replaced here wholesale.
+        diamondCut.initCalldata = abi.encodeCall(
+            IDiamondInit.initialize,
+            (
+                InitializeData({
+                    chainId: _chainId,
+                    bridgehub: BRIDGE_HUB,
+                    interopCenter: INTEROP_CENTER,
+                    chainTypeManager: address(this),
+                    protocolVersion: protocolVersion,
+                    admin: _admin,
+                    validatorTimelock: validatorTimelockPostV29,
+                    baseTokenAssetId: _baseTokenAssetId,
+                    storedBatchZero: storedBatchZero
+                })
+            )
         );
-        diamondCut.initCalldata = initData;
         // deploy zkChainContract
         // slither-disable-next-line reentrancy-no-eth
         DiamondProxy zkChainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);

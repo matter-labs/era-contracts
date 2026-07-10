@@ -241,9 +241,9 @@ contract ZKChainDeployer is L1ContractDeployer {
             ecosystemConfig.contracts.diamondCutData,
             (Diamond.DiamondCutData)
         );
-        // Composed exactly as ChainTypeManagerBase._deployNewChain does: the chain-specific
-        // head plus the committed cut's chain-independent tail (abi-encoded
-        // InitializeDataNewChain, incl. the facets DiamondInit installs itself).
+        // Composed exactly as ChainTypeManagerBase._deployNewChain does: only the
+        // chain-specific data — DiamondInit reads the facet set and base system contract
+        // hashes from the genesis registry the CTM pins.
         diamondCut.initCalldata = abi.encodeCall(
             IDiamondInit.initialize,
             (
@@ -257,8 +257,7 @@ contract ZKChainDeployer is L1ContractDeployer {
                     validatorTimelock: address(0x1337),
                     baseTokenAssetId: _baseTokenAssetId,
                     storedBatchZero: _storedBatchZero
-                }),
-                diamondCut.initCalldata
+                })
             )
         );
         DiamondProxy hyperchainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);

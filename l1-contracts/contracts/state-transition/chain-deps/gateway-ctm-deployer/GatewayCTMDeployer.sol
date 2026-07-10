@@ -25,7 +25,7 @@ struct GatewayCTMDeployerConfig {
     /// @notice Flag indicating whether to use ZKsync OS mode.
     bool isZKsyncOS;
     // Facet selector lists are intentionally absent: the genesis cut installs no facets directly.
-    // The Gateway CTM points at a `GatewayGenesisRegistry` (deployed and initialized by this
+    // The Gateway CTM points at a `GenesisRegistry` (deployed and initialized by this
     // deployer), and `DiamondInit` reads each facet's own `ISelfDescribingFacet.selectors()` at
     // chain creation — mirroring the L1 registry-driven genesis path.
     /// @notice Hash of the bootloader bytecode.

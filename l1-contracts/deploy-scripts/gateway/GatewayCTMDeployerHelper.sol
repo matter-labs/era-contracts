@@ -19,7 +19,6 @@ import {
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {
     ChainCreationParams,
     ChainTypeManagerInitializeData,
@@ -670,8 +669,8 @@ library GatewayCTMDeployerHelper {
             // shared salt and no constructor args, so its address is deterministic and independent
             // of the facet addresses — computable here, before the facets exist, for the cut.
             address genesisRegistry = _deployInternalEmptyParams(
-                "GatewayGenesisRegistry",
-                "GatewayGenesisRegistry.sol",
+                "GenesisRegistry",
+                "GenesisRegistry.sol",
                 innerConfig,
                 isZKsyncOS
             );
@@ -698,20 +697,15 @@ library GatewayCTMDeployerHelper {
         GatewayCTMDeployerConfig memory baseConfig
     ) private pure returns (bytes memory) {
         // Mirrors GatewayCTMDeployerCTMBase: the cut carries NO facet addresses (empty
-        // `facetCuts`), only a pointer to the genesis registry set in `ChainCreationParams` below.
-        // DiamondInit reads the registry and installs the facets itself. Empty here means this
+        // `facetCuts`) and NO init payload (empty `initCalldata`), only a pointer to the genesis
+        // registry set in `ChainCreationParams` below. DiamondInit reads the registry and
+        // installs the facets and base system contract hashes itself. Empty here means this
         // off-chain reconstruction matches the on-chain cut exactly (both feed the CTM proxy's
         // CREATE2 address).
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
-        DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
-            l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
-            l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
-        });
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
+            facetCuts: new Diamond.FacetCut[](0),
             initAddress: facets.diamondInit,
-            initCalldata: abi.encode(initializeData)
+            initCalldata: ""
         });
         return abi.encode(diamondCut);
     }
@@ -910,11 +904,7 @@ library GatewayCTMDeployerHelper {
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Committer.sol", "CommitterFacet");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "DiamondInit.sol", "DiamondInit");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "L1GenesisUpgrade.sol", "L1GenesisUpgrade");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            false,
-            "GatewayGenesisRegistry.sol",
-            "GatewayGenesisRegistry"
-        );
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "GenesisRegistry.sol", "GenesisRegistry");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Multicall3.sol", "Multicall3");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "DiamondProxy.sol", "DiamondProxy");
     }

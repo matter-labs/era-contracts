@@ -16,7 +16,6 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {
     IChainTypeManager,
@@ -206,10 +205,10 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
-        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain();
-        bytes memory initCalldata = abi.encode(initializeData);
-        // No registry pinned: facets ride in the cut's own `facetCuts`, DiamondInit skips.
-        return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
+        // No init payload: DiamondInit reads everything chain-independent from the genesis
+        // registry. These tests only exercise `setChainCreationParams` validation and never
+        // create a chain, so no registry needs to exist.
+        return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: ""});
     }
 
     // ============================================================

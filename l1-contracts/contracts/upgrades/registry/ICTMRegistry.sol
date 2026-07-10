@@ -28,7 +28,8 @@ interface ICTMRegistry is IGenesisFacetRegistry {
     /// @notice The ChainTypeManager proxy address (version-independent).
     function ctmProxy() external view returns (address);
 
-    // `newProtocolVersion`, `facetList`, `ctmAddress`, `facetSelectors` and `facetIsFreezable` are
+    // `newProtocolVersion`, `facetList`, `ctmAddress`, `facetSelectors`, `facetIsFreezable` and
+    // `baseSystemContractHashes` are
     // inherited from `IGenesisFacetRegistry`. For this registry: `ctmAddress` also pins the old
     // address of facets the upgrade touches (the one irreducible old-side datum — the upgrade cut
     // needs the old facet to read its old selectors); `facetList` at the OLD version returns the
@@ -67,12 +68,6 @@ interface ICTMRegistry is IGenesisFacetRegistry {
     ///         given protocol version. All hashes must be published to the `BytecodesSupplier`
     ///         before the upgrade executes.
     function factoryDepHashes(uint256 _protocolVersion) external view returns (uint256[] memory);
-
-    /// @notice The base system contract hashes at a given protocol version. Zero means
-    ///         "not updated by this upgrade" (see `ProposedUpgrade`).
-    function baseSystemContractHashes(
-        uint256 _protocolVersion
-    ) external view returns (bytes32 bootloaderHash, bytes32 defaultAccountHash, bytes32 evmEmulatorHash);
 
     /// @notice The encoded ecosystem-wide `FixedForceDeploymentsData` used as
     ///         `ChainCreationParams.forceDeploymentsData` for newly created chains.

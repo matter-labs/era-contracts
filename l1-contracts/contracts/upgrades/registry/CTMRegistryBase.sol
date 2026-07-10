@@ -274,7 +274,7 @@ abstract contract CTMRegistryBase is ICTMRegistry {
         return _factoryDepHashes();
     }
 
-    /// @inheritdoc ICTMRegistry
+    /// @inheritdoc IGenesisFacetRegistry
     function baseSystemContractHashes(
         uint256 _protocolVersion
     ) external pure returns (bytes32 bootloaderHash, bytes32 defaultAccountHash, bytes32 evmEmulatorHash) {

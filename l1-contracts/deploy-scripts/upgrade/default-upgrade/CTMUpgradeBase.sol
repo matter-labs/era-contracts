@@ -104,6 +104,52 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         }
     }
 
+    /// @notice The six facet Add-cuts of the legacy upgrade pipeline, with explicit selector
+    /// lists read from the deployed facet code. Kept only for this banner-marked pipeline: the
+    /// registry-driven path (and chain creation, which is registry-driven everywhere now) lets
+    /// the diamond-side code read selectors from the facets themselves.
+    function getLegacyUpgradeFacetCuts(
+        StateTransitionDeployedAddresses memory _stateTransition
+    ) internal returns (Diamond.FacetCut[] memory facetCuts) {
+        facetCuts = new Diamond.FacetCut[](6);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: _stateTransition.facets.adminFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(_stateTransition.facets.adminFacet.code)
+        });
+        facetCuts[1] = Diamond.FacetCut({
+            facet: _stateTransition.facets.gettersFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(_stateTransition.facets.gettersFacet.code)
+        });
+        facetCuts[2] = Diamond.FacetCut({
+            facet: _stateTransition.facets.mailboxFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getAllSelectors(_stateTransition.facets.mailboxFacet.code)
+        });
+        facetCuts[3] = Diamond.FacetCut({
+            facet: _stateTransition.facets.executorFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getAllSelectors(_stateTransition.facets.executorFacet.code)
+        });
+        facetCuts[4] = Diamond.FacetCut({
+            facet: _stateTransition.facets.migratorFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(_stateTransition.facets.migratorFacet.code)
+        });
+        facetCuts[5] = Diamond.FacetCut({
+            facet: _stateTransition.facets.committerFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getAllSelectors(_stateTransition.facets.committerFacet.code)
+        });
+    }
+
     /// @notice Generate upgrade cut data.
     function generateUpgradeCutData(
         StateTransitionDeployedAddresses memory _stateTransition,
@@ -116,7 +162,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         Diamond.FacetCut[] memory facetCutsForDeletion = FacetCutsLib.getDeletionCuts(_registeredChainIdDiamondProxy);
 
         Diamond.FacetCut[] memory facetCuts;
-        facetCuts = getLegacyChainCreationFacetCuts(_stateTransition);
+        facetCuts = getLegacyUpgradeFacetCuts(_stateTransition);
         facetCuts = FacetCutsLib.merge(facetCutsForDeletion, facetCuts);
         uint256 nonce = UpgradeHelperLib.getProtocolUpgradeNonce(_chainCreationParams.latestProtocolVersion);
         ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(

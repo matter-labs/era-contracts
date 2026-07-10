@@ -10,7 +10,8 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-import {EmptyAssetId, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {IGenesisFacetRegistry} from "contracts/upgrades/registry/IGenesisFacetRegistry.sol";
+import {EmptyAssetId, EmptyBytes32, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract InitializeTest is DiamondInitTest {
     function test_revertWhen_verifierIsZeroAddress() public {
@@ -24,10 +25,7 @@ contract InitializeTest is DiamondInitTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(
-                DiamondInit.initialize,
-                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
-            )
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
         });
 
         vm.expectRevert(ZeroAddress.selector);
@@ -40,10 +38,7 @@ contract InitializeTest is DiamondInitTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(
-                DiamondInit.initialize,
-                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
-            )
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
         });
 
         vm.expectRevert(ZeroAddress.selector);
@@ -56,10 +51,7 @@ contract InitializeTest is DiamondInitTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(
-                DiamondInit.initialize,
-                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
-            )
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
         });
 
         vm.expectRevert(ZeroAddress.selector);
@@ -72,10 +64,7 @@ contract InitializeTest is DiamondInitTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(
-                DiamondInit.initialize,
-                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
-            )
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
         });
 
         vm.expectRevert(ZeroAddress.selector);
@@ -88,10 +77,7 @@ contract InitializeTest is DiamondInitTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(
-                DiamondInit.initialize,
-                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
-            )
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
         });
 
         vm.expectRevert(ZeroAddress.selector);
@@ -104,10 +90,7 @@ contract InitializeTest is DiamondInitTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(
-                DiamondInit.initialize,
-                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
-            )
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
         });
 
         vm.expectRevert(EmptyAssetId.selector);
@@ -125,10 +108,7 @@ contract InitializeTest is DiamondInitTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(
-                DiamondInit.initialize,
-                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
-            )
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
         });
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
@@ -146,17 +126,48 @@ contract InitializeTest is DiamondInitTest {
         assertEq(utilsFacet.util_getValidator(initializeData.validatorTimelock), true);
 
         assertEq(utilsFacet.util_getStoredBatchHashes(0), initializeData.storedBatchZero);
-        assertEq(
-            utilsFacet.util_getL2BootloaderBytecodeHash(),
-            Utils.makeInitializeDataForNewChain().l2BootloaderBytecodeHash
+        // The base system contract hashes are no longer passed in calldata: DiamondInit reads
+        // them from the genesis registry the CTM pins (mocked in UtilsCallMocker).
+        assertEq(utilsFacet.util_getL2BootloaderBytecodeHash(), Utils.TEST_BASE_SYSTEM_CONTRACT_HASH);
+        assertEq(utilsFacet.util_getL2DefaultAccountBytecodeHash(), Utils.TEST_BASE_SYSTEM_CONTRACT_HASH);
+        assertEq(utilsFacet.util_getL2EvmEmulatorBytecodeHash(), Utils.TEST_BASE_SYSTEM_CONTRACT_HASH);
+    }
+
+    /// @notice The genesis registry is mandatory: a CTM that pins none must make chain creation
+    ///         fail loudly.
+    function test_revertWhen_genesisRegistryIsZeroAddress() public {
+        vm.mockCall(
+            initializeData.chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.genesisRegistry.selector),
+            abi.encode(address(0))
         );
-        assertEq(
-            utilsFacet.util_getL2DefaultAccountBytecodeHash(),
-            Utils.makeInitializeDataForNewChain().l2DefaultAccountBytecodeHash
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(new DiamondInit(false)),
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
+        });
+
+        vm.expectRevert(ZeroAddress.selector);
+        new DiamondProxy(block.chainid, diamondCutData);
+    }
+
+    /// @notice On Era (non-ZKsync-OS) chains the registry must pin non-zero base system contract
+    ///         hashes.
+    function test_revertWhen_registryReturnsZeroBootloaderHash() public {
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(IGenesisFacetRegistry.baseSystemContractHashes.selector),
+            abi.encode(bytes32(0), Utils.TEST_BASE_SYSTEM_CONTRACT_HASH, Utils.TEST_BASE_SYSTEM_CONTRACT_HASH)
         );
-        assertEq(
-            utilsFacet.util_getL2EvmEmulatorBytecodeHash(),
-            Utils.makeInitializeDataForNewChain().l2EvmEmulatorBytecodeHash
-        );
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(new DiamondInit(false)),
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
+        });
+
+        vm.expectRevert(EmptyBytes32.selector);
+        new DiamondProxy(block.chainid, diamondCutData);
     }
 }

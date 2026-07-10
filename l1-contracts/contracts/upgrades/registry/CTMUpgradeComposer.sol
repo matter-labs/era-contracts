@@ -6,7 +6,6 @@ import {CoreContract, CTMContract} from "./ContractIdentifiers.sol";
 import {ICTMRegistry} from "./ICTMRegistry.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
-import {InitializeDataNewChain} from "../../state-transition/chain-interfaces/IDiamondInit.sol";
 import {ChainCreationParams} from "../../state-transition/IChainTypeManager.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
@@ -133,27 +132,18 @@ library CTMUpgradeComposer {
             });
     }
 
-    /// @dev The initial cut of a new chain: no `facetCuts` (DiamondInit installs the facet set it
-    ///      reads from the registry) and no facets in the init calldata — only the chain-independent
-    ///      base-system-contract hashes, passed through opaquely by the CTM.
+    /// @dev The initial cut of a new chain: no `facetCuts` and no init payload — DiamondInit
+    ///      reads the facet set and the base system contract hashes straight from the registry
+    ///      the CTM pins, so the committed cut is only the DiamondInit address.
     function _buildChainCreationCut(
         ICTMRegistry _registry,
         uint256 _newVersion
     ) private view returns (Diamond.DiamondCutData memory) {
-        (bytes32 bootloaderHash, bytes32 defaultAccountHash, bytes32 evmEmulatorHash) = _registry
-            .baseSystemContractHashes(_newVersion);
-
         return
             Diamond.DiamondCutData({
                 facetCuts: new Diamond.FacetCut[](0),
                 initAddress: _registry.ctmAddress(CTMContract.DiamondInit, _newVersion),
-                initCalldata: abi.encode(
-                    InitializeDataNewChain({
-                        l2BootloaderBytecodeHash: bootloaderHash,
-                        l2DefaultAccountBytecodeHash: defaultAccountHash,
-                        l2EvmEmulatorBytecodeHash: evmEmulatorHash
-                    })
-                )
+                initCalldata: ""
             });
     }
 

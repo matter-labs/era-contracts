@@ -11,7 +11,7 @@
     "contracts": {
       "MessageRoot": {
         "proxy": "0x4A02a75C31b433fc8D87F510500b90e0fa7E0254",
-        "implNew": "0x8F4ec854Dd12F1fe79500a1f53D0cbB30f9b6134",
+        "implNew": "0xeF31027350Be2c7439C1b0BE022d49421488b72C",
         "implNewCodehash": "0x38a76dd3fa4cc1b89fd4fb2add08c18b50a7187c8f229f129a78af31070ccaa4"
       }
     }
@@ -20,16 +20,16 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0x8Eb2F1327fF2d46d7d2CCd012B11Fe604798CF7b",
-      "verifierNew": "0x71089Ba41e478702e1904692385Be3972B2cBf9e",
+      "ctmProxy": "0x78C8a8e98a31Bc89F17E1Fd4C90DB43598bEE472",
+      "verifierNew": "0xC66AB83418C20A65C3f8e83B3d11c8C3a6097b6F",
       "contracts": {
         "DefaultUpgrade": {
-          "new": "0x1780bCf4103D3F501463AD3414c7f4b654bb7aFd",
+          "new": "0x71089Ba41e478702e1904692385Be3972B2cBf9e",
           "newCodehash": "0xb6168846e24a0483b17a10f409fa4d4f4e8b0687f229becfb3bcc3606bbc9adc"
         },
         "DiamondInit": {
-          "new": "0x5133BBdfCCa3Eb4F739D599ee4eC45cBCD0E16c5",
-          "newCodehash": "0x3dccd987a1cb97be1665ef206a18eecaa07e15c4f3f5ce793ed9ca3aec500f26"
+          "new": "0x8F4ec854Dd12F1fe79500a1f53D0cbB30f9b6134",
+          "newCodehash": "0xa93be2efdf6d329c85bc4c551954bc3d697f5c694b4bc16bf61f83463f63c76c"
         }
       },
       "facets": {
@@ -63,31 +63,31 @@
         "installed": [
           {
             "name": "AdminFacet",
-            "address": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C",
+            "address": "0x413b1AfCa96a3df5A686d8BFBF93d30688a7f7D9",
             "codehash": "0xe8e31854a39f59042ebdf56730808bd85eabdff0c2a16bd8e67afbccb7425836",
             "selectors": []
           },
           {
             "name": "GettersFacet",
-            "address": "0x2b5A4e5493d4a54E717057B127cf0C000C876f9B",
+            "address": "0x02df3a3F960393F5B349E40A599FEda91a7cc1A7",
             "codehash": "0x6eb8cfdb1a91fd28763e291cfe354d2bedbd8cbf7bbc01b1c30b60329c4f33f5",
             "selectors": []
           },
           {
             "name": "ExecutorFacet",
-            "address": "0x413b1AfCa96a3df5A686d8BFBF93d30688a7f7D9",
+            "address": "0x821f3361D454cc98b7555221A06Be563a7E2E0A6",
             "codehash": "0x941916e9669e766aedaf2f02c36405ab1a12393c8d7badd54607ca300a9048aa",
             "selectors": []
           },
           {
             "name": "MigratorFacet",
-            "address": "0x02df3a3F960393F5B349E40A599FEda91a7cc1A7",
+            "address": "0x1780bCf4103D3F501463AD3414c7f4b654bb7aFd",
             "codehash": "0xb46bf0e9faf014f7ae48b518a854de07f262a5f7cfdcd4bc51404f56e0b87e2e",
             "selectors": []
           },
           {
             "name": "CommitterFacet",
-            "address": "0x821f3361D454cc98b7555221A06Be563a7E2E0A6",
+            "address": "0x5133BBdfCCa3Eb4F739D599ee4eC45cBCD0E16c5",
             "codehash": "0xa528dfec9924d790b1a385a90a7313c3fcfa70f1916af8791d772a9950b55d6f",
             "selectors": []
           },

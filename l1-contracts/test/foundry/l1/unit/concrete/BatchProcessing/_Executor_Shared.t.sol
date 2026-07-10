@@ -28,11 +28,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
-import {
-    FacetInstallation,
-    InitializeData,
-    InitializeDataNewChain
-} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {FacetInstallation, InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
@@ -300,8 +296,6 @@ contract ExecutorTest is UtilsCallMockerTest {
         );
         validatorTimelock = ValidatorTimelock(deployValidatorTimelock(address(dummyBridgehub), owner, 0));
 
-        bytes8 dummyHash = 0x1234567890123456;
-
         genesisStoredBatchInfo = IExecutor.StoredBatchInfo({
             batchNumber: 0,
             batchHash: bytes32(""),
@@ -326,12 +320,8 @@ contract ExecutorTest is UtilsCallMockerTest {
             baseTokenAssetId: baseTokenAssetId,
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo))
         });
-        // verifier is fetched from CTM
-        InitializeDataNewChain memory newChainParams = InitializeDataNewChain({
-            l2BootloaderBytecodeHash: dummyHash,
-            l2DefaultAccountBytecodeHash: dummyHash,
-            l2EvmEmulatorBytecodeHash: dummyHash
-        });
+        // verifier and base system contract hashes are fetched from the CTM / its genesis
+        // registry (both mocked below)
         mockDiamondInitInteropCenterCallsWithAddress(
             address(dummyBridgehub),
             address(0),
@@ -340,7 +330,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             address(permissionlessValidator)
         );
 
-        bytes memory diamondInitData = abi.encodeCall(diamondInit.initialize, (params, abi.encode(newChainParams)));
+        bytes memory diamondInitData = abi.encodeCall(diamondInit.initialize, (params));
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](5);
         facetCuts[0] = Diamond.FacetCut({

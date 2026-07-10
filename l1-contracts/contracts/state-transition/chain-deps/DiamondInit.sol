@@ -15,12 +15,7 @@ import {
     DEFAULT_PUBDATA_PRICING_MODE,
     DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT
 } from "../../common/Config.sol";
-import {
-    FacetInstallation,
-    IDiamondInit,
-    InitializeData,
-    InitializeDataNewChain
-} from "../chain-interfaces/IDiamondInit.sol";
+import {FacetInstallation, IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol";
 import {ISelfDescribingFacet} from "../chain-interfaces/ISelfDescribingFacet.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../IChainTypeManager.sol";
@@ -57,14 +52,8 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
     /// initializer
     function initialize(
-        InitializeData calldata _initializeData,
-        bytes calldata _newChainData
+        InitializeData calldata _initializeData
     ) public virtual reentrancyGuardInitializer returns (bytes32) {
-        // The chain-independent half, committed in the chain-creation cut and passed through by
-        // the CTM as opaque bytes: decoding it here keeps the (size-constrained) CTM free of the
-        // nested-type codecs.
-        InitializeDataNewChain memory newChainData = abi.decode(_newChainData, (InitializeDataNewChain));
-
         if (_initializeData.admin == address(0)) {
             revert ZeroAddress();
         }
@@ -81,28 +70,33 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
             revert EmptyAssetId();
         }
 
-        // Facets are installed here, by the init itself. Their addresses are NOT in the committed
-        // cut — they are read from the CTM by protocol version, mirroring how the verifier is
-        // fetched below. Selector lists come from each facet's own bytecode at execution time.
-        // Facets are installed here, by the init itself. Their addresses are NOT in the committed
-        // cut — the CTM pins the genesis registry (like the verifier, fetched below), and the
-        // facet set is read straight from that registry. Selector lists come from each facet's own
-        // bytecode at execution time.
+        // Everything chain-independent is read from the genesis registry the CTM pins — the
+        // committed chain-creation cut carries no init payload. Facets are installed here, by
+        // the init itself (their selector lists come from each facet's own bytecode at execution
+        // time), and the base system contract hashes are pinned per protocol version, so the
+        // registry reverts if the CTM's protocol version disagrees with the registry's pin.
         address genesisRegistry = IChainTypeManager(_initializeData.chainTypeManager).genesisRegistry();
-        if (genesisRegistry != address(0)) {
-            _installFacets(RegistryFacetReader.newChainInstallations(IGenesisFacetRegistry(genesisRegistry)));
+        if (genesisRegistry == address(0)) {
+            revert ZeroAddress();
         }
+        _installFacets(RegistryFacetReader.newChainInstallations(IGenesisFacetRegistry(genesisRegistry)));
+
+        (
+            bytes32 l2BootloaderBytecodeHash,
+            bytes32 l2DefaultAccountBytecodeHash,
+            bytes32 l2EvmEmulatorBytecodeHash
+        ) = IGenesisFacetRegistry(genesisRegistry).baseSystemContractHashes(_initializeData.protocolVersion);
 
         if (!IS_ZKSYNC_OS) {
-            if (newChainData.l2BootloaderBytecodeHash == bytes32(0)) {
+            if (l2BootloaderBytecodeHash == bytes32(0)) {
                 revert EmptyBytes32();
             }
 
-            if (newChainData.l2DefaultAccountBytecodeHash == bytes32(0)) {
+            if (l2DefaultAccountBytecodeHash == bytes32(0)) {
                 revert EmptyBytes32();
             }
 
-            if (newChainData.l2EvmEmulatorBytecodeHash == bytes32(0)) {
+            if (l2EvmEmulatorBytecodeHash == bytes32(0)) {
                 revert EmptyBytes32();
             }
         }
@@ -136,9 +130,9 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.validators[_initializeData.validatorTimelock] = true;
 
         s.storedBatchHashes[0] = _initializeData.storedBatchZero;
-        s.l2BootloaderBytecodeHash = newChainData.l2BootloaderBytecodeHash;
-        s.l2DefaultAccountBytecodeHash = newChainData.l2DefaultAccountBytecodeHash;
-        s.l2EvmEmulatorBytecodeHash = newChainData.l2EvmEmulatorBytecodeHash;
+        s.l2BootloaderBytecodeHash = l2BootloaderBytecodeHash;
+        s.l2DefaultAccountBytecodeHash = l2DefaultAccountBytecodeHash;
+        s.l2EvmEmulatorBytecodeHash = l2EvmEmulatorBytecodeHash;
         s.priorityTxMaxGasLimit = DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT;
         s.priorityModeInfo.permissionlessValidator = IChainTypeManager(_initializeData.chainTypeManager)
             .PERMISSIONLESS_VALIDATOR();

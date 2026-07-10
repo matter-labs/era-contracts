@@ -56,7 +56,9 @@ contract ZKsyncOSChainTypeManagerSharedTest is ChainTypeManagerTest {
             genesisBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(diamondInit),
             forceDeploymentsData: forceDeploymentsData,
-            registry: address(0)
+            // The mocked genesis registry the base fixture sets up (see `deploy()`); real
+            // registries cannot pin protocol version 0.
+            registry: Utils.TEST_GENESIS_REGISTRY
         });
 
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({

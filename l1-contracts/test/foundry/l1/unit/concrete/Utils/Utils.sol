@@ -22,11 +22,7 @@ import {
     VerifierParams
 } from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
-import {
-    FacetInstallation,
-    InitializeData,
-    InitializeDataNewChain
-} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {FacetInstallation, InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {
     IExecutor,
     SystemLogKey,
@@ -55,6 +51,12 @@ address constant TEST_ROLLUP_DA_MANAGER_OWNER = address(0x1234567890DEADBEEF);
 uint256 constant EVENT_INDEX = 0;
 
 library Utils {
+    /// @dev The genesis-registry address the mocked CTM fixtures return; the registry itself is
+    ///      mocked too (see `UtilsCallMocker`), pinning no facets and these base system hashes.
+    address internal constant TEST_GENESIS_REGISTRY = address(0x9E8E5157A9);
+    bytes32 internal constant TEST_BASE_SYSTEM_CONTRACT_HASH =
+        0x0100000000000000000000000000000000000000000000000000000000000000;
+
     function packBatchTimestampAndBlockTimestamp(
         uint256 batchTimestamp,
         uint256 blockTimestamp
@@ -549,21 +551,9 @@ library Utils {
             });
     }
 
-    function makeInitializeDataForNewChain() public pure returns (InitializeDataNewChain memory) {
-        return
-            InitializeDataNewChain({
-                l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
-            });
-    }
-
     function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address bridgehub) public returns (address) {
         DiamondInit diamondInit = new DiamondInit(false);
-        bytes memory diamondInitData = abi.encodeCall(
-            diamondInit.initialize,
-            (makeInitializeData(bridgehub), abi.encode(makeInitializeDataForNewChain()))
-        );
+        bytes memory diamondInitData = abi.encodeCall(diamondInit.initialize, (makeInitializeData(bridgehub)));
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -627,9 +617,15 @@ library Utils {
     }
 
     function _batchMetaParameters() internal pure returns (bytes memory) {
-        // Used in __Executor_Shared.t.sol
-        bytes8 dummyHash = 0x1234567890123456;
-        return abi.encodePacked(false, bytes32(dummyHash), bytes32(dummyHash), bytes32(dummyHash));
+        // Mirrors the base system contract hashes the _Executor_Shared.t.sol chain stores: they
+        // come from the mocked genesis registry (see UtilsCallMocker.mockGenesisRegistryContract).
+        return
+            abi.encodePacked(
+                false,
+                TEST_BASE_SYSTEM_CONTRACT_HASH,
+                TEST_BASE_SYSTEM_CONTRACT_HASH,
+                TEST_BASE_SYSTEM_CONTRACT_HASH
+            );
     }
 
     function _batchAuxiliaryOutput(

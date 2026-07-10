@@ -21,7 +21,7 @@ library ZKsyncOSCTMRegistryV32Data {
     }
 
     function ctmProxy() internal pure returns (address) {
-        return address(uint160(0x008eb2f1327ff2d46d7d2ccd012b11fe604798cf7b));
+        return address(uint160(0x0078c8a8e98a31bc89f17e1fd4c90db43598bee472));
     }
 
     function ctmAddressRows() internal pure returns (CTMRegistryBase.AddressRow[] memory rows) {
@@ -30,13 +30,13 @@ library ZKsyncOSCTMRegistryV32Data {
         rows[i] = CTMRegistryBase.AddressRow({
             key: CTMContract.DefaultUpgrade,
             protocolVersion: NEW_PROTOCOL_VERSION,
-            value: address(uint160(0x001780bcf4103d3f501463ad3414c7f4b654bb7afd))
+            value: address(uint160(0x0071089ba41e478702e1904692385be3972b2cbf9e))
         }); // DefaultUpgrade @ 0.32.0
         ++i;
         rows[i] = CTMRegistryBase.AddressRow({
             key: CTMContract.DiamondInit,
             protocolVersion: NEW_PROTOCOL_VERSION,
-            value: address(uint160(0x005133bbdfcca3eb4f739d599ee4ec45cbcd0e16c5))
+            value: address(uint160(0x008f4ec854dd12f1fe79500a1f53d0cbb30f9b6134))
         }); // DiamondInit @ 0.32.0
         ++i;
     }
@@ -45,7 +45,7 @@ library ZKsyncOSCTMRegistryV32Data {
         rows = new CTMRegistryBase.VerifierRow[](1);
         rows[0] = CTMRegistryBase.VerifierRow({
             protocolVersion: NEW_PROTOCOL_VERSION,
-            verifier: address(uint160(0x0071089ba41e478702e1904692385be3972b2cbf9e))
+            verifier: address(uint160(0x00c66ab83418c20a65c3f8e83b3d11c8c3a6097b6f))
         }); // verifier @ 0.32.0
     }
 
@@ -113,7 +113,7 @@ library ZKsyncOSCTMRegistryV32Data {
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.AdminFacet,
                 protocolVersion: NEW_PROTOCOL_VERSION,
-                facetAddress: address(uint160(0x00045857bdeae7c1c7252d611eb24eb55564198b4c)),
+                facetAddress: address(uint160(0x00413b1afca96a3df5a686d8bfbf93d30688a7f7d9)),
                 selectorList: selectorList
             }); // AdminFacet @ 0.32.0
             ++i;
@@ -124,7 +124,7 @@ library ZKsyncOSCTMRegistryV32Data {
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.GettersFacet,
                 protocolVersion: NEW_PROTOCOL_VERSION,
-                facetAddress: address(uint160(0x002b5a4e5493d4a54e717057b127cf0c000c876f9b)),
+                facetAddress: address(uint160(0x0002df3a3f960393f5b349e40a599feda91a7cc1a7)),
                 selectorList: selectorList
             }); // GettersFacet @ 0.32.0
             ++i;
@@ -135,7 +135,7 @@ library ZKsyncOSCTMRegistryV32Data {
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.ExecutorFacet,
                 protocolVersion: NEW_PROTOCOL_VERSION,
-                facetAddress: address(uint160(0x00413b1afca96a3df5a686d8bfbf93d30688a7f7d9)),
+                facetAddress: address(uint160(0x00821f3361d454cc98b7555221a06be563a7e2e0a6)),
                 selectorList: selectorList
             }); // ExecutorFacet @ 0.32.0
             ++i;
@@ -146,7 +146,7 @@ library ZKsyncOSCTMRegistryV32Data {
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.MigratorFacet,
                 protocolVersion: NEW_PROTOCOL_VERSION,
-                facetAddress: address(uint160(0x0002df3a3f960393f5b349e40a599feda91a7cc1a7)),
+                facetAddress: address(uint160(0x001780bcf4103d3f501463ad3414c7f4b654bb7afd)),
                 selectorList: selectorList
             }); // MigratorFacet @ 0.32.0
             ++i;
@@ -157,7 +157,7 @@ library ZKsyncOSCTMRegistryV32Data {
             rows[i] = CTMRegistryBase.FacetRow({
                 facet: CTMContract.CommitterFacet,
                 protocolVersion: NEW_PROTOCOL_VERSION,
-                facetAddress: address(uint160(0x00821f3361d454cc98b7555221a06be563a7e2e0a6)),
+                facetAddress: address(uint160(0x005133bbdfcca3eb4f739d599ee4ec45cbcd0e16c5)),
                 selectorList: selectorList
             }); // CommitterFacet @ 0.32.0
             ++i;
@@ -253,37 +253,37 @@ library ZKsyncOSCTMRegistryV32Data {
         pins = new CTMRegistryBase.CodehashPin[](8);
         uint256 i = 0;
         pins[i] = CTMRegistryBase.CodehashPin({
-            target: address(uint160(0x001780bcf4103d3f501463ad3414c7f4b654bb7afd)),
+            target: address(uint160(0x0071089ba41e478702e1904692385be3972b2cbf9e)),
             expectedCodehash: 0xb6168846e24a0483b17a10f409fa4d4f4e8b0687f229becfb3bcc3606bbc9adc
         }); // DefaultUpgrade @ 0.32.0
         ++i;
         pins[i] = CTMRegistryBase.CodehashPin({
-            target: address(uint160(0x005133bbdfcca3eb4f739d599ee4ec45cbcd0e16c5)),
-            expectedCodehash: 0x3dccd987a1cb97be1665ef206a18eecaa07e15c4f3f5ce793ed9ca3aec500f26
+            target: address(uint160(0x008f4ec854dd12f1fe79500a1f53d0cbb30f9b6134)),
+            expectedCodehash: 0xa93be2efdf6d329c85bc4c551954bc3d697f5c694b4bc16bf61f83463f63c76c
         }); // DiamondInit @ 0.32.0
         ++i;
         pins[i] = CTMRegistryBase.CodehashPin({
-            target: address(uint160(0x00045857bdeae7c1c7252d611eb24eb55564198b4c)),
+            target: address(uint160(0x00413b1afca96a3df5a686d8bfbf93d30688a7f7d9)),
             expectedCodehash: 0xe8e31854a39f59042ebdf56730808bd85eabdff0c2a16bd8e67afbccb7425836
         }); // AdminFacet @ 0.32.0
         ++i;
         pins[i] = CTMRegistryBase.CodehashPin({
-            target: address(uint160(0x002b5a4e5493d4a54e717057b127cf0c000c876f9b)),
+            target: address(uint160(0x0002df3a3f960393f5b349e40a599feda91a7cc1a7)),
             expectedCodehash: 0x6eb8cfdb1a91fd28763e291cfe354d2bedbd8cbf7bbc01b1c30b60329c4f33f5
         }); // GettersFacet @ 0.32.0
         ++i;
         pins[i] = CTMRegistryBase.CodehashPin({
-            target: address(uint160(0x00413b1afca96a3df5a686d8bfbf93d30688a7f7d9)),
+            target: address(uint160(0x00821f3361d454cc98b7555221a06be563a7e2e0a6)),
             expectedCodehash: 0x941916e9669e766aedaf2f02c36405ab1a12393c8d7badd54607ca300a9048aa
         }); // ExecutorFacet @ 0.32.0
         ++i;
         pins[i] = CTMRegistryBase.CodehashPin({
-            target: address(uint160(0x0002df3a3f960393f5b349e40a599feda91a7cc1a7)),
+            target: address(uint160(0x001780bcf4103d3f501463ad3414c7f4b654bb7afd)),
             expectedCodehash: 0xb46bf0e9faf014f7ae48b518a854de07f262a5f7cfdcd4bc51404f56e0b87e2e
         }); // MigratorFacet @ 0.32.0
         ++i;
         pins[i] = CTMRegistryBase.CodehashPin({
-            target: address(uint160(0x00821f3361d454cc98b7555221a06be563a7e2e0a6)),
+            target: address(uint160(0x005133bbdfcca3eb4f739d599ee4ec45cbcd0e16c5)),
             expectedCodehash: 0xa528dfec9924d790b1a385a90a7313c3fcfa70f1916af8791d772a9950b55d6f
         }); // CommitterFacet @ 0.32.0
         ++i;

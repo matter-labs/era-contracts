@@ -12,7 +12,7 @@
     "chainRegistrationSender": "0xbDC63994Bc7D7f77Ef5ABf1c277AAbCB5F47C7c0"
   },
   "ctmAddresses": {
-    "chainTypeManager": "0x8Eb2F1327fF2d46d7d2CCd012B11Fe604798CF7b",
+    "chainTypeManager": "0x78C8a8e98a31Bc89F17E1Fd4C90DB43598bEE472",
     "chainAdmin": "0x16b5d0b1A5c64195453315C58671A6f847CE1aC2",
     "verifier": "0x5422b0509a532dd24b0dD99AfaC766E66172af37",
     "rollupL1DAValidator": "0xC533CcE441ED81782127ef99B936bFbeB62DD26B"
@@ -20,23 +20,23 @@
   "chainAddresses": [
     {
       "chainId": 10,
-      "diamondProxy": "0x743816f8c8a970aC676259c45092BAFD9ACDa5F7"
+      "diamondProxy": "0xf1BB150Fe3fdB7631e99B2D3D5c7470BB9a144e4"
     },
     {
       "chainId": 11,
-      "diamondProxy": "0x327259F6AE39cB4AaBe7e33Da3efa44d615fBFa9"
+      "diamondProxy": "0x2988c7b5c943CC78Fa97Ba948c0EE8A911e38c0D"
     },
     {
       "chainId": 12,
-      "diamondProxy": "0xFd6d62672ab47F99e8c9211ECcD1071870580d21"
+      "diamondProxy": "0xeE820D705Cc77f24B3BbA0fA9126Da21b282916b"
     },
     {
       "chainId": 13,
-      "diamondProxy": "0x7bAeA7830568Cc69AdDAc7c22997b8824279354b"
+      "diamondProxy": "0x65169d89A4B3208d3df1fA8c76EAc700D21967D6"
     },
     {
       "chainId": 14,
-      "diamondProxy": "0xd4b0E7D506A67D372657255a20e14Fc3fC42700A"
+      "diamondProxy": "0x78f91c3AecB23551310B7002b87353171ca83DCB"
     }
   ],
   "testTokens": {
@@ -47,7 +47,7 @@
     "14": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
   },
   "customBaseTokens": {
-    "14": "0x49fd2BE640DB2910c2fAb69bB8531Ab6E76127ff"
+    "14": "0x86A2EE8FAf9A840F7a2c64CA3d51209F9A02081D"
   },
   "tbmAccountingSnapshots": {
     "12:0x8df3463b1850eb1d8d1847743ea155aef6b16074db8ba81d897dc30554fb2085": {
@@ -72,9 +72,9 @@
       "gwPendingAfter": "0",
       "migratedAmount": "0"
     },
-    "14:0xfca0d5a4c6dcacfb1db788e8a11c0341c7f724b00920aba1361d76ca38951057": {
+    "14:0x3c89bbde098aee068d6dd63e413d535a7da2ebabc1bc5376e0b5fa693efb82c3": {
       "chainId": 14,
-      "assetId": "0xfca0d5a4c6dcacfb1db788e8a11c0341c7f724b00920aba1361d76ca38951057",
+      "assetId": "0x3c89bbde098aee068d6dd63e413d535a7da2ebabc1bc5376e0b5fa693efb82c3",
       "l1SourceBefore": "0",
       "l1SourceAfter": "0",
       "gwChainBefore": "0",

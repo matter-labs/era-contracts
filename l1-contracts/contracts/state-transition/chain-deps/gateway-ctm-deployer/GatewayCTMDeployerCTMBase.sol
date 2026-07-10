@@ -5,13 +5,12 @@ pragma solidity 0.8.28;
 import {Diamond} from "../../libraries/Diamond.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "../../chain-interfaces/IDiamondInit.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "../../IChainTypeManager.sol";
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
 
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
 import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
-import {GatewayGenesisRegistry} from "./GatewayGenesisRegistry.sol";
+import {GenesisRegistry} from "../GenesisRegistry.sol";
 import {GatewayCTMDeployerConfig, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "./GatewayCTMDeployer.sol";
 
 /// @title GatewayCTMDeployerCTMBase
@@ -89,26 +88,19 @@ abstract contract GatewayCTMDeployerCTMBase {
         Facets memory facets = _config.facets;
 
         // Gateway pins a genesis registry, exactly like L1: the committed cut carries NO facet
-        // addresses (empty `facetCuts`), only a pointer to the registry. `DiamondInit` reads the
-        // registry (via the CTM's `genesisRegistry()`) and installs the facets itself, resolving
-        // each facet's selectors from its own `ISelfDescribingFacet.selectors()` bytecode. The
-        // registry is deployed via CREATE2 (deterministic address, independent of the facet
-        // addresses) so the off-chain helper can put it in the cut before any facet exists.
-        address genesisRegistry = _deployGenesisRegistry(_salt, baseConfig.protocolVersion, facets);
-
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
-
-        // Only system contract hashes are initialized here; the verifier is read from the CTM.
-        DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
-            l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
-            l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
-        });
+        // addresses (empty `facetCuts`) and NO init payload (empty `initCalldata`), only a
+        // pointer to the registry. `DiamondInit` reads the registry (via the CTM's
+        // `genesisRegistry()`) and installs the facets itself, resolving each facet's selectors
+        // from its own `ISelfDescribingFacet.selectors()` bytecode; the base system contract
+        // hashes are read from the registry too. The registry is deployed via CREATE2
+        // (deterministic address, independent of the pinned values) so the off-chain helper can
+        // put it in the cut before any facet exists.
+        address genesisRegistry = _deployGenesisRegistry(_salt, baseConfig, facets);
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
+            facetCuts: new Diamond.FacetCut[](0),
             initAddress: facets.diamondInit,
-            initCalldata: abi.encode(initializeData)
+            initCalldata: ""
         });
 
         _result.diamondCutData = abi.encode(diamondCut);
@@ -143,18 +135,19 @@ abstract contract GatewayCTMDeployerCTMBase {
         );
     }
 
-    /// @notice Deploys the Gateway genesis facet registry and pins the facet set into it.
+    /// @notice Deploys the Gateway genesis registry and pins the facet set and base system
+    ///         contract hashes into it.
     /// @dev CREATE2 with the shared salt: the address is deterministic and independent of the
-    ///      facet addresses (no constructor args), so the off-chain helper reproduces it for the
+    ///      pinned values (no constructor args), so the off-chain helper reproduces it for the
     ///      genesis cut before the facets are deployed. Initialized in the same transaction; the
     ///      facet order and freezability mirror the diamond's installed set.
     /// @param _salt Salt used for the CREATE2 deployment.
-    /// @param _protocolVersion The packed SemVer protocol version new chains are created at.
+    /// @param _baseConfig The deployment config (protocol version and base system hashes).
     /// @param _facets The deployed diamond facet addresses.
     /// @return registry The address of the deployed and initialized genesis registry.
     function _deployGenesisRegistry(
         bytes32 _salt,
-        uint256 _protocolVersion,
+        GatewayCTMDeployerConfig memory _baseConfig,
         Facets memory _facets
     ) internal returns (address registry) {
         CTMContract[] memory facetIds = new CTMContract[](6);
@@ -185,8 +178,17 @@ abstract contract GatewayCTMDeployerCTMBase {
         facetAddresses[5] = _facets.committerFacet;
         freezable[5] = true;
 
-        GatewayGenesisRegistry genesisRegistry = new GatewayGenesisRegistry{salt: _salt}();
-        genesisRegistry.initialize(_protocolVersion, facetIds, facetAddresses, freezable);
+        GenesisRegistry genesisRegistry = new GenesisRegistry{salt: _salt}();
+        // solhint-disable-next-line func-named-parameters
+        genesisRegistry.initialize(
+            _baseConfig.protocolVersion,
+            facetIds,
+            facetAddresses,
+            freezable,
+            _baseConfig.bootloaderHash,
+            _baseConfig.defaultAccountHash,
+            _baseConfig.evmEmulatorHash
+        );
         registry = address(genesisRegistry);
     }
 

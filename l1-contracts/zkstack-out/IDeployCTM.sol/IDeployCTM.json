@@ -156,6 +156,11 @@
                 "name": "chainTypeManagerProxyAdmin",
                 "type": "address",
                 "internalType": "address"
+              },
+              {
+                "name": "genesisRegistry",
+                "type": "address",
+                "internalType": "address"
               }
             ]
           },

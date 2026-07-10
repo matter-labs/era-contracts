@@ -66,10 +66,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(
-                DiamondInit.initialize,
-                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
-            )
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
         });
 
         vm.expectRevert(bytes("pr"));
@@ -80,10 +77,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(
-                DiamondInit.initialize,
-                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
-            )
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
         });
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
@@ -98,10 +92,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(
-                DiamondInit.initialize,
-                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
-            )
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
         });
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
@@ -116,10 +107,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(
-                DiamondInit.initialize,
-                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
-            )
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
         });
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
@@ -139,10 +127,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(
-                DiamondInit.initialize,
-                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
-            )
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
         });
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
@@ -156,10 +141,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(
-                DiamondInit.initialize,
-                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
-            )
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
         });
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
@@ -176,10 +158,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(
-                DiamondInit.initialize,
-                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
-            )
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
         });
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
@@ -202,10 +181,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: cuts,
             initAddress: address(new DiamondInit(false)),
-            initCalldata: abi.encodeCall(
-                DiamondInit.initialize,
-                (initializeData, abi.encode(Utils.makeInitializeDataForNewChain()))
-            )
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (initializeData))
         });
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);

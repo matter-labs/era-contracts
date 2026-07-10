@@ -16,9 +16,9 @@ struct FacetInstallation {
     bytes4[] selectors;
 }
 
-/// @notice The chain-specific, CTM-known half of the initialization data; the chain-independent
-///         half (`InitializeDataNewChain`) rides in the committed chain-creation cut and is passed
-///         through by the CTM as opaque bytes — so the CTM never re-encodes nested dynamic types.
+/// @notice The chain-specific initialization data, filled in by the CTM. This is ALL the calldata
+///         `DiamondInit` takes: everything chain-independent (facet set, verifier, base system
+///         contract hashes) is read from the genesis registry the CTM pins per protocol version.
 /// @param chainId the id of the chain
 /// @param bridgehub the address of the bridgehub contract
 /// @param chainTypeManager contract's address
@@ -40,23 +40,10 @@ struct InitializeData {
     bytes32 storedBatchZero;
 }
 
-/// @notice The chain-independent half of the initialization data, committed in the
-///         chain-creation diamond cut's init calldata (abi-encoded).
-/// @dev The facet set is NOT here — `DiamondInit` reads it from the registry the CTM pins per protocol version
-///      (`IChainTypeManager.genesisRegistry`), the same way it reads the verifier, so the
-///      committed cut carries no facet addresses.
-/// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
-/// @param l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
-/// @param l2EvmEmulatorBytecodeHash The hash of EVM emulator L2 bytecode
-struct InitializeDataNewChain {
-    bytes32 l2BootloaderBytecodeHash;
-    bytes32 l2DefaultAccountBytecodeHash;
-    bytes32 l2EvmEmulatorBytecodeHash;
-}
-
 interface IDiamondInit {
-    /// @param _initData The chain-specific data, filled in by the ChainTypeManager.
-    /// @param _newChainData The abi-encoded `InitializeDataNewChain` from the committed
-    ///        chain-creation cut, passed through opaquely and decoded here.
-    function initialize(InitializeData calldata _initData, bytes calldata _newChainData) external returns (bytes32);
+    /// @param _initData The chain-specific data, filled in by the ChainTypeManager. Everything
+    ///        else — the facet set, the verifier and the base system contract hashes — is read
+    ///        from the genesis registry the CTM pins (`IChainTypeManager.genesisRegistry`), so
+    ///        the committed chain-creation cut carries no init payload at all.
+    function initialize(InitializeData calldata _initData) external returns (bytes32);
 }

@@ -24,7 +24,6 @@ import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Commi
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {
     IChainTypeManager,
@@ -193,6 +192,11 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             })
         );
 
+        // The fixture's CTM runs at protocol version 0, which a real `GenesisRegistry` cannot
+        // pin (zero doubles as its init guard), so the registry DiamondInit reads is mocked
+        // (empty facet set + test base system hashes; the fixture facets ride in the cut).
+        mockGenesisRegistryContract();
+
         ChainCreationParams memory chainCreationParams = ChainCreationParams({
             genesisUpgrade: address(genesisUpgradeContract),
             genesisBatchHash: bytes32(uint256(0x01)),
@@ -200,7 +204,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             genesisBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(address(diamondInit)),
             forceDeploymentsData: forceDeploymentsData,
-            registry: address(0)
+            registry: Utils.TEST_GENESIS_REGISTRY
         });
 
         ChainTypeManagerInitializeData memory ctmInitializeDataNoGovernor = ChainTypeManagerInitializeData({
@@ -239,14 +243,10 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
-        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain();
-
-        bytes memory initCalldata = abi.encode(initializeData);
-
-        // The fixture pins no registry (`ChainCreationParams.registry == address(0)`), so the
-        // facet set rides in the cut's own `facetCuts` — DiamondInit sees no genesis registry and
-        // installs nothing further.
-        return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
+        // The committed cut carries no init payload: DiamondInit reads the base system contract
+        // hashes from the (mocked) genesis registry. The fixture facets still ride in the cut's
+        // own `facetCuts` since the mocked registry pins none.
+        return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: ""});
     }
 
     function getDiamondCutDataWithCustomFacets(

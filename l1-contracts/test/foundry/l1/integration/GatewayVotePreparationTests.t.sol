@@ -22,6 +22,8 @@ import {
     FacetInstallation
 } from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {GenesisRegistry} from "contracts/state-transition/chain-deps/GenesisRegistry.sol";
+import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 
@@ -208,19 +210,20 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
             abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector),
             abi.encode(makeAddr("mockVerifier"))
         );
-        // The Gateway cut carries its facets in-cut (with config selectors); the CTM pins no
-        // genesis registry, so DiamondInit sees a zero address and installs nothing further —
-        // the facets are added (and their code validated) by the outer cut, which is what this
-        // test checks.
+        // The Gateway cut is empty (no facets, no init payload): DiamondInit installs the
+        // facet set it reads from the genesis registry the CTM pins and self-describes each
+        // facet's selectors — validating the facets' code, which is what this test checks.
+        // The registry is a REAL GenesisRegistry initialized exactly as
+        // GatewayCTMDeployerCTMBase._deployGenesisRegistry pins it; only the CTM (already a
+        // mock here) has its pointer mocked.
         vm.mockCall(
             mockCTM,
             abi.encodeWithSelector(IChainTypeManager.genesisRegistry.selector),
-            abi.encode(address(0))
+            abi.encode(_deployGatewayGenesisRegistry(contracts, config))
         );
 
-        // Build full initCalldata: the chain-specific head plus the committed cut's
-        // chain-independent tail (abi-encoded InitializeDataNewChain), exactly as
-        // ChainTypeManagerBase composes it.
+        // Build the initCalldata exactly as ChainTypeManagerBase composes it: only the
+        // chain-specific data — everything else is read from the registry.
         // Use L2_BRIDGEHUB_ADDR as bridgehub so initialize() takes the L2 branch
         // (sets nativeTokenVault/assetTracker from L2 constants, no external calls).
         diamondCut.initCalldata = abi.encodeCall(
@@ -236,13 +239,59 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
                     validatorTimelock: address(0x1337),
                     baseTokenAssetId: keccak256("baseTokenAssetId"),
                     storedBatchZero: bytes32(uint256(1))
-                }),
-                diamondCut.initCalldata
+                })
             )
         );
 
         // Deploy the DiamondProxy with real facets - validates all facets have code AND runs initialize()
         new DiamondProxy(GATEWAY_CHAIN_ID, diamondCut);
+    }
+
+    /// @notice Deploys and initializes a real `GenesisRegistry` pinning the computed Gateway
+    /// facet set and base system hashes, mirroring GatewayCTMDeployerCTMBase._deployGenesisRegistry.
+    function _deployGatewayGenesisRegistry(
+        DeployedContracts memory contracts,
+        GatewayCTMDeployerConfig memory config
+    ) internal returns (address) {
+        CTMContract[] memory facetIds = new CTMContract[](6);
+        address[] memory facetAddresses = new address[](6);
+        bool[] memory freezable = new bool[](6);
+
+        facetIds[0] = CTMContract.AdminFacet;
+        facetAddresses[0] = contracts.stateTransition.facets.adminFacet;
+        freezable[0] = false;
+
+        facetIds[1] = CTMContract.GettersFacet;
+        facetAddresses[1] = contracts.stateTransition.facets.gettersFacet;
+        freezable[1] = false;
+
+        facetIds[2] = CTMContract.MailboxFacet;
+        facetAddresses[2] = contracts.stateTransition.facets.mailboxFacet;
+        freezable[2] = true;
+
+        facetIds[3] = CTMContract.ExecutorFacet;
+        facetAddresses[3] = contracts.stateTransition.facets.executorFacet;
+        freezable[3] = true;
+
+        facetIds[4] = CTMContract.MigratorFacet;
+        facetAddresses[4] = contracts.stateTransition.facets.migratorFacet;
+        freezable[4] = false;
+
+        facetIds[5] = CTMContract.CommitterFacet;
+        facetAddresses[5] = contracts.stateTransition.facets.committerFacet;
+        freezable[5] = true;
+
+        GenesisRegistry registry = new GenesisRegistry();
+        registry.initialize(
+            config.protocolVersion,
+            facetIds,
+            facetAddresses,
+            freezable,
+            config.bootloaderHash,
+            config.defaultAccountHash,
+            config.evmEmulatorHash
+        );
+        return address(registry);
     }
 
     /// @notice Simulates a CREATE2 deployment by calling the deterministic CREATE2 factory.

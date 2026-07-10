@@ -2,33 +2,35 @@
 
 pragma solidity 0.8.28;
 
-import {CTMContract} from "../../../upgrades/registry/ContractIdentifiers.sol";
-import {IGenesisFacetRegistry} from "../../../upgrades/registry/IGenesisFacetRegistry.sol";
+import {CTMContract} from "../../upgrades/registry/ContractIdentifiers.sol";
+import {IGenesisFacetRegistry} from "../../upgrades/registry/IGenesisFacetRegistry.sol";
 import {
     RegistryUnknownKey,
     RegistryAlreadyInitialized,
     RegistryLengthMismatch
-} from "../../../common/L1ContractErrors.sol";
+} from "../../common/L1ContractErrors.sol";
 
-/// @title GatewayGenesisRegistry
+/// @title GenesisRegistry
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The genesis facet registry the Gateway ChainTypeManager points at, so `DiamondInit`
-///         installs a new chain's facet set from here (via `RegistryFacetReader`) exactly like on
-///         L1 — the committed genesis cut carries no facet addresses, only a pointer to this
-///         registry.
-/// @dev Storage-backed rather than constants-in-bytecode (the L1 form): the Gateway facet
-///      addresses are only known at deploy time (they are CREATE2-computed by
-///      `GatewayCTMDeployerHelper`), and this registry runs under zksync-os where no constructor /
-///      immutable is available. `GatewayCTMDeployer` deploys it via CREATE2 (so its address is
-///      deterministic and independent of the facet addresses — letting the off-chain helper put it
-///      in the cut before any facet exists) and calls {initialize} once, in the same transaction,
-///      to pin the facet set. The atomic deploy-and-initialize is the commitment (the deployer
-///      bytecode + config is what governance approves), so a one-shot flag is sufficient guarding.
+/// @notice The storage-backed genesis registry a freshly deployed ChainTypeManager points at:
+///         `DiamondInit` installs a new chain's facet set from here (via `RegistryFacetReader`)
+///         and reads the base system contract hashes chains start from — the committed genesis
+///         cut carries no facet addresses and no init payload, only a pointer to this registry.
+/// @dev Storage-backed rather than constants-in-bytecode (the generated upgrade-registry form)
+///      because the pinned values are only known at deploy time: the facet addresses are computed
+///      by the deploy flow itself. Used by both the L1 CTM deploy scripts and the on-chain
+///      `GatewayCTMDeployer` — the latter runs under zksync-os, so no constructor / immutable is
+///      available; deployment is CREATE2 (deterministic address, independent of the pinned
+///      values) followed by a one-shot {initialize} in the same flow. The atomic
+///      deploy-and-initialize is the commitment (the deployer bytecode + config is what
+///      governance approves), so a one-shot flag is sufficient guarding. Once a protocol upgrade
+///      is applied, the CTM's pointer moves to the audited constants-in-bytecode registry of
+///      that version.
 /// @dev Selectors are pinned empty on purpose: `DiamondInit` reads each facet's own
 ///      `ISelfDescribingFacet.selectors()` at genesis (the facets are already deployed by then),
-///      matching the steady-state L1 registry-driven path.
-contract GatewayGenesisRegistry is IGenesisFacetRegistry {
+///      matching the steady-state registry-driven path.
+contract GenesisRegistry is IGenesisFacetRegistry {
     /// @notice The packed SemVer protocol version chains are created at. Also doubles as the
     ///         initialization guard: zero until {initialize} runs, non-zero afterwards.
     uint256 public newProtocolVersion;
@@ -42,16 +44,27 @@ contract GatewayGenesisRegistry is IGenesisFacetRegistry {
     /// @dev Facet identifier => whether its selectors are freezable in the diamond.
     mapping(CTMContract facet => bool isFreezable) internal facetIsFreezableOf;
 
-    /// @notice Pins the facet set for `_protocolVersion`. Callable exactly once.
+    /// @dev The base system contract hashes chains start from (all zero on ZKsync OS).
+    bytes32 internal l2BootloaderBytecodeHash;
+    bytes32 internal l2DefaultAccountBytecodeHash;
+    bytes32 internal l2EvmEmulatorBytecodeHash;
+
+    /// @notice Pins the genesis data for `_protocolVersion`. Callable exactly once.
     /// @param _protocolVersion The packed SemVer protocol version new chains are created at.
     /// @param _facets The ordered facet set installed at genesis.
     /// @param _addresses The deployed address of each facet, in the same order as `_facets`.
     /// @param _freezable Whether each facet's selectors are freezable, in the same order.
+    /// @param _bootloaderHash The hash of the bootloader L2 bytecode (zero on ZKsync OS).
+    /// @param _defaultAccountHash The hash of the default account L2 bytecode (zero on ZKsync OS).
+    /// @param _evmEmulatorHash The hash of the EVM emulator L2 bytecode (zero on ZKsync OS).
     function initialize(
         uint256 _protocolVersion,
         CTMContract[] calldata _facets,
         address[] calldata _addresses,
-        bool[] calldata _freezable
+        bool[] calldata _freezable,
+        bytes32 _bootloaderHash,
+        bytes32 _defaultAccountHash,
+        bytes32 _evmEmulatorHash
     ) external {
         if (newProtocolVersion != 0) {
             revert RegistryAlreadyInitialized();
@@ -68,6 +81,10 @@ contract GatewayGenesisRegistry is IGenesisFacetRegistry {
             facetAddressOf[facet] = _addresses[i];
             facetIsFreezableOf[facet] = _freezable[i];
         }
+
+        l2BootloaderBytecodeHash = _bootloaderHash;
+        l2DefaultAccountBytecodeHash = _defaultAccountHash;
+        l2EvmEmulatorBytecodeHash = _evmEmulatorHash;
     }
 
     /// @inheritdoc IGenesisFacetRegistry
@@ -92,6 +109,14 @@ contract GatewayGenesisRegistry is IGenesisFacetRegistry {
     /// @inheritdoc IGenesisFacetRegistry
     function facetIsFreezable(CTMContract _facet) external view returns (bool) {
         return facetIsFreezableOf[_facet];
+    }
+
+    /// @inheritdoc IGenesisFacetRegistry
+    function baseSystemContractHashes(
+        uint256 _protocolVersion
+    ) external view returns (bytes32 bootloaderHash, bytes32 defaultAccountHash, bytes32 evmEmulatorHash) {
+        _checkVersion(_protocolVersion);
+        return (l2BootloaderBytecodeHash, l2DefaultAccountBytecodeHash, l2EvmEmulatorBytecodeHash);
     }
 
     /// @dev Only the single pinned protocol version is answerable, mirroring the generated

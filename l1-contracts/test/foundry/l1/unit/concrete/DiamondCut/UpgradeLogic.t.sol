@@ -4,12 +4,7 @@ pragma solidity 0.8.28;
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
-import {
-    DiamondInit,
-    FacetInstallation,
-    InitializeData,
-    InitializeDataNewChain
-} from "contracts/state-transition/chain-deps/DiamondInit.sol";
+import {DiamondInit, FacetInstallation, InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -103,14 +98,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             baseTokenAssetId: baseTokenAssetId,
             storedBatchZero: bytes32(0)
         });
-        // initialProtocolVersion: 0,
-        InitializeDataNewChain memory newChainParams = InitializeDataNewChain({
-            l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-            l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-            l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
-        });
-
-        bytes memory diamondInitCalldata = abi.encodeCall(diamondInit.initialize, (params, abi.encode(newChainParams)));
+        bytes memory diamondInitCalldata = abi.encodeCall(diamondInit.initialize, (params));
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -119,6 +107,9 @@ contract UpgradeLogicTest is DiamondCutTest {
         });
 
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), baseTokenAssetId);
+        // The fixture's CTM is a real (Dummy)EraChainTypeManager whose genesis registry pointer
+        // is unset; DiamondInit requires one, so mock the pointer + registry here.
+        mockGenesisRegistry(chainTypeManager);
         diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
         proxyAsAdmin = AdminFacet(address(diamondProxy));
         proxyAsGetters = GettersFacet(address(diamondProxy));

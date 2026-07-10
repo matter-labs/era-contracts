@@ -11,7 +11,7 @@ import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
-import {FacetInstallation, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {FacetInstallation} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ProposedUpgrade, UpgradeFacetSwap} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
@@ -215,18 +215,12 @@ contract GeneratedRegistriesTest is Test {
         assertEq(params.genesisIndexRepeatedStorageChanges, 54);
         assertEq(params.forceDeploymentsData, hex"f1f2");
         assertEq(params.diamondCut.initAddress, address(0xF204)); // DiamondInit
-        // The genesis cut carries no facet cuts and no facets in its init calldata: DiamondInit
-        // reads the facet set from the pinned registry. The cut's init calldata holds only the
-        // base-system-contract hashes.
+        // The genesis cut carries no facet cuts and NO init payload at all: DiamondInit reads
+        // both the facet set and the base-system-contract hashes from the pinned registry.
         assertEq(params.diamondCut.facetCuts.length, 0);
-        InitializeDataNewChain memory newChainData = abi.decode(
-            params.diamondCut.initCalldata,
-            (InitializeDataNewChain)
-        );
-        assertEq(
-            newChainData.l2BootloaderBytecodeHash,
-            bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000b00))
-        );
+        assertEq(params.diamondCut.initCalldata.length, 0);
+        (bytes32 bootloaderHash, , ) = ctmRegistry.baseSystemContractHashes(ctmRegistry.newProtocolVersion());
+        assertEq(bootloaderHash, bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000b00)));
         // The registry pinned for genesis is the registry itself — DiamondInit reads the facet
         // set straight from it (the same set the upgrade path's swap plan produces).
         assertEq(params.registry, address(ctmRegistry));
