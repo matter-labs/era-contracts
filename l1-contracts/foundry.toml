@@ -83,6 +83,18 @@ cache_path = "cache-forge-registry-deterministic"
 enable_eravm_extensions = true
 zksolc = "1.5.11"
 
+# zksync-mode TEST profile: identical toolchain, but zksolc optimizes for SIZE ('z') — the big
+# L2 integration test contracts (which inherit the full deploy-script surface) sit close to
+# EraVM's 65536-instruction cap under the default cycle-optimizing mode. Separate out/cache
+# dirs so production zkout artifacts (built with the default profile) are never clobbered.
+[profile.zktest]
+out = "out-zktest"
+cache_path = "cache-forge-zktest"
+[profile.zktest.zksync]
+enable_eravm_extensions = true
+zksolc = "1.5.11"
+optimizer_mode = "z"
+
 [profile.invariant_tests_l1context]
 test = "test"
 ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]

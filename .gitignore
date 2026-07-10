@@ -16,6 +16,8 @@ node_modules/
 # also match node_modules symlinks (worktrees link them to the main checkout)
 node_modules
 out/
+out-zktest/
+cache-forge-zktest/
 target/
 work/
 tools/verifier-gen/data/*.sol
