@@ -407,6 +407,11 @@
   },
   {
     "type": "error",
+    "name": "PayloadTooShort",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "SlotOccupied",
     "inputs": []
   },
