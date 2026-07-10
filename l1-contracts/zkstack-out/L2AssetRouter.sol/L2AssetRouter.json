@@ -684,6 +684,22 @@
   },
   {
     "type": "error",
+    "name": "InteropSenderChainIdMismatch",
+    "inputs": [
+      {
+        "name": "senderChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "payloadSourceChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InteroperableAddressParsingError",
     "inputs": [
       {

@@ -9,11 +9,7 @@ import {
   L2_ASSET_ROUTER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../core/const";
-import {
-  encodeAssetRouterBridgehubDepositData,
-  encodeBridgeBurnData,
-  encodeNtvAssetId,
-} from "../core/data-encoding";
+import { encodeAssetRouterBridgehubDepositData, encodeBridgeBurnData, encodeNtvAssetId } from "../core/data-encoding";
 import type { CoreDeployedAddresses } from "../core/types";
 import { indirectCallAttr, interopCallValueAttr, sendInteropBundle } from "./interop-helpers";
 import { encodeEvmAddress } from "./erc7930";
