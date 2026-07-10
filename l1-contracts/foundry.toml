@@ -85,11 +85,11 @@ zksolc = "1.5.11"
 
 # zksync-mode TEST profile: identical toolchain, but zksolc optimizes for SIZE ('z') — the big
 # L2 integration test contracts (which inherit the full deploy-script surface) sit close to
-# EraVM's 65536-instruction cap under the default cycle-optimizing mode. Separate out/cache
-# dirs so production zkout artifacts (built with the default profile) are never clobbered.
+# EraVM's 65536-instruction cap under the default cycle-optimizing mode. Shares the standard
+# out/ dirs because tests read compiled artifacts from `out/` at runtime; the EVM-side settings
+# are identical, and zkout artifacts for production are always rebuilt by build:foundry (which
+# uses the default profile and different compiler settings, so the cache never mixes them up).
 [profile.zktest]
-out = "out-zktest"
-cache_path = "cache-forge-zktest"
 [profile.zktest.zksync]
 enable_eravm_extensions = true
 zksolc = "1.5.11"
