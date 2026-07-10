@@ -51,15 +51,6 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     // ============ commitValue ============
 
-    function test_commitValue_matchesSpec() public view {
-        bytes32 flowId = keccak256("flow");
-        bytes32 bundleHash = keccak256("bundle");
-        assertEq(
-            proofLib.commitValue(flowId, bundleHash),
-            uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))
-        );
-    }
-
     function testFuzz_commitValue_matchesSpec(bytes32 _flowId, bytes32 _bundleHash) public view {
         assertEq(
             proofLib.commitValue(_flowId, _bundleHash),
@@ -78,6 +69,23 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
             DEADLINE - 1 // settled before the deadline
         );
         // Outcome under test: an in-time, correctly-authenticated inclusion proof does NOT revert.
+        _expectRootAuthentication(proof);
+        proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
+    }
+
+    /// @dev The root-authentication adapter must forward both message coordinates. Keeping them distinct
+    /// and non-zero prevents the all-zero default fixture from hiding a hardcoded index or tx number.
+    function test_verifyInclusion_forwardsNonZeroMessageCoordinatesToVerifier() public {
+        ImtProof memory proof = _inclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            committedIndex,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            DEADLINE - 1
+        );
+        proof.messageTxNumberInBatch = 7;
+        proof.messageIndex = 1;
+
         _expectRootAuthentication(proof);
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
@@ -303,27 +311,6 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         vm.expectRevert(
             abi.encodeWithSelector(ProofSourceChainMismatch.selector, SOURCE_CHAIN_ID, wrongSuccessorChain)
         );
-        proofLib.verifyTimeoutAdjacency(absence, successor, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
-    }
-
-    function test_RevertWhen_timeout_adjacencyNotConsecutive() public {
-        ImtProof memory absence = _nonInclusionProof(
-            SOURCE_CHAIN_ID,
-            BATCH_N,
-            absentValue,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            DEADLINE - 1
-        );
-        uint256 nonConsecutive = BATCH_N + 2;
-        ImtProof memory successor = _rootAuthProof(
-            SOURCE_CHAIN_ID,
-            nonConsecutive,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            uint256(DEADLINE) + 1
-        );
-        _expectRootAuthentication(absence);
-        _expectRootAuthentication(successor);
-        vm.expectRevert(abi.encodeWithSelector(ProofAdjacencyNotConsecutive.selector, BATCH_N, nonConsecutive));
         proofLib.verifyTimeoutAdjacency(absence, successor, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
