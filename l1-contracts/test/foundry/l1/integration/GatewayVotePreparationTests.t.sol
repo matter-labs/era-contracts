@@ -194,6 +194,7 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         _simulateCreate2(create2Factory, directCalldata.diamondInitCalldata, "DiamondInit");
         _simulateCreate2(create2Factory, directCalldata.genesisUpgradeCalldata, "GenesisUpgrade");
         _simulateCreate2(create2Factory, directCalldata.multicall3Calldata, "Multicall3");
+        _simulateCreate2(create2Factory, directCalldata.bootstrapRegistryCalldata, "CTMRegistry");
 
         // Mock the CTM calls that DiamondInit.initialize() makes. The CTM is `msg.sender`
         // during the proxy construction, so the deploy below pranks as this mock.

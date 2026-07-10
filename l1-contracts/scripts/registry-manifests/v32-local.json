@@ -11,7 +11,7 @@
     "contracts": {
       "MessageRoot": {
         "proxy": "0xEeBD607623e9Baf752DF115d89d82b6391feC9aa",
-        "implNew": "0xAD523115cd35a8d4E60B3C0953E0E0ac10418309",
+        "implNew": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C",
         "implNewCodehash": "0xd64f41869617d844a8b103a5ebcdd01ab4918fd422f4a856b47e0082eef0c9ed"
       }
     }
@@ -21,14 +21,14 @@
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
       "ctmProxy": "0x2Ed7Fa601037FC1a7F295aee9B4ADf79fE8ccf6d",
-      "verifierNew": "0xaB7B4c595d3cE8C85e16DA86630f2fc223B05057",
+      "verifierNew": "0xAD523115cd35a8d4E60B3C0953E0E0ac10418309",
       "contracts": {
         "DefaultUpgrade": {
-          "new": "0xddE78e6202518FF4936b5302cC2891ec180E8bFf",
+          "new": "0xB06c856C8eaBd1d8321b687E188204C1018BC4E5",
           "newCodehash": "0x5faf1d86a01c82bee946ad7c5ec15ced0660650a4778dae50f4c5a0cc056a1d9"
         },
         "DiamondInit": {
-          "new": "0xB06c856C8eaBd1d8321b687E188204C1018BC4E5",
+          "new": "0xaB7B4c595d3cE8C85e16DA86630f2fc223B05057",
           "newCodehash": "0x1c11c008864151015433b20dd022626e5f271bc21db03693c82be87aaac46f6b"
         }
       },
@@ -63,31 +63,31 @@
         "installed": [
           {
             "name": "AdminFacet",
-            "address": "0xaca81583840B1bf2dDF6CDe824ada250C1936B4D",
+            "address": "0x70bDA08DBe07363968e9EE53d899dFE48560605B",
             "codehash": "0xe8e31854a39f59042ebdf56730808bd85eabdff0c2a16bd8e67afbccb7425836",
             "selectors": []
           },
           {
             "name": "GettersFacet",
-            "address": "0x70bDA08DBe07363968e9EE53d899dFE48560605B",
+            "address": "0x26B862f640357268Bd2d9E95bc81553a2Aa81D7E",
             "codehash": "0x6eb8cfdb1a91fd28763e291cfe354d2bedbd8cbf7bbc01b1c30b60329c4f33f5",
             "selectors": []
           },
           {
             "name": "ExecutorFacet",
-            "address": "0x26B862f640357268Bd2d9E95bc81553a2Aa81D7E",
+            "address": "0xA56F946D6398Dd7d9D4D9B337Cf9E0F68982ca5B",
             "codehash": "0x44eafc4ee037764abdaf3c51b011ad76b212bed96171391036b5fa825b16674e",
             "selectors": []
           },
           {
             "name": "MigratorFacet",
-            "address": "0xA56F946D6398Dd7d9D4D9B337Cf9E0F68982ca5B",
+            "address": "0x5D42EBdBBa61412295D7b0302d6F50aC449Ddb4F",
             "codehash": "0x0cb6b357a2495ebad9edbde1e8aed66c507e5c57376b1ca0c10fe06907be1305",
             "selectors": []
           },
           {
             "name": "CommitterFacet",
-            "address": "0x5D42EBdBBa61412295D7b0302d6F50aC449Ddb4F",
+            "address": "0xddE78e6202518FF4936b5302cC2891ec180E8bFf",
             "codehash": "0xd4c360992416dd82f883f8e7eb3fb160326825598f56f93ded25035e2b63bfd9",
             "selectors": []
           },

@@ -143,6 +143,11 @@ struct GatewayCTMFinalConfig {
     address genesisUpgrade;
     /// @notice Address of the Verifier contract (from Verifiers deployer).
     address verifier;
+    /// @notice Address of the (deployed directly, uninitialized) bootstrap `CTMRegistry`; this
+    ///         deployer initializes it with the genesis manifest. Deployed directly rather than
+    ///         by this deployer because embedding its creation code here would push the
+    ///         deployer's initcode past the EIP-3860 cap.
+    address bootstrapRegistry;
 }
 
 /// @notice Result from CTM deployer.

@@ -407,10 +407,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
 
     console.log("\n✅ Registry-driven upgrade verified successfully!\n");
     if (regenRegistries) {
-      console.log(
-        `Regenerated ${GENERATED_REGISTRY_FILES.join(", ")} in ${REGISTRY_GEN_DIR_REL} ` +
-          `and ${REGISTRY_MANIFEST_REL} — review the diff and commit it.\n`
-      );
+      console.log(`Regenerated ${REGISTRY_MANIFEST_REL} — review the diff and commit it.\n`);
     }
   } finally {
     if (!keepChains) {

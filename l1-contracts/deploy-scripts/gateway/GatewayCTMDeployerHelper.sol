@@ -77,6 +77,7 @@ struct DirectDeployedAddresses {
     Facets facets;
     address genesisUpgrade;
     address multicall3;
+    address bootstrapRegistry;
 }
 
 /// @notice CREATE2 calldata for contracts deployed directly (no deployer)
@@ -90,6 +91,7 @@ struct DirectCreate2Calldata {
     bytes diamondInitCalldata;
     bytes genesisUpgradeCalldata;
     bytes multicall3Calldata;
+    bytes bootstrapRegistryCalldata;
 }
 
 struct CalculateAddressesIntermediate {
@@ -424,6 +426,18 @@ library GatewayCTMDeployerHelper {
             config.isZKsyncOS,
             true
         );
+
+        // Bootstrap CTMRegistry — deployed directly (its ~12KB creation code would push the CTM
+        // deployer's initcode past the EIP-3860 cap) and left uninitialized; the CTM deployer
+        // initializes it with the genesis manifest.
+        (addresses.bootstrapRegistry, data.bootstrapRegistryCalldata) = _calculateCreate2AddressAndCalldata(
+            _create2Salt,
+            "CTMRegistry.sol",
+            "CTMRegistry",
+            hex"",
+            config.isZKsyncOS,
+            true
+        );
     }
 
     function _calculateCreate2AddressAndCalldata(
@@ -506,7 +520,8 @@ library GatewayCTMDeployerHelper {
                 validatorTimelockProxy: validatorTimelockResult.validatorTimelockProxy,
                 facets: directAddresses.facets,
                 genesisUpgrade: directAddresses.genesisUpgrade,
-                verifier: verifiersResult.verifier
+                verifier: verifiersResult.verifier,
+                bootstrapRegistry: directAddresses.bootstrapRegistry
             });
     }
 
@@ -665,15 +680,10 @@ library GatewayCTMDeployerHelper {
         );
 
         {
-            // The genesis registry is deployed by the CTM deployer contract via CREATE2 with the
-            // shared salt and no constructor args, so its address is deterministic and independent
-            // of the facet addresses — computable here, before the facets exist, for the cut.
-            address genesisRegistry = _deployInternalEmptyParams(
-                "CTMRegistry",
-                "CTMRegistry.sol",
-                innerConfig,
-                isZKsyncOS
-            );
+            // The bootstrap registry is a DIRECT deployment (see _calculateDirectDeployments);
+            // its address rides in the final config, deterministic and independent of the facet
+            // addresses — known here, before the facets exist, for the cut.
+            address genesisRegistry = config.bootstrapRegistry;
             bytes memory proxyConstructorArgs = _buildCTMProxyConstructorArgs(
                 config,
                 baseConfig,
@@ -770,6 +780,7 @@ library GatewayCTMDeployerHelper {
         contracts.stateTransition.facets = directAddresses.facets;
         contracts.stateTransition.genesisUpgrade = directAddresses.genesisUpgrade;
         contracts.multicall3 = directAddresses.multicall3;
+        contracts.stateTransition.genesisRegistry = directAddresses.bootstrapRegistry;
 
         // From CTM deployer
         contracts.stateTransition.implementations.serverNotifier = ctmResult.serverNotifierImplementation;

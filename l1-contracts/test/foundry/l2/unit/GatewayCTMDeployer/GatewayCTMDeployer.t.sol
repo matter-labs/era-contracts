@@ -63,7 +63,8 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {
     GatewayCTMDeployerHelper,
     DeployerCreate2Calldata,
-    DeployerAddresses
+    DeployerAddresses,
+    DirectCreate2Calldata
 } from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
 
 import {
@@ -113,6 +114,13 @@ contract GatewayCTMDeployerTester {
 
         deployerAddr = abi.decode(returnData, (address));
         result = GatewayCTMDeployerVerifiers(deployerAddr).getResult();
+    }
+
+    /// @notice Deploys a directly-deployed contract (no deployer) via the L2 CREATE2 factory.
+    function deployDirect(bytes memory data) external returns (address deployedAddr) {
+        (bool success, bytes memory returnData) = L2_CREATE2_FACTORY_ADDR.call(data);
+        require(success, "direct deployment failed");
+        deployedAddr = abi.decode(returnData, (address));
     }
 
     /// @notice Deploys CTM and ServerNotifier
@@ -201,8 +209,8 @@ contract GatewayCTMDeployerTest is Test {
         (
             DeployedContracts memory calculatedContracts,
             DeployerCreate2Calldata memory deployerCalldata,
-            DeployerAddresses memory expectedDeployers, // DirectCreate2Calldata and create2FactoryAddress not needed for this test
-            ,
+            DeployerAddresses memory expectedDeployers,
+            DirectCreate2Calldata memory directCalldata, // create2FactoryAddress not needed for this test
 
         ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), deployerConfig);
 
@@ -210,6 +218,14 @@ contract GatewayCTMDeployerTest is Test {
         _publishDeployerBytecodes(calculatedContracts);
 
         GatewayCTMDeployerTester tester = new GatewayCTMDeployerTester();
+
+        // The bootstrap CTMRegistry is a direct deployment the CTM deployer initializes; it must
+        // exist before the CTM deployer runs.
+        address bootstrapRegistry = tester.deployDirect(directCalldata.bootstrapRegistryCalldata);
+        require(
+            bootstrapRegistry == calculatedContracts.stateTransition.genesisRegistry,
+            "bootstrap registry address mismatch"
+        );
 
         // Deploy all deployers and collect results
         AllDeployerResults memory results = _deployAllDeployers(
@@ -311,7 +327,11 @@ contract GatewayCTMDeployerTest is Test {
             validatorTimelockProxy: results.validatorTimelockResult.validatorTimelockProxy,
             facets: calculatedContracts.stateTransition.facets,
             genesisUpgrade: calculatedContracts.stateTransition.genesisUpgrade,
-            verifier: results.verifiersResult.verifier
+            verifier: results.verifiersResult.verifier,
+            // This publish-run actually EXECUTES the deployer constructor, which initializes
+            // (write-once) whatever registry the config points at — so point it at a throwaway
+            // instance, keeping the real bootstrap registry uninitialized for the factory run.
+            bootstrapRegistry: address(new CTMRegistry())
         });
         new GatewayCTMDeployerCTM(ctmConfig);
     }

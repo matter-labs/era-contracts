@@ -80,6 +80,8 @@ contract CTMRegistry is ICTMRegistry {
     /// @dev For a BOOTSTRAP (genesis) registry of a freshly deployed CTM most sections are empty:
     ///      only `newProtocolVersion`, the new-version facet rows, freezability rows and the base
     ///      system contract hashes are needed by `DiamondInit`; `oldProtocolVersion` is zero.
+    /// @dev Field order mirrors review-friendly manifest grouping; the struct is calldata-only.
+    // solhint-disable-next-line gas-struct-packing
     struct CTMRegistryManifest {
         bool isZKsyncOS;
         uint256 oldProtocolVersion;

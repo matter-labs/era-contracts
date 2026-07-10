@@ -92,10 +92,11 @@ abstract contract GatewayCTMDeployerCTMBase {
         // pointer to the registry. `DiamondInit` reads the registry (via the CTM's
         // `genesisRegistry()`) and installs the facets itself, resolving each facet's selectors
         // from its own `ISelfDescribingFacet.selectors()` bytecode; the base system contract
-        // hashes are read from the registry too. The registry is deployed via CREATE2
-        // (deterministic address, independent of the pinned values) so the off-chain helper can
-        // put it in the cut before any facet exists.
-        address genesisRegistry = _deployGenesisRegistry(_salt, baseConfig, facets);
+        // hashes are read from the registry too. The registry contract is deployed DIRECTLY via
+        // CREATE2 (no constructor, so its address is independent of the pinned values — the
+        // off-chain helper can put it in the cut before any facet exists) and initialized HERE,
+        // in the same deployer flow governance approved.
+        address genesisRegistry = _initializeGenesisRegistry(_config.bootstrapRegistry, baseConfig, facets);
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
@@ -135,22 +136,20 @@ abstract contract GatewayCTMDeployerCTMBase {
         );
     }
 
-    /// @notice Deploys the Gateway bootstrap registry and pins the genesis manifest into it.
-    /// @dev CREATE2 with the shared salt: the address is deterministic and independent of the
-    ///      pinned values (no constructor args), so the off-chain helper reproduces it for the
-    ///      genesis cut before the facets are deployed. Initialized in the same transaction; the
-    ///      facet order and freezability mirror the diamond's installed set.
-    /// @param _salt Salt used for the CREATE2 deployment.
+    /// @notice Initializes the (directly deployed, still-uninitialized) bootstrap registry with
+    ///         the genesis manifest. The facet order and freezability mirror the diamond's
+    ///         installed set.
+    /// @param _registry The pre-deployed bootstrap `CTMRegistry` address.
     /// @param _baseConfig The deployment config (protocol version and base system hashes).
     /// @param _facets The deployed diamond facet addresses.
-    /// @return registry The address of the deployed and initialized bootstrap registry.
-    function _deployGenesisRegistry(
-        bytes32 _salt,
+    /// @return registry The initialized bootstrap registry (echoed back).
+    function _initializeGenesisRegistry(
+        address _registry,
         GatewayCTMDeployerConfig memory _baseConfig,
         Facets memory _facets
     ) internal returns (address registry) {
-        CTMRegistry genesisRegistry = new CTMRegistry{salt: _salt}();
-        genesisRegistry.initialize(
+        CTMRegistry(_registry).initialize(
+            // solhint-disable-next-line func-named-parameters
             GenesisManifestLib.buildGenesisManifest(
                 _baseConfig.isZKsyncOS,
                 _baseConfig.protocolVersion,
@@ -160,7 +159,7 @@ abstract contract GatewayCTMDeployerCTMBase {
                 _baseConfig.evmEmulatorHash
             )
         );
-        registry = address(genesisRegistry);
+        registry = _registry;
     }
 
     /// @notice Sets the previously deployed CTM inside the ServerNotifier and transfers ownership.

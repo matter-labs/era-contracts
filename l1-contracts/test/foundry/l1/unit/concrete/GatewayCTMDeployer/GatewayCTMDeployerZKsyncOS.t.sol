@@ -259,5 +259,13 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
         // Multicall3
         deployed = tester.deployDirect(directCalldata.multicall3Calldata);
         assertEq(deployed, calculatedContracts.multicall3, "Multicall3 address mismatch");
+
+        // Bootstrap CTMRegistry (deployed directly, uninitialized; the CTM deployer initializes it)
+        deployed = tester.deployDirect(directCalldata.bootstrapRegistryCalldata);
+        assertEq(
+            deployed,
+            calculatedContracts.stateTransition.genesisRegistry,
+            "bootstrap CTMRegistry address mismatch"
+        );
     }
 }
