@@ -39,8 +39,8 @@ const ARTIFACTS = {
   // Committed generated registries (contracts/upgrades/registry/v32, tag "V32"). They compile
   // with the regular forge build; regenerate via `yarn regen:v32-registries` (emit mode of the
   // registry upgrade runner).
-  CoreRegistryV32: "CoreRegistryV32.sol/CoreRegistryV32.json",
-  ZKsyncOSCTMRegistryV32: "ZKsyncOSCTMRegistryV32.sol/ZKsyncOSCTMRegistryV32.json",
+  CTMRegistry: "CTMRegistry.sol/CTMRegistry.json",
+  CoreRegistry: "CoreRegistry.sol/CoreRegistry.json",
   BridgedStandardERC20: "BridgedStandardERC20.sol/BridgedStandardERC20.json",
   ChainAdminOwnable: "ChainAdminOwnable.sol/ChainAdminOwnable.json",
   ChainRegistrationSender: "ChainRegistrationSender.sol/ChainRegistrationSender.json",

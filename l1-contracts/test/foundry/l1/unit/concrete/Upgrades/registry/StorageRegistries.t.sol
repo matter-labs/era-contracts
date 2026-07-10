@@ -5,6 +5,8 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {CoreContract, CTMContract, EcosystemContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+import {CTMRegistry} from "contracts/upgrades/registry/CTMRegistry.sol";
+import {CoreRegistry} from "contracts/upgrades/registry/CoreRegistry.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/CTMUpgradeComposer.sol";
 import {RegistryFacetReader} from "contracts/upgrades/registry/RegistryFacetReader.sol";
 import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
@@ -17,30 +19,212 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {RegistryUnknownKey} from "contracts/common/L1ContractErrors.sol";
+import {RegistryUnknownKey, RegistryAlreadyInitialized} from "contracts/common/L1ContractErrors.sol";
 
-import {CoreRegistryV99} from "./CoreRegistryV99.sol";
-import {ZKsyncOSCTMRegistryV99} from "./ZKsyncOSCTMRegistryV99.sol";
-
-/// @notice Tests the generator's output (checked-in sample from
-///         scripts/gen-registry-manifest.example.json) and the on-chain composition the
-///         orchestrator performs on top of it. Regenerate with:
-///         `ts-node scripts/gen-registry.ts scripts/gen-registry-manifest.example.json
-///          test/foundry/l1/unit/concrete/upgrades/registry-gen`
-contract GeneratedRegistriesTest is Test {
-    CoreRegistryV99 internal coreRegistry;
-    ZKsyncOSCTMRegistryV99 internal ctmRegistry;
+/// @notice Tests the storage-backed registries initialized with a full UPGRADE manifest (the
+///         values form a compact synthetic upgrade: facet swap + removal + addition) and the on-chain
+///         composition the orchestrator performs on top of them. The write-once property and
+///         the manifest-hash commitment are covered here too — they are what makes a
+///         per-upgrade review a pure data check.
+contract StorageRegistriesTest is Test {
+    CoreRegistry internal coreRegistry;
+    CTMRegistry internal ctmRegistry;
 
     uint256 internal constant OLD_VERSION = uint256(98) << 32; // 0.98.0
     uint256 internal constant NEW_VERSION = uint256(99) << 32; // 0.99.0
 
     function setUp() public {
-        coreRegistry = new CoreRegistryV99();
-        ctmRegistry = new ZKsyncOSCTMRegistryV99();
+        coreRegistry = new CoreRegistry();
+        coreRegistry.initialize(_coreManifest());
+        ctmRegistry = new CTMRegistry();
+        ctmRegistry.initialize(_ctmManifest());
     }
 
     /*//////////////////////////////////////////////////////////////
-                        generated getter surface
+                        manifest fixtures
+    //////////////////////////////////////////////////////////////*/
+
+    function _coreManifest() internal pure returns (CoreRegistry.CoreRegistryManifest memory manifest) {
+        CoreRegistry.EcosystemContractRow[] memory rows = new CoreRegistry.EcosystemContractRow[](3);
+        rows[0] = CoreRegistry.EcosystemContractRow({
+            key: EcosystemContract.Bridgehub,
+            proxy: address(0xB001),
+            implNew: address(0xB201)
+        });
+        rows[1] = CoreRegistry.EcosystemContractRow({
+            key: EcosystemContract.L1AssetRouter,
+            proxy: address(0xB002),
+            implNew: address(0xB202)
+        });
+        // MessageRoot participates (its proxy is pinned) but this upgrade pins no new
+        // implementation for it: zero means "nothing to upgrade".
+        rows[2] = CoreRegistry.EcosystemContractRow({
+            key: EcosystemContract.MessageRoot,
+            proxy: address(0xB003),
+            implNew: address(0)
+        });
+
+        CoreRegistry.CodehashPin[] memory pins = new CoreRegistry.CodehashPin[](1);
+        pins[0] = CoreRegistry.CodehashPin({target: address(0xB201), expectedCodehash: keccak256(hex"6001600155")});
+
+        manifest = CoreRegistry.CoreRegistryManifest({
+            oldProtocolVersion: OLD_VERSION,
+            newProtocolVersion: NEW_VERSION,
+            proxyAdmin: address(0xA001),
+            eraCTMRegistry: address(0xC001),
+            zksyncOSCTMRegistry: address(0xC002),
+            contractRows: rows,
+            codehashPins: pins
+        });
+    }
+
+    function _ctmManifest() internal pure returns (CTMRegistry.CTMRegistryManifest memory manifest) {
+        // Old-side rows are the upgrade PLAN: AdminFacet changes address, MailboxFacet is
+        // removed, ExecutorFacet is added (zero old address). GettersFacet is unchanged and has
+        // no old row. New-side rows are the complete post-upgrade facet set.
+        CTMRegistry.FacetRow[] memory facetRows = new CTMRegistry.FacetRow[](6);
+        facetRows[0] = CTMRegistry.FacetRow({
+            facet: CTMContract.AdminFacet,
+            protocolVersion: OLD_VERSION,
+            facetAddress: address(0xF101),
+            selectorList: _selectors2(bytes4(uint32(1)), bytes4(uint32(2)))
+        });
+        facetRows[1] = CTMRegistry.FacetRow({
+            facet: CTMContract.MailboxFacet,
+            protocolVersion: OLD_VERSION,
+            facetAddress: address(0xF103),
+            selectorList: _selectors1(bytes4(uint32(0x30)))
+        });
+        facetRows[2] = CTMRegistry.FacetRow({
+            facet: CTMContract.ExecutorFacet,
+            protocolVersion: OLD_VERSION,
+            facetAddress: address(0),
+            selectorList: new bytes4[](0)
+        });
+        facetRows[3] = CTMRegistry.FacetRow({
+            facet: CTMContract.AdminFacet,
+            protocolVersion: NEW_VERSION,
+            facetAddress: address(0xF201),
+            selectorList: _selectors2(bytes4(uint32(2)), bytes4(uint32(3)))
+        });
+        facetRows[4] = CTMRegistry.FacetRow({
+            facet: CTMContract.GettersFacet,
+            protocolVersion: NEW_VERSION,
+            facetAddress: address(0xF102),
+            selectorList: _selectors2(bytes4(uint32(0x10)), bytes4(uint32(0x11)))
+        });
+        facetRows[5] = CTMRegistry.FacetRow({
+            facet: CTMContract.ExecutorFacet,
+            protocolVersion: NEW_VERSION,
+            facetAddress: address(0xF203),
+            selectorList: _selectors1(bytes4(uint32(0x20)))
+        });
+
+        CTMRegistry.FreezabilityRow[] memory freezabilityRows = new CTMRegistry.FreezabilityRow[](4);
+        freezabilityRows[0] = CTMRegistry.FreezabilityRow({facet: CTMContract.AdminFacet, isFreezable: false});
+        freezabilityRows[1] = CTMRegistry.FreezabilityRow({facet: CTMContract.GettersFacet, isFreezable: false});
+        freezabilityRows[2] = CTMRegistry.FreezabilityRow({facet: CTMContract.MailboxFacet, isFreezable: true});
+        freezabilityRows[3] = CTMRegistry.FreezabilityRow({facet: CTMContract.ExecutorFacet, isFreezable: true});
+
+        CTMRegistry.AddressRow[] memory addressRows = new CTMRegistry.AddressRow[](2);
+        addressRows[0] = CTMRegistry.AddressRow({
+            key: CTMContract.DiamondInit,
+            protocolVersion: NEW_VERSION,
+            value: address(0xF204)
+        });
+        addressRows[1] = CTMRegistry.AddressRow({
+            key: CTMContract.DefaultUpgrade,
+            protocolVersion: NEW_VERSION,
+            value: address(0xF205)
+        });
+
+        CTMRegistry.VerifierRow[] memory verifierRows = new CTMRegistry.VerifierRow[](1);
+        verifierRows[0] = CTMRegistry.VerifierRow({protocolVersion: NEW_VERSION, verifier: address(0xE002)});
+
+        CTMRegistry.L2DeploymentRow[] memory l2Rows = new CTMRegistry.L2DeploymentRow[](2);
+        l2Rows[0] = CTMRegistry.L2DeploymentRow({
+            key: CoreContract.L2Bridgehub,
+            info: IComplexUpgrader.UniversalContractUpgradeInfo({
+                upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
+                deployedBytecodeInfo: hex"aa01",
+                newAddress: address(0x00010002)
+            }),
+            bytecodeHash: bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001))
+        });
+        l2Rows[1] = CTMRegistry.L2DeploymentRow({
+            key: CoreContract.L2AssetRouter,
+            info: IComplexUpgrader.UniversalContractUpgradeInfo({
+                upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
+                deployedBytecodeInfo: hex"aa02",
+                newAddress: address(0x00010003)
+            }),
+            bytecodeHash: bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000002))
+        });
+
+        uint256[] memory factoryDeps = new uint256[](2);
+        factoryDeps[0] = 0x0100000000000000000000000000000000000000000000000000000000000001;
+        factoryDeps[1] = 0x0100000000000000000000000000000000000000000000000000000000000002;
+
+        manifest = CTMRegistry.CTMRegistryManifest({
+            isZKsyncOS: true,
+            oldProtocolVersion: OLD_VERSION,
+            newProtocolVersion: NEW_VERSION,
+            ctmProxy: address(0xD001),
+            ctmAddressRows: addressRows,
+            verifierRows: verifierRows,
+            facetRows: facetRows,
+            freezabilityRows: freezabilityRows,
+            l2DeploymentRows: l2Rows,
+            l2UpgradeDelegateTo: address(0x00010004),
+            l2UpgradeDelegateCalldata: hex"beef",
+            factoryDepHashes: factoryDeps,
+            bootloaderHash: bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000b00)),
+            defaultAccountHash: bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000da0)),
+            evmEmulatorHash: bytes32(0),
+            fixedForceDeploymentsData: hex"f1f2",
+            genesisUpgrade: address(0x00010005),
+            genesisBatchHash: bytes32(uint256(0x0200000000000000000000000000000000000000000000000000000000000001)),
+            genesisBatchCommitment: bytes32(
+                uint256(0x0200000000000000000000000000000000000000000000000000000000000002)
+            ),
+            genesisIndexRepeatedStorageChanges: 54,
+            codehashPins: new CTMRegistry.CodehashPin[](0)
+        });
+    }
+
+    function _selectors1(bytes4 _a) internal pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](1);
+        selectors[0] = _a;
+    }
+
+    function _selectors2(bytes4 _a, bytes4 _b) internal pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](2);
+        selectors[0] = _a;
+        selectors[1] = _b;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        write-once + commitment
+    //////////////////////////////////////////////////////////////*/
+
+    function test_initializeIsWriteOnce() public {
+        assertTrue(coreRegistry.initialized());
+        assertTrue(ctmRegistry.initialized());
+
+        vm.expectRevert(RegistryAlreadyInitialized.selector);
+        coreRegistry.initialize(_coreManifest());
+
+        vm.expectRevert(RegistryAlreadyInitialized.selector);
+        ctmRegistry.initialize(_ctmManifest());
+    }
+
+    function test_manifestHashCommitsToManifest() public view {
+        assertEq(coreRegistry.manifestHash(), keccak256(abi.encode(_coreManifest())));
+        assertEq(ctmRegistry.manifestHash(), keccak256(abi.encode(_ctmManifest())));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        pinned getter surface
     //////////////////////////////////////////////////////////////*/
 
     function test_coreRegistryPinsManifestValues() public view {
@@ -105,7 +289,7 @@ contract GeneratedRegistriesTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                     composition on generated data
+                     composition on pinned data
     //////////////////////////////////////////////////////////////*/
 
     function test_buildFacetSwapPlan_plansExactlyThePlanRows() public view {
@@ -118,7 +302,7 @@ contract GeneratedRegistriesTest is Test {
         assertEq(plan[0].oldFacet, address(0xF101));
         assertEq(plan[0].newFacet, address(0xF201));
         assertFalse(plan[0].isFreezable);
-        // The sample pins selector lists (the bootstrap override); they ride along verbatim.
+        // The manifest pins selector lists (the bootstrap override); they ride along verbatim.
         assertEq(plan[0].oldSelectors.length, 2);
         assertEq(plan[0].oldSelectors[0], bytes4(uint32(1)));
         assertEq(plan[0].newSelectors.length, 2);

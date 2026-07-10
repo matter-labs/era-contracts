@@ -19,8 +19,8 @@ import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.s
 import {IDiamondInit, FacetInstallation} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {GenesisRegistry} from "contracts/state-transition/chain-deps/GenesisRegistry.sol";
-import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+import {CTMRegistry} from "contracts/upgrades/registry/CTMRegistry.sol";
+import {GenesisManifestLib} from "contracts/upgrades/registry/GenesisManifestLib.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 
@@ -259,49 +259,23 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         new DiamondProxy(GATEWAY_CHAIN_ID, diamondCut);
     }
 
-    /// @notice Deploys and initializes a real `GenesisRegistry` pinning the computed Gateway
-    /// facet set and base system hashes, mirroring GatewayCTMDeployerCTMBase._deployGenesisRegistry.
+    /// @notice Deploys and initializes a real bootstrap `CTMRegistry` pinning the computed
+    /// Gateway facet set and base system hashes, mirroring
+    /// GatewayCTMDeployerCTMBase._deployGenesisRegistry.
     function _deployGatewayGenesisRegistry(
         DeployedContracts memory contracts,
         GatewayCTMDeployerConfig memory config
     ) internal returns (address) {
-        CTMContract[] memory facetIds = new CTMContract[](6);
-        address[] memory facetAddresses = new address[](6);
-        bool[] memory freezable = new bool[](6);
-
-        facetIds[0] = CTMContract.AdminFacet;
-        facetAddresses[0] = contracts.stateTransition.facets.adminFacet;
-        freezable[0] = false;
-
-        facetIds[1] = CTMContract.GettersFacet;
-        facetAddresses[1] = contracts.stateTransition.facets.gettersFacet;
-        freezable[1] = false;
-
-        facetIds[2] = CTMContract.MailboxFacet;
-        facetAddresses[2] = contracts.stateTransition.facets.mailboxFacet;
-        freezable[2] = true;
-
-        facetIds[3] = CTMContract.ExecutorFacet;
-        facetAddresses[3] = contracts.stateTransition.facets.executorFacet;
-        freezable[3] = true;
-
-        facetIds[4] = CTMContract.MigratorFacet;
-        facetAddresses[4] = contracts.stateTransition.facets.migratorFacet;
-        freezable[4] = false;
-
-        facetIds[5] = CTMContract.CommitterFacet;
-        facetAddresses[5] = contracts.stateTransition.facets.committerFacet;
-        freezable[5] = true;
-
-        GenesisRegistry registry = new GenesisRegistry();
+        CTMRegistry registry = new CTMRegistry();
         registry.initialize(
-            config.protocolVersion,
-            facetIds,
-            facetAddresses,
-            freezable,
-            config.bootloaderHash,
-            config.defaultAccountHash,
-            config.evmEmulatorHash
+            GenesisManifestLib.buildGenesisManifest(
+                config.isZKsyncOS,
+                config.protocolVersion,
+                contracts.stateTransition.facets,
+                config.bootloaderHash,
+                config.defaultAccountHash,
+                config.evmEmulatorHash
+            )
         );
         return address(registry);
     }

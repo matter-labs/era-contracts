@@ -8,8 +8,8 @@ import {console2 as console} from "forge-std/Script.sol";
 
 import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {GenesisRegistry} from "contracts/state-transition/chain-deps/GenesisRegistry.sol";
-import {CTMContract as RegistryCTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+import {CTMRegistry} from "contracts/upgrades/registry/CTMRegistry.sol";
+import {GenesisManifestLib} from "contracts/upgrades/registry/GenesisManifestLib.sol";
 
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -127,7 +127,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     /// @dev Plain CREATE, not CREATE2: the registry has no constructor args, so a CREATE2 deploy
     /// with the shared salt would land every run (Era CTM, ZKsyncOS CTM, later upgrades) on the
     /// same, already-initialized address. A deterministic address buys nothing here — the CTM
-    /// stores the pointer.
+    /// stores the pointer — and the manifest hash is verified after initialization.
     function deployGenesisRegistry() internal returns (address) {
         if (!config.isZKsyncOS) {
             require(config.contracts.chainCreationParams.bootloaderHash != bytes32(0), "bootloader hash is zero");
@@ -138,49 +138,26 @@ abstract contract DeployCTMUtils is DeployUtils {
             require(config.contracts.chainCreationParams.evmEmulatorHash != bytes32(0), "EVM emulator hash is zero");
         }
 
-        RegistryCTMContract[] memory facetIds = new RegistryCTMContract[](6);
-        address[] memory facetAddresses = new address[](6);
-        bool[] memory freezable = new bool[](6);
-
-        facetIds[0] = RegistryCTMContract.AdminFacet;
-        facetAddresses[0] = ctmAddresses.stateTransition.facets.adminFacet;
-        freezable[0] = false;
-
-        facetIds[1] = RegistryCTMContract.GettersFacet;
-        facetAddresses[1] = ctmAddresses.stateTransition.facets.gettersFacet;
-        freezable[1] = false;
-
-        facetIds[2] = RegistryCTMContract.MailboxFacet;
-        facetAddresses[2] = ctmAddresses.stateTransition.facets.mailboxFacet;
-        freezable[2] = true;
-
-        facetIds[3] = RegistryCTMContract.ExecutorFacet;
-        facetAddresses[3] = ctmAddresses.stateTransition.facets.executorFacet;
-        freezable[3] = true;
-
-        facetIds[4] = RegistryCTMContract.MigratorFacet;
-        facetAddresses[4] = ctmAddresses.stateTransition.facets.migratorFacet;
-        freezable[4] = false;
-
-        facetIds[5] = RegistryCTMContract.CommitterFacet;
-        facetAddresses[5] = ctmAddresses.stateTransition.facets.committerFacet;
-        freezable[5] = true;
-
-        vm.broadcast(getBroadcasterAddress());
-        GenesisRegistry registry = new GenesisRegistry();
-
-        vm.broadcast(getBroadcasterAddress());
-        registry.initialize(
+        CTMRegistry.CTMRegistryManifest memory manifest = GenesisManifestLib.buildGenesisManifest(
+            config.isZKsyncOS,
             config.contracts.chainCreationParams.latestProtocolVersion,
-            facetIds,
-            facetAddresses,
-            freezable,
+            ctmAddresses.stateTransition.facets,
             config.contracts.chainCreationParams.bootloaderHash,
             config.contracts.chainCreationParams.defaultAAHash,
             config.contracts.chainCreationParams.evmEmulatorHash
         );
 
-        console.log("GenesisRegistry deployed at:", address(registry));
+        vm.broadcast(getBroadcasterAddress());
+        CTMRegistry registry = new CTMRegistry();
+
+        vm.broadcast(getBroadcasterAddress());
+        registry.initialize(manifest);
+
+        // The initializer is unauthenticated (one-shot, no constructor), so confirm nobody
+        // front-ran it with different contents before this address gets pinned anywhere.
+        require(registry.manifestHash() == keccak256(abi.encode(manifest)), "genesis registry manifest mismatch");
+
+        console.log("Bootstrap CTMRegistry (genesis) deployed at:", address(registry));
         return address(registry);
     }
 

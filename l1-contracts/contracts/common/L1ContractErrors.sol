@@ -368,8 +368,6 @@ error QueueIsEmpty();
 error Reentrancy();
 // 0xe45872b6
 error RegistryAlreadyInitialized();
-// 0xc6c44c21
-error RegistryLengthMismatch();
 // 0x1f20dafa
 error RegistryUnknownKey();
 // 0x667d17de

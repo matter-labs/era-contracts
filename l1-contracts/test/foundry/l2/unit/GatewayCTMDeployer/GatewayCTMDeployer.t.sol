@@ -46,7 +46,7 @@ import {ValidatorTimelock} from "contracts/state-transition/validators/Validator
 
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {GenesisRegistry} from "contracts/state-transition/chain-deps/GenesisRegistry.sol";
+import {CTMRegistry} from "contracts/upgrades/registry/CTMRegistry.sol";
 
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
@@ -161,7 +161,7 @@ contract GatewayCTMDeployerTest is Test {
         new MigratorFacet(1, false);
         new DiamondInit(false);
         new L1GenesisUpgrade();
-        new GenesisRegistry();
+        new CTMRegistry();
         new Multicall3();
 
         // This call will likely fail due to various checks, but we just need to get the bytecode published

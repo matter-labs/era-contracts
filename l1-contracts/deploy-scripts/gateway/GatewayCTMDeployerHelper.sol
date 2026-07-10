@@ -669,8 +669,8 @@ library GatewayCTMDeployerHelper {
             // shared salt and no constructor args, so its address is deterministic and independent
             // of the facet addresses — computable here, before the facets exist, for the cut.
             address genesisRegistry = _deployInternalEmptyParams(
-                "GenesisRegistry",
-                "GenesisRegistry.sol",
+                "CTMRegistry",
+                "CTMRegistry.sol",
                 innerConfig,
                 isZKsyncOS
             );
@@ -904,7 +904,7 @@ library GatewayCTMDeployerHelper {
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Committer.sol", "CommitterFacet");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "DiamondInit.sol", "DiamondInit");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "L1GenesisUpgrade.sol", "L1GenesisUpgrade");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "GenesisRegistry.sol", "GenesisRegistry");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "CTMRegistry.sol", "CTMRegistry");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Multicall3.sol", "Multicall3");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "DiamondProxy.sol", "DiamondProxy");
     }

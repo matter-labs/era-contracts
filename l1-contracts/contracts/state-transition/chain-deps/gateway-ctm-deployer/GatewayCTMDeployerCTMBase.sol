@@ -9,8 +9,8 @@ import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} 
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
 
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
-import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
-import {GenesisRegistry} from "../GenesisRegistry.sol";
+import {CTMRegistry} from "../../../upgrades/registry/CTMRegistry.sol";
+import {GenesisManifestLib} from "../../../upgrades/registry/GenesisManifestLib.sol";
 import {GatewayCTMDeployerConfig, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "./GatewayCTMDeployer.sol";
 
 /// @title GatewayCTMDeployerCTMBase
@@ -135,8 +135,7 @@ abstract contract GatewayCTMDeployerCTMBase {
         );
     }
 
-    /// @notice Deploys the Gateway genesis registry and pins the facet set and base system
-    ///         contract hashes into it.
+    /// @notice Deploys the Gateway bootstrap registry and pins the genesis manifest into it.
     /// @dev CREATE2 with the shared salt: the address is deterministic and independent of the
     ///      pinned values (no constructor args), so the off-chain helper reproduces it for the
     ///      genesis cut before the facets are deployed. Initialized in the same transaction; the
@@ -144,50 +143,22 @@ abstract contract GatewayCTMDeployerCTMBase {
     /// @param _salt Salt used for the CREATE2 deployment.
     /// @param _baseConfig The deployment config (protocol version and base system hashes).
     /// @param _facets The deployed diamond facet addresses.
-    /// @return registry The address of the deployed and initialized genesis registry.
+    /// @return registry The address of the deployed and initialized bootstrap registry.
     function _deployGenesisRegistry(
         bytes32 _salt,
         GatewayCTMDeployerConfig memory _baseConfig,
         Facets memory _facets
     ) internal returns (address registry) {
-        CTMContract[] memory facetIds = new CTMContract[](6);
-        address[] memory facetAddresses = new address[](6);
-        bool[] memory freezable = new bool[](6);
-
-        facetIds[0] = CTMContract.AdminFacet;
-        facetAddresses[0] = _facets.adminFacet;
-        freezable[0] = false;
-
-        facetIds[1] = CTMContract.GettersFacet;
-        facetAddresses[1] = _facets.gettersFacet;
-        freezable[1] = false;
-
-        facetIds[2] = CTMContract.MailboxFacet;
-        facetAddresses[2] = _facets.mailboxFacet;
-        freezable[2] = true;
-
-        facetIds[3] = CTMContract.ExecutorFacet;
-        facetAddresses[3] = _facets.executorFacet;
-        freezable[3] = true;
-
-        facetIds[4] = CTMContract.MigratorFacet;
-        facetAddresses[4] = _facets.migratorFacet;
-        freezable[4] = false;
-
-        facetIds[5] = CTMContract.CommitterFacet;
-        facetAddresses[5] = _facets.committerFacet;
-        freezable[5] = true;
-
-        GenesisRegistry genesisRegistry = new GenesisRegistry{salt: _salt}();
-        // solhint-disable-next-line func-named-parameters
+        CTMRegistry genesisRegistry = new CTMRegistry{salt: _salt}();
         genesisRegistry.initialize(
-            _baseConfig.protocolVersion,
-            facetIds,
-            facetAddresses,
-            freezable,
-            _baseConfig.bootloaderHash,
-            _baseConfig.defaultAccountHash,
-            _baseConfig.evmEmulatorHash
+            GenesisManifestLib.buildGenesisManifest(
+                _baseConfig.isZKsyncOS,
+                _baseConfig.protocolVersion,
+                _facets,
+                _baseConfig.bootloaderHash,
+                _baseConfig.defaultAccountHash,
+                _baseConfig.evmEmulatorHash
+            )
         );
         registry = address(genesisRegistry);
     }

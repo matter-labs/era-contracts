@@ -116,7 +116,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             testnetVerifier: config.testnetVerifier,
             isZKsyncOS: config.isZKsyncOS,
             // No facet selectors: the Gateway genesis cut installs no facets directly; the
-            // GenesisRegistry the CTM points at drives installation, and DiamondInit reads
+            // bootstrap CTMRegistry the CTM points at drives installation, and DiamondInit reads
             // each facet's own `selectors()` at chain creation.
             bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
             defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,

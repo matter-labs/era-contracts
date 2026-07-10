@@ -142,7 +142,7 @@ jobs:
   # Registry-driven upgrade test: loads the current chain states, deploys the
   # UpgradeExecutor + orchestrator modules and fresh new-version implementations,
   # generates constants-in-bytecode registries from live on-chain data
-  # (scripts/gen-registry.ts, verifyAll() asserted against the deployment),
+  # (storage registries initialized from the committed manifest, verifyAll() asserted against the deployment),
   # hands CTM/ProxyAdmin ownership to the executor, executes the whole upgrade
   # through executor.execute(module, ...) — no stage governance calldata — and
   # relays the registry-composed L2 upgrade transaction through the real

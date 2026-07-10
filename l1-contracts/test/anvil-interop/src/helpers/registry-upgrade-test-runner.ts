@@ -4,7 +4,7 @@
  * Proves the NEW registry-driven upgrade process end-to-end on live anvil chains, mirroring
  * the foundry e2e test `test/foundry/l1/unit/concrete/Upgrades/registry/RegistryDrivenUpgrade.t.sol`
  * but against a fully deployed ecosystem (the pre-generated anvil-interop chain states) and
- * with a REAL generated constants-in-bytecode registry:
+ * with REAL storage-backed, write-once registries initialized from the committed manifest:
  *
  *   1. Boot the pre-generated ecosystem (current branch's code) from chain-states/.
  *   2. Deploy the registry-driven machinery on the anvil L1: `UpgradeExecutor`,
@@ -16,18 +16,17 @@
  *      (CBOR-metadata-free ⇒ byte-identical across platforms), and the deployer key + starting
  *      nonce are fixed by the committed chain states, so all addresses AND codehashes are
  *      reproducible run-to-run and machine-to-machine.
- *   3. Deploy the COMMITTED generated registries `CoreRegistryV32` +
- *      `ZKsyncOSCTMRegistryV32` (contracts/upgrades/registry/v32 — fixed, audited,
- *      checked-in generator output) and assert `verifyAll()` against the live deployment.
- *      This is the default CONSUME mode: the registries are never regenerated here, so any
- *      drift between the committed constants and the live/freshly-deployed addresses or
+ *   3. Deploy the fixed `CTMRegistry` + `CoreRegistry` implementations and initialize them
+ *      (write-once) from the COMMITTED manifest scripts/registry-manifests/v32-local.json —
+ *      the reviewable per-upgrade artifact — then assert `verifyAll()` against the live
+ *      deployment. This is the default CONSUME mode: the manifest is never regenerated here,
+ *      so any drift between the committed data and the live/freshly-deployed addresses or
  *      codehashes fails loudly. With `REGEN_REGISTRIES=1` (EMIT mode, `yarn
  *      regen:v32-registries`) the runner instead rebuilds the manifest from the LIVE
- *      deployment (live facet address + selectors, live genesis-upgrade address, freshly
- *      deployed implementations, pinned codehashes), writes it to
- *      scripts/registry-manifests/v32-local.json, reruns `scripts/gen-registry.ts` into the
- *      committed directory (prettier-formatted so the output is byte-stable), and then
- *      continues exactly like consume mode — regenerated files are meant to be committed.
+ *      deployment (live facet addresses, live genesis-upgrade address, freshly deployed
+ *      implementations, pinned codehashes) and writes it to the committed path, then
+ *      continues exactly like consume mode — the regenerated manifest is meant to be
+ *      committed.
  *   4. Hand the CTM to the executor through the production surface
  *      (`transferOwnership` + `executor.forward(acceptOwnership)`) and the ecosystem
  *      `ProxyAdmin` through its 1-step `transferOwnership`.
@@ -76,6 +75,7 @@ import {
   getDeterministicCreationBytecode,
 } from "../core/contracts";
 import { impersonateAndRun } from "../core/utils";
+import { coreInitArgs, ctmInitArgs } from "./registry-manifest";
 import type { ChainRole } from "../core/types";
 import { clearGenesisUpgradeTxHash, selectUpgradeChains, traceFailedTx } from "./v31-upgrade-test-runner";
 
@@ -87,30 +87,25 @@ const l1ContractsDir = path.resolve(anvilInteropDir, "../..");
 // Packed SemVer layout (contracts/common/libraries/SemVer.sol): major << 64 | minor << 32 | patch.
 const SEMVER_MINOR_SHIFT = 32;
 
-// gen-registry manifest tag: contract names are `CoreRegistry${TAG}` and
-// `${ctmName}CTMRegistry${TAG}`, matching the ARTIFACTS entries in core/contracts.ts.
+// Manifest tag (kept in the JSON for human orientation) and the CTM entry consumed here.
 const REGISTRY_TAG = "V32";
 const CTM_REGISTRY_NAME = "ZKsyncOS";
 
-// Committed home of the generated production registries for the local (chain-states)
-// environment. The default CONSUME mode deploys these checked-in sources as-is; the EMIT mode
-// (REGEN_REGISTRIES=1) regenerates them in place so the diff can be reviewed and committed.
-const REGISTRY_GEN_DIR_REL = "contracts/upgrades/registry/v32";
+// The fixed registry implementations live here; the incremental forge build below keeps their
+// artifacts current before deployment.
+const REGISTRY_CONTRACTS_DIR_REL = "contracts/upgrades/registry";
+// Committed manifest for the local (chain-states) environment — the reviewable per-upgrade
+// artifact the registries are initialized from. The default CONSUME mode reads it as-is; the
+// EMIT mode (REGEN_REGISTRIES=1) rewrites it so the diff can be reviewed and committed.
 const REGISTRY_MANIFEST_REL = "scripts/registry-manifests/v32-local.json";
-const GENERATED_REGISTRY_FILES = [
-  "CoreRegistryV32.sol",
-  "CoreRegistryV32Data.sol",
-  "ZKsyncOSCTMRegistryV32.sol",
-  "ZKsyncOSCTMRegistryV32Data.sol",
-];
 
 // Set REGEN_REGISTRIES=1 to run in EMIT mode (see module docs).
 const REGEN_ENV_VAR = "REGEN_REGISTRIES";
 
 const STALE_REGISTRIES_HINT =
-  `committed v32 registries are stale — rerun with ${REGEN_ENV_VAR}=1 ` +
+  `committed v32 registry manifest is stale — rerun with ${REGEN_ENV_VAR}=1 ` +
   "(yarn regen:v32-registries in l1-contracts/test/anvil-interop) and commit the result " +
-  `(${REGISTRY_GEN_DIR_REL}/*.sol + ${REGISTRY_MANIFEST_REL}).`;
+  `(${REGISTRY_MANIFEST_REL}).`;
 
 // Sources compiled with the `registry-deterministic` forge profile (CBOR-metadata-free ⇒
 // byte-identical across platforms; see foundry.toml). Everything the committed registries pin
@@ -233,21 +228,20 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       chainAssetHandler: live.chainAssetHandler,
     });
 
-    // ── 4. Regenerate (EMIT mode) or validate (CONSUME mode) the committed registries, then
-    //       deploy them ──
+    // ── 4. Regenerate (EMIT mode) or validate (CONSUME mode) the committed manifest, then
+    //       deploy + initialize the registries from it ──
     const manifestPath = path.join(l1ContractsDir, REGISTRY_MANIFEST_REL);
     if (regenRegistries) {
-      console.log(`\n── ${REGEN_ENV_VAR}=1: regenerating the committed v32 registries in place ──`);
+      console.log(`\n── ${REGEN_ENV_VAR}=1: regenerating the committed v32 registry manifest ──`);
       const manifest = await buildRegistryManifest(l1Provider, live, deployed, ctmAddresses.chainTypeManager);
       fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
       fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
       console.log(`  manifest written to ${REGISTRY_MANIFEST_REL}`);
-      regenerateCommittedRegistries(manifestPath);
     } else {
-      console.log(`\n── Consuming the committed v32 registries (${REGISTRY_GEN_DIR_REL}) ──`);
+      console.log(`\n── Consuming the committed v32 registry manifest (${REGISTRY_MANIFEST_REL}) ──`);
       assertCommittedManifestMatchesLiveDeployment(manifestPath, live, deployed, ctmAddresses.chainTypeManager);
     }
-    const registries = await deployCommittedRegistries(deployer);
+    const registries = await deployRegistriesFromManifest(deployer, manifestPath);
     console.log(`  CTM registry:  ${registries.ctmRegistry}`);
     console.log(`  core registry: ${registries.coreRegistry}`);
 
@@ -778,20 +772,6 @@ function buildDeterministicArtifacts(): void {
   });
 }
 
-/**
- * EMIT mode: rerun scripts/gen-registry.ts on the freshly written manifest, regenerating the
- * committed registry sources in place, then prettier-format them so the files are byte-stable
- * against the committed (lint-clean) versions.
- */
-function regenerateCommittedRegistries(manifestPath: string): void {
-  execSync(
-    `npx ts-node scripts/gen-registry.ts ${JSON.stringify(manifestPath)} ${JSON.stringify(REGISTRY_GEN_DIR_REL)}`,
-    { cwd: l1ContractsDir, stdio: "inherit" }
-  );
-  const files = GENERATED_REGISTRY_FILES.map((f) => JSON.stringify(path.join(REGISTRY_GEN_DIR_REL, f))).join(" ");
-  execSync(`npx prettier --write ${files}`, { cwd: l1ContractsDir, stdio: "inherit" });
-}
-
 function staleRegistriesError(cause: unknown): Error {
   const message = cause instanceof Error ? cause.message : String(cause);
   return new Error(`${message}\n\n${STALE_REGISTRIES_HINT}`);
@@ -853,25 +833,34 @@ function assertCommittedManifestMatchesLiveDeployment(
 }
 
 /**
- * Deploy the COMMITTED generated registries. Their artifacts come from the regular forge
- * build (the sources live under contracts/); the incremental build below makes sure they are
- * present and current.
+ * Deploy the fixed registry implementations and initialize them (write-once) from the
+ * committed manifest. Their artifacts come from the regular forge build; the incremental
+ * build below makes sure they are present and current.
  */
-async function deployCommittedRegistries(
-  deployer: ethers.Wallet
+async function deployRegistriesFromManifest(
+  deployer: ethers.Wallet,
+  manifestPath: string
 ): Promise<{ ctmRegistry: string; coreRegistry: string }> {
-  execSync(`forge build ${REGISTRY_GEN_DIR_REL}`, { cwd: l1ContractsDir, stdio: "inherit" });
+  execSync(`forge build ${REGISTRY_CONTRACTS_DIR_REL}`, { cwd: l1ContractsDir, stdio: "inherit" });
 
-  const deployGenerated = async (name: "ZKsyncOSCTMRegistryV32" | "CoreRegistryV32") => {
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+  const ctm = (manifest.ctms || []).find((c: { name?: string }) => c.name === CTM_REGISTRY_NAME);
+  if (!ctm) {
+    throw new Error(`manifest has no "${CTM_REGISTRY_NAME}" CTM entry`);
+  }
+
+  const deployAndInit = async (name: "CTMRegistry" | "CoreRegistry", initArgs: unknown) => {
     const factory = new ethers.ContractFactory(getAbi(name), getCreationBytecode(name), deployer);
     const contract = await factory.deploy();
     await contract.deployed();
+    const initTx = await contract.initialize(initArgs);
+    await initTx.wait();
     return contract.address;
   };
 
   return {
-    ctmRegistry: await deployGenerated("ZKsyncOSCTMRegistryV32"),
-    coreRegistry: await deployGenerated("CoreRegistryV32"),
+    ctmRegistry: await deployAndInit("CTMRegistry", ctmInitArgs(manifest, ctm)),
+    coreRegistry: await deployAndInit("CoreRegistry", coreInitArgs(manifest)),
   };
 }
 
