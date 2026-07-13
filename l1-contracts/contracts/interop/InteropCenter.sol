@@ -276,47 +276,12 @@ contract InteropCenter is
 
         // Ensure the destination is valid: L2->L2, or an L2->L1 bundle expressed as a single call (canonically a withdrawal).
         _ensureValidDestination(destinationChainId, _callStarters.length);
-        InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](
-            _callStarters.length
-        );
-        uint256 callStartersLength = _callStarters.length;
 
-        // Prepare original attributes array for all calls
-        bytes[][] memory originalCallAttributes = new bytes[][](callStartersLength);
-
-        for (uint256 i = 0; i < callStartersLength; ++i) {
-            _ensureEmptyChainReference(_callStarters[i].to);
-
-            // slither-disable-next-line unused-return
-            (, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_callStarters[i].to);
-
-            // Store original attributes for MessageSent event emission
-            originalCallAttributes[i] = _callStarters[i].callAttributes;
-
-            // solhint-disable-next-line no-unused-vars
-            (CallAttributes memory callAttributes, ) = parseAttributes(
-                _callStarters[i].callAttributes,
-                AttributeParsingRestrictions.OnlyCallAttributes
-            );
-            callStartersInternal[i] = InteropCallStarterInternal({
-                to: recipientAddress,
-                data: _callStarters[i].data,
-                callAttributes: callAttributes
-            });
-        }
-        // solhint-disable-next-line no-unused-vars
-        (, BundleAttributes memory bundleAttributes) = parseAttributes(
-            _bundleAttributes,
-            AttributeParsingRestrictions.OnlyBundleAttributes
-        );
-
-        // If the unbundler was not set for a bundle, we set the unbundler to be equal to the original sender, so
-        // that it's still possible to unbundle the bundle. If the original sender is the contract, it'll still be
-        // able to unbundle the bundle either via direct call to `unbundleBundle`, or via `sendMessage` to `L2InteropHandler`,
-        // with specific payload. Refer to `L2InteropHandler` for details.
-        if (bundleAttributes.unbundlerAddress.length == 0) {
-            bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
-        }
+        (
+            InteropCallStarterInternal[] memory callStartersInternal,
+            BundleAttributes memory bundleAttributes,
+            bytes[][] memory originalCallAttributes
+        ) = _parseBundleInputs(_callStarters, _bundleAttributes);
 
         AtomicSend memory atomicSend = _parseAtomicSend(_bundleAttributes);
 
@@ -340,31 +305,14 @@ contract InteropCenter is
         (uint256 destinationChainId, ) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
         _ensureL2ToL2(destinationChainId);
 
-        uint256 callStartersLength = _callStarters.length;
-        InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](callStartersLength);
-        for (uint256 i = 0; i < callStartersLength; ++i) {
-            _ensureEmptyChainReference(_callStarters[i].to);
-            // slither-disable-next-line unused-return
-            (, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_callStarters[i].to);
-            // solhint-disable-next-line no-unused-vars
-            (CallAttributes memory callAttributes, ) = parseAttributes(
-                _callStarters[i].callAttributes,
-                AttributeParsingRestrictions.OnlyCallAttributes
-            );
-            callStartersInternal[i] = InteropCallStarterInternal({
-                to: recipientAddress,
-                data: _callStarters[i].data,
-                callAttributes: callAttributes
-            });
-        }
-        // solhint-disable-next-line no-unused-vars
-        (, BundleAttributes memory bundleAttributes) = parseAttributes(
-            _bundleAttributes,
-            AttributeParsingRestrictions.OnlyBundleAttributes
-        );
-        if (bundleAttributes.unbundlerAddress.length == 0) {
-            bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
-        }
+        // Shares the send path's input parsing so the previewed hash is byte-identical to sendBundle's.
+        // The original call attributes (event data) are irrelevant to the hash, so they are discarded here.
+        // slither-disable-next-line unused-return
+        (
+            InteropCallStarterInternal[] memory callStartersInternal,
+            BundleAttributes memory bundleAttributes,
+
+        ) = _parseBundleInputs(_callStarters, _bundleAttributes);
 
         // slither-disable-next-line unused-return
         (InteropBundle memory bundle, , ) = _buildInteropBundle(
@@ -537,6 +485,66 @@ contract InteropCenter is
         if (protocolFee > 0) {
             accumulatedProtocolFees[block.coinbase] += protocolFee;
             emit ProtocolFeesAccumulated(block.coinbase, protocolFee);
+        }
+    }
+
+    /// @notice Parses the raw `sendBundle`/`previewBundleHash` inputs into the internal representation shared
+    /// by the real send and the hash preview: resolves each call starter's recipient address and per-call
+    /// attributes, captures the original per-call attributes (for `MessageSent` events), parses the bundle
+    /// attributes and defaults the unbundler to the sender.
+    /// @dev Does NOT validate the destination — `sendBundle` allows L2->L1 withdrawals while the previews are
+    /// L2<->L2 only, so each caller runs its own destination check before calling this.
+    /// @param _callStarters Raw call starters (ERC-7930 recipient + calldata + ERC-7786 attributes).
+    /// @param _bundleAttributes Raw ERC-7786 bundle attributes.
+    /// @return callStartersInternal Resolved call starters ready for `_buildInteropBundle`.
+    /// @return bundleAttributes Parsed bundle attributes, with the unbundler defaulted to `msg.sender`.
+    /// @return originalCallAttributes Per-call original attributes, preserved for `MessageSent` emission.
+    function _parseBundleInputs(
+        InteropCallStarter[] calldata _callStarters,
+        bytes[] calldata _bundleAttributes
+    )
+        internal
+        view
+        returns (
+            InteropCallStarterInternal[] memory callStartersInternal,
+            BundleAttributes memory bundleAttributes,
+            bytes[][] memory originalCallAttributes
+        )
+    {
+        uint256 callStartersLength = _callStarters.length;
+        callStartersInternal = new InteropCallStarterInternal[](callStartersLength);
+        originalCallAttributes = new bytes[][](callStartersLength);
+
+        for (uint256 i = 0; i < callStartersLength; ++i) {
+            _ensureEmptyChainReference(_callStarters[i].to);
+
+            // slither-disable-next-line unused-return
+            (, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_callStarters[i].to);
+
+            // Store original attributes for MessageSent event emission.
+            originalCallAttributes[i] = _callStarters[i].callAttributes;
+
+            // solhint-disable-next-line no-unused-vars
+            (CallAttributes memory callAttributes, ) = parseAttributes(
+                _callStarters[i].callAttributes,
+                AttributeParsingRestrictions.OnlyCallAttributes
+            );
+            callStartersInternal[i] = InteropCallStarterInternal({
+                to: recipientAddress,
+                data: _callStarters[i].data,
+                callAttributes: callAttributes
+            });
+        }
+
+        // solhint-disable-next-line no-unused-vars
+        (, bundleAttributes) = parseAttributes(_bundleAttributes, AttributeParsingRestrictions.OnlyBundleAttributes);
+
+        // If the unbundler was not set for a bundle, we set the unbundler to be equal to the original sender, so
+        // that it's still possible to unbundle the bundle. If the original sender is the contract, it'll still be
+        // able to unbundle the bundle either via direct call to `unbundleBundle`, or via `sendMessage` to
+        // `L2InteropHandler`, with specific payload. Refer to `L2InteropHandler` for details.
+        if (bundleAttributes.unbundlerAddress.length == 0) {
+            bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
         }
     }
 
