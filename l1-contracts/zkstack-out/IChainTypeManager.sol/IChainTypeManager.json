@@ -92,24 +92,9 @@
         "internalType": "uint256"
       },
       {
-        "name": "_baseTokenAssetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
         "name": "_admin",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "_initData",
-        "type": "bytes",
-        "internalType": "bytes"
-      },
-      {
-        "name": "_factoryDeps",
-        "type": "bytes[]",
-        "internalType": "bytes[]"
       }
     ],
     "outputs": [
@@ -451,19 +436,6 @@
   },
   {
     "type": "function",
-    "name": "initialCutHash",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "initialize",
     "inputs": [
       {
@@ -482,85 +454,9 @@
             "internalType": "address"
           },
           {
-            "name": "chainCreationParams",
-            "type": "tuple",
-            "internalType": "struct ChainCreationParams",
-            "components": [
-              {
-                "name": "genesisUpgrade",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "genesisBatchHash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              },
-              {
-                "name": "genesisIndexRepeatedStorageChanges",
-                "type": "uint64",
-                "internalType": "uint64"
-              },
-              {
-                "name": "genesisBatchCommitment",
-                "type": "bytes32",
-                "internalType": "bytes32"
-              },
-              {
-                "name": "diamondCut",
-                "type": "tuple",
-                "internalType": "struct Diamond.DiamondCutData",
-                "components": [
-                  {
-                    "name": "facetCuts",
-                    "type": "tuple[]",
-                    "internalType": "struct Diamond.FacetCut[]",
-                    "components": [
-                      {
-                        "name": "facet",
-                        "type": "address",
-                        "internalType": "address"
-                      },
-                      {
-                        "name": "action",
-                        "type": "uint8",
-                        "internalType": "enum Diamond.Action"
-                      },
-                      {
-                        "name": "isFreezable",
-                        "type": "bool",
-                        "internalType": "bool"
-                      },
-                      {
-                        "name": "selectors",
-                        "type": "bytes4[]",
-                        "internalType": "bytes4[]"
-                      }
-                    ]
-                  },
-                  {
-                    "name": "initAddress",
-                    "type": "address",
-                    "internalType": "address"
-                  },
-                  {
-                    "name": "initCalldata",
-                    "type": "bytes",
-                    "internalType": "bytes"
-                  }
-                ]
-              },
-              {
-                "name": "forceDeploymentsData",
-                "type": "bytes",
-                "internalType": "bytes"
-              },
-              {
-                "name": "registry",
-                "type": "address",
-                "internalType": "address"
-              }
-            ]
+            "name": "genesisRegistry",
+            "type": "address",
+            "internalType": "address"
           },
           {
             "name": "protocolVersion",
@@ -694,88 +590,12 @@
   },
   {
     "type": "function",
-    "name": "setChainCreationParams",
+    "name": "setGenesisRegistry",
     "inputs": [
       {
-        "name": "_chainCreationParams",
-        "type": "tuple",
-        "internalType": "struct ChainCreationParams",
-        "components": [
-          {
-            "name": "genesisUpgrade",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "genesisBatchHash",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "genesisIndexRepeatedStorageChanges",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "genesisBatchCommitment",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "diamondCut",
-            "type": "tuple",
-            "internalType": "struct Diamond.DiamondCutData",
-            "components": [
-              {
-                "name": "facetCuts",
-                "type": "tuple[]",
-                "internalType": "struct Diamond.FacetCut[]",
-                "components": [
-                  {
-                    "name": "facet",
-                    "type": "address",
-                    "internalType": "address"
-                  },
-                  {
-                    "name": "action",
-                    "type": "uint8",
-                    "internalType": "enum Diamond.Action"
-                  },
-                  {
-                    "name": "isFreezable",
-                    "type": "bool",
-                    "internalType": "bool"
-                  },
-                  {
-                    "name": "selectors",
-                    "type": "bytes4[]",
-                    "internalType": "bytes4[]"
-                  }
-                ]
-              },
-              {
-                "name": "initAddress",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "initCalldata",
-                "type": "bytes",
-                "internalType": "bytes"
-              }
-            ]
-          },
-          {
-            "name": "forceDeploymentsData",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "registry",
-            "type": "address",
-            "internalType": "address"
-          }
-        ]
+        "name": "_registry",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -1334,94 +1154,19 @@
   },
   {
     "type": "event",
-    "name": "NewChainCreationParams",
+    "name": "NewGenesisRegistry",
     "inputs": [
       {
-        "name": "genesisUpgrade",
+        "name": "protocolVersion",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "registry",
         "type": "address",
-        "indexed": false,
+        "indexed": true,
         "internalType": "address"
-      },
-      {
-        "name": "genesisBatchHash",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "genesisIndexRepeatedStorageChanges",
-        "type": "uint64",
-        "indexed": false,
-        "internalType": "uint64"
-      },
-      {
-        "name": "genesisBatchCommitment",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "newInitialCut",
-        "type": "tuple",
-        "indexed": false,
-        "internalType": "struct Diamond.DiamondCutData",
-        "components": [
-          {
-            "name": "facetCuts",
-            "type": "tuple[]",
-            "internalType": "struct Diamond.FacetCut[]",
-            "components": [
-              {
-                "name": "facet",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "action",
-                "type": "uint8",
-                "internalType": "enum Diamond.Action"
-              },
-              {
-                "name": "isFreezable",
-                "type": "bool",
-                "internalType": "bool"
-              },
-              {
-                "name": "selectors",
-                "type": "bytes4[]",
-                "internalType": "bytes4[]"
-              }
-            ]
-          },
-          {
-            "name": "initAddress",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "initCalldata",
-            "type": "bytes",
-            "internalType": "bytes"
-          }
-        ]
-      },
-      {
-        "name": "newInitialCutHash",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "forceDeploymentsData",
-        "type": "bytes",
-        "indexed": false,
-        "internalType": "bytes"
-      },
-      {
-        "name": "forceDeploymentHash",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
       }
     ],
     "anonymous": false

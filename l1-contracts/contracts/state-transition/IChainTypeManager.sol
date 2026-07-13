@@ -10,7 +10,7 @@ import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
 /// @param owner The address who can manage non-critical updates in the contract
 /// @param validatorTimelock The address that serves as consensus, i.e. can submit blocks to be processed
-/// @param chainCreationParams The struct that contains the fields that define how a new chain should be created
+/// @param genesisRegistry The genesis `CTMRegistry` new chains read their genesis data from
 /// @param protocolVersion The initial protocol version on the newly deployed chain
 /// @param verifier The verifier address for the initial protocol version
 /// @param serverNotifier The address that serves as server notifier
@@ -25,7 +25,6 @@ struct ChainTypeManagerInitializeData {
     address verifier;
     address serverNotifier;
 }
-
 
 interface IChainTypeManager {
     /// @dev Emitted when a new ZKChain is added

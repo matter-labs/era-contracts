@@ -83,9 +83,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         if (genesisRegistry == address(0)) {
             revert ZeroAddress();
         }
-        Diamond.FacetCut[] memory facetCuts = RegistryFacetReader.newChainInstallations(
-            ICTMRegistry(genesisRegistry)
-        );
+        Diamond.FacetCut[] memory facetCuts = RegistryFacetReader.newChainInstallations(ICTMRegistry(genesisRegistry));
         if (facetCuts.length != 0) {
             Diamond.diamondCut(
                 Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: ""})

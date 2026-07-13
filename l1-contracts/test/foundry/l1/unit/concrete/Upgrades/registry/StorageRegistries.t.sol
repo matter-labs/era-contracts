@@ -399,12 +399,7 @@ contract StorageRegistriesTest is Test {
     function test_genesisData_readStraightFromRegistry() public view {
         uint256 newVersion = ctmRegistry.newProtocolVersion();
 
-        (
-            address genesisUpgrade,
-            ,
-            ,
-            uint64 genesisIndexRepeatedStorageChanges
-        ) = ctmRegistry.genesisParams(newVersion);
+        (address genesisUpgrade, , , uint64 genesisIndexRepeatedStorageChanges) = ctmRegistry.genesisParams(newVersion);
         assertEq(genesisUpgrade, address(0x00010005));
         assertEq(genesisIndexRepeatedStorageChanges, 54);
         assertEq(ctmRegistry.fixedForceDeploymentsData(newVersion), hex"f1f2");
