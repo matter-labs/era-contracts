@@ -19,7 +19,6 @@ import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
 contract L2InteropUnbundleTest is Test, L2InteropUnbundleTestAbstract, SharedL2ContractL2Deployer {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL2Deployer) {}
 
-
     function getChainCreationParamsConfig(
         string memory _config
     ) internal override(DeployCTMUtils, SharedL2ContractL2Deployer) returns (ChainCreationParamsConfig memory) {

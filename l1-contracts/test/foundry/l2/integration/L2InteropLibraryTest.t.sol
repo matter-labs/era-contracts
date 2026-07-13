@@ -19,7 +19,6 @@ import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
 contract L2InteropLibraryTest is Test, L2InteropLibraryBasicTestAbstract, SharedL2ContractL2Deployer {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL2Deployer) {}
 
-
     function initSystemContracts(
         SystemContractsArgs memory _args
     ) internal override(SharedL2ContractDeployer, SharedL2ContractL2Deployer) {

@@ -172,16 +172,25 @@ const INTEROP_BUNDLE_SALT_SELECTOR = erc7786Iface.getSighash("interopBundleSalt"
  *
  * The InteropCenter derives the bundle hash from `keccak256(msg.sender, salt)` and rejects a (sender, salt)
  * pair that has already been used (`InteropBundleSaltAlreadyUsed`). Since the test harness sends many bundles
- * from the same source wallet, we attach a fresh random salt whenever the caller did not provide one, so that
- * each bundle gets a unique hash (mirroring the previously auto-incremented interop nonce). If the caller already
+ * from the same source wallet, we attach a fresh salt whenever the caller did not provide one, so that each
+ * bundle gets a unique hash (mirroring the previously auto-incremented interop nonce). If the caller already
  * supplied a salt attribute, it is left untouched.
+ *
+ * The salt is derived deterministically from `(sender, account nonce)` rather than random bytes: the nonce is
+ * consumed by the send so every bundle still gets a fresh salt, but re-runs of the harness reproduce identical
+ * salts. That keeps the pre-generated chain-state snapshots byte-deterministic (random salts change both the
+ * salt-keyed storage slots and the calldata gas cost run-to-run), and later test runs against a loaded snapshot
+ * cannot collide with salts already used during state generation because the account nonce has advanced.
  */
-function ensureUniqueBundleSalt(attributes: string[]): string[] {
+async function ensureUniqueBundleSalt(attributes: string[], wallet: Wallet): Promise<string[]> {
   const hasSalt = attributes.some((attr) => attr.slice(0, 10).toLowerCase() === INTEROP_BUNDLE_SALT_SELECTOR);
   if (hasSalt) {
     return attributes;
   }
-  const salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+  const nonce = await wallet.getTransactionCount();
+  const salt = ethers.utils.keccak256(
+    ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [wallet.address, nonce])
+  );
   return [...attributes, interopBundleSaltAttr(salt)];
 }
 
@@ -303,7 +312,7 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
 
   const destinationChainIdBytes = encodeEvmChain(options.destinationChainId);
   // Attributes carry a stable salt used for BOTH the hash prediction and the real send.
-  const baseAttributes = ensureUniqueBundleSalt(options.bundleAttributes || []);
+  const baseAttributes = await ensureUniqueBundleSalt(options.bundleAttributes || [], wallet);
 
   // Interop is atomic. Two cases:
   //  - caller-managed (a multi-leg swap already supplied its shared `atomicBundle` attribute): send the
@@ -393,7 +402,7 @@ export async function simulateInteropBundle(options: SendBundleOptions): Promise
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
 
   const destinationChainIdBytes = encodeEvmChain(options.destinationChainId);
-  const baseAttributes = ensureUniqueBundleSalt(options.bundleAttributes || []);
+  const baseAttributes = await ensureUniqueBundleSalt(options.bundleAttributes || [], wallet);
   // Mirror the real send's atomic attribute construction so the callStatic exercises the full path
   // (value collection included — the preview alone skips it, so reverts like MsgValueMismatch only
   // surface on the real `sendBundle`).
@@ -433,7 +442,7 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
   const wallet = new Wallet(getInteropSourcePrivateKey(), options.sourceProvider);
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
 
-  const baseAttributes = ensureUniqueBundleSalt(options.attributes);
+  const baseAttributes = await ensureUniqueBundleSalt(options.attributes, wallet);
   // Single-call sends are single-leg atomic flows too: predict the bundleHash (of the wrapping bundle)
   // and attach the atomic flow that commits to it.
   const predictedBundleHash: string = await interopCenter.callStatic.previewMessageHash(
@@ -536,7 +545,7 @@ export async function executeBundle(
   gasLimit?: number
 ): Promise<ethers.providers.TransactionReceipt> {
   const wallet = new Wallet(getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
   const tx = await interopHandler.executeBundle(bundleData, proof, {
@@ -555,7 +564,7 @@ export async function simulateExecuteBundle(
   gasLimit?: number
 ): Promise<void> {
   const wallet = new Wallet(getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
   await interopHandler.callStatic.executeBundle(bundleData, proof, {
@@ -575,7 +584,7 @@ export async function verifyBundle(
   signerKey?: string
 ): Promise<ethers.providers.TransactionReceipt> {
   const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
   const tx = await interopHandler.verifyBundle(bundleData, proof, { gasLimit: DEFAULT_TX_GAS_LIMIT });
@@ -611,7 +620,7 @@ export async function unbundleBundle(
   signerKey?: string
 ): Promise<ethers.providers.TransactionReceipt> {
   const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
 
   const tx = await interopHandler.unbundleBundle(bundleData, callStatuses, { gasLimit: DEFAULT_TX_GAS_LIMIT });
   return tx.wait();
@@ -627,7 +636,7 @@ export async function simulateUnbundleBundle(
   signerKey?: string
 ): Promise<void> {
   const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
 
   await interopHandler.callStatic.unbundleBundle(bundleData, callStatuses, { gasLimit: DEFAULT_TX_GAS_LIMIT });
 }
@@ -636,7 +645,7 @@ export async function simulateUnbundleBundle(
  * Query bundle status from InteropHandler.
  */
 export async function getBundleStatus(provider: providers.JsonRpcProvider, bundleHash: string): Promise<number> {
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), provider);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), provider);
   const result = await interopHandler.bundleStatus(bundleHash);
   return typeof result === "number" ? result : result.toNumber();
 }
@@ -649,7 +658,7 @@ export async function getCallStatus(
   bundleHash: string,
   callIndex: number
 ): Promise<number> {
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), provider);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), provider);
   const result = await interopHandler.callStatus(bundleHash, callIndex);
   return typeof result === "number" ? result : result.toNumber();
 }

@@ -34,6 +34,8 @@ import {
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
@@ -112,14 +114,19 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     function setUp() public virtual {
         setUpInner(false);
-        _installTestMocks();
+        // Interop is atomic-only: the InteropCenter calls `AtomicFlowManager.append` on send and the
+        // InteropHandler calls `AtomicFlowManager.requireFlowFinalized` on execute. The AtomicFlowManager is
+        // not deployed in these Foundry contexts, so mock both (void) calls to succeed. This mock is inert for
+        // non-interop suites (they never touch that address), so installing it unconditionally in the single
+        // shared `setUp` frees every concrete entrypoint from setUp/MRO boilerplate — the alternative
+        // (an overridable hook) still triggers a diamond-override on every interop concrete.
+        vm.mockCall(L2_ATOMIC_FLOW_MANAGER_ADDR, abi.encodeWithSelector(IAtomicFlowManager.append.selector), "");
+        vm.mockCall(
+            L2_ATOMIC_FLOW_MANAGER_ADDR,
+            abi.encodeWithSelector(IAtomicFlowManager.requireFlowFinalized.selector),
+            ""
+        );
     }
-
-    /// @dev Hook run at the end of {setUp} for suites that need extra test doubles installed. Default is a
-    /// no-op; the interop suites override it (see {L2InteropTestUtils}) to mock the AtomicFlowManager, which
-    /// is not deployed in these Foundry contexts. Overriding this hook instead of {setUp} keeps the single
-    /// `setUp` in this base, so concrete entrypoints need no setUp/MRO boilerplate.
-    function _installTestMocks() internal virtual {}
 
     function setUpInner(bool _skip) public virtual {
         // Avoid block.timestamp == 0 to keep paused-deposits sentinel semantics stable in tests.
@@ -212,11 +219,11 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             abi.encode(bytes(""))
         );
 
-        // Fund InteropHandler with ETH so it can send value with receiveMessage calls
+        // Fund L2InteropHandler with ETH so it can send value with receiveMessage calls
         // The mint mock doesn't actually give ETH, so we need to fund it manually
         vm.deal(L2_INTEROP_HANDLER_ADDR, 1000 ether);
 
-        // Mock currentSettlementLayerChainId for gateway mode check in InteropHandler
+        // Mock currentSettlementLayerChainId for gateway mode check in L2InteropHandler
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
             abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),

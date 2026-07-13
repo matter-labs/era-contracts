@@ -18,7 +18,7 @@ import {AtomicFinalityProof} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {BundleExecutionResult, L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
-import {InteropHandler} from "contracts/interop/InteropHandler.sol";
+import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 
 abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
     function test_unbundleBundleViaReceiveMessage() public {
@@ -57,7 +57,7 @@ abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
 
         // Verify bundle status is Verified after verifyBundle call
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
             1,
             "Bundle status should be Verified after verifyBundle"
         );
@@ -94,14 +94,14 @@ abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
 
         // Verify the original bundle status is Unbundled (value 3)
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
             3,
             "Original bundle status should be Unbundled"
         );
 
         // Verify call status of the original bundle is Executed (value 1)
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 0)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 0)),
             1,
             "Original bundle call 0 status should be Executed"
         );

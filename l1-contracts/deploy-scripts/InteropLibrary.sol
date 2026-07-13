@@ -250,6 +250,65 @@ library InteropLibrary {
         return L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(destinationChainId), calls, bundleAttrs);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                          WITHDRAWALS (L2 -> L1)
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Build the single-attribute (`interopBundleSalt`) bundle-attribute array used by L2->L1
+    /// withdrawal bundles.
+    /// @dev Each (sender, salt) pair may be used only once by the InteropCenter, so callers derive the salt
+    /// deterministically from the withdrawal content.
+    /// @param _salt Salt mixed into the bundle's `interopBundleSalt`.
+    function buildWithdrawalBundleAttributes(bytes32 _salt) internal pure returns (bytes[] memory attributes) {
+        attributes = new bytes[](1);
+        attributes[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (_salt));
+    }
+
+    /// @notice ABI-encode the `InteropCenter.sendBundle` calldata for an L2->L1 withdrawal of a single
+    /// registered (non-base-token) asset. Used where the call is wrapped into an admin L1->L2 transaction /
+    /// ChainAdmin multicall rather than sent directly.
+    /// @param _l1ChainId Destination L1 chain id.
+    /// @param _assetId The withdrawn asset id (an ERC20 or the CTM/ZK asset — NOT a base-token asset).
+    /// @param _transferData Bridgehub-burn transfer data for the asset.
+    /// @param _salt Salt mixed into the bundle's `interopBundleSalt` (must be unique per sender).
+    function encodeWithdrawalSendBundleCalldata(
+        uint256 _l1ChainId,
+        bytes32 _assetId,
+        bytes memory _transferData,
+        bytes32 _salt
+    ) internal pure returns (bytes memory) {
+        return
+            abi.encodeCall(
+                InteropCenter.sendBundle,
+                (
+                    InteroperableAddress.formatEvmV1(_l1ChainId),
+                    DataEncoding.encodeInteropWithdrawalCallStarters(_assetId, _transferData),
+                    buildWithdrawalBundleAttributes(_salt)
+                )
+            );
+    }
+
+    /// @notice Send an L2->L1 withdrawal bundle for a single registered (non-base-token) asset directly through
+    /// the InteropCenter. Wrap in `vm.broadcast()` when broadcasting.
+    /// @param _l1ChainId Destination L1 chain id.
+    /// @param _assetId The withdrawn asset id (an ERC20 or the CTM/ZK asset — NOT a base-token asset).
+    /// @param _transferData Bridgehub-burn transfer data for the asset.
+    /// @param _salt Salt mixed into the bundle's `interopBundleSalt` (must be unique per sender).
+    /// @return bundleHash Hash of the sent bundle.
+    function sendWithdrawal(
+        uint256 _l1ChainId,
+        bytes32 _assetId,
+        bytes memory _transferData,
+        bytes32 _salt
+    ) internal returns (bytes32 bundleHash) {
+        return
+            L2_INTEROP_CENTER.sendBundle(
+                InteroperableAddress.formatEvmV1(_l1ChainId),
+                DataEncoding.encodeInteropWithdrawalCallStarters(_assetId, _transferData),
+                buildWithdrawalBundleAttributes(_salt)
+            );
+    }
+
     /// @notice Build and send a bundle of interop calls.
     /// @dev
     /// - All arrays must be the same length; each index describes one call.

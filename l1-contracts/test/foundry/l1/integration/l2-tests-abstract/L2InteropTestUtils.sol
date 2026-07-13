@@ -22,7 +22,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {InteropHandler} from "contracts/interop/InteropHandler.sol";
+import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 
 /// @notice Struct to hold bundle execution result for assertions
 struct BundleExecutionResult {
@@ -35,23 +35,10 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
     uint256 destinationChainId = 271;
     bytes32 destinationBaseTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
 
-    /// @dev Interop is atomic-only. On the send side `InteropCenter` calls
-    /// `AtomicFlowManager.append`, and on the destination side `InteropHandler` calls
-    /// `AtomicFlowManager.requireFlowFinalized`. The AtomicFlowManager is not deployed in these
-    /// unit-level Foundry tests (its IMT proof machinery is exercised end-to-end in the anvil-interop
-    /// atomic-swap spec), so we mock both (void) calls to succeed. We override the shared
-    /// {SharedL2ContractDeployer._installTestMocks} hook rather than `setUp` itself, so the single `setUp`
-    /// stays in the shared base and interop concretes need no setUp/MRO boilerplate. The mock is still
-    /// scoped to the interop suites (only they extend {L2InteropTestUtils}); non-interop suites inherit the
-    /// no-op default.
-    function _installTestMocks() internal virtual override {
-        vm.mockCall(L2_ATOMIC_FLOW_MANAGER_ADDR, abi.encodeWithSelector(IAtomicFlowManager.append.selector), "");
-        vm.mockCall(
-            L2_ATOMIC_FLOW_MANAGER_ADDR,
-            abi.encodeWithSelector(IAtomicFlowManager.requireFlowFinalized.selector),
-            ""
-        );
-    }
+    /// @dev The AtomicFlowManager `append`/`requireFlowFinalized` gates are mocked to succeed in
+    /// {SharedL2ContractDeployer.setUp} (installed unconditionally there, inert for non-interop suites), so
+    /// interop concretes need no setUp/MRO boilerplate. The IMT proof machinery itself is exercised
+    /// end-to-end in the anvil-interop atomic-swap spec.
 
     /// @notice Returns a copy of `_attrs` with the mandatory ERC-7786 `atomicBundle` attribute appended.
     /// @dev Every interop send must be atomic (see {InteropCenter}); without this attribute the send
@@ -132,7 +119,7 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
     function assertBundleExecuted(BundleExecutionResult memory result) internal view {
         // Verify bundle status is FullyExecuted (value 2)
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(result.bundleHash)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(result.bundleHash)),
             2,
             "Bundle status should be FullyExecuted"
         );
@@ -140,7 +127,7 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
         // Verify all call statuses are Executed (value 1)
         for (uint256 i = 0; i < result.callCount; i++) {
             assertEq(
-                uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(result.bundleHash, i)),
+                uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(result.bundleHash, i)),
                 1,
                 string(abi.encodePacked("Call ", vm.toString(i), " status should be Executed"))
             );

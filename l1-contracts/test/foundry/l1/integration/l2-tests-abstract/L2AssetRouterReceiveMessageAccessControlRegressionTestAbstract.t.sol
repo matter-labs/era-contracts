@@ -47,7 +47,7 @@ abstract contract L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract
         );
     }
 
-    /// @notice Test that receiveMessage reverts for any address that is not InteropHandler
+    /// @notice Test that receiveMessage reverts for any address that is not L2InteropHandler
     /// @dev Tests various addresses to ensure none can bypass the access control
     function test_regression_receiveMessageRevertsForVariousUnauthorizedAddresses() public {
         bytes memory payload = abi.encodeWithSelector(
@@ -73,19 +73,20 @@ abstract contract L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract
         }
     }
 
-    /// @notice Test that receiveMessage does not revert with Unauthorized when called by InteropHandler
-    /// @dev We craft a payload with a deliberately wrong selector. Reaching the InvalidSelector
-    ///      revert at L2AssetRouter.receiveMessage:251 is causally downstream of:
-    ///        - the onlyL2InteropHandler gate at line 226, and
-    ///        - the secondary sender-address Unauthorized check at line 244.
-    ///      Therefore an InvalidSelector revert proves the access-control gate is open for InteropHandler.
+    /// @notice Test that receiveMessage does not revert with Unauthorized when called by L2InteropHandler
+    /// @dev We craft a payload with a deliberately wrong selector. Reaching the InvalidSelector revert in
+    ///      `AssetRouterBase.receiveMessage` is causally downstream of:
+    ///        - the `msg.sender == _interopHandler()` gate, and
+    ///        - the `_isValidInteropSender` sender validation.
+    ///      Therefore an InvalidSelector revert proves the access-control gate is open for L2InteropHandler.
     function test_regression_receiveMessageAllowedForInteropHandler() public {
         bytes4 bogusSelector = bytes4(0xdeadbeef);
 
-        // Sender bytes that pass the L244 check: senderChainId != L1_CHAIN_ID and senderAddress == address(this).
+        // Sender bytes that pass `_isValidInteropSender`: senderChainId != L1_CHAIN_ID and
+        // senderAddress == address(this).
         bytes memory sender = InteroperableAddress.formatEvmV1(block.chainid + 1, L2_ASSET_ROUTER_ADDR);
 
-        // Payload with a non-finalizeDeposit selector so the L251 selector check is the deterministic next failure.
+        // Payload with a non-finalizeDeposit selector so the selector check is the deterministic next failure.
         bytes memory payload = abi.encodeWithSelector(
             bogusSelector,
             block.chainid + 1, // originChainId (different from L1 and current chain)
@@ -98,7 +99,7 @@ abstract contract L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract
         IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage(bytes32(0), sender, payload);
     }
 
-    /// @notice Test that a contract trying to impersonate InteropHandler still fails
+    /// @notice Test that a contract trying to impersonate L2InteropHandler still fails
     /// @dev Ensures that the access control cannot be bypassed by contract tricks
     function test_regression_contractCannotImpersonateInteropHandler() public {
         bytes memory payload = abi.encodeWithSelector(

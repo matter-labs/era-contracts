@@ -18,8 +18,7 @@ import {
 } from "contracts/common/Messaging.sol";
 import {AtomicFinalityProof} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
-import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
-import {InteropHandler} from "contracts/interop/InteropHandler.sol";
+import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 import {Reentrancy} from "contracts/common/L1ContractErrors.sol";
 
 import {
@@ -57,7 +56,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         // but the key is it shouldn't fail due to reentrancy. Atomic interop: a default
         // AtomicFinalityProof suffices (the finality gate is mocked in setUp).
         AtomicFinalityProof memory innerFinality;
-        bytes memory innerPayload = abi.encodeCall(IInteropHandler.verifyBundle, (new bytes(0), innerFinality));
+        bytes memory innerPayload = abi.encodeCall(L2InteropHandler.verifyBundle, (new bytes(0), innerFinality));
 
         // Create the outer bundle that calls receiveMessage on InteropHandler
         InteropCall[] memory calls = new InteropCall[](1);
@@ -139,7 +138,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         AtomicFinalityProof memory innerProof;
 
         // Payload for receiveMessage that dispatches to executeBundle(innerBundle)
-        bytes memory innerPayload = abi.encodeCall(IInteropHandler.executeBundle, (encodedInnerBundle, innerProof));
+        bytes memory innerPayload = abi.encodeCall(L2InteropHandler.executeBundle, (encodedInnerBundle, innerProof));
 
         // Outer bundle: its call targets InteropHandler.receiveMessage with the above payload.
         // Call chain: executeBundle(outer) -> _executeCalls -> receiveMessage -> this.executeBundle(inner)
@@ -221,7 +220,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         AtomicFinalityProof memory innerProof;
 
         // Payload for receiveMessage that dispatches to verifyBundle(innerBundle)
-        bytes memory innerPayload = abi.encodeCall(IInteropHandler.verifyBundle, (encodedInnerBundle, innerProof));
+        bytes memory innerPayload = abi.encodeCall(L2InteropHandler.verifyBundle, (encodedInnerBundle, innerProof));
 
         // Outer bundle: its call targets InteropHandler.receiveMessage with the above payload.
         // Call chain: executeBundle(outer) -> _executeCalls -> receiveMessage -> this.verifyBundle(inner)

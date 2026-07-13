@@ -246,6 +246,19 @@
   },
   {
     "type": "function",
+    "name": "setL1InteropHandler",
+    "inputs": [
+      {
+        "name": "_l1InteropHandler",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setNativeTokenVault",
     "inputs": [
       {
@@ -399,7 +412,7 @@
     "name": "DepositFinalizedAssetRouter",
     "inputs": [
       {
-        "name": "chainId",
+        "name": "sourceChainId",
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"

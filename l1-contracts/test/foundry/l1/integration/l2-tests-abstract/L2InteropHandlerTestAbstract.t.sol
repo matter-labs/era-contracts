@@ -38,7 +38,8 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
-import {CallStatus, IInteropHandler} from "contracts/interop/IInteropHandler.sol";
+import {CallStatus} from "contracts/common/Messaging.sol";
+import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
 
 import {WrongDestinationBaseTokenAssetId, WrongDestinationChainId} from "contracts/interop/InteropErrors.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
@@ -59,7 +60,7 @@ import {
 } from "contracts/common/Messaging.sol";
 
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
-import {InteropHandler} from "contracts/interop/InteropHandler.sol";
+import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
 abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer {
@@ -196,18 +197,18 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
         // Expect event
         vm.expectEmit(true, false, false, false);
-        emit IInteropHandler.BundleExecuted(bundleHash);
+        emit IInteropHandlerBase.BundleExecuted(bundleHash);
         vm.prank(EXECUTION_ADDRESS);
         L2_INTEROP_HANDLER.executeBundle(bundle, finality);
         // Check storage changes
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
             2,
             "BundleStatus should be FullyExecuted"
         );
         for (uint256 i = 0; i < interopBundle.calls.length; ++i) {
             assertEq(
-                uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, i)),
+                uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, i)),
                 1,
                 "CallStatus should be Executed"
             );
@@ -230,7 +231,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encode(bytes32(0))
         );
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
         CallStatus[] memory callStatuses1 = new CallStatus[](3);
         callStatuses1[0] = CallStatus.Unprocessed;
         callStatuses1[1] = CallStatus.Cancelled;
@@ -241,59 +242,59 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         callStatuses2[2] = CallStatus.Unprocessed;
         // Expect events for first unbundle
         vm.expectEmit(true, false, false, false);
-        emit IInteropHandler.CallProcessed(bundleHash, 1, CallStatus.Cancelled);
+        emit IInteropHandlerBase.CallProcessed(bundleHash, 1, CallStatus.Cancelled);
         vm.expectEmit(true, false, false, false);
-        emit IInteropHandler.CallProcessed(bundleHash, 2, CallStatus.Executed);
+        emit IInteropHandlerBase.CallProcessed(bundleHash, 2, CallStatus.Executed);
         vm.expectEmit(true, false, false, false);
-        emit IInteropHandler.BundleUnbundled(bundleHash);
+        emit IInteropHandlerBase.BundleUnbundled(bundleHash);
         vm.prank(UNBUNDLER_ADDRESS);
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(bundle, callStatuses1);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(bundle, callStatuses1);
         // Check storage changes after first unbundle
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 0)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 0)),
             0,
             "Call 0 should be Unprocessed"
         );
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 1)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 1)),
             2,
             "Call 1 should be Cancelled"
         );
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 2)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 2)),
             1,
             "Call 2 should be Executed"
         );
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
             3,
             "BundleStatus should be Unbundled"
         );
         // Expect events for second unbundle
         vm.expectEmit(true, false, false, false);
-        emit IInteropHandler.CallProcessed(bundleHash, 0, CallStatus.Executed);
+        emit IInteropHandlerBase.CallProcessed(bundleHash, 0, CallStatus.Executed);
         vm.expectEmit(true, false, false, false);
-        emit IInteropHandler.BundleUnbundled(bundleHash);
+        emit IInteropHandlerBase.BundleUnbundled(bundleHash);
         vm.prank(UNBUNDLER_ADDRESS);
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(bundle, callStatuses2);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(bundle, callStatuses2);
         // Check storage changes after second unbundle
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 0)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 0)),
             1,
             "Call 0 should be Executed"
         );
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 1)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 1)),
             2,
             "Call 1 should be Cancelled"
         );
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 2)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 2)),
             1,
             "Call 2 should be Executed"
         );
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
             3,
             "BundleStatus should be Unbundled"
         );
@@ -314,7 +315,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             data: abi.encodeCall(
                 AssetRouterBase.finalizeDeposit,
                 (
-                    L1_CHAIN_ID,
+                    ERA_CHAIN_ID,
                     assetId,
                     DataEncoding.encodeBridgeMintData(
                         depositor,
@@ -335,7 +336,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             data: abi.encodeCall(
                 AssetRouterBase.finalizeDeposit,
                 (
-                    L1_CHAIN_ID,
+                    ERA_CHAIN_ID,
                     assetId,
                     DataEncoding.encodeBridgeMintData(
                         depositor,
@@ -356,7 +357,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             data: abi.encodeCall(
                 AssetRouterBase.finalizeDeposit,
                 (
-                    L1_CHAIN_ID,
+                    ERA_CHAIN_ID,
                     assetId,
                     DataEncoding.encodeBridgeMintData(
                         depositor,
@@ -407,7 +408,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encodeWithSelector(WrongDestinationChainId.selector, bundleHash, wrongChainId, block.chainid)
         );
 
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
     }
 
     /// @notice Test that verifyBundle works while settling on L1.
@@ -429,10 +430,10 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
 
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
 
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
 
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
             1, // BundleStatus.Verified
             "Bundle should be in Verified status"
         );
@@ -460,7 +461,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             )
         );
 
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
     }
 
     /// @notice Test pause functionality in InteropCenter
@@ -544,13 +545,13 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
 
         vm.expectEmit(true, false, false, false);
-        emit IInteropHandler.BundleVerified(bundleHash);
+        emit IInteropHandlerBase.BundleVerified(bundleHash);
 
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
 
         // Verify the bundle status was updated correctly
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
             1, // BundleStatus.Verified
             "Bundle should be in Verified status"
         );
@@ -586,14 +587,14 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
 
         vm.expectEmit(true, false, false, false);
-        emit IInteropHandler.BundleExecuted(bundleHash);
+        emit IInteropHandlerBase.BundleExecuted(bundleHash);
 
         vm.prank(EXECUTION_ADDRESS);
         L2_INTEROP_HANDLER.executeBundle(bundle, finality);
 
         // Verify successful execution
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
             2, // BundleStatus.FullyExecuted
             "Bundle should be fully executed"
         );
