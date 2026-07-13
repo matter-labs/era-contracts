@@ -169,7 +169,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         saveOutput(outputPath);
     }
 
-    function initializeGeneratedData() internal {
+    function initializeGeneratedData() internal virtual {
         generatedData.forceDeploymentsData = prepareForceDeploymentsData();
     }
 
