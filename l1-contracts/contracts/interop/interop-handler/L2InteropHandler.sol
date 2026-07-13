@@ -48,17 +48,11 @@ contract L2InteropHandler is InteropHandlerBase {
     /// @param _bundle ABI-encoded InteropBundle to execute (carries the `atomicBundle` attribute at send time).
     /// @param _finality The flow definition (`flowId`, legs, deadline) + one IMT inclusion proof per leg.
     function executeBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public {
-        // No-op on L2 (the system contract is not pausable); present for symmetry with L1.
-        _ensureNotPaused();
-
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
-        // An atomic bundle is never published to L1, so its source chain id is the bundle's own field (the
-        // atomic proof self-binds each leg's source chain via `commitValue`/`legSourceChainIds`).
-        _validateBundleDestinationContext(bundleHash, interopBundle, interopBundle.sourceChainId);
-
-        _requireExecutionAllowed(bundleHash, interopBundle);
-        _requireExecutable(bundleHash, status);
+        // Shared pre-gate validation. An atomic bundle is never published to L1, so it self-binds its own
+        // source chain id (the atomic proof authenticates each leg's source chain via `legSourceChainIds`).
+        _validateExecutable(bundleHash, interopBundle, interopBundle.sourceChainId, status);
 
         // Atomicity gate: prove the whole flow was committed before the deadline. Skipped if already verified.
         if (status != BundleStatus.Verified) {
@@ -74,10 +68,9 @@ contract L2InteropHandler is InteropHandlerBase {
     function verifyBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
-        _validateBundleDestinationContext(bundleHash, interopBundle, interopBundle.sourceChainId);
+        _validateVerifiable(bundleHash, interopBundle, interopBundle.sourceChainId, status);
 
-        require(status == BundleStatus.Unreceived, BundleAlreadyProcessed(bundleHash));
-
+        // Atomicity gate, then mark verified.
         IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).requireFlowFinalized(bundleHash, _finality);
 
         _markVerified(bundleHash);
@@ -104,17 +97,14 @@ contract L2InteropHandler is InteropHandlerBase {
         address _senderAddress,
         bytes calldata _sender
     ) internal override {
-        (bytes memory bundle, AtomicFinalityProof memory finality) = abi.decode(
-            _payload[4:],
-            (bytes, AtomicFinalityProof)
-        );
+        (bytes memory bundle, AtomicFinalityProof memory finality) =
+            abi.decode(_payload[4:], (bytes, AtomicFinalityProof));
 
         // Decode the bundle to get execution permissions
-        (InteropBundle memory interopBundle, bytes32 bundleHash, ) = _getBundleData(bundle);
+        (InteropBundle memory interopBundle, bytes32 bundleHash,) = _getBundleData(bundle);
         if (interopBundle.bundleAttributes.executionAddress.length != 0) {
-            (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
-                interopBundle.bundleAttributes.executionAddress
-            );
+            (uint256 executionChainId, address executionAddress) =
+                InteroperableAddress.parseEvmV1(interopBundle.bundleAttributes.executionAddress);
             require(
                 (executionChainId == _senderChainId || executionChainId == 0) && executionAddress == _senderAddress,
                 ExecutingNotAllowed(bundleHash, _sender, interopBundle.bundleAttributes.executionAddress)
@@ -126,10 +116,8 @@ contract L2InteropHandler is InteropHandlerBase {
 
     /// @inheritdoc InteropHandlerBase
     function _receiveVerifyBundle(bytes calldata _payload) internal override {
-        (bytes memory bundle, AtomicFinalityProof memory finality) = abi.decode(
-            _payload[4:],
-            (bytes, AtomicFinalityProof)
-        );
+        (bytes memory bundle, AtomicFinalityProof memory finality) =
+            abi.decode(_payload[4:], (bytes, AtomicFinalityProof));
 
         // Bundle verification is permissionless
         this.verifyBundle(bundle, finality);

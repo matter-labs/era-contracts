@@ -104,15 +104,14 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
-        (uint256 unbundlerChainId, address unbundlerAddress) = InteroperableAddress.parseEvmV1(
-            interopBundle.bundleAttributes.unbundlerAddress
-        );
+        (uint256 unbundlerChainId, address unbundlerAddress) =
+            InteroperableAddress.parseEvmV1(interopBundle.bundleAttributes.unbundlerAddress);
 
         // Verify that the caller has permission to unbundle the bundle.
         // It's also possible that the caller is InteropHandler itself, in case the unbundling was initiated through receiveMessage.
         require(
-            msg.sender == address(this) ||
-                ((unbundlerChainId == block.chainid || unbundlerChainId == 0) && unbundlerAddress == msg.sender),
+            msg.sender == address(this)
+                || ((unbundlerChainId == block.chainid || unbundlerChainId == 0) && unbundlerAddress == msg.sender),
             UnbundlingNotAllowed(
                 bundleHash,
                 InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
@@ -179,10 +178,16 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
     /// @param payload ABI-encoded function call data with selector and parameters.
     /// @return selector The function selector of this receiveMessage function, as per ERC-7786.
     function receiveMessage(
-        bytes32 /* receiveId */,
+        bytes32,
+        /* receiveId */
         bytes calldata sender,
         bytes calldata payload
-    ) external payable override returns (bytes4) {
+    )
+        external
+        payable
+        override
+        returns (bytes4)
+    {
         // Verify that call to this function is a result of a call being executed, meaning this message came from a valid bundle.
         // This is the only way receiveMessage can be invoked on InteropHandler by itself.
         require(msg.sender == address(this), Unauthorized(msg.sender));
@@ -215,9 +220,11 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
     /// @return interopBundle The decoded InteropBundle struct.
     /// @return bundleHash Hash corresponding to the bundle that gets decoded.
     /// @return currentStatus The current BundleStatus of the bundle that gets decoded.
-    function _getBundleData(
-        bytes memory _bundle
-    ) internal view returns (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus currentStatus) {
+    function _getBundleData(bytes memory _bundle)
+        internal
+        view
+        returns (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus currentStatus)
+    {
         // Revert with a clean error on an empty bundle instead of the panic `abi.decode` would produce.
         require(_bundle.length != 0, EmptyBundle());
         interopBundle = abi.decode(_bundle, (InteropBundle));
@@ -234,12 +241,12 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         if (_interopBundle.bundleAttributes.executionAddress.length == 0) {
             return;
         }
-        (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
-            _interopBundle.bundleAttributes.executionAddress
-        );
+        (uint256 executionChainId, address executionAddress) =
+            InteroperableAddress.parseEvmV1(_interopBundle.bundleAttributes.executionAddress);
         require(
-            (msg.sender == address(this) ||
-                ((executionChainId == block.chainid || executionChainId == 0) && executionAddress == msg.sender)),
+            (msg.sender == address(this)
+                    || ((executionChainId == block.chainid || executionChainId == 0)
+                        && executionAddress == msg.sender)),
             ExecutingNotAllowed(
                 _bundleHash,
                 InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
@@ -252,9 +259,40 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
     /// @dev Whitelist approach: any future status is rejected until explicitly allowed.
     function _requireExecutable(bytes32 _bundleHash, BundleStatus _status) internal pure {
         require(
-            _status == BundleStatus.Unreceived || _status == BundleStatus.Verified,
-            BundleAlreadyProcessed(_bundleHash)
+            _status == BundleStatus.Unreceived || _status == BundleStatus.Verified, BundleAlreadyProcessed(_bundleHash)
         );
+    }
+
+    /// @notice Shared pre-gate validation for the derived `executeBundle`: pause gate, destination-context
+    /// check, caller permission and executability. Both handlers run this identically; the only per-layer
+    /// difference is the proof gate that follows (message inclusion on L1, atomic IMT finality on L2) and
+    /// the proof-attested source chain id passed here. The handler then calls {_markFullyExecutedAndRun}.
+    /// @param _proofSourceChainId Source chain id attested by the proof — the message-inclusion
+    /// `proof.chainId` on L1, or the bundle's self-binding `sourceChainId` on the L2 atomic path.
+    function _validateExecutable(
+        bytes32 _bundleHash,
+        InteropBundle memory _interopBundle,
+        uint256 _proofSourceChainId,
+        BundleStatus _status
+    ) internal view {
+        _ensureNotPaused();
+        _validateBundleDestinationContext(_bundleHash, _interopBundle, _proofSourceChainId);
+        _requireExecutionAllowed(_bundleHash, _interopBundle);
+        _requireExecutable(_bundleHash, _status);
+    }
+
+    /// @notice Shared pre-gate validation for the derived `verifyBundle`: destination-context check plus a
+    /// fresh-bundle (`Unreceived`) requirement. The handler then runs its typed proof gate and marks the
+    /// bundle `Verified`.
+    /// @param _proofSourceChainId See {_validateExecutable}.
+    function _validateVerifiable(
+        bytes32 _bundleHash,
+        InteropBundle memory _interopBundle,
+        uint256 _proofSourceChainId,
+        BundleStatus _status
+    ) internal view {
+        _validateBundleDestinationContext(_bundleHash, _interopBundle, _proofSourceChainId);
+        require(_status == BundleStatus.Unreceived, BundleAlreadyProcessed(_bundleHash));
     }
 
     /// @notice Marks a proven bundle `Verified` and emits the event. Shared tail of the derived `verifyBundle`.
@@ -363,11 +401,10 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         (bytes memory bundle, CallStatus[] memory providedCallStatus) = abi.decode(payload[4:], (bytes, CallStatus[]));
 
         // Decode the bundle to get unbundling permissions
-        (InteropBundle memory interopBundle, bytes32 bundleHash, ) = _getBundleData(bundle);
+        (InteropBundle memory interopBundle, bytes32 bundleHash,) = _getBundleData(bundle);
 
-        (uint256 unbundlerChainId, address unbundlerAddress) = InteroperableAddress.parseEvmV1(
-            interopBundle.bundleAttributes.unbundlerAddress
-        );
+        (uint256 unbundlerChainId, address unbundlerAddress) =
+            InteroperableAddress.parseEvmV1(interopBundle.bundleAttributes.unbundlerAddress);
 
         // Verify sender has unbundling permission
         require(
