@@ -7,21 +7,23 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
-import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_CENTER_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {
     CannotInitiateInteropOnL1,
+    DirectCallToL1NotSupported,
+    InteropCallToL1NotToAssetRouter,
     InteropToSelfNotSupported,
     MultiCallToL1NotSupported,
     NonZeroValueToL1NotSupported
 } from "contracts/interop/InteropErrors.sol";
 
-/// @notice `InteropCenter` send-time destination constraints: an L2->L1 bundle must be exactly one zero-value
-/// call (direct or indirect), interop can never be initiated from L1 itself, and a bundle/message can never
-/// target the sending chain itself.
+/// @notice `InteropCenter` send-time destination constraints: an L2->L1 bundle must be exactly one indirect,
+/// zero-value call to the L2 AssetRouter (a withdrawal), interop can never be initiated from L1 itself, and a
+/// bundle/message can never target the sending chain itself.
 /// @dev Kept in its own abstract (mixed into `L2InteropCenterTestAbstract`, i.e. the L1-context runner) rather than
 /// in `L2InteropLibraryBasicTestAbstract`, because that abstract is also inherited by the zksync `L2InteropLibraryTest`
 /// and the extra test code would push that contract over EraVM's 65536-instruction bytecode limit. These checks are
@@ -63,55 +65,35 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
     /// @notice A bundle to L1 with more than one call is rejected: an L1-destined bundle is a single call.
     function test_sendBundle_RevertWhen_MultiCallToL1() public {
         InteropCallStarter[] memory calls = new InteropCallStarter[](2);
-        calls[0] = _l1CallStarter(true, 0);
-        calls[1] = _l1CallStarter(true, 0);
+        calls[0] = _l1CallStarter(L2_ASSET_ROUTER_ADDR, true, 0);
+        calls[1] = _l1CallStarter(L2_ASSET_ROUTER_ADDR, true, 0);
         vm.expectRevert(abi.encodeWithSelector(MultiCallToL1NotSupported.selector, uint256(2)));
         l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, _l1BundleAttributes());
     }
 
-    /// @notice A single DIRECT zero-value call to L1 is allowed: a plain L2->L1 message needing no asset-router
-    /// routing. (The receive side is covered by the L1InteropHandler unit test finalizing an arbitrary single
-    /// call via ERC-7786 `receiveMessage`.)
-    function test_sendBundle_DirectCallToL1_Succeeds() public {
+    /// @notice A DIRECT (non-indirect) call to L1 is rejected: L1 interop is restricted to withdrawals, which
+    /// must be indirect calls routed through the asset router.
+    function test_sendBundle_RevertWhen_DirectCallToL1() public {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
-        calls[0] = _l1CallStarter(false, 0);
+        calls[0] = _l1CallStarter(L2_ASSET_ROUTER_ADDR, false, 0);
+        vm.expectRevert(DirectCallToL1NotSupported.selector);
+        l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, _l1BundleAttributes());
+    }
 
-        vm.recordLogs();
-        bytes32 bundleHash = l2InteropCenter.sendBundle(
-            InteroperableAddress.formatEvmV1(L1_CHAIN_ID),
-            calls,
-            _l1BundleAttributes()
-        );
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-
-        assertTrue(bundleHash != bytes32(0), "direct L1-destined bundle should return a non-zero hash");
-        bool foundBundle;
-        for (uint256 i = 0; i < logs.length; i++) {
-            if (
-                logs[i].emitter == L2_INTEROP_CENTER_ADDR &&
-                logs[i].topics[0] == IInteropCenter.InteropBundleSent.selector
-            ) {
-                foundBundle = true;
-                break;
-            }
-        }
-        assertTrue(foundBundle, "InteropBundleSent should be emitted for the direct L1-destined call");
+    /// @notice An indirect L1 call targeting anything other than the L2 AssetRouter is rejected: L1 interop is
+    /// withdrawals-only, so the call must route through the asset router.
+    function test_sendBundle_RevertWhen_CallToL1NotAssetRouter() public {
+        InteropCallStarter[] memory calls = new InteropCallStarter[](1);
+        calls[0] = _l1CallStarter(interopTargetContract, true, 0);
+        vm.expectRevert(abi.encodeWithSelector(InteropCallToL1NotToAssetRouter.selector, interopTargetContract));
+        l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, _l1BundleAttributes());
     }
 
     /// @notice An L1 call carrying non-zero destination-side value is rejected: the amount must ride in the payload.
     function test_sendBundle_RevertWhen_NonZeroValueToL1() public {
         uint256 callValue = 5;
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
-        calls[0] = _l1CallStarter(true, callValue);
-        vm.expectRevert(abi.encodeWithSelector(NonZeroValueToL1NotSupported.selector, callValue));
-        l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, _l1BundleAttributes());
-    }
-
-    /// @notice The zero-value rule applies to DIRECT L1 calls as well.
-    function test_sendBundle_RevertWhen_DirectCallToL1WithValue() public {
-        uint256 callValue = 7;
-        InteropCallStarter[] memory calls = new InteropCallStarter[](1);
-        calls[0] = _l1CallStarter(false, callValue);
+        calls[0] = _l1CallStarter(L2_ASSET_ROUTER_ADDR, true, callValue);
         vm.expectRevert(abi.encodeWithSelector(NonZeroValueToL1NotSupported.selector, callValue));
         l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, _l1BundleAttributes());
     }
@@ -152,7 +134,7 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
     /// @notice A bundle can never target the sending chain itself.
     function test_sendBundle_RevertWhen_DestinationIsSelf() public {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
-        calls[0] = _l1CallStarter(true, 0);
+        calls[0] = _l1CallStarter(L2_ASSET_ROUTER_ADDR, true, 0);
         vm.expectRevert(InteropToSelfNotSupported.selector);
         l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(block.chainid), calls, _l1BundleAttributes());
     }
@@ -171,17 +153,22 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
     /// @notice Interop can never be initiated from L1 itself, regardless of destination.
     function test_sendBundle_RevertWhen_InitiatedOnL1() public {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
-        calls[0] = _l1CallStarter(true, 0);
+        calls[0] = _l1CallStarter(L2_ASSET_ROUTER_ADDR, true, 0);
         // Pretend the InteropCenter is running on L1.
         vm.chainId(L1_CHAIN_ID);
         vm.expectRevert(abi.encodeWithSelector(CannotInitiateInteropOnL1.selector, L1_CHAIN_ID));
         l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, _l1BundleAttributes());
     }
 
-    /// @dev Builds a single L1-destined call starter. `_indirect` toggles the ERC-7786 indirectCall attribute;
-    /// `_callValue` (when non-zero) adds an interopCallValue attribute. The target is a placeholder — these are
-    /// only used for send-time rejection tests.
-    function _l1CallStarter(bool _indirect, uint256 _callValue) internal view returns (InteropCallStarter memory) {
+    /// @dev Builds a single L1-destined call starter targeting `_to`. `_indirect` toggles the ERC-7786
+    /// indirectCall attribute; `_callValue` (when non-zero) adds an interopCallValue attribute. These starters
+    /// are only used for send-time rejection tests — each is crafted so the specific L1 guard under test is the
+    /// first to fire (the L1-branch requires run before `_processCallStarter`).
+    function _l1CallStarter(
+        address _to,
+        bool _indirect,
+        uint256 _callValue
+    ) internal pure returns (InteropCallStarter memory) {
         uint256 n;
         if (_indirect) ++n;
         if (_callValue != 0) ++n;
@@ -189,12 +176,7 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
         uint256 j;
         if (_indirect) attrs[j++] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
         if (_callValue != 0) attrs[j++] = abi.encodeCall(IERC7786Attributes.interopCallValue, (_callValue));
-        return
-            InteropCallStarter({
-                to: InteroperableAddress.formatEvmV1(interopTargetContract),
-                data: hex"",
-                callAttributes: attrs
-            });
+        return InteropCallStarter({to: InteroperableAddress.formatEvmV1(_to), data: hex"", callAttributes: attrs});
     }
 
     /// @dev Minimal bundle attributes accepted by `sendBundle` (fee is waived for L1 destinations anyway).

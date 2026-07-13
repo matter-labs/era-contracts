@@ -17,6 +17,8 @@ error CannotInitiateInteropOnL1(uint256 destinationChainId);
 error CanNotUnbundle(bytes32 bundleHash);
 // 0x2d159f39
 error DestinationChainNotRegistered(uint256 destinationChainId);
+// 0x43f0659c
+error DirectCallToL1NotSupported();
 // 0x558c44fc
 error EmptyBundle();
 // 0xe845be4c
@@ -27,6 +29,8 @@ error FeeWithdrawalFailed();
 error IndirectCallValueMismatch(uint256 expected, uint256 actual);
 // 0xbfa9bcca
 error InteropBundleSaltAlreadyUsed(address user, bytes32 salt);
+// 0xd9b009c7
+error InteropCallToL1NotToAssetRouter(address target);
 // 0xfe8b1b16
 error InteroperableAddressChainReferenceNotEmpty(bytes interoperableAddress);
 // 0x884f49ba

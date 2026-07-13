@@ -18,11 +18,11 @@ import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice L1-side interop handler. It executes L2 -> L1 interop bundles through the shared
-/// `InteropHandlerBase.executeBundle` interface (symmetric to the L2 `L2InteropHandler`). An L1-destined bundle
-/// is a single zero-value call — direct (a plain L2 -> L1 message) or indirect (asset-router routed) — enforced
-/// at send time by the L2 InteropCenter and delivered to its target on L1 via ERC-7786 `receiveMessage`. The
-/// target and payload are general: the canonical use is an L2 -> L1 withdrawal (an indirect call targeting the
-/// L1 asset router's `finalizeDeposit`), but any single such call is allowed.
+/// `InteropHandlerBase.executeBundle` interface (symmetric to the L2 `L2InteropHandler`). For this release an
+/// L1-destined bundle is restricted to a single asset WITHDRAWAL: the L2 InteropCenter only accepts an indirect,
+/// zero-value call to the L2 AssetRouter, which resolves to a call targeting the L1 asset router's
+/// `finalizeDeposit`, delivered here via ERC-7786 `receiveMessage`. Arbitrary/direct L2 -> L1 calls are not
+/// allowed, keeping the L1-side surface to the asset router.
 /// @dev Deployed behind a proxy on L1.
 /// @dev Pausable so that withdrawals can be halted: previously `L1Nullifier.finalizeDeposit` carried the
 /// `whenNotPaused` gate for withdrawal finalization; that gate now lives here, on the call-executing entry
