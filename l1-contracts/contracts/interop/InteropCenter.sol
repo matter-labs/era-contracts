@@ -320,6 +320,90 @@ contract InteropCenter is
         });
     }
 
+    /// @inheritdoc IInteropCenter
+    function previewBundleHash(
+        bytes calldata _destinationChainId,
+        InteropCallStarter[] calldata _callStarters,
+        bytes[] calldata _bundleAttributes
+    ) external returns (bytes32 bundleHash) {
+        _ensureEmptyAddress(_destinationChainId);
+        // slither-disable-next-line unused-return
+        (uint256 destinationChainId, ) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
+        _ensureL2ToL2(destinationChainId);
+
+        uint256 callStartersLength = _callStarters.length;
+        InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](
+            callStartersLength
+        );
+        for (uint256 i = 0; i < callStartersLength; ++i) {
+            _ensureEmptyChainReference(_callStarters[i].to);
+            // slither-disable-next-line unused-return
+            (, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_callStarters[i].to);
+            // solhint-disable-next-line no-unused-vars
+            (CallAttributes memory callAttributes, ) = parseAttributes(
+                _callStarters[i].callAttributes,
+                AttributeParsingRestrictions.OnlyCallAttributes
+            );
+            callStartersInternal[i] = InteropCallStarterInternal({
+                to: recipientAddress,
+                data: _callStarters[i].data,
+                callAttributes: callAttributes
+            });
+        }
+        // solhint-disable-next-line no-unused-vars
+        (, BundleAttributes memory bundleAttributes) = parseAttributes(
+            _bundleAttributes,
+            AttributeParsingRestrictions.OnlyBundleAttributes
+        );
+        if (bundleAttributes.unbundlerAddress.length == 0) {
+            bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
+        }
+
+        // slither-disable-next-line unused-return
+        (InteropBundle memory bundle, , ) = _buildInteropBundle(
+            destinationChainId,
+            callStartersInternal,
+            bundleAttributes,
+            msg.sender
+        );
+        bundleHash = _hashBundle(bundle);
+    }
+
+    /// @inheritdoc IInteropCenter
+    function previewMessageHash(
+        bytes calldata _recipient,
+        bytes calldata _payload,
+        bytes[] calldata _attributes
+    ) external returns (bytes32 bundleHash) {
+        // slither-disable-next-line unused-return
+        (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_recipient);
+        _ensureL2ToL2(recipientChainId);
+
+        (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) = parseAttributes(
+            _attributes,
+            AttributeParsingRestrictions.CallAndBundleAttributes
+        );
+        if (bundleAttributes.unbundlerAddress.length == 0) {
+            bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
+        }
+
+        InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](1);
+        callStartersInternal[0] = InteropCallStarterInternal({
+            to: recipientAddress,
+            data: _payload,
+            callAttributes: callAttributes
+        });
+
+        // slither-disable-next-line unused-return
+        (InteropBundle memory bundle, , ) = _buildInteropBundle(
+            recipientChainId,
+            callStartersInternal,
+            bundleAttributes,
+            msg.sender
+        );
+        bundleHash = _hashBundle(bundle);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             Internal functions
     //////////////////////////////////////////////////////////////*/
@@ -441,40 +525,15 @@ contract InteropCenter is
         );
         isInteropBundleSaltUsed[msg.sender][_bundleAttributes.salt] = true;
 
-        // Form an InteropBundle.
-        bytes32 destinationBaseTokenAssetId = _getDestinationBaseTokenAssetId(_destinationChainId);
-        InteropBundle memory bundle = InteropBundle({
-            version: INTEROP_BUNDLE_VERSION,
-            sourceChainId: block.chainid,
-            destinationChainId: _destinationChainId,
-            destinationBaseTokenAssetId: destinationBaseTokenAssetId,
-            // The salt is derived from the sender and a user-provided salt (from the `interopBundleSalt` bundle attribute).
-            // Mixing in `msg.sender` ensures bundles from different senders can never collide, while the user-provided salt
-            // lets the sender control uniqueness of their own bundles. A random user-provided salt additionally keeps the
-            // resulting bundle hash unpredictable, preserving the bundle's privacy.
-            interopBundleSalt: keccak256(abi.encodePacked(msg.sender, _bundleAttributes.salt)),
-            calls: new InteropCall[](_callStarters.length),
-            bundleAttributes: _bundleAttributes
-        });
-
-        // This will calculate how much value does all of the calls use cumulatively.
-        uint256 totalBurnedCallsValue;
-        uint256 totalIndirectCallsValue;
-
-        // Fill the formed InteropBundle with calls.
-        uint256 callStartersLength = _callStarters.length;
-        for (uint256 i = 0; i < callStartersLength; ++i) {
-            _validateCallStarterValue(_callStarters[i].callAttributes.interopCallValue);
-            InteropCall memory interopCall = _processCallStarter(_callStarters[i], _destinationChainId, msg.sender);
-            bundle.calls[i] = interopCall;
-            totalBurnedCallsValue += _callStarters[i].callAttributes.interopCallValue;
-            // For indirect calls, also account for the bridge message value that gets sent to the AssetRouter
-            if (_callStarters[i].callAttributes.indirectCall) {
-                totalIndirectCallsValue += _callStarters[i].callAttributes.indirectCallMessageValue;
-            }
-        }
+        // Form an InteropBundle (this also runs each call starter, burning value for indirect calls).
+        (
+            InteropBundle memory bundle,
+            uint256 totalBurnedCallsValue,
+            uint256 totalIndirectCallsValue
+        ) = _buildInteropBundle(_destinationChainId, _callStarters, _bundleAttributes, msg.sender);
 
         // If using fixed fees, collect ZK tokens per-call and accumulate for coinbase.
+        uint256 callStartersLength = _callStarters.length;
         // Coinbase can later claim via claimZKFees().
         // This is handled to not allow malicious operator to fail sending bundles by providing malicious coinbase.
         if (_bundleAttributes.useFixedFee) {
@@ -511,6 +570,55 @@ contract InteropCenter is
         // Emit event stating that the bundle was sent out successfully. Atomic bundles are never
         // published to L1, so there is no L2->L1 message hash.
         emit InteropBundleSent(bytes32(0), bundleHash, bundle);
+    }
+
+    /// @notice Assembles the {InteropBundle} from resolved call starters: derives the sender-scoped salt,
+    /// resolves the destination base-token asset id, and processes each call starter (which, for indirect
+    /// calls, executes the value-burning `initiateIndirectCall`). Returns the bundle plus the aggregated
+    /// call values needed for source-chain value collection.
+    /// @dev Shared by {_sendBundle} (the real send) and the {previewBundleHash}/{previewMessageHash}
+    /// simulations, so a preview's `bundleHash` is byte-identical to the value the matching send emits.
+    function _buildInteropBundle(
+        uint256 _destinationChainId,
+        InteropCallStarterInternal[] memory _callStarters,
+        BundleAttributes memory _bundleAttributes,
+        address _sender
+    )
+        internal
+        returns (InteropBundle memory bundle, uint256 totalBurnedCallsValue, uint256 totalIndirectCallsValue)
+    {
+        bytes32 destinationBaseTokenAssetId = _getDestinationBaseTokenAssetId(_destinationChainId);
+        bundle = InteropBundle({
+            version: INTEROP_BUNDLE_VERSION,
+            sourceChainId: block.chainid,
+            destinationChainId: _destinationChainId,
+            destinationBaseTokenAssetId: destinationBaseTokenAssetId,
+            // The salt is derived from the sender and a user-provided salt (from the `interopBundleSalt` bundle attribute).
+            // Mixing in `msg.sender` ensures bundles from different senders can never collide, while the user-provided salt
+            // lets the sender control uniqueness of their own bundles. A random user-provided salt additionally keeps the
+            // resulting bundle hash unpredictable, preserving the bundle's privacy.
+            interopBundleSalt: keccak256(abi.encodePacked(_sender, _bundleAttributes.salt)),
+            calls: new InteropCall[](_callStarters.length),
+            bundleAttributes: _bundleAttributes
+        });
+
+        // Fill the formed InteropBundle with calls, aggregating the value each one consumes.
+        uint256 callStartersLength = _callStarters.length;
+        for (uint256 i = 0; i < callStartersLength; ++i) {
+            _validateCallStarterValue(_callStarters[i].callAttributes.interopCallValue);
+            InteropCall memory interopCall = _processCallStarter(_callStarters[i], _destinationChainId, _sender);
+            bundle.calls[i] = interopCall;
+            totalBurnedCallsValue += _callStarters[i].callAttributes.interopCallValue;
+            // For indirect calls, also account for the bridge message value that gets sent to the AssetRouter
+            if (_callStarters[i].callAttributes.indirectCall) {
+                totalIndirectCallsValue += _callStarters[i].callAttributes.indirectCallMessageValue;
+            }
+        }
+    }
+
+    /// @notice Hashes an assembled {InteropBundle} into its canonical `bundleHash`.
+    function _hashBundle(InteropBundle memory _bundle) internal view returns (bytes32) {
+        return InteropDataEncoding.encodeInteropBundleHash(block.chainid, abi.encode(_bundle));
     }
 
     /// @notice Returns the base token asset ID for the destination chain. Override for pre-v31 chains.
@@ -560,8 +668,7 @@ contract InteropCenter is
         InteropBundle memory _bundle,
         AtomicSend memory _atomicSend
     ) internal returns (bytes32 bundleHash) {
-        bytes memory interopBundleBytes = abi.encode(_bundle);
-        bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
+        bundleHash = _hashBundle(_bundle);
 
         if (!_atomicSend.isAtomic) {
             revert NonAtomicSendUnsupported();

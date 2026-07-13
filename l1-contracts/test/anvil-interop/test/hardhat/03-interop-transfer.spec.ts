@@ -18,13 +18,7 @@ async function expectTransferToRevert(promise: Promise<unknown>, expectedSubstri
   expect(rejected, "Expected transfer to revert").to.equal(true);
 }
 
-// SKIPPED (temporarily): interop is now atomic-only (public bundle publication to L1 was removed), and the
-// shared TS helpers (`sendInteropBundle`/`executeBundle` in interop-helpers.ts) still speak the old public
-// API — the send lacks the now-mandatory `atomicBundle` attribute and the execute passes a
-// MessageInclusionProof where the contract expects an AtomicFinalityProof. Re-enable once the helpers are
-// migrated to the atomic IMT flow in the tracked atomic anvil follow-up (see 13-imt-atomic-swap.spec.ts for
-// the working atomic orchestration these helpers should generalize).
-describe.skip("03 - Interop Transfer", function () {
+describe("03 - Interop Transfer", function () {
   this.timeout(0);
 
   const runner = new DeploymentRunner();

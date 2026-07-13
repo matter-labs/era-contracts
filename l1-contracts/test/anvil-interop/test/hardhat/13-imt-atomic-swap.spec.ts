@@ -10,7 +10,7 @@
  *           The bridge transfer burns via `initiateIndirectCall`; the `atomicBundle` attribute makes
  *           the InteropCenter append the leg's commit value to the L2InteropCommitmentTree instead of
  *           publishing to L1.
- *   RECEIVE `InteropHandler.executeAtomicBundle(bundleBytes, AtomicFinalityProof)`. Proves every leg
+ *   RECEIVE `InteropHandler.executeBundle(bundleBytes, AtomicFinalityProof)`. Proves every leg
  *           was committed in its source chain's IMT before the deadline (one inclusion proof per leg),
  *           then executes the bundle's calls (the destination mint). `bundleStatus` guards double-execute.
  *   TIMEOUT `AtomicFlowManager.authorizeRefund(...)` (proves the missing leg absent from the last batch
@@ -22,7 +22,8 @@
  *   - `bundleHash = keccak256(abi.encode(sourceChainId, abi.encode(InteropBundle)))`. The atomic send
  *     params (flowId, deadline, lowNullifierIndex) ride in the `atomicBundle` attribute and are not part
  *     of the InteropBundle, so `bundleHash` is independent of `flowId`. We predict each leg's bundleHash
- *     off-chain with a non-atomic `callStatic.sendBundle`, then cross-check it against the real send's
+ *     off-chain with the static `previewBundleHash` (sendBundle now requires the atomicBundle attribute,
+ *     whose flowId depends on this very hash), then cross-check it against the real send's
  *     `InteropBundleSent` event and fail loudly on mismatch.
  *   - `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`
  *     (bundle hashes ascending, source chain ids positionally aligned).
@@ -36,7 +37,7 @@
  * off-chain engine agrees with the on-chain one.
  *
  * Verifies:
- *   - HAPPY PATH: atomic send (source burn + IMT insert) on both legs -> executeAtomicBundle (every-leg
+ *   - HAPPY PATH: atomic send (source burn + IMT insert) on both legs -> executeBundle (every-leg
  *     inclusion proof, `t <= deadline`) on each destination. Recipients receive the bridged token;
  *     source legs stay terminal at Committed; both destination bundles end FullyExecuted.
  *   - TIMEOUT PATH: one leg commits, the other never does -> after the deadline, an adjacency proof
@@ -61,7 +62,6 @@ import {
   L2_NATIVE_TOKEN_VAULT_ADDR,
   ATOMIC_SEND_BUNDLE_GAS_LIMIT,
   DEFAULT_TX_GAS_LIMIT,
-  INTEROP_SEND_BUNDLE_GAS_LIMIT,
 } from "../../src/core/const";
 import { encodeEvmAddress, encodeEvmChain } from "../../src/core/data-encoding";
 import {
@@ -198,10 +198,7 @@ function parseManagerLog(manager: Contract, log: ethers.providers.Log): ParsedMa
   }
 }
 
-// SKIPPED (temporarily): the interop contracts changed (executeAtomicBundle was folded into executeBundle,
-// InteropHandler/InteropCenter bytecode changed, value legs are now refundable). This spec's TS tooling and
-// the dumped chain states must be regenerated in the tracked atomic anvil follow-up before re-enabling.
-describe.skip("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
+describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
   this.timeout(0);
 
   const runner = new DeploymentRunner();
@@ -253,7 +250,7 @@ describe.skip("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function (
   });
 
   /**
-   * Predict a leg's bundleHash via a non-atomic callStatic on its source chain, targeting `dest`.
+   * Predict a leg's bundleHash via the static `previewBundleHash` on its source chain, targeting `dest`.
    * (Kept local so the `dest` chain id is explicit rather than threaded through a placeholder.)
    */
   async function predictLegBundleHash(
@@ -264,14 +261,15 @@ describe.skip("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function (
     salt: string
   ): Promise<string> {
     const interopCenter = source.stack.interopCenter.connect(source.user);
-    // The bundleHash now depends on the `interopBundleSalt` attribute (folded into the bundle), so the
-    // prediction MUST carry the exact same salt the real atomic send will use — otherwise the predicted
-    // hash (and the flowId derived from it) would not match the emitted one.
-    return interopCenter.callStatic.sendBundle(
+    // `sendBundle` now requires the mandatory `atomicBundle` attribute (interop is atomic-only), which needs
+    // the very flowId we are trying to derive — a circular dependency. `previewBundleHash` breaks it: it runs
+    // the identical bundle assembly (including the simulated, discarded indirect-call burn) without the atomic
+    // append, returning the exact bundleHash the real send will emit. The prediction MUST carry the same salt
+    // the real send uses, since the bundleHash commits to the `interopBundleSalt` attribute.
+    return interopCenter.callStatic.previewBundleHash(
       encodeEvmChain(dest.chainId),
       [bridgeCallStarter(source, amount, recipient)],
-      [interopBundleSaltAttr(salt)],
-      { gasLimit: INTEROP_SEND_BUNDLE_GAS_LIMIT, value: fee }
+      [interopBundleSaltAttr(salt)]
     );
   }
 
@@ -309,8 +307,7 @@ describe.skip("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function (
       // Same salt used to predict `predictedBundleHash`, so the emitted bundleHash matches the flowId.
       bundleAttributes: [atomicBundleAttr(flowId, deadline, lowNull), interopBundleSaltAttr(salt)],
       value: fee,
-      // Atomic sends append to the IMT (~1.1M gas insert) on top of the burn; the plain-send default
-      // (INTEROP_SEND_BUNDLE_GAS_LIMIT) is too small.
+      // Atomic sends append to the IMT (~1.1M gas insert) on top of the burn, so they need the larger cap.
       gasLimit: ATOMIC_SEND_BUNDLE_GAS_LIMIT,
     });
 
@@ -321,7 +318,7 @@ describe.skip("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function (
     return { bundleData: sendResult.bundleData, bundleHash: sendResult.bundleHash };
   }
 
-  it("happy path: atomic send -> executeAtomicBundle mints both legs and leaves source Committed", async () => {
+  it("happy path: atomic send -> executeBundle mints both legs and leaves source Committed", async () => {
     const user = chainA.user.address; // anvil acct #0, the depositor + recipient on both chains
     const now = Math.max(await chainNow(chainA.provider), await chainNow(chainB.provider));
     // The deadline is an SL timestamp; the harness sets each leg's batch `l1Timestamp == deadline`
@@ -393,7 +390,7 @@ describe.skip("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function (
     expect(imtB.root.toLowerCase()).to.equal((await chainB.stack.tree.root()).toLowerCase());
 
     // ── PHASE 2: build the per-flow inclusion proofs (one per leg, in ascending bundleHash order) ─
-    // executeAtomicBundle requires EVERY leg present in a root settled no later than the deadline,
+    // executeBundle requires EVERY leg present in a root settled no later than the deadline,
     // so even the executing chain's own leg needs an inclusion proof.
     const abProof = await buildInclusionProof({
       l2Tree: chainA.stack.tree,
@@ -417,7 +414,7 @@ describe.skip("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function (
       proofs: proofsAsc,
     });
 
-    // ── PHASE 3: execute each destination leg via executeAtomicBundle ─────────────────────────
+    // ── PHASE 3: execute each destination leg via executeBundle ─────────────────────────
     // Snapshot the recipient shim balances BEFORE execute. The coverage harness runs every spec on
     // one shared chain set, so `user` may already hold these bridged shims from earlier specs — so we
     // assert the DELTA credited by this swap, not the absolute balance (the source-side checks above
@@ -439,8 +436,8 @@ describe.skip("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function (
 
     const handlerB = chainB.stack.interopHandler.connect(chainB.user);
     const handlerA = chainA.stack.interopHandler.connect(chainA.user);
-    await (await handlerB.executeAtomicBundle(ab.bundleData, finality, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
-    await (await handlerA.executeAtomicBundle(ba.bundleData, finality, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
+    await (await handlerB.executeBundle(ab.bundleData, finality, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
+    await (await handlerA.executeBundle(ba.bundleData, finality, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
 
     // Destination bundles are FullyExecuted; source legs remain Committed (terminal on the happy path).
     expect(await handlerB.bundleStatus(hAB)).to.equal(BundleStatus.FullyExecuted, "AB executed on B");

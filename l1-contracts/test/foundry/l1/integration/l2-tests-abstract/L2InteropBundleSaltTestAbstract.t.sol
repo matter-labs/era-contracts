@@ -91,6 +91,26 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
         (, , bundle) = abi.decode(data, (bytes32, bytes32, InteropBundle));
     }
 
+    /// @notice `previewBundleHash` returns exactly the `bundleHash` the matching `sendBundle` emits, so the
+    ///         off-chain atomic `flowId` (which commits to `bundleHash`) can be derived before the real send.
+    /// @dev The anvil-interop helpers rely on this equivalence to build atomic flows. The preview must run
+    ///      from the same sender (its address feeds both the salt derivation and each call's `from`) and must
+    ///      not consume the salt-uniqueness slot, so the real send below can reuse the same salt.
+    function test_previewBundleHash_matchesSentBundleHash() public {
+        _setupGatewayMode();
+        address sender = makeAddr("previewSender");
+        bytes32 userSalt = keccak256("preview-salt-1");
+        bytes[] memory attrs = _buildBundleAttributesWithSalt(userSalt, true);
+        InteropCallStarter[] memory calls = _buildSimpleCall();
+        bytes memory destination = InteroperableAddress.formatEvmV1(destinationChainId);
+
+        vm.prank(sender);
+        bytes32 predicted = l2InteropCenter.previewBundleHash(destination, calls, attrs);
+
+        (, bytes32 emitted) = _sendAndDecodeBundle(sender, attrs);
+        assertEq(predicted, emitted, "previewBundleHash must equal the emitted bundleHash");
+    }
+
     /*//////////////////////////////////////////////////////////////
                         Happy path
     //////////////////////////////////////////////////////////////*/

@@ -12,23 +12,82 @@ import { Contract, ethers, Wallet } from "ethers";
 import { getAbi, getCreationBytecode } from "../core/contracts";
 import { getInteropSourcePrivateKey, isLiveInteropMode } from "../core/accounts";
 import {
+  ATOMIC_SEND_BUNDLE_GAS_LIMIT,
   DEFAULT_TX_GAS_LIMIT,
   INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
-  INTEROP_SEND_BUNDLE_GAS_LIMIT,
   L2_BOOTLOADER_ADDR,
   L2_ASSET_ROUTER_ADDR,
+  L2_INTEROP_COMMITMENT_TREE_ADDR,
   L2_INTEROP_HANDLER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../core/const";
 import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
-import { buildMockInteropProof, impersonateAndRun } from "../core/utils";
+import { impersonateAndRun } from "../core/utils";
 import { encodeEvmChain, encodeEvmAddress } from "./erc7930";
-import { waitForLiveInteropProof } from "./temp-sdk";
+import {
+  atomicFinalityProofTuple,
+  buildInclusionProof,
+  commitValue,
+  commitmentTree,
+  computeFlowId,
+  lowNullifierIndexFor,
+} from "./imt-engine-lib";
 import { approveTokenForNtv, expectBalanceDelta, getTokenAddressForAsset, getTokenBalance } from "./balance-helpers";
 
 const abiCoder = ethers.utils.defaultAbiCoder;
 const sendResultsByBundleData = new Map<string, InteropSendResult>();
+
+/**
+ * Far-future settlement-layer deadline used for the single-leg atomic flows these helpers build. The
+ * anvil harness mocks root-message authentication and fabricates each proof's `l1Timestamp` (see
+ * imt-engine-lib), so the only real check is `l1Timestamp <= deadline`; a large fixed deadline satisfies
+ * it without any wall-clock coupling. Kept identical between the send (attribute) and the execute
+ * (finality proof) so the derived `flowId` matches.
+ */
+const ATOMIC_INTEROP_DEADLINE = 4_000_000_000;
+
+/**
+ * Derives the single-leg atomic-flow metadata for a predicted `bundleHash`: computes the `flowId` (which
+ * commits to the hash), finds the IMT low-nullifier index for the commit value, and returns the
+ * `atomicBundle` attribute to attach to the send plus the flow fields needed later to build the
+ * {AtomicFinalityProof} at execute time.
+ */
+async function buildSingleLegAtomicSend(
+  sourceProvider: providers.JsonRpcProvider,
+  bundleHash: string
+): Promise<{ attribute: string; flowId: string; deadline: number; sourceChainId: number }> {
+  const sourceChainId = (await sourceProvider.getNetwork()).chainId;
+  const deadline = ATOMIC_INTEROP_DEADLINE;
+  const flowId = computeFlowId([bundleHash], [sourceChainId], deadline);
+  const value = commitValue(flowId, bundleHash);
+  const tree = commitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR, sourceProvider);
+  const lowNull = await lowNullifierIndexFor(tree, value);
+  return { attribute: atomicBundleAttr(flowId, deadline, lowNull), flowId, deadline, sourceChainId };
+}
+
+/**
+ * Builds the single-leg {AtomicFinalityProof} tuple for a previously-sent bundle, proving its commit leaf
+ * is present in the source chain's {L2InteropCommitmentTree}. Root-message authentication is mocked to
+ * `true` on the anvil harness, so the exercised checks are IMT membership and `l1Timestamp <= deadline`.
+ */
+async function buildSingleLegFinality(sendResult: InteropSendResult): Promise<unknown> {
+  const value = commitValue(sendResult.flowId, sendResult.bundleHash);
+  const tree = commitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR, sendResult.sourceProvider);
+  const proof = await buildInclusionProof({
+    l2Tree: tree,
+    chainId: sendResult.legSourceChainId,
+    value,
+    l1Timestamp: sendResult.deadline,
+  });
+  return atomicFinalityProofTuple({
+    flowId: sendResult.flowId,
+    deadline: sendResult.deadline,
+    legBundleHashes: [sendResult.bundleHash],
+    chainIds: [sendResult.legSourceChainId],
+    proofs: [proof],
+  });
+}
 
 /** IERC7786Attributes interface — used for attribute encoding via encodeFunctionData. */
 const erc7786Iface = new ethers.utils.Interface(getAbi("IERC7786Attributes"));
@@ -69,10 +128,10 @@ export function useFixedFeeAttr(useFixedFee: boolean): string {
 
 /**
  * Encode the ERC-7786 `atomicBundle(bytes32 flowId, uint64 deadline, uint256 lowNullifierIndex)`
- * bundle attribute. When present, the InteropCenter appends the bundle's commit value to the interop
- * IMT via the AtomicFlowManager (in place of publishing the bundle to L1), and the destination
- * executes it via InteropHandler.executeAtomicBundle once the whole flow is proven committed before
- * the deadline. `_deadline` is a settlement-layer block number.
+ * bundle attribute. All interop is atomic: the InteropCenter appends the bundle's commit value to the
+ * interop IMT via the AtomicFlowManager (public L1 publication was removed), and the destination executes
+ * it via InteropHandler.executeBundle once the flow is proven committed before the deadline (per-leg IMT
+ * inclusion in an {AtomicFinalityProof}). `deadline` is a settlement-layer timestamp.
  */
 export function atomicBundleAttr(flowId: string, deadline: number, lowNullifierIndex: number): string {
   return erc7786Iface.encodeFunctionData("atomicBundle", [flowId, deadline, lowNullifierIndex]);
@@ -81,6 +140,28 @@ export function atomicBundleAttr(flowId: string, deadline: number, lowNullifierI
 /** Encode an interopBundleSalt bundle attribute. */
 export function interopBundleSaltAttr(salt: string): string {
   return erc7786Iface.encodeFunctionData("interopBundleSalt", [salt]);
+}
+
+/** Selector of the mandatory `atomicBundle` bundle attribute. */
+const ATOMIC_BUNDLE_SELECTOR = erc7786Iface.getSighash("atomicBundle").toLowerCase();
+
+/**
+ * True if `attrs` already carries an `atomicBundle` attribute. When it does, the caller manages the atomic
+ * flow itself (e.g. a multi-leg swap that shares one `flowId` across legs — see 13-imt-atomic-swap), so the
+ * send helpers must NOT derive and attach their own single-leg flow.
+ */
+function hasAtomicBundleAttribute(attrs: string[]): boolean {
+  return attrs.some((a) => a.slice(0, 10).toLowerCase() === ATOMIC_BUNDLE_SELECTOR);
+}
+
+/** Decode `(flowId, deadline)` from a caller-provided `atomicBundle` attribute. */
+function decodeAtomicBundleAttribute(attrs: string[]): { flowId: string; deadline: number } {
+  const attr = attrs.find((a) => a.slice(0, 10).toLowerCase() === ATOMIC_BUNDLE_SELECTOR);
+  if (!attr) {
+    throw new Error("atomicBundle attribute not present");
+  }
+  const decoded = erc7786Iface.decodeFunctionData("atomicBundle", attr);
+  return { flowId: decoded[0] as string, deadline: Number(decoded[1]) };
 }
 
 /** Selector of the interopBundleSalt bundle attribute, used to detect whether a salt was already supplied. */
@@ -204,6 +285,12 @@ export interface InteropSendResult {
   /** ABI-encoded bundle data, ready for executeBundle / verifyBundle / unbundleBundle. */
   bundleData: string;
   bundleHash: string;
+  /** Atomic-flow id this bundle was committed under (single-leg flow: `[bundleHash]`). */
+  flowId: string;
+  /** Settlement-layer deadline embedded in the atomic flow (see {ATOMIC_INTEROP_DEADLINE}). */
+  deadline: number;
+  /** Source chain id of the (single) leg — used to build the AtomicFinalityProof at execute time. */
+  legSourceChainId: number;
 }
 
 /**
@@ -215,15 +302,43 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
 
   const destinationChainIdBytes = encodeEvmChain(options.destinationChainId);
-  const tx = await interopCenter.sendBundle(
-    destinationChainIdBytes,
-    options.callStarters,
-    ensureUniqueBundleSalt(options.bundleAttributes || []),
-    {
-      gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
-      value: options.value || 0,
-    }
-  );
+  // Attributes carry a stable salt used for BOTH the hash prediction and the real send.
+  const baseAttributes = ensureUniqueBundleSalt(options.bundleAttributes || []);
+
+  // Interop is atomic. Two cases:
+  //  - caller-managed (a multi-leg swap already supplied its shared `atomicBundle` attribute): send the
+  //    attributes as-is; the caller owns the flow and builds its own AtomicFinalityProof at execute time.
+  //  - single-leg (the common case): predict the bundleHash the send will emit — via a static preview that
+  //    runs the real assembly, including the burning indirect-call, but persists nothing — then derive the
+  //    single-leg atomic flow that commits to it and attach the `atomicBundle` attribute.
+  let attributes: string[];
+  let flowId: string;
+  let deadline: number;
+  let legSourceChainId: number;
+  let predictedBundleHash: string | undefined;
+  if (hasAtomicBundleAttribute(baseAttributes)) {
+    attributes = baseAttributes;
+    ({ flowId, deadline } = decodeAtomicBundleAttribute(baseAttributes));
+    legSourceChainId = (await options.sourceProvider.getNetwork()).chainId;
+  } else {
+    const predicted: string = await interopCenter.callStatic.previewBundleHash(
+      destinationChainIdBytes,
+      options.callStarters,
+      baseAttributes
+    );
+    predictedBundleHash = predicted;
+    const atomic = await buildSingleLegAtomicSend(options.sourceProvider, predicted);
+    attributes = [...baseAttributes, atomic.attribute];
+    flowId = atomic.flowId;
+    deadline = atomic.deadline;
+    legSourceChainId = atomic.sourceChainId;
+  }
+
+  const tx = await interopCenter.sendBundle(destinationChainIdBytes, options.callStarters, attributes, {
+    // Atomic sends append to the IMT (~1.1M-gas insert) on top of the calls; needs the larger cap.
+    gasLimit: options.gasLimit || ATOMIC_SEND_BUNDLE_GAS_LIMIT,
+    value: options.value || 0,
+  });
   const receipt = await tx.wait();
 
   // Extract InteropBundleSent event
@@ -245,6 +360,12 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
     throw new Error("InteropBundleSent event not found in source transaction receipt");
   }
 
+  // For the auto single-leg path the predicted hash feeds the atomic flowId; a mismatch would make the
+  // finality proof unverifiable. (Caller-managed flows do their own cross-check.)
+  if (predictedBundleHash !== undefined && bundleHash.toLowerCase() !== predictedBundleHash.toLowerCase()) {
+    throw new Error(`predicted bundleHash ${predictedBundleHash} != emitted ${bundleHash}`);
+  }
+
   const bundleData = abiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
 
   const result = {
@@ -256,6 +377,9 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
     interopBundle,
     bundleData,
     bundleHash,
+    flowId,
+    deadline,
+    legSourceChainId,
   };
   sendResultsByBundleData.set(bundleData, result);
   return result;
@@ -269,12 +393,22 @@ export async function simulateInteropBundle(options: SendBundleOptions): Promise
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
 
   const destinationChainIdBytes = encodeEvmChain(options.destinationChainId);
+  const baseAttributes = ensureUniqueBundleSalt(options.bundleAttributes || []);
+  // Mirror the real send's atomic attribute construction so the callStatic exercises the full path
+  // (value collection included — the preview alone skips it, so reverts like MsgValueMismatch only
+  // surface on the real `sendBundle`).
+  const predictedBundleHash: string = await interopCenter.callStatic.previewBundleHash(
+    destinationChainIdBytes,
+    options.callStarters,
+    baseAttributes
+  );
+  const atomic = await buildSingleLegAtomicSend(options.sourceProvider, predictedBundleHash);
   await interopCenter.callStatic.sendBundle(
     destinationChainIdBytes,
     options.callStarters,
-    ensureUniqueBundleSalt(options.bundleAttributes || []),
+    [...baseAttributes, atomic.attribute],
     {
-      gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
+      gasLimit: options.gasLimit || ATOMIC_SEND_BUNDLE_GAS_LIMIT,
       value: options.value || 0,
     }
   );
@@ -299,12 +433,22 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
   const wallet = new Wallet(getInteropSourcePrivateKey(), options.sourceProvider);
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
 
+  const baseAttributes = ensureUniqueBundleSalt(options.attributes);
+  // Single-call sends are single-leg atomic flows too: predict the bundleHash (of the wrapping bundle)
+  // and attach the atomic flow that commits to it.
+  const predictedBundleHash: string = await interopCenter.callStatic.previewMessageHash(
+    options.recipient,
+    options.payload,
+    baseAttributes
+  );
+  const atomic = await buildSingleLegAtomicSend(options.sourceProvider, predictedBundleHash);
+
   const tx = await interopCenter.sendMessage(
     options.recipient,
     options.payload,
-    ensureUniqueBundleSalt(options.attributes),
+    [...baseAttributes, atomic.attribute],
     {
-      gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
+      gasLimit: options.gasLimit || ATOMIC_SEND_BUNDLE_GAS_LIMIT,
       value: options.value || 0,
     }
   );
@@ -329,6 +473,10 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
     throw new Error("InteropBundleSent event not found in sendMessage receipt");
   }
 
+  if (bundleHash.toLowerCase() !== predictedBundleHash.toLowerCase()) {
+    throw new Error(`predicted message bundleHash ${predictedBundleHash} != emitted ${bundleHash}`);
+  }
+
   const bundleData = abiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
 
   const result = {
@@ -340,6 +488,9 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
     interopBundle,
     bundleData,
     bundleHash,
+    flowId: atomic.flowId,
+    deadline: atomic.deadline,
+    legSourceChainId: atomic.sourceChainId,
   };
   sendResultsByBundleData.set(bundleData, result);
   return result;
@@ -355,37 +506,28 @@ export interface InteropExecutionData {
 }
 
 export async function getInteropExecutionData(
-  destProvider: providers.JsonRpcProvider,
+  _destProvider: providers.JsonRpcProvider,
   bundleInput: BundleExecutionInput,
-  sourceChainId: number
+  _sourceChainId: number
 ): Promise<InteropExecutionData> {
-  if (!isLiveInteropMode()) {
-    return {
-      bundleData: getBundleData(bundleInput),
-      proof: buildMockInteropProof(sourceChainId),
-    };
+  // Atomic interop: the proof is a per-leg IMT inclusion proof ({AtomicFinalityProof}) built from the
+  // source chain's commitment tree, not a live gateway message-inclusion proof. The flow metadata
+  // (flowId/deadline/source chain) was recorded when the bundle was sent.
+  const sendResult = getSendResult(bundleInput);
+  if (isLiveInteropMode()) {
+    throw new Error("Atomic live-mode interop proof generation is not yet implemented");
   }
-
-  const sendResult = getLiveSendResult(bundleInput);
-  const liveData = await waitForLiveInteropProof(
-    sendResult.sourceProvider,
-    destProvider,
-    sendResult.sourceTxHash,
-    sourceChainId,
-    sendResult.proofIndex
-  );
-  if (!liveData.rawData || !liveData.proofDecoded) {
-    throw new Error(`Live interop proof was not available for ${sendResult.sourceTxHash}`);
-  }
+  const proof = await buildSingleLegFinality(sendResult);
   return {
-    bundleData: liveData.rawData,
-    proof: liveData.proofDecoded,
+    bundleData: sendResult.bundleData,
+    proof,
   };
 }
 
 /**
  * Execute an interop bundle on the destination chain via InteropHandler.executeBundle.
- * Uses a mock proof in Anvil and a proof-based gateway proof in live mode.
+ * Builds the atomic {AtomicFinalityProof} (single-leg IMT inclusion) from the source chain's commitment
+ * tree; the bundle must have been sent via `sendInteropBundle`/`sendInteropMessage` in this process.
  */
 export async function executeBundle(
   destProvider: providers.JsonRpcProvider,
@@ -423,7 +565,8 @@ export async function simulateExecuteBundle(
 
 /**
  * Verify a bundle on the destination chain via InteropHandler.verifyBundle.
- * Uses a mock proof.
+ * Uses the same atomic {AtomicFinalityProof} as {executeBundle}; marks the bundle Verified so it can
+ * later be unbundled.
  */
 export async function verifyBundle(
   destProvider: providers.JsonRpcProvider,
@@ -439,18 +582,20 @@ export async function verifyBundle(
   return tx.wait();
 }
 
-function getBundleData(bundleInput: BundleExecutionInput): string {
-  return typeof bundleInput === "string" ? bundleInput : bundleInput.bundleData;
-}
-
-function getLiveSendResult(bundleInput: BundleExecutionInput): InteropSendResult {
+/**
+ * Resolves the {InteropSendResult} for a bundle. Atomic execution needs the flow metadata
+ * (flowId/deadline/source chain) recorded at send time, so a bare `bundleData` string is only usable if
+ * its bundle was sent via `sendInteropBundle`/`sendInteropMessage` in this process.
+ */
+function getSendResult(bundleInput: BundleExecutionInput): InteropSendResult {
   if (typeof bundleInput !== "string") {
     return bundleInput;
   }
   const sendResult = sendResultsByBundleData.get(bundleInput);
   if (!sendResult) {
     throw new Error(
-      "Live interop execution requires an InteropSendResult or bundleData returned by sendInteropBundle/sendInteropMessage in this process"
+      "Atomic interop execution requires an InteropSendResult (or bundleData) returned by " +
+        "sendInteropBundle/sendInteropMessage in this process, so the atomic flow metadata is known"
     );
   }
   return sendResult;

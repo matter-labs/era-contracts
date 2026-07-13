@@ -9,7 +9,6 @@ import "forge-std/console.sol";
 
 import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {L2InteropCenterTestAbstract} from "../l2-tests-abstract/L2InteropCenterTestAbstract.t.sol";
-import {L2InteropTestUtils} from "../l2-tests-abstract/L2InteropTestUtils.sol";
 
 import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
 import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
@@ -19,11 +18,6 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 contract L2InteropCenterL1Test is Test, SharedL2ContractL1Deployer, L2InteropCenterTestAbstract {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}
 
-    /// @dev Route setUp through {L2InteropTestUtils} so the atomic-interop AtomicFlowManager mocks are
-    /// installed (see {L2InteropTestUtils.setUp}), then on through the deployer chain.
-    function setUp() public virtual override(SharedL2ContractDeployer, L2InteropTestUtils) {
-        L2InteropTestUtils.setUp();
-    }
 
     function initSystemContracts(
         SystemContractsArgs memory _args

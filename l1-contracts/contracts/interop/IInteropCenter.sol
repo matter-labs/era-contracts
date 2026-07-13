@@ -155,6 +155,36 @@ interface IInteropCenter {
         bytes[] calldata _bundleAttributes
     ) external payable returns (bytes32 bundleHash);
 
+    /// @notice Simulates {sendBundle} and returns the `bundleHash` it would produce for the same caller and
+    ///         inputs, without collecting value or committing to the atomic interop IMT.
+    /// @dev MUST be invoked as a static call (e.g. `eth_call` / ethers `callStatic`). For indirect calls it
+    ///      runs the value-burning `initiateIndirectCall` so the resolved calls — and thus the hash — are
+    ///      byte-exact; under a static call nothing persists. A state-changing invocation would execute those
+    ///      burns without ever committing a bundle. Callers derive the atomic `flowId` (which commits to
+    ///      `bundleHash`) from this value before the real send. Requires no `msg.value` and no `atomicBundle`
+    ///      attribute, and does not consume the `interopBundleSalt` uniqueness slot.
+    /// @param _destinationChainId Same as {sendBundle}.
+    /// @param _callStarters Same as {sendBundle}.
+    /// @param _bundleAttributes Same as {sendBundle}.
+    /// @return bundleHash The hash the matching {sendBundle} call would emit.
+    function previewBundleHash(
+        bytes calldata _destinationChainId,
+        InteropCallStarter[] calldata _callStarters,
+        bytes[] calldata _bundleAttributes
+    ) external returns (bytes32 bundleHash);
+
+    /// @notice Simulates {sendMessage} and returns the `bundleHash` of the single-call bundle it would produce
+    ///         for the same caller and inputs. Same static-call contract as {previewBundleHash}.
+    /// @param _recipient Same as {sendMessage}.
+    /// @param _payload Same as {sendMessage}.
+    /// @param _attributes Same as {sendMessage}.
+    /// @return bundleHash The hash the matching {sendMessage} call would emit.
+    function previewMessageHash(
+        bytes calldata _recipient,
+        bytes calldata _payload,
+        bytes[] calldata _attributes
+    ) external returns (bytes32 bundleHash);
+
     /// @notice Parses the attributes of the call or bundle.
     /// @param _attributes ERC-7786 Attributes of the call or bundle.
     /// @param _restriction Restriction for parsing attributes.

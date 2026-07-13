@@ -39,11 +39,12 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
     /// `AtomicFlowManager.append`, and on the destination side `InteropHandler` calls
     /// `AtomicFlowManager.requireFlowFinalized`. The AtomicFlowManager is not deployed in these
     /// unit-level Foundry tests (its IMT proof machinery is exercised end-to-end in the anvil-interop
-    /// atomic-swap spec), so we mock both (void) calls to succeed. This mock is scoped to the interop
-    /// test suites (which all extend {L2InteropTestUtils}) and is intentionally NOT placed in the shared
-    /// {SharedL2ContractDeployer} setUp, which many non-interop suites rely on.
-    function setUp() public virtual override {
-        super.setUp();
+    /// atomic-swap spec), so we mock both (void) calls to succeed. We override the shared
+    /// {SharedL2ContractDeployer._installTestMocks} hook rather than `setUp` itself, so the single `setUp`
+    /// stays in the shared base and interop concretes need no setUp/MRO boilerplate. The mock is still
+    /// scoped to the interop suites (only they extend {L2InteropTestUtils}); non-interop suites inherit the
+    /// no-op default.
+    function _installTestMocks() internal virtual override {
         vm.mockCall(L2_ATOMIC_FLOW_MANAGER_ADDR, abi.encodeWithSelector(IAtomicFlowManager.append.selector), "");
         vm.mockCall(
             L2_ATOMIC_FLOW_MANAGER_ADDR,

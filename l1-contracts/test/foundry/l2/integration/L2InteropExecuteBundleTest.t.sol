@@ -10,7 +10,6 @@ import "forge-std/console.sol";
 import {SystemContractsArgs} from "./L2Utils.sol";
 import {L2InteropExecuteBundleTestAbstract} from "../../l1/integration/l2-tests-abstract/L2InteropExecuteBundleTestAbstract.t.sol";
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
-import {L2InteropTestUtils} from "../../l1/integration/l2-tests-abstract/L2InteropTestUtils.sol";
 import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 
 import {Create2FactoryUtils} from "deploy-scripts/utils/deploy/Create2FactoryUtils.s.sol";
@@ -20,11 +19,6 @@ import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
 contract L2InteropExecuteBundleTest is Test, L2InteropExecuteBundleTestAbstract, SharedL2ContractL2Deployer {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL2Deployer) {}
 
-    /// @dev Route setUp through {L2InteropTestUtils} so the atomic-interop AtomicFlowManager mocks are
-    /// installed (see {L2InteropTestUtils.setUp}), then on through the deployer chain.
-    function setUp() public virtual override(SharedL2ContractDeployer, L2InteropTestUtils) {
-        L2InteropTestUtils.setUp();
-    }
 
     function initSystemContracts(
         SystemContractsArgs memory _args

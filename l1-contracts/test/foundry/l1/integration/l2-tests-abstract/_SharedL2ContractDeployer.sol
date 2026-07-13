@@ -112,7 +112,14 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     function setUp() public virtual {
         setUpInner(false);
+        _installTestMocks();
     }
+
+    /// @dev Hook run at the end of {setUp} for suites that need extra test doubles installed. Default is a
+    /// no-op; the interop suites override it (see {L2InteropTestUtils}) to mock the AtomicFlowManager, which
+    /// is not deployed in these Foundry contexts. Overriding this hook instead of {setUp} keeps the single
+    /// `setUp` in this base, so concrete entrypoints need no setUp/MRO boilerplate.
+    function _installTestMocks() internal virtual {}
 
     function setUpInner(bool _skip) public virtual {
         // Avoid block.timestamp == 0 to keep paused-deposits sentinel semantics stable in tests.
