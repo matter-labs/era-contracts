@@ -38,6 +38,8 @@ import {MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/
 
 import {
     AtomicBundleCallCarriesValue,
+    AtomicBundleDirectAssetRouterCall,
+    AtomicBundleNotAllowedInSendMessage,
     AttributeAlreadySet,
     AttributeViolatesRestriction,
     CannotInitiateInteropOnL1,
@@ -218,18 +220,23 @@ contract InteropCenter is
         returns (bytes32 sendId)
     {
         (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(recipient);
+        // The recipient must carry a concrete address; a chain-only ERC-7930 encoding parses to address(0),
+        // which would collect value up-front yet never be executable and has no refund path.
+        require(recipientAddress != address(0), ZeroAddress());
 
         _ensureL2ToL2(recipientChainId);
 
         (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) =
             parseAttributes(attributes, AttributeParsingRestrictions.CallAndBundleAttributes);
+        // A single-call send is never atomic; reject a stray `atomicBundle` attribute rather than silently
+        // ignoring it (`sendBundle` is the atomic entry point).
+        require(!_parseAtomicSend(attributes).isAtomic, AtomicBundleNotAllowedInSendMessage());
 
-        // If the unbundler was not set for a call, we set the unbundler to be equal to the original sender, so that it's
-        // still possible to unbundle the bundle containing the call. If the original sender is the contract, it'll still
-        // be able to unbundle the bundle either via direct call to `unbundleBundle`, or via `sendMessage` to `L2InteropHandler`,
-        // with specific payload. Refer to `L2InteropHandler` for details.
+        // Default the unbundler to a chain-wildcard (chainId 0) so the sender can unbundle directly on the
+        // destination; embedding this (source) chainId would force the default unbundle onto the
+        // `receiveMessage` rescue path. Refer to `L2InteropHandler` for details.
         if (bundleAttributes.unbundlerAddress.length == 0) {
-            bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
+            bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(0, msg.sender);
         }
 
         InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](1);
@@ -297,12 +304,11 @@ contract InteropCenter is
         (, BundleAttributes memory bundleAttributes) =
             parseAttributes(_bundleAttributes, AttributeParsingRestrictions.OnlyBundleAttributes);
 
-        // If the unbundler was not set for a bundle, we set the unbundler to be equal to the original sender, so
-        // that it's still possible to unbundle the bundle. If the original sender is the contract, it'll still be
-        // able to unbundle the bundle either via direct call to `unbundleBundle`, or via `sendMessage` to `L2InteropHandler`,
-        // with specific payload. Refer to `L2InteropHandler` for details.
+        // Default the unbundler to a chain-wildcard (chainId 0) so the sender can unbundle directly on the
+        // destination; embedding this (source) chainId would force the default unbundle onto the
+        // `receiveMessage` rescue path. Refer to `L2InteropHandler` for details.
         if (bundleAttributes.unbundlerAddress.length == 0) {
-            bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
+            bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(0, msg.sender);
         }
 
         AtomicSend memory atomicSend = _parseAtomicSend(_bundleAttributes);
@@ -664,8 +670,15 @@ contract InteropCenter is
     function _validateAtomicBundle(InteropBundle memory _bundle) internal pure {
         uint256 callsLength = _bundle.calls.length;
         for (uint256 i = 0; i < callsLength; ++i) {
-            if (_bundle.calls[i].value != 0) {
-                revert AtomicBundleCallCarriesValue(i, _bundle.calls[i].value);
+            InteropCall memory currentCall = _bundle.calls[i];
+            if (currentCall.value != 0) {
+                revert AtomicBundleCallCarriesValue(i, currentCall.value);
+            }
+            // Reject direct calls to the asset router: a burn-produced call has `from == asset router` (set by
+            // _processCallStarter), so a direct one (from == sender) with finalizeDeposit-shaped data would be
+            // "recovered" on timeout, minting funds with no matching burn. (_recoverBundle guards this too.)
+            if (currentCall.to == L2_ASSET_ROUTER_ADDR && currentCall.from != L2_ASSET_ROUTER_ADDR) {
+                revert AtomicBundleDirectAssetRouterCall(i);
             }
         }
     }

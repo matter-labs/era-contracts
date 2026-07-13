@@ -9,6 +9,7 @@ import {LegState, AtomicFlow, AtomicTimeoutProof, AtomicFinalityProof} from "./I
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
 import {InteropDataEncoding} from "../interop/InteropDataEncoding.sol";
 import {
+    L2_ASSET_ROUTER_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_INTEROP_HANDLER_ADDR
@@ -210,6 +211,12 @@ contract AtomicFlowManager is IAtomicFlowManager {
         uint256 recovered = 0;
         for (uint256 i = 0; i < callsLen; ++i) {
             InteropCall memory c = _bundle.calls[i];
+            // Only recover burn-produced calls (from == asset router). A direct call never burned, so
+            // recovering it would mint funds with no matching burn. (InteropCenter rejects these at commit;
+            // this is the recovery-side guard.)
+            if (c.from != L2_ASSET_ROUTER_ADDR) {
+                continue;
+            }
             if (IAtomicRecoverable(c.to).recoverAtomicCall(destChainId, c.data)) {
                 ++recovered;
             }

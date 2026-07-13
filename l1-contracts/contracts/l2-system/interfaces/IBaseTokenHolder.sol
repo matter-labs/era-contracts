@@ -42,11 +42,23 @@ interface IBaseTokenHolder {
     /// @param amount The amount of base tokens burnt.
     event BaseTokenBurntInterop(address indexed from, uint256 toChainId, uint256 amount);
 
+    /// @notice Emitted when base tokens escrowed by a failed/timed-out bridge-out are returned to the depositor.
+    /// @param to The original depositor refunded.
+    /// @param amount The amount of base tokens returned.
+    event BaseTokenRecovered(address indexed to, uint256 amount);
+
     /// @notice Gives out base tokens from the holder to a recipient.
     /// @param _to The address to receive the base tokens.
     /// @param _amount The amount of base tokens to give out.
     /// @param _fromChainId The source chain ID of the bridging operation.
     function give(address _to, uint256 _amount, uint256 _fromChainId) external;
+
+    /// @notice Returns base tokens escrowed by a failed/timed-out bridge-out to the original depositor.
+    /// @dev Callable only by the NativeTokenVault; reverses the source-side bridging accounting.
+    /// @param _to The original depositor to refund.
+    /// @param _amount The amount of base tokens to return.
+    /// @param _toChainId The original bridge-out destination chain id.
+    function recoverBaseToken(address _to, uint256 _amount, uint256 _toChainId) external;
 
     /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.
     /// @dev Called by InteropCenter and NativeTokenVault during bridging operations.

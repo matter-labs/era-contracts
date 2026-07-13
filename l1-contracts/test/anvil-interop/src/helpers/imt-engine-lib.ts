@@ -20,7 +20,8 @@
  *     root() is the top-level node and merklePath(i) has length == the current height,
  *   - leaf is `IMTLeaf { uint256 value; uint256 nextIndex; uint256 nextValue }` (note the field order),
  *   - leaf hash = keccak256(abi.encode(value, nextIndex, nextValue)),
- *   - node hashing via efficientHash(a,b) = keccak256(a ++ b); zeros[0] = hashLeaf({0,0,0}),
+ *   - node hashing via efficientHash(a,b) = keccak256(a ++ b); zeros[0] = keccak256("zkSync:IndexedMerkleTree:emptyLeaf")
+ *     (the domain-separated empty-leaf padding, NOT hashLeaf({0,0,0}) — see IMT_EMPTY_LEAF_HASH in Config.sol),
  *     zeros[i+1] = efficientHash(zeros[i], zeros[i]), built lazily as the tree grows,
  *   - the tree seeds the {0,0,0} head at index 0, then appends each inserted leaf and repoints its
  *     low-nullifier, splicing the sorted linked list (forward search bounded by MAX_LOW_INDEX_SEARCH_ATTEMPTS).
@@ -159,11 +160,13 @@ export class IndexedMerkleTree {
       throw new Error("IndexedMerkleTree requires at least the sentinel leaf at index 0");
     }
 
-    // Mirror IndexedMerkleTree.setup: FullMerkle.setup(zeroLeafHash) seeds zeros[0] + nodes[0]=[zero],
-    // then pushNewLeaf(zeroLeafHash) inserts the sentinel {0,0,0} at index 0.
-    const zeroLeafHash = indexedLeafHash({ value: "0", nextIndex: "0", nextValue: "0" });
-    this.setup(zeroLeafHash);
-    this.pushNewLeaf(zeroLeafHash);
+    // Mirror IndexedMerkleTree.setup: seed the domain-separated padding value (NOT hashLeaf({0,0,0}), so
+    // padded indices can't forge a {0,0,0} low leaf — see IMT_EMPTY_LEAF_HASH in Config.sol; must match
+    // on-chain), then push the real {0,0,0} sentinel at index 0.
+    const emptyLeafPadding = utils.keccak256(utils.toUtf8Bytes("zkSync:IndexedMerkleTree:emptyLeaf"));
+    const sentinelLeafHash = indexedLeafHash({ value: "0", nextIndex: "0", nextValue: "0" });
+    this.setup(emptyLeafPadding);
+    this.pushNewLeaf(sentinelLeafHash);
 
     // The `setup`/`pushNewLeaf` above seed index 0 from a pristine {0,0,0} sentinel. In a live tree the
     // head leaf has been repointed (its `nextIndex`/`nextValue` splice to the smallest inserted value),

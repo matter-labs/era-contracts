@@ -14,6 +14,7 @@ import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER,
+    L2_BASE_TOKEN_HOLDER,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR
@@ -25,6 +26,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {
     AddressMismatch,
+    AssetIdMismatch,
     AssetIdNotSupported,
     ChainIdMismatch,
     DeployFailed,
@@ -159,6 +161,13 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         // Prevent changing L1_CHAIN_ID if already set to a different value
         require(L1_CHAIN_ID == 0 || L1_CHAIN_ID == _l1ChainId, ChainIdMismatch());
 
+        // Freeze BASE_TOKEN_ASSET_ID once set (mirrors the WETH_TOKEN / L1_CHAIN_ID guards above): a change
+        // would strand in-flight bundles whose snapshotted destinationBaseTokenAssetId no longer matches.
+        require(
+            BASE_TOKEN_ASSET_ID == bytes32(0) || BASE_TOKEN_ASSET_ID == _baseTokenBridgingData.assetId,
+            AssetIdMismatch(BASE_TOKEN_ASSET_ID, _baseTokenBridgingData.assetId)
+        );
+
         WETH_TOKEN = _wethToken;
         BASE_TOKEN_ASSET_ID = _baseTokenBridgingData.assetId;
         L1_CHAIN_ID = _l1ChainId;
@@ -238,6 +247,18 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     function _withdrawFunds(bytes32 _assetId, address _to, address _token, uint256 _amount) internal override {
         require(_assetId != BASE_TOKEN_ASSET_ID, AssetIdNotSupported(BASE_TOKEN_ASSET_ID));
         IERC20(_token).safeTransfer(_to, _amount);
+    }
+
+    /// @dev Recovers a failed base-token transfer by returning the value escrowed in `BaseTokenHolder` at burn
+    /// time (which also reverses the source-side bridging accounting) — the inverse of `burnAndStartBridging`.
+    /// `_chainId` is the original bridge-out destination.
+    function _recoverBaseTokenFailedTransfer(
+        uint256 _chainId,
+        address _receiver,
+        uint256 _amount
+    ) internal override returns (bool handled) {
+        L2_BASE_TOKEN_HOLDER.recoverBaseToken(_receiver, _amount, _chainId);
+        return true;
     }
 
     /*//////////////////////////////////////////////////////////////

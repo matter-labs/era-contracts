@@ -268,6 +268,15 @@ abstract contract NativeTokenVaultBase is
 
     function _withdrawFunds(bytes32 _assetId, address _to, address _token, uint256 _amount) internal virtual;
 
+    /// @dev Recovers a failed transfer of the chain's base token. The base token is escrowed off-vault (on L2,
+    /// in `BaseTokenHolder`), so it cannot use the native/bridged disbursement branches. Returns true if the
+    /// concrete vault handled the recovery (L2), false to fall through to the default logic (L1 ETH base token).
+    function _recoverBaseTokenFailedTransfer(
+        uint256 _chainId,
+        address _receiver,
+        uint256 _amount
+    ) internal virtual returns (bool handled);
+
     /// @notice Disburses a failed/recovered transfer's funds to `_receiver`, reversing the source-side
     /// `bridgeBurn` that locked/burned them.
     /// @dev Shared by `bridgeRecoverFailedTransfer` (atomic-interop recovery) and the L1
@@ -290,6 +299,12 @@ abstract contract NativeTokenVaultBase is
         address _originToken,
         bytes memory _erc20Data
     ) internal {
+        // The base token is escrowed off-vault (on L2, in BaseTokenHolder), so the native/bridged branches
+        // below cannot recover it; let the concrete vault reverse it. L1 (ETH base token) returns false and
+        // falls through to the normal native path.
+        if (_assetId == _baseTokenAssetId() && _recoverBaseTokenFailedTransfer(_chainId, _receiver, _amount)) {
+            return;
+        }
         // IMPORTANT: We must handle chain balance decrease before giving out funds to the user,
         // because otherwise the latter operation (via a malicious token or ETH recipient)
         // could've overwritten the transient values from L1Nullifier.
