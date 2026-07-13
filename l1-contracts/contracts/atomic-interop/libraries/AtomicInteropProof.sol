@@ -37,8 +37,8 @@ import {
 /// {MessageHashing._getProofData} (computing the same leaf the verifier uses) and read
 /// `pd.l1BatchTimestamp`. It is authenticated because it is folded into the chain batch leaf
 /// ({MessageHashing.batchLeafHash}), so it cannot be forged without breaking the chainId /
-/// shared-tree path. The same parse also gives `pd.settlementLayerChainId` and
-/// `pd.settlementLayerBatchNumber` (the SL snapshot block the root resolved `interopRoots` against).
+/// shared-tree path. The same parse also gives `pd.settlementLayerChainId`, the settlement layer whose
+/// imported aggregation root the proof resolves against.
 ///
 /// A flow's `deadline` and `t` are only comparable if all legs settle on the same settlement layer,
 /// so {verifyInclusion} / {verifyTimeoutAdjacency} require the resolved `slChainId` to equal the
@@ -80,14 +80,14 @@ library AtomicInteropProof {
         uint64 _deadline,
         uint256 _expectedSlChainId
     ) internal view {
-        (, uint256 slChainId, uint256 batchTimestamp) = _authenticateRoot(_proof);
+        (uint256 slChainId, uint256 l1BatchTimestamp) = _authenticateRoot(_proof);
         if (slChainId != _expectedSlChainId) {
             revert ProofSettlementLayerMismatch(_expectedSlChainId, slChainId);
         }
         // The value's batch must have settled no later than the deadline. `t` only rises, so a commit
         // can't be back-dated to look in-time after the fact.
-        if (batchTimestamp > _deadline) {
-            revert ProofDeadlineExceeded(batchTimestamp, _deadline);
+        if (l1BatchTimestamp > _deadline) {
+            revert ProofDeadlineExceeded(l1BatchTimestamp, _deadline);
         }
         bool included = IndexedMerkleTree.verifyInclusion({
             _root: _proof.chainImtRoot,
@@ -121,7 +121,7 @@ library AtomicInteropProof {
         uint256 _expectedSlChainId
     ) internal view {
         // Absence at batch N, with t_N <= deadline.
-        (, uint256 slChainIdN, uint256 tN) = _authenticateRoot(_absence);
+        (uint256 slChainIdN, uint256 tN) = _authenticateRoot(_absence);
         if (slChainIdN != _expectedSlChainId) {
             revert ProofSettlementLayerMismatch(_expectedSlChainId, slChainIdN);
         }
@@ -139,7 +139,7 @@ library AtomicInteropProof {
         if (!absent) revert ProofNonInclusionFailed(_absence.chainImtRoot, _commitValue);
 
         // Consecutive successor N+1, same chain & SL, with t_{N+1} > deadline.
-        (, uint256 slChainIdS, uint256 tS) = _authenticateRoot(_successor);
+        (uint256 slChainIdS, uint256 tS) = _authenticateRoot(_successor);
         if (slChainIdS != _expectedSlChainId) {
             revert ProofSettlementLayerMismatch(_expectedSlChainId, slChainIdS);
         }
@@ -160,8 +160,8 @@ library AtomicInteropProof {
     /// @dev Authenticates the commitment tree's `(root)` L2->L1 message for `(_sourceChainId,
     /// _batchNumber)` against the imported SL aggregation root — the accepted (multi-hop) proof
     /// terminates at `interopRoots[slChainId][slBlock]`, with the source chain bound via its chain-id
-    /// leaf inside that root — and derives the settlement-layer metadata (SL snapshot block, SL chain
-    /// id, and the batch's `l1Timestamp`) from that same proof.
+    /// leaf inside that root — and derives the settlement-layer metadata (SL chain id and the batch's
+    /// `l1Timestamp`) from that same proof.
     ///
     /// Step 1 (auth, unchanged): build the {L2Message} (sender pinned to {L2_INTEROP_COMMITMENT_TREE_ADDR},
     /// identical on every chain — this binds the root to the real tree; the chain-id leaf binds it to
@@ -171,14 +171,13 @@ library AtomicInteropProof {
     /// Step 2: re-parse the same proof to read the SL metadata. We compute the same leaf the verifier
     /// hashes and run {MessageHashing._getProofData} over the same inputs. A single-level / commit-based
     /// proof (`finalProofNode == true`) carries no SL anchor, so we reject it; a multi-hop proof exposes
-    /// `pd.settlementLayerBatchNumber`, `pd.settlementLayerChainId`, and `pd.l1BatchTimestamp`.
+    /// `pd.settlementLayerChainId` and `pd.l1BatchTimestamp`.
     ///
-    /// @return slBlock The SL snapshot block `interopRoots(slChainId, slBlock)` was resolved at.
     /// @return slChainId The settlement-layer chain id (callers require it to equal the flow's SL).
-    /// @return batchTimestamp The batch's `l1Timestamp`, compared to the deadline.
+    /// @return l1BatchTimestamp The batch's `l1Timestamp`, compared to the deadline.
     function _authenticateRoot(
         ImtProof calldata _proof
-    ) private view returns (uint256 slBlock, uint256 slChainId, uint256 batchTimestamp) {
+    ) private view returns (uint256 slChainId, uint256 l1BatchTimestamp) {
         L2Message memory message = L2Message({
             txNumberInBatch: _proof.messageTxNumberInBatch,
             sender: L2_INTEROP_COMMITMENT_TREE_ADDR,
@@ -207,8 +206,7 @@ library AtomicInteropProof {
         // deadline nor `t` can be checked against it.
         if (pd.finalProofNode) revert ProofMissingSettlementLayerAnchor(_proof.sourceChainId, _proof.batchNumber);
 
-        slBlock = pd.settlementLayerBatchNumber;
         slChainId = pd.settlementLayerChainId;
-        batchTimestamp = pd.l1BatchTimestamp;
+        l1BatchTimestamp = pd.l1BatchTimestamp;
     }
 }
