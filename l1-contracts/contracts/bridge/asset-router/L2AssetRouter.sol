@@ -92,7 +92,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         if (_sourceChainId == L1_CHAIN_ID) {
             // For messages originating on L1, only the L1 Asset Router counterpart may call this function.
             require(
-                AddressAliasHelper.undoL1ToL2Alias(msg.sender) == address(L1_ASSET_ROUTER), Unauthorized(msg.sender)
+                AddressAliasHelper.undoL1ToL2Alias(msg.sender) == address(L1_ASSET_ROUTER),
+                Unauthorized(msg.sender)
             );
         } else {
             revert Unauthorized(msg.sender);
@@ -106,8 +107,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         if (_sourceChainId == L1_CHAIN_ID) {
             // For messages originating on L1, only the L1 Asset Router counterpart may call this function.
             if (
-                (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != address(L1_ASSET_ROUTER))
-                    && msg.sender != address(this)
+                (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != address(L1_ASSET_ROUTER)) &&
+                msg.sender != address(this)
             ) {
                 revert Unauthorized(msg.sender);
             }
@@ -196,19 +197,19 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     }
 
     /// @inheritdoc IL2AssetRouter
-    function setAssetHandlerAddress(uint256 _sourceChainId, bytes32 _assetId, address _assetHandlerAddress)
-        external
-        override
-        onlyAssetRouterCounterpart(_sourceChainId)
-    {
+    function setAssetHandlerAddress(
+        uint256 _sourceChainId,
+        bytes32 _assetId,
+        address _assetHandlerAddress
+    ) external override onlyAssetRouterCounterpart(_sourceChainId) {
         _setAssetHandler(_assetId, _assetHandlerAddress);
     }
 
     /// @inheritdoc AssetRouterBase
-    function setAssetHandlerAddressThisChain(bytes32 _assetRegistrationData, address _assetHandlerAddress)
-        external
-        override
-    {
+    function setAssetHandlerAddressThisChain(
+        bytes32 _assetRegistrationData,
+        address _assetHandlerAddress
+    ) external override {
         _setAssetHandlerAddressThisChain(_nativeTokenVaultAddr(), _assetRegistrationData, _assetHandlerAddress);
     }
 
@@ -231,12 +232,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     /// 3. Source L2AssetRouter becomes the "sender" for the destination L2 call
     /// 4. Destination L2 validates senderAddress == address(this) for non-L1 sources
     ///    (L2AssetRouter address is equal for all ZKsync chains)
-    function _isValidInteropSender(uint256 _senderChainId, address _senderAddress)
-        internal
-        view
-        override
-        returns (bool)
-    {
+    function _isValidInteropSender(
+        uint256 _senderChainId,
+        address _senderAddress
+    ) internal view override returns (bool) {
         return _senderChainId != L1_CHAIN_ID && _senderAddress == address(this);
     }
 
@@ -244,13 +243,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
                             INITIATE BRIDGE Functions
     //////////////////////////////////////////////////////////////*/
 
-    function bridgehubDepositBaseToken(uint256 _chainId, bytes32 _assetId, address _originalCaller, uint256 _amount)
-        public
-        payable
-        virtual
-        override
-        onlyL2InteropCenter
-    {
+    function bridgehubDepositBaseToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _originalCaller,
+        uint256 _amount
+    ) public payable virtual override onlyL2InteropCenter {
         _bridgehubDepositBaseToken(_chainId, _assetId, _originalCaller, _amount);
     }
 
@@ -264,13 +262,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     /// @param _assetId The encoding of the asset on L2
     /// @param _transferData The encoded data required for finalization
     /// (address _sender, uint256 _amount, address _receiver, bytes memory erc20Data, address originToken)
-    function finalizeDeposit(uint256 _sourceChainId, bytes32 _assetId, bytes calldata _transferData)
-        public
-        payable
-        override
-        onlyAssetRouterCounterpartOrSelf(_sourceChainId)
-        nonReentrant
-    {
+    function finalizeDeposit(
+        uint256 _sourceChainId,
+        bytes32 _assetId,
+        bytes calldata _transferData
+    ) public payable override onlyAssetRouterCounterpartOrSelf(_sourceChainId) nonReentrant {
         require(_assetId != BASE_TOKEN_ASSET_ID, AssetIdNotSupported(BASE_TOKEN_ASSET_ID));
         _finalizeDeposit(_sourceChainId, _assetId, _transferData, _nativeTokenVaultAddr());
 
@@ -282,12 +278,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     /// call: re-credits the burned asset to the original depositor (the burn's `originalCaller`) on the
     /// burn's destination chain, swapping the receiver to the depositor. Returns `false` for any other
     /// call so the {AtomicFlowManager} can skip non-recoverable bundle calls without reverting.
-    function recoverAtomicCall(uint256 _destChainId, bytes calldata _callData)
-        external
-        onlyAtomicFlowManager
-        nonReentrant
-        returns (bool recovered)
-    {
+    function recoverAtomicCall(
+        uint256 _destChainId,
+        bytes calldata _callData
+    ) external onlyAtomicFlowManager nonReentrant returns (bool recovered) {
         if (_callData.length < 4 || bytes4(_callData[:4]) != AssetRouterBase.finalizeDeposit.selector) {
             return false;
         }
@@ -302,12 +296,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     }
 
     /// @inheritdoc IL2CrossChainSender
-    function initiateIndirectCall(uint256 _chainId, address _originalCaller, uint256 _value, bytes calldata _data)
-        external
-        payable
-        onlyL2InteropCenter
-        returns (InteropCallStarter memory interopCallStarter)
-    {
+    function initiateIndirectCall(
+        uint256 _chainId,
+        address _originalCaller,
+        uint256 _value,
+        bytes calldata _data
+    ) external payable onlyL2InteropCenter returns (InteropCallStarter memory interopCallStarter) {
         // This function is called by the InteropCenter when processing indirect interop calls.
         // It prepares the bridge operation for cross-chain execution through these steps:
         // 1. Processing the bridge request through the standard bridgehub flow
