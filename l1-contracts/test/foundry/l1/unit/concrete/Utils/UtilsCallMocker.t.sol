@@ -11,7 +11,7 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IGenesisFacetRegistry} from "contracts/upgrades/registry/IGenesisFacetRegistry.sol";
+import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
 import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -167,17 +167,17 @@ contract UtilsCallMockerTest is Test {
         // answers all of them identically.
         vm.mockCall(
             genesisRegistry,
-            abi.encodeWithSelector(IGenesisFacetRegistry.newProtocolVersion.selector),
+            abi.encodeWithSelector(ICTMRegistry.newProtocolVersion.selector),
             abi.encode(uint256(0))
         );
         vm.mockCall(
             genesisRegistry,
-            abi.encodeWithSelector(IGenesisFacetRegistry.facetList.selector),
+            abi.encodeWithSelector(ICTMRegistry.facetList.selector),
             abi.encode(new CTMContract[](0))
         );
         vm.mockCall(
             genesisRegistry,
-            abi.encodeWithSelector(IGenesisFacetRegistry.baseSystemContractHashes.selector),
+            abi.encodeWithSelector(ICTMRegistry.baseSystemContractHashes.selector),
             abi.encode(
                 Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
                 Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,

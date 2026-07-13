@@ -15,11 +15,10 @@ import {
     DEFAULT_PUBDATA_PRICING_MODE,
     DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT
 } from "../../common/Config.sol";
-import {FacetInstallation, IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
-import {ISelfDescribingFacet} from "../chain-interfaces/ISelfDescribingFacet.sol";
+import {IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../IChainTypeManager.sol";
-import {IGenesisFacetRegistry} from "../../upgrades/registry/IGenesisFacetRegistry.sol";
+import {ICTMRegistry} from "../../upgrades/registry/ICTMRegistry.sol";
 import {RegistryFacetReader} from "../../upgrades/registry/RegistryFacetReader.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
@@ -84,13 +83,20 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         if (genesisRegistry == address(0)) {
             revert ZeroAddress();
         }
-        _installFacets(RegistryFacetReader.newChainInstallations(IGenesisFacetRegistry(genesisRegistry)));
+        Diamond.FacetCut[] memory facetCuts = RegistryFacetReader.newChainInstallations(
+            ICTMRegistry(genesisRegistry)
+        );
+        if (facetCuts.length != 0) {
+            Diamond.diamondCut(
+                Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: ""})
+            );
+        }
 
         (
             bytes32 l2BootloaderBytecodeHash,
             bytes32 l2DefaultAccountBytecodeHash,
             bytes32 l2EvmEmulatorBytecodeHash
-        ) = IGenesisFacetRegistry(genesisRegistry).baseSystemContractHashes(protocolVersion);
+        ) = ICTMRegistry(genesisRegistry).baseSystemContractHashes(protocolVersion);
 
         if (!IS_ZKSYNC_OS) {
             if (l2BootloaderBytecodeHash == bytes32(0)) {
@@ -156,29 +162,5 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
-    }
-
-    /// @dev Adds every facet in the registry-supplied set to the diamond this contract is
-    ///      delegatecalled into. Selector lists resolve at execution time: a pinned non-empty list
-    ///      wins, otherwise the facet's own `ISelfDescribingFacet.selectors()` is read (its
-    ///      immutable bytecode is the single source of truth for what it serves).
-    function _installFacets(FacetInstallation[] memory _facets) private {
-        uint256 facetsLength = _facets.length;
-        if (facetsLength == 0) {
-            return;
-        }
-
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](facetsLength);
-        for (uint256 i = 0; i < facetsLength; ++i) {
-            FacetInstallation memory facet = _facets[i];
-            facetCuts[i] = Diamond.FacetCut({
-                facet: facet.facet,
-                action: Diamond.Action.Add,
-                isFreezable: facet.isFreezable,
-                selectors: facet.selectors.length != 0 ? facet.selectors : ISelfDescribingFacet(facet.facet).selectors()
-            });
-        }
-
-        Diamond.diamondCut(Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: ""}));
     }
 }

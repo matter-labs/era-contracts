@@ -13,7 +13,6 @@ import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
-import {FacetInstallation} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ProposedUpgrade, UpgradeFacetSwap} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
@@ -410,14 +409,15 @@ contract StorageRegistriesTest is Test {
         assertEq(params.registry, address(ctmRegistry));
 
         // And that facet set (read via the shared reader) is AdminFacet(new) + GettersFacet +
-        // ExecutorFacet, with the registry's pinned selector lists.
-        FacetInstallation[] memory facets = RegistryFacetReader.newChainInstallations(
+        // ExecutorFacet, as ready-to-apply Add cuts with the registry's pinned selector lists.
+        Diamond.FacetCut[] memory facets = RegistryFacetReader.newChainInstallations(
             ICTMRegistry(address(ctmRegistry))
         );
         assertEq(facets.length, 3);
         assertEq(facets[0].facet, address(0xF201));
         assertEq(facets[1].facet, address(0xF102));
         assertEq(facets[2].facet, address(0xF203));
+        assertTrue(uint256(facets[0].action) == uint256(Diamond.Action.Add));
         assertTrue(facets[2].isFreezable);
         assertEq(facets[0].selectors.length, 2);
     }

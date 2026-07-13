@@ -4,8 +4,8 @@ pragma solidity 0.8.28;
 
 import {CTMContract} from "./ContractIdentifiers.sol";
 import {ICTMRegistry} from "./ICTMRegistry.sol";
-import {IGenesisFacetRegistry} from "./IGenesisFacetRegistry.sol";
-import {FacetInstallation} from "../../state-transition/chain-interfaces/IDiamondInit.sol";
+import {Diamond} from "../../state-transition/libraries/Diamond.sol";
+import {ISelfDescribingFacet} from "../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {UpgradeFacetSwap} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
 
 /// @title RegistryFacetReader
@@ -22,19 +22,24 @@ import {UpgradeFacetSwap} from "../../state-transition/libraries/ProposedUpgrade
 ///      facet versions predating that interface. Facet bytecode is immutable, so reads are stable.
 library RegistryFacetReader {
     /// @notice The complete facet set a chain created at the registry's new protocol version
-    ///         installs at genesis (all pure additions).
-    function newChainInstallations(
-        IGenesisFacetRegistry _registry
-    ) internal view returns (FacetInstallation[] memory installations) {
+    ///         installs at genesis, as ready-to-apply `Diamond.FacetCut`s (all pure `Add`s).
+    /// @dev Selectors resolve here: a pinned non-empty registry list wins (the bootstrap override
+    ///      for facets predating `ISelfDescribingFacet`), otherwise the facet's own
+    ///      `selectors()` is read — its immutable bytecode is the single source of truth for what
+    ///      it serves, so the read is stable.
+    function newChainInstallations(ICTMRegistry _registry) internal view returns (Diamond.FacetCut[] memory facetCuts) {
         uint256 newVersion = _registry.newProtocolVersion();
         CTMContract[] memory facets = _registry.facetList(newVersion);
         uint256 facetsLength = facets.length;
-        installations = new FacetInstallation[](facetsLength);
+        facetCuts = new Diamond.FacetCut[](facetsLength);
         for (uint256 i = 0; i < facetsLength; ++i) {
-            installations[i] = FacetInstallation({
-                facet: _registry.ctmAddress(facets[i], newVersion),
+            address facetAddress = _registry.ctmAddress(facets[i], newVersion);
+            bytes4[] memory selectors = _registry.facetSelectors(facets[i], newVersion);
+            facetCuts[i] = Diamond.FacetCut({
+                facet: facetAddress,
+                action: Diamond.Action.Add,
                 isFreezable: _registry.facetIsFreezable(facets[i]),
-                selectors: _registry.facetSelectors(facets[i], newVersion)
+                selectors: selectors.length != 0 ? selectors : ISelfDescribingFacet(facetAddress).selectors()
             });
         }
     }

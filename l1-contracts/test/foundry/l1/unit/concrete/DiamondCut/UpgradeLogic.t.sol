@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
-import {DiamondInit, FacetInstallation} from "contracts/state-transition/chain-deps/DiamondInit.sol";
+import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";

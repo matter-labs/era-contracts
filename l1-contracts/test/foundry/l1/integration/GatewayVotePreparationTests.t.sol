@@ -16,7 +16,7 @@ import {
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {IDiamondInit, FacetInstallation} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {CTMRegistry} from "contracts/upgrades/registry/CTMRegistry.sol";

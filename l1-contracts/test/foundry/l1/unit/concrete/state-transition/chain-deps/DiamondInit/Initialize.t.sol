@@ -10,7 +10,7 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-import {IGenesisFacetRegistry} from "contracts/upgrades/registry/IGenesisFacetRegistry.sol";
+import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {EmptyAssetId, EmptyBytes32, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
@@ -153,7 +153,7 @@ contract InitializeTest is DiamondInitTest {
     function test_revertWhen_registryReturnsZeroBootloaderHash() public {
         vm.mockCall(
             Utils.TEST_GENESIS_REGISTRY,
-            abi.encodeWithSelector(IGenesisFacetRegistry.baseSystemContractHashes.selector),
+            abi.encodeWithSelector(ICTMRegistry.baseSystemContractHashes.selector),
             abi.encode(bytes32(0), Utils.TEST_BASE_SYSTEM_CONTRACT_HASH, Utils.TEST_BASE_SYSTEM_CONTRACT_HASH)
         );
 

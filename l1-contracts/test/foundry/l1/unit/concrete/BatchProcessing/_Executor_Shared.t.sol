@@ -29,7 +29,6 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
-import {FacetInstallation} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";

@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {CoreContract, CTMContract} from "./ContractIdentifiers.sol";
 import {ICTMRegistry} from "./ICTMRegistry.sol";
-import {IGenesisFacetRegistry} from "./IGenesisFacetRegistry.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
 import {RegistryAlreadyInitialized, RegistryUnknownKey} from "../../common/L1ContractErrors.sol";
 
@@ -214,7 +213,7 @@ contract CTMRegistry is ICTMRegistry {
         return oldProtocolVersion_;
     }
 
-    /// @inheritdoc IGenesisFacetRegistry
+    /// @inheritdoc ICTMRegistry
     function newProtocolVersion() external view returns (uint256) {
         return newProtocolVersion_;
     }
@@ -224,7 +223,7 @@ contract CTMRegistry is ICTMRegistry {
         return ctmProxy_;
     }
 
-    /// @inheritdoc IGenesisFacetRegistry
+    /// @inheritdoc ICTMRegistry
     function ctmAddress(CTMContract _contract, uint256 _protocolVersion) external view returns (address) {
         _requireKnownVersion(_protocolVersion);
         // Facet addresses resolve from the facet rows (see `FacetRow`); everything else from the
@@ -256,7 +255,7 @@ contract CTMRegistry is ICTMRegistry {
         revert RegistryUnknownKey();
     }
 
-    /// @inheritdoc IGenesisFacetRegistry
+    /// @inheritdoc ICTMRegistry
     function facetList(uint256 _protocolVersion) external view returns (CTMContract[] memory list) {
         _requireKnownVersion(_protocolVersion);
         uint256 rowsLength = facetRows.length;
@@ -276,7 +275,7 @@ contract CTMRegistry is ICTMRegistry {
         }
     }
 
-    /// @inheritdoc IGenesisFacetRegistry
+    /// @inheritdoc ICTMRegistry
     function facetSelectors(CTMContract _facet, uint256 _protocolVersion) external view returns (bytes4[] memory) {
         uint256 rowsLength = facetRows.length;
         for (uint256 i = 0; i < rowsLength; ++i) {
@@ -287,7 +286,7 @@ contract CTMRegistry is ICTMRegistry {
         revert RegistryUnknownKey();
     }
 
-    /// @inheritdoc IGenesisFacetRegistry
+    /// @inheritdoc ICTMRegistry
     function facetIsFreezable(CTMContract _facet) external view returns (bool) {
         uint256 rowsLength = freezabilityRows.length;
         for (uint256 i = 0; i < rowsLength; ++i) {
@@ -350,7 +349,7 @@ contract CTMRegistry is ICTMRegistry {
         return factoryDepHashes_;
     }
 
-    /// @inheritdoc IGenesisFacetRegistry
+    /// @inheritdoc ICTMRegistry
     function baseSystemContractHashes(uint256 _protocolVersion) external view returns (bytes32, bytes32, bytes32) {
         _requireNewVersion(_protocolVersion);
         return (bootloaderHash, defaultAccountHash, evmEmulatorHash);

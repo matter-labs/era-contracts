@@ -2,8 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {CoreContract} from "./ContractIdentifiers.sol";
-import {IGenesisFacetRegistry} from "./IGenesisFacetRegistry.sol";
+import {CoreContract, CTMContract} from "./ContractIdentifiers.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
 
 /// @title Per-CTM upgrade registry (one per ChainTypeManager: Era and ZKsyncOS).
@@ -18,7 +17,7 @@ import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.
 ///      is ever passed as hand-built calldata.
 /// @dev Getters revert for unknown `(key, version)` combinations; only the two pinned versions
 ///      (`oldProtocolVersion`, `newProtocolVersion`) are answerable.
-interface ICTMRegistry is IGenesisFacetRegistry {
+interface ICTMRegistry {
     /// @notice Whether this registry describes the ZKsyncOS CTM (true) or the Era one (false).
     function isZKsyncOS() external view returns (bool);
 
@@ -28,14 +27,39 @@ interface ICTMRegistry is IGenesisFacetRegistry {
     /// @notice The ChainTypeManager proxy address (version-independent).
     function ctmProxy() external view returns (address);
 
-    // `newProtocolVersion`, `facetList`, `ctmAddress`, `facetSelectors`, `facetIsFreezable` and
-    // `baseSystemContractHashes` are
-    // inherited from `IGenesisFacetRegistry`. For this registry: `ctmAddress` also pins the old
-    // address of facets the upgrade touches (the one irreducible old-side datum — the upgrade cut
-    // needs the old facet to read its old selectors); `facetList` at the OLD version returns the
-    // upgrade PLAN (only the facets this upgrade changes, adds or removes), and at the NEW version
-    // the complete installed set. `facetSelectors` is generated from the audited facet source
-    // (`forge inspect <Facet> methodIdentifiers`).
+    // ---- Genesis facet surface ----
+    // The subset `DiamondInit` (via `RegistryFacetReader`) reads to initialize a newly created
+    // chain: the new protocol version, the facet set, each facet's address, freezability and
+    // selector override, plus the base system contract hashes the chain starts from.
+
+    /// @notice The packed SemVer (see `SemVer.sol`) protocol version chains are created at.
+    function newProtocolVersion() external view returns (uint256);
+
+    /// @notice The facet set at a given protocol version. At the OLD version this returns the
+    ///         upgrade PLAN (only the facets this upgrade changes, adds or removes); at the NEW
+    ///         version the complete installed set.
+    function facetList(uint256 _protocolVersion) external view returns (CTMContract[] memory);
+
+    /// @notice Address of a CTM-scoped facet at a given protocol version. Also pins the OLD
+    ///         address of facets the upgrade touches (the one irreducible old-side datum — the
+    ///         upgrade cut needs the old facet to read its old selectors).
+    function ctmAddress(CTMContract _contract, uint256 _protocolVersion) external view returns (address);
+
+    /// @notice The pinned selector-list override of a facet at a given protocol version; an empty
+    ///         list means "read the facet's own `ISelfDescribingFacet.selectors()`". Generated
+    ///         from the audited facet source (`forge inspect <Facet> methodIdentifiers`).
+    function facetSelectors(CTMContract _facet, uint256 _protocolVersion) external view returns (bytes4[] memory);
+
+    /// @notice Whether the facet's selectors are freezable in the diamond.
+    function facetIsFreezable(CTMContract _facet) external view returns (bool);
+
+    /// @notice The base system contract hashes at a given protocol version. `DiamondInit` reads
+    ///         these at genesis (they are never passed in calldata); on the upgrade path zero
+    ///         means "not updated by this upgrade" (see `ProposedUpgrade`), and on ZKsync OS they
+    ///         are always zero.
+    function baseSystemContractHashes(
+        uint256 _protocolVersion
+    ) external view returns (bytes32 bootloaderHash, bytes32 defaultAccountHash, bytes32 evmEmulatorHash);
 
     /// @notice The verifier address chains verify against at the new protocol version; reverts
     ///         for any other version.

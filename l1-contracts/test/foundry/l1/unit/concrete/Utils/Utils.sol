@@ -23,7 +23,6 @@ import {
 } from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {FacetInstallation} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {
     IExecutor,
     SystemLogKey,
