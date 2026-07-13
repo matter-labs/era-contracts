@@ -19,7 +19,8 @@ import {
 import {AtomicFinalityProof} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
-import {Reentrancy} from "contracts/common/L1ContractErrors.sol";
+import {EmptyBundle, ExecutingNotAllowed} from "contracts/interop/InteropErrors.sol";
+import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 
 import {
     L2_INTEROP_CENTER_ADDR,
@@ -85,25 +86,15 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         // Switch to destination chain
         vm.chainId(destinationChainId);
 
-        // Execute the bundle
-        // Before the fix: This would revert with "ReentrancyGuard: reentrant call" when
-        // executeBundle (with nonReentrant) calls _executeCalls which calls receiveMessage (with nonReentrant)
-        // After the fix: The reentrancy should not be an issue
+        // Before the fix: `executeBundle` (nonReentrant) -> _executeCalls -> receiveMessage (nonReentrant)
+        // would revert with the reentrancy guard error before any inner-bundle logic ran.
+        // After the fix: the nested call is reached; the inner `verifyBundle` decodes an EMPTY bundle and
+        // reverts deterministically with EmptyBundle (from `_getBundleData`). Asserting that exact error
+        // proves both that the reentrancy guard is gone (a Reentrancy revert would fire first) and that the
+        // nested dispatch reached the inner handler.
         vm.prank(bundleExecutor);
-
-        // We expect this to revert, but NOT due to reentrancy
-        // It should revert due to InvalidInteropBundleVersion (empty bundle) or similar
-        // The key assertion is that if we see a revert, it's not the reentrancy revert
-        try L2_INTEROP_HANDLER.executeBundle(encodedBundle, proof) {
-            // If it succeeds, that's fine - reentrancy didn't block it
-        } catch (bytes memory reason) {
-            // Check that it's not a reentrancy error
-            // The InteropHandler contract used our custom ReentrancyGuard implementation, not the OZ one
-            assertFalse(
-                reason.length >= 4 && bytes4(reason) == Reentrancy.selector,
-                "Should not revert due to reentrancy"
-            );
-        }
+        vm.expectRevert(EmptyBundle.selector);
+        L2_INTEROP_HANDLER.executeBundle(encodedBundle, proof);
     }
 
     /// @notice Test that executeBundle doesn't have nonReentrant modifier blocking nested calls
@@ -175,17 +166,14 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         // Switch to destination chain
         vm.chainId(destinationChainId);
 
-        // It should revert due to ExecutingNotAllowed or similar
-        // The key assertion is that if we see a revert, it's not the reentrancy revert
+        // The nested `executeBundle` is reached via receiveMessage -> _handleExecuteBundle, proving the
+        // reentrancy guard is gone. It then reverts deterministically with ExecutingNotAllowed: the inner
+        // bundle's execution address is bound to `destinationChainId`, but the interop sender chain id (from
+        // the outer call's `from`) is the source chain, so the execution-permission check fails.
+        // Selector-only match: ExecutingNotAllowed carries (bundleHash, caller, executionAddress) args.
         vm.prank(bundleExecutor);
-        try L2_INTEROP_HANDLER.executeBundle(encodedOuterBundle, outerProof) {
-            // Success - reentrancy did not block the nested executeBundle call
-        } catch (bytes memory reason) {
-            assertFalse(
-                reason.length >= 4 && bytes4(reason) == Reentrancy.selector,
-                "Should not revert due to reentrancy"
-            );
-        }
+        vm.expectPartialRevert(ExecutingNotAllowed.selector);
+        L2_INTEROP_HANDLER.executeBundle(encodedOuterBundle, outerProof);
     }
 
     /// @notice Test that verifyBundle doesn't have nonReentrant blocking it
@@ -250,15 +238,18 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         // Switch to destination chain
         vm.chainId(destinationChainId);
 
+        // The nested `verifyBundle` is permissionless, so it runs to completion (the atomicity gate is
+        // mocked in setUp) and marks the inner bundle Verified — the whole outer `executeBundle` therefore
+        // succeeds. That success (rather than a mere "didn't revert with reentrancy") is the strongest proof
+        // the reentrancy guard is gone; assert the inner bundle was actually verified by the nested call.
+        bytes32 innerBundleHash = InteropDataEncoding.encodeInteropBundleHash(sourceChainId, encodedInnerBundle);
         vm.prank(bundleExecutor);
-        try L2_INTEROP_HANDLER.executeBundle(encodedOuterBundle, outerProof) {
-            // Success - reentrancy did not block the nested verifyBundle call
-        } catch (bytes memory reason) {
-            assertFalse(
-                reason.length >= 4 && bytes4(reason) == Reentrancy.selector,
-                "Should not revert due to reentrancy"
-            );
-        }
+        L2_INTEROP_HANDLER.executeBundle(encodedOuterBundle, outerProof);
+        assertEq(
+            uint256(L2_INTEROP_HANDLER.bundleStatus(innerBundleHash)),
+            uint256(BundleStatus.Verified),
+            "nested verifyBundle should have marked the inner bundle Verified"
+        );
     }
     /// @notice Helper to create bundle attributes with execution address
     function _createBundleAttributes(address executor) internal view returns (BundleAttributes memory) {
@@ -269,35 +260,5 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
                 useFixedFee: false,
                 salt: bytes32(0)
             });
-    }
-
-    /// @notice Helper to extract revert message from bytes
-    function _getRevertMessage(bytes memory reason) internal pure returns (string memory) {
-        if (reason.length < 68) return "";
-        assembly {
-            reason := add(reason, 0x04)
-        }
-        return abi.decode(reason, (string));
-    }
-
-    /// @notice Helper to check if string contains substring
-    function _containsString(string memory source, string memory search) internal pure returns (bool) {
-        bytes memory sourceBytes = bytes(source);
-        bytes memory searchBytes = bytes(search);
-
-        if (searchBytes.length > sourceBytes.length) return false;
-        if (searchBytes.length == 0) return true;
-
-        for (uint256 i = 0; i <= sourceBytes.length - searchBytes.length; i++) {
-            bool found = true;
-            for (uint256 j = 0; j < searchBytes.length; j++) {
-                if (sourceBytes[i + j] != searchBytes[j]) {
-                    found = false;
-                    break;
-                }
-            }
-            if (found) return true;
-        }
-        return false;
     }
 }
