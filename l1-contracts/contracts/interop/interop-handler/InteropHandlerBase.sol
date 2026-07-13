@@ -1,22 +1,11 @@
 // SPDX-License-Identifier: MIT
-
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.24;
 
-import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
+import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 
-import {
-    L2_BASE_TOKEN_HOLDER,
-    L2_INTEROP_CENTER_ADDR,
-    L2_NATIVE_TOKEN_VAULT,
-    L2_MESSAGE_VERIFICATION,
-    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
-    L2_COMPLEX_UPGRADER_ADDR
-} from "../common/l2-helpers/L2ContractInterfaces.sol";
-import {IL2NativeTokenVault} from "../bridge/ntv/IL2NativeTokenVault.sol";
-import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {IAtomicFlowManager} from "../atomic-interop/IAtomicFlowManager.sol";
-import {AtomicFinalityProof} from "../atomic-interop/IAtomicInterop.sol";
-import {IInteropHandler} from "./IInteropHandler.sol";
+import {L2_INTEROP_CENTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {IInteropHandlerBase} from "./IInteropHandlerBase.sol";
 import {
     BUNDLE_IDENTIFIER,
     INTEROP_BUNDLE_VERSION,
@@ -26,16 +15,16 @@ import {
     InteropBundle,
     InteropCall,
     MessageInclusionProof
-} from "../common/Messaging.sol";
-import {IERC7786Recipient} from "./IERC7786Recipient.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {InteropDataEncoding} from "./InteropDataEncoding.sol";
+} from "../../common/Messaging.sol";
+import {IERC7786Recipient} from "../IERC7786Recipient.sol";
+import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
+import {InteropDataEncoding} from "../InteropDataEncoding.sol";
 import {
     BundleAlreadyProcessed,
     CallAlreadyExecuted,
     CallNotExecutable,
     CanNotUnbundle,
-    CannotClaimInteropOnL1Settlement,
+    EmptyBundle,
     ExecutingNotAllowed,
     MessageNotIncluded,
     UnauthorizedMessageSender,
@@ -46,17 +35,20 @@ import {
     WrongSourceChainId,
     InvalidInteropBundleVersion,
     InvalidInteropCallVersion
-} from "./InteropErrors.sol";
-import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
+} from "../InteropErrors.sol";
+import {InvalidSelector, PayloadTooShort, Unauthorized} from "../../common/L1ContractErrors.sol";
 
-/// @title InteropHandler
+/// @title InteropHandlerBase
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev This contract serves as the entry-point for executing, verifying and unbundling interop bundles.
-contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
-    /// @notice The chain ID of L1. This contract can be deployed on multiple layers, but this value is still equal to the
-    /// L1 that is at the most base layer.
-    uint256 public L1_CHAIN_ID;
+/// @notice Shared entry-point logic for executing, verifying and unbundling interop bundles. Both the L2 system
+/// contract (`L2InteropHandler`) and the L1-side `L1InteropHandler` inherit this base and provide the environment
+/// specific behaviour (message-inclusion verification and base-token value handling) via the virtual hooks below.
+abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, ReentrancyGuard {
+    /// @dev Deprecated. This slot previously held the L1 chain id, which is no longer used (the handler operates
+    /// on `block.chainid`). Retained — not removed — to preserve the upgradeable storage layout.
+    // slither-disable-next-line uninitialized-state
+    uint256 internal __DEPRECATED_L1_CHAIN_ID;
 
     /// @notice Tracks the processing status of a bundle by its hash.
     mapping(bytes32 bundleHash => BundleStatus bundleStatus) public bundleStatus;
@@ -64,48 +56,60 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
     /// @notice Tracks the individual call statuses within a bundle.
     mapping(bytes32 bundleHash => mapping(uint256 callIndex => CallStatus callStatus)) public callStatus;
 
-    /// @dev Only allows calls from the complex upgrader contract on L2.
-    modifier onlyUpgrader() {
-        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
+    /*//////////////////////////////////////////////////////////////
+                        Environment-specific hooks
+    //////////////////////////////////////////////////////////////*/
 
-    /// @notice Returns the interop center address. Virtual to allow override in private interop.
-    function _interopCenterAddr() internal view virtual returns (address) {
-        return L2_INTEROP_CENTER_ADDR;
-    }
+    /// @notice Proves that the bundle message was included on the source chain.
+    /// @dev L2 uses the `L2_MESSAGE_VERIFICATION` system contract; L1 uses the `MessageRoot`.
+    function _proveInclusion(MessageInclusionProof memory _proof) internal view virtual returns (bool);
 
-    /// @notice Returns the native token vault. Virtual to allow override in private interop.
-    function _nativeTokenVault() internal view virtual returns (IL2NativeTokenVault) {
-        return L2_NATIVE_TOKEN_VAULT;
-    }
+    /// @notice Handles the base-token value that rides along an interop call before it is forwarded.
+    /// @dev L2 pulls the value from the `BaseTokenHolder`; L1 forbids non-zero value (withdrawals carry the amount in
+    /// their transfer data, not as call value).
+    function _handleCallValue(uint256 _value, uint256 _sourceChainId) internal virtual;
 
-    /// @inheritdoc IInteropHandler
-    function initL2(uint256 _l1ChainId) public reentrancyGuardInitializer onlyUpgrader {
-        L1_CHAIN_ID = _l1ChainId;
-    }
+    /// @notice The base-token asset ID expected as the bundle's destination base token on this layer.
+    function _expectedDestinationBaseTokenAssetId() internal view virtual returns (bytes32);
 
-    /// @inheritdoc IInteropHandler
+    /// @notice Guard invoked by the call-executing entry points (`executeBundle` and `unbundleBundle`).
+    /// @dev On L1 this enforces the pausable check, so withdrawals can be halted; on L2 it is a no-op (the L2
+    /// system contract is not pausable). `verifyBundle` is intentionally not guarded: it only records that a
+    /// bundle message was included and moves no assets.
+    function _ensureNotPaused() internal view virtual {}
+
+    /*//////////////////////////////////////////////////////////////
+                            Public entry points
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IInteropHandlerBase
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
-        // Interop is only supported while the chain settles on Gateway (not on L1).
-        // We read the chain's current settlement layer from `SystemContext` (kept in sync with each
-        // batch's bootloader-driven `setSettlementLayerChainId` call); the analogous mapping on the
-        // chain's own `L2Bridgehub` is only written for chains that *settle on this Bridgehub*
-        // (i.e. populated on L1's L1Bridgehub and on a Gateway's L2Bridgehub for the chains it
-        // hosts), and is never written on a chain's own L2Bridgehub for itself.
-        require(
-            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
-            CannotClaimInteropOnL1Settlement()
-        );
+        _ensureNotPaused();
 
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
-        // For a non-atomic bundle the cross-chain binding is the L1 message; the proof carries its chainId.
         _validateBundleDestinationContext(bundleHash, interopBundle, _proof.chainId);
-        _requireExecutionAllowed(bundleHash, interopBundle);
+
+        // If the execution address is not specified then the execution is permissionless.
+        if (interopBundle.bundleAttributes.executionAddress.length != 0) {
+            (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
+                interopBundle.bundleAttributes.executionAddress
+            );
+
+            // Verify that the caller has permission to execute the bundle.
+            // Note, that in case the executionAddress wasn't specified in the bundle then executing is permissionless, as documented in Messaging.sol
+            // It's also possible that the caller is InteropHandler itself, in case the execution was initiated through receiveMessage.
+            require(
+                (msg.sender == address(this) ||
+                    ((executionChainId == block.chainid || executionChainId == 0) && executionAddress == msg.sender)),
+                ExecutingNotAllowed(
+                    bundleHash,
+                    InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
+                    interopBundle.bundleAttributes.executionAddress
+                )
+            );
+        }
 
         // We can only process bundles that are either unreceived (first time processing) or verified (already verified but not executed).
         // This whitelist approach ensures that if new bundle statuses are added in the future, they will be explicitly rejected
@@ -115,92 +119,34 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
             BundleAlreadyProcessed(bundleHash)
         );
 
-        // Proof gate: verify the bundle's L1-message inclusion, if not done yet.
+        // Verify the bundle inclusion, if not done yet.
         if (status != BundleStatus.Verified) _verifyBundle(_bundle, _proof, bundleHash);
 
-        _markFullyExecutedAndRun(bundleHash, interopBundle);
-    }
+        // Mark the given bundle as fully executed, following CEI pattern.
+        bundleStatus[bundleHash] = BundleStatus.FullyExecuted;
 
-    /// @inheritdoc IInteropHandler
-    function executeAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public {
-        // No gateway-mode requirement here (unlike executeBundle): an atomic bundle's cross-chain
-        // binding comes from the per-leg IMT inclusion proofs authenticated against the interop root,
-        // which is built on both L1 and the gateway. Atomic execution is therefore valid regardless of
-        // settlement layer, including L1-settled chains.
-
-        // Decode the bundle, compute its hash, read its status.
-        (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
-
-        // An atomic bundle is never published to L1, so its source chain id is the bundle's own field;
-        // the cross-chain binding comes from the IMT inclusion proof (the atomicity gate) below.
-        _validateBundleDestinationContext(bundleHash, interopBundle, interopBundle.sourceChainId);
-        _requireExecutionAllowed(bundleHash, interopBundle);
-
-        // Atomic bundles have no verify path (they were never published to L1), so only a fresh bundle
-        // may be executed; replay is then prevented by marking it FullyExecuted below. (A non-atomic
-        // bundle cannot reach here: the gate requires its commit value in an IMT, which only `append`
-        // — i.e. an atomic send — ever writes.)
-        require(status == BundleStatus.Unreceived, BundleAlreadyProcessed(bundleHash));
-
-        // Atomicity gate: replaces executeBundle's L1-message inclusion proof. Proves every leg of the
-        // flow was committed in its source chain's IMT before the deadline, and that this bundle is one
-        // of the flow's legs. Reverts otherwise. No explicit "block.chainid in flow" check is needed: the
-        // bundle self-binds its own destinationChainId (asserted == block.chainid above) and per-send
-        // salts make each leg's bundleHash unique to its destination.
-        IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).requireFlowFinalized(bundleHash, _finality);
-
-        // No nonReentrant guard, matching executeBundle. Replay safety is by CEI: _markFullyExecutedAndRun
-        // sets bundleStatus = FullyExecuted before running any call, so a reentrant call for THIS bundle
-        // hits the Unreceived check and reverts; a reentry for a different bundle is independently guarded.
-        // A global lock would also block legitimate nested interop.
-        _markFullyExecutedAndRun(bundleHash, interopBundle);
-    }
-
-    /// @notice Execution-address permission gate shared by executeBundle / executeAtomicBundle.
-    /// @dev Permissionless when no `executionAddress` is set; otherwise only that address (on this
-    /// chain, or chain-agnostic via chainId 0) may execute — or this contract itself, when execution
-    /// was initiated through `receiveMessage`.
-    function _requireExecutionAllowed(bytes32 _bundleHash, InteropBundle memory _interopBundle) internal view {
-        if (_interopBundle.bundleAttributes.executionAddress.length == 0) {
-            return;
-        }
-        (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
-            _interopBundle.bundleAttributes.executionAddress
-        );
-        require(
-            (msg.sender == address(this) ||
-                ((executionChainId == block.chainid || executionChainId == 0) && executionAddress == msg.sender)),
-            ExecutingNotAllowed(
-                _bundleHash,
-                InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
-                _interopBundle.bundleAttributes.executionAddress
-            )
-        );
-    }
-
-    /// @notice Marks the bundle `FullyExecuted` (CEI) and executes all of its calls — the shared tail of
-    /// executeBundle / executeAtomicBundle. `_executeAllCalls = true`, so any failing call reverts the
-    /// whole flow, leaving no state changes.
-    function _markFullyExecutedAndRun(bytes32 _bundleHash, InteropBundle memory _interopBundle) internal {
-        bundleStatus[_bundleHash] = BundleStatus.FullyExecuted;
-
-        uint256 callsLength = _interopBundle.calls.length;
+        // Update callStatus of the calls which are to be executed.
+        uint256 callsLength = interopBundle.calls.length;
         for (uint256 i = 0; i < callsLength; ++i) {
-            callStatus[_bundleHash][i] = CallStatus.Executed;
+            callStatus[bundleHash][i] = CallStatus.Executed;
         }
 
+        // Execute all of the calls.
+        // Since we provide the flag `_executeAllCalls` to be true, if either of the calls fail,
+        // the `_executeCalls` will fail as well, thus making the whole flow revert, no changes will be applied to the state.
         _executeCalls({
-            _sourceChainId: _interopBundle.sourceChainId,
-            _bundleHash: _bundleHash,
-            _interopBundle: _interopBundle,
+            _sourceChainId: interopBundle.sourceChainId,
+            _bundleHash: bundleHash,
+            _interopBundle: interopBundle,
             _executeAllCalls: true,
             _providedCallStatus: new CallStatus[](0)
         });
 
-        emit BundleExecuted(_bundleHash);
+        // Emit event stating that the bundle was executed.
+        emit BundleExecuted(bundleHash);
     }
 
-    /// @inheritdoc IInteropHandler
+    /// @inheritdoc IInteropHandlerBase
     function verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
@@ -214,14 +160,9 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
         _verifyBundle(_bundle, _proof, bundleHash);
     }
 
-    /// @inheritdoc IInteropHandler
+    /// @inheritdoc IInteropHandlerBase
     function unbundleBundle(bytes memory _bundle, CallStatus[] calldata _providedCallStatus) public {
-        // Interop is only supported while the chain settles on Gateway (not on L1).
-        // See `executeBundle` for why this reads `SystemContext` rather than `L2_BRIDGEHUB`.
-        require(
-            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
-            CannotClaimInteropOnL1Settlement()
-        );
+        _ensureNotPaused();
 
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
@@ -301,6 +242,8 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
     function _getBundleData(
         bytes memory _bundle
     ) internal view returns (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus currentStatus) {
+        // Revert with a clean error on an empty bundle instead of the panic `abi.decode` would produce.
+        require(_bundle.length != 0, EmptyBundle());
         interopBundle = abi.decode(_bundle, (InteropBundle));
         require(interopBundle.version == INTEROP_BUNDLE_VERSION, InvalidInteropBundleVersion());
         bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, _bundle);
@@ -332,12 +275,9 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
             InteropCall memory interopCall = _interopBundle.calls[i];
             require(interopCall.version == INTEROP_CALL_VERSION, InvalidInteropCallVersion());
 
-            if (interopCall.value > 0) {
-                // Transfer base tokens from the BaseTokenHolder instead of minting.
-                L2_BASE_TOKEN_HOLDER.give(address(this), interopCall.value, _sourceChainId);
-            }
+            // Environment-specific handling of the call's base-token value.
+            _handleCallValue(interopCall.value, _sourceChainId);
 
-            // Normal execution via receiveMessage
             // slither-disable-next-line arbitrary-send-eth
             bytes4 selector = IERC7786Recipient(interopCall.to).receiveMessage{value: interopCall.value}({
                 receiveId: keccak256(abi.encodePacked(_bundleHash, i)),
@@ -353,34 +293,21 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
     /// @param _proof Proof for the message that corresponds to the bundle that is to be verified.
     /// @param _bundleHash Hash corresponding to the bundle that is to be verified.
     /// That message gets sent to L1 by origin chain in InteropCenter contract, and is picked up and included in receiving chain by sequencer.
-    function _verifyBundle(
-        bytes memory _bundle,
-        MessageInclusionProof memory _proof,
-        bytes32 _bundleHash
-    ) internal virtual {
+    function _verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bytes32 _bundleHash) internal {
         // Verify that the message came from the legitimate InteropCenter.
         // The bundle is authenticated solely by message inclusion plus the sender being the
         // canonical `L2_INTEROP_CENTER_ADDR`. Asset correctness across chains is guaranteed by ZK
         // proofs (assuming proofs are correct and chains are not malicious), so no on-chain
         // per-chain balance reconciliation is performed here.
-        address interopCenter = _interopCenterAddr();
         require(
-            _proof.message.sender == interopCenter,
-            UnauthorizedMessageSender(interopCenter, _proof.message.sender)
+            _proof.message.sender == L2_INTEROP_CENTER_ADDR,
+            UnauthorizedMessageSender(L2_INTEROP_CENTER_ADDR, _proof.message.sender)
         );
 
-        // Substitute provided message data with format-specific data.
-        _proof.message.data = _getBundleMessageData(_bundle);
+        // Substitute provided message data with data corresponding to the bundle currently being verified.
+        _proof.message.data = bytes.concat(BUNDLE_IDENTIFIER, _bundle);
 
-        bool isIncluded = L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared({
-            _chainId: _proof.chainId,
-            _blockOrBatchNumber: _proof.l1BatchNumber,
-            _index: _proof.l2MessageIndex,
-            _message: _proof.message,
-            _proof: _proof.proof
-        });
-
-        require(isIncluded, MessageNotIncluded());
+        require(_proveInclusion(_proof), MessageNotIncluded());
 
         bundleStatus[_bundleHash] = BundleStatus.Verified;
 
@@ -388,15 +315,10 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
         emit BundleVerified(_bundleHash);
     }
 
-    /// @notice Returns the message data for bundle verification. Override for private interop format.
-    function _getBundleMessageData(bytes memory _bundle) internal view virtual returns (bytes memory) {
-        return bytes.concat(BUNDLE_IDENTIFIER, _bundle);
-    }
-
     /// @notice The sole purpose of this function is to serve as a rescue mechanism in case the sender is a contract,
     ///         the unbundler chainid is set to the sender chainid and the unbundler address is set to the contract's address.
     ///         In particular, this happens when the unbundler is not specified.
-    ///         In such a case, the contract might nol be able to call `InteropHandler.unbundleBundle` directly.
+    ///         In such a case, the contract might not be able to call `InteropHandler.unbundleBundle` directly.
     ///         Instead, it's able to send another bundle which calls `InteropHandler.unbundleBundle` via the `receiveMessage` function.
     /// @dev Implements ERC-7786 recipient interface. The payload must be encoded using abi.encodeCall
     ///      with one of the following function selectors:
@@ -418,6 +340,8 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
         // This is the only way receiveMessage can be invoked on InteropHandler by itself.
         require(msg.sender == address(this), Unauthorized(msg.sender));
 
+        // Revert cleanly on a payload too short to carry a selector, instead of the slice-out-of-bounds panic.
+        require(payload.length >= 4, PayloadTooShort());
         bytes4 selector = bytes4(payload[:4]);
 
         (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
@@ -449,7 +373,7 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
         );
 
         // Decode the bundle to get execution permissions
-        (InteropBundle memory interopBundle, , ) = _getBundleData(bundle);
+        (InteropBundle memory interopBundle, bytes32 bundleHash, ) = _getBundleData(bundle);
 
         // If the execution address is not specified then the execution is permissionless.
         if (interopBundle.bundleAttributes.executionAddress.length != 0) {
@@ -460,7 +384,7 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
             // Verify sender has execution permission
             require(
                 (executionChainId == senderChainId || executionChainId == 0) && executionAddress == senderAddress,
-                ExecutingNotAllowed(keccak256(bundle), sender, interopBundle.bundleAttributes.executionAddress)
+                ExecutingNotAllowed(bundleHash, sender, interopBundle.bundleAttributes.executionAddress)
             );
         }
 
@@ -486,7 +410,7 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
         (bytes memory bundle, CallStatus[] memory providedCallStatus) = abi.decode(payload[4:], (bytes, CallStatus[]));
 
         // Decode the bundle to get unbundling permissions
-        (InteropBundle memory interopBundle, , ) = _getBundleData(bundle);
+        (InteropBundle memory interopBundle, bytes32 bundleHash, ) = _getBundleData(bundle);
 
         (uint256 unbundlerChainId, address unbundlerAddress) = InteroperableAddress.parseEvmV1(
             interopBundle.bundleAttributes.unbundlerAddress
@@ -495,7 +419,7 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
         // Verify sender has unbundling permission
         require(
             (unbundlerChainId == senderChainId || unbundlerChainId == 0) && unbundlerAddress == senderAddress,
-            UnbundlingNotAllowed(keccak256(bundle), sender, interopBundle.bundleAttributes.unbundlerAddress)
+            UnbundlingNotAllowed(bundleHash, sender, interopBundle.bundleAttributes.unbundlerAddress)
         );
 
         this.unbundleBundle(bundle, providedCallStatus);
@@ -519,19 +443,10 @@ contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
         );
 
         // Verify that the destination base token asset ID of the bundle is equal to the base token asset ID of the chain
-        bytes32 baseTokenAssetId = _nativeTokenVault().BASE_TOKEN_ASSET_ID();
+        bytes32 baseTokenAssetId = _expectedDestinationBaseTokenAssetId();
         require(
             interopBundle.destinationBaseTokenAssetId == baseTokenAssetId,
             WrongDestinationBaseTokenAssetId(bundleHash, baseTokenAssetId, interopBundle.destinationBaseTokenAssetId)
         );
-    }
-
-    /// @notice Allows the contract to receive native ETH from L2_BASE_TOKEN_HOLDER.
-    /// @dev This is required because L2_BASE_TOKEN_HOLDER.give() transfers ETH to this contract
-    ///      before forwarding it to the interop call recipient.
-    receive() external payable {
-        if (msg.sender != address(L2_BASE_TOKEN_HOLDER)) {
-            revert Unauthorized(msg.sender);
-        }
     }
 }

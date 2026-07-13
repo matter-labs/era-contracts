@@ -38,7 +38,7 @@ import {L2AssetRouter} from "../bridge/asset-router/L2AssetRouter.sol";
 import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
 import {L2AssetTracker} from "../bridge/asset-tracker/L2AssetTracker.sol";
 import {L2ChainAssetHandler} from "../core/chain-asset-handler/L2ChainAssetHandler.sol";
-import {InteropHandler} from "../interop/InteropHandler.sol";
+import {L2InteropHandler} from "../interop/interop-handler/L2InteropHandler.sol";
 import {L2InteropCommitmentTree} from "../atomic-interop/L2InteropCommitmentTree.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {
@@ -404,7 +404,7 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     /// @notice Initializes contracts introduced in v31: L2AssetTracker,
-    /// InteropHandler, L2BaseToken, and base token registration.
+    /// L2InteropHandler, L2BaseToken, and base token registration.
     /// @dev Called after `_finalizeDeployments` as part of `performForceDeployedContractsInit()`.
     /// Keeping this in the library ensures a single source of truth for v31-specific initialization.
     function _initializeV31Contracts(
@@ -421,7 +421,7 @@ library L2GenesisForceDeploymentsHelper {
             _isZKsyncOS && !_isGenesisUpgrade
         );
 
-        InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2();
 
         InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
             _fixedForceDeploymentsData.l1ChainId,

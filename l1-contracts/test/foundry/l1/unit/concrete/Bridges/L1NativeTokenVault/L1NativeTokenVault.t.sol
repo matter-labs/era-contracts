@@ -97,14 +97,12 @@ contract L1NativeTokenVaultTest is Test {
         // Deploy L1Nullifier
         L1NullifierDev l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehubAddress),
-            _messageRoot: IMessageRootBase(messageRootAddress),
-            _eraChainId: eraChainId,
-            _eraDiamondProxy: eraDiamondProxy
+            _messageRoot: IMessageRootBase(messageRootAddress)
         });
         TransparentUpgradeableProxy l1NullifierProxy = new TransparentUpgradeableProxy(
             address(l1NullifierImpl),
             proxyAdmin,
-            abi.encodeWithSelector(L1Nullifier.initialize.selector, owner, 1, 1, 1, 0)
+            abi.encodeWithSelector(L1Nullifier.initialize.selector, owner)
         );
         l1Nullifier = L1Nullifier(payable(l1NullifierProxy));
 

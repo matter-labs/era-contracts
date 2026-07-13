@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IInteropHandler} from "../../interop/IInteropHandler.sol";
+import {IInteropHandlerBase} from "../../interop/interop-handler/IInteropHandlerBase.sol";
 import {L2Message, MessageInclusionProof} from "../../common/Messaging.sol";
 import {GasFields, InteropTrigger, TRIGGER_IDENTIFIER} from "./Utils.sol";
 import {L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_VERIFICATION} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {Transaction} from "../../common/l2-helpers/L2ContractHelper.sol";
 
-IInteropHandler constant L2_INTEROP_HANDLER = IInteropHandler(L2_INTEROP_HANDLER_ADDR);
+IInteropHandlerBase constant L2_INTEROP_HANDLER = IInteropHandlerBase(L2_INTEROP_HANDLER_ADDR);
 
 event MessageNotIncluded2();
 
