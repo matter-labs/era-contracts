@@ -82,7 +82,7 @@ contract MailboxBaseTests is MailboxTest {
         );
     }
 
-    function test_requestL2TransactionToGatewayMailboxWithBalanceChange_RevertWhen_ExpirationTimestampNotZero() public {
+    function test_requestL2TransactionToGatewayMailbox_RevertWhen_ExpirationTimestampNotZero() public {
         uint256 chainId = 42;
         utilsFacet.util_setChainId(eraChainId);
 
@@ -99,12 +99,6 @@ contract MailboxBaseTests is MailboxTest {
 
         vm.prank(sender);
         vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, 0, 1));
-        IMailboxImpl(address(mailboxFacet)).requestL2TransactionToGatewayMailboxWithBalanceChange(
-            chainId,
-            bytes32(0),
-            1,
-            0,
-            false
-        );
+        IMailboxImpl(address(mailboxFacet)).requestL2TransactionToGatewayMailbox(chainId, bytes32(0), 1);
     }
 }

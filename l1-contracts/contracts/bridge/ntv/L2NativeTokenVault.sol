@@ -11,12 +11,9 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 import {IL2NativeTokenVault} from "./IL2NativeTokenVault.sol";
 import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 
-import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
-
-import {IL2AssetTracker} from "../asset-tracker/IL2AssetTracker.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
-    L2_ASSET_TRACKER_ADDR,
+    L2_ASSET_TRACKER,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR
@@ -128,11 +125,11 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     }
 
     function registerBaseTokenIfNeeded() external onlyUpgrader {
-        if (_assetTracker().isAssetRegistered(BASE_TOKEN_ASSET_ID)) {
+        if (L2_ASSET_TRACKER.isAssetRegistered(BASE_TOKEN_ASSET_ID)) {
             // Base token is already registered, no need to register it again
             return;
         }
-        _assetTracker().registerNewTokenIfNeeded(BASE_TOKEN_ASSET_ID, originChainId[BASE_TOKEN_ASSET_ID]);
+        L2_ASSET_TRACKER.registerNewTokenIfNeeded(BASE_TOKEN_ASSET_ID, originChainId[BASE_TOKEN_ASSET_ID]);
     }
 
     /// @notice Updates the contract.
@@ -185,8 +182,9 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         }
     }
 
-    function _assetTracker() internal view virtual override returns (IAssetTrackerBase) {
-        return IAssetTrackerBase(L2_ASSET_TRACKER_ADDR);
+    /// @dev Records the token in the L2AssetTracker (total-supply / outbound bookkeeping).
+    function _registerTokenInAssetTracker(bytes32 _assetId, uint256 _originChainId) internal override {
+        L2_ASSET_TRACKER.registerNewTokenIfNeeded(_assetId, _originChainId);
     }
 
     /// @notice Ensures that the token is deployed.
@@ -300,19 +298,14 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
         // so L2NativeTokenVault doesn't have to handle balance changes on GW.
         // We need to check the migration number.
-        IL2AssetTracker(address(_assetTracker())).handleInitiateBridgingOnL2(
-            _chainid,
-            _assetId,
-            _amount,
-            originChainId[_assetId]
-        );
+        L2_ASSET_TRACKER.handleInitiateBridgingOnL2(_chainid, _assetId, _amount, originChainId[_assetId]);
     }
 
     function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual override {
         // on L2s we don't track the balance.
         // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
         // so L2NativeTokenVault doesn't have to handle balance changes on GW.
-        IL2AssetTracker(address(_assetTracker())).handleFinalizeBridgingOnL2({
+        L2_ASSET_TRACKER.handleFinalizeBridgingOnL2({
             _fromChainId: _chainId,
             _assetId: _assetId,
             _amount: _amount,

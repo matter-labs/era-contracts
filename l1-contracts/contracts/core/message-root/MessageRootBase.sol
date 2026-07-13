@@ -15,13 +15,10 @@ import {
     DepthMoreThanOneForRecursiveMerkleProof,
     MessageRootNotRegistered,
     NonConsecutiveBatchNumber,
-    OnlyAssetTracker,
     OnlyChainAssetHandler,
     OnlyBridgehubOrChainAssetHandler,
     OnlyChain
 } from "../bridgehub/L1BridgehubErrors.sol";
-
-import {GW_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
@@ -141,18 +138,14 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         _;
     }
 
-    /// @notice On L1, the chain can add it directly, while on GW, the asset tracker should add it,
+    /// @notice The chain itself appends its batch root, both on L1 and on Gateway. On Gateway the
+    /// chain's `Executor` calls this directly while settling (it no longer routes through the asset
+    /// tracker). Asset correctness across chains is guaranteed by ZK proofs.
     /// @dev Note, that at the moment of the v31 upgrade we no chains to settle on top of the old
     /// Era-based Gateway, and so no special handling is needed for pre-v31 chains.
     modifier addChainBatchRootRestriction(uint256 _chainId) {
-        if (block.chainid != L1_CHAIN_ID()) {
-            if (msg.sender != GW_ASSET_TRACKER_ADDR) {
-                revert OnlyAssetTracker(msg.sender, GW_ASSET_TRACKER_ADDR);
-            }
-        } else {
-            if (msg.sender != IBridgehubBase(_bridgehub()).getZKChain(_chainId)) {
-                revert OnlyChain(msg.sender, IBridgehubBase(_bridgehub()).getZKChain(_chainId));
-            }
+        if (msg.sender != IBridgehubBase(_bridgehub()).getZKChain(_chainId)) {
+            revert OnlyChain(msg.sender, IBridgehubBase(_bridgehub()).getZKChain(_chainId));
         }
         _;
     }

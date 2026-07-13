@@ -111,7 +111,7 @@
   },
   {
     "type": "function",
-    "name": "forwardTransactionOnGatewayWithBalanceChange",
+    "name": "forwardTransactionOnGateway",
     "inputs": [
       {
         "name": "_chainId",
@@ -127,48 +127,6 @@
         "name": "_expirationTimestamp",
         "type": "uint64",
         "internalType": "uint64"
-      },
-      {
-        "name": "_balanceChange",
-        "type": "tuple",
-        "internalType": "struct BalanceChange",
-        "components": [
-          {
-            "name": "version",
-            "type": "bytes1",
-            "internalType": "bytes1"
-          },
-          {
-            "name": "originToken",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "baseTokenAssetId",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "baseTokenAmount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "assetId",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "tokenOriginChainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
       }
     ],
     "outputs": [],
@@ -212,17 +170,11 @@
   },
   {
     "type": "function",
-    "name": "interopBundleNonce",
-    "inputs": [
-      {
-        "name": "sender",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
+    "name": "interopProtocolFee",
+    "inputs": [],
     "outputs": [
       {
-        "name": "numberOfBundlesSent",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -231,13 +183,24 @@
   },
   {
     "type": "function",
-    "name": "interopProtocolFee",
-    "inputs": [],
+    "name": "isInteropBundleSaltUsed",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "salt",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
     "outputs": [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "hasBeenUsed",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
@@ -312,6 +275,11 @@
             "name": "useFixedFee",
             "type": "bool",
             "internalType": "bool"
+          },
+          {
+            "name": "salt",
+            "type": "bytes32",
+            "internalType": "bytes32"
           }
         ]
       }
@@ -639,6 +607,11 @@
                 "name": "useFixedFee",
                 "type": "bool",
                 "internalType": "bool"
+              },
+              {
+                "name": "salt",
+                "type": "bytes32",
+                "internalType": "bytes32"
               }
             ]
           }
@@ -721,25 +694,6 @@
       },
       {
         "name": "newAssetRouter",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "NewAssetTracker",
-    "inputs": [
-      {
-        "name": "oldAssetTracker",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "newAssetTracker",
         "type": "address",
         "indexed": true,
         "internalType": "address"
@@ -882,22 +836,6 @@
   },
   {
     "type": "error",
-    "name": "AssetIdMismatch",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "supplied",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "AtomicBundleCallCarriesValue",
     "inputs": [
       {
@@ -968,6 +906,22 @@
         "name": "actual",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InteropBundleSaltAlreadyUsed",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "salt",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ]
   },

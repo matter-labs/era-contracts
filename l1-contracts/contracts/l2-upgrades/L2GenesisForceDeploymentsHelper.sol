@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {
-    GW_ASSET_TRACKER_ADDR,
     L2_ASSET_TRACKER_ADDR,
     L2_ASSET_ROUTER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -38,7 +37,6 @@ import {L2Bridgehub} from "../core/bridgehub/L2Bridgehub.sol";
 import {L2AssetRouter} from "../bridge/asset-router/L2AssetRouter.sol";
 import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
 import {L2AssetTracker} from "../bridge/asset-tracker/L2AssetTracker.sol";
-import {GWAssetTracker} from "../bridge/asset-tracker/GWAssetTracker.sol";
 import {L2ChainAssetHandler} from "../core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {InteropHandler} from "../interop/InteropHandler.sol";
 import {L2InteropCommitmentTree} from "../atomic-interop/L2InteropCommitmentTree.sol";
@@ -405,7 +403,7 @@ library L2GenesisForceDeploymentsHelper {
         );
     }
 
-    /// @notice Initializes contracts introduced in v31: AssetTracker, GWAssetTracker,
+    /// @notice Initializes contracts introduced in v31: L2AssetTracker,
     /// InteropHandler, L2BaseToken, and base token registration.
     /// @dev Called after `_finalizeDeployments` as part of `performForceDeployedContractsInit()`.
     /// Keeping this in the library ensures a single source of truth for v31-specific initialization.
@@ -421,11 +419,6 @@ library L2GenesisForceDeploymentsHelper {
             // The only chains that need backfill for the base token's total supply are ZKsync OS
             // chains that existed before the v31 upgrade (i.e. isGenesis is false).
             _isZKsyncOS && !_isGenesisUpgrade
-        );
-
-        GWAssetTracker(GW_ASSET_TRACKER_ADDR).initL2(
-            _fixedForceDeploymentsData.l1ChainId,
-            _fixedForceDeploymentsData.aliasedL1Governance
         );
 
         InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);

@@ -9,64 +9,16 @@ import {VmSafe} from "forge-std/Vm.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
-import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
-/// @notice Shared token migration utilities for the v31 upgrade.
-/// @dev Used by both `CoreUpgrade_v31.stage3` (post-governance migration) and `ChainUpgrade_v31`.
+/// @notice Shared token-registration utilities for the v31 upgrade.
+/// @dev Used by `CoreUpgrade_v31.stage3` (post-governance NTV bridged-token registration).
+/// The pre-v31 token-balance migration was removed together with the asset trackers.
 library TokenMigrationUtils {
     using stdToml for string;
 
     VmSafe private constant vm = VmSafe(address(uint160(uint256(keccak256("hevm cheat code")))));
-
-    /// @notice Register all legacy bridged tokens in the AssetTracker.
-    /// @dev No-op on clean-slate deployments: there are no pre-v31 bridged tokens to register, and the
-    /// AssetTracker's `registerLegacyToken` migration entry point has been removed. Kept as a stub so the
-    /// v31 upgrade scripts continue to compile and call into a single place.
-    // solhint-disable-next-line no-empty-blocks
-    function registerAllLegacyTokens(address _bridgehub) internal {}
-
-    /// @notice Migrate token balances for a specific chain from NTV to AssetTracker.
-    /// @dev No-op on clean-slate deployments (no pre-v31 chain balances to migrate); see
-    /// `registerAllLegacyTokens`.
-    // solhint-disable-next-line no-empty-blocks
-    function migrateTokenBalancesForChain(
-        uint256 _chainId,
-        L1NativeTokenVault _ntv,
-        IL1AssetTracker _assetTracker
-    ) internal {}
-
-    /// @notice Migrate token balances from NTV chainBalance to AssetTracker for all chains.
-    function migrateAllTokenBalances(address _ntv, address _assetTracker, IBridgehubBase _bridgehub) internal {
-        console.log("Migrating token balances...");
-
-        L1NativeTokenVault ntv = L1NativeTokenVault(payable(_ntv));
-        IL1AssetTracker assetTracker = IL1AssetTracker(_assetTracker);
-
-        uint256 tokenCount = ntv.bridgedTokensCount();
-        console.log("Number of bridged tokens:", tokenCount);
-
-        // First, migrate balances for the L1 chain itself
-        uint256 l1ChainId = block.chainid;
-        console.log("Migrating L1 chain balances (chainId:", l1ChainId, ")");
-        migrateTokenBalancesForChain(l1ChainId, ntv, assetTracker);
-
-        // Get list of registered L2 chains
-        uint256[] memory chainIds = _bridgehub.getAllZKChainChainIDs();
-        console.log("Number of L2 chains:", chainIds.length);
-
-        // For each L2 chain and each token, migrate the balance
-        for (uint256 i = 0; i < chainIds.length; ++i) {
-            migrateTokenBalancesForChain(chainIds[i], ntv, assetTracker);
-        }
-
-        console.log("Token balance migration complete");
-    }
 
     /// @notice Register legacy bridged tokens in the NTV bridged tokens list for v31 stage3.
     /// @dev Registers ETH plus any extra legacy L1 tokens declared in the dedicated bridged-tokens TOML.

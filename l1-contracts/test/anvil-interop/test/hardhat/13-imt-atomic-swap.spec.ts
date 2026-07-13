@@ -67,6 +67,7 @@ import {
 import { encodeEvmAddress, encodeEvmChain } from "../../src/core/data-encoding";
 import {
   atomicBundleAttr,
+  interopBundleSaltAttr,
   getInteropProtocolFee,
   getTokenTransferData,
   indirectCallAttr,
@@ -256,15 +257,25 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     source: ChainCtx,
     dest: ChainCtx,
     amount: BigNumber,
-    recipient: string
+    recipient: string,
+    salt: string
   ): Promise<string> {
     const interopCenter = source.stack.interopCenter.connect(source.user);
+    // The bundleHash now depends on the `interopBundleSalt` attribute (folded into the bundle), so the
+    // prediction MUST carry the exact same salt the real atomic send will use — otherwise the predicted
+    // hash (and the flowId derived from it) would not match the emitted one.
     return interopCenter.callStatic.sendBundle(
       encodeEvmChain(dest.chainId),
       [bridgeCallStarter(source, amount, recipient)],
-      [],
+      [interopBundleSaltAttr(salt)],
       { gasLimit: INTEROP_SEND_BUNDLE_GAS_LIMIT, value: fee }
     );
+  }
+
+  /** A fresh, deterministic-per-send bundle salt. Random keeps it unique per (sender, salt) — the
+   *  uniqueness InteropCenter enforces — while staying known off-chain so the bundleHash is predictable. */
+  function freshBundleSalt(): string {
+    return ethers.utils.hexlify(ethers.utils.randomBytes(32));
   }
 
   /**
@@ -279,8 +290,9 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     flowId: string;
     deadline: number;
     predictedBundleHash: string;
+    salt: string;
   }): Promise<{ bundleData: string; bundleHash: string }> {
-    const { source, dest, amount, recipient, flowId, deadline, predictedBundleHash } = params;
+    const { source, dest, amount, recipient, flowId, deadline, predictedBundleHash, salt } = params;
 
     await ensureNtvApproval(source, amount);
 
@@ -291,7 +303,8 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       sourceProvider: source.provider,
       destinationChainId: dest.chainId,
       callStarters: [bridgeCallStarter(source, amount, recipient)],
-      bundleAttributes: [atomicBundleAttr(flowId, deadline, lowNull)],
+      // Same salt used to predict `predictedBundleHash`, so the emitted bundleHash matches the flowId.
+      bundleAttributes: [atomicBundleAttr(flowId, deadline, lowNull), interopBundleSaltAttr(salt)],
       value: fee,
       // Atomic sends append to the IMT (~1.1M gas insert) on top of the burn; the plain-send default
       // (INTEROP_SEND_BUNDLE_GAS_LIMIT) is too small.
@@ -313,8 +326,10 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     const deadline = now + 3600;
 
     // ── Predict each leg's bundleHash (no state change), then derive flowId ──────────────────
-    const hAB = await predictLegBundleHash(chainA, chainB, aAmount, user);
-    const hBA = await predictLegBundleHash(chainB, chainA, bAmount, user);
+    const saltAB = freshBundleSalt();
+    const saltBA = freshBundleSalt();
+    const hAB = await predictLegBundleHash(chainA, chainB, aAmount, user, saltAB);
+    const hBA = await predictLegBundleHash(chainB, chainA, bAmount, user, saltBA);
 
     // Legs sorted by ascending bundleHash; each leg's source chain id stays positionally aligned:
     // chainIdsAsc[i] is the source chain of legHashesAsc[i]. Sorting the chain ids independently
@@ -339,6 +354,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       flowId,
       deadline,
       predictedBundleHash: hAB,
+      salt: saltAB,
     });
     const ba = await sendAtomicLeg({
       source: chainB,
@@ -348,6 +364,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       flowId,
       deadline,
       predictedBundleHash: hBA,
+      salt: saltBA,
     });
 
     // Source legs are Committed; tokens left the depositor and were burned via AR/NTV.
@@ -461,8 +478,10 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     const bTimeoutAmount = ethers.utils.parseUnits("5", TEST_TOKEN_DECIMALS);
 
     // ── Predict both legs' bundleHashes -> flowId (the BA leg is never sent). ─────────────────
-    const hAB = await predictLegBundleHash(chainA, chainB, aTimeoutAmount, refundRecipient);
-    const hBA = await predictLegBundleHash(chainB, chainA, bTimeoutAmount, refundRecipient);
+    const saltAB = freshBundleSalt();
+    const saltBA = freshBundleSalt();
+    const hAB = await predictLegBundleHash(chainA, chainB, aTimeoutAmount, refundRecipient, saltAB);
+    const hBA = await predictLegBundleHash(chainB, chainA, bTimeoutAmount, refundRecipient, saltBA);
 
     // Legs sorted by ascending bundleHash; each leg's source chain id stays positionally aligned:
     // chainIdsAsc[i] is the source chain of legHashesAsc[i]. Sorting the chain ids independently
@@ -485,6 +504,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       flowId,
       deadline,
       predictedBundleHash: hAB,
+      salt: saltAB,
     });
 
     expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Committed, "AB committed on A");

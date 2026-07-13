@@ -3,7 +3,6 @@ use clap::Subcommand;
 pub mod convert;
 pub mod migrate_from;
 pub mod migrate_to;
-pub mod setup_fee_payer;
 
 /// Gateway operations: converting a chain into a gateway or migrating a chain to/from one.
 #[derive(Subcommand, Debug)]
@@ -17,23 +16,16 @@ pub enum GatewayCommands {
     /// Migrate a chain off a gateway, back to L1 settlement
     #[command(subcommand, name = "migrate-from")]
     MigrateFrom(MigrateFromCommands),
-    /// Opt the signer's EOA in (or out) as the settlement-fee payer for a
-    /// specific chain on the Gateway. Sends one tx to `GWAssetTracker`'s
-    /// `setSettlementFeePayerAgreement(chainId, agreed)` on the GW L2 RPC.
-    #[command(name = "setup-fee-payer")]
-    SetupFeePayer(SetupFeePayerArgs),
 }
 
 pub use convert::ConvertArgs;
 pub use migrate_from::MigrateFromCommands;
 pub use migrate_to::MigrateToCommands;
-pub use setup_fee_payer::SetupFeePayerArgs;
 
 pub async fn run(args: GatewayCommands) -> anyhow::Result<()> {
     match args {
         GatewayCommands::Convert(cmd) => convert::run_convert(cmd).await,
         GatewayCommands::MigrateTo(cmd) => migrate_to::run_migrate_to(cmd).await,
         GatewayCommands::MigrateFrom(cmd) => migrate_from::run(cmd).await,
-        GatewayCommands::SetupFeePayer(cmd) => setup_fee_payer::run(cmd).await,
     }
 }

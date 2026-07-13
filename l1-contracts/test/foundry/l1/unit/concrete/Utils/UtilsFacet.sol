@@ -243,10 +243,6 @@ contract UtilsFacet is ZKChainBase {
         return s.pausedDepositsTimestamp;
     }
 
-    function util_setAssetTracker(address _assetTracker) external {
-        s.assetTracker = _assetTracker;
-    }
-
     function util_setNativeTokenVault(address _nativeTokenVault) external {
         s.nativeTokenVault = _nativeTokenVault;
     }

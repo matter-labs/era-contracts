@@ -1063,22 +1063,6 @@
   },
   {
     "type": "error",
-    "name": "OnlyAssetTracker",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "OnlyBridgehubOrChainAssetHandler",
     "inputs": [
       {

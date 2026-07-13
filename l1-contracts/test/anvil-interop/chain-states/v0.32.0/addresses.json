@@ -1,18 +1,17 @@
 {
   "l1Addresses": {
-    "bridgehub": "0x4bF1999069c5AC5663CcAfdCE13bB011BF7aCA5c",
-    "l1SharedBridge": "0x1bFD67575bc7CBD597205985F36Ab6563bD1DEDe",
-    "l1NullifierProxy": "0x2EbC11c6ed5822587F66d6Ed92dd1Be7a40aCbCc",
-    "l1NativeTokenVault": "0x0C164A3430a0b4182e40170ebAF1A0d700f6Bbf0",
-    "l1AssetTracker": "0x49dAbcb34c8a9ADa3cB240c94fb3c8939769E87a",
+    "bridgehub": "0xA0e02871d6116280C97685D65407A38DB42e9C48",
+    "l1SharedBridge": "0xeF39fa76B80A39B4e817aD79a5d0694205694144",
+    "l1NullifierProxy": "0x5Ef27856851a27A391075670da1a9939CDD228aB",
+    "l1NativeTokenVault": "0x827F761FA753cFfa5bFA9e7ebd2718138e3EF3Eb",
     "governance": "0xa60F07cAaFA0aE451296c0ca5C261578A390105e",
     "transparentProxyAdmin": "0x0FA38b5c8cb180809E0C95E2EE923eC093123285",
-    "messageRoot": "0xc7FcB23D9F232DaF696099d2c40C53B9E517DC40",
-    "ctmDeploymentTracker": "0xD9561D1f297a42004e5fF8f649251341860db700",
-    "chainRegistrationSender": "0x7DE6363E3D09B7b9DfA9b4602E709EBb9340b8e3"
+    "messageRoot": "0x95bC312A2941Af39FF1339bA05AdBa020b2f4A02",
+    "ctmDeploymentTracker": "0x545fD9ab9d6dCA6FD61d1E4aBc0626967d9bfB58",
+    "chainRegistrationSender": "0xe1B340472037229788A2CDa9448678F3A5217A36"
   },
   "ctmAddresses": {
-    "chainTypeManager": "0xD49d7ee94CceD9E851cA028f2622a9429Dd472bE",
+    "chainTypeManager": "0x5eeEd0D7Ed3A92129683108688837842aAE178E2",
     "chainAdmin": "0x16b5d0b1A5c64195453315C58671A6f847CE1aC2",
     "verifier": "0x5422b0509a532dd24b0dD99AfaC766E66172af37",
     "rollupL1DAValidator": "0xC533CcE441ED81782127ef99B936bFbeB62DD26B"
@@ -20,105 +19,37 @@
   "chainAddresses": [
     {
       "chainId": 10,
-      "diamondProxy": "0x7646f05671AB472C3deAD8ec62d68557cCe427A9"
+      "diamondProxy": "0xcd2FcB1BC450416404f87194F60419731356b79e"
     },
     {
       "chainId": 11,
-      "diamondProxy": "0x5b0DDd9deeC42481cF884eAc7a9942988c19396B"
+      "diamondProxy": "0xEC6EB9Ad807D3e48b6489aDa125Da4E250d6cC94"
     },
     {
       "chainId": 12,
-      "diamondProxy": "0x0dE3e51B7F6D12213184F4A649240dA952A2436a"
+      "diamondProxy": "0x25544213D50b837a74850F52e6e8198c1B89ee01"
     },
     {
       "chainId": 13,
-      "diamondProxy": "0x27E67b8551c5C8De56aa530FC26e2F59d6c4f71F"
+      "diamondProxy": "0x96771a7015DB70195b9e63733bb5b86674Bdf31D"
     },
     {
       "chainId": 14,
-      "diamondProxy": "0xF5A013D29b024a878DC8Fe68B2dC5FfC3d77Ea43"
+      "diamondProxy": "0xc8f342eBEd64c633b1b17a5A273c5E48e259FB82"
     }
   ],
   "testTokens": {
     "10": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
     "11": "0x9A676e781A523b5d0C0e43731313A708CB607508",
-    "12": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-    "13": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-    "14": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+    "12": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "13": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "14": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
   },
   "customBaseTokens": {
-    "14": "0x49fd2BE640DB2910c2fAb69bB8531Ab6E76127ff"
-  },
-  "tbmAccountingSnapshots": {
-    "12:0x8df3463b1850eb1d8d1847743ea155aef6b16074db8ba81d897dc30554fb2085": {
-      "chainId": 12,
-      "assetId": "0x8df3463b1850eb1d8d1847743ea155aef6b16074db8ba81d897dc30554fb2085",
-      "l1SourceBefore": "0",
-      "l1SourceAfter": "0",
-      "gwChainBefore": "0",
-      "gwChainAfter": "0",
-      "gwPendingBefore": "0",
-      "gwPendingAfter": "0",
-      "migratedAmount": "0"
-    },
-    "13:0x8df3463b1850eb1d8d1847743ea155aef6b16074db8ba81d897dc30554fb2085": {
-      "chainId": 13,
-      "assetId": "0x8df3463b1850eb1d8d1847743ea155aef6b16074db8ba81d897dc30554fb2085",
-      "l1SourceBefore": "0",
-      "l1SourceAfter": "0",
-      "gwChainBefore": "0",
-      "gwChainAfter": "0",
-      "gwPendingBefore": "0",
-      "gwPendingAfter": "0",
-      "migratedAmount": "0"
-    },
-    "14:0xfca0d5a4c6dcacfb1db788e8a11c0341c7f724b00920aba1361d76ca38951057": {
-      "chainId": 14,
-      "assetId": "0xfca0d5a4c6dcacfb1db788e8a11c0341c7f724b00920aba1361d76ca38951057",
-      "l1SourceBefore": "0",
-      "l1SourceAfter": "0",
-      "gwChainBefore": "0",
-      "gwChainAfter": "0",
-      "gwPendingBefore": "0",
-      "gwPendingAfter": "0",
-      "migratedAmount": "0"
-    },
-    "12:0xbee78cda199aa999344d96fbe38e7fe2b0d24b9018a4f300e29c8a2691cd737b": {
-      "chainId": 12,
-      "assetId": "0xbee78cda199aa999344d96fbe38e7fe2b0d24b9018a4f300e29c8a2691cd737b",
-      "l1SourceBefore": "0",
-      "l1SourceAfter": "0",
-      "gwChainBefore": "0",
-      "gwChainAfter": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
-      "gwPendingBefore": "0",
-      "gwPendingAfter": "0",
-      "migratedAmount": "0"
-    },
-    "13:0x017d0b927e0489aeb853e419973f9fe16a0e08dad85826115d7d8cfdfddd3913": {
-      "chainId": 13,
-      "assetId": "0x017d0b927e0489aeb853e419973f9fe16a0e08dad85826115d7d8cfdfddd3913",
-      "l1SourceBefore": "0",
-      "l1SourceAfter": "0",
-      "gwChainBefore": "0",
-      "gwChainAfter": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
-      "gwPendingBefore": "0",
-      "gwPendingAfter": "0",
-      "migratedAmount": "0"
-    },
-    "14:0x907a2b130d57aad113bf2b68baafe39102a6f0e7ac39435c48f845f2e6983beb": {
-      "chainId": 14,
-      "assetId": "0x907a2b130d57aad113bf2b68baafe39102a6f0e7ac39435c48f845f2e6983beb",
-      "l1SourceBefore": "0",
-      "l1SourceAfter": "0",
-      "gwChainBefore": "0",
-      "gwChainAfter": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
-      "gwPendingBefore": "0",
-      "gwPendingAfter": "0",
-      "migratedAmount": "0"
-    }
+    "14": "0xC9a43158891282A2B1475592D5719c001986Aaec"
   },
   "zkToken": {
-    "l1Address": "0x4826533B4897376654Bb4d4AD88B7faFD0C98528",
-    "assetId": "0x29531b98baea905c89e9dcf602fc1ec219c72187989e76331e5fa3bf89c0b124"
+    "l1Address": "0x851356ae760d987E095750cCeb3bC6014560891C",
+    "assetId": "0xc93027ef72800936b226f884aa827d1d1af7aeea1bee7e0eed7d78536b1d8013"
   }
 }

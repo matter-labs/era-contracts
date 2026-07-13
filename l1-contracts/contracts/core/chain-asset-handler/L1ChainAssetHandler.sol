@@ -20,8 +20,10 @@ import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
-import {IAssetTrackerBase} from "../../bridge/asset-tracker/IAssetTrackerBase.sol";
 import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
+import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
+import {L2_CHAIN_ASSET_HANDLER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {IL2ChainAssetHandler} from "./IL2ChainAssetHandler.sol";
 import {ChainNotReadyForMigration, ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
 import {CTMNotRegistered} from "../../common/L1ContractErrors.sol";
 import {
@@ -185,18 +187,34 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         require(zkChain != address(0), ZKChainNotRegistered());
         IL1AssetRouter l1AssetRouter = IL1AssetRouter(address(_assetRouter()));
         IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(address(l1AssetRouter.nativeTokenVault()));
-        IAssetTrackerBase l1AssetTracker = IAssetTrackerBase(address(nativeTokenVault.l1AssetTracker()));
 
         return
             // The chain must have version higher than v31.
             !IL1MessageRoot(address(_messageRoot())).isPreV31(_chainId) &&
-            // The chain's base token must be registered as otherwise the token balance
-            // migration won't work. This is done just in case to unblock any potential L1->L2 transactions.
-            l1AssetTracker.isAssetRegistered(baseAssetId) &&
+            // The chain's base token must be registered in the NTV, as otherwise L1->L2 base-token
+            // deposits (which the destination NTV relies on) would not work.
+            nativeTokenVault.tokenAddress(baseAssetId) != address(0) &&
             // The chain's base token must support `totalSupply()`, which is the case
             // for all chains except for pre-v31 ZKsync OS ones. For them, this value
             // has to be backfilled. Otherwise token balance migration may not work.
             IZKChain(zkChain).baseTokenSupportsTotalSupply();
+    }
+
+    /// @notice Requests that deposits be paused on the settlement layer (Gateway) for a chain that is
+    /// about to migrate away from it. Callable only by the chain itself (its diamond).
+    /// @dev Re-homes the cross-layer message that previously went through the asset tracker. The
+    /// ChainAssetHandler is an authorized service-transaction sender on the settlement layer chain,
+    /// so it forwards the request to the settlement layer's `L2ChainAssetHandler`.
+    /// @param _chainId The chain whose deposits should be paused on the settlement layer.
+    function requestPauseDepositsForChainOnGateway(uint256 _chainId) external {
+        require(msg.sender == BRIDGEHUB.getZKChain(_chainId), ZKChainNotRegistered());
+        uint256 settlementLayer = BRIDGEHUB.settlementLayer(_chainId);
+        require(settlementLayer != block.chainid, SettlementLayerMustNotBeL1());
+        // slither-disable-next-line unused-return
+        IMailbox(BRIDGEHUB.getZKChain(settlementLayer)).requestL2ServiceTransaction(
+            L2_CHAIN_ASSET_HANDLER_ADDR,
+            abi.encodeCall(IL2ChainAssetHandler.requestPauseDepositsForChainOnGateway, (_chainId))
+        );
     }
 
     function _setMigrationInProgressOnL1(uint256 _chainId) internal override {

@@ -6,10 +6,9 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {IMessageRootBase} from "../../../core/message-root/IMessageRoot.sol";
 import {EMPTY_STRING_KECCAK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
-import {IExecutor, ProcessLogsInput} from "../../chain-interfaces/IExecutor.sol";
+import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
-import {GW_ASSET_TRACKER} from "../../../common/l2-helpers/L2ContractInterfaces.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {
     CanOnlyProcessOneBatch,
@@ -200,32 +199,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             );
         }
 
-        // On Gateway we route through the Asset Tracker, which appends the chain batch root AND
-        // processes the interop logs/messages (asset-tracking / settlement-fee accounting). On L1 we
-        // append the chain batch root directly to the MessageRoot: this builds the chain's interop tree
-        // and emits the interop root (so L1-settled chains participate in interop), and the stored
-        // chain batch roots are used for L2->L1 message verification. L1 does not run the asset-tracker
-        // message processing, hence no logs/messages are passed on L1 (enforced above).
-        if (block.chainid != L1_CHAIN_ID) {
-            uint256 messagesLength = decoded.messages.length;
-            for (uint256 i = 0; i < messagesLength; ++i) {
-                ProcessLogsInput memory processLogsInput = ProcessLogsInput({
-                    logs: decoded.logs[i],
-                    messages: decoded.messages[i],
-                    chainId: s.chainId,
-                    batchNumber: batchesData[i].batchNumber,
-                    chainBatchRoot: batchesData[i].l2LogsTreeRoot,
-                    multichainBatchRoot: decoded.multichainBatchRoots[i],
-                    imtRoots: decoded.imtRoots[i],
-                    settlementFeePayer: decoded.settlementFeePayer
-                });
-                GW_ASSET_TRACKER.processLogsAndMessages(processLogsInput);
-            }
-        } else {
-            uint256 batchesDataLength = batchesData.length;
-            for (uint256 i = 0; i < batchesDataLength; ++i) {
-                _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
-            }
+        // Append each batch's proven `l2LogsTreeRoot` to the global message root. On Gateway the
+        // committed `l2LogsTreeRoot` is the chain batch root (it already commits to the empty
+        // multichain batch root), so the append is identical to the L1 path. Asset correctness across
+        // chains is guaranteed by ZK proofs (assuming proofs are correct),
+        // so no per-batch log reconstruction / balance accounting is performed.
+        for (uint256 i = 0; i < nBatches; ++i) {
+            _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
         }
 
         for (uint256 i = 0; i < nBatches; ++i) {

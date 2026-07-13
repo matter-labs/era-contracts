@@ -18,7 +18,6 @@ import {
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_HANDLER_ADDR,
     L2_ASSET_TRACKER_ADDR,
-    GW_ASSET_TRACKER_ADDR,
     L2_INTEROP_ROOT_STORAGE,
     L2_MESSAGE_ROOT_ADDR,
     L2_MESSAGE_VERIFICATION,
@@ -42,8 +41,6 @@ import {DummyL2InteropRootStorage} from "contracts/dev-contracts/test/DummyL2Int
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
-import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
-import {GWAssetTrackerDev} from "contracts/dev-contracts/test/GWAssetTrackerDev.sol";
 // import {InteropAccount} from "contracts/interop/InteropAccount.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
 
@@ -91,7 +88,6 @@ library L2Utils {
         forceDeployInteropCenter(_args);
         forceDeployInteropHandler(_args);
         forceDeployL2AssetTracker(_args);
-        forceDeployGWAssetTracker(_args);
         forceDeployL2L1Messenger(_args);
         forceDeployBaseTokenContracts(_args);
 
@@ -204,12 +200,6 @@ library L2Utils {
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(_args.l1ChainId, ethAssetId, false);
-    }
-
-    function forceDeployGWAssetTracker(SystemContractsArgs memory _args) internal {
-        new GWAssetTrackerDev();
-
-        forceDeployWithoutConstructor("GWAssetTrackerDev", GW_ASSET_TRACKER_ADDR);
     }
 
     /// @notice Deploys the L2AssetRouter contract.

@@ -23,4 +23,8 @@ library AttributesDecoder {
     ) internal pure returns (bytes32 flowId, uint64 deadline, uint256 lowNullifierIndex) {
         return abi.decode(_data[4:], (bytes32, uint64, uint256));
     }
+
+    function decodeBytes32(bytes calldata _data) internal pure returns (bytes32) {
+        return abi.decode(_data[4:], (bytes32));
+    }
 }

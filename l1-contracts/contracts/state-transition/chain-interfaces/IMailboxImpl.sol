@@ -86,15 +86,10 @@ interface IMailboxImpl is IZKChainBase {
     /// @param _chainId the chainId of the chain.
     /// @param _canonicalTxHash the canonical transaction hash.
     /// @param _expirationTimestamp Deprecated, always 0.
-    /// @param _baseTokenAmount the base token amount that is sent with the transaction.
-    /// @param _getBalanceChange whether a second token is passed with the transaction,
-    /// the amount of which will be fetched from the L1 asset tracker. If false it is not fetched for gas savings.
-    function requestL2TransactionToGatewayMailboxWithBalanceChange(
+    function requestL2TransactionToGatewayMailbox(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp,
-        uint256 _baseTokenAmount,
-        bool _getBalanceChange
+        uint64 _expirationTimestamp
     ) external returns (bytes32 canonicalTxHash);
 
     /// @notice Estimates the cost in Ether of requesting execution of an L2 transaction from L1.

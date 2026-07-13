@@ -250,49 +250,6 @@ contract DataEncodingTest is Test {
         return DataEncoding.decodeTokenData(_data);
     }
 
-    // ============ encodeAssetTrackerData / decodeAssetTrackerData Tests ============
-
-    function test_encodeAssetTrackerData_basicValues() public view {
-        uint256 chainId = 100;
-        bytes32 assetId = bytes32(uint256(0xABCDEF));
-        uint256 amount = 1000000;
-        bool migratingChainIsMinter = true;
-        bool hasSettlingMintingChains = false;
-        uint256 newSLBalance = 500000;
-
-        bytes memory encoded = DataEncoding.encodeAssetTrackerData(
-            chainId,
-            assetId,
-            amount,
-            migratingChainIsMinter,
-            hasSettlingMintingChains,
-            newSLBalance
-        );
-
-        (
-            uint256 decodedChainId,
-            bytes32 decodedAssetId,
-            uint256 decodedAmount,
-            bool decodedMigratingChainIsMinter,
-            bool decodedHasSettlingMintingChains,
-            uint256 decodedNewSLBalance
-        ) = this.externalDecodeAssetTrackerData(encoded);
-
-        assertEq(decodedChainId, chainId);
-        assertEq(decodedAssetId, assetId);
-        assertEq(decodedAmount, amount);
-        assertEq(decodedMigratingChainIsMinter, migratingChainIsMinter);
-        assertEq(decodedHasSettlingMintingChains, hasSettlingMintingChains);
-        assertEq(decodedNewSLBalance, newSLBalance);
-    }
-
-    // External wrapper for calldata conversion
-    function externalDecodeAssetTrackerData(
-        bytes calldata _data
-    ) external pure returns (uint256, bytes32, uint256, bool, bool, uint256) {
-        return DataEncoding.decodeAssetTrackerData(_data);
-    }
-
     // ============ getSelector Tests ============
 
     function test_getSelector_extractsCorrectly() public pure {

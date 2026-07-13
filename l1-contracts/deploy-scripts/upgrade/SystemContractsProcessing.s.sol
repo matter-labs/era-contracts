@@ -5,7 +5,6 @@ import {console2 as console} from "forge-std/Script.sol";
 import {Utils} from "../utils/Utils.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {
-    GW_ASSET_TRACKER_ADDR,
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
@@ -50,7 +49,7 @@ struct SystemContract {
 uint256 constant SYSTEM_CONTRACTS_COUNT = 31;
 /// @dev Fixed-address CoreContract entries backed by l1-contracts bytecodes.
 ///      Era deploys them directly; ZKsyncOS upgrades them via universal force deployments.
-uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 12;
+uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 11;
 /// @dev Era runtime creation bytecodes published as factory deps but not force-deployed.
 uint256 constant RUNTIME_ONLY_FACTORY_DEPS_COUNT = 2;
 /// @dev Era factory deps: fixed-address core contracts plus runtime-only proxy creation bytecodes.
@@ -201,7 +200,6 @@ library SystemContractsProcessing {
         ids[i++] = CoreContract.L2AssetTracker;
         ids[i++] = CoreContract.InteropCenter;
         ids[i++] = CoreContract.InteropHandler;
-        ids[i++] = CoreContract.GWAssetTracker;
         // Under-filling would silently leave `CoreContract(0)` entries; over-filling
         // already reverts with an out-of-bounds access on the fixed-length array.
         require(i == FIXED_ADDRESS_CORE_CONTRACTS_COUNT, "fixed-address core contract count mismatch");

@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {
-    GW_ASSET_TRACKER_ADDR,
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
@@ -207,7 +206,7 @@ contract L2V31UpgradeUnitTest is Test {
 
         // AcceptAll mock for contracts where we don't verify behavior
         MockAcceptAll acceptAll = new MockAcceptAll();
-        address[] memory acceptAllAddresses = new address[](9);
+        address[] memory acceptAllAddresses = new address[](8);
         acceptAllAddresses[0] = L2_DEPLOYER_SYSTEM_CONTRACT_ADDR;
         acceptAllAddresses[1] = L2_MESSAGE_ROOT_ADDR;
         acceptAllAddresses[2] = L2_BRIDGEHUB_ADDR;
@@ -215,8 +214,7 @@ contract L2V31UpgradeUnitTest is Test {
         acceptAllAddresses[4] = L2_CHAIN_ASSET_HANDLER_ADDR;
         acceptAllAddresses[5] = L2_INTEROP_CENTER_ADDR;
         acceptAllAddresses[6] = L2_INTEROP_HANDLER_ADDR;
-        acceptAllAddresses[7] = GW_ASSET_TRACKER_ADDR;
-        acceptAllAddresses[8] = L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR;
+        acceptAllAddresses[7] = L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR;
         for (uint256 i = 0; i < acceptAllAddresses.length; i++) {
             vm.etch(acceptAllAddresses[i], address(acceptAll).code);
         }
