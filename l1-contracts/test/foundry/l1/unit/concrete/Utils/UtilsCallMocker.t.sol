@@ -184,6 +184,26 @@ contract UtilsCallMockerTest is Test {
                 Utils.TEST_BASE_SYSTEM_CONTRACT_HASH
             )
         );
+        // Genesis params the CTM validates in `_setGenesisRegistry` and reads back via
+        // `storedBatchZero()` / `l1GenesisUpgrade()`. All non-zero so both Era and ZKsyncOS
+        // validation passes; fixtures that actually run the genesis upgrade (i.e. create a chain
+        // through the CTM) re-mock `genesisParams` with their real genesis-upgrade address.
+        vm.mockCall(
+            genesisRegistry,
+            abi.encodeWithSelector(ICTMRegistry.genesisParams.selector),
+            abi.encode(
+                Utils.TEST_GENESIS_REGISTRY, // genesisUpgrade (placeholder non-zero)
+                bytes32(uint256(0x01)), // genesisBatchHash
+                bytes32(uint256(0x01)), // genesisBatchCommitment
+                uint64(0x01) // genesisIndexRepeatedStorageChanges
+            )
+        );
+        // New chains read their force-deployments blob from the registry (empty in fixtures).
+        vm.mockCall(
+            genesisRegistry,
+            abi.encodeWithSelector(ICTMRegistry.fixedForceDeploymentsData.selector),
+            abi.encode(bytes(""))
+        );
     }
 
     /// @notice Mocks the CTM's protocolVersionVerifier call for DiamondInit

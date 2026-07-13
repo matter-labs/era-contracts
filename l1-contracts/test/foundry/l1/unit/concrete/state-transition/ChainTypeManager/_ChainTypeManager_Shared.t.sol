@@ -25,11 +25,9 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
-import {
-    IChainTypeManager,
-    ChainCreationParams,
-    ChainTypeManagerInitializeData
-} from "contracts/state-transition/IChainTypeManager.sol";
+import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
+import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
+import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -193,24 +191,27 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         );
 
         // The fixture's CTM runs at protocol version 0, which a real `GenesisRegistry` cannot
-        // pin (zero doubles as its init guard), so the registry DiamondInit reads is mocked
-        // (empty facet set + test base system hashes; the fixture facets ride in the cut).
+        // pin (zero doubles as its init guard), so the registry the CTM reads is mocked: base
+        // system hashes + genesis params here, and the diamond facet set is mocked per chain
+        // creation from the cut the test passes to `createNewChain` (see `_mockGenesisRegistryFacets`).
         mockGenesisRegistryContract();
-
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: address(genesisUpgradeContract),
-            genesisBatchHash: bytes32(uint256(0x01)),
-            genesisIndexRepeatedStorageChanges: 0x01,
-            genesisBatchCommitment: bytes32(uint256(0x01)),
-            diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: forceDeploymentsData,
-            registry: Utils.TEST_GENESIS_REGISTRY
-        });
+        // Re-mock `genesisParams` with the fixture's real genesis-upgrade contract (the CTM calls
+        // it while creating a chain) and pin this fixture's `DiamondInit` in the registry.
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRegistry.genesisParams.selector),
+            abi.encode(address(genesisUpgradeContract), bytes32(uint256(0x01)), bytes32(uint256(0x01)), uint64(0x01))
+        );
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRegistry.ctmAddress.selector, CTMContract.DiamondInit),
+            abi.encode(diamondInit)
+        );
 
         ChainTypeManagerInitializeData memory ctmInitializeDataNoGovernor = ChainTypeManagerInitializeData({
             owner: address(0),
             validatorTimelock: validator,
-            chainCreationParams: chainCreationParams,
+            genesisRegistry: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             verifier: testnetVerifier,
             serverNotifier: serverNotifier
@@ -226,7 +227,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            chainCreationParams: chainCreationParams,
+            genesisRegistry: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             verifier: testnetVerifier,
             serverNotifier: serverNotifier
@@ -278,15 +279,65 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
 
         mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
 
+        // From v32 the CTM builds the genesis cut from its registry, not from a passed cut: mock
+        // the registry so `DiamondInit` installs exactly the facets this test wants.
+        _mockGenesisRegistryFacets(_diamondCut.facetCuts);
+
         vm.prank(address(bridgehub));
         return
             chainContractAddress.createNewChain({
                 _chainId: chainId,
                 _baseTokenAssetId: baseTokenAssetId,
                 _admin: newChainAdmin,
-                _initData: abi.encode(abi.encode(_diamondCut), bytes("")),
                 _factoryDeps: new bytes[](0)
             });
+    }
+
+    /// @notice Mocks the genesis registry so `DiamondInit.newChainInstallations` reconstructs the
+    ///         given facet set. Each facet is keyed by a distinct `CTMContract` enum value (any
+    ///         value except `DiamondInit`, which the registry maps to the init contract itself);
+    ///         since this is a pure mock the mapping is arbitrary.
+    function _mockGenesisRegistryFacets(Diamond.FacetCut[] memory _facetCuts) internal {
+        CTMContract[] memory keys = new CTMContract[](_facetCuts.length);
+        uint256 v = 0;
+        for (uint256 i = 0; i < _facetCuts.length; ++i) {
+            if (v == uint256(CTMContract.DiamondInit)) {
+                ++v;
+            }
+            CTMContract key = CTMContract(v);
+            keys[i] = key;
+            ++v;
+            vm.mockCall(
+                Utils.TEST_GENESIS_REGISTRY,
+                abi.encodeWithSelector(ICTMRegistry.ctmAddress.selector, key),
+                abi.encode(_facetCuts[i].facet)
+            );
+            vm.mockCall(
+                Utils.TEST_GENESIS_REGISTRY,
+                abi.encodeWithSelector(ICTMRegistry.facetSelectors.selector, key),
+                abi.encode(_facetCuts[i].selectors)
+            );
+            vm.mockCall(
+                Utils.TEST_GENESIS_REGISTRY,
+                abi.encodeWithSelector(ICTMRegistry.facetIsFreezable.selector, key),
+                abi.encode(_facetCuts[i].isFreezable)
+            );
+        }
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRegistry.facetList.selector),
+            abi.encode(keys)
+        );
+        // `createNewChain` runs the genesis upgrade against `genesisParams.genesisUpgrade`, so it
+        // must be the fixture's real upgrade contract. The generic mocker (re-invoked via
+        // `mockDiamondInitInteropCenterCallsWithAddress`) pins a placeholder there; re-mock it
+        // here, last, so the real contract is what `createNewChain` reads. Commitment == 1 keeps
+        // both Era and ZKsyncOS genesis validation happy.
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRegistry.genesisParams.selector),
+            abi.encode(address(genesisUpgradeContract), bytes32(uint256(0x01)), bytes32(uint256(0x01)), uint64(0x01))
+        );
     }
 
     function createNewChainWithId(Diamond.DiamondCutData memory _diamondCut, uint256 id) internal {
@@ -305,12 +356,13 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(18));
 
+        _mockGenesisRegistryFacets(_diamondCut.facetCuts);
+
         vm.prank(address(bridgehub));
         chainContractAddress.createNewChain({
             _chainId: id,
             _baseTokenAssetId: DataEncoding.encodeNTVAssetId(id, baseToken),
             _admin: newChainAdmin,
-            _initData: abi.encode(abi.encode(_diamondCut), bytes("")),
             _factoryDeps: new bytes[](0)
         });
     }

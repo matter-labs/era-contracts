@@ -8,20 +8,12 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
-import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
-import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
-import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
-import {
-    IChainTypeManager,
-    ChainCreationParams,
-    ChainTypeManagerInitializeData
-} from "contracts/state-transition/IChainTypeManager.sol";
+import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
+import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {
@@ -34,10 +26,7 @@ import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymen
 
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-
-import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -45,6 +34,10 @@ import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCall
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 
+/// @notice From v32 the ZKsyncOS CTM validates genesis params by reading them from the genesis
+///         `CTMRegistry` it is initialized with (not from an inline `ChainCreationParams`). These
+///         tests mock that registry's `genesisParams` per case and assert the CTM enforces the
+///         ZKsyncOS rules (genesis upgrade non-zero, batch hash non-zero, commitment == 1).
 contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
     using stdStorage for StdStorage;
 
@@ -54,7 +47,6 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
     L1Bridgehub internal bridgehub;
     L1ChainAssetHandler internal chainAssetHandler;
     L1MessageRoot internal messageroot;
-    address internal rollupL1DAValidator;
     address internal diamondInit;
     address internal interopCenterAddress;
     address internal governor;
@@ -62,19 +54,12 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
     address internal baseToken;
     address internal sharedBridge;
     address internal validator;
-    address internal l1Nullifier;
     address internal serverNotifier;
     bytes32 internal baseTokenAssetId;
-    address internal newChainAdmin;
-    uint256 l1ChainId = 5;
     uint256 chainId = 112;
     address internal testnetVerifier;
-    bytes internal forceDeploymentsData = hex"";
 
-    uint256 eraChainId = 9;
     uint256 internal constant MAX_NUMBER_OF_ZK_CHAINS = 10;
-
-    Diamond.FacetCut[] internal facetCuts;
 
     function setUp() public {
         // Avoid block.timestamp == 0 to keep paused-deposits sentinel semantics stable in tests.
@@ -86,9 +71,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         baseToken = makeAddr("baseToken");
         sharedBridge = makeAddr("sharedBridge");
         validator = makeAddr("validator");
-        l1Nullifier = makeAddr("l1Nullifier");
         serverNotifier = makeAddr("serverNotifier");
-        newChainAdmin = makeAddr("chainadmin");
         baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, baseToken);
         testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
@@ -130,66 +113,31 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         );
         diamondInit = address(new DiamondInit(false));
         genesisUpgradeContract = new L1GenesisUpgrade();
-
-        facetCuts.push(
-            Diamond.FacetCut({
-                facet: address(new UtilsFacet()),
-                action: Diamond.Action.Add,
-                isFreezable: true,
-                selectors: Utils.getUtilsFacetSelectors()
-            })
-        );
-        facetCuts.push(
-            Diamond.FacetCut({
-                facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)))),
-                action: Diamond.Action.Add,
-                isFreezable: false,
-                selectors: Utils.getAdminSelectors()
-            })
-        );
-        facetCuts.push(
-            Diamond.FacetCut({
-                facet: address(new ExecutorFacet(block.chainid)),
-                action: Diamond.Action.Add,
-                isFreezable: true,
-                selectors: Utils.getExecutorSelectors()
-            })
-        );
-        facetCuts.push(
-            Diamond.FacetCut({
-                facet: address(new GettersFacet()),
-                action: Diamond.Action.Add,
-                isFreezable: false,
-                selectors: Utils.getGettersSelectors()
-            })
-        );
-        facetCuts.push(
-            Diamond.FacetCut({
-                facet: address(
-                    new MailboxFacet(
-                        eraChainId,
-                        block.chainid,
-                        address(0),
-                        IEIP7702Checker(makeAddr("eip7702Checker")),
-                        false
-                    )
-                ),
-                action: Diamond.Action.Add,
-                isFreezable: false,
-                selectors: Utils.getMailboxSelectors()
-            })
-        );
         vm.stopPrank();
     }
 
-    function _deployChainTypeManager(
-        ChainCreationParams memory chainCreationParams
-    ) internal returns (ZKsyncOSChainTypeManager) {
+    /// @dev Mocks the (single) test genesis registry to return the given genesis params. These
+    ///      tests only exercise `_setGenesisRegistry` validation and never create a chain, so only
+    ///      `genesisParams` needs mocking.
+    function _mockGenesisParams(
+        address _genesisUpgrade,
+        bytes32 _genesisBatchHash,
+        bytes32 _genesisBatchCommitment,
+        uint64 _genesisIndexRepeatedStorageChanges
+    ) internal {
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRegistry.genesisParams.selector),
+            abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisBatchCommitment, _genesisIndexRepeatedStorageChanges)
+        );
+    }
+
+    function _deployChainTypeManager() internal returns (ZKsyncOSChainTypeManager) {
         vm.startPrank(address(bridgehub));
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            chainCreationParams: chainCreationParams,
+            genesisRegistry: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             verifier: testnetVerifier,
             serverNotifier: serverNotifier
@@ -204,11 +152,24 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         return ZKsyncOSChainTypeManager(address(transparentUpgradeableProxy));
     }
 
-    function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
-        // No init payload: DiamondInit reads everything chain-independent from the genesis
-        // registry. These tests only exercise `setChainCreationParams` validation and never
-        // create a chain, so no registry needs to exist.
-        return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: ""});
+    function _expectInitRevert(bytes4 _err) internal {
+        vm.startPrank(address(bridgehub));
+        ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
+            owner: governor,
+            validatorTimelock: validator,
+            genesisRegistry: Utils.TEST_GENESIS_REGISTRY,
+            protocolVersion: 0,
+            verifier: testnetVerifier,
+            serverNotifier: serverNotifier
+        });
+
+        vm.expectRevert(_err);
+        new TransparentUpgradeableProxy(
+            address(chainTypeManager),
+            admin,
+            abi.encodeCall(IChainTypeManager.initialize, ctmInitializeData)
+        );
+        vm.stopPrank();
     }
 
     // ============================================================
@@ -226,135 +187,35 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
     }
 
     // ============================================================
-    // setChainCreationParams - GenesisBatchCommitmentIncorrect tests
+    // Genesis params validation - GenesisBatchCommitmentIncorrect
     // ============================================================
 
     function test_RevertWhen_genesisBatchCommitmentNotOne() public {
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: address(genesisUpgradeContract),
-            genesisBatchHash: bytes32(uint256(0x01)),
-            genesisIndexRepeatedStorageChanges: 0x01,
-            genesisBatchCommitment: bytes32(uint256(0x02)), // Invalid: should be 1
-            diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: forceDeploymentsData,
-            registry: address(0)
-        });
-
-        vm.startPrank(address(bridgehub));
-        ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
-            owner: governor,
-            validatorTimelock: validator,
-            chainCreationParams: chainCreationParams,
-            protocolVersion: 0,
-            verifier: testnetVerifier,
-            serverNotifier: serverNotifier
-        });
-
-        vm.expectRevert(GenesisBatchCommitmentIncorrect.selector);
-        new TransparentUpgradeableProxy(
-            address(chainTypeManager),
-            admin,
-            abi.encodeCall(IChainTypeManager.initialize, ctmInitializeData)
-        );
-        vm.stopPrank();
+        _mockGenesisParams(address(genesisUpgradeContract), bytes32(uint256(0x01)), bytes32(uint256(0x02)), 0x01);
+        _expectInitRevert(GenesisBatchCommitmentIncorrect.selector);
     }
 
     function test_RevertWhen_genesisBatchCommitmentZero() public {
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: address(genesisUpgradeContract),
-            genesisBatchHash: bytes32(uint256(0x01)),
-            genesisIndexRepeatedStorageChanges: 0x01,
-            genesisBatchCommitment: bytes32(0), // Invalid: should be 1
-            diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: forceDeploymentsData,
-            registry: address(0)
-        });
-
-        vm.startPrank(address(bridgehub));
-        ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
-            owner: governor,
-            validatorTimelock: validator,
-            chainCreationParams: chainCreationParams,
-            protocolVersion: 0,
-            verifier: testnetVerifier,
-            serverNotifier: serverNotifier
-        });
-
-        vm.expectRevert(GenesisBatchCommitmentIncorrect.selector);
-        new TransparentUpgradeableProxy(
-            address(chainTypeManager),
-            admin,
-            abi.encodeCall(IChainTypeManager.initialize, ctmInitializeData)
-        );
-        vm.stopPrank();
+        _mockGenesisParams(address(genesisUpgradeContract), bytes32(uint256(0x01)), bytes32(0), 0x01);
+        _expectInitRevert(GenesisBatchCommitmentIncorrect.selector);
     }
 
     // ============================================================
-    // validateChainCreationParams - GenesisUpgradeZero tests
+    // Genesis params validation - GenesisUpgradeZero
     // ============================================================
 
     function test_RevertWhen_genesisUpgradeIsZero() public {
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: address(0), // Invalid: should not be zero
-            genesisBatchHash: bytes32(uint256(0x01)),
-            genesisIndexRepeatedStorageChanges: 0x01,
-            genesisBatchCommitment: bytes32(uint256(0x01)),
-            diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: forceDeploymentsData,
-            registry: address(0)
-        });
-
-        vm.startPrank(address(bridgehub));
-        ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
-            owner: governor,
-            validatorTimelock: validator,
-            chainCreationParams: chainCreationParams,
-            protocolVersion: 0,
-            verifier: testnetVerifier,
-            serverNotifier: serverNotifier
-        });
-
-        vm.expectRevert(GenesisUpgradeZero.selector);
-        new TransparentUpgradeableProxy(
-            address(chainTypeManager),
-            admin,
-            abi.encodeCall(IChainTypeManager.initialize, ctmInitializeData)
-        );
-        vm.stopPrank();
+        _mockGenesisParams(address(0), bytes32(uint256(0x01)), bytes32(uint256(0x01)), 0x01);
+        _expectInitRevert(GenesisUpgradeZero.selector);
     }
 
     // ============================================================
-    // validateChainCreationParams - GenesisBatchHashZero tests
+    // Genesis params validation - GenesisBatchHashZero
     // ============================================================
 
     function test_RevertWhen_genesisBatchHashIsZero() public {
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: address(genesisUpgradeContract),
-            genesisBatchHash: bytes32(0), // Invalid: should not be zero
-            genesisIndexRepeatedStorageChanges: 0x01,
-            genesisBatchCommitment: bytes32(uint256(0x01)),
-            diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: forceDeploymentsData,
-            registry: address(0)
-        });
-
-        vm.startPrank(address(bridgehub));
-        ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
-            owner: governor,
-            validatorTimelock: validator,
-            chainCreationParams: chainCreationParams,
-            protocolVersion: 0,
-            verifier: testnetVerifier,
-            serverNotifier: serverNotifier
-        });
-
-        vm.expectRevert(GenesisBatchHashZero.selector);
-        new TransparentUpgradeableProxy(
-            address(chainTypeManager),
-            admin,
-            abi.encodeCall(IChainTypeManager.initialize, ctmInitializeData)
-        );
-        vm.stopPrank();
+        _mockGenesisParams(address(genesisUpgradeContract), bytes32(0), bytes32(uint256(0x01)), 0x01);
+        _expectInitRevert(GenesisBatchHashZero.selector);
     }
 
     // ============================================================
@@ -362,22 +223,17 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
     // ============================================================
 
     function test_successful_setNewVersionUpgrade() public {
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: address(genesisUpgradeContract),
-            genesisBatchHash: bytes32(uint256(0x01)),
-            genesisIndexRepeatedStorageChanges: 0x01,
-            genesisBatchCommitment: bytes32(uint256(0x01)),
-            diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: forceDeploymentsData,
-            registry: address(0)
-        });
-
-        chainContractAddress = _deployChainTypeManager(chainCreationParams);
+        _mockGenesisParams(address(genesisUpgradeContract), bytes32(uint256(0x01)), bytes32(uint256(0x01)), 0x01);
+        chainContractAddress = _deployChainTypeManager();
 
         // Mock migration paused check
         vm.mockCall(address(chainAssetHandler), abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
 
-        Diamond.DiamondCutData memory cutData = getDiamondCutData(address(diamondInit));
+        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
+            facetCuts: new Diamond.FacetCut[](0),
+            initAddress: diamondInit,
+            initCalldata: ""
+        });
         uint256 oldProtocolVersion = 0;
         uint256 oldProtocolVersionDeadline = block.timestamp + 100;
         uint256 newProtocolVersion = 1;
@@ -401,19 +257,14 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
     }
 
     function test_RevertWhen_setNewVersionUpgradeNotOwner() public {
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: address(genesisUpgradeContract),
-            genesisBatchHash: bytes32(uint256(0x01)),
-            genesisIndexRepeatedStorageChanges: 0x01,
-            genesisBatchCommitment: bytes32(uint256(0x01)),
-            diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: forceDeploymentsData,
-            registry: address(0)
+        _mockGenesisParams(address(genesisUpgradeContract), bytes32(uint256(0x01)), bytes32(uint256(0x01)), 0x01);
+        chainContractAddress = _deployChainTypeManager();
+
+        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
+            facetCuts: new Diamond.FacetCut[](0),
+            initAddress: diamondInit,
+            initCalldata: ""
         });
-
-        chainContractAddress = _deployChainTypeManager(chainCreationParams);
-
-        Diamond.DiamondCutData memory cutData = getDiamondCutData(address(diamondInit));
         uint256 oldProtocolVersion = 0;
         uint256 oldProtocolVersionDeadline = block.timestamp + 100;
         uint256 newProtocolVersion = 1;
@@ -436,17 +287,8 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
     // ============================================================
 
     function test_successful_initialization() public {
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: address(genesisUpgradeContract),
-            genesisBatchHash: bytes32(uint256(0x01)),
-            genesisIndexRepeatedStorageChanges: 0x01,
-            genesisBatchCommitment: bytes32(uint256(0x01)), // Valid: exactly 1
-            diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: forceDeploymentsData,
-            registry: address(0)
-        });
-
-        chainContractAddress = _deployChainTypeManager(chainCreationParams);
+        _mockGenesisParams(address(genesisUpgradeContract), bytes32(uint256(0x01)), bytes32(uint256(0x01)), 0x01);
+        chainContractAddress = _deployChainTypeManager();
 
         assertEq(chainContractAddress.owner(), governor);
         assertEq(chainContractAddress.BRIDGE_HUB(), address(bridgehub));
@@ -460,32 +302,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         // Skip the valid case
         vm.assume(commitment != bytes32(uint256(1)));
 
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: address(genesisUpgradeContract),
-            genesisBatchHash: bytes32(uint256(0x01)),
-            genesisIndexRepeatedStorageChanges: 0x01,
-            genesisBatchCommitment: commitment,
-            diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: forceDeploymentsData,
-            registry: address(0)
-        });
-
-        vm.startPrank(address(bridgehub));
-        ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
-            owner: governor,
-            validatorTimelock: validator,
-            chainCreationParams: chainCreationParams,
-            protocolVersion: 0,
-            verifier: testnetVerifier,
-            serverNotifier: serverNotifier
-        });
-
-        vm.expectRevert(GenesisBatchCommitmentIncorrect.selector);
-        new TransparentUpgradeableProxy(
-            address(chainTypeManager),
-            admin,
-            abi.encodeCall(IChainTypeManager.initialize, ctmInitializeData)
-        );
-        vm.stopPrank();
+        _mockGenesisParams(address(genesisUpgradeContract), bytes32(uint256(0x01)), commitment, 0x01);
+        _expectInitRevert(GenesisBatchCommitmentIncorrect.selector);
     }
 }

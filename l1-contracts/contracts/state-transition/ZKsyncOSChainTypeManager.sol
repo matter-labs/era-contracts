@@ -7,7 +7,8 @@ import {ICTMRegistry} from "../upgrades/registry/ICTMRegistry.sol";
 import {
     GenesisBatchHashZero,
     GenesisBatchCommitmentIncorrect,
-    GenesisUpgradeZero
+    GenesisUpgradeZero,
+    ZeroAddress
 } from "../common/L1ContractErrors.sol";
 
 /// @title ZKsync OS Chain Type Manager contract
@@ -31,6 +32,9 @@ contract ZKsyncOSChainTypeManager is ChainTypeManagerBase {
     /// ZKsync-OS-specific genesis params it pins before storing it.
     /// @param _registry The genesis registry to pin.
     function _setGenesisRegistry(address _registry) internal override {
+        if (_registry == address(0)) {
+            revert ZeroAddress();
+        }
         (address genesisUpgrade, bytes32 genesisBatchHash, bytes32 genesisBatchCommitment, ) = ICTMRegistry(_registry)
             .genesisParams(protocolVersion);
 

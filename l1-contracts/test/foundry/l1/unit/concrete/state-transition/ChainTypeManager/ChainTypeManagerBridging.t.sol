@@ -30,7 +30,7 @@ contract ChainTypeManagerBridgingTest is ChainTypeManagerTest {
 
         vm.prank(notAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notAssetHandler));
-        chainContractAddress.forwardedBridgeBurn(chainId, abi.encode(makeAddr("admin"), bytes("")));
+        chainContractAddress.forwardedBridgeBurn(chainId, abi.encode(makeAddr("admin")));
     }
 
     // Test forwardedBridgeBurn reverts when admin is zero
@@ -47,7 +47,7 @@ contract ChainTypeManagerBridgingTest is ChainTypeManagerTest {
         vm.stopPrank();
         vm.prank(chainAssetHandlerMock);
         vm.expectRevert(AdminZero.selector);
-        chainContractAddress.forwardedBridgeBurn(chainId, abi.encode(address(0), bytes("")));
+        chainContractAddress.forwardedBridgeBurn(chainId, abi.encode(address(0)));
     }
 
     // Test forwardedBridgeMint reverts for non-asset-handler
@@ -62,12 +62,9 @@ contract ChainTypeManagerBridgingTest is ChainTypeManagerTest {
             abi.encode(chainAssetHandlerMock)
         );
 
-        bytes memory ctmData = abi.encode(
-            bytes32(uint256(1)), // baseTokenAssetId
-            makeAddr("admin"),
-            0, // protocolVersion
-            abi.encode(getDiamondCutData(diamondInit))
-        );
+        // ctmData carries only (admin, protocolVersion): the destination CTM rebuilds the genesis
+        // cut from its own registry.
+        bytes memory ctmData = abi.encode(makeAddr("admin"), uint256(0));
 
         vm.prank(notAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notAssetHandler));
@@ -89,12 +86,7 @@ contract ChainTypeManagerBridgingTest is ChainTypeManagerTest {
             abi.encode(address(0))
         );
 
-        bytes memory ctmData = abi.encode(
-            bytes32(uint256(1)), // baseTokenAssetId
-            makeAddr("admin"),
-            999, // Wrong protocol version
-            abi.encode(getDiamondCutData(diamondInit))
-        );
+        bytes memory ctmData = abi.encode(makeAddr("admin"), uint256(999)); // Wrong protocol version
 
         vm.prank(chainAssetHandlerMock);
         vm.expectRevert(abi.encodeWithSelector(OutdatedProtocolVersion.selector, 0, 999));
@@ -113,7 +105,6 @@ contract ChainTypeManagerBridgingTest is ChainTypeManagerTest {
             _chainId: chainId + 1,
             _baseTokenAssetId: bytes32(uint256(1)),
             _admin: makeAddr("admin"),
-            _initData: bytes(""),
             _factoryDeps: new bytes[](0)
         });
     }

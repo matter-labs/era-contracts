@@ -266,7 +266,6 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             ERA_CHAIN_ID + 1,
             baseTokenAssetId,
             chainAdmin,
-            abi.encode(config.contracts.diamondCutData, generatedData.forceDeploymentsData),
             new bytes[](0)
         );
         vm.chainId(currentChainId);

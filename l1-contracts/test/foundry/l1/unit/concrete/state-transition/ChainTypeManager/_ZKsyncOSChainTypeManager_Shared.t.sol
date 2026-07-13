@@ -9,11 +9,9 @@ import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
-import {
-    IChainTypeManager,
-    ChainCreationParams,
-    ChainTypeManagerInitializeData
-} from "contracts/state-transition/IChainTypeManager.sol";
+import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
+import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
+import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 
 /// @notice Reusable fixture for tests that need a `ZKsyncOSChainTypeManager` together with the
 ///         full chain-creation plumbing (`createNewChain`, bridgehub mocks, real facet cuts) of
@@ -37,9 +35,15 @@ contract ZKsyncOSChainTypeManagerSharedTest is ChainTypeManagerTest {
         deploy();
 
         // ZKsyncOS chains must be initialized with `DiamondInit(true)`: it stores
-        // `s.zksyncOS = true` on the diamond. Tests building chain-creation cuts through
-        // `getDiamondCutData(diamondInit)` automatically pick this init up.
+        // `s.zksyncOS = true` on the diamond. Re-pin this new init in the mocked genesis registry
+        // (the base fixture pinned the Era `DiamondInit`); tests building chain-creation cuts
+        // through `getDiamondCutData(diamondInit)` pick it up via `_mockGenesisRegistryFacets`.
         diamondInit = address(new DiamondInit(true));
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRegistry.ctmAddress.selector, CTMContract.DiamondInit),
+            abi.encode(diamondInit)
+        );
 
         ZKsyncOSChainTypeManager implementation = new ZKsyncOSChainTypeManager(
             address(bridgehub),
@@ -48,23 +52,12 @@ contract ZKsyncOSChainTypeManagerSharedTest is ChainTypeManagerTest {
             address(0)
         );
 
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: address(genesisUpgradeContract),
-            genesisBatchHash: bytes32(uint256(0x01)),
-            genesisIndexRepeatedStorageChanges: 0x01,
-            // ZKsyncOSChainTypeManager requires the genesis batch commitment to be exactly 1.
-            genesisBatchCommitment: bytes32(uint256(0x01)),
-            diamondCut: getDiamondCutData(diamondInit),
-            forceDeploymentsData: forceDeploymentsData,
-            // The mocked genesis registry the base fixture sets up (see `deploy()`); real
-            // registries cannot pin protocol version 0.
-            registry: Utils.TEST_GENESIS_REGISTRY
-        });
-
+        // ZKsyncOS requires the genesis batch commitment to be exactly 1; the base fixture's
+        // mocked `genesisParams` already returns commitment == 1, so it validates as-is.
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            chainCreationParams: chainCreationParams,
+            genesisRegistry: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             verifier: testnetVerifier,
             serverNotifier: serverNotifier

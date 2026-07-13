@@ -41,12 +41,19 @@ contract CTMRegistryBootstrapTest is Test {
     function _genesisManifest() internal view returns (CTMRegistry.CTMRegistryManifest memory) {
         return
             GenesisManifestLib.buildGenesisManifest(
-                false,
-                VERSION,
-                facets,
-                BOOTLOADER_HASH,
-                DEFAULT_ACCOUNT_HASH,
-                EVM_EMULATOR_HASH
+                GenesisManifestLib.GenesisConfig({
+                    isZKsyncOS: false,
+                    protocolVersion: VERSION,
+                    facets: facets,
+                    bootloaderHash: BOOTLOADER_HASH,
+                    defaultAccountHash: DEFAULT_ACCOUNT_HASH,
+                    evmEmulatorHash: EVM_EMULATOR_HASH,
+                    genesisUpgrade: address(0xABCD),
+                    genesisBatchHash: bytes32(uint256(1)),
+                    genesisBatchCommitment: bytes32(uint256(1)),
+                    genesisIndexRepeatedStorageChanges: 1,
+                    fixedForceDeploymentsData: bytes("")
+                })
             );
     }
 
@@ -147,7 +154,23 @@ contract CTMRegistryBootstrapTest is Test {
     /// @dev ZKsync OS pins all-zero hashes; the registry must store and serve them as-is (the
     ///      zero-check lives in DiamondInit and is skipped for ZKsync OS chains).
     function test_zeroHashesAreServedForPinnedVersion() public {
-        registry.initialize(GenesisManifestLib.buildGenesisManifest(true, VERSION, facets, 0, 0, 0));
+        registry.initialize(
+            GenesisManifestLib.buildGenesisManifest(
+                GenesisManifestLib.GenesisConfig({
+                    isZKsyncOS: true,
+                    protocolVersion: VERSION,
+                    facets: facets,
+                    bootloaderHash: 0,
+                    defaultAccountHash: 0,
+                    evmEmulatorHash: 0,
+                    genesisUpgrade: address(0xABCD),
+                    genesisBatchHash: bytes32(uint256(1)),
+                    genesisBatchCommitment: bytes32(uint256(1)),
+                    genesisIndexRepeatedStorageChanges: 1,
+                    fixedForceDeploymentsData: bytes("")
+                })
+            )
+        );
 
         (bytes32 bootloaderHash, bytes32 defaultAccountHash, bytes32 evmEmulatorHash) = registry
             .baseSystemContractHashes(VERSION);

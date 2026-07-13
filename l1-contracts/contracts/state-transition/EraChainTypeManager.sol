@@ -8,7 +8,8 @@ import {
     GenesisIndexStorageZero,
     GenesisBatchCommitmentZero,
     GenesisBatchHashZero,
-    GenesisUpgradeZero
+    GenesisUpgradeZero,
+    ZeroAddress
 } from "../common/L1ContractErrors.sol";
 
 /// @title Era Chain Type Manager contract
@@ -32,6 +33,9 @@ contract EraChainTypeManager is ChainTypeManagerBase {
     /// genesis params it pins before storing it.
     /// @param _registry The genesis registry to pin.
     function _setGenesisRegistry(address _registry) internal override {
+        if (_registry == address(0)) {
+            revert ZeroAddress();
+        }
         (
             address genesisUpgrade,
             bytes32 genesisBatchHash,

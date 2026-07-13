@@ -270,12 +270,19 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         CTMRegistry registry = new CTMRegistry();
         registry.initialize(
             GenesisManifestLib.buildGenesisManifest(
-                config.isZKsyncOS,
-                config.protocolVersion,
-                contracts.stateTransition.facets,
-                config.bootloaderHash,
-                config.defaultAccountHash,
-                config.evmEmulatorHash
+                GenesisManifestLib.GenesisConfig({
+                    isZKsyncOS: config.isZKsyncOS,
+                    protocolVersion: config.protocolVersion,
+                    facets: contracts.stateTransition.facets,
+                    bootloaderHash: config.bootloaderHash,
+                    defaultAccountHash: config.defaultAccountHash,
+                    evmEmulatorHash: config.evmEmulatorHash,
+                    genesisUpgrade: contracts.stateTransition.genesisUpgrade,
+                    genesisBatchHash: config.genesisRoot,
+                    genesisBatchCommitment: config.genesisBatchCommitment,
+                    genesisIndexRepeatedStorageChanges: uint64(config.genesisRollupLeafIndex),
+                    fixedForceDeploymentsData: config.forceDeploymentsData
+                })
             )
         );
         return address(registry);

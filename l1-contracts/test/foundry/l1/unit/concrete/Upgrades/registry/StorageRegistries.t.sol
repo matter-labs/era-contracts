@@ -12,7 +12,6 @@ import {RegistryFacetReader} from "contracts/upgrades/registry/RegistryFacetRead
 import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
 import {ProposedUpgrade, UpgradeFacetSwap} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
@@ -389,26 +388,27 @@ contract StorageRegistriesTest is Test {
         // stored in the CTM, read back by BaseZkSyncUpgrade at execution.
     }
 
-    function test_buildChainCreationParams_pinsRegistryAndBaseHashes() public view {
-        ChainCreationParams memory params = CTMUpgradeComposer.buildChainCreationParams(
-            ICTMRegistry(address(ctmRegistry))
-        );
+    /// @notice From v32 the CTM no longer builds a `ChainCreationParams` struct: it pins the
+    ///         registry and reads genesis data straight from it. This asserts the registry exposes
+    ///         exactly the genesis data DiamondInit + the CTM read at chain creation.
+    function test_genesisData_readStraightFromRegistry() public view {
+        uint256 newVersion = ctmRegistry.newProtocolVersion();
 
-        assertEq(params.genesisUpgrade, address(0x00010005));
-        assertEq(params.genesisIndexRepeatedStorageChanges, 54);
-        assertEq(params.forceDeploymentsData, hex"f1f2");
-        assertEq(params.diamondCut.initAddress, address(0xF204)); // DiamondInit
-        // The genesis cut carries no facet cuts and NO init payload at all: DiamondInit reads
-        // both the facet set and the base-system-contract hashes from the pinned registry.
-        assertEq(params.diamondCut.facetCuts.length, 0);
-        assertEq(params.diamondCut.initCalldata.length, 0);
-        (bytes32 bootloaderHash, , ) = ctmRegistry.baseSystemContractHashes(ctmRegistry.newProtocolVersion());
+        (
+            address genesisUpgrade,
+            ,
+            ,
+            uint64 genesisIndexRepeatedStorageChanges
+        ) = ctmRegistry.genesisParams(newVersion);
+        assertEq(genesisUpgrade, address(0x00010005));
+        assertEq(genesisIndexRepeatedStorageChanges, 54);
+        assertEq(ctmRegistry.fixedForceDeploymentsData(newVersion), hex"f1f2");
+        assertEq(ctmRegistry.ctmAddress(CTMContract.DiamondInit, newVersion), address(0xF204));
+
+        (bytes32 bootloaderHash, , ) = ctmRegistry.baseSystemContractHashes(newVersion);
         assertEq(bootloaderHash, bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000b00)));
-        // The registry pinned for genesis is the registry itself — DiamondInit reads the facet
-        // set straight from it (the same set the upgrade path's swap plan produces).
-        assertEq(params.registry, address(ctmRegistry));
 
-        // And that facet set (read via the shared reader) is AdminFacet(new) + GettersFacet +
+        // The facet set (read via the shared reader) is AdminFacet(new) + GettersFacet +
         // ExecutorFacet, as ready-to-apply Add cuts with the registry's pinned selector lists.
         Diamond.FacetCut[] memory facets = RegistryFacetReader.newChainInstallations(
             ICTMRegistry(address(ctmRegistry))

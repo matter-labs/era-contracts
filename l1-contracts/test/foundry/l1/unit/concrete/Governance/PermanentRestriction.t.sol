@@ -440,6 +440,9 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
         bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, baseToken);
         mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
+        // The CTM builds the genesis cut from its registry: mock the registry to install the
+        // fixture facets (`_initData` below is forwarded by the bridgehub but ignored by the CTM).
+        _mockGenesisRegistryFacets(facetCuts);
         vm.startPrank(governor);
         bridgehub.createNewChain({
             _chainId: chainId,

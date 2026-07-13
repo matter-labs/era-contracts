@@ -128,7 +128,7 @@ contract CTMUpgradeModuleTest is ChainTypeManagerTest {
                            applyCTMUpgrade
     //////////////////////////////////////////////////////////////*/
 
-    function test_applyCTMUpgrade_setsVersionCutAndChainCreationParams() public {
+    function test_applyCTMUpgrade_setsVersionCutAndGenesisRegistry() public {
         _applyCTMUpgrade(1000, 777);
 
         // Version bookkeeping.
@@ -141,12 +141,9 @@ contract CTMUpgradeModuleTest is ChainTypeManagerTest {
         bytes32 expectedCutHash = keccak256(abi.encode(_expectedUpgradeCut(777)));
         assertEq(chainContractAddress.upgradeCutHash(0), expectedCutHash);
 
-        // Chain creation params were set from the same registry constants.
+        // The CTM is now pinned to the upgrade's registry, from which it derives all genesis data.
+        assertEq(chainContractAddress.genesisRegistry(), address(ctmRegistry));
         assertEq(chainContractAddress.l1GenesisUpgrade(), makeAddr("genesisUpgrade"));
-        bytes32 expectedInitialCutHash = keccak256(
-            abi.encode(CTMUpgradeComposer.buildChainCreationParams(ICTMRegistry(address(ctmRegistry))).diamondCut)
-        );
-        assertEq(chainContractAddress.initialCutHash(), expectedInitialCutHash);
     }
 
     function test_revertWhen_moduleCalledDirectly() public {
