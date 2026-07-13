@@ -8,7 +8,7 @@ import {InteropHandlerBase} from "./InteropHandlerBase.sol";
 import {IAtomicFlowManager} from "../../atomic-interop/IAtomicFlowManager.sol";
 import {AtomicFinalityProof} from "../../atomic-interop/IAtomicInterop.sol";
 import {BundleStatus, InteropBundle} from "../../common/Messaging.sol";
-import {BundleAlreadyProcessed, ExecutingNotAllowed} from "../InteropErrors.sol";
+import {ExecutingNotAllowed} from "../InteropErrors.sol";
 import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 

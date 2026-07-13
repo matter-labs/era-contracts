@@ -16,7 +16,6 @@ import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
 import {InteropWithdrawalNonZeroValue} from "../../bridge/L1BridgeContractErrors.sol";
 import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {
-    BundleAlreadyProcessed,
     ExecutingNotAllowed,
     MessageNotIncluded,
     UnauthorizedMessageSender
