@@ -20,7 +20,6 @@ import {
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {
-    ChainCreationParams,
     ChainTypeManagerInitializeData,
     IChainTypeManager
 } from "contracts/state-transition/IChainTypeManager.sol";
@@ -727,23 +726,10 @@ library GatewayCTMDeployerHelper {
         address serverNotifierProxy,
         address genesisRegistry
     ) private pure returns (bytes memory) {
-        Diamond.DiamondCutData memory diamondCut = abi.decode(
-            _buildDiamondCutDataEncoded(config.facets, baseConfig),
-            (Diamond.DiamondCutData)
-        );
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: config.genesisUpgrade,
-            genesisBatchHash: baseConfig.genesisRoot,
-            genesisIndexRepeatedStorageChanges: uint64(baseConfig.genesisRollupLeafIndex),
-            genesisBatchCommitment: baseConfig.genesisBatchCommitment,
-            diamondCut: diamondCut,
-            forceDeploymentsData: baseConfig.forceDeploymentsData,
-            registry: genesisRegistry
-        });
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
             owner: baseConfig.aliasedGovernanceAddress,
             validatorTimelock: config.validatorTimelockProxy,
-            chainCreationParams: chainCreationParams,
+            genesisRegistry: genesisRegistry,
             protocolVersion: baseConfig.protocolVersion,
             verifier: config.verifier,
             serverNotifier: serverNotifierProxy

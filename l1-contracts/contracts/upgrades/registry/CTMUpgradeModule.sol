@@ -64,7 +64,9 @@ contract CTMUpgradeModule {
             // nothing copied into CTM state.
             _registry: address(_registry)
         });
-        ctm.setChainCreationParams(CTMUpgradeComposer.buildChainCreationParams(_registry));
+        // New chains are created at the new version straight from this same registry (facet set,
+        // base system contract hashes, verifier and genesis params all live in it).
+        ctm.setGenesisRegistry(address(_registry));
 
         emit CTMUpgradeApplied(address(ctm), address(_registry), oldProtocolVersion, newProtocolVersion);
     }

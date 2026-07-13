@@ -18,33 +18,14 @@ import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 struct ChainTypeManagerInitializeData {
     address owner;
     address validatorTimelock;
-    ChainCreationParams chainCreationParams;
+    /// @dev The genesis `CTMRegistry` new chains read their facet set, base system contract
+    ///      hashes and genesis params from (pinned in the CTM as `genesisRegistry`).
+    address genesisRegistry;
     uint256 protocolVersion;
     address verifier;
     address serverNotifier;
 }
 
-/// @notice The struct that contains the fields that define how a new chain should be created
-/// within this CTM.
-/// @param genesisUpgrade The address that is used in the diamond cut initialize address on chain creation
-/// @param genesisBatchHash Batch hash of the genesis (initial) batch
-/// @param genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for the genesis batch
-/// @param genesisBatchCommitment The zk-proof commitment for the genesis batch
-/// @param diamondCut The diamond cut for the first upgrade transaction on the newly deployed chain
-/// @param registry The CTM registry pinned for chains created at this protocol version — the
-///        source `DiamondInit` reads the facet set from at genesis (stored in the CTM as
-///        `genesisRegistry`, the same way the verifier is pinned per version). Zero for the legacy
-///        path, where the facet set rides in `diamondCut.facetCuts` instead.
-// solhint-disable-next-line gas-struct-packing
-struct ChainCreationParams {
-    address genesisUpgrade;
-    bytes32 genesisBatchHash;
-    uint64 genesisIndexRepeatedStorageChanges;
-    bytes32 genesisBatchCommitment;
-    Diamond.DiamondCutData diamondCut;
-    bytes forceDeploymentsData;
-    address registry;
-}
 
 interface IChainTypeManager {
     /// @dev Emitted when a new ZKChain is added
@@ -76,17 +57,10 @@ interface IChainTypeManager {
     /// @notice ServerNotifier changed
     event NewServerNotifier(address indexed oldServerNotifier, address indexed newServerNotifier);
 
-    /// @notice chain creation parameters changed
-    event NewChainCreationParams(
-        address genesisUpgrade,
-        bytes32 genesisBatchHash,
-        uint64 genesisIndexRepeatedStorageChanges,
-        bytes32 genesisBatchCommitment,
-        Diamond.DiamondCutData newInitialCut,
-        bytes32 newInitialCutHash,
-        bytes forceDeploymentsData,
-        bytes32 forceDeploymentHash
-    );
+    /// @notice The genesis registry for chain creation changed. All genesis data (facet set,
+    ///         base system contract hashes, verifier, genesis params, force deployments) lives in
+    ///         the registry; off-chain trackers read it from there.
+    event NewGenesisRegistry(uint256 indexed protocolVersion, address indexed registry);
 
     /// @notice New UpgradeCutHash
     event NewUpgradeCutHash(uint256 indexed protocolVersion, bytes32 indexed upgradeCutHash);
@@ -121,8 +95,6 @@ interface IChainTypeManager {
 
     function storedBatchZero() external view returns (bytes32);
 
-    function initialCutHash() external view returns (bytes32);
-
     function l1GenesisUpgrade() external view returns (address);
 
     function upgradeCutHash(uint256 _protocolVersion) external view returns (bytes32);
@@ -137,9 +109,10 @@ interface IChainTypeManager {
 
     function setProtocolVersionVerifier(uint256 _protocolVersion, address _verifier) external;
 
-    /// @notice The CTM registry a newly created chain reads its facet set from, for the current
-    ///         protocol version. Read by `DiamondInit` at genesis; a single value updated by
-    ///         `setChainCreationParams`, parallel to `initialCutHash`. Zero for the legacy path.
+    /// @notice The genesis `CTMRegistry` a newly created chain reads everything from — facet set,
+    ///         base system contract hashes, verifier and genesis params — for the current protocol
+    ///         version. A single value updated by `setGenesisRegistry`. Read by `DiamondInit` and
+    ///         the CTM itself at chain creation; the CTM stores no other genesis data.
     function genesisRegistry() external view returns (address);
 
     /// @notice The CTM registry the upgrade contract reads the facet-swap plan from when a chain
@@ -161,7 +134,7 @@ interface IChainTypeManager {
 
     function setValidatorTimelockPostV29(address _validatorTimelockPostV29) external;
 
-    function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external;
+    function setGenesisRegistry(address _registry) external;
 
     function getChainAdmin(uint256 _chainId) external view returns (address);
 
@@ -169,7 +142,6 @@ interface IChainTypeManager {
         uint256 _chainId,
         bytes32 _baseTokenAssetId,
         address _admin,
-        bytes calldata _initData,
         bytes[] calldata _factoryDeps
     ) external returns (address);
 

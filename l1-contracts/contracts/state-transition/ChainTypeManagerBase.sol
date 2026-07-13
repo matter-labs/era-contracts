@@ -11,20 +11,16 @@ import {IAdmin} from "./chain-interfaces/IAdmin.sol";
 import {IMigrator} from "./chain-interfaces/IMigrator.sol";
 import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
-import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "./IChainTypeManager.sol";
+import {ChainTypeManagerInitializeData, IChainTypeManager} from "./IChainTypeManager.sol";
+import {ICTMRegistry} from "../upgrades/registry/ICTMRegistry.sol";
+import {CTMContract} from "../upgrades/registry/ContractIdentifiers.sol";
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE} from "../common/Config.sol";
-import {
-    AdminZero,
-    InitialForceDeploymentMismatch,
-    NotAPatchUpgrade,
-    OutdatedProtocolVersion
-} from "./L1StateTransitionErrors.sol";
+import {AdminZero, NotAPatchUpgrade, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
 import {
     ChainAlreadyLive,
-    HashMismatch,
     MigrationsNotPaused,
     Unauthorized,
     ZeroAddress
@@ -59,14 +55,18 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @notice The map from chainId => zkChain contract
     EnumerableMap.UintToAddressMap internal __DEPRECATED_zkChainMap;
 
-    /// @dev The batch zero hash, calculated at initialization
-    bytes32 public storedBatchZero;
+    /// @dev Deprecated. Genesis batch zero, the initial diamond cut hash and the L1 genesis
+    ///      upgrade address are no longer stored: they are read from the genesis `CTMRegistry`
+    ///      (see `storedBatchZero()` / `l1GenesisUpgrade()` and the `_deployNewChain` cut). Slots
+    ///      retained to preserve the upgradeable storage layout.
+    // slither-disable-next-line constable-states
+    bytes32 internal __DEPRECATED_storedBatchZero;
 
-    /// @dev The stored cutData for diamond cut
-    bytes32 public initialCutHash;
+    // slither-disable-next-line constable-states
+    bytes32 internal __DEPRECATED_initialCutHash;
 
-    /// @dev The l1GenesisUpgrade contract address, used to set chainId
-    address public l1GenesisUpgrade;
+    // slither-disable-next-line constable-states
+    address internal __DEPRECATED_l1GenesisUpgrade;
 
     /// @dev The current packed protocolVersion. To access human-readable version, use `getSemverProtocolVersion` function.
     uint256 public protocolVersion;
@@ -87,8 +87,11 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev The address to accept the admin role
     address private pendingAdmin;
 
-    /// @dev The initial force deployment hash
-    bytes32 public initialForceDeploymentHash;
+    /// @dev Deprecated. The genesis force-deployments are read from the registry
+    ///      (`fixedForceDeploymentsData`); no hash of a caller-supplied copy is stored. Slot
+    ///      retained to preserve the upgradeable storage layout.
+    // slither-disable-next-line constable-states
+    bytes32 internal __DEPRECATED_initialForceDeploymentHash;
 
     /// @dev The contract, that notifies server about l1 changes
     address public serverNotifierAddress;
@@ -112,12 +115,11 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev Emergency verifier changes still require a chain upgrade (diamond cut).
     mapping(uint256 protocolVersion => address) public protocolVersionVerifier;
 
-    /// @dev The CTM registry a newly created chain reads its facet set from, for the CURRENT
-    /// protocol version. A single value, parallel to `initialCutHash`: new chains are always
-    /// created at the current version, and it is updated by `setChainCreationParams`.
-    /// `DiamondInit` reads it at genesis and fetches the facet set directly from the registry
-    /// (see `RegistryFacetReader`). Zero means "no registry" — the legacy path, where facets
-    /// ride in the diamond cut's own `facetCuts` instead.
+    /// @dev The genesis `CTMRegistry` for the CURRENT protocol version — the single source of
+    /// everything a new chain needs: facet set, base system contract hashes, verifier and
+    /// genesis params. New chains are always created at the current version, so this is one
+    /// value, updated by `setGenesisRegistry`. `DiamondInit` and the CTM read it at chain
+    /// creation; the CTM stores no other genesis data.
     address public genesisRegistry;
 
     /// @dev The CTM registry the upgrade contract reads the facet-swap plan from when a chain
@@ -228,61 +230,58 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         validatorTimelockPostV29 = _initializeData.validatorTimelock;
         serverNotifierAddress = _initializeData.serverNotifier;
 
-        _setChainCreationParams(_initializeData.chainCreationParams);
+        _setGenesisRegistry(_initializeData.genesisRegistry);
     }
 
-    /// @notice Updates the parameters with which a new chain is created
-    /// @param _chainCreationParams The new chain creation parameters
-    /// @dev To be overridden in derived contracts for custom validation
-    function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal virtual;
+    /// @notice Points chain creation at a new genesis `CTMRegistry` for the current protocol
+    ///         version. The registry is the single source of the facet set, base system contract
+    ///         hashes, verifier and genesis params a new chain is created with.
+    /// @dev Overridden per VM to validate the registry's pinned genesis params before storing it.
+    /// @param _registry The genesis registry to pin.
+    function _setGenesisRegistry(address _registry) internal virtual;
 
-    /// @notice Updates the parameters with which a new chain is created
-    /// @param _chainCreationParams The new chain creation parameters
-    function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external onlyOwner {
-        _setChainCreationParams(_chainCreationParams);
+    /// @notice Points chain creation at a new genesis `CTMRegistry`.
+    /// @param _registry The genesis registry to pin.
+    function setGenesisRegistry(address _registry) external onlyOwner {
+        _setGenesisRegistry(_registry);
     }
 
-    /// @notice Validates chain creation parameters common to all chain types
-    /// @param _chainCreationParams The chain creation parameters to validate
-    function _validateChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal pure virtual;
+    /// @notice Stores the validated genesis registry pointer. Called by the per-VM
+    ///         `_setGenesisRegistry` after its validation.
+    /// @param _registry The genesis registry to pin.
+    function _storeGenesisRegistry(address _registry) internal {
+        if (_registry == address(0)) {
+            revert ZeroAddress();
+        }
+        genesisRegistry = _registry;
+        newChainCreationParamsBlock[protocolVersion] = block.number;
+        emit NewGenesisRegistry(protocolVersion, _registry);
+    }
 
-    /// @notice Sets chain creation parameters after validation
-    /// @param _chainCreationParams The chain creation parameters
-    function _processValidatedChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal {
-        l1GenesisUpgrade = _chainCreationParams.genesisUpgrade;
+    /// @notice The L1 genesis upgrade contract new chains run at creation, read from the genesis
+    ///         registry (used to set chainId + force-deploy the L2 system contracts).
+    function l1GenesisUpgrade() public view returns (address genesisUpgrade) {
+        (genesisUpgrade, , , ) = ICTMRegistry(genesisRegistry).genesisParams(protocolVersion);
+    }
 
-        // We need to initialize the state hash because it is used in the commitment of the next batch
+    /// @notice The genesis (batch zero) stored-batch hash new chains start from — derived from
+    ///         the genesis params the registry pins, so it stays consistent with the registry.
+    function storedBatchZero() public view returns (bytes32) {
+        (, bytes32 genesisBatchHash, bytes32 genesisBatchCommitment, uint64 genesisIndexRepeatedStorageChanges) = ICTMRegistry(
+            genesisRegistry
+        ).genesisParams(protocolVersion);
         IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo({
             batchNumber: 0,
-            batchHash: _chainCreationParams.genesisBatchHash,
-            indexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
+            batchHash: genesisBatchHash,
+            indexRepeatedStorageChanges: genesisIndexRepeatedStorageChanges,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: EMPTY_STRING_KECCAK,
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             dependencyRootsRollingHash: bytes32(0),
             timestamp: 0,
-            commitment: _chainCreationParams.genesisBatchCommitment
+            commitment: genesisBatchCommitment
         });
-        storedBatchZero = keccak256(abi.encode(batchZero));
-        bytes32 newInitialCutHash = keccak256(abi.encode(_chainCreationParams.diamondCut));
-        initialCutHash = newInitialCutHash;
-        // The registry DiamondInit reads the genesis facet set from — single current value,
-        // updated here just like `initialCutHash` above.
-        genesisRegistry = _chainCreationParams.registry;
-        bytes32 forceDeploymentHash = keccak256(abi.encode(_chainCreationParams.forceDeploymentsData));
-        initialForceDeploymentHash = forceDeploymentHash;
-        newChainCreationParamsBlock[protocolVersion] = block.number;
-
-        emit NewChainCreationParams({
-            genesisUpgrade: _chainCreationParams.genesisUpgrade,
-            genesisBatchHash: _chainCreationParams.genesisBatchHash,
-            genesisIndexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
-            genesisBatchCommitment: _chainCreationParams.genesisBatchCommitment,
-            newInitialCut: _chainCreationParams.diamondCut,
-            newInitialCutHash: newInitialCutHash,
-            forceDeploymentsData: _chainCreationParams.forceDeploymentsData,
-            forceDeploymentHash: forceDeploymentHash
-        });
+        return keccak256(abi.encode(batchZero));
     }
 
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
@@ -600,32 +599,22 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @notice deploys a full set of chains contracts
     /// @param _chainId the chain's id
     /// @param _admin the chain's admin address
-    /// @param _diamondCut the diamond cut data that initializes the chains Diamond Proxy
-    function _deployNewChain(
-        uint256 _chainId,
-        address _admin,
-        bytes memory _diamondCut
-    ) internal returns (address zkChainAddress) {
+    /// @dev The genesis cut is built entirely from the genesis registry this CTM pins: no facet
+    ///      cuts, the DiamondInit address read from the registry, and `initialize(chainId, admin)`
+    ///      as init calldata. DiamondInit reads everything else back from this CTM (it is
+    ///      `msg.sender` during the proxy construction) and the registry / bridgehub.
+    function _deployNewChain(uint256 _chainId, address _admin) internal returns (address zkChainAddress) {
         if (getZKChain(_chainId) != address(0)) {
             // ZKChain already registered
             revert ChainAlreadyLive();
         }
 
-        Diamond.DiamondCutData memory diamondCut = abi.decode(_diamondCut, (Diamond.DiamondCutData));
-
-        {
-            // check input
-            bytes32 cutHashInput = keccak256(_diamondCut);
-            if (cutHashInput != initialCutHash) {
-                revert HashMismatch(initialCutHash, cutHashInput);
-            }
-        }
-
-        // Only the two per-chain values are passed to DiamondInit; everything else it reads
-        // back from this CTM (it is `msg.sender` during the proxy construction below) and from
-        // the genesis registry / bridgehub this CTM points at. The committed cut's own
-        // `initCalldata` is empty and is replaced here wholesale.
-        diamondCut.initCalldata = abi.encodeCall(IDiamondInit.initialize, (_chainId, _admin));
+        address diamondInit = ICTMRegistry(genesisRegistry).ctmAddress(CTMContract.DiamondInit, protocolVersion);
+        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
+            facetCuts: new Diamond.FacetCut[](0),
+            initAddress: diamondInit,
+            initCalldata: abi.encodeCall(IDiamondInit.initialize, (_chainId, _admin))
+        });
         // deploy zkChainContract
         // slither-disable-next-line reentrancy-no-eth
         DiamondProxy zkChainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
@@ -638,36 +627,27 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @param _chainId the chain's id
     /// @param _baseTokenAssetId the base token asset id used to pay for gas fees
     /// @param _admin the chain's admin address
-    /// @param _initData the diamond cut data, force deployments and factoryDeps encoded
     /// @param _factoryDeps the factory dependencies used for the genesis upgrade
     /// that initializes the chains Diamond Proxy
-    /// @dev The base token asset id stays in the (bridgehub-facing) signature for compatibility
-    /// but is not consumed here: DiamondInit reads it from the bridgehub, which registers it
-    /// before this call.
+    /// @dev `_baseTokenAssetId` is unused here — DiamondInit reads it from the bridgehub, which
+    /// registers it before this call. It stays in the (bridgehub-facing) signature so the
+    /// bridgehub↔CTM ABI is unchanged.
     function createNewChain(
         uint256 _chainId,
         // solhint-disable-next-line no-unused-vars
         bytes32 _baseTokenAssetId,
         address _admin,
-        bytes calldata _initData,
         bytes[] calldata _factoryDeps
     ) external onlyBridgehub returns (address zkChainAddress) {
-        (bytes memory _diamondCut, bytes memory _forceDeploymentData) = abi.decode(_initData, (bytes, bytes));
+        zkChainAddress = _deployNewChain(_chainId, _admin);
 
-        zkChainAddress = _deployNewChain(_chainId, _admin, _diamondCut);
-
-        {
-            // check input
-            bytes32 forceDeploymentHash = keccak256(abi.encode(_forceDeploymentData));
-            if (forceDeploymentHash != initialForceDeploymentHash) {
-                revert InitialForceDeploymentMismatch(forceDeploymentHash, initialForceDeploymentHash);
-            }
-        }
-        // genesis upgrade, deploys some contracts, sets chainId
+        // genesis upgrade, deploys some contracts, sets chainId. The force-deployments data and
+        // the genesis-upgrade address are read from the registry (single source of truth).
+        bytes memory forceDeploymentsData = ICTMRegistry(genesisRegistry).fixedForceDeploymentsData(protocolVersion);
         IAdmin(zkChainAddress).genesisUpgrade(
-            l1GenesisUpgrade,
+            l1GenesisUpgrade(),
             address(IL1Bridgehub(BRIDGE_HUB).l1CtmDeployer()),
-            _forceDeploymentData,
+            forceDeploymentsData,
             _factoryDeps
         );
         // Deposits start paused by default to allow immediate Gateway migration.
@@ -687,9 +667,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         uint256 _chainId,
         bytes calldata _data
     ) external view override onlyChainAssetHandler returns (bytes memory ctmForwardedBridgeMintData) {
-        // Note that the `_diamondCut` here is not for the current chain, for the chain where the migration
-        // happens. The correctness of it will be checked on the CTM on the new settlement layer.
-        (address _newSettlementLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
+        // The destination CTM rebuilds the genesis cut from its own registry, so no cut is
+        // forwarded — only the new admin. The base token asset id is re-registered on the
+        // destination bridgehub before its `forwardedBridgeMint`, so it isn't forwarded either.
+        address _newSettlementLayerAdmin = abi.decode(_data, (address));
         if (_newSettlementLayerAdmin == address(0)) {
             revert AdminZero();
         }
@@ -701,13 +682,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             revert OutdatedProtocolVersion(protocolVersion, chainProtocolVersion);
         }
 
-        return
-            abi.encode(
-                IL1Bridgehub(BRIDGE_HUB).baseTokenAssetId(_chainId),
-                _newSettlementLayerAdmin,
-                protocolVersion,
-                _diamondCut
-            );
+        return abi.encode(_newSettlementLayerAdmin, protocolVersion);
     }
 
     /// @notice Called by the bridgehub during the migration of a chain to the current settlement layer.
@@ -717,20 +692,14 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         uint256 _chainId,
         bytes calldata _ctmData
     ) external override onlyChainAssetHandler returns (address chainAddress) {
-        // The base token asset id stays in the burn-side encoding for compatibility but is not
-        // consumed here: DiamondInit reads it from the bridgehub, which registers it before this
-        // call (see `BridgehubBase.forwardedBridgeMint`).
-        (, address _admin, uint256 _protocolVersion, bytes memory _diamondCut) = abi.decode(
-            _ctmData,
-            (bytes32, address, uint256, bytes)
-        );
+        (address _admin, uint256 _protocolVersion) = abi.decode(_ctmData, (address, uint256));
 
         // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
         if (_protocolVersion != protocolVersion) {
             revert OutdatedProtocolVersion(protocolVersion, _protocolVersion);
         }
-        chainAddress = _deployNewChain({_chainId: _chainId, _admin: _admin, _diamondCut: _diamondCut});
+        chainAddress = _deployNewChain({_chainId: _chainId, _admin: _admin});
     }
 
     /// @notice Called by the bridgehub during the failed migration of a chain.

@@ -30,6 +30,7 @@ import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {ILegacyChainTypeManager} from "contracts/state-transition/ILegacyChainTypeManager.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
@@ -500,7 +501,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         );
 
         bytes memory l2Calldata = abi.encodeCall(
-            IChainTypeManager.setChainCreationParams,
+            ILegacyChainTypeManager.setChainCreationParams,
             (getChainCreationParams(gatewayConfig.gatewayStateTransition))
         );
 

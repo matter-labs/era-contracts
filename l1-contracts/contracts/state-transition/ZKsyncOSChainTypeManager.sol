@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
-import {ChainCreationParams} from "./IChainTypeManager.sol";
+import {ICTMRegistry} from "../upgrades/registry/ICTMRegistry.sol";
 import {
     GenesisBatchHashZero,
     GenesisBatchCommitmentIncorrect,
@@ -27,31 +27,24 @@ contract ZKsyncOSChainTypeManager is ChainTypeManagerBase {
         return true;
     }
 
-    /// @notice Updates the parameters with which a new chain is created
-    /// @param _chainCreationParams The new chain creation parameters
-    function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal override {
-        // Validate common parameters
-        _validateChainCreationParams(_chainCreationParams);
+    /// @notice Points chain creation at a new genesis `CTMRegistry`, validating the
+    /// ZKsync-OS-specific genesis params it pins before storing it.
+    /// @param _registry The genesis registry to pin.
+    function _setGenesisRegistry(address _registry) internal override {
+        (address genesisUpgrade, bytes32 genesisBatchHash, bytes32 genesisBatchCommitment, ) = ICTMRegistry(_registry)
+            .genesisParams(protocolVersion);
 
-        // For ZKsync OS, the genesis batch commitment must be equal to 1
-        if (_chainCreationParams.genesisBatchCommitment != bytes32(uint256(1))) {
+        if (genesisUpgrade == address(0)) {
+            revert GenesisUpgradeZero();
+        }
+        if (genesisBatchHash == bytes32(0)) {
+            revert GenesisBatchHashZero();
+        }
+        // For ZKsync OS, the genesis batch commitment must be equal to 1.
+        if (genesisBatchCommitment != bytes32(uint256(1))) {
             revert GenesisBatchCommitmentIncorrect();
         }
 
-        // Process the validated parameters
-        _processValidatedChainCreationParams(_chainCreationParams);
-    }
-
-    /// @notice Validates chain creation parameters common to all chain types
-    /// @param _chainCreationParams The chain creation parameters to validate
-    function _validateChainCreationParams(
-        ChainCreationParams calldata _chainCreationParams
-    ) internal pure virtual override {
-        if (_chainCreationParams.genesisUpgrade == address(0)) {
-            revert GenesisUpgradeZero();
-        }
-        if (_chainCreationParams.genesisBatchHash == bytes32(0)) {
-            revert GenesisBatchHashZero();
-        }
+        _storeGenesisRegistry(_registry);
     }
 }

@@ -6,7 +6,8 @@ pragma solidity ^0.8.24;
 import {stdToml} from "forge-std/StdToml.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
-import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
+import {ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
+import {ChainCreationParams} from "contracts/state-transition/ILegacyChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {CTMRegistry} from "contracts/upgrades/registry/CTMRegistry.sol";
 import {GenesisManifestLib} from "contracts/upgrades/registry/GenesisManifestLib.sol";
@@ -138,13 +139,21 @@ abstract contract DeployCTMUtils is DeployUtils {
             require(config.contracts.chainCreationParams.evmEmulatorHash != bytes32(0), "EVM emulator hash is zero");
         }
 
+        require(generatedData.forceDeploymentsData.length != 0, "force deployments data is empty");
         CTMRegistry.CTMRegistryManifest memory manifest = GenesisManifestLib.buildGenesisManifest(
-            config.isZKsyncOS,
-            config.contracts.chainCreationParams.latestProtocolVersion,
-            ctmAddresses.stateTransition.facets,
-            config.contracts.chainCreationParams.bootloaderHash,
-            config.contracts.chainCreationParams.defaultAAHash,
-            config.contracts.chainCreationParams.evmEmulatorHash
+            GenesisManifestLib.GenesisConfig({
+                isZKsyncOS: config.isZKsyncOS,
+                protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
+                facets: ctmAddresses.stateTransition.facets,
+                bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
+                defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,
+                evmEmulatorHash: config.contracts.chainCreationParams.evmEmulatorHash,
+                genesisUpgrade: ctmAddresses.stateTransition.genesisUpgrade,
+                genesisBatchHash: config.contracts.chainCreationParams.genesisRoot,
+                genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
+                genesisIndexRepeatedStorageChanges: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex),
+                fixedForceDeploymentsData: generatedData.forceDeploymentsData
+            })
         );
 
         vm.broadcast(getBroadcasterAddress());
@@ -245,12 +254,14 @@ abstract contract DeployCTMUtils is DeployUtils {
     function getChainTypeManagerInitializeData(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (ChainTypeManagerInitializeData memory) {
-        ChainCreationParams memory chainCreationParams = getChainCreationParams(stateTransition);
+        require(stateTransition.genesisRegistry != address(0), "genesis registry is not deployed");
+        // Populate `config.contracts.diamondCutData` (a legacy output field) for serialization.
+        getChainCreationParams(stateTransition);
         return
             ChainTypeManagerInitializeData({
                 owner: getBroadcasterAddress(),
                 validatorTimelock: stateTransition.proxies.validatorTimelock,
-                chainCreationParams: chainCreationParams,
+                genesisRegistry: stateTransition.genesisRegistry,
                 protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
                 verifier: stateTransition.verifiers.verifier,
                 serverNotifier: stateTransition.proxies.serverNotifier

@@ -2,11 +2,10 @@
 
 pragma solidity 0.8.28;
 
-import {CoreContract, CTMContract} from "./ContractIdentifiers.sol";
+import {CoreContract} from "./ContractIdentifiers.sol";
 import {ICTMRegistry} from "./ICTMRegistry.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
-import {ChainCreationParams} from "../../state-transition/IChainTypeManager.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 import {
@@ -105,46 +104,6 @@ library CTMUpgradeComposer {
             proposedUpgrade.evmEmulatorHash
         ) = _registry.baseSystemContractHashes(newVersion);
         proposedUpgrade.upgradeTimestamp = _upgradeTimestamp;
-    }
-
-    /// @notice Builds the `ChainCreationParams` for chains created at the registry's new protocol
-    ///         version. The facet set is NOT embedded — the CTM stores the registry address
-    ///         (`genesisRegistry`) and `DiamondInit` reads the set straight from it, the same set
-    ///         the upgrade path reads for existing chains, so they cannot disagree.
-    function buildChainCreationParams(ICTMRegistry _registry) internal view returns (ChainCreationParams memory) {
-        uint256 newVersion = _registry.newProtocolVersion();
-        (
-            address genesisUpgrade,
-            bytes32 genesisBatchHash,
-            bytes32 genesisBatchCommitment,
-            uint64 genesisIndexRepeatedStorageChanges
-        ) = _registry.genesisParams(newVersion);
-
-        return
-            ChainCreationParams({
-                genesisUpgrade: genesisUpgrade,
-                genesisBatchHash: genesisBatchHash,
-                genesisIndexRepeatedStorageChanges: genesisIndexRepeatedStorageChanges,
-                genesisBatchCommitment: genesisBatchCommitment,
-                diamondCut: _buildChainCreationCut(_registry, newVersion),
-                forceDeploymentsData: _registry.fixedForceDeploymentsData(newVersion),
-                registry: address(_registry)
-            });
-    }
-
-    /// @dev The initial cut of a new chain: no `facetCuts` and no init payload — DiamondInit
-    ///      reads the facet set and the base system contract hashes straight from the registry
-    ///      the CTM pins, so the committed cut is only the DiamondInit address.
-    function _buildChainCreationCut(
-        ICTMRegistry _registry,
-        uint256 _newVersion
-    ) private view returns (Diamond.DiamondCutData memory) {
-        return
-            Diamond.DiamondCutData({
-                facetCuts: new Diamond.FacetCut[](0),
-                initAddress: _registry.ctmAddress(CTMContract.DiamondInit, _newVersion),
-                initCalldata: ""
-            });
     }
 
     /// @notice The nonce of the L2 protocol upgrade transaction for a packed SemVer version.

@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
-import {ChainCreationParams} from "./IChainTypeManager.sol";
+import {ICTMRegistry} from "../upgrades/registry/ICTMRegistry.sol";
 import {
     GenesisIndexStorageZero,
     GenesisBatchCommitmentZero,
@@ -28,35 +28,31 @@ contract EraChainTypeManager is ChainTypeManagerBase {
         return false;
     }
 
-    /// @notice Updates the parameters with which a new chain is created
-    /// @param _chainCreationParams The new chain creation parameters
-    function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal override {
-        // Validate common parameters
-        _validateChainCreationParams(_chainCreationParams);
+    /// @notice Points chain creation at a new genesis `CTMRegistry`, validating the Era-specific
+    /// genesis params it pins before storing it.
+    /// @param _registry The genesis registry to pin.
+    function _setGenesisRegistry(address _registry) internal override {
+        (
+            address genesisUpgrade,
+            bytes32 genesisBatchHash,
+            bytes32 genesisBatchCommitment,
+            uint64 genesisIndexRepeatedStorageChanges
+        ) = ICTMRegistry(_registry).genesisParams(protocolVersion);
 
-        // Additional validation for Era chains
-        if (_chainCreationParams.genesisIndexRepeatedStorageChanges == uint64(0)) {
+        if (genesisUpgrade == address(0)) {
+            revert GenesisUpgradeZero();
+        }
+        if (genesisBatchHash == bytes32(0)) {
+            revert GenesisBatchHashZero();
+        }
+        if (genesisBatchCommitment == bytes32(0)) {
+            revert GenesisBatchCommitmentZero();
+        }
+        // Era chains require a non-zero genesis repeated-storage index.
+        if (genesisIndexRepeatedStorageChanges == uint64(0)) {
             revert GenesisIndexStorageZero();
         }
 
-        // Process the validated parameters
-        _processValidatedChainCreationParams(_chainCreationParams);
-    }
-
-    /// @notice Validates chain creation parameters common to all chain types
-    /// @param _chainCreationParams The chain creation parameters to validate
-    function _validateChainCreationParams(
-        ChainCreationParams calldata _chainCreationParams
-    ) internal pure virtual override {
-        if (_chainCreationParams.genesisUpgrade == address(0)) {
-            revert GenesisUpgradeZero();
-        }
-        if (_chainCreationParams.genesisBatchHash == bytes32(0)) {
-            revert GenesisBatchHashZero();
-        }
-
-        if (_chainCreationParams.genesisBatchCommitment == bytes32(0)) {
-            revert GenesisBatchCommitmentZero();
-        }
+        _storeGenesisRegistry(_registry);
     }
 }

@@ -24,6 +24,7 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {ILegacyChainTypeManager} from "contracts/state-transition/ILegacyChainTypeManager.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
@@ -718,7 +719,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         calls[0] = Call({
             target: ctmAddresses.stateTransition.proxies.chainTypeManager,
             data: abi.encodeCall(
-                IChainTypeManager.setChainCreationParams,
+                ILegacyChainTypeManager.setChainCreationParams,
                 (getChainCreationParams(ctmAddresses.stateTransition))
             ),
             value: 0

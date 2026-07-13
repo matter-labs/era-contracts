@@ -125,11 +125,13 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         baseTokenAssetId[_chainId] = _baseTokenAssetId;
         settlementLayer[_chainId] = block.chainid;
 
+        // `_initData` is no longer forwarded: the CTM reads all genesis data from its genesis
+        // registry (see `IChainTypeManager.createNewChain` / `genesisRegistry`). The bridgehub
+        // keeps `_initData` in its own signature for ABI stability with existing callers.
         address chainAddress = IChainTypeManager(_chainTypeManager).createNewChain({
             _chainId: _chainId,
             _baseTokenAssetId: _baseTokenAssetId,
             _admin: _admin,
-            _initData: _initData,
             _factoryDeps: _factoryDeps
         });
         // It is an additional protection against a malicious chain type manager

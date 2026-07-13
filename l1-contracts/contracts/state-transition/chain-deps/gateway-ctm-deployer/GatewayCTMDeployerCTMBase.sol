@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {Diamond} from "../../libraries/Diamond.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "../../IChainTypeManager.sol";
+import {ChainTypeManagerInitializeData, IChainTypeManager} from "../../IChainTypeManager.sol";
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
 
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
@@ -96,7 +96,12 @@ abstract contract GatewayCTMDeployerCTMBase {
         // CREATE2 (no constructor, so its address is independent of the pinned values — the
         // off-chain helper can put it in the cut before any facet exists) and initialized HERE,
         // in the same deployer flow governance approved.
-        address genesisRegistry = _initializeGenesisRegistry(_config.bootstrapRegistry, baseConfig, facets);
+        address genesisRegistry = _initializeGenesisRegistry(
+            _config.bootstrapRegistry,
+            _config.genesisUpgrade,
+            baseConfig,
+            facets
+        );
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
@@ -106,20 +111,10 @@ abstract contract GatewayCTMDeployerCTMBase {
 
         _result.diamondCutData = abi.encode(diamondCut);
 
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: _config.genesisUpgrade,
-            genesisBatchHash: baseConfig.genesisRoot,
-            genesisIndexRepeatedStorageChanges: uint64(baseConfig.genesisRollupLeafIndex),
-            genesisBatchCommitment: baseConfig.genesisBatchCommitment,
-            diamondCut: diamondCut,
-            forceDeploymentsData: baseConfig.forceDeploymentsData,
-            registry: genesisRegistry
-        });
-
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
             owner: baseConfig.aliasedGovernanceAddress,
             validatorTimelock: _config.validatorTimelockProxy,
-            chainCreationParams: chainCreationParams,
+            genesisRegistry: genesisRegistry,
             protocolVersion: baseConfig.protocolVersion,
             verifier: _config.verifier,
             serverNotifier: _result.serverNotifierProxy
@@ -140,23 +135,31 @@ abstract contract GatewayCTMDeployerCTMBase {
     ///         the genesis manifest. The facet order and freezability mirror the diamond's
     ///         installed set.
     /// @param _registry The pre-deployed bootstrap `CTMRegistry` address.
-    /// @param _baseConfig The deployment config (protocol version and base system hashes).
+    /// @param _genesisUpgrade The L1 genesis upgrade contract new chains run at creation.
+    /// @param _baseConfig The deployment config (protocol version, base system hashes, genesis).
     /// @param _facets The deployed diamond facet addresses.
     /// @return registry The initialized bootstrap registry (echoed back).
     function _initializeGenesisRegistry(
         address _registry,
+        address _genesisUpgrade,
         GatewayCTMDeployerConfig memory _baseConfig,
         Facets memory _facets
     ) internal returns (address registry) {
         CTMRegistry(_registry).initialize(
-            // solhint-disable-next-line func-named-parameters
             GenesisManifestLib.buildGenesisManifest(
-                _baseConfig.isZKsyncOS,
-                _baseConfig.protocolVersion,
-                _facets,
-                _baseConfig.bootloaderHash,
-                _baseConfig.defaultAccountHash,
-                _baseConfig.evmEmulatorHash
+                GenesisManifestLib.GenesisConfig({
+                    isZKsyncOS: _baseConfig.isZKsyncOS,
+                    protocolVersion: _baseConfig.protocolVersion,
+                    facets: _facets,
+                    bootloaderHash: _baseConfig.bootloaderHash,
+                    defaultAccountHash: _baseConfig.defaultAccountHash,
+                    evmEmulatorHash: _baseConfig.evmEmulatorHash,
+                    genesisUpgrade: _genesisUpgrade,
+                    genesisBatchHash: _baseConfig.genesisRoot,
+                    genesisBatchCommitment: _baseConfig.genesisBatchCommitment,
+                    genesisIndexRepeatedStorageChanges: uint64(_baseConfig.genesisRollupLeafIndex),
+                    fixedForceDeploymentsData: _baseConfig.forceDeploymentsData
+                })
             )
         );
         registry = _registry;
