@@ -21,6 +21,10 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 );
 
 contract MessageRootTest is Test {
+    uint256 internal constant TEST_L1_TIMESTAMP = 1_700_000_000;
+    bytes32 internal constant NON_ZERO_TIMESTAMP_INTEROP_ROOT =
+        0x55765aa3f08b5bec688734c70b62b130aeb4be787d6206ed626d7675742db67d;
+
     address bridgeHub;
     L2MessageVerification l2MessageVerification;
 
@@ -62,7 +66,7 @@ contract MessageRootTest is Test {
         assertEq(isIncluded, true);
     }
 
-    function test_l2MessageVerification_with_double_proof() public {
+    function test_l2MessageVerification_bindsNonZeroL1Timestamp() public {
         uint256 chainId = 271;
         uint256 batchNumber = 66;
         uint256 l2ToL1LogIndex = 1;
@@ -93,7 +97,7 @@ contract MessageRootTest is Test {
         proof[13] = bytes32(0xa707d1c62d8be699d34cb74804fdd7b4c568b6c1a821066f126c680d4b83e00b);
         proof[14] = bytes32(0xf6e093070e0389d2e529d60fadb855fdded54976ec50ac709e3a36ceaa64c291);
         proof[15] = bytes32(0xe4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf75944);
-        proof[16] = bytes32(uint256(0)); // l1Timestamp bound into the batch leaf
+        proof[16] = bytes32(TEST_L1_TIMESTAMP);
         proof[17] = bytes32(0x0000000000000000000000000000000000000000000000000000000000000034);
         proof[18] = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
         proof[19] = bytes32(0xcc4c41edb0c2031348b292b768e9bac1ee8c92c09ef8a3277c2ece409c12d86a);
@@ -106,11 +110,12 @@ contract MessageRootTest is Test {
         proof[26] = bytes32(0x0101000100000000000000000000000000000000000000000000000000000000);
         proof[27] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
 
-        // Root the proof hashes to after the l1Timestamp is bound into the batch leaf.
+        // Golden recursive root for this proof with the non-zero timestamp above. A verifier that drops
+        // the timestamp from the batch leaf no longer reconstructs this imported root.
         vm.mockCall(
             address(L2_INTEROP_ROOT_STORAGE),
             abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
-            abi.encode(bytes32(0xf2ed765ea90479defa99f4853559bec02617067e736f70475cc64a8e571f509a))
+            abi.encode(NON_ZERO_TIMESTAMP_INTEROP_ROOT)
         );
         bool isIncluded = l2MessageVerification.proveL2LogInclusionShared(
             chainId,
@@ -119,7 +124,19 @@ contract MessageRootTest is Test {
             log,
             proof
         );
-        assertEq(isIncluded, true);
+        assertTrue(isIncluded, "non-zero settlement timestamp should verify");
+
+        // The timestamp is part of the authenticated batch leaf. Reusing every other proof field while
+        // changing only the timestamp must no longer resolve to the imported interop root.
+        proof[16] = bytes32(TEST_L1_TIMESTAMP + 1);
+        bool isIncludedAfterTimestampTampering = l2MessageVerification.proveL2LogInclusionShared(
+            chainId,
+            batchNumber,
+            l2ToL1LogIndex,
+            log,
+            proof
+        );
+        assertFalse(isIncludedAfterTimestampTampering, "tampered settlement timestamp should not verify");
     }
 
     /// @notice Test proving L2 message inclusion using data from integration tests
