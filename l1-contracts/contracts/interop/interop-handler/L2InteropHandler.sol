@@ -97,14 +97,17 @@ contract L2InteropHandler is InteropHandlerBase {
         address _senderAddress,
         bytes calldata _sender
     ) internal override {
-        (bytes memory bundle, AtomicFinalityProof memory finality) =
-            abi.decode(_payload[4:], (bytes, AtomicFinalityProof));
+        (bytes memory bundle, AtomicFinalityProof memory finality) = abi.decode(
+            _payload[4:],
+            (bytes, AtomicFinalityProof)
+        );
 
         // Decode the bundle to get execution permissions
-        (InteropBundle memory interopBundle, bytes32 bundleHash,) = _getBundleData(bundle);
+        (InteropBundle memory interopBundle, bytes32 bundleHash, ) = _getBundleData(bundle);
         if (interopBundle.bundleAttributes.executionAddress.length != 0) {
-            (uint256 executionChainId, address executionAddress) =
-                InteroperableAddress.parseEvmV1(interopBundle.bundleAttributes.executionAddress);
+            (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
+                interopBundle.bundleAttributes.executionAddress
+            );
             require(
                 (executionChainId == _senderChainId || executionChainId == 0) && executionAddress == _senderAddress,
                 ExecutingNotAllowed(bundleHash, _sender, interopBundle.bundleAttributes.executionAddress)
@@ -116,8 +119,10 @@ contract L2InteropHandler is InteropHandlerBase {
 
     /// @inheritdoc InteropHandlerBase
     function _receiveVerifyBundle(bytes calldata _payload) internal override {
-        (bytes memory bundle, AtomicFinalityProof memory finality) =
-            abi.decode(_payload[4:], (bytes, AtomicFinalityProof));
+        (bytes memory bundle, AtomicFinalityProof memory finality) = abi.decode(
+            _payload[4:],
+            (bytes, AtomicFinalityProof)
+        );
 
         // Bundle verification is permissionless
         this.verifyBundle(bundle, finality);

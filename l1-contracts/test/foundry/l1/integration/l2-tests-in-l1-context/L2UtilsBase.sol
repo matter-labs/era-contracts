@@ -45,9 +45,7 @@ import {InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol"
 import {L2InteropHandler} from "../../../../../contracts/interop/interop-handler/L2InteropHandler.sol";
 import {DummyL2L1Messenger} from "../../../../../contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 
-import {
-    DummyBaseTokenSystemContract
-} from "../../../../../contracts/dev-contracts/test/DummyBaseTokenSystemContract.sol";
+import {DummyBaseTokenSystemContract} from "../../../../../contracts/dev-contracts/test/DummyBaseTokenSystemContract.sol";
 import {DummyL2BaseTokenHolder} from "../../../../../contracts/dev-contracts/test/DummyL2BaseTokenHolder.sol";
 import {DummyL2InteropAccount} from "../../../../../contracts/dev-contracts/test/DummyL2InteropAccount.sol";
 
@@ -81,12 +79,11 @@ library L2UtilsBase {
             address interopCenter = address(new InteropCenter());
             vm.etch(L2_INTEROP_CENTER_ADDR, interopCenter.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            InteropCenter(L2_INTEROP_CENTER_ADDR)
-                .initL2(
-                    _args.l1ChainId,
-                    _args.aliasedOwner,
-                    DataEncoding.encodeNTVAssetId(_args.eraChainId, address(uint160(uint256(keccak256("zkToken")))))
-                );
+            InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
+                _args.l1ChainId,
+                _args.aliasedOwner,
+                DataEncoding.encodeNTVAssetId(_args.eraChainId, address(uint160(uint256(keccak256("zkToken")))))
+            );
         }
 
         {
@@ -106,14 +103,13 @@ library L2UtilsBase {
 
             vm.prank(_args.aliasedOwner);
             address aliasedL1ChainRegistrationSender = address(0x000000000000000000000000000000000002000a);
-            L2Bridgehub(L2_BRIDGEHUB_ADDR)
-                .setAddresses(
-                    L2_ASSET_ROUTER_ADDR,
-                    ICTMDeploymentTracker(_args.l1CtmDeployer),
-                    IMessageRootBase(L2_MESSAGE_ROOT_ADDR),
-                    L2_CHAIN_ASSET_HANDLER_ADDR,
-                    aliasedL1ChainRegistrationSender
-                );
+            L2Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses(
+                L2_ASSET_ROUTER_ADDR,
+                ICTMDeploymentTracker(_args.l1CtmDeployer),
+                IMessageRootBase(L2_MESSAGE_ROOT_ADDR),
+                L2_CHAIN_ASSET_HANDLER_ADDR,
+                aliasedL1ChainRegistrationSender
+            );
         }
 
         {
@@ -162,14 +158,13 @@ library L2UtilsBase {
             address assetRouter = address(new L2AssetRouter());
             vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            L2AssetRouter(L2_ASSET_ROUTER_ADDR)
-                .initL2(
-                    _args.l1ChainId,
-                    _args.eraChainId,
-                    IL1AssetRouter(_args.l1AssetRouter),
-                    baseTokenAssetId,
-                    _args.aliasedOwner
-                );
+            L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
+                _args.l1ChainId,
+                _args.eraChainId,
+                IL1AssetRouter(_args.l1AssetRouter),
+                baseTokenAssetId,
+                _args.aliasedOwner
+            );
         }
 
         {
@@ -187,21 +182,24 @@ library L2UtilsBase {
             vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);
 
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR)
-                .initL2(
-                    _args.l1ChainId,
-                    _args.aliasedOwner,
-                    _args.l2TokenProxyBytecodeHash,
-                    _args.l2TokenBeacon,
-                    wethToken,
-                    TokenBridgingData({
-                        assetId: baseTokenAssetId, originChainId: _args.l1ChainId, originToken: ETH_TOKEN_ADDRESS
-                    }),
-                    TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
-                );
+            L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
+                _args.l1ChainId,
+                _args.aliasedOwner,
+                _args.l2TokenProxyBytecodeHash,
+                _args.l2TokenBeacon,
+                wethToken,
+                TokenBridgingData({
+                    assetId: baseTokenAssetId,
+                    originChainId: _args.l1ChainId,
+                    originToken: ETH_TOKEN_ADDRESS
+                }),
+                TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
+            );
 
             vm.store(
-                L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(251)), bytes32(uint256(_args.l2TokenProxyBytecodeHash))
+                L2_NATIVE_TOKEN_VAULT_ADDR,
+                bytes32(uint256(251)),
+                bytes32(uint256(_args.l2TokenProxyBytecodeHash))
             );
             L2NativeTokenVaultDev(L2_NATIVE_TOKEN_VAULT_ADDR).deployBridgedStandardERC20(_args.aliasedOwner);
 

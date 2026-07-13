@@ -15,11 +15,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
 import {InteropWithdrawalNonZeroValue} from "../../bridge/L1BridgeContractErrors.sol";
 import {ZeroAddress} from "../../common/L1ContractErrors.sol";
-import {
-    ExecutingNotAllowed,
-    MessageNotIncluded,
-    UnauthorizedMessageSender
-} from "../InteropErrors.sol";
+import {ExecutingNotAllowed, MessageNotIncluded, UnauthorizedMessageSender} from "../InteropErrors.sol";
 
 /// @title L1InteropHandler
 /// @author Matter Labs
@@ -118,14 +114,17 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
         address _senderAddress,
         bytes calldata _sender
     ) internal override {
-        (bytes memory bundle, MessageInclusionProof memory proof) =
-            abi.decode(_payload[4:], (bytes, MessageInclusionProof));
+        (bytes memory bundle, MessageInclusionProof memory proof) = abi.decode(
+            _payload[4:],
+            (bytes, MessageInclusionProof)
+        );
 
         // Decode the bundle to get execution permissions
-        (InteropBundle memory interopBundle, bytes32 bundleHash,) = _getBundleData(bundle);
+        (InteropBundle memory interopBundle, bytes32 bundleHash, ) = _getBundleData(bundle);
         if (interopBundle.bundleAttributes.executionAddress.length != 0) {
-            (uint256 executionChainId, address executionAddress) =
-                InteroperableAddress.parseEvmV1(interopBundle.bundleAttributes.executionAddress);
+            (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
+                interopBundle.bundleAttributes.executionAddress
+            );
             require(
                 (executionChainId == _senderChainId || executionChainId == 0) && executionAddress == _senderAddress,
                 ExecutingNotAllowed(bundleHash, _sender, interopBundle.bundleAttributes.executionAddress)
@@ -137,8 +136,10 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
 
     /// @inheritdoc InteropHandlerBase
     function _receiveVerifyBundle(bytes calldata _payload) internal override {
-        (bytes memory bundle, MessageInclusionProof memory proof) =
-            abi.decode(_payload[4:], (bytes, MessageInclusionProof));
+        (bytes memory bundle, MessageInclusionProof memory proof) = abi.decode(
+            _payload[4:],
+            (bytes, MessageInclusionProof)
+        );
 
         // Bundle verification is permissionless
         this.verifyBundle(bundle, proof);
@@ -160,14 +161,7 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
     /// @dev Deliberate double-defense: the same invariant is already enforced at SEND time by the L2
     /// InteropCenter (`NonZeroValueToL1NotSupported`); this receive-side check re-verifies it with its own
     /// error (`InteropWithdrawalNonZeroValue`) in case a malformed bundle ever reaches L1.
-    function _handleCallValue(
-        uint256 _value,
-        uint256 /* _sourceChainId */
-    )
-        internal
-        pure
-        override
-    {
+    function _handleCallValue(uint256 _value, uint256 /* _sourceChainId */) internal pure override {
         require(_value == 0, InteropWithdrawalNonZeroValue(_value));
     }
 
@@ -199,12 +193,13 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
 
     /// @dev Proves the bundle's inclusion via the L1 MessageRoot.
     function _proveInclusion(MessageInclusionProof memory _proof) internal view returns (bool) {
-        return MESSAGE_ROOT.proveL2MessageInclusionShared({
-            _chainId: _proof.chainId,
-            _blockOrBatchNumber: _proof.l1BatchNumber,
-            _index: _proof.l2MessageIndex,
-            _message: _proof.message,
-            _proof: _proof.proof
-        });
+        return
+            MESSAGE_ROOT.proveL2MessageInclusionShared({
+                _chainId: _proof.chainId,
+                _blockOrBatchNumber: _proof.l1BatchNumber,
+                _index: _proof.l2MessageIndex,
+                _message: _proof.message,
+                _proof: _proof.proof
+            });
     }
 }

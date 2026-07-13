@@ -104,14 +104,15 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
-        (uint256 unbundlerChainId, address unbundlerAddress) =
-            InteroperableAddress.parseEvmV1(interopBundle.bundleAttributes.unbundlerAddress);
+        (uint256 unbundlerChainId, address unbundlerAddress) = InteroperableAddress.parseEvmV1(
+            interopBundle.bundleAttributes.unbundlerAddress
+        );
 
         // Verify that the caller has permission to unbundle the bundle.
         // It's also possible that the caller is InteropHandler itself, in case the unbundling was initiated through receiveMessage.
         require(
-            msg.sender == address(this)
-                || ((unbundlerChainId == block.chainid || unbundlerChainId == 0) && unbundlerAddress == msg.sender),
+            msg.sender == address(this) ||
+                ((unbundlerChainId == block.chainid || unbundlerChainId == 0) && unbundlerAddress == msg.sender),
             UnbundlingNotAllowed(
                 bundleHash,
                 InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
@@ -182,12 +183,7 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         /* receiveId */
         bytes calldata sender,
         bytes calldata payload
-    )
-        external
-        payable
-        override
-        returns (bytes4)
-    {
+    ) external payable override returns (bytes4) {
         // Verify that call to this function is a result of a call being executed, meaning this message came from a valid bundle.
         // This is the only way receiveMessage can be invoked on InteropHandler by itself.
         require(msg.sender == address(this), Unauthorized(msg.sender));
@@ -220,11 +216,9 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
     /// @return interopBundle The decoded InteropBundle struct.
     /// @return bundleHash Hash corresponding to the bundle that gets decoded.
     /// @return currentStatus The current BundleStatus of the bundle that gets decoded.
-    function _getBundleData(bytes memory _bundle)
-        internal
-        view
-        returns (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus currentStatus)
-    {
+    function _getBundleData(
+        bytes memory _bundle
+    ) internal view returns (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus currentStatus) {
         // Revert with a clean error on an empty bundle instead of the panic `abi.decode` would produce.
         require(_bundle.length != 0, EmptyBundle());
         interopBundle = abi.decode(_bundle, (InteropBundle));
@@ -241,12 +235,12 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         if (_interopBundle.bundleAttributes.executionAddress.length == 0) {
             return;
         }
-        (uint256 executionChainId, address executionAddress) =
-            InteroperableAddress.parseEvmV1(_interopBundle.bundleAttributes.executionAddress);
+        (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
+            _interopBundle.bundleAttributes.executionAddress
+        );
         require(
-            (msg.sender == address(this)
-                    || ((executionChainId == block.chainid || executionChainId == 0)
-                        && executionAddress == msg.sender)),
+            (msg.sender == address(this) ||
+                ((executionChainId == block.chainid || executionChainId == 0) && executionAddress == msg.sender)),
             ExecutingNotAllowed(
                 _bundleHash,
                 InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
@@ -259,7 +253,8 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
     /// @dev Whitelist approach: any future status is rejected until explicitly allowed.
     function _requireExecutable(bytes32 _bundleHash, BundleStatus _status) internal pure {
         require(
-            _status == BundleStatus.Unreceived || _status == BundleStatus.Verified, BundleAlreadyProcessed(_bundleHash)
+            _status == BundleStatus.Unreceived || _status == BundleStatus.Verified,
+            BundleAlreadyProcessed(_bundleHash)
         );
     }
 
@@ -401,10 +396,11 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         (bytes memory bundle, CallStatus[] memory providedCallStatus) = abi.decode(payload[4:], (bytes, CallStatus[]));
 
         // Decode the bundle to get unbundling permissions
-        (InteropBundle memory interopBundle, bytes32 bundleHash,) = _getBundleData(bundle);
+        (InteropBundle memory interopBundle, bytes32 bundleHash, ) = _getBundleData(bundle);
 
-        (uint256 unbundlerChainId, address unbundlerAddress) =
-            InteroperableAddress.parseEvmV1(interopBundle.bundleAttributes.unbundlerAddress);
+        (uint256 unbundlerChainId, address unbundlerAddress) = InteroperableAddress.parseEvmV1(
+            interopBundle.bundleAttributes.unbundlerAddress
+        );
 
         // Verify sender has unbundling permission
         require(
