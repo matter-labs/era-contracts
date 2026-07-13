@@ -284,13 +284,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         _mockGenesisRegistryFacets(_diamondCut.facetCuts);
 
         vm.prank(address(bridgehub));
-        return
-            chainContractAddress.createNewChain({
-                _chainId: chainId,
-                _baseTokenAssetId: baseTokenAssetId,
-                _admin: newChainAdmin,
-                _factoryDeps: new bytes[](0)
-            });
+        return chainContractAddress.createNewChain({_chainId: chainId, _admin: newChainAdmin});
     }
 
     /// @notice Mocks the genesis registry so `DiamondInit.newChainInstallations` reconstructs the
@@ -359,12 +353,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         _mockGenesisRegistryFacets(_diamondCut.facetCuts);
 
         vm.prank(address(bridgehub));
-        chainContractAddress.createNewChain({
-            _chainId: id,
-            _baseTokenAssetId: DataEncoding.encodeNTVAssetId(id, baseToken),
-            _admin: newChainAdmin,
-            _factoryDeps: new bytes[](0)
-        });
+        chainContractAddress.createNewChain({_chainId: id, _admin: newChainAdmin});
     }
 
     function _mockGetZKChainFromBridgehub(address _chainAddress) internal {

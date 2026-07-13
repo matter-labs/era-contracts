@@ -138,12 +138,11 @@ interface IChainTypeManager {
 
     function getChainAdmin(uint256 _chainId) external view returns (address);
 
-    function createNewChain(
-        uint256 _chainId,
-        bytes32 _baseTokenAssetId,
-        address _admin,
-        bytes[] calldata _factoryDeps
-    ) external returns (address);
+    /// @notice Deploys a new chain. The bridgehub passes only the minimal chain-specific data
+    ///         (id + admin); everything else (base token asset id, genesis facet set, base system
+    ///         hashes, genesis params, force deployments) is derived from the bridgehub and the
+    ///         CTM's genesis registry.
+    function createNewChain(uint256 _chainId, address _admin) external returns (address);
 
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,

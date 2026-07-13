@@ -19,12 +19,7 @@ contract createNewChainTest is ChainTypeManagerTest {
     function test_RevertWhen_CalledNotByBridgehub() public {
         vm.prank(governor);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
-        chainContractAddress.createNewChain({
-            _chainId: chainId,
-            _baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, baseToken),
-            _admin: admin,
-            _factoryDeps: new bytes[](0)
-        });
+        chainContractAddress.createNewChain({_chainId: chainId, _admin: admin});
     }
 
     function test_SuccessfulCreationOfNewChain() public {

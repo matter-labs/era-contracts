@@ -262,12 +262,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         mockDiamondInitInteropCenterCallsWithAddress(L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, baseTokenAssetId);
         uint256 currentChainId = block.chainid;
         vm.chainId(L1_CHAIN_ID);
-        address chainAddress = chainTypeManager.createNewChain(
-            ERA_CHAIN_ID + 1,
-            baseTokenAssetId,
-            chainAdmin,
-            new bytes[](0)
-        );
+        address chainAddress = chainTypeManager.createNewChain(ERA_CHAIN_ID + 1, chainAdmin);
         vm.chainId(currentChainId);
 
         // This function is available only on L1 (and it is correct),

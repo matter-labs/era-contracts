@@ -101,12 +101,7 @@ contract ChainTypeManagerBridgingTest is ChainTypeManagerTest {
 
         vm.prank(notBridgehub);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notBridgehub));
-        chainContractAddress.createNewChain({
-            _chainId: chainId + 1,
-            _baseTokenAssetId: bytes32(uint256(1)),
-            _admin: makeAddr("admin"),
-            _factoryDeps: new bytes[](0)
-        });
+        chainContractAddress.createNewChain({_chainId: chainId + 1, _admin: makeAddr("admin")});
     }
 
     // Test forwardedBridgeConfirmTransferResult (empty function)

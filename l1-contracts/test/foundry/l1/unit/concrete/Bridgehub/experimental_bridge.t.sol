@@ -875,7 +875,7 @@ contract ExperimentalBridgeTest is Test {
         vm.mockCall(
             address(mockCTM),
             // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(mockCTM.createNewChain.selector, chainId, tokenAssetId, admin, factoryDeps),
+            abi.encodeWithSelector(mockCTM.createNewChain.selector, chainId, admin),
             abi.encode(newChainAddress)
         );
 

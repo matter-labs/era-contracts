@@ -625,20 +625,13 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
     /// @notice called by Bridgehub when a chain registers
     /// @param _chainId the chain's id
-    /// @param _baseTokenAssetId the base token asset id used to pay for gas fees
     /// @param _admin the chain's admin address
-    /// @param _factoryDeps the factory dependencies used for the genesis upgrade
-    /// that initializes the chains Diamond Proxy
-    /// @dev `_baseTokenAssetId` is unused here — DiamondInit reads it from the bridgehub, which
-    /// registers it before this call. It stays in the (bridgehub-facing) signature so the
-    /// bridgehub↔CTM ABI is unchanged.
-    function createNewChain(
-        uint256 _chainId,
-        // solhint-disable-next-line no-unused-vars
-        bytes32 _baseTokenAssetId,
-        address _admin,
-        bytes[] calldata _factoryDeps
-    ) external onlyBridgehub returns (address zkChainAddress) {
+    /// @dev The bridgehub passes only the minimal chain-specific data. The base token asset id is
+    /// read by DiamondInit from the bridgehub (which registers it before this call), and the
+    /// genesis force-deployments (with their factory-dep hashes) live in the registry, so neither
+    /// is forwarded. Genesis factory-dep bytecodes are published out-of-band (via the bytecodes
+    /// supplier) and referenced by hash, so an empty `_factoryDeps` is passed to `genesisUpgrade`.
+    function createNewChain(uint256 _chainId, address _admin) external onlyBridgehub returns (address zkChainAddress) {
         zkChainAddress = _deployNewChain(_chainId, _admin);
 
         // genesis upgrade, deploys some contracts, sets chainId. The force-deployments data and
@@ -648,7 +641,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             l1GenesisUpgrade(),
             address(IL1Bridgehub(BRIDGE_HUB).l1CtmDeployer()),
             forceDeploymentsData,
-            _factoryDeps
+            new bytes[](0)
         );
         // Deposits start paused by default to allow immediate Gateway migration.
         // Otherwise, any deposit would trigger the PAUSE_DEPOSITS_TIME_WINDOW_START delay.
