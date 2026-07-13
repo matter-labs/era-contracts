@@ -852,6 +852,22 @@
   },
   {
     "type": "error",
+    "name": "AtomicBundleDirectAssetRouterCall",
+    "inputs": [
+      {
+        "name": "callIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "AtomicBundleNotAllowedInSendMessage",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "AttributeAlreadySet",
     "inputs": [
       {

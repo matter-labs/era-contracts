@@ -168,6 +168,24 @@
   },
   {
     "type": "function",
+    "name": "handleRecoverBaseTokenBridgingOnL2",
+    "inputs": [
+      {
+        "name": "_toChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "initL2",
     "inputs": [
       {
