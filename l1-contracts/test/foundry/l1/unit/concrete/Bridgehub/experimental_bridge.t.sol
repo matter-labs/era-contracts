@@ -601,10 +601,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
 
         vm.prank(bridgeOwner);
@@ -616,10 +613,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
@@ -645,10 +639,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
@@ -674,10 +665,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
 
         chainId = 0;
@@ -687,10 +675,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
@@ -712,10 +697,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: HARD_CODED_CHAIN_ID,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
@@ -737,10 +719,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: HARD_CODED_CHAIN_ID,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
@@ -769,10 +748,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
@@ -801,10 +777,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
@@ -829,10 +802,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
@@ -859,10 +829,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: factoryDeps
+            _admin: admin
         });
 
         vm.prank(mockCTM.owner());
@@ -886,10 +853,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: uint256(chainId * 2),
-            _admin: admin,
-            _initData: mockInitCalldata,
-            _factoryDeps: factoryDeps
+            _admin: admin
         });
 
         vm.stopPrank();

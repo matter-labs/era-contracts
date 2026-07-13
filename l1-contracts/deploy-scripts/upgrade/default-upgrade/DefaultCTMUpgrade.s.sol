@@ -367,15 +367,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             value: 0,
             data: abi.encodeCall(
                 IL1Bridgehub.createNewChain,
-                (
-                    chainId,
-                    ctmAddresses.stateTransition.proxies.chainTypeManager,
-                    newChainAssetId,
-                    5,
-                    msg.sender,
-                    abi.encode(newlyGeneratedData.diamondCutData, generatedData.forceDeploymentsData),
-                    new bytes[](0)
-                )
+                (chainId, ctmAddresses.stateTransition.proxies.chainTypeManager, newChainAssetId, msg.sender)
             )
         });
     }

@@ -25,10 +25,7 @@ interface IL1Bridgehub is IBridgehubBase {
         uint256 _chainId,
         address _chainTypeManager,
         bytes32 _baseTokenAssetId,
-        uint256 _salt,
-        address _admin,
-        bytes calldata _initData,
-        bytes[] calldata _factoryDeps
+        address _admin
     ) external returns (uint256 chainId);
 
     /// @notice Set settlement layer status

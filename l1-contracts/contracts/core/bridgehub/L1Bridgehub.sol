@@ -104,20 +104,12 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     /// @param _chainId the chainId of the chain
     /// @param _chainTypeManager the state transition manager address
     /// @param _baseTokenAssetId the base token asset id of the chain
-    /// @param _salt the salt for the chainId, currently not used
     /// @param _admin the admin of the chain
-    /// @param _initData the fixed initialization data for the chain
-    /// @param _factoryDeps the factory dependencies for the chain's deployment
     function createNewChain(
         uint256 _chainId,
         address _chainTypeManager,
         bytes32 _baseTokenAssetId,
-        // solhint-disable-next-line no-unused-vars
-        uint256 _salt,
-        address _admin,
-        bytes calldata _initData,
-        // solhint-disable-next-line no-unused-vars
-        bytes[] calldata _factoryDeps
+        address _admin
     ) external onlyOwnerOrAdmin nonReentrant whenNotPaused returns (uint256 chainId) {
         _validateChainParams({_chainId: _chainId, _assetId: _baseTokenAssetId, _chainTypeManager: _chainTypeManager});
 
@@ -128,9 +120,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
 
         // The bridgehub passes only the minimal chain-specific data (id + admin) to the CTM: the
         // CTM reads all genesis data from its genesis registry, and DiamondInit reads the base
-        // token asset id from the bridgehub (registered just above). `_initData`, `_baseTokenAssetId`
-        // and `_factoryDeps` stay in the bridgehub's own signature for ABI stability with existing
-        // callers, but are not forwarded.
+        // token asset id from the bridgehub (registered just above).
         address chainAddress = IChainTypeManager(_chainTypeManager).createNewChain({
             _chainId: _chainId,
             _admin: _admin
