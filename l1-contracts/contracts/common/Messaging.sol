@@ -140,11 +140,19 @@ struct BridgehubL2TransactionRequest {
 /// @param chainId The chain id of the dependency chain
 /// @param blockOrBatchNumber The block number or the batch number where the message root was created
 /// For proof based interop it is block number. For commit based interop it is batch number.
+/// @param timestamp The settlement-layer block timestamp at which the imported root was created
+/// (i.e. `block.timestamp` of `blockOrBatchNumber` on the dependency chain). Imported alongside the
+/// root itself so that time-sensitive proofs (e.g. the atomic-interop timeout protocol) can anchor
+/// "this aggregated root is from after the deadline" on chain. Double checked on the settlement
+/// layer during batch execution against `MessageRoot.historicalRootTimestamp`. A zero value means
+/// the root was imported through the legacy (timestamp-less) path and cannot be used for
+/// time-sensitive proofs.
 /// @param sides The sides of the dynamic incremental merkle tree emitted in the L2ToL1Messenger for precommit based interop
 /// For proof and commit based interop, the sides contain a single root.
 struct InteropRoot {
     uint256 chainId;
     uint256 blockOrBatchNumber;
+    uint256 timestamp;
     // We are double overloading this. The sides of the dynamic incremental merkle tree normally contains the root, as well as the sides of the tree.
     // Second overloading: if the length is 1, we are importing a chainBatchRoot/messageRoot instead of sides.
     bytes32[] sides;

@@ -23,6 +23,7 @@ import {
     CommitBasedInteropNotSupported,
     DependencyRootsRollingHashMismatch,
     InvalidBatchesDataLength,
+    InvalidInteropRootTimestamp,
     MessageRootIsZero,
     MismatchNumberOfLayer1Txs
 } from "../../L1StateTransitionErrors.sol";
@@ -108,6 +109,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @notice Verifies the dependency message roots that the chain relied on.
+    /// @dev Each imported dependency is a `(blockNumber, root, timestamp)` tuple; both the root and
+    /// its creation timestamp are double checked against the `MessageRoot` contract's historical
+    /// records, and both are folded into the rolling hash the proven batch commits to. The timestamp
+    /// check is what lets L2 contracts trust `L2InteropRootStorage.interopRootTimestamps` for
+    /// time-sensitive proofs (e.g. the atomic-interop timeout protocol).
     function _verifyDependencyInteropRoots(
         InteropRoot[] memory _dependencyRoots
     ) internal view returns (bytes32 dependencyRootsRollingHash) {
@@ -117,10 +123,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         for (uint256 i = 0; i < length; ++i) {
             InteropRoot memory interopRoot = _dependencyRoots[i];
             bytes32 correctRootHash;
+            uint256 correctTimestamp;
             if (interopRoot.chainId == block.chainid) {
                 // For the same chain we verify using the MessageRoot contract. Note, that in this
                 // release, import and export only happens on GW, so this is the only case we have to cover.
                 correctRootHash = messageRootContract.historicalRoot(uint256(interopRoot.blockOrBatchNumber));
+                correctTimestamp = messageRootContract.historicalRootTimestamp(uint256(interopRoot.blockOrBatchNumber));
             } else {
                 revert CommitBasedInteropNotSupported();
             }
@@ -130,12 +138,16 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             if (interopRoot.sides.length != 1 || interopRoot.sides[0] != correctRootHash) {
                 revert InvalidMessageRoot(correctRootHash, interopRoot.sides[0]);
             }
+            if (interopRoot.timestamp != correctTimestamp) {
+                revert InvalidInteropRootTimestamp(correctTimestamp, interopRoot.timestamp);
+            }
             dependencyRootsRollingHash = keccak256(
                 // solhint-disable-next-line func-named-parameters
                 abi.encodePacked(
                     dependencyRootsRollingHash,
                     interopRoot.chainId,
                     interopRoot.blockOrBatchNumber,
+                    interopRoot.timestamp,
                     interopRoot.sides
                 )
             );

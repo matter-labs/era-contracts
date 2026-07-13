@@ -397,6 +397,25 @@
   },
   {
     "type": "function",
+    "name": "historicalRootTimestamp",
+    "inputs": [
+      {
+        "name": "blockNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "timestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "interopRootLogId",
     "inputs": [],
     "outputs": [

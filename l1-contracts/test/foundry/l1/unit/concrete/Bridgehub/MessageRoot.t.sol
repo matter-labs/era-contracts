@@ -16,6 +16,7 @@ import {
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
+import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {
     L2_COMPLEX_UPGRADER_ADDR,
     L2_BRIDGEHUB_ADDR,
@@ -92,8 +93,66 @@ contract MessageRootTest is Test {
         vm.mockCall(address(bridgeHub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(assetTracker));
     }
 
+    /// @dev The chain root of a freshly registered chain: a single-leaf tree holding the seeded
+    /// genesis batch leaf (see `MessageRootBase._addNewChain`), so the root is the leaf itself.
+    function _genesisChainRoot(uint256 _startingBatchNumber) internal view returns (bytes32) {
+        return
+            MessageHashing.batchLeafHash(
+                ChainBatchRootTree.genesisChainBatchRoot(),
+                _startingBatchNumber,
+                block.timestamp
+            );
+    }
+
     function test_init() public {
-        assertEq(messageRoot.getAggregatedRoot(), (MessageHashing.chainIdLeafHash(0x00, block.chainid)));
+        assertEq(
+            messageRoot.getAggregatedRoot(),
+            (MessageHashing.chainIdLeafHash(_genesisChainRoot(0), block.chainid))
+        );
+    }
+
+    /// @notice Registering a chain seeds its tree with the genesis batch leaf and emits
+    /// `AppendedChainBatchRoot` for it (so off-chain tree reconstructions include the leaf).
+    function test_addNewChain_seedsGenesisBatchLeaf() public {
+        uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
+        uint256 startingBatchNumber = 7;
+
+        vm.prank(bridgeHub);
+        vm.expectEmit(true, true, false, true);
+        emit IMessageRootBase.AppendedChainBatchRoot(
+            alphaChainId,
+            startingBatchNumber,
+            ChainBatchRootTree.genesisChainBatchRoot(),
+            block.timestamp
+        );
+        messageRoot.addNewChain(alphaChainId, startingBatchNumber);
+
+        // The single-leaf chain root is the genesis batch leaf itself, and its timestamp is recorded.
+        assertEq(messageRoot.getChainRoot(alphaChainId), _genesisChainRoot(startingBatchNumber));
+        assertEq(messageRoot.chainBatchRootTimestamp(alphaChainId, startingBatchNumber), block.timestamp);
+        // `chainBatchRoots` must stay empty for the genesis batch: for migrating/upgrading chains a
+        // real batch with this number exists elsewhere and message verification must keep resolving
+        // through the fallback path.
+        assertEq(messageRoot.chainBatchRoots(alphaChainId, startingBatchNumber), bytes32(0));
+        // Real batches continue right after the starting batch number, unaffected by the seeding.
+        assertEq(messageRoot.currentChainBatchNumber(alphaChainId), startingBatchNumber);
+    }
+
+    /// @notice Every historical root is recorded together with its creation timestamp — the
+    /// `(blockNumber, root, timestamp)` tuple chains import and the executor double checks.
+    function test_historicalRootTimestampRecorded() public {
+        uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
+
+        vm.warp(1_700_000_123);
+        vm.roll(100);
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(alphaChainId, 0);
+
+        assertEq(messageRoot.historicalRoot(100), messageRoot.getAggregatedRoot());
+        assertEq(messageRoot.historicalRootTimestamp(100), 1_700_000_123);
+
+        // A block with no recorded root has no timestamp either.
+        assertEq(messageRoot.historicalRootTimestamp(101), 0);
     }
 
     function test_RevertWhen_addChainNotBridgeHub() public {
@@ -137,7 +196,8 @@ contract MessageRootTest is Test {
         assertTrue(messageRoot.chainRegistered(alphaChainId), "alpha chain 2");
         assertFalse(messageRoot.chainRegistered(betaChainId), "beta chain 2");
 
-        assertEq(messageRoot.getChainRoot(alphaChainId), bytes32(0));
+        // The chain tree is seeded with the genesis batch leaf at registration.
+        assertEq(messageRoot.getChainRoot(alphaChainId), _genesisChainRoot(0));
     }
 
     function test_RevertWhen_ChainNotRegistered() public {
@@ -220,9 +280,9 @@ contract MessageRootTest is Test {
         // Verify chain is now registered
         assertTrue(messageRoot.chainRegistered(alphaChainId), "Chain should be registered after addNewChain");
 
-        // Initial chain root should be zero
+        // Initial chain root holds the seeded genesis batch leaf
         bytes32 initialChainRoot = messageRoot.getChainRoot(alphaChainId);
-        assertEq(initialChainRoot, bytes32(0), "Initial chain root should be zero");
+        assertEq(initialChainRoot, _genesisChainRoot(0), "Initial chain root should be the genesis leaf");
 
         // Verify first batch number is 0 before adding any batches
         uint256 initialBatchNumber = messageRoot.currentChainBatchNumber(alphaChainId);
@@ -333,9 +393,11 @@ contract MessageRootTest is Test {
         vm.prank(bridgeHub);
         messageRoot.addNewChain(betaChainId, 0);
 
-        bytes32 hash0 = MessageHashing.chainIdLeafHash(0x00, block.chainid);
-        bytes32 hash1 = MessageHashing.chainIdLeafHash(0x00, alphaChainId);
-        bytes32 hash2 = MessageHashing.chainIdLeafHash(0x00, betaChainId);
+        // Every chain tree is seeded with the genesis batch leaf at registration; all three chains
+        // registered in the same block, so their genesis chain roots coincide.
+        bytes32 hash0 = MessageHashing.chainIdLeafHash(_genesisChainRoot(0), block.chainid);
+        bytes32 hash1 = MessageHashing.chainIdLeafHash(_genesisChainRoot(0), alphaChainId);
+        bytes32 hash2 = MessageHashing.chainIdLeafHash(_genesisChainRoot(0), betaChainId);
 
         bytes32[] memory pathFor1 = messageRoot.getMerklePathForChain(alphaChainId);
         bytes32[] memory expectedPath = new bytes32[](2);

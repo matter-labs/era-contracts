@@ -45,6 +45,21 @@ library ChainBatchRootTree {
     bytes32 internal constant RESERVED_SUBTREE_NODE =
         0xb4c11951957c6f8f642c4af61cd6b24640fec6dc7fc607ee8206a99e92410d30;
 
+    /// @dev Root of a freshly seeded interop commitment tree: the {IndexedMerkleTree} after `setup`
+    /// holds only the `{value: 0, nextIndex: 0, nextValue: 0}` sentinel head leaf in a height-0
+    /// {FullMerkle}, so the root is the sentinel's leaf hash `keccak256(abi.encode(0, 0, 0))`.
+    /// Locked against the recomputation by a unit test.
+    bytes32 internal constant EMPTY_IMT_ROOT = keccak256(abi.encodePacked(uint256(0), uint256(0), uint256(0)));
+
+    /// @notice The chain batch root of a chain's synthetic genesis batch: no local logs, no
+    /// multichain root, and the interop commitment tree in its freshly seeded (empty) state at both
+    /// batch boundaries. The settlement layer appends a batch leaf with this root when a chain is
+    /// registered in the `MessageRoot`, so every registered chain has at least one batch inside the
+    /// shared root — a precondition of the atomic-interop timeout protocol (see {AtomicInteropProof}).
+    function genesisChainBatchRoot() internal pure returns (bytes32) {
+        return compute(bytes32(0), bytes32(0), EMPTY_IMT_ROOT, EMPTY_IMT_ROOT);
+    }
+
     /// @notice Computes the chain batch root from the four live leaves.
     /// @param _logsRoot The batch's local L2->L1 logs tree root (leaf 0).
     /// @param _multichainRoot The chain's own multichain root (leaf 1).

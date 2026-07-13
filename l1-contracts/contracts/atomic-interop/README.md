@@ -43,32 +43,67 @@ bundle, so `bundleHash` does not depend on `flowId` (which would be circular).
    `AtomicFlowManager.requireFlowFinalized`, which for **every** leg verifies an IMT **inclusion** proof
    (`AtomicInteropProof.verifyInclusion`): the leg's `commitValue` is present in its source chain's
    **batch-end** IMT root (chain-batch-root leaf 3, authenticated with an exact-depth 3-sibling path)
-   of a batch that settled by the deadline (`l1Timestamp <= deadline`) on the flow's
+   of a batch that settled strictly before the deadline (`l1Timestamp < deadline`) on the flow's
    `settlementLayerChainId`, and the proof's `sourceChainId` matches the
    leg's declared `legSourceChainIds[i]`. If all legs are proven committed in time, the bundle's calls
    execute (the destination mint). A `commitValue` can only exist in its true source chain's tree, so
    inclusion is self-binding; non-inclusion is not, which is why the source chain is checked explicitly.
 4. **Timeout / refund.** If a leg never commits in time, `AtomicFlowManager.authorizeRefund` takes a
-   single absence proof (`AtomicInteropProof.verifyTimeoutAbsence`): the missing leg's `commitValue` is
-   absent from the **batch-begin** IMT root (leaf 2) of a source batch with `t > deadline`. Since the
-   IMT is append-only, `begin(N) == end(N-1)`, and `t` is monotone, absence at the begin of a late
-   batch means the value was not committed in any in-time batch — so this cannot succeed for an on-time
-   or already-finalized leg, while a genuinely missing (or late-committed) leg is refundable against
-   the first late batch. A chain whose first-ever settled batch is already late is refundable against
-   that batch's begin root (the seeded genesis root); the only remaining liveness gap is a source chain
-   that halts before settling any late batch.
-   The proof is bound to the missing leg's source chain and settlement layer. It
-   marks this chain's `Committed` legs `Revertable`; `claimRefund` then reverses each burn by asking the
-   call's target to recover itself via `IAtomicRecoverable.recoverAtomicCall` (implemented by
-   `L2AssetRouter`), re-minting to the original depositor. Recovery is **best-effort**: each target
-   reverses the calls it recognises (an asset-router deposit re-mints the burned funds) and returns
-   `false` for calls that move no funds and have nothing to reverse (e.g. flipping a flag); the refund
-   succeeds as long as at least one call recovered. Consequently the protocol does not guarantee full
-   refundability of an arbitrary bundle — making a fund-moving leg recoverable (an asset-router deposit)
-   is the flow author's responsibility. Atomic sends reject only native-`value` legs (`InteropCenter`),
-   since those can never be reversed.
+   single absence proof (`AtomicInteropProof.verifyTimeoutAbsence`). The proof anchors on an
+   **aggregated root created after the deadline** — the imported interop root's creation timestamp
+   `T` (stored as `interopRootTimestamps` next to the root and double checked on the settlement layer
+   during batch execution) must satisfy `T >= deadline` — plus one batch of the source chain inside
+   that root, with two branches on the batch's inclusion time `t` (the `l1Timestamp` bound into the
+   batch leaf when the batch root was aggregated):
+   - `t >= deadline` (late batch): the missing leg's `commitValue` is absent from the **batch-begin**
+     IMT root (leaf 2). Since the IMT is append-only, `begin(N) == end(N-1)`, and `t` is monotone,
+     absence at the begin of a late batch means the value was not committed in any in-time batch.
+   - `t < deadline` (in-time batch): the batch is additionally proven to be the chain's **last batch
+     inside the aggregated root** (every left-child hop of the batch-leaf path carries the
+     empty-subtree hash), and the `commitValue` is absent from the **batch-end** IMT root (leaf 3).
+     Any batch aggregated after the anchor root has `t' >= T >= deadline`, so that end root is the
+     final IMT state reachable in time. This branch keeps a source chain that **halts** (never
+     settles a post-deadline batch) refundable — closing the previous liveness gap.
+     Neither branch can succeed for an on-time or already-finalized leg, while a genuinely missing (or
+     late-committed) leg is always refundable. Every registered chain has at least one batch inside the
+     shared root — `MessageRoot` seeds a genesis batch leaf (empty-IMT chain batch root) at chain
+     registration — so the "last batch" required by the second branch always exists.
+     The proof is bound to the missing leg's source chain and settlement layer. It
+     marks this chain's `Committed` legs `Revertable`; `claimRefund` then reverses each burn by asking the
+     call's target to recover itself via `IAtomicRecoverable.recoverAtomicCall` (implemented by
+     `L2AssetRouter`), re-minting to the original depositor. Recovery is **best-effort**: each target
+     reverses the calls it recognises (an asset-router deposit re-mints the burned funds) and returns
+     `false` for calls that move no funds and have nothing to reverse (e.g. flipping a flag); the refund
+     succeeds as long as at least one call recovered. Consequently the protocol does not guarantee full
+     refundability of an arbitrary bundle — making a fund-moving leg recoverable (an asset-router deposit)
+     is the flow author's responsibility. Atomic sends reject only native-`value` legs (`InteropCenter`),
+     since those can never be reversed.
 
 Leg state machine (`LegState`): `Unset -> Committed` (send) `-> Revertable -> Reverted` (timeout path).
+
+## Timeout-protocol preconditions
+
+The timeout proof relies on three preconditions, each enforced on chain:
+
+1. **Every chain has at least one batch inside the settlement layer's message root.** Enforced by
+   `MessageRootBase._addNewChain`, which seeds a genesis batch leaf (the empty-IMT chain batch root,
+   `ChainBatchRootTree.genesisChainBatchRoot()`) into the chain's tree at registration. This
+   guarantees the "last batch inside the aggregated root" required by the in-time timeout branch
+   always exists, even for a chain that halts before settling anything.
+2. **Interop only involves registered chains.** A leg's commit value only "counts" once it settles:
+   both finality and timeout proofs resolve against the source chain's batches inside the settlement
+   layer's message root, and `MessageRoot.addChainBatchRoot` only accepts batches from registered
+   chains (which, per precondition 1, already have their genesis leaf). A flow declaring an
+   unregistered source chain simply can never finalize, and stays refundable against that chain's
+   (genesis-only) tree once the chain registers — so destinations should only accept flows whose
+   source chains are registered.
+3. **Every batch leaf carries the timestamp at which it entered the shared root.** Enforced by
+   `MessageRoot.addChainBatchRoot`, which folds the settlement-layer `block.timestamp` into the batch
+   leaf (`MessageHashing.batchLeafHash`); the timestamp is therefore proven by the same inclusion
+   proof that authenticates the IMT root. Aggregated roots additionally carry their own creation
+   timestamp (`historicalRootTimestamp` on the settlement layer, imported as
+   `interopRootTimestamps` and double checked at batch execution), which anchors the "root from
+   after the deadline" requirement.
 
 ## Contracts
 

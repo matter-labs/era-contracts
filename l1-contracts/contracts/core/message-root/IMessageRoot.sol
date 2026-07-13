@@ -69,6 +69,11 @@ interface IMessageRootBase is IMessageVerification {
 
     function historicalRoot(uint256 _blockNumber) external view returns (bytes32);
 
+    /// @notice The block timestamp at which the `historicalRoot` for `_blockNumber` was written.
+    /// @dev Together with `historicalRoot` this forms the `(blockNumber, root, timestamp)` tuple that
+    /// chains import; the imported timestamp is double checked against this value during batch execution.
+    function historicalRootTimestamp(uint256 _blockNumber) external view returns (uint256);
+
     /// @dev Used to parse the merkle proof data, this function calls a library function.
     function getProofData(
         uint256 _chainId,

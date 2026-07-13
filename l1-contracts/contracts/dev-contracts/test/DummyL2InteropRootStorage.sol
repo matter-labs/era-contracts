@@ -25,12 +25,26 @@ contract DummyL2InteropRootStorage {
     mapping(uint256 index => PendingMessageRootId) public pendingMessageRootIds;
     // mapping(bytes32 interopRoot => uint256 batchNumber) public batchNumberFrominteropRoot;
 
-    event InteropRootAdded(uint256 indexed chainId, uint256 indexed batchNumber, bytes32[] sides);
+    /// @notice Mirrors `L2InteropRootStorage.interopRootTimestamps`: the creation timestamp of each
+    /// imported root, consulted by time-sensitive proofs (e.g. the atomic-interop timeout protocol).
+    mapping(uint256 chainId => mapping(uint256 batchNumber => uint256 timestamp)) public interopRootTimestamps;
+
+    event InteropRootAdded(uint256 indexed chainId, uint256 indexed batchNumber, uint256 timestamp, bytes32[] sides);
 
     function addInteropRoot(uint256 chainId, uint256 batchNumber, bytes32[] memory sides) external {
-        emit InteropRootAdded(chainId, batchNumber, sides);
+        addInteropRootWithTimestamp(chainId, batchNumber, 0, sides);
+    }
+
+    function addInteropRootWithTimestamp(
+        uint256 chainId,
+        uint256 batchNumber,
+        uint256 timestamp,
+        bytes32[] memory sides
+    ) public {
+        emit InteropRootAdded(chainId, batchNumber, timestamp, sides);
         if (sides.length == 1) {
             interopRoots[chainId][batchNumber] = sides[0];
+            interopRootTimestamps[chainId][batchNumber] = timestamp;
             batchNumberFrominteropRoot[sides[0]] = batchNumber;
             chainIdFrominteropRoot[sides[0]] = chainId;
         } else {

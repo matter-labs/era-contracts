@@ -61,6 +61,24 @@ contract ChainBatchRootTreeTest is Test {
         assertTrue(ChainBatchRootTree.compute(z, z, z, z) != bytes32(0));
     }
 
+    /// @notice Locks `EMPTY_IMT_ROOT` against its definition: the root of a freshly seeded
+    /// {IndexedMerkleTree} — a height-0 {FullMerkle} holding only the `{0,0,0}` sentinel head leaf,
+    /// so the root is the sentinel's leaf hash `keccak256(abi.encode(0, 0, 0))`.
+    function test_emptyImtRoot_matchesRecomputation() public pure {
+        assertEq(ChainBatchRootTree.EMPTY_IMT_ROOT, keccak256(abi.encode(uint256(0), uint256(0), uint256(0))));
+    }
+
+    /// @notice Locks `genesisChainBatchRoot()` against its definition: the chain batch root of a
+    /// synthetic genesis batch — zero logs root, zero multichain root, and the freshly seeded IMT
+    /// at both batch boundaries.
+    function test_genesisChainBatchRoot_matchesRecomputation() public pure {
+        bytes32 emptyImtRoot = keccak256(abi.encode(uint256(0), uint256(0), uint256(0)));
+        assertEq(
+            ChainBatchRootTree.genesisChainBatchRoot(),
+            ChainBatchRootTree.compute(bytes32(0), bytes32(0), emptyImtRoot, emptyImtRoot)
+        );
+    }
+
     /// @notice The IMT leaves sit exactly `TREE_DEPTH` hops below the root at the documented
     /// indices: recomputing the root from leaf 2 / leaf 3 with their sibling paths must succeed.
     /// This is the property `AtomicInteropProof._authenticateRoot` relies on when it fixes the

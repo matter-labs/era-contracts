@@ -27,13 +27,23 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
     /// @notice Mapping of chain ID to block or batch number to message root.
     mapping(uint256 chainId => mapping(uint256 blockOrBatchNumber => bytes32 interopRoot)) public interopRoots;
 
-    /// @dev Adds a message root to the L2InteropRootStorage contract.
+    /// @notice Mapping of chain ID to block or batch number to the settlement-layer block timestamp
+    /// at which the corresponding interop root was created on the dependency chain.
+    /// @dev The timestamp is imported together with the root itself, i.e. the storage effectively holds
+    /// `(blockOrBatchNumber, root, timestamp)` tuples per chain. It is double checked on the settlement
+    /// layer during batch execution (see `ExecutorFacet._verifyDependencyInteropRoots`), so time-sensitive
+    /// proofs (e.g. the atomic-interop timeout protocol) can rely on it.
+    /// @dev Zero for roots imported through the legacy (timestamp-less) `addInteropRoot` path.
+    mapping(uint256 chainId => mapping(uint256 blockOrBatchNumber => uint256 timestamp)) public interopRootTimestamps;
+
+    /// @dev Adds a message root to the L2InteropRootStorage contract, without a creation timestamp.
     /// @dev For both proof-based and commit-based interop, the `sides` parameter contains only the root.
     /// @dev Once pre-commit interop is introduced, `sides` will include both the root and its associated sides.
     /// @dev This interface is preserved now so that enabling pre-commit interop later requires no changes in interface.
     /// @dev In proof-based and pre-commit interop, `blockOrBatchNumber` represents the block number, in commit-based interop,
     /// it represents the batch number. This distinction reflects the implementation requirements  of each interop finality form.
-    /// @dev Note: should be removed in the next protocol version.
+    /// @dev Note: should be removed in the next protocol version. Roots imported through this legacy
+    /// entry point have no timestamp recorded and cannot be used for time-sensitive proofs.
     /// @param chainId The chain ID of the chain that the message root is for.
     /// @param blockOrBatchNumber The block or batch number of the message root. Either of block number or batch number will be used,
     /// depends on finality form of interop, mentioned above.
@@ -43,14 +53,14 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
         uint256 blockOrBatchNumber,
         bytes32[] calldata sides
     ) external onlyCallFromBootloader {
-        _addInteropRoot(chainId, blockOrBatchNumber, sides);
+        _addInteropRoot(chainId, blockOrBatchNumber, 0, sides);
     }
 
     /// @dev Adds a message root to the L2InteropRootStorage contract.
-    /// @dev Currently duplicates `addInteropRoot` for backward compatibility.
+    /// @dev Imports the full `(blockOrBatchNumber, root, timestamp)` tuple; see {InteropRoot}.
     /// @param interopRoot The interop root to be added. See the description of the corresponding struct above.
     function addSingleInteropRoot(InteropRoot calldata interopRoot) external onlyCallFromBootloader {
-        _addInteropRoot(interopRoot.chainId, interopRoot.blockOrBatchNumber, interopRoot.sides);
+        _addInteropRoot(interopRoot.chainId, interopRoot.blockOrBatchNumber, interopRoot.timestamp, interopRoot.sides);
     }
 
     /// @dev Adds a group of interop roots to the L2InteropRootStorage contract.
@@ -62,13 +72,19 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
                 _addInteropRoot(
                     interopRootsInput[i].chainId,
                     interopRootsInput[i].blockOrBatchNumber,
+                    interopRootsInput[i].timestamp,
                     interopRootsInput[i].sides
                 );
             }
         }
     }
 
-    function _addInteropRoot(uint256 chainId, uint256 blockOrBatchNumber, bytes32[] calldata sides) private {
+    function _addInteropRoot(
+        uint256 chainId,
+        uint256 blockOrBatchNumber,
+        uint256 timestamp,
+        bytes32[] calldata sides
+    ) private {
         // In the current code sides should only contain the Interop Root itself, as mentioned above.
         if (sides.length != 1) {
             revert SidesLengthNotOne();
@@ -84,7 +100,8 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
 
         // Set interopRoots for specified chainId and blockOrBatchNumber, emit event.
         interopRoots[chainId][blockOrBatchNumber] = sides[0];
+        interopRootTimestamps[chainId][blockOrBatchNumber] = timestamp;
 
-        emit InteropRootAdded(chainId, blockOrBatchNumber, sides);
+        emit InteropRootAdded(chainId, blockOrBatchNumber, timestamp, sides);
     }
 }

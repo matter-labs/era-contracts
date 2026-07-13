@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
+import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @notice Locks the L2InteropCommitmentTree storage ABI the ZKsync OS bootloader depends on:
@@ -35,6 +36,15 @@ contract L2InteropCommitmentTreeStorageTest is Test {
         bytes32 cached = vm.load(address(tree), CURRENT_ROOT_SLOT);
         assertTrue(cached != bytes32(0));
         assertEq(cached, tree.root());
+    }
+
+    /// @notice The freshly seeded tree's root equals `ChainBatchRootTree.EMPTY_IMT_ROOT` — the
+    /// constant the settlement layer bakes into the genesis chain batch root it seeds for every
+    /// registered chain (see `MessageRootBase._addNewChain`). If the seeding or the leaf hashing
+    /// ever changes, this cross-check must be updated together with a matching bootloader change.
+    function test_initialize_seedRootMatchesEmptyImtRootConstant() public {
+        tree.initialize();
+        assertEq(tree.root(), ChainBatchRootTree.EMPTY_IMT_ROOT);
     }
 
     /// @notice Every insert refreshes the slot-0 cache to the engine's new root.

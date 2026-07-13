@@ -45,7 +45,7 @@ interface IAtomicFlowManager {
 
     /// @notice Revert if the flow is not fully committed in time. Callable only by the {InteropHandler}.
     /// Verifies an inclusion proof for every leg against its source chain's IMT (each in a batch whose
-    /// `l1Timestamp <= deadline`), recomputes `flowId`, ties each proof to its source chain
+    /// `l1Timestamp < deadline`), recomputes `flowId`, ties each proof to its source chain
     /// and the flow's settlement layer, and asserts the bundle being executed is a leg of the flow.
     /// @param _executingBundleHash The bundle hash the handler is about to execute.
     /// @param _finality The flow definition + per-leg inclusion proofs.
@@ -57,9 +57,10 @@ interface IAtomicFlowManager {
     /// and matched. The absence proof for the missing leg must target
     /// `_flow.legSourceChainIds[_missingLegIndex]`.
     /// @param _missingLegIndex Index into `_flow.legBundleHashes` of the leg proven absent.
-    /// @param _absence Timeout proof: non-inclusion of the leg's commit value in the batch-BEGIN IMT
-    /// root of a source batch with `l1Timestamp > deadline` (see
-    /// {AtomicInteropProof.verifyTimeoutAbsence}).
+    /// @param _absence Timeout proof, anchored on an aggregated root created after the deadline:
+    /// non-inclusion of the leg's commit value in the batch-BEGIN IMT root of a late source batch
+    /// (`l1Timestamp >= deadline`), or in the batch-END IMT root of the chain's LAST batch inside
+    /// that root when the batch is in time (see {AtomicInteropProof.verifyTimeoutAbsence}).
     function authorizeRefund(AtomicFlow calldata _flow, uint256 _missingLegIndex, ImtProof calldata _absence) external;
 
     /// @notice Recover the burned source funds for a `Revertable` leg by reversing the bundle's
