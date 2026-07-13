@@ -14,6 +14,7 @@ import {IL2GenesisUpgrade} from "contracts/state-transition/l2-deps/IL2GenesisUp
 import {Utils} from "../../utils/Utils.sol";
 
 import {Call} from "contracts/governance/Common.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CTMUpgradeParams} from "../default-upgrade/UpgradeParams.sol";
@@ -93,6 +94,11 @@ contract CTMUpgrade_v32 is Script, DefaultCTMUpgrade {
         );
 
         deployStateTransitionDiamondFacets();
+
+        // v32 is the first registry-driven genesis: deploy + initialize the genesis `CTMRegistry`
+        // that the upgraded CTM will be pinned to (via `setGenesisRegistry` in the stage-1 bundle).
+        // Depends on the facet set and genesis-upgrade address deployed just above.
+        ctmAddresses.stateTransition.genesisRegistry = deployGenesisRegistry();
     }
 
     /// @notice Append the ValidatorTimelock proxy swap to the stage-1 bundle — only if the v32
@@ -123,6 +129,23 @@ contract CTMUpgrade_v32 is Script, DefaultCTMUpgrade {
                 ProxyAdmin.upgrade,
                 (ITransparentUpgradeableProxy(payable(validatorTimelockProxy)), newImpl)
             ),
+            value: 0
+        });
+    }
+
+    /// @notice v32 governance call: pin the (freshly deployed) genesis `CTMRegistry` on the
+    ///         upgraded CTM. This replaces the legacy `setChainCreationParams` emission from
+    ///         `DefaultCTMUpgrade` — the v32 CTM reads all genesis data from the registry instead.
+    function prepareNewChainCreationParamsCall() public virtual override returns (Call[] memory calls) {
+        address ctm = ctmAddresses.stateTransition.proxies.chainTypeManager;
+        address registry = ctmAddresses.stateTransition.genesisRegistry;
+        require(ctm != address(0), "v32: chainTypeManager proxy is zero");
+        require(registry != address(0), "v32: genesis registry not deployed");
+
+        calls = new Call[](1);
+        calls[0] = Call({
+            target: ctm,
+            data: abi.encodeCall(IChainTypeManager.setGenesisRegistry, (registry)),
             value: 0
         });
     }
