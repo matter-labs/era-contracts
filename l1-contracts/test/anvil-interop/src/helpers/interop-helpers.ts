@@ -281,6 +281,12 @@ export interface SendBundleOptions {
   bundleAttributes?: string[];
   value?: BigNumber;
   gasLimit?: number;
+  /**
+   * Set to `false` for an L2->L1 withdrawal: the bundle is published to L1 and finalized there via a
+   * message-inclusion proof, so there is no atomic flow to predict — skip the `previewBundleHash` /
+   * `atomicBundle` attribute path (which is L2<->L2 only). Defaults to atomic (L2<->L2).
+   */
+  atomic?: boolean;
 }
 
 export interface InteropSendResult {
@@ -325,7 +331,15 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
   let deadline: number;
   let legSourceChainId: number;
   let predictedBundleHash: string | undefined;
-  if (hasAtomicBundleAttribute(baseAttributes)) {
+  if (options.atomic === false) {
+    // L2->L1 withdrawal: non-atomic. The bundle is published to L1 and finalized there via a
+    // message-inclusion proof, so there is no atomic flow to predict — send the attributes as-is and
+    // leave the atomic flow fields empty (they are unused on the withdrawal finalization path).
+    attributes = baseAttributes;
+    flowId = ethers.constants.HashZero;
+    deadline = 0;
+    legSourceChainId = (await options.sourceProvider.getNetwork()).chainId;
+  } else if (hasAtomicBundleAttribute(baseAttributes)) {
     attributes = baseAttributes;
     ({ flowId, deadline } = decodeAtomicBundleAttribute(baseAttributes));
     legSourceChainId = (await options.sourceProvider.getNetwork()).chainId;
@@ -521,7 +535,10 @@ export async function getInteropExecutionData(
 ): Promise<InteropExecutionData> {
   // Atomic interop: the proof is a per-leg IMT inclusion proof ({AtomicFinalityProof}) built from the
   // source chain's commitment tree, not a live gateway message-inclusion proof. The flow metadata
-  // (flowId/deadline/source chain) was recorded when the bundle was sent.
+  // (flowId/deadline/source chain) was recorded when the bundle was sent. `_destProvider` and
+  // `_sourceChainId` are therefore unused here; they are kept for signature parity with `executeBundle`.
+  void _destProvider;
+  void _sourceChainId;
   const sendResult = getSendResult(bundleInput);
   if (isLiveInteropMode()) {
     throw new Error("Atomic live-mode interop proof generation is not yet implemented");
