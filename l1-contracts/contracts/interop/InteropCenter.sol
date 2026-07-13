@@ -41,8 +41,10 @@ import {
     AttributeViolatesRestriction,
     CannotInitiateInteropOnL1,
     DestinationChainNotRegistered,
+    DirectCallToL1NotSupported,
     IndirectCallValueMismatch,
     InteropBundleSaltAlreadyUsed,
+    InteropCallToL1NotToAssetRouter,
     InteroperableAddressChainReferenceNotEmpty,
     InteroperableAddressNotEmpty,
     FeeWithdrawalFailed,
@@ -344,14 +346,14 @@ contract InteropCenter is
     /// @notice Validates the bundle destination.
     /// @dev The InteropCenter only runs on L2s (never on L1 itself). Destinations may be:
     ///      - another L2 (the classic L2->L2 interop), or
-    ///      - L1, but only for a single-call bundle (canonically an L2->L1 asset withdrawal). Multi-call
-    ///        bundles to L1 are not supported; an L1-destined bundle is exactly one indirect, zero-value call.
+    ///      - L1, but only for a single-call asset WITHDRAWAL bundle. Multi-call bundles to L1 are not
+    ///        supported; an L1-destined bundle is exactly one call.
     /// @dev The destination must not be this chain itself: a chain can end up registered for interop on
     ///      its own Bridgehub, and a self-destination bundle would burn value into a self-bridging
     ///      accounting path that is not supported.
     /// @dev The remaining destination-dependent requirements are enforced in `_sendBundle` once the call
-    ///      attributes have been parsed: for an L1 destination the single call (direct or indirect) must
-    ///      carry zero interopCallValue, and non-L1 destinations are checked against the Bridgehub registry
+    ///      attributes have been parsed: an L1-destined call must be an indirect, zero-value call to the L2
+    ///      AssetRouter (a withdrawal), and non-L1 destinations are checked against the Bridgehub registry
     ///      (`DestinationChainNotRegistered`).
     /// @param _destinationChainId Destination chain ID.
     /// @param _callCount Number of calls in the bundle.
@@ -495,12 +497,19 @@ contract InteropCenter is
         uint256 callStartersLength = _callStarters.length;
         for (uint256 i = 0; i < callStartersLength; ++i) {
             if (_destinationChainId == L1_CHAIN_ID) {
-                // An L1-destined call is executed by the L1InteropHandler, which invokes ERC-7786
-                // `receiveMessage` on the call target. The target is general and the call may be direct
-                // (a plain L2->L1 message) or indirect (asset-router routed — the canonical case is an
-                // L2->L1 withdrawal targeting the L1 asset router's `finalizeDeposit`). The call must
-                // carry no destination-side value: rejecting value-bearing calls at send time prevents
-                // burned funds from ending up in an unfinalizable bundle.
+                // Interop to L1 is restricted to asset WITHDRAWALS for this release. The single call must be
+                // an indirect call routed through the L2 AssetRouter: `_processCallStarter` invokes
+                // `L2AssetRouter.initiateIndirectCall`, which (for an L1 destination) rewrites the call to
+                // target the L1 AssetRouter's `finalizeDeposit`. Requiring `indirectCall` + `to == L2 asset
+                // router` keeps the L1-side attack surface to the asset router only, rather than allowing an
+                // arbitrary L2->L1 call to any `IERC7786Recipient`. The call must also carry no
+                // destination-side value: the withdrawn amount rides in the transfer data / indirect-call
+                // message value, and a value-bearing call could otherwise end up in an unfinalizable bundle.
+                require(_callStarters[i].callAttributes.indirectCall, DirectCallToL1NotSupported());
+                require(
+                    _callStarters[i].to == L2_ASSET_ROUTER_ADDR,
+                    InteropCallToL1NotToAssetRouter(_callStarters[i].to)
+                );
                 require(
                     _callStarters[i].callAttributes.interopCallValue == 0,
                     NonZeroValueToL1NotSupported(_callStarters[i].callAttributes.interopCallValue)

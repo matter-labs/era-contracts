@@ -61,9 +61,8 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Proves that the bundle message was included on the source chain.
-    /// @dev L2 uses the `L2_MESSAGE_VERIFICATION` system contract; L1 uses the `MessageRoot` (and additionally records
-    /// the settlement layer of the proof in transient storage).
-    function _proveInclusion(MessageInclusionProof memory _proof) internal virtual returns (bool);
+    /// @dev L2 uses the `L2_MESSAGE_VERIFICATION` system contract; L1 uses the `MessageRoot`.
+    function _proveInclusion(MessageInclusionProof memory _proof) internal view virtual returns (bool);
 
     /// @notice Handles the base-token value that rides along an interop call before it is forwarded.
     /// @dev L2 pulls the value from the `BaseTokenHolder`; L1 forbids non-zero value (withdrawals carry the amount in

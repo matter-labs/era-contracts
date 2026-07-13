@@ -885,6 +885,11 @@
   },
   {
     "type": "error",
+    "name": "DirectCallToL1NotSupported",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "FeeWithdrawalFailed",
     "inputs": []
   },
@@ -917,6 +922,17 @@
         "name": "salt",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InteropCallToL1NotToAssetRouter",
+    "inputs": [
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   },

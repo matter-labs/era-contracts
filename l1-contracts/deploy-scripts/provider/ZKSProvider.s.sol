@@ -71,7 +71,7 @@ contract ZKSProvider is Script {
     }
 
     /// we might not need this.
-    /// nullifier.finalizeDeposit simulation probably happens at an earlier blocknumber.
+    /// the interop handler's executeBundle simulation probably happens at an earlier blocknumber.
     /// It might be enough to wait for the merkle proof from the server.
     function waitForBatchToBeExecuted(
         address l1Bridgehub,

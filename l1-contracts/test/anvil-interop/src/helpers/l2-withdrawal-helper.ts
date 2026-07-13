@@ -134,7 +134,8 @@ export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): P
  * destination of the L1 chain. The InteropCenter invokes
  * `L2AssetRouter.initiateIndirectCall`, which builds the bridgehub-deposit
  * request; because the destination is L1, it burns on L2 and produces the
- * `finalizeDeposit` message that `L1Nullifier.finalizeDeposit` consumes.
+ * single-call interop bundle finalized on L1 via `L1InteropHandler.executeBundle`
+ * (which delivers `finalizeDeposit` to the L1 asset router).
  *
  * (The legacy `L2AssetRouter.withdraw(assetId, data)` entrypoint was removed; all
  * L2→L1 withdrawals now flow through the InteropCenter.)

@@ -32,7 +32,7 @@ contract L2InteropHandler is InteropHandlerBase {
     function initL2() public reentrancyGuardInitializer onlyUpgrader {}
 
     /// @inheritdoc InteropHandlerBase
-    function _proveInclusion(MessageInclusionProof memory _proof) internal override returns (bool) {
+    function _proveInclusion(MessageInclusionProof memory _proof) internal view override returns (bool) {
         return
             L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared({
                 _chainId: _proof.chainId,
