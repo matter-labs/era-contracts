@@ -32,9 +32,11 @@ interface IBaseTokenHolder {
     event BaseTokenMintedInterop(address indexed to, uint256 amount);
 
     /// @notice Emitted when base tokens are received and outbound bridging is initiated.
-    /// @dev This event is only emitted for outbound bridging through BaseTokenHolder.burnAndStartBridging().
-    /// @dev On Era, L1 withdrawals go through L2BaseTokenEra which does NOT route back through this contract.
-    /// @dev Therefore, the sum of BaseTokenBurntInterop amounts may not equal the total outbound base token volume.
+    /// @dev Emitted for outbound base-token bridging through BaseTokenHolder.burnAndStartBridging(), which is now
+    /// the unified path on both Era and ZK OS: base-token L2->L1 withdrawals and cross-chain sends flow through
+    /// the InteropCenter, and bridged base-token burns through the NativeTokenVault — both call
+    /// burnAndStartBridging. (The dedicated L2BaseToken withdraw entrypoint that used to bypass this contract on
+    /// Era was removed, so Era withdrawals now route through here too.)
     /// @param from The address that sent the base tokens.
     /// @param toChainId The destination chain ID for the bridging operation.
     /// @param amount The amount of base tokens burnt.
@@ -47,7 +49,7 @@ interface IBaseTokenHolder {
     function give(address _to, uint256 _amount, uint256 _fromChainId) external;
 
     /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.
-    /// @dev Called by InteropHandler, InteropCenter, NativeTokenVault, and L2BaseToken during bridging operations.
+    /// @dev Called by InteropCenter and NativeTokenVault during bridging operations.
     /// @param _toChainId The chain ID which the funds are sent to.
     function burnAndStartBridging(uint256 _toChainId) external payable;
 }

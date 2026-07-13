@@ -2,19 +2,21 @@
 
 pragma solidity 0.8.28;
 
-import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_ROUTER_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
 import {NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
+import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
+import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 import {
     AssetIdMismatch,
     InvalidNTVBurnData,
     UnsupportedEncodingVersion,
     BadTransferDataLength,
-    EmptyData,
-    L2WithdrawalMessageWrongLength
+    EmptyData
 } from "../L1ContractErrors.sol";
 import {WrongMsgLength} from "../../bridge/L1BridgeContractErrors.sol";
 import {UnsafeBytes} from "./UnsafeBytes.sol";
+import {InteropCallStarter} from "../../common/Messaging.sol";
 
 /**
  * @author Matter Labs
@@ -244,23 +246,61 @@ library DataEncoding {
         transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
     }
 
-    /// @notice Decodes the base token withdrawal message emitted by the L2 base token system contract.
-    /// @param _l2ToL1message The L2 to L1 message to be decoded.
-    /// @return functionSignature The function signature of the message.
-    /// @return l1Receiver The address of the L1 receiver.
-    /// @return amount The amount of base token withdrawn.
-    function decodeBaseTokenFinalizeWithdrawalData(
-        bytes memory _l2ToL1message
-    ) internal pure returns (bytes4 functionSignature, address l1Receiver, uint256 amount) {
-        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
-        functionSignature = bytes4(functionSignatureUint);
+    /// @notice Builds the single indirect-call `InteropCallStarter` for an L2->L1 withdrawal of a registered,
+    /// NON-base-token asset (an ERC20 or the CTM/ZK asset).
+    /// @dev An L2->L1 withdrawal is a single-call interop bundle whose one call is an indirect call to the
+    /// L2 AssetRouter carrying the bridgehub-deposit payload for the withdrawn asset; on L1 it is executed
+    /// by `L1InteropHandler.executeBundle`. Callers pass the resulting array to `InteropCenter.sendBundle`
+    /// (directly, or ABI-encoded for an admin L1->L2 transaction). Both the `indirectCall` message value and
+    /// `interopCallValue` are zero, so NO base-token value rides the bundle; the withdrawn amount is carried
+    /// inside `_transferData` and released by the asset handler on L1. For withdrawing the chain's base token
+    /// (which must actually move value) use `encodeInteropBaseTokenWithdrawalCallStarters` instead.
+    /// @param _assetId The asset being withdrawn — an ERC20 assetId or the CTM/ZK assetId, NOT a base-token assetId.
+    /// @param _transferData The bridgehub-burn/transfer data for the asset.
+    function encodeInteropWithdrawalCallStarters(
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) internal pure returns (InteropCallStarter[] memory callStarters) {
+        return _encodeInteropWithdrawalCallStarters(_assetId, _transferData, 0);
+    }
 
-        // The data is expected to be at least 56 bytes long.
-        require(_l2ToL1message.length >= 56, L2WithdrawalMessageWrongLength(_l2ToL1message.length));
-        // this message is a base token withdrawal
-        (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-        // slither-disable-next-line unused-return
-        (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
+    /// @notice Builds the single indirect-call `InteropCallStarter` for an L2->L1 withdrawal of the chain's
+    /// BASE token.
+    /// @dev Same single-call shape as `encodeInteropWithdrawalCallStarters`, but the withdrawn amount rides as
+    /// the `indirectCall` message value: the InteropCenter burns it from the `msg.value` provided to
+    /// `sendBundle` (via the BaseTokenHolder), and the L1 asset handler releases it to the recipient when the
+    /// bundle is finalized. The caller of `InteropCenter.sendBundle` MUST therefore send `_amount` as the
+    /// transaction value. `interopCallValue` stays zero — destination-side call value is not supported for L1
+    /// destinations (`NonZeroValueToL1NotSupported`).
+    /// @param _assetId The base-token assetId of the withdrawn token.
+    /// @param _transferData The bridgehub-burn/transfer data for the base token; the amount it encodes must
+    /// match `_amount`.
+    /// @param _amount The withdrawn base-token amount, burned from the `sendBundle` transaction value.
+    function encodeInteropBaseTokenWithdrawalCallStarters(
+        bytes32 _assetId,
+        bytes memory _transferData,
+        uint256 _amount
+    ) internal pure returns (InteropCallStarter[] memory callStarters) {
+        return _encodeInteropWithdrawalCallStarters(_assetId, _transferData, _amount);
+    }
+
+    /// @dev Shared builder for the two withdrawal encoders above; `_indirectCallMessageValue` is the base-token
+    /// amount riding along the indirect call (zero for registered-asset withdrawals).
+    function _encodeInteropWithdrawalCallStarters(
+        bytes32 _assetId,
+        bytes memory _transferData,
+        uint256 _indirectCallMessageValue
+    ) private pure returns (InteropCallStarter[] memory callStarters) {
+        bytes[] memory callAttributes = new bytes[](2);
+        callAttributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (_indirectCallMessageValue));
+        callAttributes[1] = abi.encodeCall(IERC7786Attributes.interopCallValue, (0));
+
+        callStarters = new InteropCallStarter[](1);
+        callStarters[0] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(L2_ASSET_ROUTER_ADDR),
+            data: encodeAssetRouterBridgehubDepositData(_assetId, _transferData),
+            callAttributes: callAttributes
+        });
     }
 
     function getSelector(bytes memory _data) internal pure returns (bytes4) {

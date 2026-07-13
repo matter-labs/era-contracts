@@ -63,7 +63,7 @@ contract L2GenesisUpgradeTestHelper {
         names.beaconDeployer = ContractName("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer");
         names.baseTokenHolder = ContractName("BaseTokenHolder.sol", "BaseTokenHolder");
         names.interopCenter = ContractName("InteropCenter.sol", "InteropCenter");
-        names.interopHandler = ContractName("InteropHandler.sol", "InteropHandler");
+        names.interopHandler = ContractName("L2InteropHandler.sol", "L2InteropHandler");
         names.assetTracker = ContractName("L2AssetTracker.sol", "L2AssetTracker");
         // For setUp etching
         names.complexUpgrader = ContractName("L2ComplexUpgrader.sol", "L2ComplexUpgrader");
