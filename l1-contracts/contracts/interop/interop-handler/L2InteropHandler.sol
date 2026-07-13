@@ -60,12 +60,12 @@ contract L2InteropHandler is InteropHandlerBase {
         // only that address (on this chain, or chain-agnostic via chainId 0) or this contract itself (when the
         // execution was initiated through `receiveMessage`) may execute.
         if (interopBundle.bundleAttributes.executionAddress.length != 0) {
-            (uint256 executionChainId, address executionAddress) =
-                InteroperableAddress.parseEvmV1(interopBundle.bundleAttributes.executionAddress);
+            (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
+                interopBundle.bundleAttributes.executionAddress
+            );
             require(
-                (msg.sender == address(this)
-                        || ((executionChainId == block.chainid || executionChainId == 0)
-                            && executionAddress == msg.sender)),
+                (msg.sender == address(this) ||
+                    ((executionChainId == block.chainid || executionChainId == 0) && executionAddress == msg.sender)),
                 ExecutingNotAllowed(
                     bundleHash,
                     InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
@@ -101,13 +101,14 @@ contract L2InteropHandler is InteropHandlerBase {
 
     /// @inheritdoc InteropHandlerBase
     function _proveInclusion(MessageInclusionProof memory _proof) internal view override returns (bool) {
-        return L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared({
-            _chainId: _proof.chainId,
-            _blockOrBatchNumber: _proof.l1BatchNumber,
-            _index: _proof.l2MessageIndex,
-            _message: _proof.message,
-            _proof: _proof.proof
-        });
+        return
+            L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared({
+                _chainId: _proof.chainId,
+                _blockOrBatchNumber: _proof.l1BatchNumber,
+                _index: _proof.l2MessageIndex,
+                _message: _proof.message,
+                _proof: _proof.proof
+            });
     }
 
     /// @inheritdoc InteropHandlerBase
