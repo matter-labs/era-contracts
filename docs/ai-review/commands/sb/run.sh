@@ -46,7 +46,7 @@ PROMPT="$(
 )"
 
 if [[ "$TOOL" == "codex" ]]; then
-    exec codex exec "$@" <<<"$PROMPT"
+    exec codex exec --yolo "$@" <<<"$PROMPT"
 else
-    exec claude -p --verbose "$PROMPT" "$@"
+    exec claude -p --dangerously-skip-permissions --verbose "$PROMPT" "$@"
 fi
