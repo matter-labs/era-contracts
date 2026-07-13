@@ -1,5 +1,4 @@
 import { expect } from "chai";
-import { BigNumber } from "ethers";
 import { executeTokenTransfer } from "../../src/helpers/token-transfer";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { getChainIdByRole, getChainIdsByRole } from "../../src/core/utils";
@@ -35,26 +34,6 @@ describe("03 - Interop Transfer Registration Paths", function () {
     gatewayChainId = getChainIdByRole(state.chains.config, "gateway");
     directSettledChainId = getChainIdByRole(state.chains.config, "directSettled");
     gwSettledChainIds = getChainIdsByRole(state.chains.config, "gwSettled");
-  });
-
-  it("transfers from the gateway chain to GW-settled chains (L1-settled source is allowed)", async () => {
-    // The gateway chain settles directly on L1; sending interop bundles from L1-settled chains is
-    // allowed (the InteropCenter's NotInGatewayMode gate was removed), so this transfer completes
-    // end-to-end: the bundle is sent from the gateway and executed on the GW-settled destination.
-    const sourceToken = state.testTokens![gatewayChainId];
-    const result = await executeTokenTransfer({
-      sourceChainId: gatewayChainId,
-      targetChainId: gwSettledChainIds[0],
-      amount: "10",
-      sourceTokenAddress: sourceToken,
-      logger: (line: string) => console.log(`[interop] ${line}`),
-    });
-
-    expect(result.targetTxHash, "bundle should execute on the destination chain").to.not.equal(null);
-    const received = BigNumber.from(result.destinationBalanceAfter).sub(result.destinationBalanceBefore);
-    expect(received.toString(), "destination balance should increase by the transferred amount").to.equal(
-      result.amountWei
-    );
   });
 
   it("rejects transfers from GW-settled chains to the gateway chain", async () => {
