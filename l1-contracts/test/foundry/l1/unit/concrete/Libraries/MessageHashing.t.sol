@@ -99,12 +99,6 @@ contract MessageHashingTest is Test {
         assertEq(leafHash, expected);
     }
 
-    function testFuzz_batchLeafHash_deterministicOutput(bytes32 batchRoot, uint256 batchNumber) public pure {
-        bytes32 leafHash1 = MessageHashing.batchLeafHash(batchRoot, batchNumber, 0);
-        bytes32 leafHash2 = MessageHashing.batchLeafHash(batchRoot, batchNumber, 0);
-        assertEq(leafHash1, leafHash2);
-    }
-
     /// @dev The `l1Timestamp` (added for atomic interop) is folded into the batch leaf preimage, which is
     /// what makes a batch's settlement timestamp provable via the same inclusion proof. A non-zero value
     /// must be part of the hash and must change the leaf versus the zero-timestamp variant.

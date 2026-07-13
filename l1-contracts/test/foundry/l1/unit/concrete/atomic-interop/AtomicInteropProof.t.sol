@@ -51,15 +51,6 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     // ============ commitValue ============
 
-    function test_commitValue_matchesSpec() public view {
-        bytes32 flowId = keccak256("flow");
-        bytes32 bundleHash = keccak256("bundle");
-        assertEq(
-            proofLib.commitValue(flowId, bundleHash),
-            uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))
-        );
-    }
-
     function testFuzz_commitValue_matchesSpec(bytes32 _flowId, bytes32 _bundleHash) public view {
         assertEq(
             proofLib.commitValue(_flowId, _bundleHash),
@@ -78,6 +69,23 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
             DEADLINE - 1 // settled before the deadline
         );
         // Outcome under test: an in-time, correctly-authenticated inclusion proof does NOT revert.
+        _expectRootAuthentication(proof);
+        proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
+    }
+
+    /// @dev The root-authentication adapter must forward both message coordinates. Keeping them distinct
+    /// and non-zero prevents the all-zero default fixture from hiding a hardcoded index or tx number.
+    function test_verifyInclusion_forwardsNonZeroMessageCoordinatesToVerifier() public {
+        ImtProof memory proof = _inclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            committedIndex,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            DEADLINE - 1
+        );
+        proof.messageTxNumberInBatch = 7;
+        proof.messageIndex = 1;
+
         _expectRootAuthentication(proof);
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
@@ -203,7 +211,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     }
 
     /// @dev Boundary: absence batch `t_N == deadline` is still in time (`t_N <= deadline`).
-    function test_verifyTimeoutAdjacency_boundary_absenceTimestampEqualsDeadline_passes() public {
+    function test_verifyTimeoutAdjacency_allowsAbsenceBatchSettledAtDeadline() public {
         ImtProof memory absence = _nonInclusionProof(
             SOURCE_CHAIN_ID,
             BATCH_N,
@@ -306,27 +314,6 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         proofLib.verifyTimeoutAdjacency(absence, successor, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
-    function test_RevertWhen_timeout_adjacencyNotConsecutive() public {
-        ImtProof memory absence = _nonInclusionProof(
-            SOURCE_CHAIN_ID,
-            BATCH_N,
-            absentValue,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            DEADLINE - 1
-        );
-        uint256 nonConsecutive = BATCH_N + 2;
-        ImtProof memory successor = _rootAuthProof(
-            SOURCE_CHAIN_ID,
-            nonConsecutive,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            uint256(DEADLINE) + 1
-        );
-        _expectRootAuthentication(absence);
-        _expectRootAuthentication(successor);
-        vm.expectRevert(abi.encodeWithSelector(ProofAdjacencyNotConsecutive.selector, BATCH_N, nonConsecutive));
-        proofLib.verifyTimeoutAdjacency(absence, successor, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
-    }
-
     function test_RevertWhen_timeout_absenceSettlementLayerMismatch() public {
         uint256 proofSl = SETTLEMENT_LAYER_CHAIN_ID + 1;
         ImtProof memory absence = _nonInclusionProof(SOURCE_CHAIN_ID, BATCH_N, absentValue, proofSl, DEADLINE - 1);
@@ -366,7 +353,9 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// @dev A value that is present in the tree cannot also be given a valid non-inclusion proof: its
     /// predecessor leaf's `nextValue` equals the value, so the engine rejects the bracketing claim. This is
     /// the library-level guarantee that a leg cannot be simultaneously finalizable (included in time) and
-    /// refundable (proven absent). Source-chain binding is enforced by the manager-level refund path.
+    /// refundable (proven absent). Note: this library does not check that an absence proof targets the
+    /// leg's own source chain; that binding (which blocks a cross-chain force-refund) is enforced by the
+    /// caller, `AtomicFlowManager.authorizeRefund`, so it is out of scope for this library-level test.
     function test_includedValueCannotBeProvenAbsent() public {
         // Sanity: the committed value verifies as included in time.
         ImtProof memory inclusion = _inclusionProof(

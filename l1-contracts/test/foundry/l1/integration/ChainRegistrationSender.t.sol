@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {StdStorage, Test, stdStorage, console2} from "forge-std/Test.sol";
+import {Test, console2} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
-import {L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {
     CHAIN_REGISTRATION_SENDER_ENCODING_VERSION,
     ChainRegistrationSender
@@ -30,7 +30,6 @@ import {LogFinder} from "test-utils/LogFinder.sol";
 import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
 
 contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
-    using stdStorage for StdStorage;
     using LogFinder for Vm.Log[];
 
     uint256 constant TEST_USERS_COUNT = 10;
@@ -76,18 +75,14 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
             abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );
-
-        // Simulate gateway mode for integration tests.
-        for (uint256 i = 0; i < zkChainIds.length; i++) {
-            stdstore
-                .target(address(addresses.bridgehub))
-                .sig("settlementLayer(uint256)")
-                .with_key(zkChainIds[i])
-                .checked_write(GATEWAY_CHAIN_ID);
-        }
     }
 
-    function test_chainRegistrationSender() public {
+    /// @notice Freshly deployed chains settle directly on L1. Registration must succeed in this real
+    /// deployment state; this prevents the removed L1-settlement prohibition from being reintroduced.
+    function test_chainRegistrationSender_succeedsWhenBothChainsSettleOnL1() public {
+        assertEq(addresses.bridgehub.settlementLayer(zkChainIds[0]), block.chainid);
+        assertEq(addresses.bridgehub.settlementLayer(zkChainIds[1]), block.chainid);
+
         // Verify chain is not registered in fresh deployment
         assertFalse(
             addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
@@ -198,59 +193,23 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         uint256 firstSettlementLayer = GATEWAY_CHAIN_ID;
         uint256 secondSettlementLayer = GATEWAY_CHAIN_ID + 1;
 
-        // Override settlement layers to different values to trigger the mismatch guard
-        stdstore
-            .target(address(addresses.bridgehub))
-            .sig("settlementLayer(uint256)")
-            .with_key(zkChainIds[0])
-            .checked_write(firstSettlementLayer);
-
-        stdstore
-            .target(address(addresses.bridgehub))
-            .sig("settlementLayer(uint256)")
-            .with_key(zkChainIds[1])
-            .checked_write(secondSettlementLayer);
+        // Isolate ChainRegistrationSender's comparison from the separately-tested migration machinery.
+        // Exact-calldata mocks avoid mutating Bridgehub storage and only affect the two queried chains.
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeCall(IBridgehubBase.settlementLayer, (zkChainIds[0])),
+            abi.encode(firstSettlementLayer)
+        );
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeCall(IBridgehubBase.settlementLayer, (zkChainIds[1])),
+            abi.encode(secondSettlementLayer)
+        );
 
         vm.expectRevert(
             abi.encodeWithSelector(ChainsSettlementLayerMismatch.selector, firstSettlementLayer, secondSettlementLayer)
         );
         addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
-    }
-
-    /// @notice Atomic interop is deployed on ecosystems where every chain settles directly on L1 (no
-    /// gateway). The former `ChainsSettlingOnL1` guard was removed, so registering two chains that both
-    /// settle on L1 must now SUCCEED. This is the positive replacement for the deleted
-    /// `revertWhen_chainsSettleOnL1` test (keeps coverage on the both-on-L1 branch of `_checkSettlementLayers`).
-    /// Uses the same `stdstore` settlement-layer override pattern as `setUp` and the mismatch test above.
-    function test_chainRegistrationSender_succeedsWhenBothChainsSettleOnL1() public {
-        // Override both chains' settlement layer to L1 (block.chainid).
-        stdstore
-            .target(address(addresses.bridgehub))
-            .sig("settlementLayer(uint256)")
-            .with_key(zkChainIds[0])
-            .checked_write(block.chainid);
-        stdstore
-            .target(address(addresses.bridgehub))
-            .sig("settlementLayer(uint256)")
-            .with_key(zkChainIds[1])
-            .checked_write(block.chainid);
-
-        assertFalse(
-            addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
-            "Chain should not be registered before calling registerChain"
-        );
-
-        vm.recordLogs();
-        addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-
-        // Storage: registration succeeds (no ChainsSettlingOnL1 revert).
-        assertTrue(
-            addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
-            "Chain should be registered when both chains settle on L1"
-        );
-        // Event: the registration service transaction was queued.
-        logs.requireOne(NEW_PRIORITY_REQUEST_SIGNATURE);
     }
 
     // add this to be excluded from coverage report

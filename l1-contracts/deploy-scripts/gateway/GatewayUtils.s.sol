@@ -22,13 +22,15 @@ import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "../utils/Utils.sol";
 
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {FinalizeL1DepositParams, IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {ConfirmTransferResultData, TxStatus} from "contracts/common/Messaging.sol";
+import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
+import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
+import {ConfirmTransferResultData, TxStatus, MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
 import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
@@ -106,17 +108,17 @@ contract GatewayUtils is Script, IGatewayUtils {
 
         address assetRouter = address(bridgehub.assetRouter());
         IL1Nullifier l1Nullifier = L1AssetRouter(assetRouter).L1_NULLIFIER();
+        address l1InteropHandlerAddr = l1Nullifier.l1InteropHandler();
 
         vm.broadcast();
-        l1Nullifier.finalizeDeposit(
-            FinalizeL1DepositParams({
+        IInteropHandlerBase(l1InteropHandlerAddr).executeBundle(
+            UnsafeBytes.readRemainingBytes(message, 1),
+            MessageInclusionProof({
                 chainId: gatewayChainId,
-                l2BatchNumber: l2BatchNumber,
+                l1BatchNumber: l2BatchNumber,
                 l2MessageIndex: l2MessageIndex,
-                l2Sender: L2_ASSET_ROUTER_ADDR,
-                l2TxNumberInBatch: l2TxNumberInBatch,
-                message: message,
-                merkleProof: merkleProof
+                message: L2Message({txNumberInBatch: l2TxNumberInBatch, sender: L2_INTEROP_CENTER_ADDR, data: hex""}),
+                proof: merkleProof
             })
         );
     }
