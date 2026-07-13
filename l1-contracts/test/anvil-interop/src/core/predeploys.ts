@@ -50,5 +50,5 @@ export const PREDEPLOY_SYSTEM_CONTRACTS: readonly SystemContractPredeploy[] = [
   { address: L2_CHAIN_ASSET_HANDLER_ADDR, contractName: "L2ChainAssetHandler" },
   { address: L2_BASE_TOKEN_HOLDER_ADDR, contractName: "BaseTokenHolder" },
   { address: INTEROP_CENTER_ADDR, contractName: "InteropCenter" },
-  { address: L2_INTEROP_HANDLER_ADDR, contractName: "InteropHandler" },
+  { address: L2_INTEROP_HANDLER_ADDR, contractName: "L2InteropHandler" },
 ] as const;

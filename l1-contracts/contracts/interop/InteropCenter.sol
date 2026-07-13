@@ -17,11 +17,11 @@ import {
     L2_BRIDGEHUB,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_NATIVE_TOKEN_VAULT,
-    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 
-import {SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_INTEROP_ATTRIBUTES} from "../common/Config.sol";
+import {SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_INTEROP_ATTRIBUTES, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {L2_BOOTLOADER_ADDRESS} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {
     BUNDLE_IDENTIFIER,
@@ -35,17 +35,22 @@ import {
     InteropCallStarterInternal
 } from "../common/Messaging.sol";
 import {MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
-import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
 import {
     AttributeAlreadySet,
     AttributeViolatesRestriction,
+    CannotInitiateInteropOnL1,
     DestinationChainNotRegistered,
+    DirectCallToL1NotSupported,
     IndirectCallValueMismatch,
     InteropBundleSaltAlreadyUsed,
+    InteropCallToL1NotToAssetRouter,
     InteroperableAddressChainReferenceNotEmpty,
     InteroperableAddressNotEmpty,
     FeeWithdrawalFailed,
+    InteropToSelfNotSupported,
+    MultiCallToL1NotSupported,
+    NonZeroValueToL1NotSupported,
     ZKTokenNotAvailable
 } from "./InteropErrors.sol";
 
@@ -208,8 +213,8 @@ contract InteropCenter is
 
         // If the unbundler was not set for a call, we set the unbundler to be equal to the original sender, so that it's
         // still possible to unbundle the bundle containing the call. If the original sender is the contract, it'll still
-        // be able to unbundle the bundle either via direct call to `unbundleBundle`, or via `sendMessage` to `InteropHandler`,
-        // with specific payload. Refer to `InteropHandler` for details.
+        // be able to unbundle the bundle either via direct call to `unbundleBundle`, or via `sendMessage` to `L2InteropHandler`,
+        // with specific payload. Refer to `L2InteropHandler` for details.
         if (bundleAttributes.unbundlerAddress.length == 0) {
             bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
         }
@@ -251,8 +256,8 @@ contract InteropCenter is
         // slither-disable-next-line unused-return
         (uint256 destinationChainId, ) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
 
-        // Ensure this is an L2 to L2 transaction
-        _ensureL2ToL2(destinationChainId);
+        // Ensure the destination is valid: L2->L2, or an L2->L1 bundle expressed as a single call (canonically a withdrawal).
+        _ensureValidDestination(destinationChainId, _callStarters.length);
         InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](
             _callStarters.length
         );
@@ -289,8 +294,8 @@ contract InteropCenter is
 
         // If the unbundler was not set for a bundle, we set the unbundler to be equal to the original sender, so
         // that it's still possible to unbundle the bundle. If the original sender is the contract, it'll still be
-        // able to unbundle the bundle either via direct call to `unbundleBundle`, or via `sendMessage` to `InteropHandler`,
-        // with specific payload. Refer to `InteropHandler` for details.
+        // able to unbundle the bundle either via direct call to `unbundleBundle`, or via `sendMessage` to `L2InteropHandler`,
+        // with specific payload. Refer to `L2InteropHandler` for details.
         if (bundleAttributes.unbundlerAddress.length == 0) {
             bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
         }
@@ -338,16 +343,44 @@ contract InteropCenter is
         require(addressLength == 0, InteroperableAddressNotEmpty(_interoperableAddress));
     }
 
+    /// @notice Validates the bundle destination.
+    /// @dev The InteropCenter only runs on L2s (never on L1 itself). Destinations may be:
+    ///      - another L2 (the classic L2->L2 interop), or
+    ///      - L1, but only for a single-call asset WITHDRAWAL bundle. Multi-call bundles to L1 are not
+    ///        supported; an L1-destined bundle is exactly one call.
+    /// @dev The destination must not be this chain itself: a chain can end up registered for interop on
+    ///      its own Bridgehub, and a self-destination bundle would burn value into a self-bridging
+    ///      accounting path that is not supported.
+    /// @dev The remaining destination-dependent requirements are enforced in `_sendBundle` once the call
+    ///      attributes have been parsed: an L1-destined call must be an indirect, zero-value call to the L2
+    ///      AssetRouter (a withdrawal), and non-L1 destinations are checked against the Bridgehub registry
+    ///      (`DestinationChainNotRegistered`).
+    /// @param _destinationChainId Destination chain ID.
+    /// @param _callCount Number of calls in the bundle.
+    function _ensureValidDestination(uint256 _destinationChainId, uint256 _callCount) internal view {
+        // Bundles can only be initiated on an L2; the destination may be another L2 or L1.
+        require(L1_CHAIN_ID != block.chainid, CannotInitiateInteropOnL1(_destinationChainId));
+        require(_destinationChainId != block.chainid, InteropToSelfNotSupported());
+        if (_destinationChainId == L1_CHAIN_ID) {
+            require(_callCount == 1, MultiCallToL1NotSupported(_callCount));
+        }
+    }
+
+    /// @notice Strict L2->L2 destination check used by the generic single-message `sendMessage` entry point.
+    /// @dev Unlike `_ensureValidDestination`, this never allows an L1 destination; the L2->L1 path
+    /// goes through `sendBundle` (single-call bundle) instead.
     function _ensureL2ToL2(uint256 _destinationChainId) internal view {
         require(
             L1_CHAIN_ID != block.chainid && _destinationChainId != L1_CHAIN_ID,
             NotL2ToL2(block.chainid, _destinationChainId)
         );
+        require(_destinationChainId != block.chainid, InteropToSelfNotSupported());
     }
 
     /// @notice Ensures the received base token value matches expected for the destination chain
     /// @dev Handles fee collection based on useFixedFee flag. When useFixedFee is true, no base token fee is charged.
     /// @dev When useFixedFee is false, interopProtocolFee is charged in base tokens.
+    /// @dev L2->L1 bundles (destination is L1) are not interop and are free: no protocol fee is charged.
     /// @param _destinationChainId Destination chain ID.
     /// @param _totalBurnedCallsValue Sum of requested interop call values.
     /// @param _totalIndirectCallsValue Sum of requested indirect call values.
@@ -364,8 +397,10 @@ contract InteropCenter is
         bytes32 thisChainBaseTokenAssetId = L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID();
 
         // Calculate protocol fee - only charge base token fee if not using fixed ZK fees.
-        // Fee is charged per-call.
-        uint256 protocolFee = _useFixedFee ? 0 : interopProtocolFee * _callCount;
+        // Fee is charged per-call. L2->L1 withdrawals are free (they are not interop).
+        uint256 protocolFee = (_useFixedFee || _destinationChainId == L1_CHAIN_ID)
+            ? 0
+            : interopProtocolFee * _callCount;
 
         // We burn the value that is passed along the bundle here, on source chain.
         if (_destinationBaseTokenAssetId == thisChainBaseTokenAssetId) {
@@ -414,7 +449,9 @@ contract InteropCenter is
         BundleAttributes memory _bundleAttributes,
         bytes[][] memory _originalCallAttributes
     ) internal returns (bytes32 bundleHash) {
-        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
+        // Note: no gateway-mode requirement here — interop bundles may be sent by chains settling
+        // directly on L1. Cross-layer correctness is enforced by the message-inclusion proof on the
+        // receiving side, not by any gateway-mode or settlement-layer check here.
 
         // Ensure the sender has not already used this salt. Since `interopBundleSalt` (and thus the bundle hash) is
         // derived from `msg.sender` and the user-provided salt, enforcing a unique salt per sender guarantees that
@@ -426,8 +463,18 @@ contract InteropCenter is
         isInteropBundleSaltUsed[msg.sender][_bundleAttributes.salt] = true;
 
         // Form an InteropBundle.
-        bytes32 destinationBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
-        require(destinationBaseTokenAssetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
+        // For an L2->L1 bundle the L1 chain is not registered as an interop destination in the
+        // L2 Bridgehub, so `baseTokenAssetId(L1_CHAIN_ID)` is unset. L1's base token is ETH, so the
+        // destination base token asset id is the L1-native ETH asset id (which is NOT necessarily this
+        // L2's base token — they only coincide on ETH-based chains). This value drives the
+        // same/cross-base-token branch of `_ensureCorrectTotalValue`.
+        bytes32 destinationBaseTokenAssetId;
+        if (_destinationChainId == L1_CHAIN_ID) {
+            destinationBaseTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+        } else {
+            destinationBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
+            require(destinationBaseTokenAssetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
+        }
         InteropBundle memory bundle = InteropBundle({
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: block.chainid,
@@ -449,6 +496,25 @@ contract InteropCenter is
         // Fill the formed InteropBundle with calls.
         uint256 callStartersLength = _callStarters.length;
         for (uint256 i = 0; i < callStartersLength; ++i) {
+            if (_destinationChainId == L1_CHAIN_ID) {
+                // Interop to L1 is restricted to asset WITHDRAWALS for this release. The single call must be
+                // an indirect call routed through the L2 AssetRouter: `_processCallStarter` invokes
+                // `L2AssetRouter.initiateIndirectCall`, which (for an L1 destination) rewrites the call to
+                // target the L1 AssetRouter's `finalizeDeposit`. Requiring `indirectCall` + `to == L2 asset
+                // router` keeps the L1-side attack surface to the asset router only, rather than allowing an
+                // arbitrary L2->L1 call to any `IERC7786Recipient`. The call must also carry no
+                // destination-side value: the withdrawn amount rides in the transfer data / indirect-call
+                // message value, and a value-bearing call could otherwise end up in an unfinalizable bundle.
+                require(_callStarters[i].callAttributes.indirectCall, DirectCallToL1NotSupported());
+                require(
+                    _callStarters[i].to == L2_ASSET_ROUTER_ADDR,
+                    InteropCallToL1NotToAssetRouter(_callStarters[i].to)
+                );
+                require(
+                    _callStarters[i].callAttributes.interopCallValue == 0,
+                    NonZeroValueToL1NotSupported(_callStarters[i].callAttributes.interopCallValue)
+                );
+            }
             InteropCall memory interopCall = _processCallStarter(_callStarters[i], _destinationChainId, msg.sender);
             bundle.calls[i] = interopCall;
             totalBurnedCallsValue += _callStarters[i].callAttributes.interopCallValue;
@@ -461,7 +527,8 @@ contract InteropCenter is
         // If using fixed fees, collect ZK tokens per-call and accumulate for coinbase.
         // Coinbase can later claim via claimZKFees().
         // This is handled to not allow malicious operator to fail sending bundles by providing malicious coinbase.
-        if (_bundleAttributes.useFixedFee) {
+        // L2->L1 bundles are not interop and are free: no fixed ZK fee is collected for them.
+        if (_bundleAttributes.useFixedFee && _destinationChainId != L1_CHAIN_ID) {
             uint256 totalZKFee = ZK_INTEROP_FEE * callStartersLength;
             _getZKToken().safeTransferFrom(msg.sender, address(this), totalZKFee);
             accumulatedZKFees[block.coinbase] += totalZKFee;

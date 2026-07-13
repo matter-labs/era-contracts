@@ -72,7 +72,7 @@ function parsePortOffset(argv: string[]): number {
   return portOffsetIdx !== -1 ? parseInt(argv[portOffsetIdx + 1], 10) : 0;
 }
 
-function readLogTail(logPath: string, maxLines = 40): string {
+function readLogTail(logPath: string, maxLines = 120): string {
   if (!fs.existsSync(logPath)) {
     return "log file not found";
   }
@@ -161,12 +161,28 @@ async function main(): Promise<void> {
     !liveMode && !workerMode && !keepChains && !skipSetup && !freshDeploy && requestedSpecs.length === 0;
 
   if (shouldParallelize) {
+    // Each worker runs its own set of 6 Anvil chains plus a hardhat process, so running every spec
+    // group at once oversubscribes small runners (10 workers ≈ 70 processes on a 4-core CI box) and
+    // causes load-dependent RPC flakes. ANVIL_INTEROP_MAX_PARALLEL_WORKERS caps how many workers run
+    // concurrently; unset (or 0) preserves the fully-parallel behavior.
+    const maxWorkers = Number(process.env.ANVIL_INTEROP_MAX_PARALLEL_WORKERS || 0) || parallelSpecGroups.length;
     await timedAsync("parallel hardhat interop workers", async () => {
-      await Promise.all(
-        parallelSpecGroups.map((specs, index) =>
-          runParallelWorker(`worker ${index + 1}`, specs, portOffset + index * 100)
-        )
-      );
+      const queue = parallelSpecGroups.map((specs, index) => ({ specs, index }));
+      const failures: Error[] = [];
+      const runNext = async (): Promise<void> => {
+        const item = queue.shift();
+        if (!item) return;
+        try {
+          await runParallelWorker(`worker ${item.index + 1}`, item.specs, portOffset + item.index * 100);
+        } catch (e) {
+          failures.push(e as Error);
+        }
+        await runNext();
+      };
+      await Promise.all(Array.from({ length: Math.min(maxWorkers, queue.length) }, () => runNext()));
+      if (failures.length > 0) {
+        throw failures[0];
+      }
     });
     console.log(`\n⏱️  [TIMING] Total test run: ${elapsedSince(totalStart)}`);
     return;

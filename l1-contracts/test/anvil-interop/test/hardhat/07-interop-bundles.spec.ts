@@ -592,7 +592,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     await expectRevert(
       () => simulateExecuteBundle(destProvider, sendResult.bundleData, sourceChainId),
       "replay executeBundle",
-      customError("InteropHandler", "BundleAlreadyProcessed(bytes32)"),
+      customError("L2InteropHandler", "BundleAlreadyProcessed(bytes32)"),
       destProvider
     );
 
@@ -627,7 +627,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     await expectRevert(
       () => simulateExecuteBundle(destProvider, sendResult.bundleData, sourceChainId),
       "execute from wrong executionAddress",
-      customError("InteropHandler", "ExecutingNotAllowed(bytes32,bytes,bytes)"),
+      customError("L2InteropHandler", "ExecutingNotAllowed(bytes32,bytes,bytes)"),
       destProvider
     );
 
