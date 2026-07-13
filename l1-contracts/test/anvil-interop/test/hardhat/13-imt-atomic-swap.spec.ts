@@ -110,7 +110,7 @@ type AtomicStack = {
   manager: Contract;
   /** {InteropCenter} at the canonical 0x1000d (the atomic SEND entry point). */
   interopCenter: Contract;
-  /** {InteropHandler} at the canonical 0x1000e (the atomic RECEIVE entry point). */
+  /** {L2InteropHandler} at the canonical 0x1000e (the atomic RECEIVE entry point). */
   interopHandler: Contract;
 };
 
@@ -122,7 +122,7 @@ function atomicStack(chainId: number, provider: ethers.providers.JsonRpcProvider
     tree: new Contract(L2_INTEROP_COMMITMENT_TREE_ADDR, getAbi("L2InteropCommitmentTree"), wallet),
     manager: new Contract(L2_ATOMIC_FLOW_MANAGER_ADDR, getAbi("AtomicFlowManager"), wallet),
     interopCenter: new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet),
-    interopHandler: new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet),
+    interopHandler: new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet),
   };
 }
 
