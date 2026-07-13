@@ -4,7 +4,12 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {CoreContract, CTMContract, EcosystemContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+import {
+    CoreContract,
+    CTMContract,
+    EcosystemContract,
+    CodehashPin
+} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {CTMRegistry} from "contracts/upgrades/registry/CTMRegistry.sol";
 import {CoreRegistry} from "contracts/upgrades/registry/CoreRegistry.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/CTMUpgradeComposer.sol";
@@ -62,8 +67,8 @@ contract StorageRegistriesTest is Test {
             implNew: address(0)
         });
 
-        CoreRegistry.CodehashPin[] memory pins = new CoreRegistry.CodehashPin[](1);
-        pins[0] = CoreRegistry.CodehashPin({target: address(0xB201), expectedCodehash: keccak256(hex"6001600155")});
+        CodehashPin[] memory pins = new CodehashPin[](1);
+        pins[0] = CodehashPin({target: address(0xB201), expectedCodehash: keccak256(hex"6001600155")});
 
         manifest = CoreRegistry.CoreRegistryManifest({
             oldProtocolVersion: OLD_VERSION,
@@ -186,7 +191,7 @@ contract StorageRegistriesTest is Test {
                 uint256(0x0200000000000000000000000000000000000000000000000000000000000002)
             ),
             genesisIndexRepeatedStorageChanges: 54,
-            codehashPins: new CTMRegistry.CodehashPin[](0)
+            codehashPins: new CodehashPin[](0)
         });
     }
 

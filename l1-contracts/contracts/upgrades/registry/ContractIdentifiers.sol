@@ -89,3 +89,13 @@ enum ZKsyncOSUpgradeType {
     SystemProxy,
     Unsafe
 }
+
+/// @notice A pinned expected codehash for a target address, verified by `verifyAll()`. Shared by
+///         both registry flavours (CTM + Core), so it lives here rather than being redeclared in
+///         each registry.
+/// @param target The address whose runtime code is pinned.
+/// @param expectedCodehash The `extcodehash` the audited bytecode must produce at `target`.
+struct CodehashPin {
+    address target;
+    bytes32 expectedCodehash;
+}

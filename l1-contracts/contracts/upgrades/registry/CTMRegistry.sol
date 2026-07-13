@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {CoreContract, CTMContract} from "./ContractIdentifiers.sol";
+import {CoreContract, CTMContract, CodehashPin} from "./ContractIdentifiers.sol";
 import {ICTMRegistry} from "./ICTMRegistry.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
 import {RegistryAlreadyInitialized, RegistryUnknownKey} from "../../common/L1ContractErrors.sol";
@@ -70,11 +70,6 @@ contract CTMRegistry is ICTMRegistry {
     }
 
     /// @dev One `address -> expected EXTCODEHASH` pin for `verifyAll`.
-    struct CodehashPin {
-        address target;
-        bytes32 expectedCodehash;
-    }
-
     /// @notice Everything a registry instance pins, set exactly once by {initialize}.
     /// @dev For a BOOTSTRAP (genesis) registry of a freshly deployed CTM most sections are empty:
     ///      only `newProtocolVersion`, the new-version facet rows, freezability rows and the base

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {EcosystemContract} from "./ContractIdentifiers.sol";
+import {EcosystemContract, CodehashPin} from "./ContractIdentifiers.sol";
 import {ICoreRegistry} from "./ICoreRegistry.sol";
 import {RegistryAlreadyInitialized, RegistryUnknownKey} from "../../common/L1ContractErrors.sol";
 
@@ -22,12 +22,6 @@ contract CoreRegistry is ICoreRegistry {
         EcosystemContract key;
         address proxy;
         address implNew;
-    }
-
-    /// @dev One `address -> expected EXTCODEHASH` pin for `verifyAll`.
-    struct CodehashPin {
-        address target;
-        bytes32 expectedCodehash;
     }
 
     /// @notice Everything a core registry instance pins, set exactly once by {initialize}.
