@@ -230,12 +230,13 @@ contract IndexedMerkleTreeTest is Test {
         assertEq(tree.merklePath(secondIndex).length, 2);
     }
 
-    /// @notice Regression (F-04): an unused *padded* leaf index must not be usable to forge a non-inclusion
-    /// proof. The empty-leaf padding value is domain-separated (IMT_EMPTY_LEAF_HASH), distinct from the real
-    /// `hashLeaf({0,0,0})` sentinel, so a padded slot can no longer be presented as a `{0,0,0}` low leaf that
-    /// brackets any value. Before the fix, padding == hashLeaf({0,0,0}), so a padded index verified as a
-    /// `{0,0,0}` tail low leaf and could prove a *present* value absent (a double-mint / atomicity break).
-    function test_regression_F04_paddedIndexCannotForgeNonInclusionOfPresentValue() public {
+    /// @notice Regression test for the domain-separated empty-leaf padding: an unused *padded* leaf index must
+    /// not be usable to forge a non-inclusion proof. The empty-leaf padding value is domain-separated
+    /// (`IMT_EMPTY_LEAF_HASH`), distinct from the real `hashLeaf({0,0,0})` sentinel, so a padded slot can no
+    /// longer be presented as a `{0,0,0}` low leaf that brackets any value. Were the padding equal to
+    /// `hashLeaf({0,0,0})`, a padded index would verify as a `{0,0,0}` tail low leaf and could prove a
+    /// *present* value absent (a double-mint / atomicity break).
+    function test_regression_paddedIndexCannotForgeNonInclusionOfPresentValue() public {
         // leafCount = 3 (sentinel + 10 + 20) → not a power of two (height 2, 4 slots), so index 3 is an
         // unused padded slot.
         (uint256 firstIndex, ) = tree.insert(10, 0);

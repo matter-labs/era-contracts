@@ -9,8 +9,8 @@ import {TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2TransactionRequestTwoBridgesInner} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
-/// @dev Exposes the internal counterpart-set path + a test-only tracker setter so the F-01 auth guard can be
-/// unit-tested in isolation (the full `bridgehubDeposit` path is covered by the integration suites).
+/// @dev Exposes the internal counterpart-set path + a test-only tracker setter so the counterpart-auth guard
+/// can be unit-tested in isolation (the full `bridgehubDeposit` path is covered by the integration suites).
 contract L1AssetRouterCounterpartHarness is L1AssetRouter {
     constructor(
         address _weth,
@@ -46,7 +46,8 @@ contract MockAssetDeploymentTracker {
     function bridgeCheckCounterpartAddress(uint256, bytes32, address, address) external view {}
 }
 
-/// @notice Regression (F-01): `_setAssetHandlerAddressOnCounterpart` must reject an assetId whose
+/// @notice Regression tests for the counterpart-auth guard: `_setAssetHandlerAddressOnCounterpart` must
+/// reject an assetId whose
 /// `assetDeploymentTracker` is unset (`address(0)`) instead of invoking the no-return counterpart check on a
 /// code-less address (which silently succeeds), which would let an unregistered asset's L2 handler be set to
 /// an attacker-controlled address.

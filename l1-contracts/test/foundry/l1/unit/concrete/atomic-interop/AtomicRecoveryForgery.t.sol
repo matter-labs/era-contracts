@@ -72,7 +72,7 @@ contract MockRecoveringNativeTokenVault {
     }
 }
 
-/// @notice Regression tests for the atomic-interop recovery forgery (F-05): an atomic bundle can be committed
+/// @notice Regression tests for the atomic-interop recovery forgery: an atomic bundle can be committed
 /// carrying a `finalizeDeposit` call, but only calls produced by the asset router's own burn path
 /// (`InteropCall.from == L2_ASSET_ROUTER_ADDR`, set by `_processCallStarter`'s indirect path) are backed by a
 /// real source burn. A direct/forged call must neither be admitted at send (InteropCenter rejects it) nor
