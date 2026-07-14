@@ -21,17 +21,16 @@ import {IMTLeafValueMismatch, IMTLowLeafNextTooSmall} from "contracts/common/L1C
 /// of the L1-free atomic interop flow). Atomicity is deployed only on L1-settled ecosystems, so every
 /// fixture uses a single L1 settlement layer (`SETTLEMENT_LAYER_CHAIN_ID`).
 ///
-/// The IMT membership half is driven against a REAL {L2InteropCommitmentTree} (the oracle); the
-/// cross-chain message verifier is mocked (isolating the separately-tested message-inclusion layer)
-/// while the real `messageProof` blob is still parsed by `MessageHashing._getProofData`, so the
-/// settlement-layer / deadline / inclusion branches all run for real. See {AtomicInteropProofBuilder}.
+/// Both halves run for real: the IMT membership half is driven against a REAL {L2InteropCommitmentTree}
+/// (the oracle), and the cross-chain authentication half against the REAL {L2MessageVerification} + a real
+/// interop-root storage. Each proof is a genuine inclusion proof whose imported root the builder seeds
+/// (see {AtomicInteropProofBuilder} / {InteropInclusionProofLib}); the "root not included" branch is
+/// reached by withholding that seed, never by mocking the verifier.
 contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     uint256 internal constant SOURCE_CHAIN_ID = 271;
     uint256 internal constant SETTLEMENT_LAYER_CHAIN_ID = 1; // L1
     uint256 internal constant BATCH_N = 100;
     uint64 internal constant DEADLINE = 1_000;
-
-    bytes32 internal constant WRONG_ROOT = bytes32(uint256(0x1234));
 
     uint256 internal committedValue;
     uint256 internal committedIndex;
@@ -39,14 +38,18 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     function setUp() public {
         _setUpAtomicFixtures();
-        // The message verifier is authenticated-true by default; individual reverts re-mock it to false.
-        _mockVerifier(true);
 
         committedValue = _commitValue(keccak256("flowA"), keccak256("bundleA"));
         committedIndex = _insertCommit(committedValue);
 
         // A value for a flow that was never committed on this chain (used by the timeout/absence tests).
         absentValue = _commitValue(keccak256("flowB"), keccak256("bundleB"));
+    }
+
+    /// @dev Perturbs a membership path so it no longer hashes to the tree root, without touching the
+    /// leaf value — the IMT engine then reports non-membership rather than a value mismatch.
+    function _corruptMembershipPath(bytes32[] memory _path) internal pure {
+        _path[0] = bytes32(uint256(_path[0]) ^ 1);
     }
 
     // ============ commitValue ============
@@ -73,18 +76,23 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
-    /// @dev The root-authentication adapter must forward both message coordinates. Keeping them distinct
-    /// and non-zero prevents the all-zero default fixture from hiding a hardcoded index or tx number.
+    /// @dev The root-authentication adapter must forward both message coordinates. A wider log tree with a
+    /// non-zero `txNumberInBatch` / `messageIndex` binds them into the proven leaf, so if either coordinate
+    /// were dropped the (real) verifier could not reconstruct the imported root.
     function test_verifyInclusion_forwardsNonZeroMessageCoordinatesToVerifier() public {
-        ImtProof memory proof = _inclusionProof(
+        bytes32[] memory logSiblings = new bytes32[](1);
+        logSiblings[0] = keccak256("sibling-log");
+
+        ImtProof memory proof = _inclusionProofWithCoordinates(
             SOURCE_CHAIN_ID,
             BATCH_N,
             committedIndex,
             SETTLEMENT_LAYER_CHAIN_ID,
-            DEADLINE - 1
+            DEADLINE - 1,
+            7, // txNumberInBatch
+            1, // messageIndex (message sits at index 1 under logSiblings[0])
+            logSiblings
         );
-        proof.messageTxNumberInBatch = 7;
-        proof.messageIndex = 1;
 
         _expectRootAuthentication(proof);
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
@@ -105,9 +113,9 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     // ============ verifyInclusion — reverts ============
 
+    /// @dev The imported root is never seeded, so the real verifier cannot authenticate the root message.
     function test_RevertWhen_inclusion_rootMessageInclusionFails() public {
-        _mockVerifier(false);
-        ImtProof memory proof = _inclusionProof(
+        ImtProof memory proof = _unresolvedInclusionProof(
             SOURCE_CHAIN_ID,
             BATCH_N,
             committedIndex,
@@ -120,15 +128,8 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     }
 
     function test_RevertWhen_inclusion_missingSettlementLayerAnchor() public {
-        ImtProof memory proof = _inclusionProof(
-            SOURCE_CHAIN_ID,
-            BATCH_N,
-            committedIndex,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            DEADLINE - 1
-        );
-        // A final-node (single-level) proof carries no settlement-layer anchor.
-        proof.messageProof = _finalMessageProof();
+        // A final-node (single-level) proof authenticates but carries no settlement-layer anchor.
+        ImtProof memory proof = _missingAnchorProof(SOURCE_CHAIN_ID, BATCH_N, committedIndex);
         _expectRootAuthentication(proof);
         vm.expectRevert(abi.encodeWithSelector(ProofMissingSettlementLayerAnchor.selector, SOURCE_CHAIN_ID, BATCH_N));
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
@@ -158,9 +159,10 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
-    /// @dev Correct commit value + correct settlement/deadline, but the membership proof does not hash to
-    /// the claimed root: the IMT check fails (distinct from a value/leaf mismatch, which the engine catches
-    /// earlier). We keep the real leaf (so `leaf.value == commitValue`) and only corrupt `chainImtRoot`.
+    /// @dev Correct commit value + correct settlement/deadline + authenticated root, but the membership
+    /// proof does not hash to the tree root: the IMT check fails (distinct from a value/leaf mismatch,
+    /// which the engine catches earlier). We keep the authenticated root real and only corrupt the
+    /// membership path, so the failure is isolated to the IMT half.
     function test_RevertWhen_inclusion_inclusionFailed() public {
         ImtProof memory proof = _inclusionProof(
             SOURCE_CHAIN_ID,
@@ -169,9 +171,9 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
             SETTLEMENT_LAYER_CHAIN_ID,
             DEADLINE - 1
         );
-        proof.chainImtRoot = WRONG_ROOT;
+        _corruptMembershipPath(proof.imtProof);
         _expectRootAuthentication(proof);
-        vm.expectRevert(abi.encodeWithSelector(ProofInclusionFailed.selector, WRONG_ROOT, committedValue));
+        vm.expectRevert(abi.encodeWithSelector(ProofInclusionFailed.selector, proof.chainImtRoot, committedValue));
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
@@ -269,6 +271,8 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         proofLib.verifyTimeoutAdjacency(absence, successor, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
+    /// @dev The low-nullifier leaf brackets `absentValue`, but its membership path no longer hashes to the
+    /// tree root, so absence is not certified. The authenticated root stays real.
     function test_RevertWhen_timeout_nonInclusionFailed() public {
         ImtProof memory absence = _nonInclusionProof(
             SOURCE_CHAIN_ID,
@@ -277,9 +281,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
             SETTLEMENT_LAYER_CHAIN_ID,
             DEADLINE - 1
         );
-        // The low-nullifier leaf brackets `absentValue`, but the membership path no longer hashes to the
-        // claimed root, so absence is not certified.
-        absence.chainImtRoot = WRONG_ROOT;
+        _corruptMembershipPath(absence.imtProof);
         ImtProof memory successor = _rootAuthProof(
             SOURCE_CHAIN_ID,
             BATCH_N + 1,
@@ -287,7 +289,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
             uint256(DEADLINE) + 1
         );
         _expectRootAuthentication(absence);
-        vm.expectRevert(abi.encodeWithSelector(ProofNonInclusionFailed.selector, WRONG_ROOT, absentValue));
+        vm.expectRevert(abi.encodeWithSelector(ProofNonInclusionFailed.selector, absence.chainImtRoot, absentValue));
         proofLib.verifyTimeoutAdjacency(absence, successor, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
@@ -368,7 +370,8 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         _expectRootAuthentication(inclusion);
         proofLib.verifyInclusion(inclusion, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
 
-        // Build an (illegitimate) absence proof using the committed value's true predecessor leaf.
+        // Build an (illegitimate) absence proof using the committed value's true predecessor leaf,
+        // authenticated by a real, seeded root proof.
         uint256 predIndex = _predecessorIndexOf(committedValue);
         ImtProof memory absence = ImtProof({
             sourceChainId: SOURCE_CHAIN_ID,
@@ -376,7 +379,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
             chainImtRoot: tree.root(),
             messageTxNumberInBatch: 0,
             messageIndex: 0,
-            messageProof: _messageProof(SETTLEMENT_LAYER_CHAIN_ID, DEADLINE - 1),
+            messageProof: _seededRootProof(SOURCE_CHAIN_ID, BATCH_N, SETTLEMENT_LAYER_CHAIN_ID, DEADLINE - 1),
             leaf: tree.leafAt(predIndex),
             imtLeafIndex: predIndex,
             imtProof: tree.merklePath(predIndex)
