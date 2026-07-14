@@ -83,6 +83,24 @@ abstract contract DefaultL2UpgradeStrategy is CTMUpgradeBase {
         return (address(L2_COMPLEX_UPGRADER_ADDR), complexUpgraderCalldata);
     }
 
+    /// @notice Like `getComplexUpgraderTargetAndData` but ALWAYS uses the universal
+    ///         `forceDeployAndUpgradeUniversal` entrypoint regardless of VM. From v32 both Era and
+    ///         ZKsyncOS chains go through the universal path (the v31 Era-only `forceDeployAndUpgrade`
+    ///         selector is a v31 concern), and `SettlementLayerV32Upgrade` validates this selector.
+    function getUniversalComplexUpgraderTargetAndData(
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments,
+        address _delegateTo,
+        bytes memory _upgradeCalldata
+    ) internal pure returns (address, bytes memory) {
+        return (
+            address(L2_COMPLEX_UPGRADER_ADDR),
+            abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                (_deployments, _delegateTo, _upgradeCalldata)
+            )
+        );
+    }
+
     /// @notice Get Era L2 upgrade target and data.
     /// @dev From V32 onwards, both Era and ZKsyncOS should use forceDeployAndUpgradeUniversal
     /// (via L2_COMPLEX_UPGRADER_ADDR) since it supports both chain types via ContractUpgradeType.

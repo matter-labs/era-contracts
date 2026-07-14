@@ -107,8 +107,6 @@ contract CoreUpgrade_v32_Test is CoreUpgrade_v32 {
 uint256 constant ZK_CHAIN_TOTAL_BATCHES_EXECUTED_SLOT = 11;
 // Slot of `ZKChainBase.totalBatchesCommitted` (absolute).
 uint256 constant ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT = 13;
-// Slot of OZ `Initializable._initialized` (uint8 packed with `_initializing`).
-uint256 constant OZ_INITIALIZABLE_VERSION_SLOT = 0;
 
 /// @notice Local (non-fork) v31 -> v32 upgrade test. Deploys a fresh ecosystem + Era chain at the
 ///         baseline version, then drives the v32 upgrade through the same Default*Upgrade harness
@@ -159,29 +157,9 @@ contract UpgradeIntegrationTest_v32_Local is
     }
 
     function setUp() public {
-        // TODO(EVM-14930): finish driving the v32 upgrade to green, then remove this skip.
-        // Current status — this harness deploys a fresh ecosystem + Era chain, prepares the v32
-        // Core/CTM/Chain upgrades, and executes governance stage 0 successfully. It then fails in
-        // stage 1: the v32 Core upgrade's L1MessageRoot impl swap calls `initialize()`
-        // (`reinitializer(2)`), whose `require(allZKChains == 0, LocallyNoChainsAtGenesis())` guard
-        // is a genesis-only invariant — wrong for an upgrade that already has the Era chain
-        // registered. The fix belongs in the v32 Core upgrade script (use a no-guard upgrade
-        // initializer / plain `ProxyAdmin.upgrade`, since v32 storage is compatible), not in the
-        // test. Skipping keeps the gate green until that script fix lands; everything below is the
-        // (correct-so-far) fixture the finished test will use.
-        vm.skip(true);
-
         console.log("setUp: Starting");
         _deployL1Contracts();
         console.log("setUp: L1 contracts deployed");
-
-        // The MessageRoot impl swap during the upgrade re-runs `initialize()` (`reinitializer(2)`),
-        // but a fresh fixture already sits at initializer version 2. Roll it back to 1 so the
-        // reinit is allowed — production reaches version 1 via its own deploy history. Scoped to
-        // this local fixture; never runs against a real chain.
-        address messageRootProxy = address(addresses.bridgehub.messageRoot());
-        vm.store(messageRootProxy, bytes32(OZ_INITIALIZABLE_VERSION_SLOT), bytes32(uint256(1)));
-
         _deployTokens();
         _registerNewTokens(tokens);
         console.log("setUp: Tokens deployed + registered");

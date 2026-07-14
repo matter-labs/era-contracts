@@ -136,14 +136,30 @@ contract CTMUpgrade_v32 is Script, DefaultCTMUpgrade {
     /// @notice v32 governance call: pin the (freshly deployed) genesis `CTMRegistry` on the
     ///         upgraded CTM. This replaces the legacy `setChainCreationParams` emission from
     ///         `DefaultCTMUpgrade` — the v32 CTM reads all genesis data from the registry instead.
+    /// @dev `setGenesisRegistry` validates `genesisParams` at the CTM's CURRENT protocol version,
+    ///      which only becomes the new (v32) version once `setNewVersionUpgrade` runs. So this
+    ///      stage-1 slot emits nothing; the `setGenesisRegistry` call is appended right AFTER the
+    ///      version bump in `provideSetNewVersionUpgradeCall` below.
     function prepareNewChainCreationParamsCall() public virtual override returns (Call[] memory calls) {
+        return new Call[](0);
+    }
+
+    /// @notice Emit `setNewVersionUpgrade` (bumps the CTM to v32) immediately followed by
+    ///         `setGenesisRegistry` (pins the v32 genesis registry, whose `genesisParams` the CTM
+    ///         now validates at the just-set v32 version).
+    function provideSetNewVersionUpgradeCall() public virtual override returns (Call[] memory calls) {
+        Call[] memory setVersionCalls = super.provideSetNewVersionUpgradeCall();
+
         address ctm = ctmAddresses.stateTransition.proxies.chainTypeManager;
         address registry = ctmAddresses.stateTransition.genesisRegistry;
         require(ctm != address(0), "v32: chainTypeManager proxy is zero");
         require(registry != address(0), "v32: genesis registry not deployed");
 
-        calls = new Call[](1);
-        calls[0] = Call({
+        calls = new Call[](setVersionCalls.length + 1);
+        for (uint256 i = 0; i < setVersionCalls.length; ++i) {
+            calls[i] = setVersionCalls[i];
+        }
+        calls[setVersionCalls.length] = Call({
             target: ctm,
             data: abi.encodeCall(IChainTypeManager.setGenesisRegistry, (registry)),
             value: 0
@@ -179,12 +195,14 @@ contract CTMUpgrade_v32 is Script, DefaultCTMUpgrade {
     function getEraL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal virtual override returns (address, bytes memory) {
-        return getComplexUpgraderTargetAndData(_deployments, L2_GENESIS_UPGRADE_ADDR, getV32L2UpgradeCalldata());
+        return
+            getUniversalComplexUpgraderTargetAndData(_deployments, L2_GENESIS_UPGRADE_ADDR, getV32L2UpgradeCalldata());
     }
 
     function getZKsyncOSL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal virtual override returns (address, bytes memory) {
-        return getComplexUpgraderTargetAndData(_deployments, L2_GENESIS_UPGRADE_ADDR, getV32L2UpgradeCalldata());
+        return
+            getUniversalComplexUpgraderTargetAndData(_deployments, L2_GENESIS_UPGRADE_ADDR, getV32L2UpgradeCalldata());
     }
 }

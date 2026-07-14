@@ -7,6 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 import {CoreUpgradeParams} from "../default-upgrade/UpgradeParams.sol";
+import {Call} from "contracts/governance/Common.sol";
 
 /// @notice Script used for the v32 (atomic interop) upgrade flow, upgrading from v31.
 /// @dev v32 is storage-compatible but NOT function-preserving (see `CTMUpgrade_v32`). Compared
@@ -51,6 +52,17 @@ contract CoreUpgrade_v32 is Script, DefaultCoreUpgrade {
             "ChainRegistrationSender",
             false
         );
+    }
+
+    /// @notice v32 storage is compatible as-is, so L1MessageRoot needs no reinitializer: swap the
+    ///         implementation with a plain `upgrade` rather than the base's `upgradeAndCall`
+    ///         (which would re-run the genesis-only `initialize()` and revert once chains exist).
+    function _buildMessageRootUpgradeCall() internal override returns (Call memory call) {
+        return
+            _buildCallProxyUpgrade(
+                coreAddresses.bridgehub.proxies.messageRoot,
+                coreAddresses.bridgehub.implementations.messageRoot
+            );
     }
 
     /// @notice Override to properly set deployerAddress in upgrade context.

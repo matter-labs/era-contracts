@@ -432,12 +432,11 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridges.implementations.l1NativeTokenVault
         );
 
-        // L1MessageRoot: Use upgradeAndCall to call initializeL1V31Upgrade
-        calls[4] = _buildCallProxyUpgradeAndCall(
-            coreAddresses.bridgehub.proxies.messageRoot,
-            coreAddresses.bridgehub.implementations.messageRoot,
-            "L1MessageRoot"
-        );
+        // L1MessageRoot swap. By default this is an `upgradeAndCall` whose init is the
+        // version-specific `getInitializeCalldata("L1MessageRoot")` (v31 → `initializeL1V31Upgrade`).
+        // A version whose MessageRoot needs no reinitializer (e.g. v32, storage-compatible) overrides
+        // `_buildMessageRootUpgradeCall` to a plain `upgrade`.
+        calls[4] = _buildMessageRootUpgradeCall();
 
         calls[5] = _buildCallProxyUpgrade(
             coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
@@ -448,6 +447,18 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             coreAddresses.bridgehub.implementations.chainAssetHandler
         );
+    }
+
+    /// @notice Builds the L1MessageRoot proxy-upgrade governance call. Default: `upgradeAndCall`
+    ///         with the version-specific MessageRoot initializer. Override for a version whose
+    ///         MessageRoot needs no reinitializer (plain `upgrade`).
+    function _buildMessageRootUpgradeCall() internal virtual returns (Call memory call) {
+        return
+            _buildCallProxyUpgradeAndCall(
+                coreAddresses.bridgehub.proxies.messageRoot,
+                coreAddresses.bridgehub.implementations.messageRoot,
+                "L1MessageRoot"
+            );
     }
 
     function _buildCallProxyUpgrade(

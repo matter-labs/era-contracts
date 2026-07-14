@@ -25,12 +25,14 @@ contract GatewayUpgrade_v32 is Script, DefaultGatewayUpgrade {
     function getEraL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal view override returns (address, bytes memory) {
-        return getComplexUpgraderTargetAndData(_deployments, L2_GENESIS_UPGRADE_ADDR, getV32L2UpgradeCalldata());
+        return
+            getUniversalComplexUpgraderTargetAndData(_deployments, L2_GENESIS_UPGRADE_ADDR, getV32L2UpgradeCalldata());
     }
 
     function getZKsyncOSL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal view override returns (address, bytes memory) {
-        return getComplexUpgraderTargetAndData(_deployments, L2_GENESIS_UPGRADE_ADDR, getV32L2UpgradeCalldata());
+        return
+            getUniversalComplexUpgraderTargetAndData(_deployments, L2_GENESIS_UPGRADE_ADDR, getV32L2UpgradeCalldata());
     }
 }
