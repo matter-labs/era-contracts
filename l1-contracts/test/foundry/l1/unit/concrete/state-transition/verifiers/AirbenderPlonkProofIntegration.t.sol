@@ -43,35 +43,38 @@ contract InertPlonkVerifier is IVerifier {
 contract AirbenderPlonkProofIntegrationTest is Test {
     uint256 internal constant AIRBENDER_PLONK_VERIFICATION_TYPE = 2;
 
-    /// Program output the guest emitted, as 8 BE u32 words. This is the
-    /// `proof_public_input` from `eravm-airbender-verifier` for batch 506093 —
-    /// the full keccak(prev_commitment ‖ curr_commitment), packed `[u32; 8]`.
+    /// Program output the guest emitted, as 8 u32 words — the guest's final
+    /// registers 10..=17 (`Receipt::output`), extracted from the FRI proof for
+    /// batch 1 (`register_final_values` of the `UnrolledProgramProof`). This is
+    /// the `proof_public_input`: the guest already folds
+    /// keccak(prev_commitment ‖ curr_commitment) into it.
     uint32[8] internal PROGRAM_OUTPUT = [
-        uint32(1130987272),
-        3890202368,
-        1477174677,
-        3755385212,
-        2290908159,
-        161842629,
-        2088189254,
-        3910592463
+        uint32(1729207614),
+        1867842805,
+        1534832305,
+        821007321,
+        1355092776,
+        2617090311,
+        1207408377,
+        2888963040
     ];
 
-    /// Commitment to the eravm-airbender-verifier guest binary, as the
-    /// wrapper sees it. Sourced from `recursion_chain_hash` in the FRI proof
-    /// for batch 506093 (also surfaced as `aux_params` of
-    /// `zkos-wrapper`'s `BinaryCommitment`). For now the value is just pinned
-    /// here from the artifact; the production wiring is for L1 to either bake
-    /// in the audited binary's commitment or fetch it from a registry.
+    /// Commitment to the eravm-airbender-verifier guest binary, as the wrapper
+    /// sees it. Sourced from `recursion_chain_hash` in the FRI proof for batch 1
+    /// (the guest's final registers 18..=25; also surfaced as `aux_params` of
+    /// `zkos-wrapper`'s `BinaryCommitment`). The recursion circuit constrains
+    /// these registers to the audited binary, so the binary commitment is bound
+    /// *inside* the proof — it is NOT part of the SNARK public input. Pinned here
+    /// only to document the value the proof was produced against.
     uint32[8] internal BINARY_COMMITMENT = [
-        uint32(1510299098),
-        4057252708,
-        2938844326,
-        4124090251,
-        2485515716,
-        1206552808,
-        429924834,
-        1342631824
+        uint32(3178311086),
+        1416018931,
+        3804989641,
+        3067714877,
+        3539870970,
+        3742360073,
+        2234587709,
+        3179844674
     ];
 
     AirbenderVerifierPlonk internal airbenderVerifier;
@@ -181,47 +184,51 @@ contract AirbenderPlonkProofIntegrationTest is Test {
     }
 
     // -------------------------------------------------------------------------------------------
-    // Full L1-side derivation: compute the SNARK public input from
-    // `(program_output, binary_commitment)` and feed it to the verifier — exactly the flow the
-    // production settlement contract has to perform. No magic constants from the proof JSON in
-    // the verify call.
+    // Full L1-side derivation: compute the SNARK public input from `program_output` and feed it to
+    // the verifier — exactly the flow the production settlement contract has to perform. No magic
+    // constants from the proof JSON in the verify call.
     // -------------------------------------------------------------------------------------------
 
-    /// Pack a `uint32[8]` as 32 little-endian bytes. The wrapper hashes both
-    /// `program_output` and `binary_commitment` in this order.
-    function _leBytes(uint32[8] memory words) internal pure returns (bytes memory out) {
-        out = new bytes(32);
+    /// Derive the single SNARK public input from `program_output`, exactly as
+    /// the wrapper does: pack the 8 u32 words little-endian into 32 bytes (RISC-V
+    /// registers are little-endian), read them big-endian, and drop the low 32
+    /// bits (`PUBLIC_INPUT_SHIFT`; BN254's scalar field is ~254 bits). No keccak
+    /// and no binary commitment enter here — the guest already hashed the batch
+    /// commitments into `program_output`, and the binary commitment is bound
+    /// inside the recursion circuit rather than exposed as a public input.
+    function _derivePublicInput(uint32[8] memory words) internal pure returns (uint256) {
+        bytes memory le = new bytes(32);
         for (uint256 i = 0; i < 8; i++) {
             uint32 w = words[i];
-            out[i * 4 + 0] = bytes1(uint8(w));
-            out[i * 4 + 1] = bytes1(uint8(w >> 8));
-            out[i * 4 + 2] = bytes1(uint8(w >> 16));
-            out[i * 4 + 3] = bytes1(uint8(w >> 24));
+            le[i * 4 + 0] = bytes1(uint8(w));
+            le[i * 4 + 1] = bytes1(uint8(w >> 8));
+            le[i * 4 + 2] = bytes1(uint8(w >> 16));
+            le[i * 4 + 3] = bytes1(uint8(w >> 24));
         }
+        uint256 packed;
+        assembly {
+            packed := mload(add(le, 32))
+        }
+        return packed >> 32;
     }
 
     /// Cross-check: the SNARK's claimed public input equals the wrapper's
-    /// derivation `keccak(program_output ‖ binary_commitment) >> 32`. If this
-    /// drifts, either our encoding understanding is wrong or the proof was
-    /// produced against different program/binary than we think.
-    function test_publicInput_isKeccakOfProgramOutputAndBinaryCommitment() public view {
-        bytes memory preimage = abi.encodePacked(_leBytes(PROGRAM_OUTPUT), _leBytes(BINARY_COMMITMENT));
-        uint256 derived = uint256(keccak256(preimage)) >> 32;
+    /// derivation from `program_output` alone. If this drifts, either our
+    /// encoding understanding is wrong or the proof was produced against a
+    /// different program than we think.
+    function test_publicInput_isShiftedProgramOutput() public view {
+        uint256 derived = _derivePublicInput(PROGRAM_OUTPUT);
 
         uint256 fromFixture = AirbenderPlonkProofFixture.publicInputs()[0];
         assertEq(derived, fromFixture, "Derived public input doesn't match SNARK fixture");
     }
 
-    /// End-to-end: derive the public input on-chain from raw program output +
-    /// binary commitment, build a single-element `uint256[]`, and verify the
-    /// SNARK proof against it. This is the shape the L1 settlement contract
-    /// will ultimately use.
+    /// End-to-end: derive the public input on-chain from the raw program output,
+    /// build a single-element `uint256[]`, and verify the SNARK proof against it.
+    /// This is the shape the L1 settlement contract ultimately uses.
     function test_endToEnd_derivePublicInputThenVerify() public view {
-        bytes memory preimage = abi.encodePacked(_leBytes(PROGRAM_OUTPUT), _leBytes(BINARY_COMMITMENT));
-        uint256 derived = uint256(keccak256(preimage)) >> 32;
-
         uint256[] memory inputs = new uint256[](1);
-        inputs[0] = derived;
+        inputs[0] = _derivePublicInput(PROGRAM_OUTPUT);
 
         bool ok = airbenderVerifier.verify(inputs, AirbenderPlonkProofFixture.serializedProof());
         assertTrue(ok, "Proof must verify against the derived public input");
