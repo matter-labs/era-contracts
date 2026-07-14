@@ -21,20 +21,12 @@ contract DummyL2InteropRootStorage {
         return storedInteropRoots[chainId][batchNumber];
     }
 
-    function addInteropRoot(uint256 chainId, uint256 batchNumber, bytes32[] memory sides) external {
-        _addInteropRoot(chainId, batchNumber, 0, sides);
-    }
-
     function addInteropRootWithTimestamp(
         uint256 chainId,
         uint256 batchNumber,
         uint256 timestamp,
         bytes32[] memory sides
     ) external {
-        _addInteropRoot(chainId, batchNumber, timestamp, sides);
-    }
-
-    function _addInteropRoot(uint256 chainId, uint256 batchNumber, uint256 timestamp, bytes32[] memory sides) private {
         emit InteropRootAdded(chainId, batchNumber, timestamp, sides);
         if (sides.length == 1) {
             storedInteropRoots[chainId][batchNumber] = StoredInteropRoot({root: sides[0], timestamp: timestamp});
