@@ -9,11 +9,14 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
+import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
+import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
+import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol";
 import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
 import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
+import {ChainUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/ChainUpgrade_v31.s.sol";
 import {IOwnableSingleStep, IChainAdminMulticall} from "../../../../deploy-scripts/AdminFunctions.s.sol";
 import {EcosystemUpgradeParams} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
-import {ChainUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/ChainUpgrade_v31.s.sol";
 import {UpgradeUtils} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeUtils.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -32,9 +35,9 @@ contract UpgradeIntegrationTestBase is Test {
 
     uint256 chainId;
 
-    CoreUpgrade_v31 coreUpgrade;
-    CTMUpgrade_v31 ctmUpgrade;
-    ChainUpgrade_v31 chainUpgrade;
+    DefaultCoreUpgrade coreUpgrade;
+    DefaultCTMUpgrade ctmUpgrade;
+    DefaultChainUpgrade chainUpgrade;
 
     /// @notice Per-test fixed paths for the deploy outputs the upgrade scripts read.
     string public ECOSYSTEM_INPUT = "file_1.toml";
@@ -93,8 +96,8 @@ contract UpgradeIntegrationTestBase is Test {
         console.log("setupUpgrade: Deploying new ecosystem contracts");
         coreUpgrade.deployNewEcosystemContractsL1();
 
-        console.log("setupUpgrade: Creating ChainUpgrade_v31");
-        chainUpgrade = new ChainUpgrade_v31();
+        console.log("setupUpgrade: Creating chain upgrade");
+        chainUpgrade = createChainUpgrade();
 
         // Hook for child classes to mutate Core/CTM state after init but before prepare
         // (e.g. local test needs to bump CTM's protocol version from the upgrade input).
@@ -113,14 +116,19 @@ contract UpgradeIntegrationTestBase is Test {
         console.log("setupUpgrade: Complete");
     }
 
-    /// @notice Override in child classes to use mocked versions.
-    function createCoreUpgrade() internal virtual returns (CoreUpgrade_v31) {
+    /// @notice Override in child classes to use mocked / version-specific upgrades.
+    function createCoreUpgrade() internal virtual returns (DefaultCoreUpgrade) {
         return new CoreUpgrade_v31();
     }
 
-    /// @notice Override in child classes to use mocked versions.
-    function createCTMUpgrade() internal virtual returns (CTMUpgrade_v31) {
+    /// @notice Override in child classes to use mocked / version-specific upgrades.
+    function createCTMUpgrade() internal virtual returns (DefaultCTMUpgrade) {
         return new CTMUpgrade_v31();
+    }
+
+    /// @notice Override in child classes to use the version-specific chain upgrade.
+    function createChainUpgrade() internal virtual returns (DefaultChainUpgrade) {
+        return new ChainUpgrade_v31();
     }
 
     /// @notice Hook for test-specific setup before chain upgrade.

@@ -2,7 +2,11 @@
 
 pragma solidity 0.8.28;
 
-import {L2EcosystemContract, CTMContract, L1EcosystemContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+import {
+    L2EcosystemContract,
+    CTMContract,
+    L1EcosystemContract
+} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {ICoreRegistry} from "contracts/upgrades/registry/ICoreRegistry.sol";
 import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";

@@ -154,7 +154,8 @@ library CoreOnGatewayHelper {
             // Plus `UpgradeableBeaconDeployer`, which
             // `FixedForceDeploymentsData.beaconDeployerInfo` references but
             // which is not one of the fixed-address core contracts.
-            L2EcosystemContract[] memory fixedAddressCoreContracts = SystemContractsProcessing.getFixedAddressCoreContracts();
+            L2EcosystemContract[] memory fixedAddressCoreContracts = SystemContractsProcessing
+                .getFixedAddressCoreContracts();
             dependencyContracts = new L2EcosystemContract[](fixedAddressCoreContracts.length + 1);
             for (uint256 i = 0; i < fixedAddressCoreContracts.length; i++) {
                 dependencyContracts[i] = fixedAddressCoreContracts[i];
@@ -201,7 +202,8 @@ library CoreOnGatewayHelper {
     /// @notice Resolve a L2EcosystemContract enum to its contract name for the active VM.
     function _resolveContractName(bool _isZKsyncOS, L2EcosystemContract _c) internal pure returns (string memory) {
         // Contracts with different names per VM
-        if (_c == L2EcosystemContract.L2NativeTokenVault) return _isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault";
+        if (_c == L2EcosystemContract.L2NativeTokenVault)
+            return _isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault";
 
         // Contracts with the same name across both VMs
         if (_c == L2EcosystemContract.L2Bridgehub) return "L2Bridgehub";

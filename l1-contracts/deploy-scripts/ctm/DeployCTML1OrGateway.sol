@@ -130,6 +130,14 @@ library DeployCTML1OrGateway {
             _compareStrings(_contractName, "EraDualVerifier") || _compareStrings(_contractName, "ZKsyncOSDualVerifier")
         ) {
             return CTMContract.DualVerifier;
+        } else if (
+            _compareStrings(_contractName, "DefaultUpgrade") ||
+            _compareStrings(_contractName, "SettlementLayerV32Upgrade")
+        ) {
+            // The per-version default-upgrade contract (v32's is `SettlementLayerV32Upgrade`).
+            return CTMContract.DefaultUpgrade;
+        } else if (_compareStrings(_contractName, "L1GenesisUpgrade")) {
+            return CTMContract.L1GenesisUpgrade;
         } else {
             revert(string.concat("Contract ", _contractName, " not CTM contract, creation calldata could not be set"));
         }
