@@ -3036,6 +3036,8 @@ DummyL2AssetTracker
 |----------+------------------------------------------------------+------------|
 | Function | handleInitiateBaseTokenBridgingOnL2(uint256,uint256) | 0x8bdf7ad0 |
 |----------+------------------------------------------------------+------------|
+| Function | handleRecoverBaseTokenBridgingOnL2(uint256,uint256)  | 0xa990ba75 |
+|----------+------------------------------------------------------+------------|
 | Function | needBaseTokenTotalSupplyBackfill()                   | 0x8e7bd422 |
 |----------+------------------------------------------------------+------------|
 | Function | recordMode()                                         | 0xf1ece133 |
