@@ -18,8 +18,6 @@ contract TestCoreRegistry is ICoreRegistry {
     uint256 internal oldVersion;
     uint256 internal newVersion;
     address internal proxyAdminAddress;
-    address internal eraCTMRegistry;
-    address internal zksyncOSCTMRegistry;
     L1EcosystemContract[] internal contractList;
     mapping(L1EcosystemContract contractId => address proxy) internal proxies;
     mapping(L1EcosystemContract contractId => address impl) internal newImpls;
@@ -31,14 +29,6 @@ contract TestCoreRegistry is ICoreRegistry {
 
     function setProxyAdmin(address _proxyAdmin) external {
         proxyAdminAddress = _proxyAdmin;
-    }
-
-    function setCTMRegistry(bool _isZKsyncOS, address _registry) external {
-        if (_isZKsyncOS) {
-            zksyncOSCTMRegistry = _registry;
-        } else {
-            eraCTMRegistry = _registry;
-        }
     }
 
     /// @dev A zero `_implNew` pins "no new implementation" (the module skips the contract).
@@ -70,10 +60,6 @@ contract TestCoreRegistry is ICoreRegistry {
 
     function proxyAdmin() external view returns (address) {
         return proxyAdminAddress;
-    }
-
-    function ctmRegistry(bool _isZKsyncOS) external view returns (address) {
-        return _isZKsyncOS ? zksyncOSCTMRegistry : eraCTMRegistry;
     }
 
     function verifyAll() external pure returns (bool) {

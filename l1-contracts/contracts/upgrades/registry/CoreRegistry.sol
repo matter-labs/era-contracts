@@ -29,8 +29,6 @@ contract CoreRegistry is ICoreRegistry {
         uint256 oldProtocolVersion;
         uint256 newProtocolVersion;
         address proxyAdmin;
-        address eraCTMRegistry;
-        address zksyncOSCTMRegistry;
         EcosystemContractRow[] contractRows;
         CodehashPin[] codehashPins;
     }
@@ -49,8 +47,6 @@ contract CoreRegistry is ICoreRegistry {
     uint256 internal oldProtocolVersion_;
     uint256 internal newProtocolVersion_;
     address internal proxyAdmin_;
-    address internal eraCTMRegistry;
-    address internal zksyncOSCTMRegistry;
     EcosystemContractRow[] internal contractRows;
     CodehashPin[] internal codehashPins;
 
@@ -74,8 +70,6 @@ contract CoreRegistry is ICoreRegistry {
         oldProtocolVersion_ = _manifest.oldProtocolVersion;
         newProtocolVersion_ = _manifest.newProtocolVersion;
         proxyAdmin_ = _manifest.proxyAdmin;
-        eraCTMRegistry = _manifest.eraCTMRegistry;
-        zksyncOSCTMRegistry = _manifest.zksyncOSCTMRegistry;
         uint256 length = _manifest.contractRows.length;
         for (uint256 i = 0; i < length; ++i) {
             contractRows.push(_manifest.contractRows[i]);
@@ -134,11 +128,6 @@ contract CoreRegistry is ICoreRegistry {
     /// @inheritdoc ICoreRegistry
     function proxyAdmin() external view returns (address) {
         return proxyAdmin_;
-    }
-
-    /// @inheritdoc ICoreRegistry
-    function ctmRegistry(bool _isZKsyncOS) external view returns (address) {
-        return _isZKsyncOS ? zksyncOSCTMRegistry : eraCTMRegistry;
     }
 
     /// @inheritdoc ICoreRegistry

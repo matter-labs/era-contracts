@@ -4,10 +4,6 @@
   "newVersion": "0.32.0",
   "core": {
     "proxyAdmin": "0x0FA38b5c8cb180809E0C95E2EE923eC093123285",
-    "ctmRegistries": {
-      "era": "0x0000000000000000000000000000000000000000",
-      "zksyncOS": "0x0000000000000000000000000000000000000000"
-    },
     "contracts": {
       "L1MessageRoot": {
         "proxy": "0xEeBD607623e9Baf752DF115d89d82b6391feC9aa",

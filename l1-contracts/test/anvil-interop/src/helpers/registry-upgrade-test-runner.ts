@@ -675,10 +675,6 @@ async function buildRegistryManifest(
     newVersion: live.newVersionString,
     core: {
       proxyAdmin: live.ecosystemProxyAdmin,
-      // Informational cross-links between the generated registries; not read by
-      // EcosystemUpgradeModule. The CTM registry address does not exist yet at generation
-      // time (it is deployed from this very manifest), so they stay unset here.
-      ctmRegistries: { era: ethers.constants.AddressZero, zksyncOS: ethers.constants.AddressZero },
       contracts: {
         MessageRoot: {
           proxy: live.messageRootProxy,

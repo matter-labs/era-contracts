@@ -76,8 +76,6 @@ export function coreInitArgs(manifest: any): any {
     oldProtocolVersion: packSemVer(manifest.oldVersion),
     newProtocolVersion: packSemVer(manifest.newVersion),
     proxyAdmin: manifest.core.proxyAdmin,
-    eraCTMRegistry: manifest.core.ctmRegistries.era,
-    zksyncOSCTMRegistry: manifest.core.ctmRegistries.zksyncOS,
     contractRows,
     codehashPins,
   };

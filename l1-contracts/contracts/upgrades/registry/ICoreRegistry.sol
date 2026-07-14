@@ -38,13 +38,8 @@ interface ICoreRegistry {
     /// @notice The ecosystem `ProxyAdmin` that administers every ecosystem proxy.
     function proxyAdmin() external view returns (address);
 
-    /// @notice The per-CTM registry holding CTM-scoped addresses, facet selector lists,
-    ///         L2 bytecode hashes and genesis parameters.
-    /// @param _isZKsyncOS False for the Era (EraVM) CTM registry, true for the ZKsyncOS one.
-    function ctmRegistry(bool _isZKsyncOS) external view returns (address);
-
-    /// @notice Walks every pinned L1 address (including the CTM registries, recursively) and
-    ///         compares its `EXTCODEHASH` against the hash pinned at generation time. Anyone can
-    ///         call this to check that deployed bytecode matches what was audited.
+    /// @notice Walks every pinned L1 address and compares its `EXTCODEHASH` against the hash
+    ///         pinned at generation time. Anyone can call this to check that deployed bytecode
+    ///         matches what was audited. Each registry (core + per-CTM) is verified independently.
     function verifyAll() external view returns (bool);
 }

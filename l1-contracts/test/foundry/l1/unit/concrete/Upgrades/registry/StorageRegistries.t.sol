@@ -74,8 +74,6 @@ contract StorageRegistriesTest is Test {
             oldProtocolVersion: OLD_VERSION,
             newProtocolVersion: NEW_VERSION,
             proxyAdmin: address(0xA001),
-            eraCTMRegistry: address(0xC001),
-            zksyncOSCTMRegistry: address(0xC002),
             contractRows: rows,
             codehashPins: pins
         });
@@ -240,8 +238,6 @@ contract StorageRegistriesTest is Test {
         // implementation for it: zero means "nothing to upgrade".
         assertEq(coreRegistry.implAddress(L1EcosystemContract.L1MessageRoot), address(0));
         assertEq(coreRegistry.proxyAdmin(), address(0xA001));
-        assertEq(coreRegistry.ctmRegistry(false), address(0xC001));
-        assertEq(coreRegistry.ctmRegistry(true), address(0xC002));
         assertEq(coreRegistry.ecosystemContractList().length, 3);
     }
 
