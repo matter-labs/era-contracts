@@ -751,12 +751,12 @@
   },
   {
     "contractName": "l1-contracts/AirbenderVerifierPlonk",
-    "zkBytecodeHash": "0x01000dbd136d540548793e7394b4f67290b8d6ced5dcc834b5316f9aeedfc9a9",
+    "zkBytecodeHash": "0x01000dbdb9b5f35499fbf3121436dec29a33d33e94084e32b4f3b10f6c853cd7",
     "zkBytecodePath": "/l1-contracts/zkout/AirbenderVerifierPlonk.sol/AirbenderVerifierPlonk.json",
-    "evmBytecodeHash": "0xa7eeac8d443e85671d9087bf0865f038638476f47203f2b1577ee676538de41f",
+    "evmBytecodeHash": "0xbd5f219edfdb523be8cac73dd3dbc975b624ca7413b40dfb3e2a2c0d9b5d29c3",
     "evmBytecodePath": "/l1-contracts/out/AirbenderVerifierPlonk.sol/AirbenderVerifierPlonk.json",
-    "evmDeployedBytecodeHash": "0xcd2ec6d50774250409f8b2386fd0f852cdb8c48c166bf63e6dc57637bbcbe110",
-    "evmDeployedBytecodeBlakeHash": "0x5c45ed277a80d6dd00346a8a5384e34a7dd705013eb504663b3f7fb296f39090",
+    "evmDeployedBytecodeHash": "0x863a32e3ed7f84ffcecf5f10854f0863aaca01018bc73777948f3f1a67532201",
+    "evmDeployedBytecodeBlakeHash": "0x6a07bdd7f077b3f4bb83ab8d96c0cea6e7debd4a34c67c63057766a0ad4ea7b4",
     "evmDeployedBytecodeLength": 17229
   },
   {
