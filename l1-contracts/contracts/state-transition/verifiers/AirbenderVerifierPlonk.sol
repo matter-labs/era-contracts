@@ -233,8 +233,8 @@ contract AirbenderVerifierPlonk is IVerifier {
                              Constants
     //////////////////////////////////////////////////////////////*/
 
-    uint256 internal constant OMEGA = 0x1951441010b2b95a6e47a6075066a50a036f5ba978c050f2821df86636c0facb;
-    uint256 internal constant DOMAIN_SIZE = 0x1000000; // 2^24
+    uint256 internal constant OMEGA = 0x0d94d63997367c97a8ed16c17adaae39262b9af83acb9e003f94c217303dd160;
+    uint256 internal constant DOMAIN_SIZE = 0x2000000; // 2^25
     uint256 internal constant Q_MOD = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
     uint256 internal constant R_MOD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
