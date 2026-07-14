@@ -1,8 +1,14 @@
-# Proposal: Registry-Driven Protocol Upgrades
+# Registry-Driven Protocol Upgrades
 
-**Status:** Draft for discussion
+**Status:** Implemented for v32 (era-contracts PR #2270). v32 is the first registry-driven
+upgrade; later phases (self-wiring L1 constructors, L2 registry) remain future work.
 **Scope:** L1 + L2 era-contracts, upgrade tooling, governance proposal shape
-**Target:** shadow-mode for v32, fully live by v33
+
+> **Reading guide.** [§ Current implementation (as built)](#current-implementation-as-built)
+> describes the flow and invariants **as they exist in the tree today**. The numbered sections
+> §§1–7 are the original design proposal, kept for rationale and history; where a decision
+> changed during implementation it is flagged inline with an **As built** note and summarized in
+> the as-built section. When the two disagree, the as-built section wins.
 
 ---
 
@@ -49,6 +55,122 @@ risks, and a phased rollout follow.
 
 ---
 
+## Current implementation (as built)
+
+v32 is the first registry-driven upgrade. This section is the source of truth for how the flow
+works today; it also calls out where the implementation diverged from the proposal below (most
+notably registries became **storage-backed** rather than constants-in-bytecode, and the CTM's
+inline `ChainCreationParams` **collapsed** into a single genesis-registry pointer).
+
+### Contracts
+
+| Contract                                      | Where                          | Role                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| --------------------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CTMRegistry`                                 | `contracts/upgrades/registry/` | Storage-backed, write-once registry of everything a chain-type-manager needs for one `(oldVersion, newVersion)` pair: facet rows + selectors, freezability, per-version addresses (`DiamondInit`, `DefaultUpgrade`, …), verifier, base system contract hashes, genesis params, force-deployments blob, L2 deployment rows, codehash pins. Era vs ZKsyncOS is a manifest flag (`isZKsyncOS`), not a separate contract. |
+| `CoreRegistry`                                | `contracts/upgrades/registry/` | Same shape for L1 ecosystem contracts (`EcosystemContract` rows: proxy + new impl) + codehash pins.                                                                                                                                                                                                                                                                                                                   |
+| `ContractIdentifiers.sol`                     | `contracts/upgrades/registry/` | The cross-version ABI: `EcosystemContract` / `CoreContract` / `CTMContract` / `ZKsyncOSUpgradeType` enums **and** the shared `CodehashPin` struct.                                                                                                                                                                                                                                                                    |
+| `ICTMRegistry` / `ICoreRegistry`              | `contracts/upgrades/registry/` | Read interfaces used by consumers (CTM, DiamondInit, composer, reader).                                                                                                                                                                                                                                                                                                                                               |
+| `RegistryFacetReader`                         | `contracts/upgrades/registry/` | `newChainInstallations(registry)` (genesis facet cuts) and `facetSwapPlan(registry)` (`UpgradeFacetSwap[]` for an upgrade), derived from the registry's rows.                                                                                                                                                                                                                                                         |
+| `GenesisManifestLib`                          | `contracts/upgrades/registry/` | `buildGenesisManifest(GenesisConfig)` → a `CTMRegistry` manifest for a freshly deployed chain-type manager's genesis registry.                                                                                                                                                                                                                                                                                        |
+| `CTMUpgradeComposer`                          | `contracts/upgrades/registry/` | Pure composition from a registry: `buildUpgradeCutData`, `buildL2UpgradeTx`, `buildProposedUpgrade`.                                                                                                                                                                                                                                                                                                                  |
+| `CTMUpgradeModule` / `EcosystemUpgradeModule` | `contracts/upgrades/registry/` | Stateless per-upgrade modules, delegatecalled by the executor: `applyCTMUpgrade(registry, oldDeadline, timestamp)` + `upgradeChain(...)`, and `applyL1Upgrade(coreRegistry)`.                                                                                                                                                                                                                                         |
+| `UpgradeExecutor`                             | `contracts/governance/`        | Permanent `Ownable2Step` (owner = PUH) exposing `execute(module, data)` (delegatecall) + `forward(Call[])` (raw-call escape hatch). Holds the ownerships PUH used to hold.                                                                                                                                                                                                                                            |
+
+Both registry flavours are **generated per environment** by `scripts/gen-registry.ts` from an
+audited `manifest.json`, `initialize(manifest)`d exactly once, and commit
+`manifestHash = keccak256(manifest)` so a governance proposal can reference exactly the reviewed
+bytes. `verifyAll()` checks the pinned `CodehashPin`s (EXTCODEHASH) against the live deployment.
+
+### Data model: the CTM stores pointers, the registry holds the data
+
+`ChainTypeManagerBase` keeps only two registry pointers and derives all genesis/upgrade data by
+reading them:
+
+- **`genesisRegistry`** (single, current-version) — set by `setGenesisRegistry(address)`, emits
+  `NewGenesisRegistry`. The source of everything a **new** chain needs.
+- **`upgradeRegistryForVersion[protocolVersion]`** — set by `setNewVersionUpgrade(…, registry)`.
+  The source of the facet-swap plan when an **existing** chain upgrades to that version.
+
+The former inline genesis data is gone: the `ChainCreationParams` struct, the `InitializeData`
+init struct, and the `storedBatchZero` / `initialCutHash` / `l1GenesisUpgrade` /
+`initialForceDeploymentHash` storage slots have been removed (slots retained as `__DEPRECATED_`
+placeholders to preserve the upgradeable-proxy layout). `storedBatchZero()` and
+`l1GenesisUpgrade()` are now views that read `genesisRegistry.genesisParams(protocolVersion)`.
+
+### Flow A — genesis (creating a new chain)
+
+1. `L1Bridgehub.createNewChain(chainId, chainTypeManager, baseTokenAssetId, admin)` records the
+   base-token asset id + settlement layer, then calls the CTM with the **minimal**
+   `createNewChain(chainId, admin)`. The base token asset id and factory deps are _not_ forwarded
+   — DiamondInit reads the asset id from the bridgehub; the genesis force-deployments live in the
+   registry.
+2. The CTM builds a genesis `DiamondCutData` with **empty** `facetCuts`, `initAddress =
+genesisRegistry.ctmAddress(DiamondInit, protocolVersion)`, and empty `initCalldata`, and
+   deploys the `DiamondProxy`.
+3. `DiamondInit.initialize(chainId, admin)` — delegatecalled from the proxy constructor, so
+   `msg.sender` is the CTM — reads the CTM's `genesisRegistry`, installs the facet set via
+   `RegistryFacetReader.newChainInstallations` (each facet's selectors from its own
+   `ISelfDescribingFacet.selectors()`, or a registry-pinned override), and reads the base system
+   contract hashes from the registry.
+4. The CTM runs the genesis upgrade (`IAdmin.genesisUpgrade`) using the registry's
+   `fixedForceDeploymentsData` + `l1GenesisUpgrade()`. Genesis factory-dep **bytecodes** are
+   published out-of-band (bytecodes supplier) and referenced by hash, so an empty `factoryDeps`
+   is passed.
+
+Chain migration between settlement layers: `forwardedBridgeBurn` forwards only
+`(admin, protocolVersion)`; the destination CTM rebuilds the genesis cut from its **own** registry
+in `forwardedBridgeMint` → `_deployNewChain(chainId, admin)`.
+
+### Flow B — a registry-driven protocol upgrade
+
+Governance (PUH) owns the permanent `UpgradeExecutor`, which owns the CTMs / ecosystem
+`ProxyAdmin` / `ValidatorTimelock`. A per-upgrade proposal is a sequence of
+`executor.execute(module, registryImpl)` calls:
+
+- `EcosystemUpgradeModule.applyL1Upgrade(coreRegistry)` — L1 ecosystem implementation swaps, etc.,
+  read from the `CoreRegistry`.
+- `CTMUpgradeModule.applyCTMUpgrade(ctmRegistry, oldDeadline, timestamp)` — reads the CTM proxy +
+  old/new protocol versions from the registry, composes the upgrade cut and L2 upgrade tx via
+  `CTMUpgradeComposer`, then calls `setNewVersionUpgrade(cut, old, deadline, new, verifier,
+ctmRegistry)` (which pins `upgradeRegistryForVersion[new] = ctmRegistry`) **and**
+  `setGenesisRegistry(ctmRegistry)`, so chains created after the upgrade start at the new version.
+- Per chain, `CTMUpgradeModule.upgradeChain(ctmRegistry, chainId, timestamp)`.
+
+When a chain executes the upgrade, `BaseZkSyncUpgrade` reads `upgradeRegistryForVersion` (via the
+CTM), `RegistryFacetReader.facetSwapPlan(registry)` produces the `UpgradeFacetSwap[]` (one entry
+per changed facet: old→new address, freezability, selector lists), and `_upgradeFacets` performs
+the `Diamond.diamondCut` (selectors resolved from `ISelfDescribingFacet.selectors()` or a
+registry override).
+
+**Legacy path.** `deploy-scripts/upgrade/default-upgrade/*` still targets _pre-v32_ CTMs and keeps
+encoding the old `setChainCreationParams`; the struct + entrypoint were moved out of the current
+CTM into `ILegacyChainTypeManager` so those scripts still compile. `CTMUpgrade_v32` deploys its
+genesis `CTMRegistry` as part of the v32 deploy and overrides the governance call to emit
+`setGenesisRegistry` instead of `setChainCreationParams`.
+
+### Assumptions / invariants
+
+- **The genesis registry is mandatory.** A CTM with `genesisRegistry == 0` cannot create chains;
+  `setGenesisRegistry(0)` reverts `ZeroAddress`.
+- **The enums are a cross-version ABI — append-only.** New variants go at the end; never reorder
+  or delete.
+- **Registry instances are write-once.** `initialize` reverts if already set; the committed
+  `manifestHash` is what a proposal pins.
+- **The facet set for a protocol version is uniform across all chains on a CTM** — the invariant
+  the swap plan and `upgradeCutHash[version]` rely on.
+- **VM-specific genesis validation** happens in `_setGenesisRegistry`, reading the registry's
+  `genesisParams`: Era requires `genesisIndexRepeatedStorageChanges != 0`; ZKsyncOS requires
+  `genesisBatchCommitment == bytes32(uint256(1))`.
+- **Reproducible bytecode is load-bearing** for CREATE2 address prediction and every codehash
+  pin — registries are built with a CBOR-metadata-free profile so hashes are byte-identical
+  across platforms (this is also why `AllContractsHashes` is regenerated only on CI, never on
+  macOS).
+- **Nothing large flows through `createNewChain`.** Genesis force-deployment bytecodes are
+  published out-of-band and referenced by hash; the bridgehub → CTM call carries only
+  `(chainId, admin)`.
+
+---
+
 ## 2. What the codebase already provides
 
 | Brief assumption                       | Reality in tree                                                                                                                                                                                                                   | Consequence                                                                                                                                         |
@@ -77,6 +199,12 @@ Two repo rules (AGENTS.md) that constrain the design:
 ## 3. Design decisions
 
 ### D1. Registries: three contracts, code-aligned naming
+
+> **As built:** **two** base contracts, `CTMRegistry` + `CoreRegistry`, and they are
+> **storage-backed write-once** (`initialize(manifest)` + `manifestHash`), _not_
+> constants-in-bytecode. Era vs ZKsyncOS is a manifest flag on `CTMRegistry`, not a separate
+> `EraCTMRegistry` / `ZKsyncOSCTMRegistry` contract. Per-environment instances are generated
+> (`gen-registry.ts`) and committed. See the as-built section above.
 
 `CoreRegistry`, `EraCTMRegistry`, `ZKsyncOSCTMRegistry` (not "Atlas" — nothing in the tree
 uses that name; if Atlas is the product name, keep it in docs only). Split, keying, and
@@ -208,6 +336,14 @@ Hard requirements picked up from `BaseZkSyncUpgrade`:
 — all inside the one upgrade tx.
 
 ### D6. `chainCreationParams` from the same source
+
+> **As built:** taken further — `ChainCreationParams` was **removed entirely**. Rather than the
+> module rebuilding the struct and calling `setChainCreationParams`, the CTM stores a single
+> `genesisRegistry` pointer (`setGenesisRegistry(address)`) and reads facet set, base system
+> hashes, verifier, genesis params, `DiamondInit` address and force-deployments straight from it.
+> `setChainCreationParams` + the struct survive only in `ILegacyChainTypeManager` for the
+> pre-v32 default-upgrade scripts. Drift is impossible not by co-locating two calls but because
+> there is only one source. See the as-built section above.
 
 As in the brief: the module builds `ChainCreationParams` from the CTM registry
 (`genesisParams(V32)` + empty-diff cut + the same `UniversalContractUpgradeInfo[]`
