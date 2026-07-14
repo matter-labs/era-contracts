@@ -24,17 +24,7 @@ import {
     L2_INTEROP_HANDLER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
-import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {
-    AssetIdNotSupported,
-    EmptyAddress,
-    ExecuteMessageFailed,
-    InvalidSelector,
-    PayloadTooShort,
-    Unauthorized
-} from "../../common/L1ContractErrors.sol";
-import {IERC7786Recipient} from "../../interop/IERC7786Recipient.sol";
+import {AssetIdNotSupported, EmptyAddress, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
 import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 
@@ -43,7 +33,7 @@ import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol"
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
-contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC7786Recipient, IAtomicRecoverable {
+contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAtomicRecoverable {
     /// @dev Deprecated: previously stored the L2 Bridgehub. Now the address is resolved via
     /// `_bridgehub()` → `L2_BRIDGEHUB_ADDR` constant. Kept as an empty slot to preserve storage layout.
     IL2Bridgehub private __DEPRECATED_BRIDGE_HUB;
@@ -88,29 +78,18 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         return L2_INTEROP_CENTER_ADDR;
     }
 
-    /// @notice Returns the interop handler address. Virtual for private interop override.
-    function _interopHandlerAddr() internal view virtual returns (address) {
-        return L2_INTEROP_HANDLER_ADDR;
-    }
-
     /// @notice Returns the canonical atomic-flow manager address — the contract whitelisted to call
     /// `recoverAtomicCall` (the IMT atomic flow's timeout recovery path). It is a genesis-deployed
-    /// built-in at a fixed address, like the interop center / handler above; chains without the
+    /// built-in at a fixed address, like the interop center above; chains without the
     /// atomic-flow stack simply have nothing deployed there, so the auth gate never passes. Virtual
     /// for private interop override.
     function _atomicFlowManagerAddr() internal view virtual returns (address) {
         return L2_ATOMIC_FLOW_MANAGER_ADDR;
     }
 
-    /// @notice Validates that an interop message sender is an authorized AssetRouter counterpart.
-    /// @dev By default, only accepts messages from the same address (all system AssetRouters share one address).
-    function _validateAssetRouterCounterpart(uint256 _senderChainId, address _senderAddress) internal view virtual {
-        require((_senderChainId != L1_CHAIN_ID && _senderAddress == address(this)), Unauthorized(_senderAddress));
-    }
-
-    /// @notice Checks that the message sender is the L1 Asset Router.
-    modifier onlyAssetRouterCounterpart(uint256 _originChainId) {
-        if (_originChainId == L1_CHAIN_ID) {
+    /// @notice Checks that the message sender is the asset-router counterpart for messages originating on L1.
+    modifier onlyAssetRouterCounterpart(uint256 _sourceChainId) {
+        if (_sourceChainId == L1_CHAIN_ID) {
             // For messages originating on L1, only the L1 Asset Router counterpart may call this function.
             require(
                 AddressAliasHelper.undoL1ToL2Alias(msg.sender) == address(L1_ASSET_ROUTER),
@@ -122,9 +101,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _;
     }
 
-    /// @notice Checks that the message sender is the L1 Asset Router or this contract itself.
-    modifier onlyAssetRouterCounterpartOrSelf(uint256 _chainId) {
-        if (_chainId == L1_CHAIN_ID) {
+    /// @notice Checks that the message sender is the L1 asset-router counterpart or this contract itself.
+    /// @dev Self-calls are used for interop flows where the destination L2AssetRouter re-enters its own finalize path.
+    modifier onlyAssetRouterCounterpartOrSelf(uint256 _sourceChainId) {
+        if (_sourceChainId == L1_CHAIN_ID) {
+            // For messages originating on L1, only the L1 Asset Router counterpart may call this function.
             if (
                 (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != address(L1_ASSET_ROUTER)) &&
                 msg.sender != address(this)
@@ -155,12 +136,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// atomic-flow stack nothing is deployed at that address, so this gate naturally never passes.
     modifier onlyAtomicFlowManager() {
         require(msg.sender == _atomicFlowManagerAddr(), Unauthorized(msg.sender));
-        _;
-    }
-
-    /// @notice Checks that the message sender is the interop handler.
-    modifier onlyL2InteropHandler() {
-        require(msg.sender == _interopHandlerAddr(), Unauthorized(msg.sender));
         _;
     }
 
@@ -223,10 +198,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
 
     /// @inheritdoc IL2AssetRouter
     function setAssetHandlerAddress(
-        uint256 _originChainId,
+        uint256 _sourceChainId,
         bytes32 _assetId,
         address _assetHandlerAddress
-    ) external override onlyAssetRouterCounterpart(_originChainId) {
+    ) external override onlyAssetRouterCounterpart(_sourceChainId) {
         _setAssetHandler(_assetId, _assetHandlerAddress);
     }
 
@@ -238,45 +213,30 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _setAssetHandlerAddressThisChain(_nativeTokenVaultAddr(), _assetRegistrationData, _assetHandlerAddress);
     }
 
-    /// @notice Executes cross-chain interop messages following ERC-7786 standard
-    /// @param sender ERC-7930 Address of the message sender
-    /// @param payload Encoded function call data (must be finalizeDeposit)
-    /// @return Function selector confirming successful execution per ERC-7786
-    function receiveMessage(
-        bytes32 /* receiveId */, // Unique identifier
-        bytes calldata sender, // ERC-7930 address
-        bytes calldata payload
-    ) external payable onlyL2InteropHandler returns (bytes4) {
-        // This function serves as the L2AssetRouter's entry point for processing cross-chain bridge operations
-        // initiated through the InteropCenter system. It implements critical security validations:
-        // - L1->L2 calls: Currently Interop can only be initiated on L2, so this case shouldn't be covered.
-        // - L2->L2 calls: Only this contract (L2AssetRouter) can send messages from other L2 chains
-        //
-        // This dual validation prevents attackers from spoofing cross-chain messages by requiring
-        // both correct source chain ID and authorized sender address.
-        //
-        // INDIRECT CALL PATTERN (L2->L2 interop flow):
-        // 1. User calls InteropCenter on source L2
-        // 2. InteropCenter calls initiateIndirectCall() on source chain's L2AssetRouter
-        // 3. Source L2AssetRouter becomes the "sender" for the destination L2 call
-        // 4. Destination L2 validates senderAddress == address(this) for non-L1 sources
-        //    (L2AssetRouter address is equal for all ZKsync chains)
+    /// @inheritdoc AssetRouterBase
+    /// @dev Interop calls are delivered by the L2 interop handler system contract.
+    function _interopHandler() internal view override returns (address) {
+        return L2_INTEROP_HANDLER_ADDR;
+    }
 
-        (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
-
-        _validateAssetRouterCounterpart(senderChainId, senderAddress);
-
-        // The payload must contain a valid finalizeDeposit selector to ensure only legitimate
-        // bridge operations are executed. This prevents arbitrary function calls through the interop system.
-        require(payload.length > 4, PayloadTooShort());
-        require(
-            bytes4(payload[0:4]) == AssetRouterBase.finalizeDeposit.selector,
-            InvalidSelector(bytes4(payload[0:4]))
-        );
-
-        (bool success, ) = address(this).call{value: msg.value}(payload);
-        require(success, ExecuteMessageFailed());
-        return IERC7786Recipient.receiveMessage.selector;
+    /// @inheritdoc AssetRouterBase
+    /// @dev Validates cross-chain bridge operations initiated through the InteropCenter system:
+    /// - L1->L2 calls: Currently Interop can only be initiated on L2, so this case shouldn't be covered.
+    /// - L2->L2 calls: Only this contract (L2AssetRouter) can send messages from other L2 chains
+    /// This dual validation prevents attackers from spoofing cross-chain messages by requiring
+    /// both correct source chain ID and authorized sender address.
+    ///
+    /// INDIRECT CALL PATTERN (L2->L2 interop flow):
+    /// 1. User calls InteropCenter on source L2
+    /// 2. InteropCenter calls initiateIndirectCall() on source chain's L2AssetRouter
+    /// 3. Source L2AssetRouter becomes the "sender" for the destination L2 call
+    /// 4. Destination L2 validates senderAddress == address(this) for non-L1 sources
+    ///    (L2AssetRouter address is equal for all ZKsync chains)
+    function _isValidInteropSender(
+        uint256 _senderChainId,
+        address _senderAddress
+    ) internal view override returns (bool) {
+        return _senderChainId != L1_CHAIN_ID && _senderAddress == address(this);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -297,19 +257,20 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Finalizes a bridge request and mints funds.
+    /// @param _sourceChainId The chain ID the deposit message originates from (the source chain of the
+    /// message, not the origin chain of the bridged token).
     /// @param _assetId The encoding of the asset on L2
     /// @param _transferData The encoded data required for finalization
     /// (address _sender, uint256 _amount, address _receiver, bytes memory erc20Data, address originToken)
     function finalizeDeposit(
-        // solhint-disable-next-line no-unused-vars
-        uint256 _originChainId,
+        uint256 _sourceChainId,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) public payable override onlyAssetRouterCounterpartOrSelf(_originChainId) nonReentrant {
+    ) public payable override onlyAssetRouterCounterpartOrSelf(_sourceChainId) nonReentrant {
         require(_assetId != BASE_TOKEN_ASSET_ID, AssetIdNotSupported(BASE_TOKEN_ASSET_ID));
-        _finalizeDeposit(_originChainId, _assetId, _transferData, _nativeTokenVaultAddr());
+        _finalizeDeposit(_sourceChainId, _assetId, _transferData, _nativeTokenVaultAddr());
 
-        emit DepositFinalizedAssetRouter(_originChainId, _assetId, _transferData);
+        emit DepositFinalizedAssetRouter(_sourceChainId, _assetId, _transferData);
     }
 
     /// @inheritdoc IAtomicRecoverable
@@ -368,59 +329,15 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         // as an ERC-7786 attribute to ensure proper value transfer in the interop call.
         bytes[] memory attributes = new bytes[](1);
         attributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, _value);
+
+        // For L2->L2 the counterpart is the L2 asset router (same address on every ZK chain). For an
+        // L2->L1 withdrawal the destination is L1, where the asset router lives at a different address,
+        // so we target the known L1 asset router instead. The finalizeDeposit calldata is identical.
+        address destinationAssetRouter = _chainId == L1_CHAIN_ID ? address(L1_ASSET_ROUTER) : request.l2Contract;
         interopCallStarter = InteropCallStarter({
-            to: InteroperableAddress.formatEvmV1(request.l2Contract),
+            to: InteroperableAddress.formatEvmV1(destinationAssetRouter),
             data: request.l2Calldata,
             callAttributes: attributes
         });
-    }
-
-    /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
-    /// where tokens would be unlocked
-    /// @dev IMPORTANT: this method will be deprecated in one of the future releases, so contracts
-    /// that rely on it must be upgradeable.
-    /// @param _assetId The asset id of the withdrawn asset
-    /// @param _assetData The data that is passed to the asset handler contract
-    function withdraw(bytes32 _assetId, bytes memory _assetData) public override nonReentrant returns (bytes32) {
-        return _withdrawSender(_assetId, _assetData, msg.sender);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                     Internal & Helpers
-    //////////////////////////////////////////////////////////////*/
-
-    /// @param _assetId The asset id of the withdrawn asset
-    /// @param _assetData The data that is passed to the asset handler contract
-    /// @param _sender The address of the sender of the message
-    function _withdrawSender(
-        bytes32 _assetId,
-        bytes memory _assetData,
-        address _sender
-    ) internal returns (bytes32 txHash) {
-        bytes memory l1bridgeMintData = _burn({
-            _chainId: L1_CHAIN_ID,
-            _nextMsgValue: 0,
-            _assetId: _assetId,
-            _originalCaller: _sender,
-            _transferData: _assetData,
-            _passValue: false,
-            _nativeTokenVault: _nativeTokenVaultAddr()
-        });
-
-        bytes memory message = _getAssetRouterWithdrawMessage(_assetId, l1bridgeMintData);
-        // slither-disable-next-line unused-return
-        txHash = L2ContractHelper.sendMessageToL1(message);
-
-        emit WithdrawalInitiatedAssetRouter(L1_CHAIN_ID, _sender, _assetId, _assetData);
-    }
-
-    /// @notice Encodes the message for l2ToL1log sent during withdraw initialization.
-    /// @param _assetId The encoding of the asset on L2 which is withdrawn.
-    /// @param _l1bridgeMintData The calldata used by l1 asset handler to unlock tokens for recipient.
-    function _getAssetRouterWithdrawMessage(
-        bytes32 _assetId,
-        bytes memory _l1bridgeMintData
-    ) internal view returns (bytes memory) {
-        return DataEncoding.encodeAssetRouterFinalizeDepositData(block.chainid, _assetId, _l1bridgeMintData);
     }
 }

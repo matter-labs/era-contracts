@@ -586,24 +586,32 @@ export function encodeExecuteBatchesData(
   const emptyLogs = batchesData.map(() => []);
   const emptyMessages = batchesData.map(() => []);
   const emptyMultichainBatchRoots = batchesData.map(() => ethers.constants.HashZero);
+  const emptyImtRoots = batchesData.map(() => ({ rootBegin: ethers.constants.HashZero, rootEnd: ethers.constants.HashZero }));
+  // The wire data is the abi-encoding of one `BatchDecoder.DecodedExecuteData` struct.
   const encodedExecuteDataWithoutVersion = defaultAbiCoder.encode(
     [
-      `${STORED_BATCH_INFO_ABI_STRING}[]`,
-      `${PRIORITY_OPS_BATCH_INFO_ABI_STRING}[]`,
-      "tuple(uint256 chainId, uint256 blockOrBatchNumber, bytes32[] sides)[][]",
-      "tuple(uint8 l2ShardId, bool isService, uint16 txNumberInBatch, address sender, bytes32 key, bytes32 value)[][]",
-      "bytes[][]",
-      "bytes32[]",
-      "address",
+      "tuple(" +
+        `${STORED_BATCH_INFO_ABI_STRING}[] batchesData, ` +
+        `${PRIORITY_OPS_BATCH_INFO_ABI_STRING}[] priorityOpsData, ` +
+        "tuple(uint256 chainId, uint256 blockOrBatchNumber, uint256 timestamp, bytes32[] sides)[][] dependencyRoots, " +
+        "tuple(uint8 l2ShardId, bool isService, uint16 txNumberInBatch, address sender, bytes32 key, bytes32 value)[][] logs, " +
+        "bytes[][] messages, " +
+        "bytes32[] multichainBatchRoots, " +
+        "tuple(bytes32 rootBegin, bytes32 rootEnd)[] imtRoots, " +
+        "address settlementFeePayer" +
+        ")",
     ],
     [
-      batchesData,
-      priorityOpsBatchInfo,
-      emptyInteropRoots,
-      emptyLogs,
-      emptyMessages,
-      emptyMultichainBatchRoots,
-      settlementFeePayer,
+      {
+        batchesData,
+        priorityOpsData: priorityOpsBatchInfo,
+        dependencyRoots: emptyInteropRoots,
+        logs: emptyLogs,
+        messages: emptyMessages,
+        multichainBatchRoots: emptyMultichainBatchRoots,
+        imtRoots: emptyImtRoots,
+        settlementFeePayer,
+      },
     ]
   );
   const executeData = hexConcat(["0x01", encodedExecuteDataWithoutVersion]);

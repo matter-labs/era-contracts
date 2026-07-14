@@ -16,19 +16,18 @@ import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
+import {SharedBridgehubWithdrawal} from "./_SharedBridgehubWithdrawal.t.sol";
 import {
     DEFAULT_L2_LOGS_TREE_ROOT_HASH,
     EMPTY_STRING_KECCAK,
     ETH_TOKEN_ADDRESS,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA
 } from "contracts/common/Config.sol";
-import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
-
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
     //@check Why is this file practically the same as BridgehubTests.t.sol???
     uint256 constant TEST_USERS_COUNT = 10;
 
@@ -53,11 +52,7 @@ contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, Token
     address[] public users;
     address[] public l2ContractAddresses;
     address[] public addressesToExclude;
-    address public currentUser;
-    uint256 public currentChainId;
     address public currentChainAddress;
-    address public currentTokenAddress = ETH_TOKEN_ADDRESS;
-    TestnetERC20Token currentToken;
 
     // Amounts deposited by each user, mapped by user address and token address
     mapping(address user => mapping(address token => uint256 deposited)) public depositsUsers;
@@ -65,8 +60,6 @@ contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, Token
     mapping(address chain => mapping(address token => uint256 deposited)) public depositsBridge;
     // Total sum of deposits into the bridge, mapped by token address
     mapping(address token => uint256 deposited) public tokenSumDeposit;
-    // Total sum of withdrawn tokens, mapped by token address
-    mapping(address token => uint256 deposited) public tokenSumWithdrawal;
     // Total sum of L2 values transferred to mock contracts, mapped by token address
     mapping(address token => uint256 deposited) public l2ValuesSum;
     // Deposits into the ZK chains contract, mapped by L2 contract address and token address
@@ -86,13 +79,6 @@ contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, Token
     modifier useZKChain(uint256 chainIndexSeed) {
         currentChainId = zkChainIds[bound(chainIndexSeed, 0, zkChainIds.length - 1)];
         currentChainAddress = getZKChainAddress(currentChainId);
-        _;
-    }
-
-    // use token specified by address, set contract variables
-    modifier useGivenToken(address tokenAddress) {
-        currentToken = TestnetERC20Token(tokenAddress);
-        currentTokenAddress = tokenAddress;
         _;
     }
 
@@ -486,17 +472,6 @@ contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, Token
         tokenSumDeposit[currentTokenAddress] += mintValue;
         l2ValuesSum[currentTokenAddress] += l2Value;
     }
-
-    // TODO(interop-withdrawal): re-wire via InteropCenter
-    // The legacy L2->L1 withdrawal flow exercised here relied on the removed
-    // `L1AssetRouter.finalizeWithdrawal` / `L1Nullifier.isWithdrawalFinalized` functions.
-    // The body has been removed until the withdrawal path is re-wired through the InteropCenter.
-    // The function (and `withdrawSuccess`) is kept so the invariant subclasses still compile.
-    function withdrawERC20Token(uint256 amountToWithdraw, address tokenAddress) private useGivenToken(tokenAddress) {}
-
-    // TODO(interop-withdrawal): re-wire via InteropCenter
-    // The legacy ETH withdrawal flow relied on the removed `L1AssetRouter.finalizeWithdrawal`.
-    function withdrawETHToken(uint256 amountToWithdraw, address tokenAddress) private useGivenToken(tokenAddress) {}
 
     function depositEthToBridgeSuccess(
         uint256 userIndexSeed,
