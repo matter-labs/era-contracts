@@ -22,8 +22,6 @@ import {
 /// tuple checks and the rolling-hash wire format against a REAL `L1MessageRoot` populated through
 /// its production entry points (`addNewChain` / `addChainBatchRoot`) — no mocked root values.
 contract DependencyInteropRootsHarness is ExecutorFacet {
-    constructor(uint256 _l1ChainId) ExecutorFacet(_l1ChainId) {}
-
     function setBridgehub(address _bridgehub) external {
         s.bridgehub = _bridgehub;
     }
@@ -54,7 +52,7 @@ contract DependencyInteropRootsTest is Test {
         chainAssetHandler = makeAddr("chainAssetHandler");
         chainSender = makeAddr("chainSender");
 
-        harness = new DependencyInteropRootsHarness(1);
+        harness = new DependencyInteropRootsHarness();
         harness.setBridgehub(bridgehub);
 
         // A real L1MessageRoot, wired to the mocked bridgehub for ACL only; every root/timestamp it

@@ -25,7 +25,6 @@ import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.so
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {
     IExecutor,
-    BatchImtRoots,
     SystemLogKey,
     MAX_NUMBER_OF_BLOBS,
     TOTAL_BLOBS_IN_COMMITMENT
@@ -284,50 +283,12 @@ library Utils {
         IExecutor.StoredBatchInfo[] memory _batchesData,
         PriorityOpsBatchInfo[] memory _priorityOpsData
     ) internal pure returns (uint256, uint256, bytes memory) {
-        return encodeExecuteBatchesData(_batchesData, _priorityOpsData, address(0));
-    }
-
-    function encodeExecuteBatchesData(
-        IExecutor.StoredBatchInfo[] memory _batchesData,
-        PriorityOpsBatchInfo[] memory _priorityOpsData,
-        address _settlementFeePayer
-    ) internal pure returns (uint256, uint256, bytes memory) {
-        uint256 len = _batchesData.length;
-        return _encodeExecuteBatchesDataInner(_batchesData, _priorityOpsData, _settlementFeePayer, len);
-    }
-
-    function encodeExecuteBatchesDataZeroLogs(
-        IExecutor.StoredBatchInfo[] memory _batchesData,
-        PriorityOpsBatchInfo[] memory _priorityOpsData
-    ) internal pure returns (uint256, uint256, bytes memory) {
-        return encodeExecuteBatchesDataZeroLogs(_batchesData, _priorityOpsData, address(0));
-    }
-
-    function encodeExecuteBatchesDataZeroLogs(
-        IExecutor.StoredBatchInfo[] memory _batchesData,
-        PriorityOpsBatchInfo[] memory _priorityOpsData,
-        address _settlementFeePayer
-    ) internal pure returns (uint256, uint256, bytes memory) {
-        return _encodeExecuteBatchesDataInner(_batchesData, _priorityOpsData, _settlementFeePayer, 0);
-    }
-
-    function _encodeExecuteBatchesDataInner(
-        IExecutor.StoredBatchInfo[] memory _batchesData,
-        PriorityOpsBatchInfo[] memory _priorityOpsData,
-        address _settlementFeePayer,
-        uint256 _logsLen
-    ) private pure returns (uint256, uint256, bytes memory) {
         uint256 len = _batchesData.length;
         bytes memory encoded = abi.encode(
             BatchDecoder.DecodedExecuteData({
                 batchesData: _batchesData,
                 priorityOpsData: _priorityOpsData,
-                dependencyRoots: new InteropRoot[][](len),
-                logs: new L2Log[][](_logsLen),
-                messages: new bytes[][](_logsLen),
-                multichainBatchRoots: new bytes32[](_logsLen),
-                imtRoots: new BatchImtRoots[](_logsLen),
-                settlementFeePayer: _settlementFeePayer
+                dependencyRoots: new InteropRoot[][](len)
             })
         );
         return (

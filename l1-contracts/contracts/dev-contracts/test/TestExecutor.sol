@@ -6,8 +6,6 @@ import {PriorityOperation, PriorityQueue} from "../../state-transition/libraries
 pragma solidity 0.8.28;
 
 contract TestExecutor is ExecutorFacet {
-    constructor() ExecutorFacet(block.chainid) {}
-
     using PriorityQueue for PriorityQueue.Queue;
 
     function setPriorityTreeStartIndex(uint256 _startIndex) external {

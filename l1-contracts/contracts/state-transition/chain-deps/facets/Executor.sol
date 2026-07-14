@@ -43,14 +43,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     // solhint-disable-next-line const-name-snakecase
     string public constant override getName = "ExecutorFacet";
 
-    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
-    /// L1 that is at the most base layer.
-    uint256 internal immutable L1_CHAIN_ID;
-
-    constructor(uint256 _l1ChainId) {
-        L1_CHAIN_ID = _l1ChainId;
-    }
-
     function _rollingHash(bytes32[] memory _hashes) internal pure returns (bytes32) {
         bytes32 hash = EMPTY_STRING_KECCAK;
         uint256 nHashes = _hashes.length;
@@ -188,31 +180,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (batchesData.length != decoded.priorityOpsData.length) {
             revert InvalidBatchesDataLength(batchesData.length, decoded.priorityOpsData.length);
         }
-        if (block.chainid == L1_CHAIN_ID) {
-            require(decoded.logs.length == 0, InvalidBatchesDataLength(0, decoded.logs.length));
-            require(decoded.messages.length == 0, InvalidBatchesDataLength(0, decoded.messages.length));
-            require(
-                decoded.multichainBatchRoots.length == 0,
-                InvalidBatchesDataLength(0, decoded.multichainBatchRoots.length)
-            );
-            require(decoded.imtRoots.length == 0, InvalidBatchesDataLength(0, decoded.imtRoots.length));
-        } else {
-            require(
-                batchesData.length == decoded.logs.length,
-                InvalidBatchesDataLength(batchesData.length, decoded.logs.length)
-            );
-            require(
-                batchesData.length == decoded.messages.length,
-                InvalidBatchesDataLength(batchesData.length, decoded.messages.length)
-            );
-            require(
-                batchesData.length == decoded.multichainBatchRoots.length,
-                InvalidBatchesDataLength(batchesData.length, decoded.multichainBatchRoots.length)
-            );
-            require(
-                batchesData.length == decoded.imtRoots.length,
-                InvalidBatchesDataLength(batchesData.length, decoded.imtRoots.length)
-            );
+        if (batchesData.length != decoded.dependencyRoots.length) {
+            revert InvalidBatchesDataLength(batchesData.length, decoded.dependencyRoots.length);
         }
 
         // Append each batch's proven `l2LogsTreeRoot` to the global message root. On Gateway the

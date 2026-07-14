@@ -579,29 +579,16 @@ export function encodeProveBatchesData(
 
 export function encodeExecuteBatchesData(
   batchesData: Array<StoredBatchInfo>,
-  priorityOpsBatchInfo: Array<PriorityOpsBatchInfo>,
-  settlementFeePayer: string = ethers.constants.AddressZero
+  priorityOpsBatchInfo: Array<PriorityOpsBatchInfo>
 ): [BigNumberish, BigNumberish, string] {
   const emptyInteropRoots = batchesData.map(() => []);
-  const emptyLogs = batchesData.map(() => []);
-  const emptyMessages = batchesData.map(() => []);
-  const emptyMultichainBatchRoots = batchesData.map(() => ethers.constants.HashZero);
-  const emptyImtRoots = batchesData.map(() => ({
-    rootBegin: ethers.constants.HashZero,
-    rootEnd: ethers.constants.HashZero,
-  }));
   // The wire data is the abi-encoding of one `BatchDecoder.DecodedExecuteData` struct.
   const encodedExecuteDataWithoutVersion = defaultAbiCoder.encode(
     [
       "tuple(" +
         `${STORED_BATCH_INFO_ABI_STRING}[] batchesData, ` +
         `${PRIORITY_OPS_BATCH_INFO_ABI_STRING}[] priorityOpsData, ` +
-        "tuple(uint256 chainId, uint256 blockOrBatchNumber, uint256 timestamp, bytes32[] sides)[][] dependencyRoots, " +
-        "tuple(uint8 l2ShardId, bool isService, uint16 txNumberInBatch, address sender, bytes32 key, bytes32 value)[][] logs, " +
-        "bytes[][] messages, " +
-        "bytes32[] multichainBatchRoots, " +
-        "tuple(bytes32 rootBegin, bytes32 rootEnd)[] imtRoots, " +
-        "address settlementFeePayer" +
+        "tuple(uint256 chainId, uint256 blockOrBatchNumber, uint256 timestamp, bytes32[] sides)[][] dependencyRoots" +
         ")",
     ],
     [
@@ -609,11 +596,6 @@ export function encodeExecuteBatchesData(
         batchesData,
         priorityOpsData: priorityOpsBatchInfo,
         dependencyRoots: emptyInteropRoots,
-        logs: emptyLogs,
-        messages: emptyMessages,
-        multichainBatchRoots: emptyMultichainBatchRoots,
-        imtRoots: emptyImtRoots,
-        settlementFeePayer,
       },
     ]
   );
