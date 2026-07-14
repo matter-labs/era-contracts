@@ -162,12 +162,15 @@ struct InteropRoot {
 /// the `(blockNumber, root, timestamp)` tuple. Used both by the settlement layer's `MessageRoot`
 /// (`historicalRoot`) and by the L2 `L2InteropRootStorage` (`interopRoots`), so the executor's
 /// double check and the L2 consumers read the same shape.
+/// @dev IMPORTANT: this logic is not compatible with EraVM, as the EraVM bootloader does not yet
+/// support the new (timestamp-carrying) add-interop-roots entry point; it is expected to be deployed
+/// on ZKsync OS chains only.
 /// @param root The aggregated root.
 /// @param timestamp The block timestamp at which the root was created on its origin chain. Zero when
-/// the root was imported through the timestamp-less `addInteropRoot` entry point (used by the EraVM
-/// bootloader); such roots cannot be used for time-sensitive proofs (e.g. the atomic-interop timeout
-/// protocol). Note that no roots recorded under previous protocol versions exist: interop was not
-/// activated in v31, so all stored roots carry the full tuple unless imported through that entry point.
+/// the root was imported through the timestamp-less `addInteropRoot` entry point; such roots cannot
+/// be used for time-sensitive proofs (e.g. the atomic-interop timeout protocol). Note that no roots
+/// recorded under previous protocol versions exist: interop was not activated in v31, so all stored
+/// roots carry the full tuple unless imported through that entry point.
 struct StoredInteropRoot {
     bytes32 root;
     uint256 timestamp;

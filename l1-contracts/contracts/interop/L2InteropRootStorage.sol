@@ -29,9 +29,11 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
     /// chain. The tuple is double checked on the settlement layer during batch execution (see
     /// `ExecutorFacet._verifyDependencyInteropRoots`), so time-sensitive proofs (e.g. the
     /// atomic-interop timeout protocol) can rely on the timestamp as much as on the root itself.
-    /// @dev The timestamp is zero when the root was imported through the timestamp-less
-    /// `addInteropRoot` entry point (used by the EraVM bootloader). No roots recorded under previous
-    /// protocol versions exist: interop was not activated in v31.
+    /// @dev IMPORTANT: this logic is not compatible with EraVM, as the EraVM bootloader does not yet
+    /// support the new (timestamp-carrying) add-interop-roots entry point; it is expected to be
+    /// deployed on ZKsync OS chains only. Roots imported through the timestamp-less `addInteropRoot`
+    /// entry point are recorded with a zero timestamp and cannot be used for time-sensitive proofs.
+    /// No roots recorded under previous protocol versions exist: interop was not activated in v31.
     /// @dev Note on storage compatibility with v31: since interop has not been enabled in v31, this
     /// mapping was empty at the time of the upgrade; additionally, mapping values live at hashed
     /// locations, so extending the value type from `bytes32` to a struct (whose first member `root`
