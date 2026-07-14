@@ -21,6 +21,8 @@ import {
 } from "../bridgehub/L1BridgehubErrors.sol";
 
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
+import {StoredInteropRoot} from "../../common/Messaging.sol";
+import {ChainBatchRootTree} from "../../common/libraries/ChainBatchRootTree.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
@@ -66,12 +68,20 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// `addChainBatchRoot`, on both settlement layers (L1 and Gateway).
     mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) internal chainTree;
 
-    /// @notice The mapping from block number to the global message root.
+    /// @notice The mapping from block number to the global message root and the block timestamp at
+    /// which it was written — the `(blockNumber, root, timestamp)` tuple chains import into their
+    /// `L2InteropRootStorage` and the executor double checks during batch execution
+    /// (see `ExecutorFacet._verifyDependencyInteropRoots`). Time-sensitive proofs (e.g. the
+    /// atomic-interop timeout protocol) rely on the timestamp to show a root is from after a deadline.
     /// @dev Each block might have multiple txs that change the historical root. You can safely use the final root in the block,
     /// since each new root cumulatively aggregates all prior changes — so the last root always contains (at minimum) everything
     /// from the earlier ones.
     /// @dev Populated on both settlement layers (L1 and Gateway) on every `addChainBatchRoot`.
-    mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
+    /// @dev Note on storage compatibility with v31: since interop has not been enabled in v31, this
+    /// mapping was empty at the time of the upgrade; additionally, mapping values live at hashed
+    /// locations, so extending the value type from `bytes32` to a struct (whose first member `root`
+    /// occupies exactly the slot the plain `bytes32` used) does not shift any other storage.
+    mapping(uint256 blockNumber => StoredInteropRoot) internal historicalRoots;
 
     /// @dev Chain ID of L1.
     /// @dev Kept here for storage layout compatibility with previous versions.
@@ -228,7 +238,19 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         emit NewChainRoot(_chainId, chainRoot, cachedChainIdLeafHash);
 
         _emitRoot(sharedTreeRoot);
-        historicalRoot[block.number] = sharedTreeRoot;
+        _recordHistoricalRoot(sharedTreeRoot);
+    }
+
+    /// @dev Records the current shared tree root together with the block timestamp at which it was
+    /// created, forming the `(blockNumber, root, timestamp)` tuple chains import for interop.
+    function _recordHistoricalRoot(bytes32 _sharedTreeRoot) internal {
+        historicalRoots[block.number] = StoredInteropRoot({root: _sharedTreeRoot, timestamp: block.timestamp});
+    }
+
+    /// @notice Returns the global message root written at `_blockNumber` together with the block
+    /// timestamp at which it was written (the `(blockNumber, root, timestamp)` tuple).
+    function historicalRoot(uint256 _blockNumber) external view returns (StoredInteropRoot memory) {
+        return historicalRoots[_blockNumber];
     }
 
     /// @notice Emits a new interop root event when the shared tree root changes.
@@ -247,7 +269,8 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
             lastEmitBlock = block.number;
         }
 
-        emit NewInteropRoot(block.chainid, block.number, currentCount, _sides);
+        // solhint-disable-next-line func-named-parameters
+        emit NewInteropRoot(block.chainid, block.number, currentCount, block.timestamp, _sides);
     }
 
     /// @notice Gets the aggregated root of all chains.
@@ -256,6 +279,17 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
             return SHARED_ROOT_TREE_EMPTY_HASH;
         }
         return sharedTree.root();
+    }
+
+    /// @notice The number of batch leaves in a chain's tree on this settlement layer.
+    /// @dev Non-zero means the chain has at least one batch inside the aggregated shared root —
+    /// the atomic-interop timeout-protocol precondition `ChainRegistrationSender` demands before a
+    /// chain can be registered for interop. Freshly created chains satisfy it from creation (the
+    /// seeded genesis batch leaf); onboarded/migrated chains satisfy it after their first settlement
+    /// on this layer.
+    /// @param _chainId The ID of the chain whose tree is being queried.
+    function chainTreeLeafCount(uint256 _chainId) external view returns (uint256) {
+        return chainTree[_chainId]._nextLeafIndex;
     }
 
     /// @dev Gets the message root of a single chain.
@@ -269,6 +303,20 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     }
 
     /// @dev Adds a single chain to the message root.
+    /// @dev For freshly created chains (`_startingBatchNumber == 0`, i.e. registration happens in the
+    /// same transaction as the chain's DiamondInit) the chain's tree is seeded with its genesis batch
+    /// root (see {ChainBatchRootTree.genesisChainBatchRoot}): batch 0 has no L2->L1 logs, no
+    /// multichain root, and a freshly seeded (empty) interop commitment tree at both boundaries, so
+    /// the value is exact and `chainBatchRoots` / `chainBatchRootTimestamp` are recorded consistently
+    /// with the tree leaf. This guarantees the atomic-interop timeout-protocol precondition — every
+    /// chain interop can target has at least one batch inside the shared root, so the "chain's LAST
+    /// batch inside a post-deadline aggregated root" a timeout proof for a halted chain points at
+    /// always exists.
+    /// @dev Chains registered with a non-zero `_startingBatchNumber` (already-deployed chains being
+    /// onboarded, settlement-layer migrations) are NOT seeded: a real batch `_startingBatchNumber`
+    /// already exists (settled pre-onboarding / on another layer), so a synthetic leaf would diverge
+    /// from the real batch root. Such chains must settle at least one batch on this layer before they
+    /// can be registered for interop — enforced by `ChainRegistrationSender`.
     /// @param _chainId The ID of the chain that is being added to the message root.
     function _addNewChain(uint256 _chainId, uint256 _startingBatchNumber) internal {
         uint256 cachedChainCount = chainCount;
@@ -281,14 +329,32 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         currentChainBatchNumber[_chainId] = _startingBatchNumber;
 
         // slither-disable-next-line unused-return
-        bytes32 initialHash = chainTree[_chainId].setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
+        chainTree[_chainId].setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
 
-        bytes32 sharedTreeRoot = sharedTree.pushNewLeaf(MessageHashing.chainIdLeafHash(initialHash, _chainId));
+        bytes32 chainRoot = bytes32(0);
+        if (_startingBatchNumber == 0) {
+            // Freshly created chain: seed its genesis batch (batch 0) root. Real batches continue at
+            // batch 1 exactly as without the seeding. Note that `_getChainBatchRoot` rejects batch 0
+            // (`BatchZeroNotAllowed`), so recording it cannot shadow any message-verification lookup.
+            bytes32 genesisChainBatchRoot = ChainBatchRootTree.genesisChainBatchRoot();
+            uint256 genesisTimestamp = block.timestamp;
+            chainBatchRoots[_chainId][0] = genesisChainBatchRoot;
+            chainBatchRootTimestamp[_chainId][0] = genesisTimestamp;
+            // slither-disable-next-line unused-return
+            (, chainRoot) = chainTree[_chainId].push(
+                MessageHashing.batchLeafHash(genesisChainBatchRoot, 0, genesisTimestamp)
+            );
+            // Emitted so that off-chain proof builders reconstructing the chain tree from
+            // `AppendedChainBatchRoot` events include the genesis leaf.
+            emit AppendedChainBatchRoot(_chainId, 0, genesisChainBatchRoot, genesisTimestamp);
+        }
+
+        bytes32 sharedTreeRoot = sharedTree.pushNewLeaf(MessageHashing.chainIdLeafHash(chainRoot, _chainId));
 
         emit AddedChain(_chainId, cachedChainCount);
 
         _emitRoot(sharedTreeRoot);
-        historicalRoot[block.number] = sharedTreeRoot;
+        _recordHistoricalRoot(sharedTreeRoot);
     }
 
     //////////////////////////////

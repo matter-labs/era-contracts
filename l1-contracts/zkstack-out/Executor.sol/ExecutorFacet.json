@@ -267,6 +267,22 @@
   },
   {
     "type": "error",
+    "name": "InvalidInteropRootTimestamp",
+    "inputs": [
+      {
+        "name": "expectedTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "providedTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InvalidMessageRoot",
     "inputs": [
       {

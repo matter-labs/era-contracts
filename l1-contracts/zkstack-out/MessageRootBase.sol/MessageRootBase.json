@@ -186,6 +186,25 @@
   },
   {
     "type": "function",
+    "name": "chainTreeLeafCount",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "currentChainBatchNumber",
     "inputs": [
       {
@@ -381,16 +400,28 @@
     "name": "historicalRoot",
     "inputs": [
       {
-        "name": "blockNumber",
+        "name": "_blockNumber",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
     "outputs": [
       {
-        "name": "globalMessageRoot",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct StoredInteropRoot",
+        "components": [
+          {
+            "name": "root",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "timestamp",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
       }
     ],
     "stateMutability": "view"
@@ -880,6 +911,12 @@
         "name": "logId",
         "type": "uint256",
         "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "timestamp",
+        "type": "uint256",
+        "indexed": false,
         "internalType": "uint256"
       },
       {

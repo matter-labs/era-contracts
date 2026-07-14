@@ -3,6 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "./IZKChainBase.sol";
+import {L2Log} from "../../common/Messaging.sol";
 // solhint-disable-next-line no-unused-import
 import {MAX_NUMBER_OF_BLOBS, SystemLogKey} from "system-contracts/contracts/Constants.sol";
 

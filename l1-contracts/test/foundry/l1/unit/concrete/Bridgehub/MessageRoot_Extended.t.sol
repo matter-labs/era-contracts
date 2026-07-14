@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {StoredInteropRoot} from "contracts/common/Messaging.sol";
 import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
@@ -383,9 +384,10 @@ contract MessageRoot_Extended_Test is Test {
             "interopRootLogId should increment by 1 when block advances"
         );
 
-        // Check that historical root is set
-        bytes32 historicalRoot = l2MessageRoot.historicalRoot(block.number);
-        assertTrue(historicalRoot != bytes32(0));
+        // Check that historical root is set (together with its creation timestamp)
+        StoredInteropRoot memory recordedRoot = l2MessageRoot.historicalRoot(block.number);
+        assertTrue(recordedRoot.root != bytes32(0));
+        assertEq(recordedRoot.timestamp, block.timestamp);
     }
 
     function test_L1_CHAIN_ID() public view {

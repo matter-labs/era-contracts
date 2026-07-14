@@ -71,7 +71,7 @@ contract L2MessageVerificationDepthRegressionTest is Test {
         vm.mockCall(
             address(L2_INTEROP_ROOT_STORAGE),
             abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
-            abi.encode(bytes32(0xf2ed765ea90479defa99f4853559bec02617067e736f70475cc64a8e571f509a))
+            abi.encode(bytes32(0xf2ed765ea90479defa99f4853559bec02617067e736f70475cc64a8e571f509a), uint256(0))
         );
 
         bool isIncluded = l2MessageVerification.proveL2LogInclusionShared(
@@ -178,7 +178,7 @@ contract L2MessageVerificationDepthRegressionTest is Test {
         vm.mockCall(
             address(L2_INTEROP_ROOT_STORAGE),
             abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
-            abi.encode(bytes32(0x46ab0a3240394cd4339c065011ad354c67d269d3c6e0f8ad7eb2eb4b8a3ffb49))
+            abi.encode(bytes32(0x46ab0a3240394cd4339c065011ad354c67d269d3c6e0f8ad7eb2eb4b8a3ffb49), uint256(0))
         );
 
         // This should work because proveL2LogInclusionShared calls _proveL2LogInclusion
@@ -252,7 +252,7 @@ contract L2MessageVerificationDepthRegressionTest is Test {
         vm.mockCall(
             address(L2_INTEROP_ROOT_STORAGE),
             abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
-            abi.encode(bytes32(0xf2ed765ea90479defa99f4853559bec02617067e736f70475cc64a8e571f509a))
+            abi.encode(bytes32(0xf2ed765ea90479defa99f4853559bec02617067e736f70475cc64a8e571f509a), uint256(0))
         );
 
         // This works: depth 0 -> recursion with depth 1 -> second part is final, so no more recursion needed

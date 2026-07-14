@@ -23,7 +23,12 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/co
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
-import {ChainsSettlementLayerMismatch, ChainAlreadyRegistered} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+import {
+    ChainsSettlementLayerMismatch,
+    ChainAlreadyRegistered,
+    ChainHasNoBatchesInMessageRoot
+} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
@@ -192,6 +197,22 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
             addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
             "chainRegisteredOnChain should remain false after TwoBridges deposit"
         );
+    }
+
+    /// @notice A chain with an empty tree in the MessageRoot (onboarded with a non-zero starting
+    /// batch number and not yet settled on this layer) cannot be registered for interop: the
+    /// atomic-interop timeout protocol needs at least one batch of the source chain inside the
+    /// aggregated root. Freshly created chains pass (the seeded genesis batch leaf) — which is what
+    /// the happy-path test above exercises — so the empty tree is simulated with a mock here.
+    function test_chainRegistrationSender_revertWhen_chainHasNoBatchesInMessageRoot() public {
+        vm.mockCall(
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
+            abi.encodeWithSelector(IMessageRootBase.chainTreeLeafCount.selector, zkChainIds[0]),
+            abi.encode(uint256(0))
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(ChainHasNoBatchesInMessageRoot.selector, zkChainIds[0]));
+        addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
     }
 
     function test_chainRegistrationSender_revertWhen_settlementLayersMismatch() public {

@@ -39,13 +39,13 @@ import {
 /// Timeout: {authorizeRefund} + {claimRefund} recover the burned source funds to the depositor by
 /// asking each of the bundle's call targets to reverse itself via {IAtomicRecoverable.recoverAtomicCall}.
 ///
-/// No double-spend: executing a bundle requires every leg present in the batch-END IMT root of a batch
-/// whose `l1Timestamp <= deadline`, while a refund requires some leg absent from the batch-BEGIN IMT
-/// root of a batch whose `l1Timestamp > deadline`. Since the per-chain trees are append-only,
-/// `begin(N) == end(N-1)`, and `l1Timestamp` is monotone, both cannot hold — but only when both proofs
-/// are checked against the leg's own source chain on the same settlement layer. Both bindings are
-/// committed in `flowId`. Without the source-chain binding a leg's commit value is trivially absent
-/// from any other chain's tree, re-opening a cross-chain force-refund double-mint.
+/// No double-spend: the finality condition ({AtomicInteropProof.verifyInclusion}) and the timeout
+/// condition ({AtomicInteropProof.verifyTimeoutAbsence}) are mutually exclusive — see the
+/// {AtomicInteropProof} library header for the protocol and its soundness/completeness argument —
+/// but only when both proofs are checked against the leg's own source chain on the same settlement
+/// layer. Both bindings are committed in `flowId`. Without the source-chain binding a leg's commit
+/// value is trivially absent from any other chain's tree, re-opening a cross-chain force-refund
+/// double-mint.
 contract AtomicFlowManager is IAtomicFlowManager {
     /// @dev (flowId, bundleHash) => source-leg state on this chain. All collaborators
     /// (commitment tree, interop center, interop handler) are genesis-deployed built-ins
@@ -91,8 +91,8 @@ contract AtomicFlowManager is IAtomicFlowManager {
         uint256 n = flow.legBundleHashes.length;
         if (_finality.proofs.length != n) revert ManagerProofCountMismatch(n, _finality.proofs.length);
 
-        // Every leg must be present in its source chain's tree as of a root settled no later than the
-        // deadline. Each proof's `sourceChainId` must equal the leg's declared `legSourceChainIds[i]`:
+        // Every leg must satisfy the finality condition (see the {AtomicInteropProof} library
+        // header). Each proof's `sourceChainId` must equal the leg's declared `legSourceChainIds[i]`:
         // defense-in-depth here (membership already self-binds via the chain-specific `commitValue`) but
         // load-bearing for the symmetric refund path. The proof's settlement layer must match the flow's
         // `settlementLayerChainId`, checked inside {AtomicInteropProof.verifyInclusion}.
@@ -121,11 +121,9 @@ contract AtomicFlowManager is IAtomicFlowManager {
             revert ProofSourceChainMismatch(missingLegChainId, _absence.sourceChainId);
         }
 
-        // 2. Timeout: the leg's commit value is absent from the batch-BEGIN IMT root of a batch with
-        //    settlement timestamp `t > deadline`. Append-only + `begin(N) == end(N-1)` make this
-        //    equivalent to absence from every in-time batch, so the flow can never finalize. Requiring
-        //    the batch itself to be late closes the stale/genesis-root force-refund: an in-time
-        //    snapshot proves nothing about the deadline moment.
+        // 2. Timeout: the leg's commit value is proven absent per the timeout protocol described in
+        //    the {AtomicInteropProof} library header, which makes the absence equivalent to "the
+        //    flow can never finalize".
         uint256 value = AtomicInteropProof.commitValue(_flow.flowId, _flow.legBundleHashes[_missingLegIndex]);
         AtomicInteropProof.verifyTimeoutAbsence(_absence, value, _flow.deadline, _flow.settlementLayerChainId);
 

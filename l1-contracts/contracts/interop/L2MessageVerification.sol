@@ -28,7 +28,7 @@ contract L2MessageVerification is MessageVerification {
         });
         if (proofData.finalProofNode) {
             // For proof based interop this is the SL InteropRoot at block number _blockOrBatchNumber
-            bytes32 correctBatchRoot = L2_INTEROP_ROOT_STORAGE.interopRoots(_chainId, _blockOrBatchNumber);
+            bytes32 correctBatchRoot = L2_INTEROP_ROOT_STORAGE.interopRoots(_chainId, _blockOrBatchNumber).root;
             return correctBatchRoot == proofData.batchSettlementRoot && correctBatchRoot != bytes32(0);
         }
         if (_depth == 1) {

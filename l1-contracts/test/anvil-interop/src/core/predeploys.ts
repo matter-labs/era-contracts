@@ -13,6 +13,7 @@ import {
   L2_GENESIS_UPGRADE_ADDR,
   L2_INTEROP_COMMITMENT_TREE_ADDR,
   L2_INTEROP_HANDLER_ADDR,
+  L2_INTEROP_ROOT_STORAGE_ADDR,
   L2_MESSAGE_ROOT_ADDR,
   L2_MESSAGE_VERIFICATION_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
@@ -45,6 +46,10 @@ export const PREDEPLOY_SYSTEM_CONTRACTS: readonly SystemContractPredeploy[] = [
   { address: L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, contractName: "L2WrappedBaseToken" },
   { address: L2_NTV_BEACON_DEPLOYER_ADDR, contractName: "UpgradeableBeaconDeployer" },
   { address: L2_MESSAGE_ROOT_ADDR, contractName: "L2MessageRoot" },
+  // Imported interop roots + their creation timestamps; on real ZKsync OS this is a genesis system
+  // contract at 0x10008. The atomic-interop timeout protocol reads `interopRootTimestamps` from it,
+  // and the harness seeds anchor roots into it via bootloader impersonation.
+  { address: L2_INTEROP_ROOT_STORAGE_ADDR, contractName: "L2InteropRootStorage" },
   { address: L2_BRIDGEHUB_ADDR, contractName: "L2Bridgehub" },
   { address: L2_ASSET_ROUTER_ADDR, contractName: "L2AssetRouter" },
   { address: L2_NATIVE_TOKEN_VAULT_ADDR, contractName: "L2NativeTokenVaultZKOS" },
