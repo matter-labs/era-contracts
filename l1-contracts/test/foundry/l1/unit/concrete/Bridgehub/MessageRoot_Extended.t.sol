@@ -383,9 +383,10 @@ contract MessageRoot_Extended_Test is Test {
             "interopRootLogId should increment by 1 when block advances"
         );
 
-        // Check that historical root is set
-        bytes32 historicalRoot = l2MessageRoot.historicalRoot(block.number);
+        // Check that historical root is set (together with its creation timestamp)
+        (bytes32 historicalRoot, uint256 historicalRootTimestamp) = l2MessageRoot.historicalRoot(block.number);
         assertTrue(historicalRoot != bytes32(0));
+        assertEq(historicalRootTimestamp, block.timestamp);
     }
 
     function test_L1_CHAIN_ID() public view {

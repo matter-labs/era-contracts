@@ -23,18 +23,11 @@ enum LegState {
 
 /// @notice A single IMT proof against a source chain's interop commitment tree, used both ways:
 ///   - inclusion ({AtomicInteropProof.verifyInclusion}): `leaf` is the leaf holding the leg's commit
-///     value (`leaf.value == commitValue`), proven present in the batch-END IMT root of a batch whose
-///     `l1Timestamp < deadline`;
+///     value (`leaf.value == commitValue`);
 ///   - non-inclusion ({AtomicInteropProof.verifyTimeoutAbsence}, timeout/refund path): `leaf` is the
-///     low-nullifier (predecessor) leaf that brackets the absent commit value. The proof is anchored
-///     on an aggregated root created after the deadline and is checked against the batch-BEGIN IMT
-///     root when the batch is late (`l1Timestamp >= deadline`), or against the batch-END IMT root of
-///     the chain's LAST batch inside the aggregated root when the batch is in time. Since the IMT is
-///     append-only and `begin(N) == end(N-1)`, either way absence means the value was not committed
-///     in any in-time batch, so the leg can never finalize.
-///
-/// The meaning of `leaf` (the value's own leaf vs. its predecessor) is fixed by which verify function
-/// consumes the proof.
+///     low-nullifier (predecessor) leaf that brackets the absent commit value.
+/// The finality / timeout conditions the proofs are checked against (which IMT snapshot, which clock
+/// bounds) are described ONCE, in the {AtomicInteropProof} library header.
 ///
 /// Authentication has two layers, both resolved against an SL aggregation root the verifying chain
 /// imported (`interopRoots[slChainId][slBlock]`; the claimed `(sourceChainId, batchNumber)` binds via
@@ -49,10 +42,7 @@ enum LegState {
 ///      {IndexedMerkleTree.verifyInclusion} / `verifyNonInclusion`).
 /// The batch's `l1Timestamp` is not a struct field, since that would be spoofable. It is parsed in-module
 /// from `settlementProof` via {MessageHashing._getProofData} and is bound to the verified interop root by
-/// being folded into the chain batch leaf. The proof library then enforces the `l1Timestamp` vs `deadline`
-/// bound (inclusion: `l1Timestamp < deadline`; timeout: anchored on an aggregated root created after the
-/// deadline, absence from the begin root of a late batch or the end root of the chain's last batch in
-/// that root).
+/// being folded into the chain batch leaf.
 /// @dev `batchNumber` is the source chain's top-level batch number passed to the leaf verifier and
 /// to `_getProofData`.
 struct ImtProof {

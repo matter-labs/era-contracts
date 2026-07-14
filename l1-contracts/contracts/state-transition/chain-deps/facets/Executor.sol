@@ -111,9 +111,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @notice Verifies the dependency message roots that the chain relied on.
     /// @dev Each imported dependency is a `(blockNumber, root, timestamp)` tuple; both the root and
     /// its creation timestamp are double checked against the `MessageRoot` contract's historical
-    /// records, and both are folded into the rolling hash the proven batch commits to. The timestamp
-    /// check is what lets L2 contracts trust `L2InteropRootStorage.interopRootTimestamps` for
-    /// time-sensitive proofs (e.g. the atomic-interop timeout protocol).
+    /// record (one `StoredInteropRoot` struct), and both are folded into the rolling hash the proven
+    /// batch commits to. The timestamp check is what lets L2 contracts trust the timestamps in
+    /// `L2InteropRootStorage.interopRoots` for time-sensitive proofs (e.g. the atomic-interop
+    /// timeout protocol).
     function _verifyDependencyInteropRoots(
         InteropRoot[] memory _dependencyRoots
     ) internal view returns (bytes32 dependencyRootsRollingHash) {
@@ -127,8 +128,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             if (interopRoot.chainId == block.chainid) {
                 // For the same chain we verify using the MessageRoot contract. Note, that in this
                 // release, import and export only happens on GW, so this is the only case we have to cover.
-                correctRootHash = messageRootContract.historicalRoot(uint256(interopRoot.blockOrBatchNumber));
-                correctTimestamp = messageRootContract.historicalRootTimestamp(uint256(interopRoot.blockOrBatchNumber));
+                (correctRootHash, correctTimestamp) = messageRootContract.historicalRoot(
+                    uint256(interopRoot.blockOrBatchNumber)
+                );
             } else {
                 revert CommitBasedInteropNotSupported();
             }

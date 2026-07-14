@@ -158,6 +158,19 @@ struct InteropRoot {
     bytes32[] sides;
 }
 
+/// @dev An aggregated (interop) root stored together with its creation timestamp — the value half of
+/// the `(blockNumber, root, timestamp)` tuple. Used both by the settlement layer's `MessageRoot`
+/// (`historicalRoot`) and by the L2 `L2InteropRootStorage` (`interopRoots`), so the executor's
+/// double check and the L2 consumers read the same shape.
+/// @param root The aggregated root.
+/// @param timestamp The block timestamp at which the root was created on its origin chain. Zero for
+/// roots recorded/imported through legacy (timestamp-less) paths; such roots cannot be used for
+/// time-sensitive proofs (e.g. the atomic-interop timeout protocol).
+struct StoredInteropRoot {
+    bytes32 root;
+    uint256 timestamp;
+}
+
 /// @param chainId The chain ID of the transaction to check.
 /// @param l2BatchNumber The L2 batch number where the withdrawal was processed.
 /// @param l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.

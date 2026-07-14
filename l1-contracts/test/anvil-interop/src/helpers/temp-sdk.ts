@@ -451,7 +451,8 @@ async function waitForInteropRootNonZero(
       );
     }
 
-    currentRoot = await interopRootStorage.interopRoots(gwChainId, gwBlockNumber);
+    // `interopRoots` returns the stored `(root, timestamp)` tuple; only the root gates readiness.
+    ({ root: currentRoot } = await interopRootStorage.interopRoots(gwChainId, gwBlockNumber));
     if (currentRoot === ethers.constants.HashZero) {
       await sleep(destProvider.pollingInterval);
     }

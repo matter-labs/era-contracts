@@ -113,28 +113,45 @@ contract MessageRootTest is Test {
 
     /// @notice Registering a chain seeds its tree with the genesis batch leaf and emits
     /// `AppendedChainBatchRoot` for it (so off-chain tree reconstructions include the leaf).
-    function test_addNewChain_seedsGenesisBatchLeaf() public {
+    function test_addNewChain_freshChainSeedsGenesisBatch() public {
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
-        uint256 startingBatchNumber = 7;
 
         vm.prank(bridgeHub);
         vm.expectEmit(true, true, false, true);
         emit IMessageRootBase.AppendedChainBatchRoot(
             alphaChainId,
-            startingBatchNumber,
+            0,
             ChainBatchRootTree.genesisChainBatchRoot(),
             block.timestamp
         );
+        messageRoot.addNewChain(alphaChainId, 0);
+
+        // The single-leaf chain root is the genesis batch leaf itself, and the batch root and its
+        // timestamp are recorded consistently with the leaf. Batch 0 is rejected by message
+        // verification (`BatchZeroNotAllowed`), so recording it cannot shadow any lookup.
+        assertEq(messageRoot.chainTreeLeafCount(alphaChainId), 1);
+        assertEq(messageRoot.getChainRoot(alphaChainId), _genesisChainRoot(0));
+        assertEq(messageRoot.chainBatchRoots(alphaChainId, 0), ChainBatchRootTree.genesisChainBatchRoot());
+        assertEq(messageRoot.chainBatchRootTimestamp(alphaChainId, 0), block.timestamp);
+        // Real batches continue at batch 1, unaffected by the seeding.
+        assertEq(messageRoot.currentChainBatchNumber(alphaChainId), 0);
+    }
+
+    /// @notice A chain onboarded with a non-zero starting batch number (already-deployed chain /
+    /// settlement-layer migration) is NOT seeded: a real batch with that number exists elsewhere, so
+    /// a synthetic leaf would diverge from it. Such chains must settle once before interop
+    /// registration (enforced by `ChainRegistrationSender.chainTreeLeafCount` gate).
+    function test_addNewChain_onboardedChainIsNotSeeded() public {
+        uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
+        uint256 startingBatchNumber = 7;
+
+        vm.prank(bridgeHub);
         messageRoot.addNewChain(alphaChainId, startingBatchNumber);
 
-        // The single-leaf chain root is the genesis batch leaf itself, and its timestamp is recorded.
-        assertEq(messageRoot.getChainRoot(alphaChainId), _genesisChainRoot(startingBatchNumber));
-        assertEq(messageRoot.chainBatchRootTimestamp(alphaChainId, startingBatchNumber), block.timestamp);
-        // `chainBatchRoots` must stay empty for the genesis batch: for migrating/upgrading chains a
-        // real batch with this number exists elsewhere and message verification must keep resolving
-        // through the fallback path.
+        assertEq(messageRoot.chainTreeLeafCount(alphaChainId), 0);
+        assertEq(messageRoot.getChainRoot(alphaChainId), bytes32(0));
         assertEq(messageRoot.chainBatchRoots(alphaChainId, startingBatchNumber), bytes32(0));
-        // Real batches continue right after the starting batch number, unaffected by the seeding.
+        assertEq(messageRoot.chainBatchRootTimestamp(alphaChainId, startingBatchNumber), 0);
         assertEq(messageRoot.currentChainBatchNumber(alphaChainId), startingBatchNumber);
     }
 
@@ -148,11 +165,14 @@ contract MessageRootTest is Test {
         vm.prank(bridgeHub);
         messageRoot.addNewChain(alphaChainId, 0);
 
-        assertEq(messageRoot.historicalRoot(100), messageRoot.getAggregatedRoot());
-        assertEq(messageRoot.historicalRootTimestamp(100), 1_700_000_123);
+        (bytes32 recordedRoot, uint256 recordedTimestamp) = messageRoot.historicalRoot(100);
+        assertEq(recordedRoot, messageRoot.getAggregatedRoot());
+        assertEq(recordedTimestamp, 1_700_000_123);
 
         // A block with no recorded root has no timestamp either.
-        assertEq(messageRoot.historicalRootTimestamp(101), 0);
+        (bytes32 emptyRoot, uint256 emptyTimestamp) = messageRoot.historicalRoot(101);
+        assertEq(emptyRoot, bytes32(0));
+        assertEq(emptyTimestamp, 0);
     }
 
     function test_RevertWhen_addChainNotBridgeHub() public {

@@ -17,6 +17,7 @@ import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 import {
     ChainAlreadyRegistered,
+    ChainHasNoBatchesInMessageRoot,
     ChainsSettlementLayerMismatch,
     NoEthAllowed,
     ZKChainNotRegistered
@@ -118,12 +119,21 @@ contract ChainRegistrationSender is
     }
 
     /// @notice Used to get the L2 transaction calldata for the chain registration.
+    /// @dev Also enforces the atomic-interop timeout-protocol precondition: the chain being
+    /// registered must already have at least one batch inside this layer's message root. A timeout
+    /// proof for a halted source chain points at the chain's LAST batch inside a post-deadline
+    /// aggregated root, so interop must never be enabled towards a chain with an empty tree. Freshly
+    /// created chains satisfy this from creation (the seeded genesis batch leaf); already-deployed
+    /// chains onboarded with a non-zero starting batch number must settle at least once first.
     /// @param chainToBeRegistered the chain to be registered
     /// @return the L2 transaction calldata
     function _getL2TxCalldata(uint256 chainToBeRegistered) internal view returns (bytes memory) {
         bytes32 baseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(chainToBeRegistered);
         if (baseTokenAssetId == bytes32(0)) {
             revert ZKChainNotRegistered();
+        }
+        if (BRIDGE_HUB.messageRoot().chainTreeLeafCount(chainToBeRegistered) == 0) {
+            revert ChainHasNoBatchesInMessageRoot(chainToBeRegistered);
         }
         return abi.encodeCall(IL2Bridgehub.registerChainForInterop, (chainToBeRegistered, baseTokenAssetId));
     }

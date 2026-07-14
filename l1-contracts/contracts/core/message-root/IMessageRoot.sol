@@ -67,12 +67,10 @@ interface IMessageRootBase is IMessageVerification {
 
     function chainBatchRoots(uint256 _chainId, uint256 _batchNumber) external view returns (bytes32);
 
-    function historicalRoot(uint256 _blockNumber) external view returns (bytes32);
-
-    /// @notice The block timestamp at which the `historicalRoot` for `_blockNumber` was written.
-    /// @dev Together with `historicalRoot` this forms the `(blockNumber, root, timestamp)` tuple that
-    /// chains import; the imported timestamp is double checked against this value during batch execution.
-    function historicalRootTimestamp(uint256 _blockNumber) external view returns (uint256);
+    /// @notice The global message root written at `_blockNumber` together with the block timestamp at
+    /// which it was written — the `(blockNumber, root, timestamp)` tuple that chains import; the
+    /// imported tuple is double checked against this record during batch execution.
+    function historicalRoot(uint256 _blockNumber) external view returns (bytes32 root, uint256 timestamp);
 
     /// @dev Used to parse the merkle proof data, this function calls a library function.
     function getProofData(
@@ -86,6 +84,10 @@ interface IMessageRootBase is IMessageVerification {
     function setMigratingChainBatchNumber(uint256 _chainId, uint256 _batchNumber) external;
 
     function currentChainBatchNumber(uint256 _chainId) external view returns (uint256);
+
+    /// @notice The number of batch leaves in a chain's tree on this settlement layer (non-zero means
+    /// the chain has at least one batch inside the aggregated shared root).
+    function chainTreeLeafCount(uint256 _chainId) external view returns (uint256);
 
     function getMerklePathForChain(uint256 _chainId) external view returns (bytes32[] memory);
 }

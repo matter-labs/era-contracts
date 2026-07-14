@@ -23,7 +23,9 @@ import {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Cross-chain authentication for the L1-free atomic interop flow.
+/// @notice Cross-chain authentication for the L1-free atomic interop flow. This header is the
+/// CANONICAL description of the finality / timeout protocol; other places (interfaces, README,
+/// off-chain helpers) reference it instead of restating it.
 ///
 /// A flow leg's commit value lives in its origin chain's {L2InteropCommitmentTree} (an Indexed
 /// Merkle Tree). The bootloader snapshots that tree's root at every batch boundary and commits both
@@ -45,8 +47,8 @@ import {
 ///     root resolved `interopRoots` against).
 ///   - the aggregated root's **creation time** `T` — the SL block timestamp at which the imported
 ///     aggregation root `interopRoots[slChainId][slBlock]` was created. It is imported alongside the
-///     root as `interopRootTimestamps[slChainId][slBlock]` and is double checked against
-///     `MessageRoot.historicalRootTimestamp` when the importing batch settles, so it is as
+///     root (one `(blockNumber, root, timestamp)` tuple; see {IL2InteropRootStorage}) and is double
+///     checked against `MessageRoot.historicalRoot` when the importing batch settles, so it is as
 ///     trustworthy as the root itself.
 ///
 /// A flow's `deadline`, `t` and `T` are only comparable if all legs settle on the same settlement
@@ -54,27 +56,36 @@ import {
 /// flow's `settlementLayerChainId` (else {ProofSettlementLayerMismatch}).
 ///
 /// A leg FINALIZES iff its commit value is present in the batch-END IMT root (leaf 3) of a batch with
-/// `t < deadline`.
+/// `t <= deadline`.
 ///
-/// A leg TIMES OUT (is refundable) via an aggregated root created after the deadline (`T >= deadline`)
-/// plus one batch of the source chain inside that root:
-///   - if the batch's `t >= deadline`: the commit value is absent from the batch-BEGIN IMT root
+/// A leg TIMES OUT (is refundable) via an aggregated root created strictly after the deadline
+/// (`T > deadline`) plus one batch of the source chain inside that root:
+///   - if the batch's `t > deadline`: the commit value is absent from the batch-BEGIN IMT root
 ///     (leaf 2). The tree is append-only and `begin(N) == end(N-1)`, so absence at the begin of a
-///     late batch means absence from every batch with `t < deadline` — the leg can never finalize.
-///   - if the batch's `t < deadline`: the batch is additionally proven to be the chain's LAST batch
+///     late batch means absence from every batch with `t <= deadline` — the leg can never finalize.
+///   - if the batch's `t <= deadline`: the batch is additionally proven to be the chain's LAST batch
 ///     inside the aggregated root (every "left child" hop of the batch-leaf path carries the empty
 ///     right-subtree hash), and the commit value is absent from the batch-END IMT root (leaf 3).
-///     Since the root was created at `T >= deadline`, any batch aggregated after it has
-///     `t' >= T >= deadline`, so the proven batch's end root is the final IMT state reachable before
-///     the deadline — absence there means the leg can never finalize. This branch restores refund
-///     liveness for a source chain that HALTS and never settles a post-deadline batch; every
-///     registered chain has at least one batch in the shared root (a genesis leaf is seeded at
-///     registration — see {MessageRootBase._addNewChain}), so the required "last batch" always exists.
+///     Since the root was created at `T > deadline`, any batch aggregated after it has
+///     `t' >= T > deadline`, so the proven batch's end root is the final IMT state reachable in time
+///     — absence there means the leg can never finalize. This branch restores refund liveness for a
+///     source chain that HALTS and never settles a post-deadline batch; every chain interop can
+///     target has at least one batch in the shared root (freshly created chains get a genesis batch
+///     leaf at creation — see {MessageRootBase._addNewChain} — and `ChainRegistrationSender` refuses
+///     to enable interop towards a chain with an empty tree), so the required "last batch" always
+///     exists.
 ///
-/// Both timeout branches are mutually exclusive with finalization: a value committed in a batch `B`
-/// with `t_B < deadline` is contained in `begin(L)` of every batch `L` with `t_L >= deadline` (batch
-/// order follows aggregation-time order) and in `end(L')` of the last batch `L'` of any root with
-/// `T >= deadline > t_B` (that root already contains `B`, so `L' >= B`).
+/// SOUNDNESS — both timeout branches are mutually exclusive with finalization: a value committed in a
+/// batch `B` with `t_B <= deadline` is contained in `begin(L)` of every batch `L` with
+/// `t_L > deadline` (batch order follows aggregation-time order) and in `end(L')` of the last batch
+/// `L'` of any root with `T > deadline >= t_B` (that root already contains `B`, so `L' >= B`).
+///
+/// COMPLETENESS — if a leg has really timed out (its commit value is absent from every batch with
+/// `t <= deadline`), a valid timeout proof can always be produced from ANY aggregated root with
+/// `T > deadline`, even if the source chain inserts the commit value later on: if the root contains a
+/// batch with `t > deadline`, the FIRST such batch works (its begin root equals the end root of the
+/// last in-time batch, which cannot contain the value); otherwise the chain's last batch in the root
+/// is in time and its end root — the final in-time IMT state — cannot contain the value either.
 ///
 /// Membership (inclusion) and non-membership (low-nullifier) against the authenticated root are
 /// delegated to {IndexedMerkleTree}, the single shared IMT engine.
@@ -85,7 +96,8 @@ library AtomicInteropProof {
     }
 
     /// @notice Verifies `_commitValue` is present in `_proof.sourceChainId`'s batch-END IMT root as of
-    /// a batch settled on `_expectedSlChainId` with `l1Timestamp < _deadline`.
+    /// a batch settled on `_expectedSlChainId` with `l1Timestamp <= _deadline` (the finality condition
+    /// from the library header).
     /// @dev The proof is bound to the correct chain by `_commitValue` itself: it bakes in the
     /// chain-specific `bundleHash`, so a leg's commit value can only be inserted into its own source
     /// chain's tree, and the membership check below can only pass against that chain. The authenticated
@@ -105,10 +117,9 @@ library AtomicInteropProof {
         if (slChainId != _expectedSlChainId) {
             revert ProofSettlementLayerMismatch(_expectedSlChainId, slChainId);
         }
-        // The value's batch must have settled strictly before the deadline (`t < deadline`; a batch
-        // with `t >= deadline` is late). `t` only rises, so a commit can't be back-dated to look
-        // in-time after the fact.
-        if (batchTimestamp >= _deadline) {
+        // The value's batch must have settled no later than the deadline. `t` only rises, so a commit
+        // can't be back-dated to look in-time after the fact.
+        if (batchTimestamp > _deadline) {
             revert ProofDeadlineExceeded(batchTimestamp, _deadline);
         }
         bool included = IndexedMerkleTree.verifyInclusion({
@@ -121,26 +132,14 @@ library AtomicInteropProof {
         if (!included) revert ProofInclusionFailed(_proof.chainImtRoot, _commitValue);
     }
 
-    /// @notice Timeout proof: shows `_commitValue` was not committed before the deadline and the flow
-    /// can never finalize.
-    /// @dev The proof anchors on an aggregated root created after the deadline (`T >= _deadline`,
-    /// where `T` is the imported `interopRootTimestamps[slChainId][slBlock]`) plus one batch of the
-    /// source chain inside it, and branches on the batch's inclusion time `t`:
-    ///   - `t >= _deadline`: low-nullifier non-inclusion against the batch-BEGIN IMT root (leaf 2).
-    ///     Append-only + `begin(N) == end(N-1)` make this equivalent to absence from every in-time
-    ///     batch.
-    ///   - `t < _deadline`: the batch must be the chain's LAST batch inside the aggregated root
-    ///     (all right siblings on the batch-leaf path are empty subtrees), and the non-inclusion is
-    ///     checked against the batch-END IMT root (leaf 3). Any batch aggregated after this root has
-    ///     `t' >= T >= _deadline`, so this end root is the final IMT state reachable in time; this
-    ///     branch keeps a halted source chain (one that never settles a post-deadline batch)
-    ///     refundable. Every registered chain has at least one batch in the shared root (the seeded
-    ///     genesis leaf), so the "last batch" always exists.
-    /// A value that WAS committed in time is present in every late batch's begin root and in the end
-    /// root of the last batch of every post-deadline aggregated root, so neither branch can succeed
-    /// for an on-time leg — including one already finalized elsewhere. The caller
-    /// ({AtomicFlowManager.authorizeRefund}) checks `_proof.sourceChainId == legSourceChainIds[i]`;
-    /// the SL match is checked here.
+    /// @notice Timeout proof: shows `_commitValue` was not committed by the deadline and the flow can
+    /// never finalize. Implements the timeout branch of the protocol described in the library header:
+    /// anchored on an aggregated root created strictly after the deadline (`T > _deadline`), the
+    /// commit value is proven absent from the batch-BEGIN IMT root of a late batch
+    /// (`l1Timestamp > _deadline`) or from the batch-END IMT root of the chain's LAST batch inside
+    /// the anchor root (`l1Timestamp <= _deadline`).
+    /// @dev The caller ({AtomicFlowManager.authorizeRefund}) checks
+    /// `_proof.sourceChainId == legSourceChainIds[i]`; the SL match is checked here.
     /// @param _absence Non-inclusion proof against the begin (late batch) or end (last in-time batch)
     /// IMT root, as described above.
     /// @param _expectedSlChainId The flow's `settlementLayerChainId` the proof's root must settle on.
@@ -150,10 +149,17 @@ library AtomicInteropProof {
         uint64 _deadline,
         uint256 _expectedSlChainId
     ) internal view {
-        // Peek the claimed batch inclusion time to select the branch (begin vs end leaf). The claimed
-        // value is only trusted after `_authenticateRoot` below verifies the same proof word: a wrong
-        // timestamp breaks the reconstructed batch leaf and the proof fails.
-        uint256 imtRootLeafIndex = _peekBatchTimestamp(_absence) >= _deadline
+        // Read the aggregation-hop section (single parse; the layout knowledge lives in
+        // {MessageHashing}). The values are only trusted after `_authenticateRoot` below verifies the
+        // same proof words: a wrong timestamp or batch-leaf path breaks the reconstructed batch leaf
+        // and the proof fails.
+        MessageHashing.AggregationHopData memory hop = MessageHashing.readAggregationHopData(_absence.settlementProof);
+        if (hop.finalProofNode) {
+            // A final-node proof carries no aggregation hop and hence no batch timestamp.
+            revert ProofMissingSettlementLayerAnchor(_absence.sourceChainId, _absence.batchNumber);
+        }
+        // Select the branch (begin vs end leaf) by the batch's claimed inclusion time.
+        uint256 imtRootLeafIndex = hop.batchTimestamp > _deadline
             ? ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX
             : ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX;
 
@@ -162,19 +168,19 @@ library AtomicInteropProof {
             revert ProofSettlementLayerMismatch(_expectedSlChainId, slChainId);
         }
 
-        // The aggregated root the proof resolves against must be from after the deadline. Roots
-        // imported without a timestamp (legacy path) read as 0 and are rejected. Without this bound,
-        // an in-time snapshot could pass the "last batch" branch below even though later in-time
-        // batches (which may contain the commit) exist.
-        uint256 rootTimestamp = L2_INTEROP_ROOT_STORAGE.interopRootTimestamps(slChainId, slBlock);
-        if (rootTimestamp < _deadline) {
+        // The aggregated root the proof resolves against must be created strictly after the deadline.
+        // Roots imported without a timestamp (legacy path) read as 0 and are rejected. Without this
+        // bound, an in-time snapshot could pass the "last batch" branch below even though later
+        // in-time batches (which may contain the commit) exist.
+        (, uint256 rootTimestamp) = L2_INTEROP_ROOT_STORAGE.interopRoots(slChainId, slBlock);
+        if (rootTimestamp <= _deadline) {
             revert ProofInteropRootNotAfterDeadline(rootTimestamp, _deadline);
         }
 
-        if (batchTimestamp < _deadline) {
+        if (batchTimestamp <= _deadline) {
             // In-time batch: only its END root proves anything about the deadline moment, and only if
             // no later batch made it into the (post-deadline) aggregated root.
-            _verifyLastBatchInRoot(_absence.settlementProof);
+            _verifyLastBatchInRoot(hop);
         }
 
         bool absent = IndexedMerkleTree.verifyNonInclusion({
@@ -187,20 +193,6 @@ library AtomicInteropProof {
         if (!absent) revert ProofNonInclusionFailed(_absence.chainImtRoot, _commitValue);
     }
 
-    /// @dev Reads the batch's claimed `l1Timestamp` from the settlement proof without verifying it —
-    /// the word right after the leaf-to-chain-batch-root section, exactly where
-    /// {MessageHashing._getProofData} reads it. Callers must still run {_authenticateRoot} over the
-    /// same proof, which folds this word into the reconstructed batch leaf and thereby authenticates it.
-    function _peekBatchTimestamp(ImtProof calldata _imtProof) private pure returns (uint256) {
-        bytes32[] calldata proof = _imtProof.settlementProof;
-        MessageHashing.ProofMetadata memory metadata = MessageHashing.parseProofMetadata(proof);
-        if (metadata.finalProofNode) {
-            // A final-node proof carries no aggregation hop and hence no batch timestamp word.
-            revert ProofMissingSettlementLayerAnchor(_imtProof.sourceChainId, _imtProof.batchNumber);
-        }
-        return uint256(proof[metadata.proofStartIndex + metadata.logLeafProofLen]);
-    }
-
     /// @dev Verifies that the proven batch leaf is the LAST leaf of the source chain's batch tree
     /// inside the aggregated root: on every level of the batch-leaf Merkle path where the current
     /// node is a left child (mask bit 0), the right sibling must be the empty-subtree hash for that
@@ -210,18 +202,13 @@ library AtomicInteropProof {
     /// collide with the zero cascade. The path itself (siblings + mask) is authenticated by the
     /// {_authenticateRoot} run over the same proof bytes: its length and contents are pinned by the
     /// chain-id leaf committed inside the aggregated root.
-    function _verifyLastBatchInRoot(bytes32[] calldata _proof) private pure {
-        MessageHashing.ProofMetadata memory metadata = MessageHashing.parseProofMetadata(_proof);
-        // Proof word layout after the metadata word (see {MessageHashing._getProofData}):
-        // [logLeafProofLen top-tree siblings][l1Timestamp][batchLeafProofMask][batchLeafProofLen siblings]...
-        uint256 ptr = metadata.proofStartIndex + metadata.logLeafProofLen + 1;
-        uint256 mask = uint256(_proof[ptr]);
-        ++ptr;
+    function _verifyLastBatchInRoot(MessageHashing.AggregationHopData memory _hop) private pure {
+        uint256 mask = _hop.batchLeafProofMask;
         bytes32 zeroSubtreeHash = CHAIN_TREE_EMPTY_ENTRY_HASH;
-        uint256 levels = metadata.batchLeafProofLen;
+        uint256 levels = _hop.batchLeafSiblings.length;
         for (uint256 i = 0; i < levels; ++i) {
             if ((mask >> i) & 1 == 0) {
-                bytes32 sibling = _proof[ptr + i];
+                bytes32 sibling = _hop.batchLeafSiblings[i];
                 if (sibling != zeroSubtreeHash) {
                     revert ProofNotLastBatchInRoot(i, sibling);
                 }

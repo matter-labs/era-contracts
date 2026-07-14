@@ -28,21 +28,15 @@
  * A chain's IMT root is authenticated as a **chain-batch-root leaf** (leaf 2 = batch begin, leaf 3 =
  * batch end; see ChainBatchRootTree.sol) via {L2_MESSAGE_VERIFICATION}.proveL2LeafInclusionShared. On
  * the harness that address hosts {MockL2MessageVerification}, which always returns true, so the root
- * check is out of harness scope. The deadline is a settlement-layer timestamp: {AtomicInteropProof}
- * re-parses the same `settlementProof` bytes with the real {MessageHashing._getProofData} to derive
- * the batch's `l1Timestamp` and the SL chain id, and it REQUIRES the leaf-to-batch-root section of
- * the proof to be exactly CHAIN_BATCH_ROOT_TREE_DEPTH (3) hops, so the harness builds format-valid
- * multi-hop proof bytes with a 3-word top-tree path carrying a chosen `l1Timestamp`
- * ({buildSlProofBytes}). The parts actually exercised are the IMT membership / low-nullifier layer
- * and the timeout-protocol clock checks:
- *   - inclusion: batch `l1Timestamp < deadline`;
- *   - timeout: the anchor aggregated root's creation timestamp (read from the REAL
- *     `L2InteropRootStorage.interopRootTimestamps[slChainId][slBlock]`, which the harness seeds via
- *     bootloader impersonation) must be `>= deadline`, and the absence is checked against the
- *     batch-BEGIN root for a late batch (`l1Timestamp >= deadline`) or against the batch-END root of
- *     the chain's LAST batch in the anchor root (`l1Timestamp < deadline`; "last" = every left-child
- *     hop of the batch-leaf path carries the empty-subtree hash, trivially true for the zero-length
- *     batch-leaf path of a single-leaf chain tree).
+ * check is out of harness scope. {AtomicInteropProof} re-parses the same `settlementProof` bytes with
+ * the real {MessageHashing} accessors and REQUIRES the leaf-to-batch-root section of the proof to be
+ * exactly CHAIN_BATCH_ROOT_TREE_DEPTH (3) hops, so the harness builds format-valid multi-hop proof
+ * bytes carrying a chosen `l1Timestamp` and batch-leaf path ({buildSlProofBytes}). The parts actually
+ * exercised are the IMT membership / low-nullifier layer and the timeout-protocol clock checks; the
+ * protocol itself (finality/timeout conditions, branches, boundaries) is described ONCE in the
+ * AtomicInteropProof.sol library header — the anchor-root timestamps it reads come from the REAL
+ * `L2InteropRootStorage.interopRoots[slChainId][slBlock]` tuples, which the harness seeds via
+ * bootloader impersonation.
  */
 
 import type { providers, Wallet } from "ethers";
@@ -345,8 +339,8 @@ export const CHAIN_BATCH_ROOT_TREE_DEPTH = 3;
 /**
  * Builds the minimal format-valid multi-hop leaf inclusion proof bytes that
  * {MessageHashing._getProofData} parses into a chosen `l1Timestamp` and settlement-layer
- * chain id (with `finalProofNode == false`). The deadline is compared against `t`; the SL snapshot
- * block `slBlock` is the key the timeout path reads `interopRootTimestamps[slChainId][slBlock]` at.
+ * chain id (with `finalProofNode == false`). The SL snapshot block `slBlock` is the key the timeout
+ * path reads the anchor `interopRoots[slChainId][slBlock]` tuple at.
  *
  * Byte layout (logLeafProofLen=3 — the chain-batch-root top-tree path {AtomicInteropProof} enforces):
  *   [0]      metadata header = version(0x01) | logLeafProofLen(3) | batchLeafProofLen(n) |
@@ -401,9 +395,7 @@ export function buildSlProofBytes(
  * Well-formed settlement proof carrying a chosen `l1Timestamp`, batch number and SL snapshot block.
  * {MockL2MessageVerification} accepts any leaf, but {MessageHashing._getProofData} parses these bytes
  * to derive `t`, the SL chain id and the SL snapshot block, which {AtomicInteropProof} uses for the
- * clock checks (inclusion: `t < deadline` on the batch-end root; timeout: anchor root timestamp
- * `interopRootTimestamps[slChainId][slBlock] >= deadline`, then batch-begin root for `t >= deadline`
- * or last-batch + batch-end root for `t < deadline`).
+ * clock checks (see the AtomicInteropProof.sol library header for the conditions).
  */
 function settlementProofForBatch(params: {
   l1Timestamp: BigNumber | number | string;
@@ -432,7 +424,7 @@ function settlementProofForBatch(params: {
 
 /**
  * Build an inclusion {ImtProof} for `value` against `chainId`'s live IMT (`leaf` is the value's own leaf),
- * carrying `l1Timestamp` (must be `< deadline` for `requireFlowFinalized` to accept).
+ * carrying `l1Timestamp` (must satisfy the finality bound — see AtomicInteropProof.sol).
  */
 export async function buildInclusionProof(params: {
   l2Tree: Contract;
@@ -465,12 +457,11 @@ export async function buildInclusionProof(params: {
 
 /**
  * Build the timeout absence {ImtProof}: proves `value` is absent from `chainId`'s live IMT (`leaf` is
- * the low-nullifier / predecessor leaf). On chain the proof is anchored on an aggregated root created
- * after the deadline (`interopRootTimestamps[slChainId][slBlock] >= deadline` — the harness seeds this
- * via bootloader impersonation) and the live tree root stands in for the **batch-begin** IMT root
- * (leaf 2) when `l1Timestamp >= deadline`, or for the **batch-end** IMT root (leaf 3) of the chain's
- * last batch inside the anchor root when `l1Timestamp < deadline`. Since the IMT is append-only and
- * begin(N) == end(N-1), either branch proves the value was never committed in time.
+ * the low-nullifier / predecessor leaf). The live tree root stands in for the batch-begin (late
+ * batch) or batch-end (last in-time batch) IMT root snapshot on the harness; the timeout conditions
+ * the proof is checked against are described in the AtomicInteropProof.sol library header, and the
+ * anchor-root tuple it resolves is seeded via bootloader impersonation (see the spec's
+ * `seedAnchorRoot`).
  */
 export async function buildNonInclusionProof(params: {
   l2Tree: Contract;

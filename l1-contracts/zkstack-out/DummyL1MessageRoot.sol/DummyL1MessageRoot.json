@@ -233,6 +233,25 @@
   },
   {
     "type": "function",
+    "name": "chainTreeLeafCount",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "currentChainBatchNumber",
     "inputs": [
       {
@@ -435,24 +454,10 @@
     ],
     "outputs": [
       {
-        "name": "globalMessageRoot",
+        "name": "root",
         "type": "bytes32",
         "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "historicalRootTimestamp",
-    "inputs": [
-      {
-        "name": "blockNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
+      },
       {
         "name": "timestamp",
         "type": "uint256",

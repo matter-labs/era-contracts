@@ -47,9 +47,12 @@ library ChainBatchRootTree {
 
     /// @dev Root of a freshly seeded interop commitment tree: the {IndexedMerkleTree} after `setup`
     /// holds only the `{value: 0, nextIndex: 0, nextValue: 0}` sentinel head leaf in a height-0
-    /// {FullMerkle}, so the root is the sentinel's leaf hash `keccak256(abi.encode(0, 0, 0))`.
-    /// Locked against the recomputation by a unit test.
-    bytes32 internal constant EMPTY_IMT_ROOT = keccak256(abi.encodePacked(uint256(0), uint256(0), uint256(0)));
+    /// {FullMerkle}, so the root is the sentinel's leaf hash `keccak256(abi.encode(0, 0, 0))` — the
+    /// keccak256 of 96 zero bytes. Hardcoded because Solidity re-evaluates non-literal constant
+    /// expressions at every use site; locked against the recomputation by
+    /// `test_emptyImtRoot_matchesRecomputation` and cross-checked against the live
+    /// {L2InteropCommitmentTree} seed root by `test_initialize_seedRootMatchesEmptyImtRootConstant`.
+    bytes32 internal constant EMPTY_IMT_ROOT = 0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21;
 
     /// @notice The chain batch root of a chain's synthetic genesis batch: no local logs, no
     /// multichain root, and the interop commitment tree in its freshly seeded (empty) state at both

@@ -45,15 +45,16 @@ error ProofInvalidChainBatchRootDepth(uint256 expected, uint256 actual);
 /// block anchor. The atomic flow requires a multi-hop / SL-global proof so the deadline can be checked
 /// against `pd.settlementLayerBatchNumber`.
 error ProofMissingSettlementLayerAnchor(uint256 chainId, uint256 batchNumber);
-/// @dev The batch's `l1Timestamp` is not strictly before the deadline (inclusion path; a batch with
-/// `t >= deadline` is late).
+/// @dev The batch's `l1Timestamp` is newer than the deadline (inclusion path; a batch with
+/// `t > deadline` is late).
 error ProofDeadlineExceeded(uint256 batchTimestamp, uint64 deadline);
-/// @dev The aggregated root the timeout proof resolves against was not created after the deadline
-/// (`interopRootTimestamps[slChainId][slBlock] < deadline`; roots imported without a timestamp read
-/// as 0 and are rejected too). Without a post-deadline anchor root, the "last batch" branch of the
-/// timeout proof could be run against a stale snapshot that misses later in-time batches.
+/// @dev The aggregated root the timeout proof resolves against was not created strictly after the
+/// deadline (the timestamp in `interopRoots[slChainId][slBlock]` is `<= deadline`; roots imported
+/// without a timestamp read as 0 and are rejected too). Without a post-deadline anchor root, the
+/// "last batch" branch of the timeout proof could be run against a stale snapshot that misses later
+/// in-time batches.
 error ProofInteropRootNotAfterDeadline(uint256 rootTimestamp, uint64 deadline);
-/// @dev The batch used for the in-time (`t < deadline`) branch of the timeout proof is not the source
+/// @dev The batch used for the in-time (`t <= deadline`) branch of the timeout proof is not the source
 /// chain's last batch inside the aggregated root: the batch-leaf Merkle path has a populated right
 /// sibling at `level` where the empty-subtree hash was required.
 error ProofNotLastBatchInRoot(uint256 level, bytes32 sibling);

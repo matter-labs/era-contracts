@@ -238,6 +238,39 @@ library MessageHashing {
         });
     }
 
+    /// @dev The unverified contents of a (multi-hop) proof's aggregation-hop section, read
+    /// positionally by {readAggregationHopData}. Callers that act on these values MUST also run the
+    /// proof through the leaf verifier (`proveL2LeafInclusionShared` / {_getProofData}): the same
+    /// words are folded into the reconstructed batch leaf there, which is what authenticates them.
+    struct AggregationHopData {
+        /// @dev True for a single-level / commit-based proof, which has no aggregation hop (and so
+        /// carries none of the fields below).
+        bool finalProofNode;
+        /// @dev The batch's claimed `l1Timestamp` (see {batchLeafHash}).
+        uint256 batchTimestamp;
+        /// @dev The Merkle mask of the batch leaf inside the chain's batch tree.
+        uint256 batchLeafProofMask;
+        /// @dev The batch leaf's sibling path inside the chain's batch tree.
+        bytes32[] batchLeafSiblings;
+    }
+
+    /// @notice Reads the aggregation-hop section (batch timestamp + batch-leaf Merkle path) from a
+    /// proof without verifying it. This is the single place that knows the proof's word layout;
+    /// external libraries must consume this accessor instead of parsing the metadata themselves.
+    function readAggregationHopData(bytes32[] calldata _proof) internal pure returns (AggregationHopData memory data) {
+        ProofMetadata memory metadata = parseProofMetadata(_proof);
+        data.finalProofNode = metadata.finalProofNode;
+        if (metadata.finalProofNode) {
+            return data;
+        }
+        // Word layout after the leaf-to-batch-root section (see {_getProofData}):
+        // [l1Timestamp][batchLeafProofMask][batchLeafProofLen siblings]...
+        uint256 ptr = metadata.proofStartIndex + metadata.logLeafProofLen;
+        data.batchTimestamp = uint256(_proof[ptr]);
+        data.batchLeafProofMask = uint256(_proof[ptr + 1]);
+        data.batchLeafSiblings = extractSlice(_proof, ptr + 2, ptr + 2 + metadata.batchLeafProofLen);
+    }
+
     /// @notice Extracts slice from the proof.
     /// @param _proof The proof.
     /// @param _left The left index.
