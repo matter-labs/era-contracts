@@ -46,7 +46,7 @@ contract ZKsyncOSVerifierFflonk is IVerifierV2 {
     // ================Transcript================
     // ================Constants================
     uint256 internal constant ONE = 1;
-    uint256 internal constant DOMAIN_SIZE = 0x800000; // 2^23
+    uint256 internal constant DOMAIN_SIZE = 8388608;
     uint256 internal constant OMEGA = 0x1283ba6f4b7b1a76ba2008fe823128bea4adb9269cbfd7c41c223be65bc60863;
     // =========================================
     uint256 internal constant TRANSCRIPT_BEGIN_SLOT = 0x200;

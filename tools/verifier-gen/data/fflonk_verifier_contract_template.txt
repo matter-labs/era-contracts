@@ -30,7 +30,7 @@ contract {{contract_name}}VerifierFflonk is IVerifierV2 {
     // ================Transcript================
     // ================Constants================
     uint256 internal constant ONE = 1;
-    uint256 internal constant DOMAIN_SIZE = {{domain_size}}; // 2^{{domain_size_log2}}
+    uint256 internal constant DOMAIN_SIZE =  8388608;
     uint256 internal constant OMEGA = {{omega}};
     // =========================================
     uint256 internal constant TRANSCRIPT_BEGIN_SLOT = 0x200;
