@@ -27,7 +27,7 @@ enum LegState {
 ///   - non-inclusion ({AtomicInteropProof.verifyTimeoutAbsence}, timeout/refund path): `leaf` is the
 ///     low-nullifier (predecessor) leaf that brackets the absent commit value.
 /// The finality / timeout conditions the proofs are checked against (which IMT snapshot, which clock
-/// bounds) are described ONCE, in the {AtomicInteropProof} library header.
+/// bounds) are described in the {AtomicInteropProof} library header.
 ///
 /// Authentication has two layers, both resolved against an SL aggregation root the verifying chain
 /// imported (`interopRoots[slChainId][slBlock]`; the claimed `(sourceChainId, batchNumber)` binds via

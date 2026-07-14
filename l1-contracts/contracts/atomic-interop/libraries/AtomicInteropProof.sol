@@ -153,7 +153,9 @@ library AtomicInteropProof {
         // {MessageHashing}). The values are only trusted after `_authenticateRoot` below verifies the
         // same proof words: a wrong timestamp or batch-leaf path breaks the reconstructed batch leaf
         // and the proof fails.
-        MessageHashing.AggregationHopData memory hop = MessageHashing.readAggregationHopData(_absence.settlementProof);
+        MessageHashing.UnverifiedAggregationHopData memory hop = MessageHashing.readUnverifiedAggregationHopData(
+            _absence.settlementProof
+        );
         if (hop.finalProofNode) {
             // A final-node proof carries no aggregation hop and hence no batch timestamp.
             revert ProofMissingSettlementLayerAnchor(_absence.sourceChainId, _absence.batchNumber);
@@ -172,7 +174,7 @@ library AtomicInteropProof {
         // Roots imported without a timestamp (legacy path) read as 0 and are rejected. Without this
         // bound, an in-time snapshot could pass the "last batch" branch below even though later
         // in-time batches (which may contain the commit) exist.
-        (, uint256 rootTimestamp) = L2_INTEROP_ROOT_STORAGE.interopRoots(slChainId, slBlock);
+        uint256 rootTimestamp = L2_INTEROP_ROOT_STORAGE.interopRoots(slChainId, slBlock).timestamp;
         if (rootTimestamp <= _deadline) {
             revert ProofInteropRootNotAfterDeadline(rootTimestamp, _deadline);
         }
@@ -202,7 +204,7 @@ library AtomicInteropProof {
     /// collide with the zero cascade. The path itself (siblings + mask) is authenticated by the
     /// {_authenticateRoot} run over the same proof bytes: its length and contents are pinned by the
     /// chain-id leaf committed inside the aggregated root.
-    function _verifyLastBatchInRoot(MessageHashing.AggregationHopData memory _hop) private pure {
+    function _verifyLastBatchInRoot(MessageHashing.UnverifiedAggregationHopData memory _hop) private pure {
         uint256 mask = _hop.batchLeafProofMask;
         bytes32 zeroSubtreeHash = CHAIN_TREE_EMPTY_ENTRY_HASH;
         uint256 levels = _hop.batchLeafSiblings.length;

@@ -16,6 +16,7 @@ import {
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
+import {StoredInteropRoot} from "contracts/common/Messaging.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {
     L2_COMPLEX_UPGRADER_ADDR,
@@ -165,14 +166,14 @@ contract MessageRootTest is Test {
         vm.prank(bridgeHub);
         messageRoot.addNewChain(alphaChainId, 0);
 
-        (bytes32 recordedRoot, uint256 recordedTimestamp) = messageRoot.historicalRoot(100);
-        assertEq(recordedRoot, messageRoot.getAggregatedRoot());
-        assertEq(recordedTimestamp, 1_700_000_123);
+        StoredInteropRoot memory recorded = messageRoot.historicalRoot(100);
+        assertEq(recorded.root, messageRoot.getAggregatedRoot());
+        assertEq(recorded.timestamp, 1_700_000_123);
 
         // A block with no recorded root has no timestamp either.
-        (bytes32 emptyRoot, uint256 emptyTimestamp) = messageRoot.historicalRoot(101);
-        assertEq(emptyRoot, bytes32(0));
-        assertEq(emptyTimestamp, 0);
+        StoredInteropRoot memory empty = messageRoot.historicalRoot(101);
+        assertEq(empty.root, bytes32(0));
+        assertEq(empty.timestamp, 0);
     }
 
     function test_RevertWhen_addChainNotBridgeHub() public {

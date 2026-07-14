@@ -144,9 +144,9 @@ struct BridgehubL2TransactionRequest {
 /// (i.e. `block.timestamp` of `blockOrBatchNumber` on the dependency chain). Imported alongside the
 /// root itself so that time-sensitive proofs (e.g. the atomic-interop timeout protocol) can anchor
 /// "this aggregated root is from after the deadline" on chain. Double checked on the settlement
-/// layer during batch execution against `MessageRoot.historicalRootTimestamp`. A zero value means
-/// the root was imported through the legacy (timestamp-less) path and cannot be used for
-/// time-sensitive proofs.
+/// layer during batch execution against `MessageRoot.historicalRoot`. A zero value means the root
+/// was imported through the timestamp-less `addInteropRoot` entry point (used by the EraVM
+/// bootloader) and cannot be used for time-sensitive proofs.
 /// @param sides The sides of the dynamic incremental merkle tree emitted in the L2ToL1Messenger for precommit based interop
 /// For proof and commit based interop, the sides contain a single root.
 struct InteropRoot {
@@ -163,9 +163,11 @@ struct InteropRoot {
 /// (`historicalRoot`) and by the L2 `L2InteropRootStorage` (`interopRoots`), so the executor's
 /// double check and the L2 consumers read the same shape.
 /// @param root The aggregated root.
-/// @param timestamp The block timestamp at which the root was created on its origin chain. Zero for
-/// roots recorded/imported through legacy (timestamp-less) paths; such roots cannot be used for
-/// time-sensitive proofs (e.g. the atomic-interop timeout protocol).
+/// @param timestamp The block timestamp at which the root was created on its origin chain. Zero when
+/// the root was imported through the timestamp-less `addInteropRoot` entry point (used by the EraVM
+/// bootloader); such roots cannot be used for time-sensitive proofs (e.g. the atomic-interop timeout
+/// protocol). Note that no roots recorded under previous protocol versions exist: interop was not
+/// activated in v31, so all stored roots carry the full tuple unless imported through that entry point.
 struct StoredInteropRoot {
     bytes32 root;
     uint256 timestamp;

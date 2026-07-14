@@ -49,16 +49,15 @@ library ChainBatchRootTree {
     /// holds only the `{value: 0, nextIndex: 0, nextValue: 0}` sentinel head leaf in a height-0
     /// {FullMerkle}, so the root is the sentinel's leaf hash `keccak256(abi.encode(0, 0, 0))` — the
     /// keccak256 of 96 zero bytes. Hardcoded because Solidity re-evaluates non-literal constant
-    /// expressions at every use site; locked against the recomputation by
-    /// `test_emptyImtRoot_matchesRecomputation` and cross-checked against the live
-    /// {L2InteropCommitmentTree} seed root by `test_initialize_seedRootMatchesEmptyImtRootConstant`.
+    /// expressions at every use site.
     bytes32 internal constant EMPTY_IMT_ROOT = 0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21;
 
-    /// @notice The chain batch root of a chain's synthetic genesis batch: no local logs, no
+    /// @notice The chain batch root of a chain's genesis batch (batch 0): no local logs, no
     /// multichain root, and the interop commitment tree in its freshly seeded (empty) state at both
-    /// batch boundaries. The settlement layer appends a batch leaf with this root when a chain is
-    /// registered in the `MessageRoot`, so every registered chain has at least one batch inside the
-    /// shared root — a precondition of the atomic-interop timeout protocol (see {AtomicInteropProof}).
+    /// batch boundaries. The settlement layer appends a batch leaf with this root when a freshly
+    /// created chain is registered in the `MessageRoot`, so such chains have at least one batch
+    /// inside the shared root from creation — a precondition of the atomic-interop timeout protocol
+    /// (see {AtomicInteropProof}).
     function genesisChainBatchRoot() internal pure returns (bytes32) {
         return compute(bytes32(0), bytes32(0), EMPTY_IMT_ROOT, EMPTY_IMT_ROOT);
     }

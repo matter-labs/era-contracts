@@ -77,12 +77,11 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// since each new root cumulatively aggregates all prior changes — so the last root always contains (at minimum) everything
     /// from the earlier ones.
     /// @dev Populated on both settlement layers (L1 and Gateway) on every `addChainBatchRoot`.
-    /// @dev Changing the mapping's value type from `bytes32` to a struct is storage-layout safe:
-    /// mapping values live at hashed locations and the struct's first member (`root`) occupies
-    /// exactly the slot the plain `bytes32` used, with `timestamp` in the following slot — and the
-    /// previous (v31) version of this field layout has never been part of a release with interop
-    /// enabled, so the corresponding entries were empty anyway.
-    mapping(uint256 blockNumber => StoredInteropRoot) public historicalRoot;
+    /// @dev Note on storage compatibility with v31: since interop has not been enabled in v31, this
+    /// mapping was empty at the time of the upgrade; additionally, mapping values live at hashed
+    /// locations, so extending the value type from `bytes32` to a struct (whose first member `root`
+    /// occupies exactly the slot the plain `bytes32` used) does not shift any other storage.
+    mapping(uint256 blockNumber => StoredInteropRoot) internal historicalRoots;
 
     /// @dev Chain ID of L1.
     /// @dev Kept here for storage layout compatibility with previous versions.
@@ -245,7 +244,13 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// @dev Records the current shared tree root together with the block timestamp at which it was
     /// created, forming the `(blockNumber, root, timestamp)` tuple chains import for interop.
     function _recordHistoricalRoot(bytes32 _sharedTreeRoot) internal {
-        historicalRoot[block.number] = StoredInteropRoot({root: _sharedTreeRoot, timestamp: block.timestamp});
+        historicalRoots[block.number] = StoredInteropRoot({root: _sharedTreeRoot, timestamp: block.timestamp});
+    }
+
+    /// @notice Returns the global message root written at `_blockNumber` together with the block
+    /// timestamp at which it was written (the `(blockNumber, root, timestamp)` tuple).
+    function historicalRoot(uint256 _blockNumber) external view returns (StoredInteropRoot memory) {
+        return historicalRoots[_blockNumber];
     }
 
     /// @notice Emits a new interop root event when the shared tree root changes.
@@ -264,7 +269,8 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
             lastEmitBlock = block.number;
         }
 
-        emit NewInteropRoot(block.chainid, block.number, currentCount, _sides);
+        // solhint-disable-next-line func-named-parameters
+        emit NewInteropRoot(block.chainid, block.number, currentCount, block.timestamp, _sides);
     }
 
     /// @notice Gets the aggregated root of all chains.

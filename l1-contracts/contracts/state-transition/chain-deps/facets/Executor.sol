@@ -30,7 +30,7 @@ import {
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
-import {InteropRoot} from "../../../common/Messaging.sol";
+import {InteropRoot, StoredInteropRoot} from "../../../common/Messaging.sol";
 
 /// @title ZK chain Executor contract capable of processing events emitted in the ZK chain protocol.
 /// @author Matter Labs
@@ -128,9 +128,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             if (interopRoot.chainId == block.chainid) {
                 // For the same chain we verify using the MessageRoot contract. Note, that in this
                 // release, import and export only happens on GW, so this is the only case we have to cover.
-                (correctRootHash, correctTimestamp) = messageRootContract.historicalRoot(
+                StoredInteropRoot memory recordedRoot = messageRootContract.historicalRoot(
                     uint256(interopRoot.blockOrBatchNumber)
                 );
+                correctRootHash = recordedRoot.root;
+                correctTimestamp = recordedRoot.timestamp;
             } else {
                 revert CommitBasedInteropNotSupported();
             }

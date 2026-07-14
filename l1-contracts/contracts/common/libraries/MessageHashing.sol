@@ -239,10 +239,10 @@ library MessageHashing {
     }
 
     /// @dev The unverified contents of a (multi-hop) proof's aggregation-hop section, read
-    /// positionally by {readAggregationHopData}. Callers that act on these values MUST also run the
+    /// positionally by {readUnverifiedAggregationHopData}. Callers that act on these values MUST also run the
     /// proof through the leaf verifier (`proveL2LeafInclusionShared` / {_getProofData}): the same
     /// words are folded into the reconstructed batch leaf there, which is what authenticates them.
-    struct AggregationHopData {
+    struct UnverifiedAggregationHopData {
         /// @dev True for a single-level / commit-based proof, which has no aggregation hop (and so
         /// carries none of the fields below).
         bool finalProofNode;
@@ -257,7 +257,9 @@ library MessageHashing {
     /// @notice Reads the aggregation-hop section (batch timestamp + batch-leaf Merkle path) from a
     /// proof without verifying it. This is the single place that knows the proof's word layout;
     /// external libraries must consume this accessor instead of parsing the metadata themselves.
-    function readAggregationHopData(bytes32[] calldata _proof) internal pure returns (AggregationHopData memory data) {
+    function readUnverifiedAggregationHopData(
+        bytes32[] calldata _proof
+    ) internal pure returns (UnverifiedAggregationHopData memory data) {
         ProofMetadata memory metadata = parseProofMetadata(_proof);
         data.finalProofNode = metadata.finalProofNode;
         if (metadata.finalProofNode) {

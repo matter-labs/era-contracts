@@ -55,8 +55,8 @@ bundle, so `bundleHash` does not depend on `flowId` (which would be circular).
    the batch-begin IMT root of a late batch — or, for a source chain that **halts** and never settles
    a post-deadline batch, from the batch-end IMT root of the chain's **last batch inside the anchor
    root**. The exact conditions, and why they are mutually exclusive with finalization yet always
-   satisfiable for a genuinely timed-out leg, are described once in the `AtomicInteropProof` library
-   header (the canonical protocol description).
+   satisfiable for a genuinely timed-out leg, are described in the `AtomicInteropProof` library
+   header.
    The proof is bound to the missing leg's source chain and settlement layer. It
    marks this chain's `Committed` legs `Revertable`; `claimRefund` then reverses each burn by asking the
    call's target to recover itself via `IAtomicRecoverable.recoverAtomicCall` (implemented by

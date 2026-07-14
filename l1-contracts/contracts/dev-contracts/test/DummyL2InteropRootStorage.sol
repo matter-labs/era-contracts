@@ -14,9 +14,13 @@ import {StoredInteropRoot} from "../../common/Messaging.sol";
  * @dev
  */
 contract DummyL2InteropRootStorage {
-    /// @notice Mirrors `L2InteropRootStorage.interopRoots`: `(blockOrBatchNumber, root, timestamp)`
+    /// @notice Mirrors `L2InteropRootStorage`: `(blockOrBatchNumber, root, timestamp)`
     /// tuples per chain, consulted by message verification and time-sensitive proofs.
-    mapping(uint256 chainId => mapping(uint256 batchNumber => StoredInteropRoot)) public interopRoots;
+    mapping(uint256 chainId => mapping(uint256 batchNumber => StoredInteropRoot)) internal storedInteropRoots;
+
+    function interopRoots(uint256 chainId, uint256 batchNumber) external view returns (StoredInteropRoot memory) {
+        return storedInteropRoots[chainId][batchNumber];
+    }
     mapping(bytes32 interopRoot => uint256 batchNumber) public batchNumberFrominteropRoot;
     mapping(bytes32 interopRoot => uint256 chainId) public chainIdFrominteropRoot;
 
@@ -43,7 +47,7 @@ contract DummyL2InteropRootStorage {
     ) public {
         emit InteropRootAdded(chainId, batchNumber, timestamp, sides);
         if (sides.length == 1) {
-            interopRoots[chainId][batchNumber] = StoredInteropRoot({root: sides[0], timestamp: timestamp});
+            storedInteropRoots[chainId][batchNumber] = StoredInteropRoot({root: sides[0], timestamp: timestamp});
             batchNumberFrominteropRoot[sides[0]] = batchNumber;
             chainIdFrominteropRoot[sides[0]] = chainId;
         } else {
@@ -57,7 +61,7 @@ contract DummyL2InteropRootStorage {
     }
 
     function addThisChainInteropRoot(uint256 batchNumber, bytes32[] memory sides) external {
-        interopRoots[block.chainid][batchNumber] = StoredInteropRoot({root: sides[0], timestamp: 0});
+        storedInteropRoots[block.chainid][batchNumber] = StoredInteropRoot({root: sides[0], timestamp: 0});
         batchNumberFrominteropRoot[sides[0]] = batchNumber;
         chainIdFrominteropRoot[sides[0]] = block.chainid;
     }

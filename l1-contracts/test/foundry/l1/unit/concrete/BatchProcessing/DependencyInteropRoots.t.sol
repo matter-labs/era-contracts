@@ -94,13 +94,13 @@ contract DependencyInteropRootsTest is Test {
         vm.warp(TIMESTAMP_1);
         vm.prank(chainSender);
         messageRoot.addChainBatchRoot(CHAIN_ID, 1, keccak256("chain-batch-root-1"));
-        (root1, ) = messageRoot.historicalRoot(BLOCK_1);
+        root1 = messageRoot.historicalRoot(BLOCK_1).root;
 
         vm.roll(BLOCK_2);
         vm.warp(TIMESTAMP_2);
         vm.prank(chainSender);
         messageRoot.addChainBatchRoot(CHAIN_ID, 2, keccak256("chain-batch-root-2"));
-        (root2, ) = messageRoot.historicalRoot(BLOCK_2);
+        root2 = messageRoot.historicalRoot(BLOCK_2).root;
 
         assertTrue(root1 != bytes32(0) && root2 != bytes32(0) && root1 != root2, "distinct real roots recorded");
     }

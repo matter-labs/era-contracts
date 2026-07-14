@@ -29,13 +29,22 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
     /// chain. The tuple is double checked on the settlement layer during batch execution (see
     /// `ExecutorFacet._verifyDependencyInteropRoots`), so time-sensitive proofs (e.g. the
     /// atomic-interop timeout protocol) can rely on the timestamp as much as on the root itself.
-    /// @dev The timestamp is zero for roots imported through the legacy (timestamp-less)
-    /// `addInteropRoot` path.
-    /// @dev Changing the mapping's value type from `bytes32` to a struct is storage-layout safe:
-    /// mapping values live at hashed locations and the struct's first member (`root`) occupies
-    /// exactly the slot the plain `bytes32` used, with `timestamp` in the following slot — and the
-    /// pre-v32 (v31) deployments never had interop enabled, so these mappings were empty anyway.
-    mapping(uint256 chainId => mapping(uint256 blockOrBatchNumber => StoredInteropRoot)) public interopRoots;
+    /// @dev The timestamp is zero when the root was imported through the timestamp-less
+    /// `addInteropRoot` entry point (used by the EraVM bootloader). No roots recorded under previous
+    /// protocol versions exist: interop was not activated in v31.
+    /// @dev Note on storage compatibility with v31: since interop has not been enabled in v31, this
+    /// mapping was empty at the time of the upgrade; additionally, mapping values live at hashed
+    /// locations, so extending the value type from `bytes32` to a struct (whose first member `root`
+    /// occupies exactly the slot the plain `bytes32` used) does not shift any other storage.
+    mapping(uint256 chainId => mapping(uint256 blockOrBatchNumber => StoredInteropRoot)) internal storedInteropRoots;
+
+    /// @notice Returns the imported `(root, timestamp)` tuple for a chain ID and block or batch number.
+    function interopRoots(
+        uint256 chainId,
+        uint256 blockOrBatchNumber
+    ) external view returns (StoredInteropRoot memory) {
+        return storedInteropRoots[chainId][blockOrBatchNumber];
+    }
 
     /// @dev Adds a message root to the L2InteropRootStorage contract, without a creation timestamp.
     /// @dev For both proof-based and commit-based interop, the `sides` parameter contains only the root.
@@ -95,12 +104,12 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
         }
 
         // Make sure that interopRoots for specified chainId and blockOrBatchNumber wasn't set already.
-        if (interopRoots[chainId][blockOrBatchNumber].root != bytes32(0)) {
+        if (storedInteropRoots[chainId][blockOrBatchNumber].root != bytes32(0)) {
             revert InteropRootAlreadyExists();
         }
 
         // Set interopRoots for specified chainId and blockOrBatchNumber, emit event.
-        interopRoots[chainId][blockOrBatchNumber] = StoredInteropRoot({root: sides[0], timestamp: timestamp});
+        storedInteropRoots[chainId][blockOrBatchNumber] = StoredInteropRoot({root: sides[0], timestamp: timestamp});
 
         emit InteropRootAdded(chainId, blockOrBatchNumber, timestamp, sides);
     }
