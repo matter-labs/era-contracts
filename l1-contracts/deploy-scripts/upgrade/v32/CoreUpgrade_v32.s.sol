@@ -8,6 +8,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 import {CoreUpgradeParams} from "../default-upgrade/UpgradeParams.sol";
 import {Call} from "contracts/governance/Common.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 /// @notice Script used for the v32 (atomic interop) upgrade flow, upgrading from v31.
 /// @dev v32 is storage-compatible but NOT function-preserving (see `CTMUpgrade_v32`). Compared
@@ -38,6 +39,18 @@ contract CoreUpgrade_v32 is Script, DefaultCoreUpgrade {
 
     /// @notice Deploy the v32 ecosystem-wide implementation set (implementations only).
     function deployNewEcosystemContractsL1() public virtual override {
+        // The v31 baseline already has a ChainRegistrationSender proxy, normally discovered by
+        // introspection. On ecosystems whose FIRST registered chain is a legacy pre-v31 chain
+        // (e.g. testnet's 8022832), `AddressIntrospector.shouldUseV29Introspection` — which keys
+        // off `zkChains[0].getProtocolVersion()` — mis-routes discovery through the V29 path,
+        // which leaves the CRS proxy unset. Read it directly from the bridgehub so the upgrade
+        // emits the real proxy and the force-deployments data carries the correct aliased sender.
+        if (coreAddresses.bridgehub.proxies.chainRegistrationSender == address(0)) {
+            coreAddresses.bridgehub.proxies.chainRegistrationSender = IBridgehubBase(
+                coreAddresses.bridgehub.proxies.bridgehub
+            ).chainRegistrationSender();
+        }
+
         coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
         coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);
         coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier", false);

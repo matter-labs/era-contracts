@@ -1,10 +1,11 @@
 l1_chain_id = 11155111
 
-# TODO(testnet): no L1NativeTokenVault asset ID is registered yet because the
-# EraVM ZK token has not been deployed on testnet. Populate this once the
-# token is live; PUVT and `ecosystem upgrade-prepare-all --env testnet` will
-# bail without it.
-# zk_token_asset_id = "0x..." # TODO
+# L1 ZK token (0xf41D4478F1D6b8A096c0369B05C0b24ae00CC2dF, the v31 sim-descriptions
+# `l1_zk_token`) is now live and registered on the testnet L1NativeTokenVault
+# (0xF8d4A5195737043f45F998539D5C62Eee02E3426). Asset id derived via
+# DataEncoding.encodeNTVAssetId(l1ChainId=11155111, zkTokenL1Address) and verified
+# against the live NTV (`tokenAddress(assetId)` round-trips to the token).
+zk_token_asset_id = "0xc479e9440a8b7ce560ba8bf25e74bdd07198bf9478156a228de961132d1f479d"
 
 [permanent_contracts]
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
@@ -22,7 +23,10 @@ bridgehub_proxy_addr = "0xc4fd2580c3487bba18d63f50301020132342fdbd"
 # on the testnet bridgehub today.
 [ctm_contracts]
 ctm_proxy_addr = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
-l1_bytecodes_supplier_addr = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
+# Atlas CTM's live BytecodesSupplier (CTM.L1_BYTECODES_SUPPLIER()). The previous
+# 0x3ad11E8B… is stale (a pre-v31 supplier lacking `evmPublishingBlock`); testnet's
+# v31 upgrade re-pointed the CTMs at new suppliers.
+l1_bytecodes_supplier_addr = "0x4332c61541c4aD8ffFB158c51d9C915e8114E845"
 rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 
 # v31 multi-CTM list — consumed by `scripts/v31-simulate-upgrade.ts`.
@@ -39,7 +43,8 @@ rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 # v0.30.0-zksync-os-blobs/testnet.toml `l1_bytecodes_supplier_addr`).
 proxy = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
 is_zk_sync_os = true
-bytecodes_supplier = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
+# CTM.L1_BYTECODES_SUPPLIER() on-chain (v31 re-pointed it; old 0x3ad11E8B… is stale).
+bytecodes_supplier = "0x4332c61541c4aD8ffFB158c51d9C915e8114E845"
 rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 
 [[ctm_contracts.ctms]]
@@ -48,7 +53,8 @@ rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 # bytecodes_supplier from v0.29.1-interopA-ff/testnet.toml.
 proxy = "0x3Cc81628a14C824057a97C1B4Ab17758E5D18864"
 is_zk_sync_os = false
-bytecodes_supplier = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
+# Era CTM.L1_BYTECODES_SUPPLIER() on-chain (v31 re-pointed it; old 0x3ad11E8B… is stale).
+bytecodes_supplier = "0xB9703133d2A84cebdC2B5D21d01939aE483dbdcE"
 rollup_da_manager = "0x6b7D8FD12eF94485c8E928a055124F94C2B5d411"
 
 # Legacy Gateway configuration for settlement layer validation

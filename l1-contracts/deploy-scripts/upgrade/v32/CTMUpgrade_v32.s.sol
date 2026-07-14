@@ -93,12 +93,17 @@ contract CTMUpgrade_v32 is Script, DefaultCTMUpgrade {
             false
         );
 
-        deployStateTransitionDiamondFacets();
+        // v32 is the first registry-driven genesis: `deployStateTransitionDiamondFacets` deploys
+        // the genesis `CTMRegistry` (the upgraded CTM is pinned to it via `setGenesisRegistry` in
+        // the stage-1 bundle), and the registry manifest embeds the fixed force-deployments data.
+        // That data is artifact-derived (bytecode hashes + core addresses), so it can — and must —
+        // be generated here, before the registry deploy, rather than in the later
+        // `generateUpgradeData` step. The result is cached, so the later call is a no-op.
+        getFixedForceDeploymentsData();
 
-        // v32 is the first registry-driven genesis: deploy + initialize the genesis `CTMRegistry`
-        // that the upgraded CTM will be pinned to (via `setGenesisRegistry` in the stage-1 bundle).
-        // Depends on the facet set and genesis-upgrade address deployed just above.
-        ctmAddresses.stateTransition.genesisRegistry = deployGenesisRegistry();
+        // Deploys the v32 facet set and the genesis `CTMRegistry` (see above). The genesis-upgrade
+        // address and facet set it pins were deployed just above.
+        deployStateTransitionDiamondFacets();
     }
 
     /// @notice Append the ValidatorTimelock proxy swap to the stage-1 bundle — only if the v32

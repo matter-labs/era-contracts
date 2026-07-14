@@ -1,0 +1,17 @@
+# v32 (atomic interop) testnet CTM scope.
+#
+# v32 upgrades ONLY the ZKsync OS (Atlas) CTM on testnet; the Era CTM
+# (0x3Cc8…, chain 301) is intentionally NOT upgraded for v32. Pass this file
+# via `--ctm-config` to override the env-derived (Atlas + Era) CTM list from
+# permanent-values/testnet.toml.
+#
+# The Core prepare script signature still takes an isZKsyncOS flag; set it here.
+core_is_zk_sync_os = true
+
+[[ctm]]
+# Atlas / ZKsync OS CTM (chains 531050204, 8022832, 8022833).
+proxy = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
+is_zk_sync_os = true
+# CTM.L1_BYTECODES_SUPPLIER() on-chain (post-v31 supplier).
+bytecodes_supplier = "0x4332c61541c4aD8ffFB158c51d9C915e8114E845"
+rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
