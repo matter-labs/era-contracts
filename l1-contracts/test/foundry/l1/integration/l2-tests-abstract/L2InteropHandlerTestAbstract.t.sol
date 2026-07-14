@@ -386,10 +386,13 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         return interopBundle;
     }
 
-    // removed: test_verifyBundle_revertWhen_messageNotFromInteropCenter tested the public
-    // L1-message-inclusion path (UnauthorizedMessageSender when the L1 message sender was not the
-    // InteropCenter), which no longer exists — atomic interop authenticates via the AtomicFlowManager
-    // IMT gate, not the message sender.
+    // Note: the public-path test_verifyBundle_revertWhen_messageNotFromInteropCenter (UnauthorizedMessageSender
+    // when the L1 message sender was not the InteropCenter) does not apply to the L2 atomic handler, which
+    // authenticates via the AtomicFlowManager IMT gate rather than the message sender. The InteropCenter-as-
+    // author authentication is NOT dropped — it moves to `AtomicFlowManager.append` being `onlyInteropCenter`
+    // (only the InteropCenter can commit a bundle to the IMT, so only its bundles can be finalized here). That
+    // gate is covered by AtomicFlowManagerAccessControl.t.sol; the L1 message-sender check for withdrawals is
+    // covered by L1InteropHandler.t.sol (test_ExecuteBundle_RevertWhen_UnauthorizedMessageSender).
 
     /// @notice Regression test to ensure bundles can only be executed on the correct destination chain
     /// @dev This test verifies that the fix for destination chain ID validation is working
