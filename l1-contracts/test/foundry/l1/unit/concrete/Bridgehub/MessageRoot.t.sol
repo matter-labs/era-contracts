@@ -284,10 +284,17 @@ contract MessageRootTest is Test {
             block.timestamp,
             "chainBatchRootTimestamp should record block.timestamp"
         );
+        // The chain tree holds the seeded genesis batch leaf (batch 0) plus the first real batch
+        // leaf, both timestamp-bound; the two-leaf incremental-Merkle root combines them.
         assertEq(
             l2MessageRoot.getChainRoot(alphaChainId),
-            MessageHashing.batchLeafHash(bytes32(alphaChainId), 1, block.timestamp),
-            "chain root should be the timestamp-bound first batch leaf"
+            keccak256(
+                bytes.concat(
+                    _genesisChainRoot(0),
+                    MessageHashing.batchLeafHash(bytes32(alphaChainId), 1, block.timestamp)
+                )
+            ),
+            "chain root should combine the genesis leaf and the timestamp-bound first batch leaf"
         );
 
         // Verify interopRootLogId incremented once for the new block

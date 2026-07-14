@@ -586,7 +586,10 @@ export function encodeExecuteBatchesData(
   const emptyLogs = batchesData.map(() => []);
   const emptyMessages = batchesData.map(() => []);
   const emptyMultichainBatchRoots = batchesData.map(() => ethers.constants.HashZero);
-  const emptyImtRoots = batchesData.map(() => ({ rootBegin: ethers.constants.HashZero, rootEnd: ethers.constants.HashZero }));
+  const emptyImtRoots = batchesData.map(() => ({
+    rootBegin: ethers.constants.HashZero,
+    rootEnd: ethers.constants.HashZero,
+  }));
   // The wire data is the abi-encoding of one `BatchDecoder.DecodedExecuteData` struct.
   const encodedExecuteDataWithoutVersion = defaultAbiCoder.encode(
     [

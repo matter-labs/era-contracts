@@ -210,7 +210,7 @@ abstract contract AtomicInteropProofBuilder is Test {
         uint256 topLen = ChainBatchRootTree.TREE_DEPTH;
         // Layout: [metadata, topSiblings(3), l1Timestamp, batchLeafProofMask, batchSiblings(n),
         //          slPackedInfo, slChainId]
-        proof = new bytes32[](topLen + 4 + _batchLeafSiblings.length);
+        proof = new bytes32[](topLen + 5 + _batchLeafSiblings.length);
         proof[0] = _composeMetadata({
             _logLeafProofLen: topLen,
             _batchLeafProofLen: _batchLeafSiblings.length,
