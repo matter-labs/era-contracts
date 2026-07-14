@@ -101,7 +101,7 @@ jobs:
           # well as by path (dev/test contracts' bare names are shown when unique).
           forge build --sizes 2>&1 \
             | grep -E '^\|' \
-            | grep -v 'test/\|Test \|Mock\|dev-contracts/\|Dev \|TestHelper \|Harness ' \
+            | grep -v 'test/\|Test \|Mock\|dev-contracts/\|Dev \|TestHelper ' \
             | tee /tmp/sizes.txt
 
           # Check for any negative runtime margin (= over the limit)

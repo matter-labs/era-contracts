@@ -8,8 +8,6 @@ import {LegState} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {ManagerNoRecoverableCalls} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
-import {InteropCenter} from "contracts/interop/InteropCenter.sol";
-import {AtomicBundleDirectAssetRouterCall} from "contracts/interop/InteropErrors.sol";
 import {
     BundleAttributes,
     INTEROP_BUNDLE_VERSION,
@@ -49,12 +47,6 @@ contract L2AssetRouterRecoveryHarness is L2AssetRouter {
     function initReentrancyGuardForTest() external reentrancyGuardInitializer {}
 }
 
-contract InteropCenterAtomicValidationHarness is InteropCenter {
-    function validateAtomicBundle(InteropBundle memory _bundle) external pure {
-        _validateAtomicBundle(_bundle);
-    }
-}
-
 contract MockRecoveringNativeTokenVault {
     uint256 public recoveries;
     uint256 public recoveredDestinationChainId;
@@ -72,18 +64,16 @@ contract MockRecoveringNativeTokenVault {
     }
 }
 
-/// @notice Regression tests for the atomic-interop recovery forgery: an atomic bundle can be committed
-/// carrying a `finalizeDeposit` call, but only calls produced by the asset router's own burn path
-/// (`InteropCall.from == L2_ASSET_ROUTER_ADDR`, set by `_processCallStarter`'s indirect path) are backed by a
-/// real source burn. A direct/forged call must neither be admitted at send (InteropCenter rejects it) nor
-/// re-credited on timeout recovery (AtomicFlowManager skips it). The NTV is mocked to isolate the provenance
-/// gate from real vault accounting; the `Revertable` state is set via a harness (the full send +
-/// `authorizeRefund` proof path is covered by the anvil-interop suite) since the gate under test is at recovery.
+/// @notice Regression tests for the atomic-interop recovery forgery: an atomic bundle can carry a
+/// `finalizeDeposit` call, but on timeout recovery only calls produced by the asset router's own burn path
+/// (`InteropCall.from == L2_ASSET_ROUTER_ADDR`, set by `_processCallStarter`'s indirect path) may be
+/// re-credited; a direct/forged call is skipped. The NTV is mocked to isolate the provenance gate from real
+/// vault accounting; the `Revertable` state is set via a harness (the full send + `authorizeRefund` proof
+/// path is covered by the anvil-interop suite) since the gate under test is at recovery.
 contract AtomicRecoveryForgeryTest is Test {
     AtomicFlowManagerRecoveryHarness internal manager;
     MockRecoveringNativeTokenVault internal ntv;
     L2AssetRouterRecoveryHarness internal router;
-    InteropCenterAtomicValidationHarness internal center;
 
     address internal attacker = makeAddr("attacker");
     bytes32 internal assetId = keccak256("existing bridged asset");
@@ -95,7 +85,6 @@ contract AtomicRecoveryForgeryTest is Test {
         ntv = new MockRecoveringNativeTokenVault();
         router = new L2AssetRouterRecoveryHarness(address(manager), address(ntv));
         router.initReentrancyGuardForTest();
-        center = new InteropCenterAtomicValidationHarness();
     }
 
     /// @dev Builds a single-call atomic bundle whose only call is a `finalizeDeposit`, with the call's
@@ -189,30 +178,5 @@ contract AtomicRecoveryForgeryTest is Test {
         assertEq(ntv.recoveredOriginalCaller(), attacker);
         assertEq(ntv.recoveredAmount(), amount);
         assertEq(uint256(manager.legState(flowId, bundleHash)), uint256(LegState.Reverted));
-    }
-
-    // ---------------------------------------------------------------------------------------------
-    // Send side (InteropCenter._validateAtomicBundle rejects direct asset-router calls)
-    // ---------------------------------------------------------------------------------------------
-
-    /// A direct call to the asset router (`to == L2_ASSET_ROUTER_ADDR`, `from == attacker`) is rejected at
-    /// commit time, so the forgery can never be committed in the first place.
-    function test_sendGateRejectsDirectAssetRouterCall() external {
-        InteropBundle memory bundle = _buildBundle({_from: attacker, _to: L2_ASSET_ROUTER_ADDR});
-        vm.expectRevert(abi.encodeWithSelector(AtomicBundleDirectAssetRouterCall.selector, uint256(0)));
-        center.validateAtomicBundle(bundle);
-    }
-
-    /// A genuine burn-produced asset-router call (`from == L2_ASSET_ROUTER_ADDR`) is still admitted.
-    function test_sendGateAllowsBurnProducedAssetRouterCall() external {
-        InteropBundle memory bundle = _buildBundle({_from: L2_ASSET_ROUTER_ADDR, _to: L2_ASSET_ROUTER_ADDR});
-        center.validateAtomicBundle(bundle);
-    }
-
-    /// A direct call to a non-router target is unaffected: only router-targeted direct calls are the forgery
-    /// vector, so the gate must not reject ordinary direct calls.
-    function test_sendGateAllowsDirectCallToNonRouter() external {
-        InteropBundle memory bundle = _buildBundle({_from: attacker, _to: makeAddr("some recipient")});
-        center.validateAtomicBundle(bundle);
     }
 }

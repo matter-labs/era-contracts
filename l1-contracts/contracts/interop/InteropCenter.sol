@@ -38,7 +38,6 @@ import {MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/
 
 import {
     AtomicBundleCallCarriesValue,
-    AtomicBundleDirectAssetRouterCall,
     AtomicBundleNotAllowedInSendMessage,
     AttributeAlreadySet,
     AttributeViolatesRestriction,
@@ -679,12 +678,6 @@ contract InteropCenter is
             InteropCall memory currentCall = _bundle.calls[i];
             if (currentCall.value != 0) {
                 revert AtomicBundleCallCarriesValue(i, currentCall.value);
-            }
-            // Reject direct calls to the asset router: a burn-produced call has `from == asset router` (set by
-            // _processCallStarter), so a direct one (from == sender) with finalizeDeposit-shaped data would be
-            // "recovered" on timeout, minting funds with no matching burn. (_recoverBundle guards this too.)
-            if (currentCall.to == L2_ASSET_ROUTER_ADDR && currentCall.from != L2_ASSET_ROUTER_ADDR) {
-                revert AtomicBundleDirectAssetRouterCall(i);
             }
         }
     }

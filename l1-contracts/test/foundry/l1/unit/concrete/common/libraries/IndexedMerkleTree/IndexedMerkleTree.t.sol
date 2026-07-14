@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {MAX_LOW_INDEX_SEARCH_ATTEMPTS} from "contracts/common/Config.sol";
+import {IMT_EMPTY_LEAF_HASH, MAX_LOW_INDEX_SEARCH_ATTEMPTS} from "contracts/common/Config.sol";
 import {
     IMTAlreadyInitialized,
     IMTLeafValueMismatch,
@@ -236,6 +236,12 @@ contract IndexedMerkleTreeTest is Test {
     /// longer be presented as a `{0,0,0}` low leaf that brackets any value. Were the padding equal to
     /// `hashLeaf({0,0,0})`, a padded index would verify as a `{0,0,0}` tail low leaf and could prove a
     /// *present* value absent (a double-mint / atomicity break).
+    /// @notice The empty-leaf padding must not equal `hashLeaf({0,0,0})`; that inequality is what makes a
+    /// padded slot unforgeable as a real leaf (guards against reintroducing `hashLeaf({0,0,0})` as the zero).
+    function test_emptyLeafPaddingIsNotAValidLeafHash() public view {
+        assertTrue(IMT_EMPTY_LEAF_HASH != tree.hashLeaf(IMTLeaf({value: 0, nextIndex: 0, nextValue: 0})));
+    }
+
     function test_regression_paddedIndexCannotForgeNonInclusionOfPresentValue() public {
         // leafCount = 3 (sentinel + 10 + 20) → not a power of two (height 2, 4 slots), so index 3 is an
         // unused padded slot.
