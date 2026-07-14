@@ -71,6 +71,7 @@ import {
   getTokenTransferData,
   indirectCallAttr,
   sendInteropBundle,
+  staticPreviewHash,
 } from "../../src/helpers/interop-helpers";
 import {
   atomicFinalityProofTuple,
@@ -266,11 +267,11 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     // the identical bundle assembly (including the simulated, discarded indirect-call burn) without the atomic
     // append, returning the exact bundleHash the real send will emit. The prediction MUST carry the same salt
     // the real send uses, since the bundleHash commits to the `interopBundleSalt` attribute.
-    return interopCenter.callStatic.previewBundleHash(
+    return staticPreviewHash(interopCenter, source.provider, source.user.address, "previewBundleHash", [
       encodeEvmChain(dest.chainId),
       [bridgeCallStarter(source, amount, recipient)],
-      [interopBundleSaltAttr(salt)]
-    );
+      [interopBundleSaltAttr(salt)],
+    ]);
   }
 
   /** A fresh, deterministic-per-send bundle salt. Random keeps it unique per (sender, salt) — the

@@ -194,6 +194,42 @@ async function ensureUniqueBundleSalt(attributes: string[], wallet: Wallet): Pro
   return [...attributes, interopBundleSaltAttr(salt)];
 }
 
+/**
+ * Statically evaluate `previewBundleHash` / `previewMessageHash` (the two functions that predict a bundle's
+ * hash before the real send) with the InteropCenter's balance overridden to a large value.
+ *
+ * Both preview functions run the identical bundle assembly as the real send, including
+ * `_processCallStarter`, which for an INDIRECT call with a non-zero `indirectCallMessageValue` (e.g. a
+ * cross-base-token deposit that bridges native base-token value) forwards that value into
+ * `L2AssetRouter.initiateIndirectCall{value: ...}`. The preview functions are intentionally non-payable —
+ * the caller cannot send `msg.value` to them — so during a plain `callStatic` the InteropCenter holds no
+ * balance and the value-carrying forward reverts (empty revert). Overriding the InteropCenter's balance for
+ * this read-only `eth_call` lets its own balance cover the forwarded value, faithfully reproducing the real
+ * send's assembly (the forwarded amount is fixed by `interopCallValue`, so the predicted hash is identical).
+ * The state override is discarded with the call; nothing is persisted.
+ *
+ * `_from` MUST be the address that will submit the real send: the preview derives the bundle salt and each
+ * call's `from` from `msg.sender`, so a mismatch would predict a different hash.
+ */
+// ~3.4e38 wei — far larger than any interop value leg, so the InteropCenter can always fund the
+// forwarded `indirectCallMessageValue` during the read-only preview.
+const PREVIEW_INTEROP_CENTER_BALANCE_OVERRIDE = "0xffffffffffffffffffffffffffffffff";
+export async function staticPreviewHash(
+  _interopCenter: Contract,
+  _provider: providers.JsonRpcProvider,
+  _from: string,
+  _fnName: "previewBundleHash" | "previewMessageHash",
+  _args: unknown[]
+): Promise<string> {
+  const data = _interopCenter.interface.encodeFunctionData(_fnName, _args);
+  const raw: string = await _provider.send("eth_call", [
+    { to: INTEROP_CENTER_ADDR, from: _from, data },
+    "latest",
+    { [INTEROP_CENTER_ADDR]: { balance: PREVIEW_INTEROP_CENTER_BALANCE_OVERRIDE } },
+  ]);
+  return _interopCenter.interface.decodeFunctionResult(_fnName, raw)[0] as string;
+}
+
 // ── Token transfer data encoding ───────────────────────────────
 
 /**
@@ -344,10 +380,12 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
     ({ flowId, deadline } = decodeAtomicBundleAttribute(baseAttributes));
     legSourceChainId = (await options.sourceProvider.getNetwork()).chainId;
   } else {
-    const predicted: string = await interopCenter.callStatic.previewBundleHash(
-      destinationChainIdBytes,
-      options.callStarters,
-      baseAttributes
+    const predicted: string = await staticPreviewHash(
+      interopCenter,
+      options.sourceProvider,
+      wallet.address,
+      "previewBundleHash",
+      [destinationChainIdBytes, options.callStarters, baseAttributes]
     );
     predictedBundleHash = predicted;
     const atomic = await buildSingleLegAtomicSend(options.sourceProvider, predicted);
@@ -420,10 +458,12 @@ export async function simulateInteropBundle(options: SendBundleOptions): Promise
   // Mirror the real send's atomic attribute construction so the callStatic exercises the full path
   // (value collection included — the preview alone skips it, so reverts like MsgValueMismatch only
   // surface on the real `sendBundle`).
-  const predictedBundleHash: string = await interopCenter.callStatic.previewBundleHash(
-    destinationChainIdBytes,
-    options.callStarters,
-    baseAttributes
+  const predictedBundleHash: string = await staticPreviewHash(
+    interopCenter,
+    options.sourceProvider,
+    wallet.address,
+    "previewBundleHash",
+    [destinationChainIdBytes, options.callStarters, baseAttributes]
   );
   const atomic = await buildSingleLegAtomicSend(options.sourceProvider, predictedBundleHash);
   await interopCenter.callStatic.sendBundle(
@@ -459,10 +499,12 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
   const baseAttributes = await ensureUniqueBundleSalt(options.attributes, wallet);
   // Single-call sends are single-leg atomic flows too: predict the bundleHash (of the wrapping bundle)
   // and attach the atomic flow that commits to it.
-  const predictedBundleHash: string = await interopCenter.callStatic.previewMessageHash(
-    options.recipient,
-    options.payload,
-    baseAttributes
+  const predictedBundleHash: string = await staticPreviewHash(
+    interopCenter,
+    options.sourceProvider,
+    wallet.address,
+    "previewMessageHash",
+    [options.recipient, options.payload, baseAttributes]
   );
   const atomic = await buildSingleLegAtomicSend(options.sourceProvider, predictedBundleHash);
 
