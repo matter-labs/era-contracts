@@ -14,7 +14,7 @@ import {
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {CoreContract} from "../../ecosystem/CoreContract.sol";
+import {L2EcosystemContract} from "../../ecosystem/CoreContract.sol";
 import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
 import {EraForceDeploymentsLib} from "./EraForceDeploymentsLib.sol";
@@ -108,10 +108,10 @@ abstract contract DefaultL2UpgradeStrategy is CTMUpgradeBase {
     }
 
     /// @notice Build Era universal force deployments from fixed-address core-contract IDs.
-    /// @dev Concrete Era plans can use this when the same CoreContract list is also
+    /// @dev Concrete Era plans can use this when the same L2EcosystemContract list is also
     ///      published as factory deps.
     function buildEraUniversalForceDeployments(
-        CoreContract[] memory _contracts
+        L2EcosystemContract[] memory _contracts
     ) internal view returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
         deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](_contracts.length);
         for (uint256 i; i < _contracts.length; i++) {

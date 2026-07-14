@@ -719,7 +719,7 @@ async function buildRegistryManifest(
         l2: {
           forceDeployments: [
             {
-              // CoreContract identifier of the per-upgrade L2 upgrade implementation slot.
+              // L2EcosystemContract identifier of the per-upgrade L2 upgrade implementation slot.
               contract: "L2V31Upgrade",
               upgradeType: "ZKsyncOSUnsafeForceDeployment",
               deployedBytecodeInfo,

@@ -19,7 +19,7 @@ import {Call} from "contracts/governance/Common.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CTMUpgradeParams} from "../default-upgrade/UpgradeParams.sol";
-import {CoreContract} from "../../ecosystem/CoreContract.sol";
+import {L2EcosystemContract} from "../../ecosystem/CoreContract.sol";
 import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 
 /// @notice Script used for v31 upgrade flow
@@ -140,16 +140,16 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     function getV31AdditionalFactoryDependencyContracts()
         internal
         pure
-        returns (CoreContract[] memory additionalDependencyContracts)
+        returns (L2EcosystemContract[] memory additionalDependencyContracts)
     {
-        additionalDependencyContracts = new CoreContract[](1);
-        additionalDependencyContracts[0] = CoreContract.L2V31Upgrade;
+        additionalDependencyContracts = new L2EcosystemContract[](1);
+        additionalDependencyContracts[0] = L2EcosystemContract.L2V31Upgrade;
     }
 
     function getAdditionalFactoryDependencyContracts()
         internal
         override
-        returns (CoreContract[] memory additionalDependencyContracts)
+        returns (L2EcosystemContract[] memory additionalDependencyContracts)
     {
         return getV31AdditionalFactoryDependencyContracts();
     }

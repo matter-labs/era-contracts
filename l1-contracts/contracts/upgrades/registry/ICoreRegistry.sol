@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {EcosystemContract} from "./ContractIdentifiers.sol";
+import {L1EcosystemContract} from "./ContractIdentifiers.sol";
 
 /// @title Core (ecosystem-wide) upgrade registry.
 /// @author Matter Labs
@@ -22,18 +22,18 @@ interface ICoreRegistry {
     function newProtocolVersion() external view returns (uint256);
 
     /// @notice Proxy address of an ecosystem contract. Version-independent: proxies survive upgrades.
-    function proxyAddress(EcosystemContract _contract) external view returns (address);
+    function proxyAddress(L1EcosystemContract _contract) external view returns (address);
 
     /// @notice The new-version implementation address of an ecosystem contract, or zero when this
     ///         upgrade pins no new implementation for it (nothing to upgrade). Old-version
     ///         implementations are deliberately not recorded: the upgrade only needs where each
     ///         proxy must point AFTER it runs.
     /// @param _contract The ecosystem contract identifier; unknown identifiers revert.
-    function implAddress(EcosystemContract _contract) external view returns (address);
+    function implAddress(L1EcosystemContract _contract) external view returns (address);
 
     /// @notice The ecosystem contracts that participate in this upgrade (i.e. that have a proxy
     ///         and, when upgraded, a new implementation pinned in this registry).
-    function ecosystemContractList() external view returns (EcosystemContract[] memory);
+    function ecosystemContractList() external view returns (L1EcosystemContract[] memory);
 
     /// @notice The ecosystem `ProxyAdmin` that administers every ecosystem proxy.
     function proxyAdmin() external view returns (address);

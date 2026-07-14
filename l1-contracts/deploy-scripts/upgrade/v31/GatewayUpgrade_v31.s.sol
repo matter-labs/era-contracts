@@ -10,7 +10,7 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 
-import {CoreContract} from "../../ecosystem/CoreContract.sol";
+import {L2EcosystemContract} from "../../ecosystem/CoreContract.sol";
 import {DefaultGatewayUpgrade} from "../default-upgrade/DefaultGatewayUpgrade.s.sol";
 
 /// @notice Script used for gateway upgrade flow. Not used in V31, but was used in V29 and will be used in V32.
@@ -18,16 +18,16 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
     function getV31AdditionalFactoryDependencyContracts()
         internal
         pure
-        returns (CoreContract[] memory additionalDependencyContracts)
+        returns (L2EcosystemContract[] memory additionalDependencyContracts)
     {
-        additionalDependencyContracts = new CoreContract[](1);
-        additionalDependencyContracts[0] = CoreContract.L2V31Upgrade;
+        additionalDependencyContracts = new L2EcosystemContract[](1);
+        additionalDependencyContracts[0] = L2EcosystemContract.L2V31Upgrade;
     }
 
     function getAdditionalFactoryDependencyContracts()
         internal
         override
-        returns (CoreContract[] memory additionalDependencyContracts)
+        returns (L2EcosystemContract[] memory additionalDependencyContracts)
     {
         return getV31AdditionalFactoryDependencyContracts();
     }

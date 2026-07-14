@@ -13,7 +13,7 @@ import {L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddr
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
-import {CoreContract} from "../../ecosystem/CoreContract.sol";
+import {L2EcosystemContract} from "../../ecosystem/CoreContract.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -42,9 +42,9 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     function getAdditionalFactoryDependencyContracts()
         internal
         virtual
-        returns (CoreContract[] memory additionalDependencyContracts)
+        returns (L2EcosystemContract[] memory additionalDependencyContracts)
     {
-        return new CoreContract[](0);
+        return new L2EcosystemContract[](0);
     }
 
     /// @notice Get L2 upgrade target and data for the active VM.

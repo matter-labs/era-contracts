@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {EcosystemContract, CodehashPin} from "./ContractIdentifiers.sol";
+import {L1EcosystemContract, CodehashPin} from "./ContractIdentifiers.sol";
 import {ICoreRegistry} from "./ICoreRegistry.sol";
 import {RegistryAlreadyInitialized, RegistryUnknownKey} from "../../common/L1ContractErrors.sol";
 
@@ -19,7 +19,7 @@ contract CoreRegistry is ICoreRegistry {
     ///      implementations are deliberately not recorded — the upgrade only needs where each
     ///      proxy must point AFTER it runs.
     struct EcosystemContractRow {
-        EcosystemContract key;
+        L1EcosystemContract key;
         address proxy;
         address implNew;
     }
@@ -101,7 +101,7 @@ contract CoreRegistry is ICoreRegistry {
     }
 
     /// @inheritdoc ICoreRegistry
-    function proxyAddress(EcosystemContract _contract) external view returns (address) {
+    function proxyAddress(L1EcosystemContract _contract) external view returns (address) {
         uint256 rowsLength = contractRows.length;
         for (uint256 i = 0; i < rowsLength; ++i) {
             if (contractRows[i].key == _contract) {
@@ -112,7 +112,7 @@ contract CoreRegistry is ICoreRegistry {
     }
 
     /// @inheritdoc ICoreRegistry
-    function implAddress(EcosystemContract _contract) external view returns (address) {
+    function implAddress(L1EcosystemContract _contract) external view returns (address) {
         uint256 rowsLength = contractRows.length;
         for (uint256 i = 0; i < rowsLength; ++i) {
             if (contractRows[i].key == _contract) {
@@ -123,9 +123,9 @@ contract CoreRegistry is ICoreRegistry {
     }
 
     /// @inheritdoc ICoreRegistry
-    function ecosystemContractList() external view returns (EcosystemContract[] memory list) {
+    function ecosystemContractList() external view returns (L1EcosystemContract[] memory list) {
         uint256 rowsLength = contractRows.length;
-        list = new EcosystemContract[](rowsLength);
+        list = new L1EcosystemContract[](rowsLength);
         for (uint256 i = 0; i < rowsLength; ++i) {
             list[i] = contractRows[i].key;
         }

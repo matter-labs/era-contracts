@@ -25,7 +25,7 @@ import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeploy
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {
-    CoreContract,
+    L2EcosystemContract,
     EraVmSystemContract,
     Language,
     ZkSyncOsSystemContract,
@@ -47,7 +47,7 @@ struct SystemContract {
 
 /// @dev The number of EraVM system contracts force-deployed from system-contracts / EraVM bytecodes.
 uint256 constant SYSTEM_CONTRACTS_COUNT = 31;
-/// @dev Fixed-address CoreContract entries backed by l1-contracts bytecodes.
+/// @dev Fixed-address L2EcosystemContract entries backed by l1-contracts bytecodes.
 ///      Era deploys them directly; ZKsyncOS upgrades them via universal force deployments.
 uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 11;
 /// @dev Era runtime creation bytecodes published as factory deps but not force-deployed.
@@ -60,7 +60,7 @@ uint256 constant ZKOS_EXTRA_SYSTEM_CONTRACTS_COUNT = 3;
 
 /// @notice A fixed-address core contract's identity plus its Era bytecode.
 struct FixedAddressCoreContractDeployInfo {
-    CoreContract id;
+    L2EcosystemContract id;
     address addr;
     bytes bytecode;
 }
@@ -68,7 +68,7 @@ struct FixedAddressCoreContractDeployInfo {
 library SystemContractsProcessing {
     /// @notice Retrieves the entire list of system contracts as a memory array.
     /// @dev Covers contracts based in the `system-contracts` folder plus fixed-address
-    ///      EraVM system helpers; fixed-address CoreContract entries are handled separately.
+    ///      EraVM system helpers; fixed-address L2EcosystemContract entries are handled separately.
     /// Note, that we do not populate the system contract for the genesis upgrade address,
     /// as it is used during the genesis upgrade or during upgrades (and so it should be populated
     /// as part of the upgrade script).
@@ -169,38 +169,38 @@ library SystemContractsProcessing {
         }
     }
 
-    /// @notice CoreContract entries with canonical fixed L2 addresses.
+    /// @notice L2EcosystemContract entries with canonical fixed L2 addresses.
     /// @dev The IDs are shared by Era and ZKsyncOS; bytecode/artifact resolution happens per VM.
-    function getFixedAddressCoreContracts() internal pure returns (CoreContract[] memory ids) {
-        ids = new CoreContract[](FIXED_ADDRESS_CORE_CONTRACTS_COUNT);
+    function getFixedAddressCoreContracts() internal pure returns (L2EcosystemContract[] memory ids) {
+        ids = new L2EcosystemContract[](FIXED_ADDRESS_CORE_CONTRACTS_COUNT);
         _fillFixedAddressCoreContracts(ids);
     }
 
-    function getEraFactoryDependencyContracts() internal pure returns (CoreContract[] memory ids) {
-        ids = new CoreContract[](ERA_FACTORY_DEPENDENCY_CONTRACTS_COUNT);
+    function getEraFactoryDependencyContracts() internal pure returns (L2EcosystemContract[] memory ids) {
+        ids = new L2EcosystemContract[](ERA_FACTORY_DEPENDENCY_CONTRACTS_COUNT);
         _fillFixedAddressCoreContracts(ids);
         uint256 runtimeOnlyIndex = FIXED_ADDRESS_CORE_CONTRACTS_COUNT;
-        ids[runtimeOnlyIndex++] = CoreContract.TransparentUpgradeableProxy;
-        ids[runtimeOnlyIndex++] = CoreContract.BeaconProxy;
+        ids[runtimeOnlyIndex++] = L2EcosystemContract.TransparentUpgradeableProxy;
+        ids[runtimeOnlyIndex++] = L2EcosystemContract.BeaconProxy;
     }
 
-    function _fillFixedAddressCoreContracts(CoreContract[] memory ids) private pure {
+    function _fillFixedAddressCoreContracts(L2EcosystemContract[] memory ids) private pure {
         // NOTE: L2WrappedBaseToken is intentionally NOT in this list. v31 must not touch the
         // WrappedBaseToken impl on either VM, so it is excluded from both the force-deployment list
         // and the factory deps (this list feeds Era + ZKsyncOS force deployments and factory deps).
         uint256 i = 0;
-        ids[i++] = CoreContract.L2Bridgehub;
-        ids[i++] = CoreContract.L2AssetRouter;
-        ids[i++] = CoreContract.L2NativeTokenVault;
-        ids[i++] = CoreContract.L2MessageRoot;
-        ids[i++] = CoreContract.L2MessageVerification;
-        ids[i++] = CoreContract.L2ChainAssetHandler;
-        ids[i++] = CoreContract.L2InteropRootStorage;
-        ids[i++] = CoreContract.BaseTokenHolder;
-        ids[i++] = CoreContract.L2AssetTracker;
-        ids[i++] = CoreContract.InteropCenter;
-        ids[i++] = CoreContract.InteropHandler;
-        // Under-filling would silently leave `CoreContract(0)` entries; over-filling
+        ids[i++] = L2EcosystemContract.L2Bridgehub;
+        ids[i++] = L2EcosystemContract.L2AssetRouter;
+        ids[i++] = L2EcosystemContract.L2NativeTokenVault;
+        ids[i++] = L2EcosystemContract.L2MessageRoot;
+        ids[i++] = L2EcosystemContract.L2MessageVerification;
+        ids[i++] = L2EcosystemContract.L2ChainAssetHandler;
+        ids[i++] = L2EcosystemContract.L2InteropRootStorage;
+        ids[i++] = L2EcosystemContract.BaseTokenHolder;
+        ids[i++] = L2EcosystemContract.L2AssetTracker;
+        ids[i++] = L2EcosystemContract.InteropCenter;
+        ids[i++] = L2EcosystemContract.InteropHandler;
+        // Under-filling would silently leave `L2EcosystemContract(0)` entries; over-filling
         // already reverts with an out-of-bounds access on the fixed-length array.
         require(i == FIXED_ADDRESS_CORE_CONTRACTS_COUNT, "fixed-address core contract count mismatch");
     }
@@ -219,14 +219,14 @@ library SystemContractsProcessing {
         ids[2] = ZkSyncOsSystemContract.SystemContext;
     }
 
-    /// @notice Era deployment metadata for the fixed-address CoreContract list.
+    /// @notice Era deployment metadata for the fixed-address L2EcosystemContract list.
     /// @dev Loads Era creation bytecodes and canonical L2 addresses.
     function getEraFixedAddressCoreContractDeployInfo()
         internal
         view
         returns (FixedAddressCoreContractDeployInfo[] memory contracts)
     {
-        CoreContract[] memory ids = getFixedAddressCoreContracts();
+        L2EcosystemContract[] memory ids = getFixedAddressCoreContracts();
         contracts = new FixedAddressCoreContractDeployInfo[](ids.length);
         for (uint256 i = 0; i < ids.length; i++) {
             string memory eraName = CoreOnGatewayHelper._resolveContractName(false, ids[i]);
@@ -240,7 +240,7 @@ library SystemContractsProcessing {
 
     /// @notice Era factory-dependency bytecodes for fixed-address core contracts plus runtime-only proxy bytecodes.
     function getEraFactoryDependencyBytecodes() internal view returns (bytes[] memory bytecodes) {
-        CoreContract[] memory contracts = getEraFactoryDependencyContracts();
+        L2EcosystemContract[] memory contracts = getEraFactoryDependencyContracts();
         bytecodes = new bytes[](contracts.length);
         for (uint256 i = 0; i < contracts.length; i++) {
             string memory eraName = CoreOnGatewayHelper._resolveContractName(false, contracts[i]);
@@ -332,7 +332,7 @@ library SystemContractsProcessing {
             // ZKsyncOS has no bootloader / DefaultAccount / EVM emulator — those
             // are Era-VM concepts.
             //
-            // Two additional baselines, neither in the CoreContract enum:
+            // Two additional baselines, neither in the L2EcosystemContract enum:
             //  - `SystemContractProxy`: every `updateZKsyncOSContract` call that needs
             //    to materialize a proxy at a previously-empty system address force-deploys
             //    this bytecode.
@@ -376,7 +376,7 @@ library SystemContractsProcessing {
         internal
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
     {
-        CoreContract[] memory fixedAddressCoreContracts = getFixedAddressCoreContracts();
+        L2EcosystemContract[] memory fixedAddressCoreContracts = getFixedAddressCoreContracts();
         ZkSyncOsSystemContract[] memory sysContracts = getZKsyncOSExtraSystemContracts();
 
         // SystemContractProxyAdmin is intentionally NOT force-deployed here: it's a direct-deployed
@@ -413,9 +413,9 @@ library SystemContractsProcessing {
         }
     }
 
-    /// @dev Build a single ZKsyncOS force deployment entry for a fixed-address CoreContract.
+    /// @dev Build a single ZKsyncOS force deployment entry for a fixed-address L2EcosystemContract.
     function _buildZKsyncOSEntry(
-        CoreContract _id
+        L2EcosystemContract _id
     ) private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
         (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, _id);
 

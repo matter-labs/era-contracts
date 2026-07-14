@@ -9,7 +9,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {UpgradeExecutor} from "contracts/governance/UpgradeExecutor.sol";
 import {CTMUpgradeModule} from "contracts/upgrades/registry/CTMUpgradeModule.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/CTMUpgradeComposer.sol";
-import {CoreContract, CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+import {L2EcosystemContract, CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
@@ -85,7 +85,7 @@ contract CTMUpgradeModuleTest is ChainTypeManagerTest {
 
         // L2 side.
         ctmRegistry.addL2ForceDeployment(
-            CoreContract.L2Bridgehub,
+            L2EcosystemContract.L2Bridgehub,
             IComplexUpgrader.UniversalContractUpgradeInfo({
                 upgradeType: IComplexUpgrader.ContractUpgradeType.EraForceDeployment,
                 deployedBytecodeInfo: hex"aa01",

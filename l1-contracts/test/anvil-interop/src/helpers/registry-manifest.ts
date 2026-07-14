@@ -60,11 +60,11 @@ function enumValue(map: Record<string, number>, name: string, enumName: string):
 
 /** `CoreRegistry.CoreRegistryManifest` initialize argument from the manifest JSON. */
 export function coreInitArgs(manifest: any): any {
-  const ecosystemContract = parseSolidityEnum(IDENTIFIERS_SOL, "EcosystemContract");
+  const ecosystemContract = parseSolidityEnum(IDENTIFIERS_SOL, "L1EcosystemContract");
 
   const entries: Array<[string, any]> = Object.entries(manifest.core.contracts);
   const contractRows = entries.map(([name, e]) => ({
-    key: enumValue(ecosystemContract, name, "EcosystemContract"),
+    key: enumValue(ecosystemContract, name, "L1EcosystemContract"),
     proxy: e.proxy,
     implNew: e.implNew ?? ethers.constants.AddressZero,
   }));
@@ -86,7 +86,7 @@ export function coreInitArgs(manifest: any): any {
 /** `CTMRegistry.CTMRegistryManifest` initialize argument from one `manifest.ctms[]` entry. */
 export function ctmInitArgs(manifest: any, ctm: any): any {
   const ctmContract = parseSolidityEnum(IDENTIFIERS_SOL, "CTMContract");
-  const coreContract = parseSolidityEnum(IDENTIFIERS_SOL, "CoreContract");
+  const coreContract = parseSolidityEnum(IDENTIFIERS_SOL, "L2EcosystemContract");
   const upgradeType = parseSolidityEnum(COMPLEX_UPGRADER_SOL, "ContractUpgradeType");
 
   const oldV = packSemVer(manifest.oldVersion);
@@ -124,7 +124,7 @@ export function ctmInitArgs(manifest: any, ctm: any): any {
   }));
 
   const l2DeploymentRows = ctm.l2.forceDeployments.map((d: any) => ({
-    key: enumValue(coreContract, d.contract, "CoreContract"),
+    key: enumValue(coreContract, d.contract, "L2EcosystemContract"),
     info: {
       upgradeType: enumValue(upgradeType, d.upgradeType, "ContractUpgradeType"),
       deployedBytecodeInfo: d.deployedBytecodeInfo,

@@ -45,7 +45,7 @@ import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {CTMDeployedAddresses, Config, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
-import {CoreContract} from "../ecosystem/CoreContract.sol";
+import {L2EcosystemContract} from "../ecosystem/CoreContract.sol";
 import {CTMContract, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
@@ -476,17 +476,17 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     /// @dev Precompute blake2s hashes for all unique bytecodes in a single FFI call.
     function _precomputeBlakeHashes() private {
-        CoreContract[10] memory contracts = [
-            CoreContract.L2Bridgehub,
-            CoreContract.L2AssetRouter,
-            CoreContract.L2NativeTokenVault,
-            CoreContract.L2MessageRoot,
-            CoreContract.UpgradeableBeaconDeployer,
-            CoreContract.L2ChainAssetHandler,
-            CoreContract.InteropCenter,
-            CoreContract.InteropHandler,
-            CoreContract.L2AssetTracker,
-            CoreContract.BaseTokenHolder
+        L2EcosystemContract[10] memory contracts = [
+            L2EcosystemContract.L2Bridgehub,
+            L2EcosystemContract.L2AssetRouter,
+            L2EcosystemContract.L2NativeTokenVault,
+            L2EcosystemContract.L2MessageRoot,
+            L2EcosystemContract.UpgradeableBeaconDeployer,
+            L2EcosystemContract.L2ChainAssetHandler,
+            L2EcosystemContract.InteropCenter,
+            L2EcosystemContract.InteropHandler,
+            L2EcosystemContract.L2AssetTracker,
+            L2EcosystemContract.BaseTokenHolder
         ];
 
         string memory tmpFile = bytes(_blakeBatchTmpFile).length != 0
@@ -558,11 +558,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             );
             return abi.encode(_cachedZKOSBytecodeInfo(implBytecode), _cachedZKOSBytecodeInfo(proxyBytecode));
         }
-        return CoreOnGatewayHelper.getBytecodeInfo(false, CoreContract.L2Bridgehub); // unreachable, but keeps compiler happy
+        return CoreOnGatewayHelper.getBytecodeInfo(false, L2EcosystemContract.L2Bridgehub); // unreachable, but keeps compiler happy
     }
 
     /// @dev Get bytecode info, using cached blake hashes for ZKsyncOS or CoreOnGatewayHelper for Era.
-    function _getBytecodeInfo(CoreContract _c) internal virtual returns (bytes memory) {
+    function _getBytecodeInfo(L2EcosystemContract _c) internal virtual returns (bytes memory) {
         if (config.isZKsyncOS) {
             (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, _c);
             return _getProxyUpgradeBytecodeInfo(fileName, contractName);
@@ -583,20 +583,20 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
             l2TokenProxyBytecodeHash: CoreOnGatewayHelper.getDeployedBytecodeHash(
                 config.isZKsyncOS,
-                CoreContract.BeaconProxy
+                L2EcosystemContract.BeaconProxy
             ),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(_governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: _getBytecodeInfo(CoreContract.L2Bridgehub),
-            l2AssetRouterBytecodeInfo: _getBytecodeInfo(CoreContract.L2AssetRouter),
-            l2NtvBytecodeInfo: _getBytecodeInfo(CoreContract.L2NativeTokenVault),
-            messageRootBytecodeInfo: _getBytecodeInfo(CoreContract.L2MessageRoot),
-            beaconDeployerInfo: _getBytecodeInfo(CoreContract.UpgradeableBeaconDeployer),
-            baseTokenHolderBytecodeInfo: _getBytecodeInfo(CoreContract.BaseTokenHolder),
-            chainAssetHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.L2ChainAssetHandler),
-            interopCenterBytecodeInfo: _getBytecodeInfo(CoreContract.InteropCenter),
-            interopHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.InteropHandler),
-            assetTrackerBytecodeInfo: _getBytecodeInfo(CoreContract.L2AssetTracker),
+            bridgehubBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.L2Bridgehub),
+            l2AssetRouterBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.L2AssetRouter),
+            l2NtvBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.L2NativeTokenVault),
+            messageRootBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.L2MessageRoot),
+            beaconDeployerInfo: _getBytecodeInfo(L2EcosystemContract.UpgradeableBeaconDeployer),
+            baseTokenHolderBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.BaseTokenHolder),
+            chainAssetHandlerBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.L2ChainAssetHandler),
+            interopCenterBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.InteropCenter),
+            interopHandlerBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.InteropHandler),
+            assetTrackerBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(

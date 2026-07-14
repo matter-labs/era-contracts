@@ -9,7 +9,7 @@
       "zksyncOS": "0x0000000000000000000000000000000000000000"
     },
     "contracts": {
-      "MessageRoot": {
+      "L1MessageRoot": {
         "proxy": "0xEeBD607623e9Baf752DF115d89d82b6391feC9aa",
         "implNew": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C",
         "implNewCodehash": "0xd64f41869617d844a8b103a5ebcdd01ab4918fd422f4a856b47e0082eef0c9ed"

@@ -10,7 +10,7 @@ import {TestCoreRegistry} from "./TestRegistries.sol";
 
 import {UpgradeExecutor} from "contracts/governance/UpgradeExecutor.sol";
 import {EcosystemUpgradeModule} from "contracts/upgrades/registry/EcosystemUpgradeModule.sol";
-import {EcosystemContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+import {L1EcosystemContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {ICoreRegistry} from "contracts/upgrades/registry/ICoreRegistry.sol";
 
 /// @dev Minimal implementation contracts for proxy-upgrade tests.
@@ -67,9 +67,9 @@ contract EcosystemUpgradeModuleTest is Test {
         // Bridgehub gets a new implementation; MessageRoot pins its live implementation (the
         // module's live comparison must skip it); L1AssetRouter pins no new implementation at
         // all (zero => skipped before any proxy interaction).
-        coreRegistry.addContract(EcosystemContract.Bridgehub, address(bridgehubProxy), address(implNew));
-        coreRegistry.addContract(EcosystemContract.MessageRoot, address(messageRootProxy), address(implOld));
-        coreRegistry.addContract(EcosystemContract.L1AssetRouter, address(0), address(0));
+        coreRegistry.addContract(L1EcosystemContract.L1Bridgehub, address(bridgehubProxy), address(implNew));
+        coreRegistry.addContract(L1EcosystemContract.L1MessageRoot, address(messageRootProxy), address(implOld));
+        coreRegistry.addContract(L1EcosystemContract.L1AssetRouter, address(0), address(0));
     }
 
     function _applyL1Upgrade() internal {

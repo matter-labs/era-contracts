@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {CoreContract, CTMContract, CodehashPin} from "./ContractIdentifiers.sol";
+import {L2EcosystemContract, CTMContract, CodehashPin} from "./ContractIdentifiers.sol";
 import {ICTMRegistry} from "./ICTMRegistry.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
 import {RegistryAlreadyInitialized, RegistryUnknownKey} from "../../common/L1ContractErrors.sol";
@@ -64,7 +64,7 @@ contract CTMRegistry is ICTMRegistry {
 
     /// @dev One force-deployed core L2 contract of the new version's upgrade transaction.
     struct L2DeploymentRow {
-        CoreContract key;
+        L2EcosystemContract key;
         IComplexUpgrader.UniversalContractUpgradeInfo info;
         bytes32 bytecodeHash;
     }
@@ -293,10 +293,10 @@ contract CTMRegistry is ICTMRegistry {
     }
 
     /// @inheritdoc ICTMRegistry
-    function l2ForceDeployList(uint256 _protocolVersion) external view returns (CoreContract[] memory list) {
+    function l2ForceDeployList(uint256 _protocolVersion) external view returns (L2EcosystemContract[] memory list) {
         _requireNewVersion(_protocolVersion);
         uint256 rowsLength = l2DeploymentRows.length;
-        list = new CoreContract[](rowsLength);
+        list = new L2EcosystemContract[](rowsLength);
         for (uint256 i = 0; i < rowsLength; ++i) {
             list[i] = l2DeploymentRows[i].key;
         }
@@ -304,7 +304,7 @@ contract CTMRegistry is ICTMRegistry {
 
     /// @inheritdoc ICTMRegistry
     function l2ForceDeployment(
-        CoreContract _contract,
+        L2EcosystemContract _contract,
         uint256 _protocolVersion
     ) external view returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
         _requireNewVersion(_protocolVersion);
@@ -318,7 +318,7 @@ contract CTMRegistry is ICTMRegistry {
     }
 
     /// @inheritdoc ICTMRegistry
-    function l2BytecodeHash(CoreContract _contract, uint256 _protocolVersion) external view returns (bytes32) {
+    function l2BytecodeHash(L2EcosystemContract _contract, uint256 _protocolVersion) external view returns (bytes32) {
         _requireKnownVersion(_protocolVersion);
         uint256 rowsLength = l2DeploymentRows.length;
         for (uint256 i = 0; i < rowsLength; ++i) {

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {CoreContract, CTMContract} from "./ContractIdentifiers.sol";
+import {L2EcosystemContract, CTMContract} from "./ContractIdentifiers.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
 
 /// @title Per-CTM upgrade registry (one per ChainTypeManager: Era and ZKsyncOS).
@@ -67,19 +67,19 @@ interface ICTMRegistry {
 
     /// @notice The core L2 contracts force-deployed by the upgrade transaction of a given
     ///         protocol version, in deployment order (the L2 registry, if any, goes first).
-    function l2ForceDeployList(uint256 _protocolVersion) external view returns (CoreContract[] memory);
+    function l2ForceDeployList(uint256 _protocolVersion) external view returns (L2EcosystemContract[] memory);
 
     /// @notice The complete universal force-deployment descriptor of a core L2 contract at a
     ///         given protocol version: upgrade type (Era force deployment / ZKsyncOS system-proxy
     ///         or unsafe), VM-specific `deployedBytecodeInfo` encoding, and the target address.
     function l2ForceDeployment(
-        CoreContract _contract,
+        L2EcosystemContract _contract,
         uint256 _protocolVersion
     ) external view returns (IComplexUpgrader.UniversalContractUpgradeInfo memory);
 
     /// @notice The pinned L2 bytecode hash of a core L2 contract at a given protocol version.
     ///         Returns zero for contracts that are not deployed on this CTM at this version.
-    function l2BytecodeHash(CoreContract _contract, uint256 _protocolVersion) external view returns (bytes32);
+    function l2BytecodeHash(L2EcosystemContract _contract, uint256 _protocolVersion) external view returns (bytes32);
 
     /// @notice The delegate target and calldata the L2 `ComplexUpgrader` delegate-calls after the
     ///         force deployments (the version-specific L2 upgrade implementation and its

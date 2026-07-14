@@ -10,7 +10,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {UpgradeExecutor} from "contracts/governance/UpgradeExecutor.sol";
 import {CTMUpgradeModule} from "contracts/upgrades/registry/CTMUpgradeModule.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/CTMUpgradeComposer.sol";
-import {CTMContract, CoreContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+import {CTMContract, L2EcosystemContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -194,7 +194,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             // Full minor upgrade: one L2 force-deployment rides in the upgrade transaction,
             // shaped per VM (EraForceDeployment vs ZKsyncOSSystemProxyUpgrade).
             registry.addL2ForceDeployment(
-                CoreContract.L2Bridgehub,
+                L2EcosystemContract.L2Bridgehub,
                 IComplexUpgrader.UniversalContractUpgradeInfo({
                     upgradeType: _l2DeploymentType(),
                     deployedBytecodeInfo: _l2DeployedBytecodeInfo(),

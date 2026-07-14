@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {CoreContract} from "./ContractIdentifiers.sol";
+import {L2EcosystemContract} from "./ContractIdentifiers.sol";
 import {ICTMRegistry} from "./ICTMRegistry.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
@@ -23,7 +23,7 @@ import {SEMVER_MINOR_OFFSET} from "../../common/libraries/SemVer.sol";
 ///         cuts, `ChainCreationParams` and the L2 protocol upgrade transaction — from a per-CTM
 ///         registry's pinned constants, at execution time, on-chain.
 /// @dev Everything here is CTM-scoped, including the L2 force-deployments keyed by
-///      `CoreContract`: L2 system-contract bytecodes are pinned per CTM (Era and ZKsyncOS ship
+///      `L2EcosystemContract`: L2 system-contract bytecodes are pinned per CTM (Era and ZKsyncOS ship
 ///      different sets). Ecosystem-wide (core) L1 upgrades have no composition to do beyond
 ///      proxy/impl lookups and live in `EcosystemUpgradeModule`.
 /// @dev This library is the on-chain port of the composition logic that
@@ -59,7 +59,7 @@ library CTMUpgradeComposer {
     function buildL2UpgradeTx(ICTMRegistry _registry) internal view returns (L2CanonicalTransaction memory) {
         uint256 newVersion = _registry.newProtocolVersion();
 
-        CoreContract[] memory deployList = _registry.l2ForceDeployList(newVersion);
+        L2EcosystemContract[] memory deployList = _registry.l2ForceDeployList(newVersion);
         uint256 deployListLength = deployList.length;
         if (deployListLength == 0) {
             // The upgrade has no L2 side (patch upgrades, or L1-only minor upgrades): an all-zero

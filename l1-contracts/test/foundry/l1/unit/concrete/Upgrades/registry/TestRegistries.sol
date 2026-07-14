@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {CoreContract, CTMContract, EcosystemContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+import {L2EcosystemContract, CTMContract, L1EcosystemContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {ICoreRegistry} from "contracts/upgrades/registry/ICoreRegistry.sol";
 import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
@@ -16,9 +16,9 @@ contract TestCoreRegistry is ICoreRegistry {
     address internal proxyAdminAddress;
     address internal eraCTMRegistry;
     address internal zksyncOSCTMRegistry;
-    EcosystemContract[] internal contractList;
-    mapping(EcosystemContract contractId => address proxy) internal proxies;
-    mapping(EcosystemContract contractId => address impl) internal newImpls;
+    L1EcosystemContract[] internal contractList;
+    mapping(L1EcosystemContract contractId => address proxy) internal proxies;
+    mapping(L1EcosystemContract contractId => address impl) internal newImpls;
 
     function setVersions(uint256 _oldVersion, uint256 _newVersion) external {
         oldVersion = _oldVersion;
@@ -38,7 +38,7 @@ contract TestCoreRegistry is ICoreRegistry {
     }
 
     /// @dev A zero `_implNew` pins "no new implementation" (the module skips the contract).
-    function addContract(EcosystemContract _contract, address _proxy, address _implNew) external {
+    function addContract(L1EcosystemContract _contract, address _proxy, address _implNew) external {
         contractList.push(_contract);
         proxies[_contract] = _proxy;
         newImpls[_contract] = _implNew;
@@ -52,15 +52,15 @@ contract TestCoreRegistry is ICoreRegistry {
         return newVersion;
     }
 
-    function proxyAddress(EcosystemContract _contract) external view returns (address) {
+    function proxyAddress(L1EcosystemContract _contract) external view returns (address) {
         return proxies[_contract];
     }
 
-    function implAddress(EcosystemContract _contract) external view returns (address) {
+    function implAddress(L1EcosystemContract _contract) external view returns (address) {
         return newImpls[_contract];
     }
 
-    function ecosystemContractList() external view returns (EcosystemContract[] memory) {
+    function ecosystemContractList() external view returns (L1EcosystemContract[] memory) {
         return contractList;
     }
 
@@ -88,9 +88,9 @@ contract TestCTMRegistry is ICTMRegistry {
     mapping(uint256 protocolVersion => CTMContract[] facets) internal facets;
     mapping(uint256 protocolVersion => mapping(CTMContract facet => bytes4[] selectors)) internal selectors;
     mapping(CTMContract facet => bool freezable) internal freezable;
-    CoreContract[] internal deployList;
-    mapping(CoreContract contractId => IComplexUpgrader.UniversalContractUpgradeInfo info) internal deployments;
-    mapping(CoreContract contractId => bytes32 hash) internal l2Hashes;
+    L2EcosystemContract[] internal deployList;
+    mapping(L2EcosystemContract contractId => IComplexUpgrader.UniversalContractUpgradeInfo info) internal deployments;
+    mapping(L2EcosystemContract contractId => bytes32 hash) internal l2Hashes;
     address internal delegateToAddress;
     bytes internal delegateCalldataBytes;
     uint256[] internal factoryDeps;
@@ -137,7 +137,7 @@ contract TestCTMRegistry is ICTMRegistry {
     }
 
     function addL2ForceDeployment(
-        CoreContract _contract,
+        L2EcosystemContract _contract,
         IComplexUpgrader.UniversalContractUpgradeInfo calldata _info,
         bytes32 _bytecodeHash
     ) external {
@@ -208,18 +208,18 @@ contract TestCTMRegistry is ICTMRegistry {
         return freezable[_facet];
     }
 
-    function l2ForceDeployList(uint256) external view returns (CoreContract[] memory) {
+    function l2ForceDeployList(uint256) external view returns (L2EcosystemContract[] memory) {
         return deployList;
     }
 
     function l2ForceDeployment(
-        CoreContract _contract,
+        L2EcosystemContract _contract,
         uint256
     ) external view returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
         return deployments[_contract];
     }
 
-    function l2BytecodeHash(CoreContract _contract, uint256) external view returns (bytes32) {
+    function l2BytecodeHash(L2EcosystemContract _contract, uint256) external view returns (bytes32) {
         return l2Hashes[_contract];
     }
 

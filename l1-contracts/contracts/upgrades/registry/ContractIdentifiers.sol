@@ -9,13 +9,13 @@ pragma solidity ^0.8.21;
 /// @dev The enum is APPEND-ONLY: new variants must be added at the end and existing
 ///      variants must never be reordered or removed, because the numeric values are
 ///      compiled into registry implementations across protocol versions.
-enum EcosystemContract {
-    Bridgehub,
-    MessageRoot,
-    CTMDeploymentTracker,
-    ChainAssetHandler,
-    ChainRegistrationSender,
-    AssetTracker,
+enum L1EcosystemContract {
+    L1Bridgehub,
+    L1MessageRoot,
+    L1CTMDeploymentTracker,
+    L1ChainAssetHandler,
+    L1ChainRegistrationSender,
+    L1AssetTracker,
     L1AssetRouter,
     L1Nullifier,
     L1NativeTokenVault
@@ -26,8 +26,8 @@ enum EcosystemContract {
 ///         The enum value is VM-neutral; `CoreOnGatewayHelper.resolve` maps it to
 ///         the correct Era or ZKsyncOS contract / artifact name, and per-CTM
 ///         registries map it to the pinned L2 bytecode hash per protocol version.
-/// @dev APPEND-ONLY (see `EcosystemContract`).
-enum CoreContract {
+/// @dev APPEND-ONLY (see `L1EcosystemContract`).
+enum L2EcosystemContract {
     L2Bridgehub,
     L2AssetRouter,
     L2NativeTokenVault,
@@ -54,7 +54,7 @@ enum CoreContract {
 ///         The enum value is VM-neutral; `DeployCTML1OrGateway.resolve` maps it to
 ///         the correct Era or ZKsyncOS contract / artifact name, and per-CTM
 ///         registries map it to the deployed address per protocol version.
-/// @dev APPEND-ONLY (see `EcosystemContract`).
+/// @dev APPEND-ONLY (see `L1EcosystemContract`).
 enum CTMContract {
     // ---- Diamond facets ----
     AdminFacet,

@@ -5,9 +5,9 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {
-    CoreContract,
+    L2EcosystemContract,
     CTMContract,
-    EcosystemContract,
+    L1EcosystemContract,
     CodehashPin
 } from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {CTMRegistry} from "contracts/upgrades/registry/CTMRegistry.sol";
@@ -50,19 +50,19 @@ contract StorageRegistriesTest is Test {
     function _coreManifest() internal pure returns (CoreRegistry.CoreRegistryManifest memory manifest) {
         CoreRegistry.EcosystemContractRow[] memory rows = new CoreRegistry.EcosystemContractRow[](3);
         rows[0] = CoreRegistry.EcosystemContractRow({
-            key: EcosystemContract.Bridgehub,
+            key: L1EcosystemContract.L1Bridgehub,
             proxy: address(0xB001),
             implNew: address(0xB201)
         });
         rows[1] = CoreRegistry.EcosystemContractRow({
-            key: EcosystemContract.L1AssetRouter,
+            key: L1EcosystemContract.L1AssetRouter,
             proxy: address(0xB002),
             implNew: address(0xB202)
         });
         // MessageRoot participates (its proxy is pinned) but this upgrade pins no new
         // implementation for it: zero means "nothing to upgrade".
         rows[2] = CoreRegistry.EcosystemContractRow({
-            key: EcosystemContract.MessageRoot,
+            key: L1EcosystemContract.L1MessageRoot,
             proxy: address(0xB003),
             implNew: address(0)
         });
@@ -146,7 +146,7 @@ contract StorageRegistriesTest is Test {
 
         CTMRegistry.L2DeploymentRow[] memory l2Rows = new CTMRegistry.L2DeploymentRow[](2);
         l2Rows[0] = CTMRegistry.L2DeploymentRow({
-            key: CoreContract.L2Bridgehub,
+            key: L2EcosystemContract.L2Bridgehub,
             info: IComplexUpgrader.UniversalContractUpgradeInfo({
                 upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
                 deployedBytecodeInfo: hex"aa01",
@@ -155,7 +155,7 @@ contract StorageRegistriesTest is Test {
             bytecodeHash: bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001))
         });
         l2Rows[1] = CTMRegistry.L2DeploymentRow({
-            key: CoreContract.L2AssetRouter,
+            key: L2EcosystemContract.L2AssetRouter,
             info: IComplexUpgrader.UniversalContractUpgradeInfo({
                 upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
                 deployedBytecodeInfo: hex"aa02",
@@ -233,12 +233,12 @@ contract StorageRegistriesTest is Test {
     function test_coreRegistryPinsManifestValues() public view {
         assertEq(coreRegistry.oldProtocolVersion(), OLD_VERSION);
         assertEq(coreRegistry.newProtocolVersion(), NEW_VERSION);
-        assertEq(coreRegistry.proxyAddress(EcosystemContract.Bridgehub), address(0xB001));
-        assertEq(coreRegistry.implAddress(EcosystemContract.Bridgehub), address(0xB201));
-        assertEq(coreRegistry.implAddress(EcosystemContract.L1AssetRouter), address(0xB202));
+        assertEq(coreRegistry.proxyAddress(L1EcosystemContract.L1Bridgehub), address(0xB001));
+        assertEq(coreRegistry.implAddress(L1EcosystemContract.L1Bridgehub), address(0xB201));
+        assertEq(coreRegistry.implAddress(L1EcosystemContract.L1AssetRouter), address(0xB202));
         // MessageRoot participates (its proxy is pinned) but this upgrade pins no new
         // implementation for it: zero means "nothing to upgrade".
-        assertEq(coreRegistry.implAddress(EcosystemContract.MessageRoot), address(0));
+        assertEq(coreRegistry.implAddress(L1EcosystemContract.L1MessageRoot), address(0));
         assertEq(coreRegistry.proxyAdmin(), address(0xA001));
         assertEq(coreRegistry.ctmRegistry(false), address(0xC001));
         assertEq(coreRegistry.ctmRegistry(true), address(0xC002));
@@ -264,7 +264,7 @@ contract StorageRegistriesTest is Test {
         assertTrue(ctmRegistry.facetIsFreezable(CTMContract.ExecutorFacet));
         assertFalse(ctmRegistry.facetIsFreezable(CTMContract.AdminFacet));
         assertEq(
-            ctmRegistry.l2BytecodeHash(CoreContract.L2Bridgehub, NEW_VERSION),
+            ctmRegistry.l2BytecodeHash(L2EcosystemContract.L2Bridgehub, NEW_VERSION),
             bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001))
         );
 
@@ -277,7 +277,7 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_unknownKeyQueried() public {
         // The core registry answers implAddress only for contracts it lists.
         vm.expectRevert(RegistryUnknownKey.selector);
-        coreRegistry.implAddress(EcosystemContract.L1Nullifier);
+        coreRegistry.implAddress(L1EcosystemContract.L1Nullifier);
 
         // Only the new version's verifier is recorded: the old one is not this upgrade's data.
         vm.expectRevert(RegistryUnknownKey.selector);

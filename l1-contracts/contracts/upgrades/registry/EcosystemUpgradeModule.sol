@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {EcosystemContract} from "./ContractIdentifiers.sol";
+import {L1EcosystemContract} from "./ContractIdentifiers.sol";
 import {ICoreRegistry} from "./ICoreRegistry.sol";
 
 /// @title EcosystemUpgradeModule
@@ -23,7 +23,7 @@ import {ICoreRegistry} from "./ICoreRegistry.sol";
 contract EcosystemUpgradeModule {
     /// @notice Emitted (from the executor's address) for every ecosystem proxy pointed at its new
     ///         implementation.
-    event EcosystemContractUpgraded(EcosystemContract indexed contractId, address indexed proxy, address newImpl);
+    event EcosystemContractUpgraded(L1EcosystemContract indexed contractId, address indexed proxy, address newImpl);
 
     /// @notice Points every ecosystem proxy at its new implementation, as pinned by the registry.
     ///         Contracts with no new implementation pinned, or whose proxy already points at the
@@ -38,7 +38,7 @@ contract EcosystemUpgradeModule {
     function applyL1Upgrade(ICoreRegistry _coreRegistry) external {
         ProxyAdmin proxyAdmin = ProxyAdmin(_coreRegistry.proxyAdmin());
 
-        EcosystemContract[] memory contracts = _coreRegistry.ecosystemContractList();
+        L1EcosystemContract[] memory contracts = _coreRegistry.ecosystemContractList();
         uint256 contractsLength = contracts.length;
         for (uint256 i = 0; i < contractsLength; ++i) {
             address newImpl = _coreRegistry.implAddress(contracts[i]);
