@@ -319,14 +319,16 @@ library Utils {
     ) private pure returns (uint256, uint256, bytes memory) {
         uint256 len = _batchesData.length;
         bytes memory encoded = abi.encode(
-            _batchesData,
-            _priorityOpsData,
-            new InteropRoot[][](len),
-            new L2Log[](_logsLen),
-            new bytes[](_logsLen),
-            new bytes32[](_logsLen),
-            new BatchImtRoots[](_logsLen),
-            _settlementFeePayer
+            BatchDecoder.DecodedExecuteData({
+                batchesData: _batchesData,
+                priorityOpsData: _priorityOpsData,
+                dependencyRoots: new InteropRoot[][](len),
+                logs: new L2Log[][](_logsLen),
+                messages: new bytes[][](_logsLen),
+                multichainBatchRoots: new bytes32[](_logsLen),
+                imtRoots: new BatchImtRoots[](_logsLen),
+                settlementFeePayer: _settlementFeePayer
+            })
         );
         return (
             _batchesData[0].batchNumber,

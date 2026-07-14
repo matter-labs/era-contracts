@@ -258,6 +258,8 @@ library BatchDecoder {
     }
 
     /// @notice Decodes execution data from a calldata byte array.
+    /// @dev The wire data after the version byte is `abi.encode(DecodedExecuteData)`, so the whole
+    /// struct is decoded directly in one pass.
     /// @param _executeData The calldata byte array containing the execution data to decode.
     /// @return decoded The decoded execute data (see {DecodedExecuteData}).
     function _decodeExecuteData(bytes calldata _executeData) private pure returns (DecodedExecuteData memory decoded) {
@@ -266,39 +268,10 @@ library BatchDecoder {
         }
 
         uint8 encodingVersion = uint8(_executeData[0]);
-        if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
-            // Decoded in two passes (each binding half of the 8-tuple) to keep the legacy-codegen
-            // stack shallow; `abi.decode` is pure, so both passes read identical data.
-            (decoded.batchesData, decoded.priorityOpsData, decoded.dependencyRoots, decoded.logs, , , , ) = abi.decode(
-                _executeData[1:],
-                (
-                    IExecutor.StoredBatchInfo[],
-                    PriorityOpsBatchInfo[],
-                    InteropRoot[][],
-                    L2Log[][],
-                    bytes[][],
-                    bytes32[],
-                    BatchImtRoots[],
-                    address
-                )
-            );
-            (, , , , decoded.messages, decoded.multichainBatchRoots, decoded.imtRoots, decoded.settlementFeePayer) = abi
-                .decode(
-                    _executeData[1:],
-                    (
-                        IExecutor.StoredBatchInfo[],
-                        PriorityOpsBatchInfo[],
-                        InteropRoot[][],
-                        L2Log[][],
-                        bytes[][],
-                        bytes32[],
-                        BatchImtRoots[],
-                        address
-                    )
-                );
-        } else {
+        if (encodingVersion != SUPPORTED_ENCODING_VERSION) {
             revert UnsupportedExecuteBatchEncoding(encodingVersion);
         }
+        decoded = abi.decode(_executeData[1:], (DecodedExecuteData));
     }
 
     /// @notice Decodes the execute data and checks that the provided batch bounds are correct.

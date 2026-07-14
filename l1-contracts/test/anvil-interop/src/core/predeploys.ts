@@ -57,7 +57,7 @@ export const PREDEPLOY_SYSTEM_CONTRACTS: readonly SystemContractPredeploy[] = [
   { address: L2_CHAIN_ASSET_HANDLER_ADDR, contractName: "L2ChainAssetHandler" },
   { address: L2_BASE_TOKEN_HOLDER_ADDR, contractName: "BaseTokenHolder" },
   { address: INTEROP_CENTER_ADDR, contractName: "InteropCenter" },
-  { address: L2_INTEROP_HANDLER_ADDR, contractName: "InteropHandler" },
+  { address: L2_INTEROP_HANDLER_ADDR, contractName: "L2InteropHandler" },
   // L1-free atomic interop built-ins. On real ZKsync OS these are predeployed by the genesis-gen
   // tool; the harness has no genesis-gen, so predeploy them here too — otherwise the genesis upgrade's
   // _initializeV31Contracts reverts (empty) calling .initialize() on an address with no code.

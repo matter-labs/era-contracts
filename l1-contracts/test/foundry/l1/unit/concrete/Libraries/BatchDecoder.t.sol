@@ -187,14 +187,16 @@ contract BatchDecoderTest is Test {
         bytes memory encodedData = abi.encodePacked(
             SUPPORTED_ENCODING_VERSION,
             abi.encode(
-                executeBatches,
-                priorityOps,
-                dependencyRoots,
-                logs,
-                messages,
-                multichainBatchRoots,
-                imtRoots,
-                address(0)
+                BatchDecoder.DecodedExecuteData({
+                    batchesData: executeBatches,
+                    priorityOpsData: priorityOps,
+                    dependencyRoots: dependencyRoots,
+                    logs: logs,
+                    messages: messages,
+                    multichainBatchRoots: multichainBatchRoots,
+                    imtRoots: imtRoots,
+                    settlementFeePayer: address(0)
+                })
             )
         );
 
@@ -228,14 +230,16 @@ contract BatchDecoderTest is Test {
         bytes memory encodedData = abi.encodePacked(
             unsupportedVersion,
             abi.encode(
-                executeBatches,
-                priorityOps,
-                dependencyRoots,
-                logs,
-                messages,
-                multichainBatchRoots,
-                imtRoots,
-                address(0)
+                BatchDecoder.DecodedExecuteData({
+                    batchesData: executeBatches,
+                    priorityOpsData: priorityOps,
+                    dependencyRoots: dependencyRoots,
+                    logs: logs,
+                    messages: messages,
+                    multichainBatchRoots: multichainBatchRoots,
+                    imtRoots: imtRoots,
+                    settlementFeePayer: address(0)
+                })
             )
         );
 
@@ -258,14 +262,16 @@ contract BatchDecoderTest is Test {
         bytes memory encodedData = abi.encodePacked(
             SUPPORTED_ENCODING_VERSION,
             abi.encode(
-                executeBatches,
-                priorityOps,
-                dependencyRoots,
-                logs,
-                messages,
-                multichainBatchRoots,
-                imtRoots,
-                address(0)
+                BatchDecoder.DecodedExecuteData({
+                    batchesData: executeBatches,
+                    priorityOpsData: priorityOps,
+                    dependencyRoots: dependencyRoots,
+                    logs: logs,
+                    messages: messages,
+                    multichainBatchRoots: multichainBatchRoots,
+                    imtRoots: imtRoots,
+                    settlementFeePayer: address(0)
+                })
             )
         );
 
@@ -285,14 +291,16 @@ contract BatchDecoderTest is Test {
         bytes memory encodedData = abi.encodePacked(
             SUPPORTED_ENCODING_VERSION,
             abi.encode(
-                executeBatches,
-                priorityOps,
-                dependencyRoots,
-                logs,
-                messages,
-                multichainBatchRoots,
-                imtRoots,
-                address(0)
+                BatchDecoder.DecodedExecuteData({
+                    batchesData: executeBatches,
+                    priorityOpsData: priorityOps,
+                    dependencyRoots: dependencyRoots,
+                    logs: logs,
+                    messages: messages,
+                    multichainBatchRoots: multichainBatchRoots,
+                    imtRoots: imtRoots,
+                    settlementFeePayer: address(0)
+                })
             )
         );
 

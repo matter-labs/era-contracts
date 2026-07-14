@@ -269,11 +269,33 @@ contract MessageRootTest is Test {
         vm.roll(block.number + 1);
 
         vm.prank(alphaChainSender);
-        vm.expectEmit(true, false, false, false);
+        // Check all topics + data so the `l1Timestamp` field (bound into the batch leaf for atomic interop)
+        // is actually asserted, not silently ignored.
+        vm.expectEmit(true, true, true, true);
         emit IMessageRootBase.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId), block.timestamp);
         vm.expectEmit(true, false, false, false);
         emit IMessageRootBase.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
         l2MessageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
+
+        // The settlement-layer timestamp is recorded per (chainId, batchNumber) — the value the atomic
+        // deadline check is compared against.
+        assertEq(
+            l2MessageRoot.chainBatchRootTimestamp(alphaChainId, 1),
+            block.timestamp,
+            "chainBatchRootTimestamp should record block.timestamp"
+        );
+        // The chain tree holds the seeded genesis batch leaf (batch 0) plus the first real batch
+        // leaf, both timestamp-bound; the two-leaf incremental-Merkle root combines them.
+        assertEq(
+            l2MessageRoot.getChainRoot(alphaChainId),
+            keccak256(
+                bytes.concat(
+                    _genesisChainRoot(0),
+                    MessageHashing.batchLeafHash(bytes32(alphaChainId), 1, block.timestamp)
+                )
+            ),
+            "chain root should combine the genesis leaf and the timestamp-bound first batch leaf"
+        );
 
         // Verify interopRootLogId incremented once for the new block
         assertEq(
