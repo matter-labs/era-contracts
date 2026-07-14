@@ -6,9 +6,9 @@
     "proxyAdmin": "0x0FA38b5c8cb180809E0C95E2EE923eC093123285",
     "contracts": {
       "L1MessageRoot": {
-        "proxy": "0xEeBD607623e9Baf752DF115d89d82b6391feC9aa",
+        "proxy": "0x2E4712F914db9d9433Bff8919792da5f720751E1",
         "implNew": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C",
-        "implNewCodehash": "0xd64f41869617d844a8b103a5ebcdd01ab4918fd422f4a856b47e0082eef0c9ed"
+        "implNewCodehash": "0xa93e8cca40a75b15ddfa88e5fc0e3e2bbeef73b0fa35d58d277c41f33362a2e8"
       }
     }
   },
@@ -16,7 +16,7 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0x2Ed7Fa601037FC1a7F295aee9B4ADf79fE8ccf6d",
+      "ctmProxy": "0xAa3A3437e35EE3aaCA6DC51A5A52EDA89F0B37f1",
       "verifierNew": "0xAD523115cd35a8d4E60B3C0953E0E0ac10418309",
       "contracts": {
         "DefaultUpgrade": {
@@ -25,7 +25,7 @@
         },
         "DiamondInit": {
           "new": "0xaB7B4c595d3cE8C85e16DA86630f2fc223B05057",
-          "newCodehash": "0x1c11c008864151015433b20dd022626e5f271bc21db03693c82be87aaac46f6b"
+          "newCodehash": "0xe5ce2f41109b984168b7eea2d2c4e5cb75e1fb069917142c5bd249ae7658abf9"
         }
       },
       "facets": {
@@ -89,8 +89,8 @@
           },
           {
             "name": "MailboxFacet",
-            "address": "0x7154413e65c9715DFbdcA2F1bc7aD5d0bBeD539f",
-            "codehash": "0x7097bc045e3c90a9c6f7bc485d69e95582eb40c41a5762b66c99d4d3024c5da0",
+            "address": "0xC50818d1ffF2E42d42618E71E753A22cB5a98c9E",
+            "codehash": "0x5d43a5a8143f4b0b62a6dfc9d35b6c2498180f06546cd1fcb0b6c33bcac2cf67",
             "selectors": []
           }
         ]

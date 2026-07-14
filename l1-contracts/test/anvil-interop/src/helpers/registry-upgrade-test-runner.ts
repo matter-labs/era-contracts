@@ -676,7 +676,7 @@ async function buildRegistryManifest(
     core: {
       proxyAdmin: live.ecosystemProxyAdmin,
       contracts: {
-        MessageRoot: {
+        L1MessageRoot: {
           proxy: live.messageRootProxy,
           implNew: deployed.newMessageRootImpl,
           implNewCodehash: await codehash(deployed.newMessageRootImpl),
@@ -796,8 +796,12 @@ function assertCommittedManifestMatchesLiveDeployment(
     ["oldVersion", manifest.oldVersion, live.oldVersionString],
     ["newVersion", manifest.newVersion, live.newVersionString],
     ["core.proxyAdmin", manifest.core?.proxyAdmin, live.ecosystemProxyAdmin],
-    ["core.contracts.MessageRoot.proxy", manifest.core?.contracts?.MessageRoot?.proxy, live.messageRootProxy],
-    ["core.contracts.MessageRoot.implNew", manifest.core?.contracts?.MessageRoot?.implNew, deployed.newMessageRootImpl],
+    ["core.contracts.L1MessageRoot.proxy", manifest.core?.contracts?.L1MessageRoot?.proxy, live.messageRootProxy],
+    [
+      "core.contracts.L1MessageRoot.implNew",
+      manifest.core?.contracts?.L1MessageRoot?.implNew,
+      deployed.newMessageRootImpl,
+    ],
     ["ctm.ctmProxy", ctm?.ctmProxy, ctmProxy],
     ["ctm.verifierNew", ctm?.verifierNew, deployed.newVerifier],
     ["ctm.facets.plan[AdminFacet].oldAddress", planFacet("AdminFacet")?.oldAddress, live.oldAdminFacet],
