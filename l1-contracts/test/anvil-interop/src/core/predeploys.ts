@@ -47,8 +47,9 @@ export const PREDEPLOY_SYSTEM_CONTRACTS: readonly SystemContractPredeploy[] = [
   { address: L2_NTV_BEACON_DEPLOYER_ADDR, contractName: "UpgradeableBeaconDeployer" },
   { address: L2_MESSAGE_ROOT_ADDR, contractName: "L2MessageRoot" },
   // Imported interop roots + their creation timestamps; on real ZKsync OS this is a genesis system
-  // contract at 0x10008. The atomic-interop timeout protocol reads `interopRootTimestamps` from it,
-  // and the harness seeds anchor roots into it via bootloader impersonation.
+  // contract at 0x10008. The atomic-interop timeout protocol reads the imported `(root, timestamp)`
+  // tuples via `interopRoots`, and the harness seeds anchor roots into it via bootloader
+  // impersonation.
   { address: L2_INTEROP_ROOT_STORAGE_ADDR, contractName: "L2InteropRootStorage" },
   { address: L2_BRIDGEHUB_ADDR, contractName: "L2Bridgehub" },
   { address: L2_ASSET_ROUTER_ADDR, contractName: "L2AssetRouter" },
