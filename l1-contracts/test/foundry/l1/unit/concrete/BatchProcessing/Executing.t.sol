@@ -192,7 +192,7 @@ contract ExecutingTest is ExecutorTest {
         );
         vm.mockCall(
             address(messageRoot),
-            abi.encodeWithSelector(IMessageRootBase.addChainBatchRoot.selector, 9, 10, bytes32(0)),
+            abi.encodeWithSelector(IMessageRootBase.addChainBatchRootV32.selector, 9, 10, bytes32(0)),
             abi.encode()
         );
 
