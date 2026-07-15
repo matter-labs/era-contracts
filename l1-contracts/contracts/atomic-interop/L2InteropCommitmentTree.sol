@@ -19,23 +19,21 @@ import {CommitmentTreeNotAppender} from "./AtomicInteropErrors.sol";
 /// batch (see {AtomicInteropProof}); the deadline is checked against the batch's `l1Timestamp`, which
 /// the settlement layer assigns and which is re-derived from the same inclusion proof.
 ///
-/// @dev STORAGE LAYOUT IS CONSENSUS-CRITICAL. The bootloader reads the cached root from
-/// `_currentRoot` — **fixed slot 0** — at every batch boundary. The cache exists precisely because
-/// the underlying dynamic-height engine has no fixed root slot (`FullMerkle` keeps the root at
-/// `_nodes[_height][0]`, which moves as the tree grows); a dedicated slot gives the bootloader a
-/// stable one-slot ABI that survives engine-internal changes. `_currentRoot` MUST stay at slot 0
-/// and MUST be updated on every root change; an uninitialized tree reads as `bytes32(0)`, matching
-/// the "no tree deployed" reading on chains without the atomic stack.
+/// @dev STORAGE LAYOUT IS CONSENSUS-CRITICAL. The bootloader reads the engine's root
+/// `_imt.tree._nodes[_imt.tree._height][0]` directly, the same way it reads the multichain root from
+/// the L2MessageRoot's `FullMerkle` tree: it loads `_height` from slot 0 and derives the
+/// `_nodes[_height][0]` slot from the `_nodes` base slot 2. `_imt` MUST therefore stay the first
+/// state variable ({FullMerkle.FullTree} puts `_height` at offset 0 and `_nodes` at offset 2 within
+/// it). An uninitialized tree reads as `bytes32(0)`, matching the "no tree deployed" reading on
+/// chains without the atomic stack.
 ///
 /// Deployed in L2 userspace (no constructor); the one-time seeding is done in `initialize`.
 contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
     using IndexedMerkleTree for IMT;
 
-    /// @dev Cache of the current IMT root, mirrored from the engine on every change. MUST stay at
-    /// slot 0 — the bootloader reads this slot directly (see contract doc).
-    bytes32 internal _currentRoot;
-
-    /// @dev The append-only indexed tree. A non-zero `_imt.tree._leafNumber` doubles as the "initialized" flag.
+    /// @dev The append-only indexed tree. MUST stay at slot 0 — the bootloader derives the engine's
+    /// root slot from this position (see contract doc). A non-zero `_imt.tree._leafNumber` doubles
+    /// as the "initialized" flag.
     IMT internal _imt;
 
     /// @notice One-shot initializer: seeds the IMT (the `{0,0,0}` head leaf at index 0). The appender
@@ -43,9 +41,7 @@ contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
     /// parameter; `_imt.setup()` reverts if the tree was already seeded.
     function initialize() external {
         _imt.setup();
-        bytes32 seedRoot = _imt.root();
-        _currentRoot = seedRoot;
-        emit RootUpdated(0, seedRoot);
+        emit RootUpdated(0, _imt.root());
     }
 
     /// @inheritdoc IL2InteropCommitmentTree
@@ -54,13 +50,12 @@ contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
         // Value / low-nullifier validation (non-zero, no duplicates, correct bracket) is enforced by
         // the engine and surfaces its own `IMT*` errors.
         (newIndex, newRoot) = _imt.insert(_value, _lowNullifierIndex);
-        _currentRoot = newRoot;
         emit RootUpdated(newIndex, newRoot);
     }
 
     /// @inheritdoc IL2InteropCommitmentTree
     function root() external view returns (bytes32) {
-        return _currentRoot;
+        return _imt.root();
     }
 
     /// @inheritdoc IL2InteropCommitmentTree
