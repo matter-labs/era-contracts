@@ -139,6 +139,10 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
 
         _registerNewZKChain(_chainId, chainAddress, true);
         messageRoot.addNewChain(_chainId, 0);
+        // Seed the chain's interop tree with its genesis (batch 0) chain batch root, computed and
+        // stored by the chain's DiamondInit and reported by the chain itself — a no-op for chains
+        // that store no genesis root (EraVM). See `ExecutorFacet.reportGenesisRoot`.
+        IZKChain(chainAddress).reportGenesisRoot();
 
         emit NewChain(_chainId, _chainTypeManager, _admin);
         return _chainId;

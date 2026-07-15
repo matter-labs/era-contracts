@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
@@ -886,6 +887,9 @@ contract ExperimentalBridgeTest is Test {
             ),
             abi.encode(newChainAddress)
         );
+        // The Bridgehub triggers the fresh chain's genesis-root report right after registration;
+        // `newChainAddress` is a fuzzed address, so mock the call explicitly.
+        vm.mockCall(newChainAddress, abi.encodeWithSelector(IZKChain.reportGenesisRoot.selector), abi.encode());
 
         vm.expectEmit(true, true, true, true, address(bridgehub));
         emit NewChain(chainId, address(mockCTM), admin);
