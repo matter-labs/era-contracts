@@ -12,6 +12,7 @@ import {
     ProofDeadlineExceeded,
     ProofInteropRootNotAfterDeadline,
     ProofNotLastBatchInRoot,
+    ProofTimeoutBranchMismatch,
     ProofInclusionFailed,
     ProofNonInclusionFailed,
     ProofSettlementLayerMismatch
@@ -34,7 +35,6 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     uint256 internal constant SETTLEMENT_LAYER_CHAIN_ID = 1; // L1
     uint256 internal constant BATCH_N = 100;
     uint256 internal constant SL_BLOCK = 555;
-    uint64 internal constant DEADLINE = 1_000;
 
     bytes32 internal constant WRONG_ROOT = bytes32(uint256(0x1234));
 
@@ -335,6 +335,44 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
+    /// @dev The declared branch must match the authenticated inclusion time: the begin root proves
+    /// nothing for an in-time batch (its begin state predates the deadline moment).
+    function test_RevertWhen_timeout_beginBranchWithInTimeBatch() public {
+        ImtProof memory absence = _nonInclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            absentValue,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            SL_BLOCK,
+            DEADLINE - 1
+        );
+        absence.provesAgainstBeginRoot = true;
+        _expectRootAuthentication(absence, ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX);
+        vm.expectRevert(
+            abi.encodeWithSelector(ProofTimeoutBranchMismatch.selector, true, uint256(DEADLINE) - 1, DEADLINE)
+        );
+        proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
+    }
+
+    /// @dev ...and the end root is paired exclusively with the in-time last-batch branch: a late
+    /// batch must use its begin root (which needs no last-batch property).
+    function test_RevertWhen_timeout_endBranchWithLateBatch() public {
+        ImtProof memory absence = _nonInclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            absentValue,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            SL_BLOCK,
+            uint256(DEADLINE) + 1
+        );
+        absence.provesAgainstBeginRoot = false;
+        _expectRootAuthentication(absence, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
+        vm.expectRevert(
+            abi.encodeWithSelector(ProofTimeoutBranchMismatch.selector, false, uint256(DEADLINE) + 1, DEADLINE)
+        );
+        proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
+    }
+
     /// @dev A LATE batch does not need the last-batch property: the same populated batch-leaf path
     /// that fails the in-time branch is accepted when `t > deadline` (begin-root branch).
     function test_verifyTimeoutAbsence_lateBatchNeedsNoLastBatchProperty() public {
@@ -452,6 +490,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
             sourceChainId: SOURCE_CHAIN_ID,
             batchNumber: BATCH_N,
             chainImtRoot: tree.root(),
+            provesAgainstBeginRoot: true,
             settlementProof: _settlementProof(
                 SETTLEMENT_LAYER_CHAIN_ID,
                 SL_BLOCK,
@@ -509,7 +548,10 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
             slBlock,
             _batchTimestamp
         );
-        uint256 imtRootLeafIndex = uint256(_batchTimestamp) > uint256(_deadline)
+        // The builder declares the branch against the fixed test DEADLINE; re-declare it against the
+        // fuzzed deadline the way an honest prover would.
+        absence.provesAgainstBeginRoot = uint256(_batchTimestamp) > uint256(_deadline);
+        uint256 imtRootLeafIndex = absence.provesAgainstBeginRoot
             ? ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX
             : ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX;
         if (uint256(_anchorTimestamp) <= uint256(_deadline)) {

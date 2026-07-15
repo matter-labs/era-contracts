@@ -45,10 +45,18 @@ enum LegState {
 /// being folded into the chain batch leaf.
 /// @dev `batchNumber` is the source chain's top-level batch number passed to the leaf verifier and
 /// to `_getProofData`.
+/// @dev `provesAgainstBeginRoot` selects the timeout branch: `true` authenticates `chainImtRoot` as
+/// the batch-BEGIN IMT root (leaf 2), `false` as the batch-END root (leaf 3). A bool (rather than a
+/// raw leaf index) constrains the choice to the two IMT leaves, so authentication can never be
+/// pointed at the logs/multichain leaves. The declared branch is validated against the authenticated
+/// batch `l1Timestamp` in {AtomicInteropProof.verifyTimeoutAbsence} (begin ⇒ late batch, end ⇒
+/// in-time LAST batch); the finality path ({AtomicInteropProof.verifyInclusion}) always uses the end
+/// root and ignores this field.
 struct ImtProof {
     uint256 sourceChainId;
     uint256 batchNumber;
     bytes32 chainImtRoot;
+    bool provesAgainstBeginRoot;
     bytes32[] settlementProof;
     IMTLeaf leaf;
     uint256 imtLeafIndex;
