@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IExecutor, BatchImtRoots} from "../chain-interfaces/IExecutor.sol";
+import {IExecutor} from "../chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, CommitBatchInfoZKsyncOS, PrecommitInfo} from "../chain-interfaces/ICommitter.sol";
 import {PriorityOpsBatchInfo} from "./PriorityTree.sol";
 import {
@@ -12,7 +12,7 @@ import {
     UnsupportedExecuteBatchEncoding,
     UnsupportedProofBatchEncoding
 } from "../../common/L1ContractErrors.sol";
-import {InteropRoot, L2Log} from "../../common/Messaging.sol";
+import {InteropRoot} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -236,25 +236,14 @@ library BatchDecoder {
         }
     }
 
-    /// @notice The decoded contents of the execute-batches wire data (an 8-tuple on the wire; grouped
-    /// into one struct so callers keep a single stack slot).
+    /// @notice The decoded contents of the execute-batches wire data.
     /// @param batchesData The stored batch information for execution.
     /// @param priorityOpsData Merkle proofs of the priority operations for each batch.
     /// @param dependencyRoots Interop dependency roots for each batch.
-    /// @param logs L2 logs for each batch.
-    /// @param messages L2 messages for each batch.
-    /// @param multichainBatchRoots Multichain batch roots for chain for each batch.
-    /// @param imtRoots Interop commitment tree root snapshots (batch begin / batch end) for each batch.
-    /// @param settlementFeePayer Address that pays gateway settlement fees.
     struct DecodedExecuteData {
         IExecutor.StoredBatchInfo[] batchesData;
         PriorityOpsBatchInfo[] priorityOpsData;
         InteropRoot[][] dependencyRoots;
-        L2Log[][] logs;
-        bytes[][] messages;
-        bytes32[] multichainBatchRoots;
-        BatchImtRoots[] imtRoots;
-        address settlementFeePayer;
     }
 
     /// @notice Decodes execution data from a calldata byte array.

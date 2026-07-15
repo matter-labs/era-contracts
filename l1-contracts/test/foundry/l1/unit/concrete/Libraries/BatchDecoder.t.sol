@@ -4,10 +4,10 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
-import {IExecutor, BatchImtRoots} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, PrecommitInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
-import {InteropRoot, L2Log} from "contracts/common/Messaging.sol";
+import {InteropRoot} from "contracts/common/Messaging.sol";
 import {
     EmptyData,
     IncorrectBatchBounds,
@@ -179,10 +179,6 @@ contract BatchDecoderTest is Test {
 
         PriorityOpsBatchInfo[] memory priorityOps = new PriorityOpsBatchInfo[](2);
         InteropRoot[][] memory dependencyRoots = new InteropRoot[][](2);
-        L2Log[][] memory logs = new L2Log[][](2);
-        bytes[][] memory messages = new bytes[][](2);
-        bytes32[] memory multichainBatchRoots = new bytes32[](2);
-        BatchImtRoots[] memory imtRoots = new BatchImtRoots[](2);
 
         bytes memory encodedData = abi.encodePacked(
             SUPPORTED_ENCODING_VERSION,
@@ -190,12 +186,7 @@ contract BatchDecoderTest is Test {
                 BatchDecoder.DecodedExecuteData({
                     batchesData: executeBatches,
                     priorityOpsData: priorityOps,
-                    dependencyRoots: dependencyRoots,
-                    logs: logs,
-                    messages: messages,
-                    multichainBatchRoots: multichainBatchRoots,
-                    imtRoots: imtRoots,
-                    settlementFeePayer: address(0)
+                    dependencyRoots: dependencyRoots
                 })
             )
         );
@@ -222,10 +213,6 @@ contract BatchDecoderTest is Test {
 
         PriorityOpsBatchInfo[] memory priorityOps = new PriorityOpsBatchInfo[](1);
         InteropRoot[][] memory dependencyRoots = new InteropRoot[][](1);
-        L2Log[][] memory logs = new L2Log[][](1);
-        bytes[][] memory messages = new bytes[][](1);
-        bytes32[] memory multichainBatchRoots = new bytes32[](1);
-        BatchImtRoots[] memory imtRoots = new BatchImtRoots[](1);
 
         bytes memory encodedData = abi.encodePacked(
             unsupportedVersion,
@@ -233,12 +220,7 @@ contract BatchDecoderTest is Test {
                 BatchDecoder.DecodedExecuteData({
                     batchesData: executeBatches,
                     priorityOpsData: priorityOps,
-                    dependencyRoots: dependencyRoots,
-                    logs: logs,
-                    messages: messages,
-                    multichainBatchRoots: multichainBatchRoots,
-                    imtRoots: imtRoots,
-                    settlementFeePayer: address(0)
+                    dependencyRoots: dependencyRoots
                 })
             )
         );
@@ -254,10 +236,6 @@ contract BatchDecoderTest is Test {
 
         PriorityOpsBatchInfo[] memory priorityOps = new PriorityOpsBatchInfo[](2);
         InteropRoot[][] memory dependencyRoots = new InteropRoot[][](2);
-        L2Log[][] memory logs = new L2Log[][](2);
-        bytes[][] memory messages = new bytes[][](2);
-        bytes32[] memory multichainBatchRoots = new bytes32[](2);
-        BatchImtRoots[] memory imtRoots = new BatchImtRoots[](2);
 
         bytes memory encodedData = abi.encodePacked(
             SUPPORTED_ENCODING_VERSION,
@@ -265,12 +243,7 @@ contract BatchDecoderTest is Test {
                 BatchDecoder.DecodedExecuteData({
                     batchesData: executeBatches,
                     priorityOpsData: priorityOps,
-                    dependencyRoots: dependencyRoots,
-                    logs: logs,
-                    messages: messages,
-                    multichainBatchRoots: multichainBatchRoots,
-                    imtRoots: imtRoots,
-                    settlementFeePayer: address(0)
+                    dependencyRoots: dependencyRoots
                 })
             )
         );
@@ -283,10 +256,6 @@ contract BatchDecoderTest is Test {
         IExecutor.StoredBatchInfo[] memory executeBatches = new IExecutor.StoredBatchInfo[](0);
         PriorityOpsBatchInfo[] memory priorityOps = new PriorityOpsBatchInfo[](0);
         InteropRoot[][] memory dependencyRoots = new InteropRoot[][](0);
-        L2Log[][] memory logs = new L2Log[][](0);
-        bytes[][] memory messages = new bytes[][](0);
-        bytes32[] memory multichainBatchRoots = new bytes32[](0);
-        BatchImtRoots[] memory imtRoots = new BatchImtRoots[](0);
 
         bytes memory encodedData = abi.encodePacked(
             SUPPORTED_ENCODING_VERSION,
@@ -294,12 +263,7 @@ contract BatchDecoderTest is Test {
                 BatchDecoder.DecodedExecuteData({
                     batchesData: executeBatches,
                     priorityOpsData: priorityOps,
-                    dependencyRoots: dependencyRoots,
-                    logs: logs,
-                    messages: messages,
-                    multichainBatchRoots: multichainBatchRoots,
-                    imtRoots: imtRoots,
-                    settlementFeePayer: address(0)
+                    dependencyRoots: dependencyRoots
                 })
             )
         );

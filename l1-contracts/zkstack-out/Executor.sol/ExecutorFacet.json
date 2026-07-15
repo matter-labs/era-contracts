@@ -1,16 +1,5 @@
 [
   {
-    "type": "constructor",
-    "inputs": [
-      {
-        "name": "_l1ChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
     "type": "function",
     "name": "executeBatchesSharedBridge",
     "inputs": [
