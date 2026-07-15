@@ -1,5 +1,5 @@
-//! Emit the `AirbenderPlonkProofFixture.sol` Solidity library (the `publicInputs()`
-//! and `serializedProof()` arrays) used by the foundry tests against
+//! Emit the `AirbenderPlonkProofFixture.sol` Solidity library (the `publicInputs()`,
+//! `serializedProof()` and `programOutput()` arrays) used by the foundry tests against
 //! `AirbenderVerifierPlonk` / `EraDualVerifier`.
 //!
 //! Two input modes:
@@ -67,9 +67,10 @@ struct Opt {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opt = Opt::from_args();
 
-    // Both modes reduce to two lists of `0x`-prefixed 32-byte hex words: the public inputs and the
-    // serialized proof. `render_fixture` is the single source of the `.sol` layout.
-    let (inputs, serialized_proof) = match (&opt.input, &opt.snark_proof_blob) {
+    // Both modes reduce to two lists of `0x`-prefixed 32-byte hex words (the public inputs and the
+    // serialized proof) plus the guest's program output. `render_fixture` is the single source of
+    // the `.sol` layout.
+    let (inputs, serialized_proof, program_output) = match (&opt.input, &opt.snark_proof_blob) {
         (Some(input), None) => from_json(input)?,
         (None, Some(blob)) => {
             let prev = opt
@@ -88,7 +89,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         (None, None) => return Err("pass --input or --snark-proof-blob".into()),
     };
 
-    let out = render_fixture(&inputs, &serialized_proof);
+    let out = render_fixture(&inputs, &serialized_proof, &program_output);
     File::create(&opt.output)?.write_all(out.as_bytes())?;
 
     println!(
@@ -101,17 +102,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Reads the canonical PLONK proof JSON and flattens it with `serialize_proof`, returning the
-/// public inputs and proof words as lowercase 64-char hex strings.
-fn from_json(input: &PathBuf) -> Result<(Vec<String>, Vec<String>), Box<dyn std::error::Error>> {
+/// public inputs and proof words as lowercase 64-char hex strings, plus the guest program output.
+fn from_json(
+    input: &PathBuf,
+) -> Result<(Vec<String>, Vec<String>, [u32; 8]), Box<dyn std::error::Error>> {
     let reader = BufReader::new(File::open(input)?);
     let proof: Proof<Bn256, ZkSyncSnarkWrapperCircuit> = serde_json::from_reader(reader)?;
     let (inputs, serialized_proof) = zksync_solidity_vk_codegen::serialize_proof(&proof);
+    let inputs: Vec<String> = inputs.iter().map(|i| format!("{i:064x}")).collect();
+    // A SNARK proof JSON only carries the already-shifted public input, so the program output's low
+    // 32 bits (dropped by `PUBLIC_INPUT_SHIFT`) are unrecoverable here — `program_output_from_public_input`
+    // zero-fills them. That low word is dropped again by the on-chain derivation, so the fixture stays
+    // self-consistent; only the blob mode reproduces the true low word.
+    let program_output = program_output_from_public_input(
+        inputs.first().ok_or("proof JSON has no public input")?,
+    )?;
     Ok((
-        inputs.iter().map(|i| format!("{i:064x}")).collect(),
+        inputs,
         serialized_proof
             .iter()
             .map(|w| format!("{w:064x}"))
             .collect(),
+        program_output,
     ))
 }
 
@@ -120,10 +132,11 @@ fn from_blob(
     blob: &PathBuf,
     prev_commitment: &str,
     curr_commitment: &str,
-) -> Result<(Vec<String>, Vec<String>), Box<dyn std::error::Error>> {
+) -> Result<(Vec<String>, Vec<String>, [u32; 8]), Box<dyn std::error::Error>> {
     let proof_words = read_proof_words(blob)?;
-    let public_input = derive_public_input(prev_commitment, curr_commitment)?;
-    Ok((vec![public_input], proof_words))
+    let (public_input, program_output) =
+        derive_public_input_and_program_output(prev_commitment, curr_commitment)?;
+    Ok((vec![public_input], proof_words, program_output))
 }
 
 /// The stored SNARK proof object, mirrored just enough to reach the serialized proof words.
@@ -177,25 +190,59 @@ fn read_proof_words(blob: &PathBuf) -> Result<Vec<String>, Box<dyn std::error::E
     Ok(proof_bytes.chunks(32).map(hex::encode).collect())
 }
 
-/// `keccak256(prev ‖ curr) >> PUBLIC_INPUT_SHIFT`, returned as a 64-char hex string. Mirrors the
-/// on-chain Era `_getBatchProofPublicInput` (and the value the guest folds into its program output).
-fn derive_public_input(
+/// From the two batch commitments, derive both:
+///   * the SNARK public input — `keccak256(prev ‖ curr) >> PUBLIC_INPUT_SHIFT`, as a 64-char hex
+///     string, mirroring the on-chain Era `_getBatchProofPublicInput`; and
+///   * the guest program output — the full `keccak256(prev ‖ curr)` digest, which the guest folds
+///     into registers 10..=17 before the wrapper shifts it into the public input, as 8 `u32` words.
+fn derive_public_input_and_program_output(
     prev_commitment: &str,
     curr_commitment: &str,
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> Result<(String, [u32; 8]), Box<dyn std::error::Error>> {
     let prev = parse_h256(prev_commitment, "prev-commitment")?;
     let curr = parse_h256(curr_commitment, "curr-commitment")?;
 
     let mut hasher = Keccak256::new();
     hasher.update(prev);
     hasher.update(curr);
-    let digest = hasher.finalize();
+    let digest: [u8; 32] = hasher.finalize().into();
 
     // Right-shift the 256-bit big-endian digest by 32 bits: zero the top 4 bytes and slide the
     // remaining 28 down.
     let mut shifted = [0u8; 32];
     shifted[PUBLIC_INPUT_SHIFT_BYTES..].copy_from_slice(&digest[..32 - PUBLIC_INPUT_SHIFT_BYTES]);
-    Ok(hex::encode(shifted))
+
+    Ok((hex::encode(shifted), program_output_words(&digest)))
+}
+
+/// Recover the program output (8 `u32` words) from an already-shifted public input, for the JSON
+/// mode that has no commitments. The public input is the top 28 bytes of the digest; the low 4
+/// bytes were dropped by `PUBLIC_INPUT_SHIFT` and cannot be recovered, so they are zero-filled.
+fn program_output_from_public_input(
+    public_input_hex: &str,
+) -> Result<[u32; 8], Box<dyn std::error::Error>> {
+    let pi = parse_h256(public_input_hex, "public-input")?;
+    // `pi` holds the shifted value (its own top 4 bytes are zero); undo the shift to recover the
+    // digest layout with a zeroed low word: digest_bytes = pi << 32.
+    let mut digest = [0u8; 32];
+    digest[..32 - PUBLIC_INPUT_SHIFT_BYTES].copy_from_slice(&pi[PUBLIC_INPUT_SHIFT_BYTES..]);
+    Ok(program_output_words(&digest))
+}
+
+/// Split a big-endian 32-byte buffer into the guest's 8 program-output registers. Each register is
+/// a little-endian `u32` occupying 4 consecutive bytes (RISC-V registers are little-endian), so the
+/// buffer's most significant byte is the low byte of word 0 — the inverse of the packing done by
+/// `_derivePublicInput` in the foundry test.
+fn program_output_words(digest: &[u8; 32]) -> [u32; 8] {
+    let mut words = [0u32; 8];
+    for (i, word) in words.iter_mut().enumerate() {
+        let j = i * 4;
+        *word = (digest[j] as u32)
+            | (digest[j + 1] as u32) << 8
+            | (digest[j + 2] as u32) << 16
+            | (digest[j + 3] as u32) << 24;
+    }
+    words
 }
 
 fn parse_h256(value: &str, what: &str) -> Result<[u8; 32], Box<dyn std::error::Error>> {
@@ -206,7 +253,11 @@ fn parse_h256(value: &str, what: &str) -> Result<[u8; 32], Box<dyn std::error::E
 }
 
 /// Renders the fixture. Inputs/words are lowercase 64-char hex strings (no `0x`).
-fn render_fixture(public_inputs: &[String], serialized_proof: &[String]) -> String {
+fn render_fixture(
+    public_inputs: &[String],
+    serialized_proof: &[String],
+    program_output: &[u32; 8],
+) -> String {
     let mut out = String::new();
     out.push_str("// SPDX-License-Identifier: MIT\n");
     out.push_str("// Generated by tools/src/bin/serialize_test_proof.rs — do not edit by hand.\n");
@@ -231,6 +282,23 @@ fn render_fixture(public_inputs: &[String], serialized_proof: &[String]) -> Stri
     for (i, word) in serialized_proof.iter().enumerate() {
         out.push_str(&format!("        proof[{i}] = 0x{word};\n"));
     }
+    out.push_str("    }\n\n");
+
+    out.push_str("    /// The guest program output: registers 10..=17 (`Receipt::output`) the guest\n");
+    out.push_str("    /// emitted for this batch, i.e. the full `keccak256(prev ‖ curr)` digest as 8\n");
+    out.push_str("    /// little-endian `u32` words. The wrapper packs these, reads them big-endian and\n");
+    out.push_str("    /// drops the low 32 bits (`PUBLIC_INPUT_SHIFT`) to obtain `publicInputs()[0]`.\n");
+    out.push_str("    function programOutput() internal pure returns (uint32[8] memory words) {\n");
+    out.push_str("        words = [\n");
+    for (i, word) in program_output.iter().enumerate() {
+        let sep = if i + 1 < program_output.len() { "," } else { "" };
+        if i == 0 {
+            out.push_str(&format!("            uint32({word}){sep}\n"));
+        } else {
+            out.push_str(&format!("            {word}{sep}\n"));
+        }
+    }
+    out.push_str("        ];\n");
     out.push_str("    }\n");
 
     out.push_str("}\n");

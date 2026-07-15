@@ -43,22 +43,6 @@ contract InertPlonkVerifier is IVerifier {
 contract AirbenderPlonkProofIntegrationTest is Test {
     uint256 internal constant AIRBENDER_PLONK_VERIFICATION_TYPE = 2;
 
-    /// Program output the guest emitted, as 8 u32 words — the guest's final
-    /// registers 10..=17 (`Receipt::output`), extracted from the FRI proof for
-    /// batch 1 (`register_final_values` of the `UnrolledProgramProof`). This is
-    /// the `proof_public_input`: the guest already folds
-    /// keccak(prev_commitment ‖ curr_commitment) into it.
-    uint32[8] internal PROGRAM_OUTPUT = [
-        uint32(1729207614),
-        1867842805,
-        1534832305,
-        821007321,
-        1355092776,
-        2617090311,
-        1207408377,
-        2888963040
-    ];
-
     /// Commitment to the eravm-airbender-verifier guest binary, as the wrapper
     /// sees it. Sourced from `recursion_chain_hash` in the FRI proof for batch 1
     /// (the guest's final registers 18..=25; also surfaced as `aux_params` of
@@ -213,11 +197,12 @@ contract AirbenderPlonkProofIntegrationTest is Test {
     }
 
     /// Cross-check: the SNARK's claimed public input equals the wrapper's
-    /// derivation from `program_output` alone. If this drifts, either our
-    /// encoding understanding is wrong or the proof was produced against a
-    /// different program than we think.
+    /// derivation from `programOutput()` alone. Both come from the fixture
+    /// generator, so this pins the Solidity encoding (`_derivePublicInput`) against
+    /// the Rust one — if the little-endian packing or `PUBLIC_INPUT_SHIFT` drift on
+    /// either side, this fails.
     function test_publicInput_isShiftedProgramOutput() public view {
-        uint256 derived = _derivePublicInput(PROGRAM_OUTPUT);
+        uint256 derived = _derivePublicInput(AirbenderPlonkProofFixture.programOutput());
 
         uint256 fromFixture = AirbenderPlonkProofFixture.publicInputs()[0];
         assertEq(derived, fromFixture, "Derived public input doesn't match SNARK fixture");
@@ -228,7 +213,7 @@ contract AirbenderPlonkProofIntegrationTest is Test {
     /// This is the shape the L1 settlement contract ultimately uses.
     function test_endToEnd_derivePublicInputThenVerify() public view {
         uint256[] memory inputs = new uint256[](1);
-        inputs[0] = _derivePublicInput(PROGRAM_OUTPUT);
+        inputs[0] = _derivePublicInput(AirbenderPlonkProofFixture.programOutput());
 
         bool ok = airbenderVerifier.verify(inputs, AirbenderPlonkProofFixture.serializedProof());
         assertTrue(ok, "Proof must verify against the derived public input");
