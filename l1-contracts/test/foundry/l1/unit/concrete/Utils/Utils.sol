@@ -294,7 +294,7 @@ library Utils {
         return (
             _batchesData[0].batchNumber,
             _batchesData[len - 1].batchNumber,
-            bytes.concat(bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION), encoded)
+            bytes.concat(bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION_EXECUTE), encoded)
         );
     }
 

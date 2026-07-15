@@ -71,6 +71,10 @@ contract AtomicInteropProofWrapper {
 /// *parses* it (it does not re-verify the terminal root, which is the mocked verifier's job), so it
 /// does not need to hash to any real interop root.
 abstract contract AtomicInteropProofBuilder is Test {
+    /// @dev The flow deadline all proofs are built against (shared with the tests so the builders
+    /// can declare the honest timeout branch for a given batch timestamp).
+    uint64 internal constant DEADLINE = 1_000;
+
     AtomicInteropProofWrapper internal proofLib;
     L2InteropCommitmentTree internal tree;
     L2InteropRootStorage internal rootStorage;
@@ -269,6 +273,8 @@ abstract contract AtomicInteropProofBuilder is Test {
                 sourceChainId: _sourceChainId,
                 batchNumber: _batchNumber,
                 chainImtRoot: tree.root(),
+                // The finality path always authenticates the end root; the branch bool is ignored.
+                provesAgainstBeginRoot: false,
                 settlementProof: _settlementProof(_slChainId, _slBlock, _l1Timestamp, new bytes32[](0)),
                 leaf: tree.leafAt(_leafIndex),
                 imtLeafIndex: _leafIndex,
@@ -293,6 +299,10 @@ abstract contract AtomicInteropProofBuilder is Test {
                 sourceChainId: _sourceChainId,
                 batchNumber: _batchNumber,
                 chainImtRoot: tree.root(),
+                // Declare the branch the way an honest prover does: begin root for a late batch,
+                // end root for an in-time one. Tests overriding the declaration set the field
+                // explicitly after building.
+                provesAgainstBeginRoot: _l1Timestamp > DEADLINE,
                 settlementProof: _settlementProof(_slChainId, _slBlock, _l1Timestamp, new bytes32[](0)),
                 leaf: tree.leafAt(lowIndex),
                 imtLeafIndex: lowIndex,

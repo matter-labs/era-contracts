@@ -22,6 +22,10 @@ import {InteropRoot} from "../../common/Messaging.sol";
 library BatchDecoder {
     /// @notice The currently supported encoding version.
     uint8 internal constant SUPPORTED_ENCODING_VERSION = 1;
+    /// @notice The currently supported encoding version for execute data. Bumped to 2 when the
+    /// execute wire changed from the v31 flat tuple to `abi.encode(DecodedExecuteData)` (a breaking
+    /// re-encoding must not reuse the old version byte).
+    uint8 internal constant SUPPORTED_ENCODING_VERSION_EXECUTE = 2;
     /// @notice The currently supported encoding version for ZKSync OS commit data.
     /// We use different encoding only for commit, while prove/execute are common for Era VM and ZKsync OS chains.
     uint8 internal constant SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS = 4;
@@ -257,7 +261,7 @@ library BatchDecoder {
         }
 
         uint8 encodingVersion = uint8(_executeData[0]);
-        if (encodingVersion != SUPPORTED_ENCODING_VERSION) {
+        if (encodingVersion != SUPPORTED_ENCODING_VERSION_EXECUTE) {
             revert UnsupportedExecuteBatchEncoding(encodingVersion);
         }
         decoded = abi.decode(_executeData[1:], (DecodedExecuteData));

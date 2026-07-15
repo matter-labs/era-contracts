@@ -113,6 +113,11 @@
                 "internalType": "bytes32"
               },
               {
+                "name": "provesAgainstBeginRoot",
+                "type": "bool",
+                "internalType": "bool"
+              },
+              {
                 "name": "settlementProof",
                 "type": "bytes32[]",
                 "internalType": "bytes32[]"

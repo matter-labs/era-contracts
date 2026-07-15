@@ -89,6 +89,11 @@
             "internalType": "bytes32"
           },
           {
+            "name": "provesAgainstBeginRoot",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
             "name": "settlementProof",
             "type": "bytes32[]",
             "internalType": "bytes32[]"
@@ -161,6 +166,19 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "initL2",
+    "inputs": [
+      {
+        "name": "_l1ChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -277,6 +295,11 @@
                 "name": "chainImtRoot",
                 "type": "bytes32",
                 "internalType": "bytes32"
+              },
+              {
+                "name": "provesAgainstBeginRoot",
+                "type": "bool",
+                "internalType": "bool"
               },
               {
                 "name": "settlementProof",

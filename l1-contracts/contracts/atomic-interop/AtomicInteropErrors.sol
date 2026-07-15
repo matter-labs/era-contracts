@@ -62,6 +62,11 @@ error ProofInteropRootNotAfterDeadline(uint256 rootTimestamp, uint64 deadline);
 /// chain's last batch inside the aggregated root: the batch-leaf Merkle path has a populated right
 /// sibling at `level` where the empty-subtree hash was required.
 error ProofNotLastBatchInRoot(uint256 level, bytes32 sibling);
+
+/// @dev The prover-declared timeout branch does not match the authenticated batch inclusion time:
+/// the begin-root branch requires a late batch (`l1BatchTimestamp > deadline`), the end-root branch
+/// an in-time one (`l1BatchTimestamp <= deadline`).
+error ProofTimeoutBranchMismatch(bool provesAgainstBeginRoot, uint256 l1BatchTimestamp, uint256 deadline);
 /// @dev The commit value is not a member of the authenticated root.
 error ProofInclusionFailed(bytes32 root, uint256 value);
 /// @dev The low-nullifier does not certify absence of the commit value in the authenticated root.
