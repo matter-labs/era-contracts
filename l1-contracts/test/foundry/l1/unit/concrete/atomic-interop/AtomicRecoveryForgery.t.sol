@@ -7,7 +7,9 @@ import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol"
 import {LegState} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {ManagerNoRecoverableCalls} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
+import {RecoverToL1NotSupported} from "contracts/common/L1ContractErrors.sol";
 import {
     BundleAttributes,
     INTEROP_BUNDLE_VERSION,
@@ -17,7 +19,7 @@ import {
 } from "contracts/common/Messaging.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 contract AtomicFlowManagerRecoveryHarness is AtomicFlowManager {
     function forceRevertable(bytes32 _flowId, bytes32 _bundleHash) external {
@@ -71,6 +73,9 @@ contract MockRecoveringNativeTokenVault {
 /// vault accounting; the `Revertable` state is set via a harness (the full send + `authorizeRefund` proof
 /// path is covered by the anvil-interop suite) since the gate under test is at recovery.
 contract AtomicRecoveryForgeryTest is Test {
+    uint256 internal constant L1_CHAIN_ID = 1;
+    uint256 internal constant ERA_CHAIN_ID = 271;
+
     AtomicFlowManagerRecoveryHarness internal manager;
     MockRecoveringNativeTokenVault internal ntv;
     L2AssetRouterRecoveryHarness internal router;
@@ -83,13 +88,21 @@ contract AtomicRecoveryForgeryTest is Test {
     function setUp() public {
         manager = new AtomicFlowManagerRecoveryHarness();
         ntv = new MockRecoveringNativeTokenVault();
-        router = new L2AssetRouterRecoveryHarness(address(manager), address(ntv));
+        // Recovery dispatches to each call's local sender (`InteropCall.from`) — for burn-produced calls
+        // the canonical L2_ASSET_ROUTER_ADDR — so the router harness must live at that address.
+        deployCodeTo(
+            "AtomicRecoveryForgery.t.sol:L2AssetRouterRecoveryHarness",
+            abi.encode(address(manager), address(ntv)),
+            L2_ASSET_ROUTER_ADDR
+        );
+        router = L2AssetRouterRecoveryHarness(L2_ASSET_ROUTER_ADDR);
         router.initReentrancyGuardForTest();
     }
 
     /// @dev Builds a single-call atomic bundle whose only call is a `finalizeDeposit`, with the call's
     /// `from`/`to` set to the given values. `from` is the provenance discriminator (`L2_ASSET_ROUTER_ADDR`
-    /// iff produced by the router's own burn path); `to` is the recovery target.
+    /// iff produced by the router's own burn path) and the recovery target; `to` is the destination-side
+    /// counterpart, never called during recovery.
     function _buildBundle(address _from, address _to) internal returns (InteropBundle memory bundle) {
         bytes memory mintData = DataEncoding.encodeBridgeMintData({
             _originalCaller: attacker,
@@ -178,5 +191,36 @@ contract AtomicRecoveryForgeryTest is Test {
         assertEq(ntv.recoveredOriginalCaller(), attacker);
         assertEq(ntv.recoveredAmount(), amount);
         assertEq(uint256(manager.legState(flowId, bundleHash)), uint256(LegState.Reverted));
+    }
+
+    /// L2->L1 interop is never revertable (`InteropCenter` rejects L1-destined atomic bundles at send), so
+    /// the recovery entry point asserts the invariant: even a genuine router-backed burn is rejected when
+    /// its destination is L1 — the whole `claimRefund` reverts (leaving the leg `Revertable`) instead of
+    /// unwinding the append-only `totalWithdrawalsToL1` accounting.
+    function test_recoverToL1IsUnreachable() external {
+        // Arm the router's L1 chain id through the real upgrade entry point.
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        // solhint-disable-next-line func-named-parameters
+        router.updateL2(
+            L1_CHAIN_ID,
+            ERA_CHAIN_ID,
+            IL1AssetRouter(makeAddr("l1 asset router")),
+            keccak256("base token asset id"),
+            makeAddr("aliased owner")
+        );
+
+        InteropBundle memory bundle = _buildBundle({_from: L2_ASSET_ROUTER_ADDR, _to: address(router)});
+        bundle.destinationChainId = L1_CHAIN_ID;
+        (bytes32 flowId, bytes32 bundleHash, bytes memory encodedBundle) = _commitRevertable(bundle);
+
+        vm.expectRevert(RecoverToL1NotSupported.selector);
+        manager.claimRefund(flowId, encodedBundle);
+
+        assertEq(ntv.recoveries(), 0, "an L1-destined burn must never reach the NTV recovery path");
+        assertEq(
+            uint256(manager.legState(flowId, bundleHash)),
+            uint256(LegState.Revertable),
+            "leg must stay Revertable when the L1-destined claim reverts"
+        );
     }
 }

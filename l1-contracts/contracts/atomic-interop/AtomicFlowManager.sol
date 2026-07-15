@@ -38,7 +38,7 @@ import {
 /// Receive: {InteropHandler.executeAtomicBundle} calls {requireFlowFinalized} (the atomicity gate) in
 /// place of the L1-message inclusion proof, then executes the bundle (and owns the replay guard).
 /// Timeout: {authorizeRefund} + {claimRefund} recover the burned source funds to the depositor by
-/// asking each of the bundle's call targets to reverse itself via {IAtomicRecoverable.recoverAtomicCall}.
+/// asking each burn-producing call's local sender to reverse itself via {IAtomicRecoverable.recoverAtomicCall}.
 ///
 /// No double-spend: executing a bundle requires every leg present in a batch whose `l1Timestamp <=
 /// deadline`, while a refund requires some leg absent from the last such batch (pinned by the next batch
@@ -189,10 +189,12 @@ contract AtomicFlowManager is IAtomicFlowManager {
     }
 
     /// @dev Reverses every recoverable call embedded in `_bundle`, re-crediting the original depositor.
-    /// Each call's target (`InteropCall.to`) owns its own reversal via {IAtomicRecoverable.recoverAtomicCall}:
-    /// the manager is agnostic to the call/encoding format and simply forwards `(destinationChainId, data)`
-    /// to every target, counting the ones that report a recovery. Targets must return `false` (not revert)
-    /// for calls they do not recognise.
+    /// Each call's local sender (`InteropCall.from`) owns its own reversal via
+    /// {IAtomicRecoverable.recoverAtomicCall}: it is the contract that authorized (and burned for) the call
+    /// on this chain, while the call's target (`InteropCall.to`) lives on the destination chain and need
+    /// not even exist here. The manager is agnostic to the call/encoding format and simply forwards
+    /// `(destinationChainId, data)`, counting the calls that report a recovery. Senders must return `false`
+    /// (not revert) for calls they do not recognise.
     ///
     /// Recovery is best-effort by design. An atomic bundle may mix fund-moving calls (e.g. asset-router
     /// deposits, which re-mint to the depositor) with calls that move no funds and have nothing to reverse
@@ -204,20 +206,22 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// Consequence: the protocol does not guarantee full refundability of an arbitrary bundle. A flow author
     /// must make any fund-moving leg a recoverable (asset-router) call to have it returned on timeout; a
     /// non-recoverable fund-moving call would strand its funds. Send-time ({InteropCenter}) only blocks
-    /// native-`value` legs, which no one can reverse.
+    /// native-`value` legs (which no one can reverse) and L1-destined atomic bundles (L2->L1 withdrawals
+    /// are never revertable).
     function _recoverBundle(bytes32 _flowId, bytes32 _bundleHash, InteropBundle memory _bundle) internal {
         uint256 destChainId = _bundle.destinationChainId;
         uint256 callsLen = _bundle.calls.length;
         uint256 recovered = 0;
         for (uint256 i = 0; i < callsLen; ++i) {
             InteropCall memory c = _bundle.calls[i];
-            // Only recover burn-produced calls (from == asset router). A direct call never burned, so
-            // recovering it would mint funds with no matching burn. (InteropCenter rejects these at commit;
-            // this is the recovery-side guard.)
+            // Only recover burn-produced calls (from == asset router, as set by `initiateIndirectCall`).
+            // A direct call never burned, so recovering it would mint funds with no matching burn — and its
+            // `from` (the original sender, possibly an EOA) need not implement {IAtomicRecoverable}, so
+            // calling it would brick the refund of the whole bundle. Skip instead.
             if (c.from != L2_ASSET_ROUTER_ADDR) {
                 continue;
             }
-            if (IAtomicRecoverable(c.to).recoverAtomicCall(destChainId, c.data)) {
+            if (IAtomicRecoverable(c.from).recoverAtomicCall(destChainId, c.data)) {
                 ++recovered;
             }
         }
