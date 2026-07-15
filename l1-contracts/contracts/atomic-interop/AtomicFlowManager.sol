@@ -9,6 +9,7 @@ import {LegState, AtomicFlow, ImtProof, AtomicFinalityProof} from "./IAtomicInte
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
 import {InteropDataEncoding} from "../interop/InteropDataEncoding.sol";
 import {
+    L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_INTEROP_HANDLER_ADDR
@@ -24,8 +25,10 @@ import {
     ManagerProofCountMismatch,
     ManagerExecutingBundleNotInFlow,
     ManagerNoRecoverableCalls,
+    ManagerSettlementLayerNotL1,
     ProofSourceChainMismatch
 } from "./AtomicInteropErrors.sol";
+import {Unauthorized} from "../l2-system/zksync-os/errors/ZKOSContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -51,6 +54,25 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// (commitment tree, interop center, interop handler) are genesis-deployed built-ins
     /// at canonical fixed addresses, so they are referenced as constants rather than stored/initialized.
     mapping(bytes32 flowId => mapping(bytes32 bundleHash => LegState)) internal _state;
+
+    /// @dev The chain ID of the L1 network, set during the genesis upgrade (see `initL2`). In this
+    /// release interop legs settle on L1 only, so every flow's `settlementLayerChainId` must equal it.
+    uint256 public L1_CHAIN_ID;
+
+    /// @dev Only allows calls from the complex upgrader contract on L2.
+    modifier onlyUpgrader() {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    /// @notice One-time L2 initialization performed by the genesis upgrade
+    /// (`L2GenesisForceDeploymentsHelper._initializeV31Contracts`), mirroring the other L2 built-ins.
+    /// @param _l1ChainId The chain ID of the L1 network.
+    function initL2(uint256 _l1ChainId) external onlyUpgrader {
+        L1_CHAIN_ID = _l1ChainId;
+    }
 
     modifier onlyInteropCenter() {
         if (msg.sender != interopCenter()) revert ManagerNotInteropCenter(msg.sender);
@@ -87,6 +109,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
     ) external view onlyInteropHandler {
         AtomicFlow calldata flow = _finality.flow;
         _checkFlowId(flow);
+        _checkSettlementLayerIsL1(flow.settlementLayerChainId);
 
         uint256 n = flow.legBundleHashes.length;
         if (_finality.proofs.length != n) revert ManagerProofCountMismatch(n, _finality.proofs.length);
@@ -111,6 +134,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// @inheritdoc IAtomicFlowManager
     function authorizeRefund(AtomicFlow calldata _flow, uint256 _missingLegIndex, ImtProof calldata _absence) external {
         _checkFlowId(_flow);
+        _checkSettlementLayerIsL1(_flow.settlementLayerChainId);
 
         // 1. Bind the absence proof to the missing leg's declared source chain. Without this, the leg's
         //    commit value — which exists only in its own source chain's tree — is trivially absent from
@@ -211,6 +235,16 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// ascending (canonical order + dedup). `legSourceChainIds` is positional, aligned 1:1 with
     /// `legBundleHashes`; it may repeat and need not be ascending, so only its length is checked. Treating
     /// it as an ascending set instead would let a sibling chain in the set still enable a wrong-chain refund.
+    /// @dev In this release interop operates against roots imported from L1 only (see
+    /// `ChainAssetHandlerBase` — only the L1 message root is assumed for interop), so every flow must
+    /// declare L1 as its settlement layer. Checked wherever the settlement layer is consumed
+    /// (finality and refund verification); send-time `append` only sees the opaque `flowId`.
+    function _checkSettlementLayerIsL1(uint256 _settlementLayerChainId) internal view {
+        if (_settlementLayerChainId != L1_CHAIN_ID) {
+            revert ManagerSettlementLayerNotL1(L1_CHAIN_ID, _settlementLayerChainId);
+        }
+    }
+
     function _checkFlowId(AtomicFlow calldata _flow) internal pure {
         uint256 n = _flow.legBundleHashes.length;
         for (uint256 i = 1; i < n; ++i) {

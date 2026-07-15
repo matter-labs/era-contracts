@@ -33,6 +33,10 @@ error ManagerExecutingBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
 /// @dev The reverted bundle has no recoverable calls, so there are no source funds to return.
 error ManagerNoRecoverableCalls(bytes32 flowId, bytes32 bundleHash);
 
+/// @dev The flow declares a settlement layer other than L1; in this release interop legs settle on
+/// L1 only.
+error ManagerSettlementLayerNotL1(uint256 expectedL1ChainId, uint256 actual);
+
 // ── AtomicInteropProof library errors ────────────────────────────────────────────────
 /// @dev The claimed IMT root could not be proven as a chain-batch-root leaf of `(chainId, batchNumber)`
 /// against the imported interop root.
