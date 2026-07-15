@@ -249,16 +249,31 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         IERC20(_token).safeTransfer(_to, _amount);
     }
 
-    /// @dev Recovers a failed base-token transfer by returning the value escrowed in `BaseTokenHolder` at burn
-    /// time (which also reverses the source-side bridging accounting) — the inverse of `burnAndStartBridging`.
-    /// `_chainId` is the original bridge-out destination.
-    function _recoverBaseTokenFailedTransfer(
+    /// @dev The base token is escrowed off-vault (in `BaseTokenHolder`) at burn time, so the native/bridged
+    /// disbursement branches cannot recover it; return the escrow instead — the inverse of
+    /// `burnAndStartBridging`. `_chainId` is the original bridge-out destination.
+    function _disburseFailedTransfer(
         uint256 _chainId,
+        bytes32 _assetId,
         address _receiver,
-        uint256 _amount
-    ) internal override returns (bool handled) {
-        L2_BASE_TOKEN_HOLDER.recoverBaseToken(_receiver, _amount, _chainId);
-        return true;
+        uint256 _amount,
+        bool _isNative,
+        address _originToken,
+        bytes memory _erc20Data
+    ) internal override {
+        if (_assetId == BASE_TOKEN_ASSET_ID) {
+            L2_BASE_TOKEN_HOLDER.recoverBaseToken(_receiver, _amount, _chainId);
+            return;
+        }
+        super._disburseFailedTransfer({
+            _chainId: _chainId,
+            _assetId: _assetId,
+            _receiver: _receiver,
+            _amount: _amount,
+            _isNative: _isNative,
+            _originToken: _originToken,
+            _erc20Data: _erc20Data
+        });
     }
 
     /*//////////////////////////////////////////////////////////////

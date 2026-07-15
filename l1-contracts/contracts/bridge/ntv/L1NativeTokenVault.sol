@@ -246,12 +246,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         }
     }
 
-    /// @dev On L1 the base token is ETH, escrowed in this vault and recovered via the native `_withdrawFunds`
-    /// path, so no special handling is needed — return false to use the default disbursement logic.
-    function _recoverBaseTokenFailedTransfer(uint256, address, uint256) internal pure override returns (bool) {
-        return false;
-    }
-
     function _deployBeaconProxy(bytes32 _salt, uint256) internal override returns (BeaconProxy proxy) {
         // Use CREATE2 to deploy the BeaconProxy
         address proxyAddress = Create2.deploy(
