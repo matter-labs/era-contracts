@@ -76,11 +76,12 @@ The timeout proof relies on three preconditions, each enforced on chain:
 
 1. **Every chain interop can target has at least one batch inside the settlement layer's message
    root.** Enforced at two points:
-   - Freshly created chains (`addNewChain` with starting batch number 0, i.e. the same transaction
-     as the chain's DiamondInit): `MessageRootBase._addNewChain` seeds the chain's genesis batch
-     root (`ChainBatchRootTree.genesisChainBatchRoot()` — batch 0 has no logs and a freshly seeded
-     IMT, so the value is exact and `chainBatchRoots`/`chainBatchRootTimestamp` are recorded
-     consistently with the tree leaf).
+   - Freshly created chains report their genesis batch root right after registration, in the same
+     `createNewChain` transaction: the chain's DiamondInit stores
+     `ChainBatchRootTree.genesisChainBatchRoot()` (batch 0 has no logs and a freshly seeded IMT, so
+     the value is exact) as the batch-0 `l2LogsRootHash`, and the Bridgehub-triggered
+     `ExecutorFacet.reportGenesisRoot` forwards it to `MessageRoot.reportGenesisRoot` (once-only,
+     fresh chains only).
    - Already-deployed chains onboarded with a non-zero starting batch number are NOT seeded (a real
      batch with that number exists elsewhere, and a synthetic leaf would diverge from it); instead
      `ChainRegistrationSender` refuses to register a chain for interop until it has settled at least
@@ -97,12 +98,13 @@ The timeout proof relies on three preconditions, each enforced on chain:
    only be enabled once the chain is registered (has its `sharedTree` leaf) AND has a batch in its
    chain tree (precondition 1) — which is exactly what the `ChainRegistrationSender` gate checks.
 3. **Every batch leaf carries the timestamp at which it entered the shared root.** Enforced by
-   `MessageRoot.addChainBatchRoot`, which folds the settlement-layer `block.timestamp` into the batch
-   leaf (`MessageHashing.batchLeafHash`); the timestamp is therefore proven by the same inclusion
-   proof that authenticates the IMT root. Aggregated roots additionally carry their own creation
-   timestamp (`historicalRootTimestamp` on the settlement layer, imported as
-   `interopRootTimestamps` and double checked at batch execution), which anchors the "root from
-   after the deadline" requirement.
+   `MessageRoot.addChainBatchRootV32`, which folds the settlement-layer `block.timestamp` into the
+   batch leaf (`MessageHashing.batchLeafHash`); the timestamp is therefore proven by the same
+   inclusion proof that authenticates the IMT root. Aggregated roots additionally carry their own
+   creation timestamp — one `(blockNumber, root, timestamp)` tuple, exposed by
+   `MessageRoot.historicalRoot` on the settlement layer, imported into
+   `L2InteropRootStorage.interopRoots` and double checked at batch execution — which anchors the
+   "root from after the deadline" requirement.
 
 ## Contracts
 
@@ -123,13 +125,16 @@ for the timeout recovery, recognising the flow manager by its canonical address.
 
 ## ZKsync OS genesis
 
-The two L2 contracts are predeployed in the ZKsync OS genesis (no `Executor` / core-protocol changes):
+The two L2 contracts are predeployed in the ZKsync OS genesis (settlement-layer support lives in the
+core protocol: the `Executor` pushes batch roots via `addChainBatchRootV32`, verifies imported
+dependency roots, and reports the genesis batch leaf via `reportGenesisRoot`):
 
 - registered in the genesis gen tool (`tools/zksync-os-genesis-gen`) at `0x10012`
   (`L2InteropCommitmentTree`) and `0x10014` (`AtomicFlowManager`) — constants in
   `common/l2-helpers/L2ContractAddresses.sol`;
 - seeded during genesis in `L2GenesisForceDeploymentsHelper._initializeV31Contracts` (ZKsync OS only):
-  the commitment tree's one-time `initialize()` seeds the IMT. No wiring or registration step is needed —
+  the commitment tree's one-time `initialize()` seeds the IMT and the manager's `initL2` records the
+  L1 chain id every flow's settlement layer is checked against. No further wiring is needed —
   every collaborator is referenced by its canonical fixed address: the tree's appender and the manager's
   tree / interop center / interop handler are constant getters, and the AR recognises the manager via
   `_atomicFlowManagerAddr()`. The manager no longer holds an asset-router reference at all — it drives

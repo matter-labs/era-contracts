@@ -119,8 +119,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             bytes32 correctRootHash;
             uint256 correctTimestamp;
             if (interopRoot.chainId == block.chainid) {
-                // For the same chain we verify using the MessageRoot contract. Note, that in this
-                // release, import and export only happens on GW, so this is the only case we have to cover.
+                // For the same chain we verify using the MessageRoot contract. In this release
+                // interop roots are imported from the settlement layer the chain settles on (L1
+                // only — see the AtomicInteropProof header), so this is the only case to cover.
                 StoredInteropRoot memory recordedRoot = messageRootContract.historicalRoot(
                     uint256(interopRoot.blockOrBatchNumber)
                 );
@@ -154,9 +155,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @notice Appends the batch's chain batch root to the L1 MessageRoot.
     /// @param _batchNumber The number of the batch
     /// @param _messageRoot The root of the merkle tree of the messages to L1.
-    /// @dev We only call this function on L1. `addChainBatchRootV32` records the root (used for L2->L1
-    /// message verification), pushes it to the chain's interop tree, and emits the interop root — so
-    /// chains settling on L1 participate in interop, the same as on Gateway.
+    /// @dev `addChainBatchRootV32` records the root (used for L2->L1 message verification), pushes
+    /// it to the chain's interop tree, and emits the interop root — chains settling on this layer
+    /// participate in interop. Runs on whichever settlement layer the chain settles on (L1 only in
+    /// this release).
     function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
         // Once the batch is executed, we include its message to the message root.
         IMessageRootBase messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();

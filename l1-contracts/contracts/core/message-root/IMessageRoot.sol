@@ -52,14 +52,16 @@ interface IMessageRootBase is IMessageVerification {
     event NewChainRoot(uint256 indexed chainId, bytes32 chainRoot, bytes32 chainIdLeafHash);
 
     /// @notice Emitted whenever the sharedTree is updated, and the new InteropRoot (root of the sharedTree) is generated.
-    /// @param chainId The ID of the chain where the sharedTree was updated.
+    /// @param chainId The ID of the chain where the sharedTree was updated (the settlement layer's own chain id).
     /// @param blockNumber The block number of the block in which the sharedTree was updated.
-    /// @param logId The ID of the log emitted when a new InteropRoot.
+    /// @param logId The per-block ID of the emission: all NewInteropRoot events within one block share
+    /// the same logId (it increments at most once per block), so off-chain consumers can group them.
     /// @param timestamp The block timestamp at which the root was created — the third element of the
     /// `(blockNumber, root, timestamp)` tuple chains import, so the event reports the full interop
     /// root info.
-    /// @param sides The "sides" of the interop root. In this release which uses proof-based interop the sides is an array
-    /// of length one, which only include the interop root itself. More on that in `L2InteropRootStorage` contract.
+    /// @param sides The "sides" of the interop root. In this release, which uses proof-based interop, the
+    /// sides are an array of length one holding only the interop root itself. More on that in the
+    /// `L2InteropRootStorage` contract.
     event NewInteropRoot(
         uint256 indexed chainId,
         uint256 indexed blockNumber,

@@ -369,7 +369,7 @@ abstract contract ChainAssetHandlerBase is
             // We allow migrating chains that were not previously registered on this settlement layer,
             // so the chain is registered here during bridgeMint.
             IBridgehubBase(_bridgehub()).registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
-            // TODO: a chain registered here (settlement-layer migration, non-zero batch number) gets
+            // IMPORTANT: a chain registered here (settlement-layer migration, non-zero batch number) gets
             // NO genesis batch leaf in this layer's message root — its tree stays empty until its
             // first settlement here. This is fine under the current assumption that only the L1
             // message root is used for atomic-interop timeout proofs (fresh chains are seeded on L1
