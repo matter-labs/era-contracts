@@ -5,6 +5,8 @@ pragma solidity ^0.8.21;
 error AtomicBundleCallCarriesValue(uint256 callIndex, uint256 value);
 // 0xcd677e60
 error AtomicBundleNotAllowedInSendMessage();
+// 0x979e85dd
+error AtomicBundleToL1NotSupported();
 // 0x9031f751
 error AttributeAlreadySet(bytes4 selector);
 // 0xbcb41ec7

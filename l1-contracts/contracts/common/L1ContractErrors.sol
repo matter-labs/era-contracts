@@ -362,6 +362,8 @@ error ProtocolIdNotGreater();
 error PubdataGreaterThanLimit(uint256 limit, uint256 length);
 // 0x63c36549
 error QueueIsEmpty();
+// 0x881fba9f
+error RecoverToL1NotSupported();
 // 0xab143c06
 error Reentrancy();
 // 0x667d17de

@@ -857,6 +857,11 @@
   },
   {
     "type": "error",
+    "name": "AtomicBundleToL1NotSupported",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "AttributeAlreadySet",
     "inputs": [
       {

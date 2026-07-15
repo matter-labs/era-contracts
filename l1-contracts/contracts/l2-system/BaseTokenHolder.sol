@@ -117,8 +117,9 @@ contract BaseTokenHolder is IBaseTokenHolder {
     }
 
     /// @notice Returns base tokens escrowed by a failed/timed-out bridge-out to the original depositor.
-    /// @dev The inverse of `burnAndStartBridging`: reverses the source-side bridging accounting, then returns
-    /// the value. Callable only by the NativeTokenVault (atomic-interop timeout recovery). Like `give`, this
+    /// @dev The inverse of `burnAndStartBridging`: notifies the asset tracker — which asserts the bridge-out
+    /// is recoverable (L2->L2 only; L2->L1 withdrawals are never revertable) — then returns the value.
+    /// Callable only by the NativeTokenVault (atomic-interop timeout recovery). Like `give`, this
     /// pushes ETH and may revert if `_to` rejects it — recovery targets the original depositor by design.
     /// @param _to The original depositor to refund.
     /// @param _amount The amount of base tokens to return.

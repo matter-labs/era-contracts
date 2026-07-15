@@ -380,6 +380,24 @@ contract BaseTokenHolderTest is Test {
         assertEq(address(baseTokenHolder).balance, holderBalanceBefore - amount, "holder balance must decrease");
     }
 
+    /// @dev The tracker hook asserts the bridge-out is recoverable (L2->L2 only); the holder must stay
+    /// wired to it so those invariants gate every recovery.
+    function test_recoverBaseToken_notifiesAssetTracker() public {
+        uint256 amount = 1 ether;
+
+        vm.expectCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSelector(
+                IL2AssetTracker.handleRecoverBaseTokenBridgingOnL2.selector,
+                GATEWAY_CHAIN_ID,
+                amount
+            )
+        );
+
+        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
+        baseTokenHolder.recoverBaseToken(recipient, amount, GATEWAY_CHAIN_ID);
+    }
+
     function test_recoverBaseToken_zeroAmountIsNoop() public {
         uint256 holderBalanceBefore = address(baseTokenHolder).balance;
 

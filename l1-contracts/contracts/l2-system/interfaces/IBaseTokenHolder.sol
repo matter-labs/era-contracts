@@ -54,7 +54,8 @@ interface IBaseTokenHolder {
     function give(address _to, uint256 _amount, uint256 _fromChainId) external;
 
     /// @notice Returns base tokens escrowed by a failed/timed-out bridge-out to the original depositor.
-    /// @dev Callable only by the NativeTokenVault; reverses the source-side bridging accounting.
+    /// @dev Callable only by the NativeTokenVault; the asset tracker asserts the bridge-out is recoverable
+    /// (L2->L2 only — L2->L1 withdrawals are never revertable).
     /// @param _to The original depositor to refund.
     /// @param _amount The amount of base tokens to return.
     /// @param _toChainId The original bridge-out destination chain id.

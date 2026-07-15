@@ -13,6 +13,7 @@ import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {
+    AtomicBundleToL1NotSupported,
     CannotInitiateInteropOnL1,
     DirectCallToL1NotSupported,
     InteropCallToL1NotToAssetRouter,
@@ -103,6 +104,23 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
         InteropCallStarter[] memory calls = new InteropCallStarter[](0);
         vm.expectRevert(abi.encodeWithSelector(MultiCallToL1NotSupported.selector, uint256(0)));
         l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, _l1BundleAttributes());
+    }
+
+    /// @notice An L1-destined bundle carrying the `atomicBundle` attribute is rejected: an atomic bundle is
+    /// never published as an L2->L1 message and L1 has no atomic execution, so it could only ever time out —
+    /// but L2->L1 withdrawals must never be revertable (`totalWithdrawalsToL1` is consumed once during the
+    /// L1->GW migration). The check fires in `_sendBundle` before any burn or state change.
+    function test_sendBundle_RevertWhen_AtomicBundleToL1() public {
+        InteropCallStarter[] memory calls = new InteropCallStarter[](1);
+        calls[0] = _l1CallStarter(L2_ASSET_ROUTER_ADDR, true, 0);
+        bytes[] memory attrs = new bytes[](2);
+        attrs[0] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
+        attrs[1] = abi.encodeCall(
+            IERC7786Attributes.atomicBundle,
+            (keccak256("flow id"), uint64(block.timestamp + 1 days), 0)
+        );
+        vm.expectRevert(AtomicBundleToL1NotSupported.selector);
+        l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, attrs);
     }
 
     /// @notice An L1-destined token withdrawal with `useFixedFee = true` still succeeds and collects NO fixed

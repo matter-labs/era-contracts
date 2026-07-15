@@ -25,7 +25,11 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {MAX_TOKEN_BALANCE} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
-import {AssetAlreadyRegistered, AssetIdNotRegistered} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {
+    AssetAlreadyRegistered,
+    AssetIdNotRegistered,
+    BaseTokenNativeToThisChain
+} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {L2BaseTokenZKOS} from "contracts/l2-system/zksync-os/L2BaseTokenZKOS.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
@@ -33,7 +37,11 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {L2UtilsBase} from "../l2-tests-in-l1-context/L2UtilsBase.sol";
 
-import {Unauthorized, BaseTokenPreV31TotalSupplyNotSet} from "contracts/common/L1ContractErrors.sol";
+import {
+    Unauthorized,
+    BaseTokenPreV31TotalSupplyNotSet,
+    RecoverToL1NotSupported
+} from "contracts/common/L1ContractErrors.sol";
 import {RAND_ADDRESS} from "test/foundry/TestConstants.sol";
 
 import {LogFinder} from "../utils/LogFinder.sol";
@@ -208,6 +216,84 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         vm.prank(RAND_ADDRESS);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, RAND_ADDRESS));
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(1, 100);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  handleRecoverBaseTokenBridgingOnL2
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// @notice An L2->L2 base-token recovery is accepted and mutates no accounting: the forward direction
+    /// (`handleInitiateBaseTokenBridgingOnL2`) records nothing for an L2->L2 bridge-out of the
+    /// never-native base token, so there is nothing to reverse.
+    function test_handleRecoverBaseTokenBridgingOnL2_noAccountingToReverse() public {
+        bytes32 baseTokenAssetId = keccak256("base_token_asset_id");
+        uint256 l1ChainId = 1;
+        uint256 destinationChainId = 505;
+        uint256 amount = 300;
+
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("L1_CHAIN_ID()").checked_write(l1ChainId);
+        stdstore
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig("originChainId(bytes32)")
+            .with_key(baseTokenAssetId)
+            .checked_write(l1ChainId);
+
+        L2AssetTracker tracker = L2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        uint256 withdrawalsBefore = _readTotalWithdrawalsToL1(baseTokenAssetId);
+        uint256 chainBalanceBefore = tracker.chainBalance(block.chainid, baseTokenAssetId);
+
+        vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
+        L2_ASSET_TRACKER.handleRecoverBaseTokenBridgingOnL2(destinationChainId, amount);
+
+        assertEq(
+            tracker.chainBalance(block.chainid, baseTokenAssetId),
+            chainBalanceBefore,
+            "no chainBalance may be re-credited: the base token is never native, so none was decreased"
+        );
+        assertEq(
+            _readTotalWithdrawalsToL1(baseTokenAssetId),
+            withdrawalsBefore,
+            "totalWithdrawalsToL1 must not move for an L2->L2 recovery"
+        );
+    }
+
+    /// @notice Recovering an L1-destined bridge-out is unreachable (the InteropCenter rejects L1-destined
+    /// atomic bundles at send, and no other revert path exists) and must revert: `totalWithdrawalsToL1`
+    /// is consumed once during the L1->GW migration and must stay append-only.
+    function test_handleRecoverBaseTokenBridgingOnL2_revertWhenToL1() public {
+        uint256 l1ChainId = 1;
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("L1_CHAIN_ID()").checked_write(l1ChainId);
+
+        vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
+        vm.expectRevert(RecoverToL1NotSupported.selector);
+        L2_ASSET_TRACKER.handleRecoverBaseTokenBridgingOnL2(l1ChainId, 100);
+    }
+
+    /// @notice The base token can never originate from this chain (`handleFinalizeBaseTokenBridgingOnL2`
+    /// hard-codes non-native); the recovery hook asserts the invariant instead of silently re-crediting
+    /// a chainBalance that was never decreased.
+    function test_handleRecoverBaseTokenBridgingOnL2_revertWhenBaseTokenNativeToThisChain() public {
+        bytes32 baseTokenAssetId = keccak256("base_token_asset_id");
+
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("L1_CHAIN_ID()").checked_write(uint256(1));
+        stdstore
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig("originChainId(bytes32)")
+            .with_key(baseTokenAssetId)
+            .checked_write(block.chainid);
+
+        vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
+        vm.expectRevert(BaseTokenNativeToThisChain.selector);
+        L2_ASSET_TRACKER.handleRecoverBaseTokenBridgingOnL2(505, 100);
+    }
+
+    /// @notice Only the BaseTokenHolder may report a base-token recovery.
+    function test_handleRecoverBaseTokenBridgingOnL2_revertUnauthorized() public {
+        vm.prank(RAND_ADDRESS);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, RAND_ADDRESS));
+        L2_ASSET_TRACKER.handleRecoverBaseTokenBridgingOnL2(505, 100);
     }
 
     // ═══════════════════════════════════════════════════════════════════
