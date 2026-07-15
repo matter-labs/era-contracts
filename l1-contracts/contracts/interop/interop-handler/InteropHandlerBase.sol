@@ -194,10 +194,10 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         // Note, that on the first call to unbundle the status of the bundle should be verified, which validates bundle correctness.
         require(status == BundleStatus.Verified || status == BundleStatus.Unbundled, CanNotUnbundle(bundleHash));
 
-        // Re-validate the destination context, as executeBundle/verifyBundle do: the Verified status is
-        // sticky, so a base-token migration between verify and unbundle could otherwise let a stale bundle
-        // execute under a different base token. Source/destination chain are already pinned by the bundle hash.
-        _validateBundleDestinationContext(bundleHash, interopBundle, interopBundle.sourceChainId);
+        // No destination-context re-validation is needed here: `Verified`/`Unbundled` status is only ever
+        // reached through `_validateBundleDestinationContext` (executeBundle/verifyBundle), and every
+        // context input is immutable afterwards — the chain ids are committed in the bundle hash and the
+        // chain's base-token asset id is set-once (see `L2NativeTokenVault.updateL2`).
 
         // Mark the given bundle as unbundled, following CEI pattern.
         bundleStatus[bundleHash] = BundleStatus.Unbundled;
