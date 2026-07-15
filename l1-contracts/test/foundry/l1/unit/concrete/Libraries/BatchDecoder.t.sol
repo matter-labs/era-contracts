@@ -19,6 +19,7 @@ import {
 /// @notice Unit tests for BatchDecoder library
 contract BatchDecoderTest is Test {
     uint8 constant SUPPORTED_ENCODING_VERSION = 1;
+    uint8 constant SUPPORTED_ENCODING_VERSION_EXECUTE = 2;
     uint8 constant SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS = 3;
 
     // ============ decodeAndCheckCommitData Tests ============
@@ -181,7 +182,7 @@ contract BatchDecoderTest is Test {
         InteropRoot[][] memory dependencyRoots = new InteropRoot[][](2);
 
         bytes memory encodedData = abi.encodePacked(
-            SUPPORTED_ENCODING_VERSION,
+            SUPPORTED_ENCODING_VERSION_EXECUTE,
             abi.encode(
                 BatchDecoder.DecodedExecuteData({
                     batchesData: executeBatches,
@@ -238,7 +239,7 @@ contract BatchDecoderTest is Test {
         InteropRoot[][] memory dependencyRoots = new InteropRoot[][](2);
 
         bytes memory encodedData = abi.encodePacked(
-            SUPPORTED_ENCODING_VERSION,
+            SUPPORTED_ENCODING_VERSION_EXECUTE,
             abi.encode(
                 BatchDecoder.DecodedExecuteData({
                     batchesData: executeBatches,
@@ -258,7 +259,7 @@ contract BatchDecoderTest is Test {
         InteropRoot[][] memory dependencyRoots = new InteropRoot[][](0);
 
         bytes memory encodedData = abi.encodePacked(
-            SUPPORTED_ENCODING_VERSION,
+            SUPPORTED_ENCODING_VERSION_EXECUTE,
             abi.encode(
                 BatchDecoder.DecodedExecuteData({
                     batchesData: executeBatches,
