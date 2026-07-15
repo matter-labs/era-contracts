@@ -20,7 +20,7 @@ import {
 /// flow is exercised by the batch-processing tests (the previous dependency-root execute tests are
 /// retired/commented in `Executing.t.sol`); this file isolates the `(blockNumber, root, timestamp)`
 /// tuple checks and the rolling-hash wire format against a REAL `L1MessageRoot` populated through
-/// its production entry points (`addNewChain` / `addChainBatchRoot`) — no mocked root values.
+/// its production entry points (`addNewChain` / `addChainBatchRootV32`) — no mocked root values.
 contract DependencyInteropRootsHarness is ExecutorFacet {
     function setBridgehub(address _bridgehub) external {
         s.bridgehub = _bridgehub;
@@ -91,13 +91,13 @@ contract DependencyInteropRootsTest is Test {
         vm.roll(BLOCK_1);
         vm.warp(TIMESTAMP_1);
         vm.prank(chainSender);
-        messageRoot.addChainBatchRoot(CHAIN_ID, 1, keccak256("chain-batch-root-1"));
+        messageRoot.addChainBatchRootV32(CHAIN_ID, 1, keccak256("chain-batch-root-1"));
         root1 = messageRoot.historicalRoot(BLOCK_1).root;
 
         vm.roll(BLOCK_2);
         vm.warp(TIMESTAMP_2);
         vm.prank(chainSender);
-        messageRoot.addChainBatchRoot(CHAIN_ID, 2, keccak256("chain-batch-root-2"));
+        messageRoot.addChainBatchRootV32(CHAIN_ID, 2, keccak256("chain-batch-root-2"));
         root2 = messageRoot.historicalRoot(BLOCK_2).root;
 
         assertTrue(root1 != bytes32(0) && root2 != bytes32(0) && root1 != root2, "distinct real roots recorded");

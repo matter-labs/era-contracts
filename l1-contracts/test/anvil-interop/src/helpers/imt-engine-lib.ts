@@ -328,9 +328,11 @@ export async function lowNullifierIndexFor(tree: Contract, value: string, blockT
 
 // ── Proof builders ────────────────────────────────────────────────────────────────────────
 
-/** Default settlement-layer chain id encoded into proof bytes. Arbitrary on the harness, since
- * {MockL2MessageVerification} accepts any message. */
-export const DEFAULT_SL_CHAIN_ID = 506;
+/** Default settlement-layer chain id encoded into proof bytes and bound into flow ids. Must equal
+ * the L1 chain id the AtomicFlowManager was initialized with (`initL2`): in this release interop
+ * legs settle on L1 only and the manager rejects flows declaring any other settlement layer. The
+ * harness L1 is the default anvil chain (31337). */
+export const DEFAULT_SL_CHAIN_ID = 31337;
 
 /** Depth of the chain batch root tree — mirrors ChainBatchRootTree.TREE_DEPTH; the on-chain
  * verifier requires the leaf-to-batch-root proof section to be exactly this long. */

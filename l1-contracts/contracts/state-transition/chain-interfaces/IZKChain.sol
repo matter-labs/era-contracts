@@ -18,4 +18,16 @@ interface IZKChain is IAdmin, ICommitter, IExecutor, IGetters, IMailbox, IMigrat
         uint256 indexed proposalId,
         bytes32 proposalSalt
     );
+
+    /// @notice One-time report of the chain's genesis (batch 0) chain batch root to the settlement
+    /// layer's MessageRoot, seeding the chain's interop tree so the atomic-interop timeout-protocol
+    /// precondition (every registered chain has at least one batch inside the shared root) holds
+    /// from creation. The root is computed and stored by the chain's DiamondInit; the Bridgehub
+    /// triggers this in the same transaction as `createNewChain`.
+    /// @dev Lives on the Executor facet. Declared here (not in `IExecutor`) because
+    /// `ValidatorTimelock` mirrors `IExecutor` and has no business forwarding this call.
+    /// @dev Callable only by the Bridgehub (defense in depth). A no-op on chains that store no
+    /// genesis root (EraVM chains); reverts once the first real batch has executed, and the
+    /// MessageRoot enforces the once-only semantics.
+    function reportGenesisRoot() external;
 }
