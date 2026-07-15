@@ -74,6 +74,10 @@ export interface ImtProof {
   sourceChainId: string;
   batchNumber: string;
   chainImtRoot: string;
+  /** Timeout-branch selector: true authenticates against the batch-BEGIN root (leaf 2), false the
+   * batch-END root (leaf 3). Validated on-chain against the authenticated batch `l1Timestamp`
+   * (begin => late batch, end => in-time last batch); ignored by the finality path. */
+  provesAgainstBeginRoot: boolean;
   settlementProof: string[];
   leaf: IMTLeaf;
   imtLeafIndex: number;
@@ -450,6 +454,8 @@ export async function buildInclusionProof(params: {
   return {
     sourceChainId: BigNumber.from(chainId).toString(),
     chainImtRoot: imt.root,
+    // The finality path always authenticates the end root; the branch selector is ignored.
+    provesAgainstBeginRoot: false,
     leaf: imt.leaves[idx],
     imtLeafIndex: idx,
     imtProof: imt.engine.merklePath(idx),
@@ -470,6 +476,9 @@ export async function buildNonInclusionProof(params: {
   chainId: BigNumber | number | string;
   value: string;
   l1Timestamp: BigNumber | number | string;
+  /** The declared timeout branch (see {ImtProof.provesAgainstBeginRoot}); an honest prover uses
+   * `l1Timestamp > deadline`. */
+  provesAgainstBeginRoot: boolean;
   batchNumber?: number | string;
   slChainId?: number;
   slBlock?: number;
@@ -482,6 +491,7 @@ export async function buildNonInclusionProof(params: {
     chainId,
     value,
     l1Timestamp,
+    provesAgainstBeginRoot,
     batchNumber = 1,
     slChainId,
     slBlock,
@@ -500,6 +510,7 @@ export async function buildNonInclusionProof(params: {
   return {
     sourceChainId: BigNumber.from(chainId).toString(),
     chainImtRoot: imt.root,
+    provesAgainstBeginRoot,
     leaf: imt.leaves[lowIndex],
     imtLeafIndex: lowIndex,
     imtProof: imt.engine.merklePath(lowIndex),
@@ -520,6 +531,7 @@ export function proofTuple(p: ImtProof): unknown[] {
     p.sourceChainId,
     p.batchNumber,
     p.chainImtRoot,
+    p.provesAgainstBeginRoot,
     p.settlementProof,
     leafTuple(p.leaf),
     p.imtLeafIndex,

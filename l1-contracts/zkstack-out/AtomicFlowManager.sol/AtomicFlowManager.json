@@ -1,6 +1,19 @@
 [
   {
     "type": "function",
+    "name": "L1_CHAIN_ID",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "append",
     "inputs": [
       {
@@ -89,6 +102,11 @@
             "internalType": "bytes32"
           },
           {
+            "name": "provesAgainstBeginRoot",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
             "name": "settlementProof",
             "type": "bytes32[]",
             "internalType": "bytes32[]"
@@ -161,6 +179,19 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "initL2",
+    "inputs": [
+      {
+        "name": "_l1ChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -277,6 +308,11 @@
                 "name": "chainImtRoot",
                 "type": "bytes32",
                 "internalType": "bytes32"
+              },
+              {
+                "name": "provesAgainstBeginRoot",
+                "type": "bool",
+                "internalType": "bool"
               },
               {
                 "name": "settlementProof",
@@ -601,6 +637,22 @@
   },
   {
     "type": "error",
+    "name": "ManagerSettlementLayerNotL1",
+    "inputs": [
+      {
+        "name": "expectedL1ChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "actual",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "MerkleIndexOutOfBounds",
     "inputs": []
   },
@@ -776,6 +828,38 @@
         "name": "proofSourceChainId",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ProofTimeoutBranchMismatch",
+    "inputs": [
+      {
+        "name": "provesAgainstBeginRoot",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "l1BatchTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "deadline",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "Unauthorized",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   },

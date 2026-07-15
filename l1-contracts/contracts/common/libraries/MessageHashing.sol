@@ -238,39 +238,30 @@ library MessageHashing {
         });
     }
 
-    /// @dev The unverified contents of a (multi-hop) proof's aggregation-hop section, read
-    /// positionally by {readUnverifiedAggregationHopData}. Callers that act on these values MUST also run the
-    /// proof through the leaf verifier (`proveL2LeafInclusionShared` / {_getProofData}): the same
-    /// words are folded into the reconstructed batch leaf there, which is what authenticates them.
-    struct UnverifiedAggregationHopData {
-        /// @dev True for a single-level / commit-based proof, which has no aggregation hop (and so
-        /// carries none of the fields below).
-        bool finalProofNode;
-        /// @dev The batch's claimed `l1Timestamp` (see {batchLeafHash}).
-        uint256 batchTimestamp;
+    /// @dev The batch-leaf Merkle path (mask + siblings) of a multi-hop proof's aggregation-hop
+    /// section, read positionally by {readAggregationHopPath}.
+    struct AggregationHopPath {
         /// @dev The Merkle mask of the batch leaf inside the chain's batch tree.
         uint256 batchLeafProofMask;
         /// @dev The batch leaf's sibling path inside the chain's batch tree.
         bytes32[] batchLeafSiblings;
     }
 
-    /// @notice Reads the aggregation-hop section (batch timestamp + batch-leaf Merkle path) from a
-    /// proof without verifying it. This is the single place that knows the proof's word layout;
-    /// external libraries must consume this accessor instead of parsing the metadata themselves.
-    function readUnverifiedAggregationHopData(
-        bytes32[] calldata _proof
-    ) internal pure returns (UnverifiedAggregationHopData memory data) {
+    /// @notice Reads the aggregation-hop batch-leaf Merkle path from a proof. This is the single
+    /// place that knows the proof's word layout; external libraries must consume this accessor
+    /// instead of parsing the metadata themselves.
+    /// @dev The returned words are trustworthy ONLY because the caller has already run the same
+    /// proof bytes through the leaf verifier (`proveL2LeafInclusionShared` / {_getProofData}): the
+    /// identical words are folded into the reconstructed batch leaf there, which is what
+    /// authenticates them — call this AFTER that verification. A single-level / commit-based proof
+    /// (`finalProofNode`) carries no aggregation hop and is already rejected by that verification.
+    function readAggregationHopPath(bytes32[] calldata _proof) internal pure returns (AggregationHopPath memory path) {
         ProofMetadata memory metadata = parseProofMetadata(_proof);
-        data.finalProofNode = metadata.finalProofNode;
-        if (metadata.finalProofNode) {
-            return data;
-        }
         // Word layout after the leaf-to-batch-root section (see {_getProofData}):
         // [l1Timestamp][batchLeafProofMask][batchLeafProofLen siblings]...
         uint256 ptr = metadata.proofStartIndex + metadata.logLeafProofLen;
-        data.batchTimestamp = uint256(_proof[ptr]);
-        data.batchLeafProofMask = uint256(_proof[ptr + 1]);
-        data.batchLeafSiblings = extractSlice(_proof, ptr + 2, ptr + 2 + metadata.batchLeafProofLen);
+        path.batchLeafProofMask = uint256(_proof[ptr + 1]);
+        path.batchLeafSiblings = extractSlice(_proof, ptr + 2, ptr + 2 + metadata.batchLeafProofLen);
     }
 
     /// @notice Extracts slice from the proof.

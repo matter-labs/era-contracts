@@ -1784,6 +1784,13 @@
   },
   {
     "type": "function",
+    "name": "reportGenesisRoot",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "requestL2ServiceTransaction",
     "inputs": [
       {

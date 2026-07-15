@@ -579,6 +579,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       chainId: chainB.chainId,
       value: baValue,
       l1Timestamp: deadline + 1, // t > deadline: the first late batch's begin root
+      provesAgainstBeginRoot: true,
       batchNumber: 1,
       slBlock: anchorSlBlock,
     });
@@ -698,6 +699,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       chainId: chainB.chainId,
       value: baValue,
       l1Timestamp: deadline,
+      provesAgainstBeginRoot: false,
       batchNumber: 1,
       slBlock: anchorSlBlock,
     });
@@ -739,6 +741,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       chainId: chainB.chainId,
       value: missingValue,
       l1Timestamp: deadline - 1,
+      provesAgainstBeginRoot: false,
       slBlock: staleSlBlock,
     });
     await expectRevertWithError(
@@ -752,6 +755,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       chainId: chainB.chainId,
       value: missingValue,
       l1Timestamp: deadline + 1,
+      provesAgainstBeginRoot: true,
       slBlock: 999_999,
     });
     await expectRevertWithError(
@@ -768,6 +772,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       chainId: chainB.chainId,
       value: missingValue,
       l1Timestamp: deadline - 1,
+      provesAgainstBeginRoot: false,
       slBlock: validSlBlock,
       batchLeafSiblings: [ethers.utils.id("populated-right-subtree")],
       batchLeafMask: 0, // left child at level 0 -> the sibling above must be the empty-subtree hash
