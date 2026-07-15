@@ -23,7 +23,8 @@ import {
     CantExecuteUnprovenBatches,
     NonSequentialBatch,
     PriorityOperationsRollingHashMismatch,
-    QueueIsEmpty
+    QueueIsEmpty,
+    Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
@@ -459,6 +460,13 @@ contract ExecutingTest is ExecutorTest {
             correctNewCommitBatchInfoArray
         );
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    /// @notice `reportGenesisRoot` is Bridgehub-only (defense in depth; the Bridgehub triggers it
+    /// right after registration in `createNewChain`).
+    function test_RevertWhen_ReportGenesisRootNotBridgehub() public {
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
+        executor.reportGenesisRoot();
     }
 
     function test_ShouldExecuteBatchesSuccessfully() public {

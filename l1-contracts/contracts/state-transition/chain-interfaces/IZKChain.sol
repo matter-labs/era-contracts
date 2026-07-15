@@ -26,7 +26,8 @@ interface IZKChain is IAdmin, ICommitter, IExecutor, IGetters, IMailbox, IMigrat
     /// triggers this in the same transaction as `createNewChain`.
     /// @dev Lives on the Executor facet. Declared here (not in `IExecutor`) because
     /// `ValidatorTimelock` mirrors `IExecutor` and has no business forwarding this call.
-    /// @dev A no-op on chains that store no genesis root (EraVM chains); reverts once the first real
-    /// batch has executed, and the MessageRoot enforces the once-only semantics.
+    /// @dev Callable only by the Bridgehub (defense in depth). A no-op on chains that store no
+    /// genesis root (EraVM chains); reverts once the first real batch has executed, and the
+    /// MessageRoot enforces the once-only semantics.
     function reportGenesisRoot() external;
 }

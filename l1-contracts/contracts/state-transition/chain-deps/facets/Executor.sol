@@ -164,10 +164,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @notice One-time report of the chain's genesis (batch 0) chain batch root to the settlement
-    /// layer's MessageRoot — see {IZKChain.reportGenesisRoot}. Permissionless: the effect is fully
-    /// determined by chain state, and the MessageRoot enforces the once-only semantics; the
-    /// Bridgehub triggers it in the same transaction as `createNewChain`.
-    function reportGenesisRoot() external {
+    /// layer's MessageRoot — see {IZKChain.reportGenesisRoot}. The Bridgehub triggers it in the same
+    /// transaction as `createNewChain`; while the effect is fully determined by chain state (and the
+    /// MessageRoot enforces the once-only semantics), the caller is restricted to the Bridgehub as
+    /// defense in depth.
+    function reportGenesisRoot() external onlyBridgehub {
         // Nothing to report: only fresh ZKsync OS chains store a genesis (batch 0) chain batch root
         // in their DiamondInit; EraVM chains (and pre-v32 ZKsync OS deployments) leave the slot empty
         // and do not participate in the genesis-leaf seeding.
