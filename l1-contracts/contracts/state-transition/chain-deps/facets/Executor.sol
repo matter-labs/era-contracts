@@ -23,6 +23,7 @@ import {
     CommitBasedInteropNotSupported,
     DependencyRootsRollingHashMismatch,
     InvalidBatchesDataLength,
+    GenesisRootAfterFirstBatch,
     InvalidInteropRootTimestamp,
     MessageRootIsZero,
     MismatchNumberOfLayer1Txs
@@ -153,13 +154,35 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @notice Appends the batch's chain batch root to the L1 MessageRoot.
     /// @param _batchNumber The number of the batch
     /// @param _messageRoot The root of the merkle tree of the messages to L1.
-    /// @dev We only call this function on L1. `addChainBatchRoot` records the root (used for L2->L1
+    /// @dev We only call this function on L1. `addChainBatchRootV32` records the root (used for L2->L1
     /// message verification), pushes it to the chain's interop tree, and emits the interop root — so
     /// chains settling on L1 participate in interop, the same as on Gateway.
     function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
         // Once the batch is executed, we include its message to the message root.
         IMessageRootBase messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
-        messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
+        messageRootContract.addChainBatchRootV32(s.chainId, _batchNumber, _messageRoot);
+    }
+
+    /// @notice One-time report of the chain's genesis (batch 0) chain batch root to the settlement
+    /// layer's MessageRoot — see {IZKChain.reportGenesisRoot}. The Bridgehub triggers it in the same
+    /// transaction as `createNewChain`; while the effect is fully determined by chain state (and the
+    /// MessageRoot enforces the once-only semantics), the caller is restricted to the Bridgehub as
+    /// defense in depth.
+    function reportGenesisRoot() external onlyBridgehub {
+        // Nothing to report: only fresh ZKsync OS chains store a genesis (batch 0) chain batch root
+        // in their DiamondInit; EraVM chains (and pre-v32 ZKsync OS deployments) leave the slot empty
+        // and do not participate in the genesis-leaf seeding.
+        bytes32 genesisChainBatchRoot = s.l2LogsRootHashes[0];
+        if (!s.zksyncOS || genesisChainBatchRoot == bytes32(0)) {
+            return;
+        }
+        // Only before the first real batch: the MessageRoot side additionally enforces the
+        // once-and-fresh-only semantics (expected next batch number 1, batch 0 not yet recorded).
+        if (s.totalBatchesExecuted != 0) {
+            revert GenesisRootAfterFirstBatch();
+        }
+        IMessageRootBase messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
+        messageRootContract.reportGenesisRoot(s.chainId, genesisChainBatchRoot);
     }
 
     /// @inheritdoc IExecutor

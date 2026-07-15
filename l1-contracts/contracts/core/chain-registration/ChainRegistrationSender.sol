@@ -125,6 +125,10 @@ contract ChainRegistrationSender is
     /// aggregated root, so interop must never be enabled towards a chain with an empty tree. Freshly
     /// created chains satisfy this from creation (the seeded genesis batch leaf); already-deployed
     /// chains onboarded with a non-zero starting batch number must settle at least once first.
+    /// @dev No backfill of pre-existing chains is needed: during v31 the ZK Gateway was never
+    /// activated, and registration required that a chain does NOT settle on L1 — so at the start of
+    /// v32 no chains have been registered here, and every chain passes through this gate (and gets
+    /// its tree populated) before interop can target it.
     /// @param chainToBeRegistered the chain to be registered
     /// @return the L2 transaction calldata
     function _getL2TxCalldata(uint256 chainToBeRegistered) internal view returns (bytes memory) {
@@ -148,7 +152,7 @@ contract ChainRegistrationSender is
             revert ChainsSettlementLayerMismatch(chainToBeRegisteredSettlementLayer, chainRegisteredOnSettlementLayer);
         }
         // Both chains settling directly on L1 is now permitted: L1 builds interop roots
-        // (MessageRootBase.addChainBatchRoot) and serves the corresponding inclusion proofs, so
+        // (MessageRootBase.addChainBatchRootV32) and serves the corresponding inclusion proofs, so
         // L1-settled chains can participate in interop without a gateway. The same-settlement-layer
         // check above still applies (a flow's legs must share a settlement layer).
     }

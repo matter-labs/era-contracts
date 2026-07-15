@@ -108,11 +108,12 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](6);
+        bytes4[] memory selectors = new bytes4[](7);
         uint256 i = 0;
         selectors[i++] = executor.proveBatchesSharedBridge.selector;
         selectors[i++] = executor.executeBatchesSharedBridge.selector;
         selectors[i++] = executor.revertBatchesSharedBridge.selector;
+        selectors[i++] = executor.reportGenesisRoot.selector;
         selectors[i++] = executor.setPriorityTreeStartIndex.selector;
         selectors[i++] = executor.setPriorityTreeHistoricalRoot.selector;
         selectors[i++] = executor.appendPriorityOp.selector;
@@ -261,7 +262,7 @@ contract ExecutorTest is UtilsCallMockerTest {
 
         vm.mockCall(
             address(messageRoot),
-            abi.encodeWithSelector(MessageRootBase.addChainBatchRoot.selector, 9, 1, bytes32(0)),
+            abi.encodeWithSelector(MessageRootBase.addChainBatchRootV32.selector, 9, 1, bytes32(0)),
             abi.encode()
         );
 

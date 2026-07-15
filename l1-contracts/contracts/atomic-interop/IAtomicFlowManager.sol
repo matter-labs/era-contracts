@@ -71,6 +71,10 @@ interface IAtomicFlowManager {
     /// @notice Current source-leg state of a `(flowId, bundleHash)` on this chain.
     function legState(bytes32 _flowId, bytes32 _bundleHash) external view returns (LegState);
 
+    /// @notice One-time L2 initialization performed by the genesis upgrade; sets the L1 chain ID
+    /// every flow's settlement layer is checked against.
+    function initL2(uint256 _l1ChainId) external;
+
     /// @notice The interop commitment tree this manager inserts into.
     function commitmentTree() external view returns (address);
 
