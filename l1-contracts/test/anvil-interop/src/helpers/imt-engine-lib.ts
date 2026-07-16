@@ -34,8 +34,8 @@
  * bytes carrying a chosen `l1Timestamp` and batch-leaf path ({buildSlProofBytes}). The parts actually
  * exercised are the IMT membership / low-nullifier layer and the timeout-protocol clock checks; the
  * protocol itself (finality/timeout conditions, branches, boundaries) is described ONCE in the
- * AtomicInteropProof.sol library header — the anchor-root timestamps it reads come from the REAL
- * `L2InteropRootStorage.interopRoots[slChainId][slBlock]` tuples, which the harness seeds via
+ * AtomicInteropProof.sol library header — the settlement interop root timestamps it reads come from
+ * the REAL `L2InteropRootStorage.interopRoots[slChainId][slBlock]` tuples, which the harness adds via
  * bootloader impersonation.
  */
 
@@ -345,8 +345,8 @@ export const CHAIN_BATCH_ROOT_TREE_DEPTH = 3;
 /**
  * Builds the minimal format-valid multi-hop leaf inclusion proof bytes that
  * {MessageHashing._getProofData} parses into a chosen `l1Timestamp` and settlement-layer
- * chain id (with `finalProofNode == false`). The SL snapshot block `slBlock` is the key the timeout
- * path reads the anchor `interopRoots[slChainId][slBlock]` tuple at.
+ * chain id (with `finalProofNode == false`). `slBlock` identifies the settlement interop root tuple
+ * that the timeout path reads from `interopRoots[slChainId][slBlock]`.
  *
  * Byte layout (logLeafProofLen=3 — the chain-batch-root top-tree path {AtomicInteropProof} enforces):
  *   [0]      metadata header = version(0x01) | logLeafProofLen(3) | batchLeafProofLen(n) |
@@ -468,8 +468,8 @@ export async function buildInclusionProof(params: {
  * the low-nullifier / predecessor leaf). The live tree root stands in for the batch-begin (late
  * batch) or batch-end (last in-time batch) IMT root snapshot on the harness; the timeout conditions
  * the proof is checked against are described in the AtomicInteropProof.sol library header, and the
- * anchor-root tuple it resolves is seeded via bootloader impersonation (see the spec's
- * `seedAnchorRoot`).
+ * settlement interop root it resolves is added via bootloader impersonation (see the spec's
+ * `ensureSettlementInteropRoot`).
  */
 export async function buildNonInclusionProof(params: {
   l2Tree: Contract;

@@ -9,8 +9,7 @@ import {CommitmentTreeNotAppender} from "./AtomicInteropErrors.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice See {IL2InteropCommitmentTree}. A thin shell over the shared dynamic-height Indexed Merkle
-/// Tree engine ({IndexedMerkleTree}): it owns the `_appender` ACL and the `initialize` seeding, while
-/// the engine owns the tree storage, insert/update logic, leaf hashing, and Merkle paths.
+/// Tree engine ({IndexedMerkleTree}).
 ///
 /// The tree publishes nothing itself. The ZKsync OS bootloader reads the root **directly from this
 /// contract's storage** at every batch boundary and commits both snapshots (batch begin and batch end)

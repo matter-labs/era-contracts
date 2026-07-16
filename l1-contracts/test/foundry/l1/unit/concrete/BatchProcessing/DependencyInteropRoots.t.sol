@@ -159,8 +159,7 @@ contract DependencyInteropRootsTest is Test {
         harness.verifyDependencyInteropRoots(roots);
     }
 
-    /// @notice A zero claimed timestamp is rejected the same way (a chain cannot silently import a
-    /// root as "timestamp-less" once the settlement layer records timestamps).
+    /// @notice A zero claimed timestamp is rejected because it does not match the recorded timestamp.
     function test_RevertWhen_TimestampZeroButRecorded() public {
         InteropRoot[] memory roots = new InteropRoot[](1);
         roots[0] = _dependencyRoot(BLOCK_1, root1, 0);

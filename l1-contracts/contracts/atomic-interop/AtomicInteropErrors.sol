@@ -53,10 +53,8 @@ error ProofMissingSettlementLayerAnchor(uint256 chainId, uint256 batchNumber);
 /// `t > deadline` is late).
 error ProofDeadlineExceeded(uint256 batchTimestamp, uint64 deadline);
 /// @dev The aggregated root the timeout proof resolves against was not created strictly after the
-/// deadline (the timestamp in `interopRoots[slChainId][slBlock]` is `<= deadline`; roots imported
-/// without a timestamp read as 0 and are rejected too). Without a post-deadline anchor root, the
-/// "last batch" branch of the timeout proof could be run against a stale snapshot that misses later
-/// in-time batches.
+/// deadline (the timestamp in `interopRoots[slChainId][slBlock]` is `<= deadline`; an unset entry
+/// reads as 0 and is rejected too).
 error ProofInteropRootNotAfterDeadline(uint256 rootTimestamp, uint64 deadline);
 /// @dev The batch used for the in-time (`t <= deadline`) branch of the timeout proof is not the source
 /// chain's last batch inside the aggregated root: the batch-leaf Merkle path has a populated right

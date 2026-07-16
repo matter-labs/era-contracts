@@ -13,12 +13,12 @@
  *   RECEIVE `InteropHandler.executeAtomicBundle(bundleBytes, AtomicFinalityProof)`. Proves every leg
  *           was committed in its source chain's IMT before the deadline (one inclusion proof per leg),
  *           then executes the bundle's calls (the destination mint). `bundleStatus` guards double-execute.
- *   TIMEOUT `AtomicFlowManager.authorizeRefund(...)`: anchored on an aggregated root created strictly
- *           after the deadline (the timestamp in `interopRoots[slChainId][slBlock]` is `> deadline`,
- *           seeded on the harness via bootloader impersonation), proves the missing leg absent from
- *           the batch-begin IMT root of a late batch (`t > deadline`) — or, for a halted source
- *           chain, absent from the batch-end IMT root of the chain's LAST batch inside the anchor
- *           root (`t <= deadline`) — then `claimRefund(flowId, bundleBytes)` recovers the burned
+ *   TIMEOUT `AtomicFlowManager.authorizeRefund(...)`: checked against a settlement interop root created
+ *           strictly after the deadline (the timestamp in `interopRoots[slChainId][slBlock]` is
+ *           `> deadline`, added on the harness via bootloader impersonation), proves the missing leg
+ *           absent from the batch-begin IMT root of a late batch (`t > deadline`) — or, for a halted source
+ *           chain, absent from the batch-end IMT root of the chain's LAST batch inside that settlement
+ *           interop root (`t <= deadline`) — then `claimRefund(flowId, bundleBytes)` recovers the burned
  *           source funds to the depositor via L2AssetRouter's recoverAtomicCall. See the
  *           AtomicInteropProof.sol library header for the canonical protocol description.
  *
@@ -46,15 +46,15 @@
  *     Recipients receive the bridged token; source legs stay terminal at Committed; both destination
  *     bundles end FullyExecuted.
  *   - TIMEOUT PATH (late batch): one leg commits, the other never does -> a single absence proof
- *     (missing leg absent from the batch-begin IMT root of a batch with `t > deadline`, anchored on
- *     a post-deadline aggregated root) authorizes a refund -> claimRefund recovers the depositor's
- *     tokens; the source leg ends Reverted.
+ *     (missing leg absent from the batch-begin IMT root of a batch with `t > deadline`, checked against
+ *     a post-deadline settlement interop root) authorizes a refund -> claimRefund recovers the
+ *     depositor's tokens; the source leg ends Reverted.
  *   - TIMEOUT PATH (halted chain): same setup, but the absence proof uses an in-time batch
- *     (`t <= deadline`, exercised exactly AT the boundary) that is the chain's LAST batch inside the
- *     post-deadline anchor root, checked against the batch-end IMT root.
- *   - TIMEOUT NEGATIVES: an anchor root not created strictly after the deadline is rejected
+ *     (`t <= deadline`, exercised exactly AT the boundary) that is the chain's LAST batch inside a
+ *     post-deadline settlement interop root, checked against the batch-end IMT root.
+ *   - TIMEOUT NEGATIVES: a settlement interop root not created strictly after the deadline is rejected
  *     (`ProofInteropRootNotAfterDeadline`, exercised exactly AT the boundary `T == deadline`), and an
- *     in-time batch that is NOT the last batch in the anchor root is rejected
+ *     in-time batch that is NOT the last batch in the settlement interop root is rejected
  *     (`ProofNotLastBatchInRoot`).
  */
 
@@ -201,25 +201,25 @@ async function chainNow(provider: ethers.providers.JsonRpcProvider): Promise<num
 }
 
 /**
- * Seed the `(slBlock, root, timestamp)` anchor tuple into the REAL {L2InteropRootStorage} on the
- * verifying chain via bootloader impersonation — the exact write path the ZKsync OS bootloader uses
- * in production (the executor double checks the tuple against the SL `MessageRoot` when the batch
- * settles). The timeout protocol reads the timestamp in `interopRoots[DEFAULT_SL_CHAIN_ID][slBlock]`
- * and requires it to be `> deadline`. Roots are write-once, so re-seeding an existing `slBlock` is a
- * no-op if the stored timestamp already matches, and an error otherwise (pick a fresh `slBlock`).
+ * Ensures the settlement interop root for `settlementBlock` exists with the requested timestamp.
+ * If an entry already exists with that timestamp, the helper leaves it unchanged. A different
+ * timestamp is an error because settlement interop roots are write-once.
  */
-async function seedAnchorRoot(
+async function ensureSettlementInteropRoot(
   provider: ethers.providers.JsonRpcProvider,
-  slBlock: number,
+  settlementBlock: number,
   timestamp: number
 ): Promise<void> {
   const storage = new Contract(L2_INTEROP_ROOT_STORAGE_ADDR, getAbi("L2InteropRootStorage"), provider);
-  const existing: { root: string; timestamp: BigNumber } = await storage.interopRoots(DEFAULT_SL_CHAIN_ID, slBlock);
+  const existing: { root: string; timestamp: BigNumber } = await storage.interopRoots(
+    DEFAULT_SL_CHAIN_ID,
+    settlementBlock
+  );
   if (existing.root !== ethers.constants.HashZero) {
     const storedTs: BigNumber = existing.timestamp;
     if (!storedTs.eq(timestamp)) {
       throw new Error(
-        `anchor root (${DEFAULT_SL_CHAIN_ID}, ${slBlock}) already seeded with timestamp ${storedTs}, wanted ${timestamp}`
+        `settlement interop root (${DEFAULT_SL_CHAIN_ID}, ${settlementBlock}) already has timestamp ${storedTs}, wanted ${timestamp}`
       );
     }
     return;
@@ -228,9 +228,9 @@ async function seedAnchorRoot(
     await (
       await storage.connect(signer).addSingleInteropRoot({
         chainId: DEFAULT_SL_CHAIN_ID,
-        blockOrBatchNumber: slBlock,
+        blockOrBatchNumber: settlementBlock,
         timestamp,
-        sides: [ethers.utils.keccak256(ethers.utils.toUtf8Bytes(`anchor-root-${slBlock}`))],
+        sides: [ethers.utils.keccak256(ethers.utils.toUtf8Bytes(`settlement-interop-root-${settlementBlock}`))],
       })
     ).wait();
   });
@@ -518,16 +518,11 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
 
   it("timeout path (late batch): one leg commits, peer never does -> authorizeRefund + claimRefund recovers depositor", async () => {
     const user = chainA.user.address;
-    // The deadline is an SL timestamp. The timeout proof anchors on an aggregated root created
-    // strictly after the deadline (seeded below) and shows the missing leg absent from the
-    // batch-BEGIN IMT root of a late batch (`t = deadline + 1 > deadline`); since the tree is
-    // append-only and begin(N) == end(N-1), that proves it was never committed in time. `t` and the
-    // anchor root are fabricated on the harness — only the clock/absence checks are exercised.
     const deadline = 1_000;
-    // The SL snapshot block the absence proof resolves against; its seeded creation timestamp must be
-    // `> deadline`. Unique per spec so reruns on a shared chain set stay idempotent.
-    const anchorSlBlock = 201;
-    await seedAnchorRoot(chainA.provider, anchorSlBlock, deadline + 5);
+    // The settlement interop root used by the absence proof must have been created after the deadline.
+    // This fixed block is unique within the spec. The helper makes reruns against retained state idempotent.
+    const settlementInteropRootBlock = 201;
+    await ensureSettlementInteropRoot(chainA.provider, settlementInteropRootBlock, deadline + 5);
 
     const refundRecipient = chainB.user.address; // irrelevant for refund; distinct dest recipient
     const aTimeoutAmount = ethers.utils.parseUnits("3", TEST_TOKEN_DECIMALS);
@@ -570,9 +565,9 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     );
 
     // ── Build the timeout proof for the missing BA leg against B's IMT: non-inclusion against the
-    //    batch-begin root of a late batch (`t > deadline`), anchored on the post-deadline aggregated
-    //    root seeded above. The live tree root stands in for the begin-root snapshot (leaf 2 of the
-    //    chain batch root) on the harness.
+    //    batch-begin root of a late batch (`t > deadline`), checked against the post-deadline
+    //    settlement interop root added above. The live tree root stands in for the begin-root snapshot
+    //    (leaf 2 of the chain batch root) on the harness.
     const baValue = commitValue(flowId, hBA);
     const absence = await buildNonInclusionProof({
       l2Tree: chainB.stack.tree,
@@ -581,7 +576,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       l1Timestamp: deadline + 1, // t > deadline: the first late batch's begin root
       provesAgainstBeginRoot: true,
       batchNumber: 1,
-      slBlock: anchorSlBlock,
+      slBlock: settlementInteropRootBlock,
     });
     const missingIdx = legHashesAsc[0] === hBA ? 0 : 1;
 
@@ -652,13 +647,13 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
   it("timeout path (halted chain): in-time LAST batch + end-root absence authorizes the refund", async () => {
     const user = chainA.user.address;
     // Same shape as the late-batch timeout test, but the source chain "halted": its last batch inside
-    // the post-deadline anchor root is still in time (`t <= deadline`, pinned exactly AT the
-    // boundary). The proof then checks absence against the batch-END IMT root of that last batch
+    // the post-deadline settlement interop root is still in time (`t <= deadline`, pinned exactly AT
+    // the boundary). The proof then checks absence against the batch-END IMT root of that last batch
     // (the zero-length batch-leaf path of the single-leaf chain tree trivially satisfies the
     // last-batch check).
     const deadline = 1_000;
-    const anchorSlBlock = 202;
-    await seedAnchorRoot(chainA.provider, anchorSlBlock, deadline + 5);
+    const settlementInteropRootBlock = 202;
+    await ensureSettlementInteropRoot(chainA.provider, settlementInteropRootBlock, deadline + 5);
 
     const refundRecipient = chainB.user.address;
     const aTimeoutAmount = ethers.utils.parseUnits("2", TEST_TOKEN_DECIMALS);
@@ -692,7 +687,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
 
     // Halted-source absence proof: `t <= deadline` selects the END-root branch (t == deadline pins
     // the boundary), and the empty batch-leaf path marks the batch as the chain's last inside the
-    // anchor root.
+    // settlement interop root.
     const baValue = commitValue(flowId, hBA);
     const absence = await buildNonInclusionProof({
       l2Tree: chainB.stack.tree,
@@ -701,7 +696,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       l1Timestamp: deadline,
       provesAgainstBeginRoot: false,
       batchNumber: 1,
-      slBlock: anchorSlBlock,
+      slBlock: settlementInteropRootBlock,
     });
     const missingIdx = legHashesAsc[0] === hBA ? 0 : 1;
 
@@ -724,33 +719,33 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     );
   });
 
-  it("timeout negatives: pre-deadline/unseeded anchor roots and non-last in-time batches are rejected", async () => {
+  it("timeout negatives: stale/missing settlement roots and non-last in-time batches are rejected", async () => {
     const deadline = 1_000;
     const { flowId, legHashesAsc, chainIdsAsc, missingIdx } = fabricatedFlow(deadline);
     const missingValue = commitValue(flowId, legHashesAsc[missingIdx]);
     const flow = atomicFlowTuple({ flowId, deadline, legBundleHashes: legHashesAsc, chainIds: chainIdsAsc });
     const managerA = chainA.stack.manager.connect(chainA.user);
 
-    // 1. Anchor root NOT created strictly after the deadline (seeded exactly AT `T == deadline` to
-    //    pin the strict bound): rejected even though the batch itself is in time and the absence
-    //    itself would hold (a stale snapshot proves nothing about the deadline moment).
-    const staleSlBlock = 203;
-    await seedAnchorRoot(chainA.provider, staleSlBlock, deadline);
-    const staleAnchor = await buildNonInclusionProof({
+    // 1. Settlement interop root NOT created strictly after the deadline (added exactly AT
+    //    `T == deadline` to pin the strict bound): rejected even though the batch itself is in time
+    //    and the absence itself would hold (a stale snapshot proves nothing about the deadline moment).
+    const staleSettlementRootBlock = 203;
+    await ensureSettlementInteropRoot(chainA.provider, staleSettlementRootBlock, deadline);
+    const staleSettlementRootProof = await buildNonInclusionProof({
       l2Tree: chainB.stack.tree,
       chainId: chainB.chainId,
       value: missingValue,
       l1Timestamp: deadline - 1,
       provesAgainstBeginRoot: false,
-      slBlock: staleSlBlock,
+      slBlock: staleSettlementRootBlock,
     });
     await expectRevertWithError(
-      managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(staleAnchor)),
+      managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(staleSettlementRootProof)),
       "ProofInteropRootNotAfterDeadline(uint256,uint64)"
     );
 
-    // 2. Anchor root never seeded (timestamp reads 0, like a legacy timestamp-less import): rejected.
-    const unseededAnchor = await buildNonInclusionProof({
+    // 2. Settlement interop root is missing, so its unset timestamp reads as 0: rejected.
+    const missingSettlementRootProof = await buildNonInclusionProof({
       l2Tree: chainB.stack.tree,
       chainId: chainB.chainId,
       value: missingValue,
@@ -759,21 +754,22 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       slBlock: 999_999,
     });
     await expectRevertWithError(
-      managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(unseededAnchor)),
+      managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(missingSettlementRootProof)),
       "ProofInteropRootNotAfterDeadline(uint256,uint64)"
     );
 
-    // 3. In-time batch that is NOT the chain's last inside the anchor root: the batch-leaf path has a
-    //    populated (non-empty-subtree) right sibling at level 0, so the last-batch check rejects it.
-    const validSlBlock = 204;
-    await seedAnchorRoot(chainA.provider, validSlBlock, deadline + 5);
+    // 3. In-time batch that is NOT the chain's last inside the settlement interop root: the batch-leaf
+    //    path has a populated (non-empty-subtree) right sibling at level 0, so the last-batch check
+    //    rejects it.
+    const validSettlementRootBlock = 204;
+    await ensureSettlementInteropRoot(chainA.provider, validSettlementRootBlock, deadline + 5);
     const notLastBatch = await buildNonInclusionProof({
       l2Tree: chainB.stack.tree,
       chainId: chainB.chainId,
       value: missingValue,
       l1Timestamp: deadline - 1,
       provesAgainstBeginRoot: false,
-      slBlock: validSlBlock,
+      slBlock: validSettlementRootBlock,
       batchLeafSiblings: [ethers.utils.id("populated-right-subtree")],
       batchLeafMask: 0, // left child at level 0 -> the sibling above must be the empty-subtree hash
     });

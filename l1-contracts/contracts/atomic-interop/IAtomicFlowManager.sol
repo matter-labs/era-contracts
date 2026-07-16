@@ -29,9 +29,7 @@ import {LegState, AtomicFlow, ImtProof, AtomicFinalityProof} from "./IAtomicInte
 /// need not be ascending). All legs settle on one `settlementLayerChainId`, so the deadline (a settlement-
 /// layer timestamp) is comparable to each batch's `l1Timestamp`.
 ///
-/// Deployed as an L2 predeploy (no constructor). All collaborators are referenced by canonical
-/// fixed address; the only initialization is `initL2` (the L1 chain id), called by the genesis
-/// upgrade.
+/// Deployed as an L2 predeploy (no constructor).
 interface IAtomicFlowManager {
     event FlowCommitted(bytes32 indexed flowId, bytes32 indexed bundleHash, uint64 deadline, uint256 leafIndex);
     event FlowRefundAuthorized(bytes32 indexed flowId, bytes32 indexed bundleHash);

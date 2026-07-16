@@ -42,17 +42,13 @@ import {Unauthorized} from "../l2-system/zksync-os/errors/ZKOSContractErrors.sol
 /// Timeout: {authorizeRefund} + {claimRefund} recover the burned source funds to the depositor by
 /// asking each of the bundle's call targets to reverse itself via {IAtomicRecoverable.recoverAtomicCall}.
 ///
-/// No double-spend: the finality condition ({AtomicInteropProof.verifyInclusion}) and the timeout
-/// condition ({AtomicInteropProof.verifyTimeoutAbsence}) are mutually exclusive — see the
-/// {AtomicInteropProof} library header for the protocol and its soundness/completeness argument —
-/// but only when both proofs are checked against the leg's own source chain on the same settlement
-/// layer. Both bindings are committed in `flowId`. Without the source-chain binding a leg's commit
-/// value is trivially absent from any other chain's tree, re-opening a cross-chain force-refund
-/// double-mint.
+/// Finalization and refund cannot both succeed when their proofs use the leg's declared source chain
+/// and the flow's settlement layer. Both values are included in `flowId`. Without the source-chain
+/// check, an attacker could finalize using a valid commitment on the real source chain, then obtain a
+/// refund by proving that the same value is absent from an unrelated chain. See {AtomicInteropProof}
+/// for the full finalization and timeout conditions.
 contract AtomicFlowManager is IAtomicFlowManager {
-    /// @dev (flowId, bundleHash) => source-leg state on this chain. All collaborators
-    /// (commitment tree, interop center, interop handler) are genesis-deployed built-ins
-    /// at canonical fixed addresses, so they are referenced as constants rather than stored/initialized.
+    /// @dev (flowId, bundleHash) => source-leg state on this chain.
     mapping(bytes32 flowId => mapping(bytes32 bundleHash => LegState)) internal _state;
 
     /// @dev The chain ID of the L1 network, set during the genesis upgrade (see `initL2`). In this
@@ -67,8 +63,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
         _;
     }
 
-    /// @notice One-time L2 initialization performed by the genesis upgrade
-    /// (`L2GenesisForceDeploymentsHelper._initializeV31Contracts`), mirroring the other L2 built-ins.
+    /// @notice One-time L2 initialization performed by the genesis upgrade.
     /// @param _l1ChainId The chain ID of the L1 network.
     function initL2(uint256 _l1ChainId) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;

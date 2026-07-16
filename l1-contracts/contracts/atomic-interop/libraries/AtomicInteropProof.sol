@@ -24,9 +24,7 @@ import {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Cross-chain authentication for the L1-free atomic interop flow. This header is the
-/// CANONICAL description of the finality / timeout protocol; other places (interfaces, README,
-/// off-chain helpers) reference it instead of restating it.
+/// @notice Cross-chain authentication for the L1-free atomic interop flow.
 ///
 /// A flow leg's commit value lives in its origin chain's {L2InteropCommitmentTree} (an Indexed
 /// Merkle Tree). The bootloader snapshots that tree's root at every batch boundary and commits both
@@ -35,11 +33,11 @@ import {
 /// chain authenticates a claimed IMT root as that leaf: the accepted (multi-hop) proof terminates at
 /// an imported SL aggregation root `interopRoots[slChainId][slBlock]` and binds the batch to
 /// `sourceChainId` via that chain's chain-id leaf inside that SL root — which the verifier only holds
-/// once the source batch has settled, so the root cannot be forged. No L2->L1 message is involved.
+/// once the source batch has settled, so the root cannot be forged.
 ///
 /// The flow `deadline` is a settlement-layer timestamp. Two authenticated clocks are compared to it:
 ///
-///   - the batch's **inclusion time** `t` (`l1Timestamp`) — the settlement-layer block timestamp at
+///   - the batch's **inclusion time** `t` (`l1BatchTimestamp`) — the settlement-layer block timestamp at
 ///     which the batch root was aggregated into the shared root. It is folded into the chain batch
 ///     leaf ({MessageHashing.batchLeafHash}), so it is proven by the same inclusion proof the leaf
 ///     verifier checks; we re-parse `settlementProof` with {MessageHashing._getProofData} (over the
@@ -55,7 +53,7 @@ import {
 /// INVARIANT: atomic interop is L1-only in this release — every chain participating in a flow
 /// settles on L1, enforced by {AtomicFlowManager}, which rejects any flow whose
 /// `settlementLayerChainId` is not the L1 chain id. `deadline`, `t` and `T` are therefore all
-/// timestamps of the single L1 clock. Mechanically, {verifyInclusion} / {verifyTimeoutAbsence} still
+/// timestamps of an L1 block. Mechanically, {verifyInclusion} / {verifyTimeoutAbsence} still
 /// require each proof's resolved `slChainId` to equal the flow's `settlementLayerChainId` (else
 /// {ProofSettlementLayerMismatch}), which under the invariant pins every leg's proof to L1.
 ///
@@ -103,7 +101,7 @@ library AtomicInteropProof {
     }
 
     /// @notice Verifies `_commitValue` is present in `_proof.sourceChainId`'s batch-END IMT root as of
-    /// a batch settled on `_expectedSlChainId` with `l1Timestamp <= _deadline` (the finality condition
+    /// a batch settled on `_expectedSlChainId` with `l1BatchTimestamp <= _deadline` (the finality condition
     /// from the library header).
     /// @dev The proof is bound to the correct chain by `_commitValue` itself: it bakes in the
     /// chain-specific `bundleHash`, so a leg's commit value can only be inserted into its own source
@@ -143,8 +141,8 @@ library AtomicInteropProof {
     /// never finalize. Implements the timeout branch of the protocol described in the library header:
     /// anchored on an aggregated root created strictly after the deadline (`T > _deadline`), the
     /// commit value is proven absent from the batch-BEGIN IMT root of a late batch
-    /// (`l1Timestamp > _deadline`) or from the batch-END IMT root of the chain's LAST batch inside
-    /// the anchor root (`l1Timestamp <= _deadline`).
+    /// (`l1BatchTimestamp > _deadline`) or from the batch-END IMT root of the chain's LAST batch inside
+    /// the anchor root (`l1BatchTimestamp <= _deadline`).
     /// @dev The caller ({AtomicFlowManager.authorizeRefund}) checks
     /// `_proof.sourceChainId == legSourceChainIds[i]`; the SL match is checked here.
     /// @param _absence Non-inclusion proof against the begin (late batch) or end (last in-time batch)
@@ -234,7 +232,7 @@ library AtomicInteropProof {
     /// _proof.batchNumber)` against the imported SL aggregation root — the accepted (multi-hop) proof
     /// terminates at `interopRoots[slChainId][slBlock]`, with the source chain bound via its chain-id
     /// leaf inside that root — and derives the settlement-layer metadata (SL snapshot block, SL chain
-    /// id, and the batch's `l1Timestamp`) from that same proof.
+    /// id, and the batch's `l1BatchTimestamp`) from that same proof.
     ///
     /// Step 1: pin the top-tree depth. The chain batch root is a fixed height-{ChainBatchRootTree.TREE_DEPTH}
     /// tree, so the leaf-to-batch-root section of the proof must be exactly that long. Without this, a

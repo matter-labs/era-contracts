@@ -296,9 +296,8 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
-    /// @dev An anchor root that was never imported with a timestamp (or not imported at all) reads as
-    /// timestamp 0 and is rejected the same way.
-    function test_RevertWhen_timeout_unseededAnchorRoot() public {
+    /// @dev A missing settlement interop root has an unset timestamp that reads as 0 and is rejected.
+    function test_RevertWhen_timeout_missingSettlementInteropRoot() public {
         uint256 unseededBlock = SL_BLOCK + 2;
         ImtProof memory absence = _nonInclusionProof(
             SOURCE_CHAIN_ID,
