@@ -47,6 +47,11 @@ interface ICTMTransition {
 
     function factoryDepHashes() external view returns (uint256[] memory);
 
+    /// @notice The base-system-contract hash CHANGES this hop applies (zero = leave unchanged).
+    /// @dev The target release holds the complete post-upgrade hash values; these fields say
+    ///      whether this hop is the one that applies them. A patch transition
+    ///      (`fromRelease == newRelease`) must carry all zeros — enforced at initialization —
+    ///      since targeting the same release cannot imply fresh system-contract changes.
     function baseSystemContractHashChanges() external view returns (bytes32, bytes32, bytes32);
 
     /// @notice Reverts unless the transition, its target release, and all codehash pins are valid.

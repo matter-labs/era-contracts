@@ -17,7 +17,8 @@ import {UpgradeFacetSwap} from "contracts/state-transition/libraries/ProposedUpg
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {HashMismatch} from "contracts/common/L1ContractErrors.sol";
+import {HashMismatch, TransitionReleaseMismatch} from "contracts/common/L1ContractErrors.sol";
+import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 /// @notice Exercises the CTM-scoped orchestrator against real write-once release and transition
 ///         objects. Release data describes new-chain genesis; transition data describes the one
@@ -76,6 +77,14 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
     }
 
     function _deployTransition(uint256 _upgradeTimestamp) internal returns (CTMTransition result) {
+        return _deployTransitionFrom(_upgradeTimestamp, chainContractAddress.currentRelease(), 0);
+    }
+
+    function _deployTransitionFrom(
+        uint256 _upgradeTimestamp,
+        address _fromRelease,
+        uint256 _oldProtocolVersion
+    ) internal returns (CTMTransition result) {
         UpgradeFacetSwap[] memory facetTransitions = new UpgradeFacetSwap[](2);
         bytes4[] memory adminOld = new bytes4[](2);
         adminOld[0] = bytes4(uint32(1));
@@ -117,12 +126,12 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         result.initialize(
             CTMTransition.TransitionManifest({
                 ctmProxy: address(chainContractAddress),
-                oldProtocolVersion: 0,
+                oldProtocolVersion: _oldProtocolVersion,
                 newProtocolVersion: newVersion,
                 verifier: testnetVerifier,
-                // This first transition departs from whatever release the fixture CTM was
-                // genesis'd with (its current release), as the module's release-edge pin requires.
-                fromRelease: chainContractAddress.currentRelease(),
+                // The default transition departs from whatever release the fixture CTM was
+                // genesis'd with (its current release), as the executor's release-edge pin requires.
+                fromRelease: _fromRelease,
                 newRelease: address(release),
                 defaultUpgrade: makeAddr("defaultUpgrade"),
                 oldProtocolVersionDeadline: 1000,
@@ -171,9 +180,38 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         ctmExecutor.applyCTMUpgrade(ICTMTransition(address(transition)));
     }
 
+    function test_revertWhen_applyCTMUpgradeFromWrongRelease() public {
+        _applyCTMUpgrade();
+
+        // Replaying the same transition trips the release edge: the CTM already moved on to the
+        // transition's target release, so `fromRelease` no longer matches.
+        vm.expectRevert(
+            abi.encodeWithSelector(TransitionReleaseMismatch.selector, transition.fromRelease(), address(release))
+        );
+        vm.prank(governor);
+        ctmExecutor.applyCTMUpgrade(ICTMTransition(address(transition)));
+    }
+
+    function test_revertWhen_applyCTMUpgradeFromWrongVersion() public {
+        _applyCTMUpgrade();
+
+        // A transition with the RIGHT release edge (departs from the now-current release, toward
+        // a fresh distinct release so it is not a patch) but a STALE version edge must trip the
+        // executor's independent version assert.
+        address appliedRelease = address(release);
+        release = _deployRelease();
+        CTMTransition staleVersionTransition = _deployTransitionFrom(779, appliedRelease, 0);
+
+        vm.expectRevert(abi.encodeWithSelector(OutdatedProtocolVersion.selector, newVersion, 0));
+        vm.prank(governor);
+        ctmExecutor.applyCTMUpgrade(ICTMTransition(address(staleVersionTransition)));
+    }
+
     function test_upgradeChain_rejectsDifferentTransition() public {
         _applyCTMUpgrade();
-        CTMTransition differentTransition = _deployTransition(778);
+        // Same edges as the committed transition (so it is a valid non-patch transition), but a
+        // different timestamp -> a different composed cut -> the chain's upgradeCutHash check trips.
+        CTMTransition differentTransition = _deployTransitionFrom(778, transition.fromRelease(), 0);
 
         vm.expectRevert(
             abi.encodeWithSelector(

@@ -9,6 +9,7 @@ import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {IDefaultUpgrade} from "../IDefaultUpgrade.sol";
 import {TransitionReleaseMismatch} from "../../common/L1ContractErrors.sol";
+import {OutdatedProtocolVersion} from "../../state-transition/L1StateTransitionErrors.sol";
 
 /// @title CTMUpgradeExecutor
 /// @author Matter Labs
@@ -39,14 +40,22 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
     constructor(address _initialOwner) UpgradeExecutorBase(_initialOwner) {}
 
     /// @notice Installs the transition and points new-chain genesis at its target release.
+    /// @dev Both transition edges are asserted independently BEFORE any mutation:
+    ///      - the release edge (`currentRelease == fromRelease`) rejects execution from the wrong
+    ///        release, and — since `applyCTMUpgrade` moves `currentRelease` — rejects replays;
+    ///      - the version edge (`protocolVersion == oldProtocolVersion`) rejects the wrong
+    ///        version schedule (also re-checked inside `setNewVersionUpgrade`).
+    ///      A zero `fromRelease` is MIGRATION-ONLY semantics: it matches only a pre-registry CTM
+    ///      (whose `currentRelease` is still unset, e.g. the v31 -> v32 hop). Because this call
+    ///      always pins a non-zero `newRelease`, a zero-`fromRelease` transition can never apply
+    ///      again once any release is installed — zero has no permanent meaning.
     /// @param _transition The write-once transition approved by governance.
     function applyCTMUpgrade(ICTMTransition _transition) external onlyOwner {
         _transition.validate();
         IChainTypeManager ctm = IChainTypeManager(_transition.ctmProxy());
 
         // Pin the release edge: the CTM must currently be at exactly the release this transition
-        // departs from (`address(0)` for the first, pre-registry transition e.g. v31 -> v32), so
-        // "how A becomes B" is never identified by version number alone.
+        // departs from, so "how A becomes B" is never identified by version number alone.
         address currentRelease = ctm.currentRelease();
         if (currentRelease != _transition.fromRelease()) {
             revert TransitionReleaseMismatch(_transition.fromRelease(), currentRelease);
@@ -54,6 +63,12 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
 
         uint256 oldProtocolVersion = _transition.oldProtocolVersion();
         uint256 newProtocolVersion = _transition.newProtocolVersion();
+
+        // Pin the version edge as well, independently of the release edge.
+        uint256 currentProtocolVersion = ctm.protocolVersion();
+        if (currentProtocolVersion != oldProtocolVersion) {
+            revert OutdatedProtocolVersion(currentProtocolVersion, oldProtocolVersion);
+        }
 
         ctm.setNewVersionUpgrade({
             _cutData: _buildUpgradeCut(_transition),

@@ -24,7 +24,11 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {RegistryAlreadyInitialized, RegistryCodehashMismatch} from "contracts/common/L1ContractErrors.sol";
+import {
+    PatchTransitionChangesHashes,
+    RegistryAlreadyInitialized,
+    RegistryCodehashMismatch
+} from "contracts/common/L1ContractErrors.sol";
 
 contract StorageRegistriesTest is Test {
     CoreRegistry internal coreRegistry;
@@ -241,6 +245,31 @@ contract StorageRegistriesTest is Test {
         assertEq(proposedUpgrade.newProtocolVersion, NEW_VERSION);
         assertEq(proposedUpgrade.upgradeTimestamp, 1234567);
         assertEq(proposedUpgrade.bootloaderHash, bytes32(uint256(0xb00)));
+    }
+
+    function test_patchTransitionWithZeroHashesInitializes() public {
+        // A patch transition targets the SAME release on both edges and changes no base-system
+        // hashes: the release already holds the complete values.
+        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        manifest.fromRelease = manifest.newRelease;
+        manifest.bootloaderHash = bytes32(0);
+        manifest.defaultAccountHash = bytes32(0);
+        manifest.evmEmulatorHash = bytes32(0);
+
+        CTMTransition patchTransition = new CTMTransition();
+        patchTransition.initialize(manifest);
+        assertEq(patchTransition.fromRelease(), patchTransition.newRelease());
+    }
+
+    function test_revertWhen_patchTransitionChangesHashes() public {
+        // Targeting the same release cannot imply fresh system-contract changes: a nonzero hash
+        // "change" on a same-release hop must be rejected at initialization.
+        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        manifest.fromRelease = manifest.newRelease;
+
+        CTMTransition patchTransition = new CTMTransition();
+        vm.expectRevert(PatchTransitionChangesHashes.selector);
+        patchTransition.initialize(manifest);
     }
 
     function test_validateRejectsCodehashDrift() public {

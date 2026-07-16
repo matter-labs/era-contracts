@@ -7,6 +7,7 @@ import {ICTMRelease} from "./ICTMRelease.sol";
 import {ICTMTransition, L2Deployment} from "./ICTMTransition.sol";
 import {UpgradeFacetSwap} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
 import {
+    PatchTransitionChangesHashes,
     RegistryAlreadyInitialized,
     RegistryCodehashMismatch,
     RegistryUnknownKey,
@@ -74,10 +75,23 @@ contract CTMTransition is ICTMTransition {
         }
 
         ICTMRelease(_manifest.newRelease).validate();
-        // `fromRelease` is `address(0)` for a transition from a pre-registry version (v31 -> v32);
-        // when set it must itself be a valid release the CTM can currently be running.
+        // `fromRelease` is `address(0)` ONLY for the migration hop from a pre-registry version
+        // (v31 -> v32): the executor matches it against a CTM whose `currentRelease` is still
+        // unset, and since every applied transition pins a non-zero release, a zero `fromRelease`
+        // can never match again afterwards. When set, it must itself be a valid release.
         if (_manifest.fromRelease != address(0)) {
             ICTMRelease(_manifest.fromRelease).validate();
+        }
+        // A patch transition (same release on both edges) changes no chain state beyond the
+        // version schedule: the target release already holds the complete base-system hashes, so
+        // the hop must not smuggle in fresh system-contract changes.
+        if (
+            _manifest.fromRelease == _manifest.newRelease &&
+            (_manifest.bootloaderHash != bytes32(0) ||
+                _manifest.defaultAccountHash != bytes32(0) ||
+                _manifest.evmEmulatorHash != bytes32(0))
+        ) {
+            revert PatchTransitionChangesHashes();
         }
         _validatePins(_manifest.codehashPins);
 
