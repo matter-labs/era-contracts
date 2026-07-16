@@ -6,7 +6,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L1EcosystemContract} from "./ContractIdentifiers.sol";
-import {ICoreRegistry} from "./ICoreRegistry.sol";
+import {ICoreRegistry, EcosystemContractRow} from "./ICoreRegistry.sol";
 import {UpgradeExecutorBase} from "../../governance/UpgradeExecutorBase.sol";
 
 /// @title EcosystemUpgradeExecutor
@@ -41,19 +41,20 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
         _coreRegistry.validate();
         ProxyAdmin proxyAdmin = ProxyAdmin(_coreRegistry.proxyAdmin());
 
-        L1EcosystemContract[] memory contracts = _coreRegistry.ecosystemContractList();
-        uint256 contractsLength = contracts.length;
-        for (uint256 i = 0; i < contractsLength; ++i) {
-            address newImpl = _coreRegistry.implAddress(contracts[i]);
+        // One call returns complete typed rows; no per-key rescans of the registry.
+        EcosystemContractRow[] memory rows = _coreRegistry.ecosystemRows();
+        uint256 rowsLength = rows.length;
+        for (uint256 i = 0; i < rowsLength; ++i) {
+            address newImpl = rows[i].implNew;
             if (newImpl == address(0)) {
                 continue;
             }
-            ITransparentUpgradeableProxy proxy = ITransparentUpgradeableProxy(_coreRegistry.proxyAddress(contracts[i]));
+            ITransparentUpgradeableProxy proxy = ITransparentUpgradeableProxy(rows[i].proxy);
             if (newImpl == proxyAdmin.getProxyImplementation(proxy)) {
                 continue;
             }
             proxyAdmin.upgrade(proxy, newImpl);
-            emit EcosystemContractUpgraded(contracts[i], address(proxy), newImpl);
+            emit EcosystemContractUpgraded(rows[i].key, address(proxy), newImpl);
         }
     }
 }

@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {L1EcosystemContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
-import {ICoreRegistry} from "contracts/upgrades/registry/ICoreRegistry.sol";
+import {ICoreRegistry, EcosystemContractRow} from "contracts/upgrades/registry/ICoreRegistry.sol";
 
 /// @dev Mutable core-registry double for unit fixtures with dynamic deployment addresses.
 contract TestCoreRegistry is ICoreRegistry {
@@ -37,16 +37,13 @@ contract TestCoreRegistry is ICoreRegistry {
         return newVersion;
     }
 
-    function proxyAddress(L1EcosystemContract _contract) external view returns (address) {
-        return proxies[_contract];
-    }
-
-    function implAddress(L1EcosystemContract _contract) external view returns (address) {
-        return newImpls[_contract];
-    }
-
-    function ecosystemContractList() external view returns (L1EcosystemContract[] memory) {
-        return contractList;
+    function ecosystemRows() external view returns (EcosystemContractRow[] memory rows) {
+        uint256 length = contractList.length;
+        rows = new EcosystemContractRow[](length);
+        for (uint256 i = 0; i < length; ++i) {
+            L1EcosystemContract key = contractList[i];
+            rows[i] = EcosystemContractRow({key: key, proxy: proxies[key], implNew: newImpls[key]});
+        }
     }
 
     function proxyAdmin() external view returns (address) {

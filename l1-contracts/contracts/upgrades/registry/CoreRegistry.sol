@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.28;
 
-import {L1EcosystemContract, CodehashPin} from "./ContractIdentifiers.sol";
-import {ICoreRegistry} from "./ICoreRegistry.sol";
+import {CodehashPin} from "./ContractIdentifiers.sol";
+import {ICoreRegistry, EcosystemContractRow} from "./ICoreRegistry.sol";
 import {
     RegistryAlreadyInitialized,
     RegistryCodehashMismatch,
@@ -18,16 +18,6 @@ import {
 ///         implementation is a fixed, audited-once contract, so a per-instance review is a pure
 ///         DATA check (read the getters or compare {manifestHash} against the audited manifest).
 contract CoreRegistry is ICoreRegistry {
-    /// @dev One ecosystem contract's proxy and new-version implementation. A zero `implNew`
-    ///      means "this upgrade pins no new implementation" (nothing to upgrade). Old-version
-    ///      implementations are deliberately not recorded — the upgrade only needs where each
-    ///      proxy must point AFTER it runs.
-    struct EcosystemContractRow {
-        L1EcosystemContract key;
-        address proxy;
-        address implNew;
-    }
-
     /// @notice Everything a core registry instance pins, set exactly once by {initialize}.
     struct CoreRegistryManifest {
         uint256 oldProtocolVersion;
@@ -99,34 +89,8 @@ contract CoreRegistry is ICoreRegistry {
     }
 
     /// @inheritdoc ICoreRegistry
-    function proxyAddress(L1EcosystemContract _contract) external view returns (address) {
-        uint256 rowsLength = contractRows.length;
-        for (uint256 i = 0; i < rowsLength; ++i) {
-            if (contractRows[i].key == _contract) {
-                return contractRows[i].proxy;
-            }
-        }
-        revert RegistryUnknownKey();
-    }
-
-    /// @inheritdoc ICoreRegistry
-    function implAddress(L1EcosystemContract _contract) external view returns (address) {
-        uint256 rowsLength = contractRows.length;
-        for (uint256 i = 0; i < rowsLength; ++i) {
-            if (contractRows[i].key == _contract) {
-                return contractRows[i].implNew;
-            }
-        }
-        revert RegistryUnknownKey();
-    }
-
-    /// @inheritdoc ICoreRegistry
-    function ecosystemContractList() external view returns (L1EcosystemContract[] memory list) {
-        uint256 rowsLength = contractRows.length;
-        list = new L1EcosystemContract[](rowsLength);
-        for (uint256 i = 0; i < rowsLength; ++i) {
-            list[i] = contractRows[i].key;
-        }
+    function ecosystemRows() external view returns (EcosystemContractRow[] memory) {
+        return contractRows;
     }
 
     /// @inheritdoc ICoreRegistry

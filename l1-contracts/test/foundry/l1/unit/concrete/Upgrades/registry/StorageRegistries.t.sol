@@ -6,6 +6,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {L2EcosystemContract, L1EcosystemContract, CodehashPin} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {CoreRegistry} from "contracts/upgrades/registry/CoreRegistry.sol";
+import {EcosystemContractRow} from "contracts/upgrades/registry/ICoreRegistry.sol";
 import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/CTMTransition.sol";
 import {ICTMTransition, L2Deployment} from "contracts/upgrades/registry/ICTMTransition.sol";
@@ -39,13 +40,13 @@ contract StorageRegistriesTest is Test {
     }
 
     function _coreManifest() internal pure returns (CoreRegistry.CoreRegistryManifest memory manifest) {
-        CoreRegistry.EcosystemContractRow[] memory rows = new CoreRegistry.EcosystemContractRow[](2);
-        rows[0] = CoreRegistry.EcosystemContractRow({
+        EcosystemContractRow[] memory rows = new EcosystemContractRow[](2);
+        rows[0] = EcosystemContractRow({
             key: L1EcosystemContract.L1Bridgehub,
             proxy: address(0xB001),
             implNew: address(0xB201)
         });
-        rows[1] = CoreRegistry.EcosystemContractRow({
+        rows[1] = EcosystemContractRow({
             key: L1EcosystemContract.L1MessageRoot,
             proxy: address(0xB003),
             implNew: address(0)

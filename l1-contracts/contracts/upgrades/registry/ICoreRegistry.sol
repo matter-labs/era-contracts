@@ -4,16 +4,24 @@ pragma solidity ^0.8.21;
 
 import {L1EcosystemContract} from "./ContractIdentifiers.sol";
 
+/// @notice One ecosystem contract's upgrade row: which proxy, and the new-version implementation
+///         it must point at afterwards (`implNew == address(0)` means nothing to upgrade).
+///         Version-independent proxy + post-upgrade impl; old implementations are not recorded —
+///         the upgrade only needs where each proxy points AFTER it runs.
+struct EcosystemContractRow {
+    L1EcosystemContract key;
+    address proxy;
+    address implNew;
+}
+
 /// @title Core (ecosystem-wide) upgrade registry.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The lookup surface of a generated, constants-in-bytecode registry that pins every
-///         ecosystem-wide L1 contract address for one protocol upgrade (old version -> new version).
-/// @dev Implementations hold all values as compile-time constants: every getter is `pure` and the
-///      deployed bytecode itself is the commitment to the upgrade manifest (its `EXTCODEHASH`
-///      commits to every pinned value). Implementations are generated from the audited manifest,
-///      never hand-written, and are redeployed to a new address for every upgrade.
-/// @dev Getters revert for unknown `(contract, version)` combinations.
+/// @notice The lookup surface of a storage-backed, write-once registry that pins every
+///         ecosystem-wide L1 contract row for one protocol upgrade (old version -> new version).
+/// @dev The registry is initialized once from an audited manifest; `manifestHash` commits to the
+///      pinned values and each pinned L1 address carries an `EXTCODEHASH` pin verified by
+///      `validate()` / `verifyAll()`.
 interface ICoreRegistry {
     /// @notice The packed SemVer (see `SemVer.sol`) protocol version this registry upgrades from.
     function oldProtocolVersion() external view returns (uint256);
@@ -21,19 +29,9 @@ interface ICoreRegistry {
     /// @notice The packed SemVer protocol version this registry upgrades to.
     function newProtocolVersion() external view returns (uint256);
 
-    /// @notice Proxy address of an ecosystem contract. Version-independent: proxies survive upgrades.
-    function proxyAddress(L1EcosystemContract _contract) external view returns (address);
-
-    /// @notice The new-version implementation address of an ecosystem contract, or zero when this
-    ///         upgrade pins no new implementation for it (nothing to upgrade). Old-version
-    ///         implementations are deliberately not recorded: the upgrade only needs where each
-    ///         proxy must point AFTER it runs.
-    /// @param _contract The ecosystem contract identifier; unknown identifiers revert.
-    function implAddress(L1EcosystemContract _contract) external view returns (address);
-
-    /// @notice The ecosystem contracts that participate in this upgrade (i.e. that have a proxy
-    ///         and, when upgraded, a new implementation pinned in this registry).
-    function ecosystemContractList() external view returns (L1EcosystemContract[] memory);
+    /// @notice Every ecosystem contract participating in this upgrade, as complete typed rows —
+    ///         one call, no per-key rescans. Consumers iterate these directly.
+    function ecosystemRows() external view returns (EcosystemContractRow[] memory);
 
     /// @notice The ecosystem `ProxyAdmin` that administers every ecosystem proxy.
     function proxyAdmin() external view returns (address);
