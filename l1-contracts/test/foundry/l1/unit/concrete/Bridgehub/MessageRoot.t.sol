@@ -12,6 +12,7 @@ import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {
     ChainBatchRootAlreadyExists,
+    ChainBatchRootZero,
     OnlyBridgehub,
     MessageRootNotRegistered,
     NonConsecutiveBatchNumber,
@@ -213,6 +214,15 @@ contract MessageRootTest is Test {
         vm.prank(bridgeHub);
         vm.expectRevert(abi.encodeWithSelector(NonConsecutiveBatchNumber.selector, betaChainId, 0));
         messageRoot.seedGenesisRoot(betaChainId);
+
+        // A ZKsync OS chain reading a zero genesis root is a bug, not a no-op.
+        uint256 gammaChainId = uint256(uint160(makeAddr("gammaChainId")));
+        _mockZkChainGenesisGetters(gammaChainId, makeAddr("gammaChainSender"), true, bytes32(0));
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(gammaChainId, 0);
+        vm.prank(bridgeHub);
+        vm.expectRevert(ChainBatchRootZero.selector);
+        messageRoot.seedGenesisRoot(gammaChainId);
     }
 
     /// @notice A chain onboarded with a non-zero starting batch number (already-deployed chain /

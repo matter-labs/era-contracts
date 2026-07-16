@@ -359,8 +359,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
 
     /// @notice One-time seeding of a freshly created chain's genesis (batch 0) chain batch root,
     /// pulled from the chain itself (`l2LogsRootHash(0)`, stored by its DiamondInit). The Bridgehub
-    /// calls this right after registration in `createNewChain`; a no-op for chains that store no
-    /// genesis root (EraVM).
+    /// calls this right after registration in `createNewChain`; a no-op for EraVM chains.
     /// @param _chainId The ID of the chain whose genesis root is seeded.
     function seedGenesisRoot(uint256 _chainId) external {
         if (msg.sender != _bridgehub()) {
@@ -370,10 +369,9 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         if (!zkChain.getZKsyncOS()) {
             return;
         }
+        // A ZKsync OS chain always stores its genesis root in DiamondInit; a zero read is a bug.
         bytes32 genesisChainBatchRoot = zkChain.l2LogsRootHash(0);
-        if (genesisChainBatchRoot == bytes32(0)) {
-            return;
-        }
+        require(genesisChainBatchRoot != bytes32(0), ChainBatchRootZero());
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();
         }
