@@ -25,5 +25,4 @@ contract DefaultUpgrade is BaseZkSyncUpgrade {
     function patchUpgrade(uint256 _newProtocolVersion) external returns (bytes32) {
         return upgrade(ProposedUpgradeLib.emptyProposedUpgrade(_newProtocolVersion));
     }
-
 }

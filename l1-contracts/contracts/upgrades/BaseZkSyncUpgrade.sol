@@ -32,12 +32,7 @@ import {
     ProtocolVersionTooSmall,
     SettlementLayerUpgradeMustPrecedeChainUpgrade
 } from "./ZkSyncUpgradeErrors.sol";
-import {
-    RegistryWrongCTM,
-    TimeNotReached,
-    TooManyFactoryDeps,
-    ZeroAddress
-} from "../common/L1ContractErrors.sol";
+import {RegistryWrongCTM, TimeNotReached, TooManyFactoryDeps, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 

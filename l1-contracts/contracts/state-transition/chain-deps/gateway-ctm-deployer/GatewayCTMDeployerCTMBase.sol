@@ -96,13 +96,12 @@ abstract contract GatewayCTMDeployerCTMBase {
         // CREATE2 (no constructor, so its address is independent of the pinned values — the
         // off-chain helper can put it in the cut before any facet exists) and initialized HERE,
         // in the same deployer flow governance approved.
-        address currentRelease = _initializeCurrentRelease(
-            _config.bootstrapRegistry,
-            _config.genesisUpgrade,
-            _config.verifier,
-            baseConfig,
-            facets
-        );
+        address currentRelease = _initializeCurrentRelease({
+            _release: _config.bootstrapRegistry,
+            _genesisUpgrade: _config.genesisUpgrade,
+            _baseConfig: baseConfig,
+            _facets: facets
+        });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
@@ -137,14 +136,14 @@ abstract contract GatewayCTMDeployerCTMBase {
     ///         installed set.
     /// @param _release The pre-deployed bootstrap `CTMRelease` address.
     /// @param _genesisUpgrade The L1 genesis upgrade contract new chains run at creation.
-    /// @param _verifier The verifier pinned by the release.
-    /// @param _baseConfig The deployment config (protocol version, base system hashes, genesis).
+    /// @param _baseConfig The deployment config (base system hashes, genesis params).
     /// @param _facets The deployed diamond facet addresses.
     /// @return release The initialized bootstrap release (echoed back).
+    /// @dev A release is version-INDEPENDENT: no protocol version or verifier is pinned here;
+    ///      the CTM holds those (see `diamondInitData`).
     function _initializeCurrentRelease(
         address _release,
         address _genesisUpgrade,
-        address _verifier,
         GatewayCTMDeployerConfig memory _baseConfig,
         Facets memory _facets
     ) internal returns (address release) {

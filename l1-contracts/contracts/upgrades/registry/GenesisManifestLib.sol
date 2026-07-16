@@ -49,16 +49,11 @@ library GenesisManifestLib {
 
         // The canonical facet set of a new chain diamond; empty selector lists mean DiamondInit
         // reads each facet's own `ISelfDescribingFacet.selectors()`.
-        (
-            address[GENESIS_FACET_COUNT] memory addrs,
-            bool[GENESIS_FACET_COUNT] memory freezable
-        ) = _genesisFacets(_cfg.facets);
+        (address[GENESIS_FACET_COUNT] memory addrs, bool[GENESIS_FACET_COUNT] memory freezable) = _genesisFacets(
+            _cfg.facets
+        );
         for (uint256 i = 0; i < GENESIS_FACET_COUNT; ++i) {
-            genesisFacets[i] = GenesisFacet({
-                facet: addrs[i],
-                isFreezable: freezable[i],
-                selectors: new bytes4[](0)
-            });
+            genesisFacets[i] = GenesisFacet({facet: addrs[i], isFreezable: freezable[i], selectors: new bytes4[](0)});
         }
 
         manifest.isZKsyncOS = _cfg.isZKsyncOS;
@@ -76,14 +71,7 @@ library GenesisManifestLib {
 
     function _genesisFacets(
         Facets memory _facets
-    )
-        private
-        pure
-        returns (
-            address[GENESIS_FACET_COUNT] memory addrs,
-            bool[GENESIS_FACET_COUNT] memory freezable
-        )
-    {
+    ) private pure returns (address[GENESIS_FACET_COUNT] memory addrs, bool[GENESIS_FACET_COUNT] memory freezable) {
         addrs[0] = _facets.adminFacet;
         freezable[0] = false;
 

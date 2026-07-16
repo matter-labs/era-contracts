@@ -4,7 +4,11 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {L2EcosystemContract, L1EcosystemContract, CodehashPin} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+import {
+    L2EcosystemContract,
+    L1EcosystemContract,
+    CodehashPin
+} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {CoreRegistry} from "contracts/upgrades/registry/CoreRegistry.sol";
 import {EcosystemContractRow} from "contracts/upgrades/registry/ICoreRegistry.sol";
 import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
@@ -197,7 +201,9 @@ contract StorageRegistriesTest is Test {
         assertEq(transition.verifier(), address(0xE002));
         assertEq(release.diamondInit(), address(0xF204));
         assertEq(release.fixedForceDeploymentsData(), hex"f1f2");
-        Diamond.FacetCut[] memory installations = ReleaseFacetReader.newChainInstallations(ICTMRelease(address(release)));
+        Diamond.FacetCut[] memory installations = ReleaseFacetReader.newChainInstallations(
+            ICTMRelease(address(release))
+        );
         assertEq(installations.length, 3);
         assertEq(installations[0].facet, address(0xF201));
         assertEq(installations[2].facet, address(0xF203));

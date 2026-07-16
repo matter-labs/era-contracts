@@ -163,11 +163,7 @@ contract UtilsCallMockerTest is Test {
     function mockGenesisRegistryContract() public {
         address genesisRegistry = Utils.TEST_GENESIS_REGISTRY;
         vm.mockCall(genesisRegistry, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
-        vm.mockCall(
-            genesisRegistry,
-            abi.encodeWithSelector(ICTMRelease.isZKsyncOS.selector),
-            abi.encode(false)
-        );
+        vm.mockCall(genesisRegistry, abi.encodeWithSelector(ICTMRelease.isZKsyncOS.selector), abi.encode(false));
         vm.mockCall(
             genesisRegistry,
             abi.encodeWithSelector(ICTMRelease.diamondInit.selector),

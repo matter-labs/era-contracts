@@ -140,9 +140,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         );
     }
 
-    function _expectedUpgradeCut(
-        ICTMTransition _transition
-    ) internal view returns (Diamond.DiamondCutData memory) {
+    function _expectedUpgradeCut(ICTMTransition _transition) internal view returns (Diamond.DiamondCutData memory) {
         return
             CTMUpgradeComposer.buildUpgradeCutData(
                 _transition.defaultUpgrade(),
