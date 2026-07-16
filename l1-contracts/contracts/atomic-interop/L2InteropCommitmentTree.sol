@@ -3,7 +3,8 @@ pragma solidity 0.8.28;
 
 import {IndexedMerkleTree, IMT, IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
 import {IL2InteropCommitmentTree} from "./IL2InteropCommitmentTree.sol";
-import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ATOMIC_FLOW_MANAGER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {Unauthorized} from "../l2-system/zksync-os/errors/ZKOSContractErrors.sol";
 import {CommitmentTreeNotAppender} from "./AtomicInteropErrors.sol";
 
 /// @author Matter Labs
@@ -31,10 +32,19 @@ contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
     /// as the "initialized" flag.
     IMT internal _imt;
 
-    /// @notice One-shot initializer: seeds the IMT (the `{0,0,0}` head leaf at index 0). The appender
-    /// is the canonical {AtomicFlowManager} (a fixed built-in address), so there is no wiring
-    /// parameter; `_imt.setup()` reverts if the tree was already seeded.
-    function initialize() external {
+    /// @dev Only allows calls from the complex upgrader contract on L2.
+    modifier onlyUpgrader() {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    /// @notice One-time L2 initialization performed by the genesis upgrade, like the other L2
+    /// built-ins: seeds the IMT (the `{0,0,0}` head leaf at index 0). The appender is the canonical
+    /// {AtomicFlowManager} (a fixed built-in address), so there is no wiring parameter;
+    /// `_imt.setup()` reverts if the tree was already seeded.
+    function initL2() external onlyUpgrader {
         _imt.setup();
         emit RootUpdated(0, _imt.root());
     }

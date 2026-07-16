@@ -10,6 +10,7 @@ import {ImtProof, ATOMIC_COMMIT_LEAF_TAG} from "contracts/atomic-interop/IAtomic
 import {IMTLeaf} from "contracts/common/libraries/IndexedMerkleTree.sol";
 import {InteropRoot} from "contracts/common/Messaging.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {CHAIN_TREE_EMPTY_ENTRY_HASH} from "contracts/core/message-root/IMessageRoot.sol";
 import {SUPPORTED_PROOF_METADATA_VERSION} from "contracts/common/Config.sol";
 import {
@@ -57,7 +58,7 @@ contract AtomicInteropProofWrapper {
 ///     and off-chain layouts cannot drift.
 ///   - A REAL {L2InteropRootStorage} is etched at its canonical address and seeded through the
 ///     production `addSingleInteropRoot` entry point (pranked as the bootloader), so the timeout
-///     protocol's anchor-root `(root, timestamp)` tuples are served by the real storage — no mocked
+///     protocol's settlement-layer interop root `(root, timestamp)` tuples are served by the real storage — no mocked
 ///     root values.
 ///   - The one system contract that IS mocked (justified: it isolates this library from the
 ///     separately-tested machinery) is `L2_MESSAGE_VERIFICATION.proveL2LeafInclusionShared` — the
@@ -85,9 +86,10 @@ abstract contract AtomicInteropProofBuilder is Test {
         proofLib = new AtomicInteropProofWrapper();
         tree = new L2InteropCommitmentTree();
         // Seeds the `{0,0,0}` head leaf at index 0.
-        tree.initialize();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        tree.initL2();
 
-        // The timeout protocol reads the anchor tuple from the canonical L2InteropRootStorage; give
+        // The timeout protocol reads the settlement-layer interop root tuple from the canonical L2InteropRootStorage; give
         // that address the REAL contract so tests seed it through the production write path.
         rootStorage = L2InteropRootStorage(L2_INTEROP_ROOT_STORAGE_ADDR);
         vm.etch(L2_INTEROP_ROOT_STORAGE_ADDR, address(new L2InteropRootStorage()).code);
@@ -106,11 +108,11 @@ abstract contract AtomicInteropProofBuilder is Test {
         );
     }
 
-    /// @dev Imports the anchor `(root, timestamp)` tuple into the REAL root storage through the
+    /// @dev Imports the settlement-layer interop root `(root, timestamp)` tuple into the REAL root storage through the
     /// production bootloader entry point.
-    function _seedAnchorRoot(uint256 _slChainId, uint256 _slBlock, uint256 _timestamp) internal {
+    function _seedSettlementLayerInteropRoot(uint256 _slChainId, uint256 _slBlock, uint256 _timestamp) internal {
         bytes32[] memory sides = new bytes32[](1);
-        sides[0] = keccak256(abi.encode("anchor-root", _slChainId, _slBlock));
+        sides[0] = keccak256(abi.encode("sl-interop-root", _slChainId, _slBlock));
         vm.prank(L2_BOOTLOADER_ADDRESS);
         rootStorage.addSingleInteropRoot(
             InteropRoot({chainId: _slChainId, blockOrBatchNumber: _slBlock, timestamp: _timestamp, sides: sides})
@@ -233,7 +235,7 @@ abstract contract AtomicInteropProofBuilder is Test {
     }
 
     /// @dev A *final* `settlementProof` (single-level / commit-based) that carries no settlement-layer
-    /// anchor, so `AtomicInteropProof` rejects it with `ProofMissingSettlementLayerAnchor`.
+    /// settlement-layer batch reference, so `AtomicInteropProof` rejects it with `ProofMissingSettlementLayerBatch`.
     function _finalSettlementProof() internal pure returns (bytes32[] memory proof) {
         uint256 topLen = ChainBatchRootTree.TREE_DEPTH;
         proof = new bytes32[](topLen + 1);
@@ -283,7 +285,7 @@ abstract contract AtomicInteropProofBuilder is Test {
     }
 
     /// @dev Non-inclusion proof for an absent `_absentValue`: uses its low-nullifier (predecessor)
-    /// leaf. The empty batch-leaf path marks the batch as the chain's last inside the anchor root
+    /// leaf. The empty batch-leaf path marks the batch as the chain's last inside the settlement-layer interop root
     /// (single-leaf chain tree), so the proof is valid for both timeout branches.
     function _nonInclusionProof(
         uint256 _sourceChainId,

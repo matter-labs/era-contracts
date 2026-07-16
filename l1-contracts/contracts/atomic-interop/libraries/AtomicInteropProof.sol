@@ -11,10 +11,11 @@ import {L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_VERIFICATION} from "../../common/l2-
 import {CHAIN_TREE_EMPTY_ENTRY_HASH} from "../../core/message-root/IMessageRoot.sol";
 import {
     ProofImtRootInclusionFailed,
-    ProofInvalidChainBatchRootDepth,
-    ProofMissingSettlementLayerAnchor,
+    IMTProofInvalidChainBatchRootDepth,
+    ProofMissingSettlementLayerBatch,
     ProofDeadlineExceeded,
     ProofInteropRootNotAfterDeadline,
+    ProofSettlementLayerInteropRootNotImported,
     ProofNotLastBatchInRoot,
     ProofTimeoutBranchMismatch,
     ProofInclusionFailed,
@@ -24,7 +25,7 @@ import {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Cross-chain authentication for the L1-free atomic interop flow.
+/// @notice Cross-chain authentication for the atomic interop flow.
 ///
 /// A flow leg's commit value lives in its origin chain's {L2InteropCommitmentTree} (an Indexed
 /// Merkle Tree). The bootloader snapshots that tree's root at every batch boundary and commits both
@@ -139,10 +140,10 @@ library AtomicInteropProof {
 
     /// @notice Timeout proof: shows `_commitValue` was not committed by the deadline and the flow can
     /// never finalize. Implements the timeout branch of the protocol described in the library header:
-    /// anchored on an aggregated root created strictly after the deadline (`T > _deadline`), the
+    /// resolved against a settlement-layer interop root created strictly after the deadline (`T > _deadline`), the
     /// commit value is proven absent from the batch-BEGIN IMT root of a late batch
     /// (`l1BatchTimestamp > _deadline`) or from the batch-END IMT root of the chain's LAST batch inside
-    /// the anchor root (`l1BatchTimestamp <= _deadline`).
+    /// the settlement-layer interop root (`l1BatchTimestamp <= _deadline`).
     /// @dev The caller ({AtomicFlowManager.authorizeRefund}) checks
     /// `_proof.sourceChainId == legSourceChainIds[i]`; the SL match is checked here.
     /// @param _absence Non-inclusion proof against the begin (late batch) or end (last in-time batch)
@@ -167,11 +168,15 @@ library AtomicInteropProof {
             revert ProofSettlementLayerMismatch(_expectedSlChainId, slChainId);
         }
 
-        // The aggregated root the proof resolves against must be created strictly after the deadline.
-        // A never-imported anchor key reads as timestamp 0 and is rejected. Without this bound, an
-        // in-time snapshot could pass the "last batch" branch below even though later in-time
-        // batches (which may contain the commit) exist.
+        // The settlement-layer interop root the proof resolves against must exist and be created
+        // strictly after the deadline. A root that was never imported for `(slChainId, slBlock)`
+        // reads as timestamp 0 and is rejected explicitly; without the deadline bound, an in-time
+        // snapshot could pass the "last batch" branch below even though later in-time batches
+        // (which may contain the commit) exist.
         uint256 rootTimestamp = L2_INTEROP_ROOT_STORAGE.interopRoots(slChainId, slBlock).timestamp;
+        if (rootTimestamp == 0) {
+            revert ProofSettlementLayerInteropRootNotImported(slChainId, slBlock);
+        }
         if (rootTimestamp <= _deadline) {
             revert ProofInteropRootNotAfterDeadline(rootTimestamp, _deadline);
         }
@@ -179,7 +184,7 @@ library AtomicInteropProof {
         // Validate the declared branch against the authenticated inclusion time (see the library
         // header): the begin root only proves anything for a late batch, the end root only for an
         // in-time batch that is additionally the chain's LAST batch inside the (post-deadline)
-        // anchor root.
+        // settlement-layer interop root.
         if (_absence.provesAgainstBeginRoot) {
             if (l1BatchTimestamp <= _deadline) {
                 revert ProofTimeoutBranchMismatch(true, l1BatchTimestamp, _deadline);
@@ -245,7 +250,7 @@ library AtomicInteropProof {
     ///
     /// Step 3: re-parse the same proof with {MessageHashing._getProofData} (same leaf, same mask) to
     /// read the SL metadata. A single-level / commit-based proof (`finalProofNode == true`) carries no
-    /// SL anchor, so we reject it; a multi-hop proof exposes `pd.settlementLayerBatchNumber`,
+    /// settlement-layer batch reference, so we reject it; a multi-hop proof exposes `pd.settlementLayerBatchNumber`,
     /// `pd.settlementLayerChainId`, and `pd.l1BatchTimestamp`.
     ///
     /// @return slBlock The SL snapshot block `interopRoots(slChainId, slBlock)` was resolved at.
@@ -257,7 +262,7 @@ library AtomicInteropProof {
     ) private view returns (uint256 slBlock, uint256 slChainId, uint256 l1BatchTimestamp) {
         MessageHashing.ProofMetadata memory metadata = MessageHashing.parseProofMetadata(_proof.settlementProof);
         if (metadata.logLeafProofLen != ChainBatchRootTree.TREE_DEPTH) {
-            revert ProofInvalidChainBatchRootDepth(ChainBatchRootTree.TREE_DEPTH, metadata.logLeafProofLen);
+            revert IMTProofInvalidChainBatchRootDepth(ChainBatchRootTree.TREE_DEPTH, metadata.logLeafProofLen);
         }
 
         bool ok = L2_MESSAGE_VERIFICATION.proveL2LeafInclusionShared({
@@ -278,9 +283,9 @@ library AtomicInteropProof {
             _leaf: _proof.chainImtRoot,
             _proof: _proof.settlementProof
         });
-        // A final-node (single-level / commit-based) proof has no settlement-layer anchor, so neither the
+        // A final-node (single-level / commit-based) proof has no settlement-layer batch reference, so neither the
         // deadline nor `t` can be checked against it.
-        if (pd.finalProofNode) revert ProofMissingSettlementLayerAnchor(_proof.sourceChainId, _proof.batchNumber);
+        if (pd.finalProofNode) revert ProofMissingSettlementLayerBatch(_proof.sourceChainId, _proof.batchNumber);
 
         slBlock = pd.settlementLayerBatchNumber;
         slChainId = pd.settlementLayerChainId;

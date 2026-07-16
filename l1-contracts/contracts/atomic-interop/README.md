@@ -133,7 +133,7 @@ dependency roots, and reports the genesis batch leaf via `reportGenesisRoot`):
   (`L2InteropCommitmentTree`) and `0x10014` (`AtomicFlowManager`) — constants in
   `common/l2-helpers/L2ContractAddresses.sol`;
 - seeded during genesis in `L2GenesisForceDeploymentsHelper._initializeV31Contracts` (ZKsync OS only):
-  the commitment tree's one-time `initialize()` seeds the IMT and the manager's `initL2` records the
+  the commitment tree's `initL2` seeds the IMT and the manager's `initL2` records the
   L1 chain id every flow's settlement layer is checked against. No further wiring is needed —
   every collaborator is referenced by its canonical fixed address: the tree's appender and the manager's
   tree / interop center / interop handler are constant getters, and the AR recognises the manager via

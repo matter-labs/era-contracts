@@ -1,5 +1,5 @@
 /**
- * End-to-end test for the L1-free atomic-interop stack (bundle model).
+ * End-to-end test for the atomic-interop stack (bundle model).
  *
  * Topology (two GW-settled chains):
  *   Chain A: depositor (anvil acct #0) sends aAmount of testTokenA -> recipient on B.
@@ -79,6 +79,7 @@ import {
   INTEROP_SEND_BUNDLE_GAS_LIMIT,
 } from "../../src/core/const";
 import { encodeEvmAddress, encodeEvmChain } from "../../src/core/data-encoding";
+import { customError, expectRevert } from "../../src/helpers/balance-helpers";
 import {
   atomicBundleAttr,
   interopBundleSaltAttr,
@@ -113,7 +114,7 @@ enum LegState {
 /**
  * Handles to the atomic-interop built-ins on one L2 chain. These contracts are predeployed into the
  * ZKsync OS genesis (see `src/core/predeploys.ts`) and the {L2InteropCommitmentTree}'s IMT is seeded
- * by the harness's relayed v31 genesis upgrade (`_initializeV31Contracts` -> `tree.initialize()`), so
+ * by the harness's relayed v31 genesis upgrade (`_initializeV31Contracts` -> `tree.initL2()`), so
  * no install/seed step is needed here — we just bind contract objects to their canonical addresses.
  */
 type AtomicStack = {
@@ -249,7 +250,7 @@ function parseManagerLog(manager: Contract, log: ethers.providers.Log): ParsedMa
   }
 }
 
-describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
+describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
   this.timeout(0);
 
   const runner = new DeploymentRunner();
@@ -616,19 +617,6 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     ).to.be.true;
   });
 
-  /** Expect a call to revert with the given custom error signature (4-byte selector match). */
-  async function expectRevertWithError(call: Promise<unknown>, errorSig: string): Promise<void> {
-    const selector = ethers.utils.id(errorSig).slice(0, 10);
-    try {
-      await call;
-    } catch (err) {
-      const encoded = JSON.stringify(err);
-      expect(encoded.includes(selector), `expected revert with ${errorSig} (${selector}); got: ${encoded}`).to.be.true;
-      return;
-    }
-    throw new Error(`expected revert with ${errorSig}, but the call succeeded`);
-  }
-
   /** A fabricated (never-sent) two-leg flow for proof-validation tests: authorizeRefund verifies the
    *  absence proof before touching any leg state, so no real sends are needed to exercise reverts. */
   function fabricatedFlow(deadline: number) {
@@ -739,9 +727,10 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       provesAgainstBeginRoot: false,
       slBlock: staleSettlementRootBlock,
     });
-    await expectRevertWithError(
-      managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(staleSettlementRootProof)),
-      "ProofInteropRootNotAfterDeadline(uint256,uint64)"
+    await expectRevert(
+      () => managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(staleSettlementRootProof)),
+      "stale settlement interop root",
+      customError("AtomicFlowManager", "ProofInteropRootNotAfterDeadline(uint256,uint64)")
     );
 
     // 2. Settlement interop root is missing, so its unset timestamp reads as 0: rejected.
@@ -753,9 +742,10 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       provesAgainstBeginRoot: true,
       slBlock: 999_999,
     });
-    await expectRevertWithError(
-      managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(missingSettlementRootProof)),
-      "ProofInteropRootNotAfterDeadline(uint256,uint64)"
+    await expectRevert(
+      () => managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(missingSettlementRootProof)),
+      "missing settlement interop root",
+      customError("AtomicFlowManager", "ProofSettlementLayerInteropRootNotImported(uint256,uint256)")
     );
 
     // 3. In-time batch that is NOT the chain's last inside the settlement interop root: the batch-leaf
@@ -773,9 +763,10 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       batchLeafSiblings: [ethers.utils.id("populated-right-subtree")],
       batchLeafMask: 0, // left child at level 0 -> the sibling above must be the empty-subtree hash
     });
-    await expectRevertWithError(
-      managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(notLastBatch)),
-      "ProofNotLastBatchInRoot(uint256,bytes32)"
+    await expectRevert(
+      () => managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(notLastBatch)),
+      "in-time batch not last in root",
+      customError("AtomicFlowManager", "ProofNotLastBatchInRoot(uint256,bytes32)")
     );
   });
 });

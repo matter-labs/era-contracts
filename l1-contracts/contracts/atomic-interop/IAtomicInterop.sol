@@ -4,7 +4,7 @@ pragma solidity ^0.8.21;
 import {IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
 
 /// @notice Per-`(flowId, bundleHash)` source-leg lifecycle on each {AtomicFlowManager} in the
-/// L1-free atomic interop flow.
+/// atomic interop flow.
 ///
 ///   Source happy path: `Unset -> Committed` (the burn happens during `InteropCenter.sendBundle` via
 ///   the normal `initiateIndirectCall`; `AtomicFlowManager.append` records the leg as `Committed`,

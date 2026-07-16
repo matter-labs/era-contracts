@@ -132,7 +132,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     }
 
     /// @notice Checks that the message sender is the canonical atomic-flow manager, which drives
-    /// `recoverAtomicCall` for the L1-free atomic interop flow's timeout path. On chains without the
+    /// `recoverAtomicCall` for the atomic interop flow's timeout path. On chains without the
     /// atomic-flow stack nothing is deployed at that address, so this gate naturally never passes.
     modifier onlyAtomicFlowManager() {
         require(msg.sender == _atomicFlowManagerAddr(), Unauthorized(msg.sender));
