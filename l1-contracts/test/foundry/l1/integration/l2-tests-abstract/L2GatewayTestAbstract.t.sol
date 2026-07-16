@@ -12,6 +12,7 @@ import {
     L2_ASSET_ROUTER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_INTEROP_CENTER_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
@@ -36,7 +37,13 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
+import {InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
+import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
@@ -144,40 +151,37 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             mintChainId
         );
 
-        vm.prank(ownerWallet);
         vm.mockCall(
             address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
-            abi.encode(bytes(""))
+            abi.encode(bytes32(uint256(1)))
         );
 
+        // The CTM-asset chain-migration withdrawal now goes through the InteropCenter as an L2->L1
+        // withdrawal bundle: a single indirect call to the L2 AssetRouter destined for L1. The
+        // indirect call runs L2AssetRouter.initiateIndirectCall, whose burn is routed to the CTM
+        // asset handler (the chain-asset-handler), which starts the migration. The transferData for a
+        // CTM asset is the ABI-encoded BridgehubBurnCTMAssetData. The bundle sender (ownerWallet) is
+        // the chain admin whose authorization the migration burn checks.
+        // The bundle salt is user-provided via the `interopBundleSalt` bundle attribute; the InteropCenter
+        // commits to it together with the sender (keccak256(sender, salt)).
+        bytes32 withdrawalBundleSalt = keccak256("ctm-migration-withdrawal-salt");
+        bytes[] memory bundleAttributes = new bytes[](1);
+        bundleAttributes[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (withdrawalBundleSalt));
         vm.recordLogs();
-        l2AssetRouter.withdraw(ctmAssetId, abi.encode(data));
+        vm.prank(ownerWallet);
+        l2InteropCenter.sendBundle(
+            InteroperableAddress.formatEvmV1(L1_CHAIN_ID),
+            DataEncoding.encodeInteropWithdrawalCallStarters(ctmAssetId, abi.encode(data)),
+            bundleAttributes
+        );
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // Verify WithdrawalInitiatedAssetRouter event content. The event has 2 indexed params
-        // (l2Sender, assetId); chainId and assetData live in the data field.
-        Vm.Log memory withdrawalLog = logs.requireOneFrom(
-            "WithdrawalInitiatedAssetRouter(uint256,address,bytes32,bytes)",
-            L2_ASSET_ROUTER_ADDR
-        );
-        assertEq(
-            withdrawalLog.topics[1],
-            bytes32(uint256(uint160(ownerWallet))),
-            "WithdrawalInitiatedAssetRouter: l2Sender should be ownerWallet"
-        );
-        assertEq(
-            withdrawalLog.topics[2],
-            ctmAssetId,
-            "WithdrawalInitiatedAssetRouter: assetId should match ctmAssetId"
-        );
-        (uint256 emittedChainId, bytes memory emittedAssetData) = abi.decode(withdrawalLog.data, (uint256, bytes));
-        assertEq(emittedChainId, L1_CHAIN_ID, "WithdrawalInitiatedAssetRouter: destination chain must be L1");
-        assertEq(
-            keccak256(emittedAssetData),
-            keccak256(abi.encode(data)),
-            "WithdrawalInitiatedAssetRouter: assetData must match the encoded BurnCTMAssetData input"
-        );
+        // Verify the InteropCenter emitted the withdrawal bundle (the new L2->L1 withdrawal signal,
+        // replacing the removed WithdrawalInitiatedAssetRouter event) and verify its content — the
+        // same checks the old event assertions performed (sender, assetId, destination chain, asset
+        // data).
+        _assertWithdrawalBundleSent(logs, withdrawalBundleSalt, migrationNumberBefore);
 
         // Verify the chain-asset-handler MigrationStarted event. 3 indexed params
         // (chainId, assetId, settlementLayerChainId); migrationNumber lives in the data field.
@@ -197,6 +201,64 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             l2Bridgehub.getZKChain(mintChainId),
             diamondProxyBefore,
             "Chain registration must be unchanged after withdraw"
+        );
+    }
+
+    /// @notice Verifies the content of the `InteropBundleSent` withdrawal bundle emitted for the
+    /// CTM-asset chain migration: destination, sender commitment (bundle salt), and the single inner
+    /// `finalizeDeposit` call (origin, target, assetId, mint data). The InteropBundle tuple is
+    /// (bytes1,uint256,uint256,bytes32,bytes32,InteropCall[],BundleAttributes), where InteropCall is
+    /// (bytes1,bool,address,address,uint256,bytes) and BundleAttributes is (bytes,bytes,bool,bytes32).
+    function _assertWithdrawalBundleSent(
+        Vm.Log[] memory logs,
+        bytes32 _bundleSalt,
+        uint256 _migrationNumberBefore
+    ) internal view {
+        Vm.Log memory bundleLog = logs.requireOneFrom(
+            "InteropBundleSent(bytes32,bytes32,(bytes1,uint256,uint256,bytes32,bytes32,(bytes1,bool,address,address,uint256,bytes)[],(bytes,bytes,bool,bytes32)))",
+            L2_INTEROP_CENTER_ADDR
+        );
+        (, , InteropBundle memory sentBundle) = abi.decode(bundleLog.data, (bytes32, bytes32, InteropBundle));
+        assertEq(sentBundle.sourceChainId, block.chainid, "InteropBundleSent: source chain mismatch");
+        assertEq(sentBundle.destinationChainId, L1_CHAIN_ID, "InteropBundleSent: destination chain must be L1");
+        // The bundle salt commits to the bundle sender and the user-provided salt attribute — the
+        // equivalent of the old event's `l2Sender == ownerWallet` check.
+        assertEq(
+            sentBundle.interopBundleSalt,
+            keccak256(abi.encodePacked(ownerWallet, _bundleSalt)),
+            "InteropBundleSent: bundle salt must commit to ownerWallet as the sender"
+        );
+        assertEq(sentBundle.calls.length, 1, "InteropBundleSent: withdrawal bundle must hold exactly one call");
+        InteropCall memory sentCall = sentBundle.calls[0];
+        assertEq(
+            sentCall.from,
+            L2_ASSET_ROUTER_ADDR,
+            "InteropBundleSent: call must originate from the L2 asset router"
+        );
+        assertEq(
+            sentCall.to,
+            address(l2AssetRouter.L1_ASSET_ROUTER()),
+            "InteropBundleSent: call must target the L1 asset router"
+        );
+        // The inner call is `finalizeDeposit(sourceChainId, assetId, transferData)`, with transferData
+        // being the BridgehubMintCTMAssetData produced by the chain-asset-handler burn.
+        assertEq(
+            bytes32(DataEncoding.getSelector(sentCall.data)),
+            bytes32(AssetRouterBase.finalizeDeposit.selector),
+            "InteropBundleSent: inner call must be finalizeDeposit"
+        );
+        (uint256 sentSourceChainId, bytes32 sentAssetId, bytes memory sentAssetData) = abi.decode(
+            UnsafeBytes.readRemainingBytes(sentCall.data, 4),
+            (uint256, bytes32, bytes)
+        );
+        assertEq(sentSourceChainId, block.chainid, "InteropBundleSent: finalizeDeposit chainId mismatch");
+        assertEq(sentAssetId, ctmAssetId, "InteropBundleSent: assetId should match ctmAssetId");
+        BridgehubMintCTMAssetData memory sentMintData = abi.decode(sentAssetData, (BridgehubMintCTMAssetData));
+        assertEq(sentMintData.chainId, mintChainId, "InteropBundleSent: migrating chainId mismatch");
+        assertEq(
+            sentMintData.migrationNumber,
+            _migrationNumberBefore + 1,
+            "InteropBundleSent: mint data must carry the incremented migrationNumber"
         );
     }
 

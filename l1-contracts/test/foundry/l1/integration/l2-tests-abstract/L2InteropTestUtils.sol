@@ -20,7 +20,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {InteropHandler} from "contracts/interop/InteropHandler.sol";
+import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 
 /// @notice Struct to hold bundle execution result for assertions
 struct BundleExecutionResult {
@@ -93,7 +93,7 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
     function assertBundleExecuted(BundleExecutionResult memory result) internal view {
         // Verify bundle status is FullyExecuted (value 2)
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(result.bundleHash)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(result.bundleHash)),
             2,
             "Bundle status should be FullyExecuted"
         );
@@ -101,7 +101,7 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
         // Verify all call statuses are Executed (value 1)
         for (uint256 i = 0; i < result.callCount; i++) {
             assertEq(
-                uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(result.bundleHash, i)),
+                uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(result.bundleHash, i)),
                 1,
                 string(abi.encodePacked("Call ", vm.toString(i), " status should be Executed"))
             );

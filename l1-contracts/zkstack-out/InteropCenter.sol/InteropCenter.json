@@ -863,6 +863,17 @@
   },
   {
     "type": "error",
+    "name": "CannotInitiateInteropOnL1",
+    "inputs": [
+      {
+        "name": "destinationChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "DestinationChainNotRegistered",
     "inputs": [
       {
@@ -871,6 +882,11 @@
         "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "DirectCallToL1NotSupported",
+    "inputs": []
   },
   {
     "type": "error",
@@ -908,6 +924,22 @@
         "internalType": "bytes32"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "InteropCallToL1NotToAssetRouter",
+    "inputs": [
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InteropToSelfNotSupported",
+    "inputs": []
   },
   {
     "type": "error",
@@ -960,8 +992,25 @@
   },
   {
     "type": "error",
-    "name": "NotInGatewayMode",
-    "inputs": []
+    "name": "MultiCallToL1NotSupported",
+    "inputs": [
+      {
+        "name": "callCount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NonZeroValueToL1NotSupported",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",

@@ -6,30 +6,9 @@ pragma solidity ^0.8.20;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Base interface for L2 Base Token contracts (shared between Era and ZK OS).
-/// @dev This interface defines the common withdrawal functionality.
+/// @dev Base-token L2->L1 withdrawals are initiated through the InteropCenter (`sendBundle`), the same
+/// unified path as ERC20 withdrawals; there is no dedicated `withdraw` entrypoint on the base token.
 interface IL2BaseTokenBase {
-    /// @notice Emitted when a withdrawal is initiated
-    event Withdrawal(address indexed _l2Sender, address indexed _l1Receiver, uint256 _amount);
-
-    /// @notice Emitted when a withdrawal with message is initiated
-    event WithdrawalWithMessage(
-        address indexed _l2Sender,
-        address indexed _l1Receiver,
-        uint256 _amount,
-        bytes _additionalData
-    );
-
-    /// @notice Initiate the withdrawal of the base token.
-    /// @dev Funds will be available to claim on L1 via `finalizeEthWithdrawal` method.
-    /// @param _l1Receiver The address on L1 to receive the funds.
-    function withdraw(address _l1Receiver) external payable;
-
-    /// @notice Initiate the withdrawal of the base token with an additional message.
-    /// @dev Funds will be available to claim on L1 via `finalizeEthWithdrawal` method.
-    /// @param _l1Receiver The address on L1 to receive the funds.
-    /// @param _additionalData Additional data to be sent to L1 with the withdrawal.
-    function withdrawWithMessage(address _l1Receiver, bytes calldata _additionalData) external payable;
-
     /// @notice Returns the total circulating supply of base tokens.
     function totalSupply() external view returns (uint256);
 

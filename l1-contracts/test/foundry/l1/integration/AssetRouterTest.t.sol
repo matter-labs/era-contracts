@@ -23,14 +23,15 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/co
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 
-import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {MessageInclusionProof} from "contracts/common/Messaging.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {InteropWithdrawalBundleEncoder} from "test-utils/InteropWithdrawalBundleEncoder.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
 import {BridgedStandardERC20, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
@@ -150,20 +151,20 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             _amount: 100,
             _erc20Metadata: BridgeHelper.getERC20Getters(_tokenAddress, chainId)
         });
-        addresses.l1Nullifier.finalizeDeposit(
-            FinalizeL1DepositParams({
+        addresses.l1InteropHandler.executeBundle(
+            InteropWithdrawalBundleEncoder.encodeInteropWithdrawalBundle(
+                chainId,
+                address(addresses.sharedBridge),
+                l2TokenAssetId,
+                transferData,
+                _nextWithdrawalBundleSalt()
+            ),
+            MessageInclusionProof({
                 chainId: chainId,
-                l2BatchNumber: 1,
+                l1BatchNumber: 1,
                 l2MessageIndex: 1,
-                l2Sender: L2_ASSET_ROUTER_ADDR,
-                l2TxNumberInBatch: 1,
-                message: abi.encodePacked(
-                    AssetRouterBase.finalizeDeposit.selector,
-                    chainId,
-                    l2TokenAssetId,
-                    transferData
-                ),
-                merkleProof: new bytes32[](0)
+                message: L2Message({txNumberInBatch: 1, sender: L2_INTEROP_CENTER_ADDR, data: hex""}),
+                proof: new bytes32[](0)
             })
         );
         tokenL1Address = addresses.l1NativeTokenVault.tokenAddress(l2TokenAssetId);

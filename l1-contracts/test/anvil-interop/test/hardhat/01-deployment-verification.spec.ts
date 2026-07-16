@@ -82,7 +82,7 @@ describe("01 - Deployment Verification", function () {
       { addr: L2_MESSAGE_ROOT_ADDR, name: "L2MessageRoot" },
       { addr: L2_CHAIN_ASSET_HANDLER_ADDR, name: "L2ChainAssetHandler" },
       { addr: INTEROP_CENTER_ADDR, name: "InteropCenter" },
-      { addr: L2_INTEROP_HANDLER_ADDR, name: "InteropHandler" },
+      { addr: L2_INTEROP_HANDLER_ADDR, name: "L2InteropHandler" },
       { addr: L2_MESSAGE_VERIFICATION_ADDR, name: "L2MessageVerification" },
     ];
 

@@ -36,19 +36,6 @@ describe("03 - Interop Transfer Registration Paths", function () {
     gwSettledChainIds = getChainIdsByRole(state.chains.config, "gwSettled");
   });
 
-  it("rejects transfers from the gateway chain to GW-settled chains", async () => {
-    const sourceToken = state.testTokens![gatewayChainId];
-    await expectTransferToRevert(
-      executeTokenTransfer({
-        sourceChainId: gatewayChainId,
-        targetChainId: gwSettledChainIds[0],
-        amount: "10",
-        sourceTokenAddress: sourceToken,
-        logger: (line: string) => console.log(`[interop] ${line}`),
-      })
-    );
-  });
-
   it("rejects transfers from GW-settled chains to the gateway chain", async () => {
     const sourceToken = state.testTokens![gwSettledChainIds[0]];
     await expectTransferToRevert(

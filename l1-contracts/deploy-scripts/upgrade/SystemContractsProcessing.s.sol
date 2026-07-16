@@ -199,7 +199,7 @@ library SystemContractsProcessing {
         ids[i++] = L2EcosystemContract.BaseTokenHolder;
         ids[i++] = L2EcosystemContract.L2AssetTracker;
         ids[i++] = L2EcosystemContract.InteropCenter;
-        ids[i++] = L2EcosystemContract.InteropHandler;
+        ids[i++] = L2EcosystemContract.L2InteropHandler;
         // Under-filling would silently leave `L2EcosystemContract(0)` entries; over-filling
         // already reverts with an out-of-bounds access on the fixed-length array.
         require(i == FIXED_ADDRESS_CORE_CONTRACTS_COUNT, "fixed-address core contract count mismatch");

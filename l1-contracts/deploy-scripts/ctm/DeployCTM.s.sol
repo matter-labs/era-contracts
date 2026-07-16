@@ -484,7 +484,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             L2EcosystemContract.UpgradeableBeaconDeployer,
             L2EcosystemContract.L2ChainAssetHandler,
             L2EcosystemContract.InteropCenter,
-            L2EcosystemContract.InteropHandler,
+            L2EcosystemContract.L2InteropHandler,
             L2EcosystemContract.L2AssetTracker,
             L2EcosystemContract.BaseTokenHolder
         ];
@@ -595,7 +595,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             baseTokenHolderBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.BaseTokenHolder),
             chainAssetHandlerBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.L2ChainAssetHandler),
             interopCenterBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.InteropCenter),
-            interopHandlerBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.InteropHandler),
+            interopHandlerBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.L2InteropHandler),
             assetTrackerBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),

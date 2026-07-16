@@ -213,7 +213,7 @@ library CoreOnGatewayHelper {
         if (_c == L2EcosystemContract.BaseTokenHolder) return "BaseTokenHolder";
         if (_c == L2EcosystemContract.L2ChainAssetHandler) return "L2ChainAssetHandler";
         if (_c == L2EcosystemContract.InteropCenter) return "InteropCenter";
-        if (_c == L2EcosystemContract.InteropHandler) return "InteropHandler";
+        if (_c == L2EcosystemContract.L2InteropHandler) return "L2InteropHandler";
         if (_c == L2EcosystemContract.L2AssetTracker) return "L2AssetTracker";
         if (_c == L2EcosystemContract.L2WrappedBaseToken) return "L2WrappedBaseToken";
         if (_c == L2EcosystemContract.L2MessageVerification) return "L2MessageVerification";
@@ -246,7 +246,7 @@ library CoreOnGatewayHelper {
         if (_c == L2EcosystemContract.BaseTokenHolder) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == L2EcosystemContract.L2AssetTracker) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == L2EcosystemContract.InteropCenter) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == L2EcosystemContract.InteropHandler) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == L2EcosystemContract.L2InteropHandler) return ZKsyncOSUpgradeType.SystemProxy;
         revert UnknownCoreContract();
     }
 
@@ -267,7 +267,7 @@ library CoreOnGatewayHelper {
         if (_c == L2EcosystemContract.BaseTokenHolder) return L2_BASE_TOKEN_HOLDER_ADDR;
         if (_c == L2EcosystemContract.L2AssetTracker) return L2_ASSET_TRACKER_ADDR;
         if (_c == L2EcosystemContract.InteropCenter) return L2_INTEROP_CENTER_ADDR;
-        if (_c == L2EcosystemContract.InteropHandler) return L2_INTEROP_HANDLER_ADDR;
+        if (_c == L2EcosystemContract.L2InteropHandler) return L2_INTEROP_HANDLER_ADDR;
         if (_c == L2EcosystemContract.UpgradeableBeaconDeployer) return L2_NTV_BEACON_DEPLOYER_ADDR;
         revert UnknownCoreContract();
     }
