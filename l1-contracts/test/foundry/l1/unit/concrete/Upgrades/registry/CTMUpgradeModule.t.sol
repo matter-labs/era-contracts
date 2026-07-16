@@ -123,7 +123,9 @@ contract CTMUpgradeModuleTest is ChainTypeManagerTest {
                 oldProtocolVersion: 0,
                 newProtocolVersion: newVersion,
                 verifier: testnetVerifier,
-                fromRelease: address(0),
+                // This first transition departs from whatever release the fixture CTM was
+                // genesis'd with (its current release), as the module's release-edge pin requires.
+                fromRelease: chainContractAddress.currentRelease(),
                 newRelease: address(release),
                 defaultUpgrade: makeAddr("defaultUpgrade"),
                 oldProtocolVersionDeadline: 1000,

@@ -301,11 +301,18 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             abi.encodeWithSelector(ICTMRelease.genesisFacets.selector),
             abi.encode(facets)
         );
+        // The generic mocker (re-invoked via `mockDiamondInitInteropCenterCallsWithAddress`) resets
+        // `diamondInit()` to a self-referential placeholder; re-mock it here, last, so the diamond
+        // is initialized against the fixture's real `DiamondInit` rather than the registry mock.
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.diamondInit.selector),
+            abi.encode(diamondInit)
+        );
         // `createNewChain` runs the genesis upgrade against `genesisParams.genesisUpgrade`, so it
-        // must be the fixture's real upgrade contract. The generic mocker (re-invoked via
-        // `mockDiamondInitInteropCenterCallsWithAddress`) pins a placeholder there; re-mock it
-        // here, last, so the real contract is what `createNewChain` reads. Commitment == 1 keeps
-        // both Era and ZKsyncOS genesis validation happy.
+        // must be the fixture's real upgrade contract. The generic mocker pins a placeholder there;
+        // re-mock it here, last, so the real contract is what `createNewChain` reads. Commitment ==
+        // 1 keeps both Era and ZKsyncOS genesis validation happy.
         vm.mockCall(
             Utils.TEST_GENESIS_REGISTRY,
             abi.encodeWithSelector(ICTMRelease.genesisParams.selector),

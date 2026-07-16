@@ -147,8 +147,9 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         // subsequent minor upgrade correctly reverts with PreviousUpgradeNotFinalized.
         UtilsFacet(chainAddress).util_setL2SystemContractsUpgradeTxHash(bytes32(0));
 
-        transitionV32 = _makeTransition(0, V32, verifierV32, address(0), address(0));
-        // V33 transitions from the V32 release the first hop pinned.
+        // The first hop departs from the fixture CTM's genesis (current) release; V33 then
+        // transitions from the V32 release the first hop pinned.
+        transitionV32 = _makeTransition(0, V32, verifierV32, chainContractAddress.currentRelease(), address(0));
         transitionV33 = _makeTransition(V32, V33, verifierV33, transitionV32.newRelease(), newAdminFacet);
     }
 

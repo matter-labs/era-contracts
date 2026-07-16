@@ -238,7 +238,8 @@ contract StorageRegistriesTest is Test {
 
     function test_validateRejectsCodehashDrift() public {
         assertFalse(coreRegistry.verifyAll());
-        vm.expectRevert(RegistryCodehashMismatch.selector);
+        // Parameterized error: match the selector, ignore the (target, expected, actual) args.
+        vm.expectPartialRevert(RegistryCodehashMismatch.selector);
         coreRegistry.validate();
 
         vm.etch(address(0xB201), hex"6001600155");
