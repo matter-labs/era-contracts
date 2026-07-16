@@ -31,14 +31,11 @@ import {SEMVER_MINOR_OFFSET} from "../../common/libraries/SemVer.sol";
 ///      Because both the upgrade cut (for existing chains) and the chain-creation cut (for new
 ///      chains) are derived from the same registry constants, they cannot drift apart.
 library CTMUpgradeComposer {
-    /// @dev The facet swaps of an upgrade together with the selector lists they diff.
-    /// @notice Builds the facet-swap plan taking a chain from the registry's old protocol version
-    ///         to its new one. The registry's old-version facet rows ARE the plan: one swap per
-    ///         row, no diffing heuristics — the generated data already says exactly what changes.
     /// @notice Builds the diamond cut that upgrades an existing chain: no `facetCuts` of its own.
-    ///         The facet-swap plan is read straight from the registry by `BaseZkSyncUpgrade` at
-    ///         execution time (via the `upgradeRegistryForVersion` pointer the CTM stores) — it is
-    ///         not carried in the cut.
+    ///         The committed cut names the write-once transition; `BaseZkSyncUpgrade` reads the
+    ///         facet-swap plan (`transition.facetTransitions()`) straight from that same transition
+    ///         at execution time, so the swaps are never carried in the cut and both facet changes
+    ///         and proposal composition share one source of truth.
     function buildUpgradeCutData(
         address _initAddress,
         bytes memory _initCalldata
