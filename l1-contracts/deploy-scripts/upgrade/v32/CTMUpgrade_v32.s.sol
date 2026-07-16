@@ -33,7 +33,7 @@ import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.
 ///        contracts land on their existing implementation address and the swap is a no-op).
 /// @dev v32 is intended to be the first registry-driven upgrade: the addresses this script
 ///      deploys are the manifest input of `scripts/gen-registry.ts`, and governance execution
-///      goes through `UpgradeExecutor` + `CTMUpgradeModule` (see
+///      goes through `CTMUpgradeExecutor` (see
 ///      contracts/upgrades/registry/) once protocol-ops adopts that flow. Until then this script
 ///      also serializes the classic stage calls.
 contract CTMUpgrade_v32 is Script, DefaultCTMUpgrade {

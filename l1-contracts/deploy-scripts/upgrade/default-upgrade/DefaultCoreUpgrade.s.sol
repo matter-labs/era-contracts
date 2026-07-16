@@ -2,8 +2,8 @@
 pragma solidity 0.8.28;
 
 // TODO(EVM-14930): LEGACY UPGRADE PROCESS — remove once the registry-driven upgrade process
-// (contracts/upgrades/registry: UpgradeExecutor + CTMUpgradeModule / EcosystemUpgradeModule +
-// gen-registry) has fully replaced off-chain governance-calldata generation. Kept for the
+// (contracts/upgrades/registry: CTMUpgradeExecutor / EcosystemUpgradeExecutor +
+// release/transition registries) has fully replaced off-chain governance-calldata generation. Kept for the
 // current (v31) upgrade, which still ships hand-composed stage0/1/2 calls.
 
 // solhint-disable no-console, gas-custom-errors

@@ -5,9 +5,8 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {Call} from "contracts/governance/Common.sol";
-import {UpgradeExecutor} from "contracts/governance/UpgradeExecutor.sol";
-import {IUpgradeExecutor} from "contracts/governance/IUpgradeExecutor.sol";
-import {AddressHasNoCode, ModuleAlteredOwnership, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {UpgradeExecutorBase} from "contracts/governance/UpgradeExecutorBase.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 /// @dev A contract whose owner-gated function stands in for the owner-gated entrypoints
 ///      (CTM, ProxyAdmin, ...) whose ownership the executor holds in production.
@@ -29,56 +28,26 @@ contract OwnedTarget {
     }
 }
 
-/// @dev A stateless orchestrator module: acts with the executor's identity via delegatecall.
-contract GoodModule {
-    function run(address _target, uint256 _value) external returns (uint256) {
-        OwnedTarget(_target).setValue(_value);
-        return _value + 1;
-    }
+/// @dev Minimal concrete executor: exercises the shared `UpgradeExecutorBase` (ownership +
+///      `forward` + `receive`) without any domain entrypoints.
+contract TestUpgradeExecutor is UpgradeExecutorBase {
+    constructor(address _initialOwner) UpgradeExecutorBase(_initialOwner) {}
 }
 
-contract RevertingModule {
-    error ModuleFailed(uint256 code);
-
-    function run() external pure {
-        revert ModuleFailed(42);
-    }
-}
-
-/// @dev A malicious/buggy module that overwrites the executor's owner slot (slot 0 of OZ Ownable).
-contract OwnerClobberModule {
-    function run() external {
-        assembly {
-            sstore(0, 0xdead)
-        }
-    }
-}
-
-/// @dev A malicious/buggy module that overwrites the executor's pendingOwner slot
-///      (slot 1 of OZ Ownable2Step).
-contract PendingOwnerClobberModule {
-    function run() external {
-        assembly {
-            sstore(1, 0xdead)
-        }
-    }
-}
-
-contract UpgradeExecutorTest is Test {
-    event UpgradeModuleExecuted(address indexed module, bytes data);
+/// @notice Tests the shared authority base: ownership, the `forward` escape hatch (the only
+///         arbitrary authority — a plain owner-gated call, no delegatecall), and `receive`.
+contract UpgradeExecutorBaseTest is Test {
     event CallForwarded(address indexed target, uint256 value, bytes data);
 
     address internal governance = makeAddr("governance");
     address internal stranger = makeAddr("stranger");
 
-    UpgradeExecutor internal executor;
+    TestUpgradeExecutor internal executor;
     OwnedTarget internal target;
-    GoodModule internal goodModule;
 
     function setUp() public {
-        executor = new UpgradeExecutor(governance);
+        executor = new TestUpgradeExecutor(governance);
         target = new OwnedTarget(address(executor));
-        goodModule = new GoodModule();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -87,70 +56,6 @@ contract UpgradeExecutorTest is Test {
 
     function test_constructorSetsOwner() public view {
         assertEq(executor.owner(), governance);
-        assertEq(executor.pendingOwner(), address(0));
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                               execute
-    //////////////////////////////////////////////////////////////*/
-
-    function test_revertWhen_executeCalledByNonOwner() public {
-        vm.expectRevert("Ownable: caller is not the owner");
-        vm.prank(stranger);
-        executor.execute(address(goodModule), abi.encodeCall(GoodModule.run, (address(target), 1)));
-    }
-
-    function test_revertWhen_executeModuleHasNoCode() public {
-        address emptyModule = makeAddr("emptyModule");
-
-        vm.expectRevert(abi.encodeWithSelector(AddressHasNoCode.selector, emptyModule));
-        vm.prank(governance);
-        executor.execute(emptyModule, hex"");
-    }
-
-    function test_successfulExecute_actsWithExecutorIdentity() public {
-        bytes memory data = abi.encodeCall(GoodModule.run, (address(target), 7));
-
-        vm.expectEmit(true, true, true, true, address(executor));
-        emit UpgradeModuleExecuted(address(goodModule), data);
-
-        vm.prank(governance);
-        bytes memory returnData = executor.execute(address(goodModule), data);
-
-        // The module ran with the executor's identity: the owner-gated target accepted the call.
-        assertEq(target.value(), 7);
-        // The module's return data is bubbled to the caller.
-        assertEq(abi.decode(returnData, (uint256)), 8);
-        // Ownership is untouched by a well-behaved module.
-        assertEq(executor.owner(), governance);
-    }
-
-    function test_revertWhen_executeModuleReverts() public {
-        RevertingModule revertingModule = new RevertingModule();
-
-        vm.expectRevert(abi.encodeWithSelector(RevertingModule.ModuleFailed.selector, 42));
-        vm.prank(governance);
-        executor.execute(address(revertingModule), abi.encodeCall(RevertingModule.run, ()));
-    }
-
-    function test_revertWhen_executeModuleClobbersOwner() public {
-        OwnerClobberModule clobberModule = new OwnerClobberModule();
-
-        vm.expectRevert(ModuleAlteredOwnership.selector);
-        vm.prank(governance);
-        executor.execute(address(clobberModule), abi.encodeCall(OwnerClobberModule.run, ()));
-
-        // The revert rolled the write back.
-        assertEq(executor.owner(), governance);
-    }
-
-    function test_revertWhen_executeModuleClobbersPendingOwner() public {
-        PendingOwnerClobberModule clobberModule = new PendingOwnerClobberModule();
-
-        vm.expectRevert(ModuleAlteredOwnership.selector);
-        vm.prank(governance);
-        executor.execute(address(clobberModule), abi.encodeCall(PendingOwnerClobberModule.run, ()));
-
         assertEq(executor.pendingOwner(), address(0));
     }
 

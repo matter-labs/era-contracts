@@ -8,8 +8,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {TestCoreRegistry} from "./TestRegistries.sol";
 
-import {UpgradeExecutor} from "contracts/governance/UpgradeExecutor.sol";
-import {EcosystemUpgradeModule} from "contracts/upgrades/registry/EcosystemUpgradeModule.sol";
+import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/EcosystemUpgradeExecutor.sol";
 import {L1EcosystemContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {ICoreRegistry} from "contracts/upgrades/registry/ICoreRegistry.sol";
 
@@ -26,17 +25,16 @@ contract DummyImplB {
     }
 }
 
-/// @notice Tests the ecosystem-scoped orchestrator module. Deliberately owned by a DIFFERENT
-///         governance address than the CTM-scoped executor in CTMUpgradeModule.t.sol: the two
-///         authority domains are separable — each scope runs its own UpgradeExecutor with its
-///         own owner, and neither module needs the other scope's registry.
-contract EcosystemUpgradeModuleTest is Test {
+/// @notice Tests the ecosystem-scoped upgrade executor. Deliberately owned by a DIFFERENT
+///         governance address than the CTM-scoped executor in CTMUpgradeExecutor.t.sol: the two
+///         authority domains are separable — each scope runs its own executor with its own owner,
+///         and neither needs the other scope's registry.
+contract EcosystemUpgradeExecutorTest is Test {
     bytes32 internal constant EIP1967_IMPL_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
     address internal ecosystemGovernor = makeAddr("ecosystemGovernor");
 
-    UpgradeExecutor internal ecosystemExecutor;
-    EcosystemUpgradeModule internal module;
+    EcosystemUpgradeExecutor internal ecosystemExecutor;
     TestCoreRegistry internal coreRegistry;
     ProxyAdmin internal proxyAdmin;
 
@@ -48,8 +46,7 @@ contract EcosystemUpgradeModuleTest is Test {
     uint256 internal constant NEW_VERSION = uint256(1) << 32; // 0.1.0
 
     function setUp() public {
-        module = new EcosystemUpgradeModule();
-        ecosystemExecutor = new UpgradeExecutor(ecosystemGovernor);
+        ecosystemExecutor = new EcosystemUpgradeExecutor(ecosystemGovernor);
 
         implOld = new DummyImplA();
         implNew = new DummyImplB();
@@ -74,10 +71,7 @@ contract EcosystemUpgradeModuleTest is Test {
 
     function _applyL1Upgrade() internal {
         vm.prank(ecosystemGovernor);
-        ecosystemExecutor.execute(
-            address(module),
-            abi.encodeCall(EcosystemUpgradeModule.applyL1Upgrade, (ICoreRegistry(address(coreRegistry))))
-        );
+        ecosystemExecutor.applyL1Upgrade(ICoreRegistry(address(coreRegistry)));
     }
 
     function test_applyL1Upgrade_upgradesChangedProxiesOnly() public {
@@ -108,21 +102,11 @@ contract EcosystemUpgradeModuleTest is Test {
         );
     }
 
-    function test_revertWhen_moduleCalledDirectly() public {
-        // Without the ecosystem executor's identity the module has no authority over the
-        // ProxyAdmin.
-        vm.expectRevert("Ownable: caller is not the owner");
-        module.applyL1Upgrade(ICoreRegistry(address(coreRegistry)));
-    }
-
     function test_revertWhen_executorCalledByNonEcosystemGovernance() public {
         // Not even the CTM-scope governor may drive the ecosystem executor: authority domains
-        // are separate.
+        // are separate, and the entrypoint is owner-gated (no arbitrary-delegatecall surface).
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(makeAddr("ctmGovernor"));
-        ecosystemExecutor.execute(
-            address(module),
-            abi.encodeCall(EcosystemUpgradeModule.applyL1Upgrade, (ICoreRegistry(address(coreRegistry))))
-        );
+        ecosystemExecutor.applyL1Upgrade(ICoreRegistry(address(coreRegistry)));
     }
 }

@@ -260,8 +260,6 @@ error MigrationsNotPaused();
 error MissingSystemLogs(uint256 expected, uint256 actual);
 // 0x1508fb47
 error MockVerifierNotSupported();
-// 0x6da40757
-error ModuleAlteredOwnership();
 // 0x4a094431
 error MsgValueMismatch(uint256 expectedMsgValue, uint256 providedMsgValue);
 // 0xb385a3da

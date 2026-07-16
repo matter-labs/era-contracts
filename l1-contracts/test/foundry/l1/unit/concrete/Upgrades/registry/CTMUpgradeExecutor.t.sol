@@ -5,10 +5,9 @@ pragma solidity 0.8.28;
 import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
 
 import {Call} from "contracts/governance/Common.sol";
-import {UpgradeExecutor} from "contracts/governance/UpgradeExecutor.sol";
 import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/CTMTransition.sol";
-import {CTMUpgradeModule} from "contracts/upgrades/registry/CTMUpgradeModule.sol";
+import {CTMUpgradeExecutor} from "contracts/upgrades/registry/CTMUpgradeExecutor.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/CTMUpgradeComposer.sol";
 import {ICTMTransition, L2Deployment} from "contracts/upgrades/registry/ICTMTransition.sol";
 import {GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
@@ -23,9 +22,8 @@ import {HashMismatch} from "contracts/common/L1ContractErrors.sol";
 /// @notice Exercises the CTM-scoped orchestrator against real write-once release and transition
 ///         objects. Release data describes new-chain genesis; transition data describes the one
 ///         movement from the fixture's current version to that release.
-contract CTMUpgradeModuleTest is ChainTypeManagerTest {
-    UpgradeExecutor internal ctmExecutor;
-    CTMUpgradeModule internal module;
+contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
+    CTMUpgradeExecutor internal ctmExecutor;
     CTMRelease internal release;
     CTMTransition internal transition;
 
@@ -38,8 +36,7 @@ contract CTMUpgradeModuleTest is ChainTypeManagerTest {
         _mockGetZKChainFromBridgehub(chainAddress);
         _mockMigrationPausedFromBridgehub();
 
-        module = new CTMUpgradeModule();
-        ctmExecutor = new UpgradeExecutor(governor);
+        ctmExecutor = new CTMUpgradeExecutor(governor);
 
         vm.prank(governor);
         chainContractAddress.transferOwnership(address(ctmExecutor));
@@ -155,10 +152,7 @@ contract CTMUpgradeModuleTest is ChainTypeManagerTest {
 
     function _applyCTMUpgrade() internal {
         vm.prank(governor);
-        ctmExecutor.execute(
-            address(module),
-            abi.encodeCall(CTMUpgradeModule.applyCTMUpgrade, (ICTMTransition(address(transition))))
-        );
+        ctmExecutor.applyCTMUpgrade(ICTMTransition(address(transition)));
     }
 
     function test_applyCTMUpgrade_setsVersionCutAndCurrentRelease() public {
@@ -173,18 +167,10 @@ contract CTMUpgradeModuleTest is ChainTypeManagerTest {
         assertEq(chainContractAddress.l1GenesisUpgrade(), makeAddr("genesisUpgrade"));
     }
 
-    function test_revertWhen_moduleCalledDirectly() public {
-        vm.expectRevert("Ownable: caller is not the owner");
-        module.applyCTMUpgrade(ICTMTransition(address(transition)));
-    }
-
     function test_revertWhen_executorCalledByNonGovernance() public {
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(makeAddr("stranger"));
-        ctmExecutor.execute(
-            address(module),
-            abi.encodeCall(CTMUpgradeModule.applyCTMUpgrade, (ICTMTransition(address(transition))))
-        );
+        ctmExecutor.applyCTMUpgrade(ICTMTransition(address(transition)));
     }
 
     function test_upgradeChain_rejectsDifferentTransition() public {
@@ -199,12 +185,6 @@ contract CTMUpgradeModuleTest is ChainTypeManagerTest {
             )
         );
         vm.prank(governor);
-        ctmExecutor.execute(
-            address(module),
-            abi.encodeCall(
-                CTMUpgradeModule.upgradeChain,
-                (ICTMTransition(address(differentTransition)), chainId)
-            )
-        );
+        ctmExecutor.upgradeChain(ICTMTransition(address(differentTransition)), chainId);
     }
 }

@@ -25,7 +25,7 @@ import {SEMVER_MINOR_OFFSET} from "../../common/libraries/SemVer.sol";
 /// @dev Everything here is CTM-scoped, including the L2 force-deployments keyed by
 ///      `L2EcosystemContract`: L2 system-contract bytecodes are pinned per CTM (Era and ZKsyncOS ship
 ///      different sets). Ecosystem-wide (core) L1 upgrades have no composition to do beyond
-///      proxy/impl lookups and live in `EcosystemUpgradeModule`.
+///      proxy/impl lookups and live in `EcosystemUpgradeExecutor`.
 /// @dev This library is the on-chain port of the composition logic that
 ///      `deploy-scripts/upgrade/default-upgrade/CTMUpgradeBase.sol` performs off-chain today.
 ///      Because both the upgrade cut (for existing chains) and the chain-creation cut (for new

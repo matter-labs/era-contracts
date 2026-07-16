@@ -13,7 +13,7 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 ///         harnesses (e.g. the anvil registry-driven upgrade runner) deploy this contract to
 ///         obtain the exact registry-composed L2 protocol upgrade transaction — both to assert
 ///         the hash committed on a chain diamond and to relay the transaction to an L2 test chain.
-/// @dev Never deployed in production. The same composition runs inside `CTMUpgradeModule` when a
+/// @dev Never deployed in production. The same composition runs inside `CTMUpgradeExecutor` when a
 ///      registry-driven upgrade executes; this harness only re-exposes it as external views so
 ///      TypeScript tooling does not have to replicate the encoding.
 contract RegistryComposerHarness {

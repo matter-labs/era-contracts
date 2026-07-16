@@ -5,8 +5,7 @@ pragma solidity 0.8.28;
 import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
 import {ZKsyncOSChainTypeManagerSharedTest} from "../../state-transition/ChainTypeManager/_ZKsyncOSChainTypeManager_Shared.t.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {UpgradeExecutor} from "contracts/governance/UpgradeExecutor.sol";
-import {CTMUpgradeModule} from "contracts/upgrades/registry/CTMUpgradeModule.sol";
+import {CTMUpgradeExecutor} from "contracts/upgrades/registry/CTMUpgradeExecutor.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/CTMUpgradeComposer.sol";
 import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/CTMTransition.sol";
@@ -55,8 +54,7 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 ///      it pins here is real: live facet addresses/selectors, a real replacement `AdminFacet`,
 ///      the real `DefaultUpgrade`, real verifier contracts.
 abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
-    UpgradeExecutor internal ctmExecutor;
-    CTMUpgradeModule internal module;
+    CTMUpgradeExecutor internal ctmExecutor;
     CTMTransition internal transitionV32;
     CTMTransition internal transitionV33;
 
@@ -112,8 +110,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         _mockGetZKChainFromBridgehub(chainAddress);
         _mockMigrationPausedFromBridgehub();
 
-        module = new CTMUpgradeModule();
-        ctmExecutor = new UpgradeExecutor(governor);
+        ctmExecutor = new CTMUpgradeExecutor(governor);
 
         // Real v33 artifacts: a fresh AdminFacet implementation (same selectors, new address)
         // and the plain DefaultUpgrade as the upgrade-init contract.
@@ -244,14 +241,8 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
 
     function _runHop(CTMTransition _transition) internal {
         vm.startPrank(governor);
-        ctmExecutor.execute(
-            address(module),
-            abi.encodeCall(CTMUpgradeModule.applyCTMUpgrade, (ICTMTransition(address(_transition))))
-        );
-        ctmExecutor.execute(
-            address(module),
-            abi.encodeCall(CTMUpgradeModule.upgradeChain, (ICTMTransition(address(_transition)), chainId))
-        );
+        ctmExecutor.applyCTMUpgrade(ICTMTransition(address(_transition)));
+        ctmExecutor.upgradeChain(ICTMTransition(address(_transition)), chainId);
         vm.stopPrank();
     }
 
@@ -305,10 +296,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         // Replaying the chain upgrade of a completed hop fails the chain's own version check.
         vm.expectRevert(abi.encodeWithSelector(ProtocolIdMismatch.selector, V32, 0));
         vm.prank(governor);
-        ctmExecutor.execute(
-            address(module),
-            abi.encodeCall(CTMUpgradeModule.upgradeChain, (ICTMTransition(address(transitionV32)), chainId))
-        );
+        ctmExecutor.upgradeChain(ICTMTransition(address(transitionV32)), chainId);
     }
 }
 

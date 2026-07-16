@@ -7,23 +7,25 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 
 import {L1EcosystemContract} from "./ContractIdentifiers.sol";
 import {ICoreRegistry} from "./ICoreRegistry.sol";
+import {UpgradeExecutorBase} from "../../governance/UpgradeExecutorBase.sol";
 
-/// @title EcosystemUpgradeModule
+/// @title EcosystemUpgradeExecutor
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice A stateless orchestrator module for the ecosystem-wide (core) part of a protocol
-///         upgrade: pointing every ecosystem proxy at its new implementation, as pinned by the
-///         core registry.
-/// @dev This contract is DELEGATECALLED by an `UpgradeExecutor` that must own the ecosystem
-///      `ProxyAdmin`. Ecosystem authority is deliberately separate from CTM authority
-///      (`CTMUpgradeModule`): the two scopes can be governed by different executors with
-///      different owners and upgrade on different cadences. The module MUST remain stateless.
+/// @notice Domain-specific executor for the ecosystem-wide (core) part of a protocol upgrade: it
+///         owns the ecosystem `ProxyAdmin` and points every ecosystem proxy at its new
+///         implementation, as pinned by the core registry. Ecosystem authority is deliberately
+///         separate from CTM authority (`CTMUpgradeExecutor`): the two scopes can be governed by
+///         different executors with different owners and upgrade on different cadences.
+/// @dev Fixed logic, no generic delegatecall: this executor calls the `ProxyAdmin` it owns
+///      directly. `forward` (from the base) remains for emergencies.
 /// @dev The registry address is a *pinned implementation address* — the exact generated contract
 ///      governance approved — never a proxy, so what was signed is exactly what is read.
-contract EcosystemUpgradeModule {
-    /// @notice Emitted (from the executor's address) for every ecosystem proxy pointed at its new
-    ///         implementation.
+contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
+    /// @notice Emitted for every ecosystem proxy pointed at its new implementation.
     event EcosystemContractUpgraded(L1EcosystemContract indexed contractId, address indexed proxy, address newImpl);
+
+    constructor(address _initialOwner) UpgradeExecutorBase(_initialOwner) {}
 
     /// @notice Points every ecosystem proxy at its new implementation, as pinned by the registry.
     ///         Contracts with no new implementation pinned, or whose proxy already points at the
@@ -35,7 +37,7 @@ contract EcosystemUpgradeModule {
     ///      function reads and writes in one atomic transaction: the live implementation cannot
     ///      change between the check and the upgrade. It also makes the call idempotent.
     /// @param _coreRegistry The pinned core-registry implementation approved by governance.
-    function applyL1Upgrade(ICoreRegistry _coreRegistry) external {
+    function applyL1Upgrade(ICoreRegistry _coreRegistry) external onlyOwner {
         _coreRegistry.validate();
         ProxyAdmin proxyAdmin = ProxyAdmin(_coreRegistry.proxyAdmin());
 
