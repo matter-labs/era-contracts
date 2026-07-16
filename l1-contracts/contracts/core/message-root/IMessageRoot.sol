@@ -78,7 +78,7 @@ interface IMessageRootBase is IMessageVerification {
 
     function addChainBatchRootV32(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external;
 
-    function reportGenesisRoot(uint256 _chainId, bytes32 _genesisChainBatchRoot) external;
+    function seedGenesisRoot(uint256 _chainId) external;
 
     function chainBatchRoots(uint256 _chainId, uint256 _batchNumber) external view returns (bytes32);
 

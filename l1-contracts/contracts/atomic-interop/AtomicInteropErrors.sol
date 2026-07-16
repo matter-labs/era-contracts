@@ -44,11 +44,11 @@ error ProofImtRootInclusionFailed(uint256 chainId, uint256 batchNumber, bytes32 
 /// @dev The leaf-to-chain-batch-root section of the proof is not exactly {ChainBatchRootTree.TREE_DEPTH}
 /// hops. Pinning the depth guarantees the claimed value is a real batch-boundary IMT root leaf; a longer
 /// path could descend into the IMT itself and pass off an internal node as "the root".
-error ProofInvalidChainBatchRootDepth(uint256 expected, uint256 actual);
-/// @dev The proof is a single-level / commit-based (final-node) proof, which carries no settlement-layer
-/// block anchor. The atomic flow requires a multi-hop / SL-global proof so the deadline can be checked
-/// against `pd.settlementLayerBatchNumber`.
-error ProofMissingSettlementLayerAnchor(uint256 chainId, uint256 batchNumber);
+error IMTProofInvalidChainBatchRootDepth(uint256 expected, uint256 actual);
+/// @dev The proof is a single-level / commit-based (final-node) proof, which carries no
+/// settlement-layer batch reference. The atomic flow requires a multi-hop / SL-global proof so the
+/// deadline can be checked against `pd.settlementLayerBatchNumber`.
+error ProofMissingSettlementLayerBatch(uint256 chainId, uint256 batchNumber);
 /// @dev The batch's `l1Timestamp` is newer than the deadline (inclusion path; a batch with
 /// `t > deadline` is late).
 error ProofDeadlineExceeded(uint256 batchTimestamp, uint64 deadline);
@@ -56,6 +56,8 @@ error ProofDeadlineExceeded(uint256 batchTimestamp, uint64 deadline);
 /// deadline (the timestamp in `interopRoots[slChainId][slBlock]` is `<= deadline`; an unset entry
 /// reads as 0 and is rejected too).
 error ProofInteropRootNotAfterDeadline(uint256 rootTimestamp, uint64 deadline);
+/// @dev No interop root was ever imported for the settlement-layer block the proof resolves against.
+error ProofSettlementLayerInteropRootNotImported(uint256 slChainId, uint256 slBlock);
 /// @dev The batch used for the in-time (`t <= deadline`) branch of the timeout proof is not the source
 /// chain's last batch inside the aggregated root: the batch-leaf Merkle path has a populated right
 /// sibling at `level` where the empty-subtree hash was required.

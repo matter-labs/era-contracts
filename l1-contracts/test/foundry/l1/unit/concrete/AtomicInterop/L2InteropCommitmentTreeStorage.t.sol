@@ -5,7 +5,10 @@ import {Test} from "forge-std/Test.sol";
 
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
-import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ATOMIC_FLOW_MANAGER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @notice Locks the L2InteropCommitmentTree storage ABI the ZKsync OS bootloader depends on:
 /// the bootloader reads the engine's root `_imt.tree._nodes[_height][0]` directly (the same scheme
@@ -50,7 +53,8 @@ contract L2InteropCommitmentTreeStorageTest is Test {
     /// @notice After `initialize`, the bootloader's derived slot holds the seeded root and matches
     /// `root()`.
     function test_initialize_bootloaderReadMatchesRoot() public {
-        tree.initialize();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        tree.initL2();
 
         bytes32 read = _readRootLikeBootloader();
         assertTrue(read != bytes32(0));
@@ -62,7 +66,8 @@ contract L2InteropCommitmentTreeStorageTest is Test {
     /// registered chain (see `MessageRootBase._addNewChain`). If the seeding or the leaf hashing
     /// ever changes, this cross-check must be updated together with a matching bootloader change.
     function test_initialize_seedRootMatchesEmptyImtRootConstant() public {
-        tree.initialize();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        tree.initL2();
         assertEq(tree.root(), ChainBatchRootTree.EMPTY_IMT_ROOT);
     }
 
@@ -70,7 +75,8 @@ contract L2InteropCommitmentTreeStorageTest is Test {
     /// change (the seeded tree starts at height 0 and grows as leaves are added), which exercises
     /// the height-dependent slot derivation.
     function test_insert_movesBootloaderReadRoot() public {
-        tree.initialize();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        tree.initL2();
         bytes32 seedRoot = _readRootLikeBootloader();
 
         vm.prank(L2_ATOMIC_FLOW_MANAGER_ADDR);

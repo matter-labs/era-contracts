@@ -254,7 +254,7 @@ library MessageHashing {
     /// proof bytes through the leaf verifier (`proveL2LeafInclusionShared` / {_getProofData}): the
     /// identical words are folded into the reconstructed batch leaf there, which is what
     /// authenticates them — call this AFTER that verification. The function also assumes that if the proof was for a
-    /// `finalProofNode`, it has been rejected. 
+    /// `finalProofNode`, it has been rejected.
     function readAggregationHopPath(bytes32[] calldata _proof) internal pure returns (AggregationHopPath memory path) {
         ProofMetadata memory metadata = parseProofMetadata(_proof);
         // Word layout after the leaf-to-batch-root section (see {_getProofData}):

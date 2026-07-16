@@ -872,17 +872,12 @@
   },
   {
     "type": "function",
-    "name": "reportGenesisRoot",
+    "name": "saveV31UpgradeChainBatchNumber",
     "inputs": [
       {
         "name": "_chainId",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "_genesisChainBatchRoot",
-        "type": "bytes32",
-        "internalType": "bytes32"
       }
     ],
     "outputs": [],
@@ -890,7 +885,7 @@
   },
   {
     "type": "function",
-    "name": "saveV31UpgradeChainBatchNumber",
+    "name": "seedGenesisRoot",
     "inputs": [
       {
         "name": "_chainId",
@@ -1188,6 +1183,22 @@
     "type": "error",
     "name": "NotAllChainsOnL1",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "OnlyBridgehub",
+    "inputs": [
+      {
+        "name": "msgSender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
   },
   {
     "type": "error",

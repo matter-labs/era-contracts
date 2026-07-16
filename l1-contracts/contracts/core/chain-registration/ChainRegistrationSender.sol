@@ -120,11 +120,8 @@ contract ChainRegistrationSender is
 
     /// @notice Used to get the L2 transaction calldata for the chain registration.
     /// @dev Also enforces the atomic-interop timeout-protocol precondition: the chain being
-    /// registered must already have at least one batch inside this layer's message root. A timeout
-    /// proof for a halted source chain points at the chain's LAST batch inside a post-deadline
-    /// aggregated root, so interop must never be enabled towards a chain with an empty tree. Freshly
-    /// created chains satisfy this from creation (the seeded genesis batch leaf); already-deployed
-    /// chains onboarded with a non-zero starting batch number must settle at least once first.
+    /// registered must already have at least one batch inside this layer's message root (see the
+    /// {AtomicInteropProof} library docs for why).
     /// @dev No backfill of pre-existing chains is needed: during v31 the ZK Gateway was never
     /// activated, and registration required that a chain does NOT settle on L1 — so at the start of
     /// v32 no chains have been registered here, and every chain passes through this gate (and gets

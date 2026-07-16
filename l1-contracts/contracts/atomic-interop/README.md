@@ -79,9 +79,9 @@ The timeout proof relies on three preconditions, each enforced on chain:
    - Freshly created chains report their genesis batch root right after registration, in the same
      `createNewChain` transaction: the chain's DiamondInit stores
      `ChainBatchRootTree.genesisChainBatchRoot()` (batch 0 has no logs and a freshly seeded IMT, so
-     the value is exact) as the batch-0 `l2LogsRootHash`, and the Bridgehub-triggered
-     `ExecutorFacet.reportGenesisRoot` forwards it to `MessageRoot.reportGenesisRoot` (once-only,
-     fresh chains only).
+     the value is exact) as the batch-0 `l2LogsRootHash`, and the Bridgehub calls
+     `MessageRoot.seedGenesisRoot`, which pulls it from the chain's getters (once-only, fresh
+     ZKsync OS chains only).
    - Already-deployed chains onboarded with a non-zero starting batch number are NOT seeded (a real
      batch with that number exists elsewhere, and a synthetic leaf would diverge from it); instead
      `ChainRegistrationSender` refuses to register a chain for interop until it has settled at least
@@ -127,13 +127,13 @@ for the timeout recovery, recognising the flow manager by its canonical address.
 
 The two L2 contracts are predeployed in the ZKsync OS genesis (settlement-layer support lives in the
 core protocol: the `Executor` pushes batch roots via `addChainBatchRootV32`, verifies imported
-dependency roots, and reports the genesis batch leaf via `reportGenesisRoot`):
+dependency roots; the genesis batch leaf is seeded by `MessageRoot.seedGenesisRoot`):
 
 - registered in the genesis gen tool (`tools/zksync-os-genesis-gen`) at `0x10012`
   (`L2InteropCommitmentTree`) and `0x10014` (`AtomicFlowManager`) — constants in
   `common/l2-helpers/L2ContractAddresses.sol`;
 - seeded during genesis in `L2GenesisForceDeploymentsHelper._initializeV31Contracts` (ZKsync OS only):
-  the commitment tree's one-time `initialize()` seeds the IMT and the manager's `initL2` records the
+  the commitment tree's `initL2` seeds the IMT and the manager's `initL2` records the
   L1 chain id every flow's settlement layer is checked against. No further wiring is needed —
   every collaborator is referenced by its canonical fixed address: the tree's appender and the manager's
   tree / interop center / interop handler are constant getters, and the AR recognises the manager via

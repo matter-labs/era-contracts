@@ -21,10 +21,6 @@ contract DummyZKChain is MailboxFacet {
         return ERA_CHAIN_ID;
     }
 
-    /// @dev Mirrors `ExecutorFacet.reportGenesisRoot`'s no-op branch: this dummy stores no genesis
-    /// root, so the Bridgehub's post-registration trigger has nothing to report.
-    function reportGenesisRoot() external {}
-
     function setBridgeHubAddress(address bridgeHubAddress) public {
         s.bridgehub = bridgeHubAddress;
     }

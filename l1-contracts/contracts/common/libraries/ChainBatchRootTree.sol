@@ -31,7 +31,7 @@ library ChainBatchRootTree {
     /// kept for completeness so the library documents every leaf of the layout.
     uint256 internal constant LOGS_ROOT_LEAF_INDEX = 0;
 
-    /// @dev Leaf index of the chain's own multichain (aggregated MessageRoot) root. This constant may be unused 
+    /// @dev Leaf index of the chain's own multichain (aggregated MessageRoot) root. This constant may be unused
     /// in the codebase, but is kept for completeness so the library documents every leaf of the layout.
     uint256 internal constant MULTICHAIN_ROOT_LEAF_INDEX = 1;
 

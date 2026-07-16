@@ -32,7 +32,7 @@ import {Unauthorized} from "../l2-system/zksync-os/errors/ZKOSContractErrors.sol
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice See {IAtomicFlowManager}. Fund-touchless coordinator for the L1-free atomic interop flow.
+/// @notice See {IAtomicFlowManager}. Fund-touchless coordinator for the atomic interop flow.
 ///
 /// Send: {InteropCenter.sendBundle} burns through the normal `initiateIndirectCall` path, then — when
 /// the bundle carries the `atomicBundle` attribute — calls {append} instead of publishing the bundle

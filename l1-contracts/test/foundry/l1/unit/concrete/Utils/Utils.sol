@@ -336,12 +336,11 @@ library Utils {
     }
 
     function getExecutorSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](4);
+        bytes4[] memory selectors = new bytes4[](3);
         uint256 i = 0;
         selectors[i++] = ExecutorFacet.proveBatchesSharedBridge.selector;
         selectors[i++] = ExecutorFacet.executeBatchesSharedBridge.selector;
         selectors[i++] = ExecutorFacet.revertBatchesSharedBridge.selector;
-        selectors[i++] = ExecutorFacet.reportGenesisRoot.selector;
         return selectors;
     }
 

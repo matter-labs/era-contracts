@@ -483,6 +483,22 @@
   },
   {
     "type": "error",
+    "name": "IMTProofInvalidChainBatchRootDepth",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "actual",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "IMTValueZero",
     "inputs": []
   },
@@ -737,23 +753,7 @@
   },
   {
     "type": "error",
-    "name": "ProofInvalidChainBatchRootDepth",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "actual",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "ProofMissingSettlementLayerAnchor",
+    "name": "ProofMissingSettlementLayerBatch",
     "inputs": [
       {
         "name": "chainId",
@@ -796,6 +796,22 @@
         "name": "sibling",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ProofSettlementLayerInteropRootNotImported",
+    "inputs": [
+      {
+        "name": "slChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "slBlock",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },

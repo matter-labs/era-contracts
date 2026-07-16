@@ -15,6 +15,7 @@ import {
     DepthMoreThanOneForRecursiveMerkleProof,
     MessageRootNotRegistered,
     NonConsecutiveBatchNumber,
+    OnlyBridgehub,
     OnlyChainAssetHandler,
     OnlyBridgehubOrChainAssetHandler,
     OnlyChain
@@ -27,6 +28,7 @@ import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
 
 import {MessageVerification} from "../../common/MessageVerification.sol";
+import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -58,13 +60,12 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     mapping(uint256 chainIndex => uint256 chainId) public chainIndexToId;
 
     /// @notice The shared full merkle tree storing the aggregate hash.
-    /// @dev The chainId leaves are updated on every `addChainBatchRoot` on both settlement layers (L1
-    /// and Gateway).
+    /// @dev The chainId leaves are updated on every pushed chain batch root.
     FullMerkle.FullTree public sharedTree;
 
     /// @dev The incremental merkle tree storing the chain message roots.
     /// @dev A chain's leaves are seeded empty when the chain is added and then pushed to on every
-    /// `addChainBatchRoot`, on both settlement layers (L1 and Gateway).
+    /// `addChainBatchRoot`.
     mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) internal chainTree;
 
     /// @notice The mapping from block number to the global message root and the block timestamp at
@@ -75,7 +76,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// @dev Each block might have multiple txs that change the historical root. You can safely use the final root in the block,
     /// since each new root cumulatively aggregates all prior changes — so the last root always contains (at minimum) everything
     /// from the earlier ones.
-    /// @dev Populated on both settlement layers (L1 and Gateway) on every pushed chain batch root.
+    /// @dev Populated on every pushed chain batch root.
     /// @dev This field was never populated on L1 prior to this upgrade (the same holds for the chain
     /// trees — those were empty as well): since interop has not been enabled in v31, this mapping was
     /// empty at the time of the upgrade, so no backfill of past blocks is needed. Additionally,
@@ -95,7 +96,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
 
     /// @notice The mapping from chainId to batchNumber to chainBatchRoot.
     /// @dev These are the same values as the leaves of the chainTree.
-    /// @dev We store these values for message verification on L1 and Gateway.
+    /// @dev We store these values for message verification.
     /// @dev An expected invariant is that for all batches starting from currentChainBatchNumber + 1, the `chainBatchRoots` is 0.
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
@@ -149,11 +150,8 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         _;
     }
 
-    /// @notice The chain itself appends its batch root, both on L1 and on Gateway. On Gateway the
-    /// chain's `Executor` calls this directly while settling (it no longer routes through the asset
-    /// tracker). Asset correctness across chains is guaranteed by ZK proofs.
-    /// @dev Note that at the moment of the v31 upgrade no chains settle on top of the old
-    /// Era-based Gateway, and so no special handling is needed for pre-v31 chains.
+    /// @notice The chain itself appends its batch root (its `Executor` calls this directly while
+    /// settling). Asset correctness across chains is guaranteed by ZK proofs.
     modifier addChainBatchRootRestriction(uint256 _chainId) {
         if (msg.sender != IBridgehubBase(_bridgehub()).getZKChain(_chainId)) {
             revert OnlyChain(msg.sender, IBridgehubBase(_bridgehub()).getZKChain(_chainId));
@@ -208,12 +206,10 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
 
     /// @notice Adds a new chainBatchRoot to the chainTree and updates the aggregated shared tree — the
     /// v32 flow.
-    /// @dev Runs on both settlement layers: on L1 the chain's DiamondProxy calls it directly during
-    /// batch execution, and the same holds on Gateway — the chain's `Executor` calls it directly
-    /// while settling (see `addChainBatchRootRestriction`).
-    /// In both cases the chainBatchRoot is recorded, pushed to the chain tree, the shared tree leaf is
-    /// updated, and a new interop root is emitted — so chains settling on either layer participate in
-    /// interop. Only v32 executors call this entry point (v31 chains keep using the record-only
+    /// @dev The chain's `Executor` calls it directly while settling (see
+    /// `addChainBatchRootRestriction`). The chainBatchRoot is recorded, pushed to the chain tree,
+    /// the shared tree leaf is updated, and a new interop root is emitted — so settling chains
+    /// participate in interop. Only v32 executors call this entry point (v31 chains keep using the record-only
     /// {addChainBatchRoot}), so the interop trees contain v32-format roots exclusively.
     /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
     /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
@@ -332,7 +328,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
 
     /// @dev Adds a single chain to the message root. The chain's tree starts empty; freshly created
     /// ZKsync OS chains report their genesis (batch 0) chain batch root themselves right after
-    /// registration via {reportGenesisRoot} (triggered by the Bridgehub in the same `createNewChain`
+    /// registration via {seedGenesisRoot} (triggered by the Bridgehub in the same `createNewChain`
     /// transaction), keeping the "chain reports its own roots" interface intact — this contract never
     /// computes a chain's batch root format.
     /// @dev Chains registered with a non-zero `_startingBatchNumber` (already-deployed chains being
@@ -361,26 +357,33 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         _recordHistoricalRoot(sharedTreeRoot);
     }
 
-    /// @notice One-time report of a freshly created chain's genesis (batch 0) chain batch root.
-    /// @param _chainId The ID of the chain reporting its genesis root.
-    /// @param _genesisChainBatchRoot The chain's genesis (batch 0) chain batch root.
-    function reportGenesisRoot(
-        uint256 _chainId,
-        bytes32 _genesisChainBatchRoot
-    ) external addChainBatchRootRestriction(_chainId) {
+    /// @notice One-time seeding of a freshly created chain's genesis (batch 0) chain batch root,
+    /// pulled from the chain itself (`l2LogsRootHash(0)`, stored by its DiamondInit). The Bridgehub
+    /// calls this right after registration in `createNewChain`; a no-op for EraVM chains.
+    /// @param _chainId The ID of the chain whose genesis root is seeded.
+    function seedGenesisRoot(uint256 _chainId) external {
+        if (msg.sender != _bridgehub()) {
+            revert OnlyBridgehub(msg.sender, _bridgehub());
+        }
+        IGetters zkChain = IGetters(IBridgehubBase(_bridgehub()).getZKChain(_chainId));
+        if (!zkChain.getZKsyncOS()) {
+            return;
+        }
+        // A ZKsync OS chain always stores its genesis root in DiamondInit; a zero read is a bug.
+        bytes32 genesisChainBatchRoot = zkChain.l2LogsRootHash(0);
+        require(genesisChainBatchRoot != bytes32(0), ChainBatchRootZero());
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();
         }
-        require(_genesisChainBatchRoot != bytes32(0), ChainBatchRootZero());
         // Expected next batch number must be 1: rules out chains onboarded at a non-zero starting
         // batch and chains that already pushed real batches.
         require(currentChainBatchNumber[_chainId] == 0, NonConsecutiveBatchNumber(_chainId, 0));
         require(chainBatchRoots[_chainId][0] == bytes32(0), ChainBatchRootAlreadyExists(_chainId, 0));
 
-        chainBatchRoots[_chainId][0] = _genesisChainBatchRoot;
+        chainBatchRoots[_chainId][0] = genesisChainBatchRoot;
         // `currentChainBatchNumber` stays 0: the first real batch continues at 1 exactly as without
         // the genesis leaf.
-        _pushChainBatchRoot(_chainId, 0, _genesisChainBatchRoot);
+        _pushChainBatchRoot(_chainId, 0, genesisChainBatchRoot);
     }
 
     //////////////////////////////

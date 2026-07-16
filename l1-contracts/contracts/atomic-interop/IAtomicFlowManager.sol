@@ -5,7 +5,7 @@ import {LegState, AtomicFlow, ImtProof, AtomicFinalityProof} from "./IAtomicInte
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Per-chain coordinator for the L1-free **atomic interop** flow. It is *not* an escrow: it
+/// @notice Per-chain coordinator for the **atomic interop** flow. It is *not* an escrow: it
 /// never custodies funds. The asset burn happens through the normal interop path
 /// ({InteropCenter.sendBundle} -> {L2AssetRouter.initiateIndirectCall}); this contract only
 /// coordinates the cross-chain atomicity and the timeout recovery, gated by **IMT proofs** against
