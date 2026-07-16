@@ -8,14 +8,18 @@ import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.
 import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @notice Locks the L2InteropCommitmentTree storage ABI the ZKsync OS bootloader depends on:
-/// the current IMT root is cached at **fixed slot 0** (`_currentRoot`) and updated on every root
-/// change. The bootloader reads exactly this slot at every batch boundary to commit the batch
-/// begin/end IMT snapshots into the chain batch root, so any layout drift here is a consensus
-/// break — these tests must never be "fixed" to accommodate one without a matching bootloader
-/// change.
+/// the bootloader reads the engine's root `_imt.tree._nodes[_height][0]` directly (the same scheme
+/// it uses for the L2MessageRoot multichain root) — it loads `_height` from slot 0 and derives the
+/// `_nodes[_height][0]` slot from the `_nodes` base slot 2. The bootloader reads exactly those slots
+/// at every batch boundary to commit the batch begin/end IMT snapshots into the chain batch root, so
+/// any layout drift here is a consensus break — these tests must never be "fixed" to accommodate one
+/// without a matching bootloader change.
 contract L2InteropCommitmentTreeStorageTest is Test {
-    /// @dev The bootloader's hardcoded storage slot for the cached root.
-    bytes32 internal constant CURRENT_ROOT_SLOT = bytes32(0);
+    /// @dev The bootloader's hardcoded slot of `_imt.tree._height` (the IMT is the first state
+    /// variable and `FullMerkle.FullTree` puts `_height` at offset 0).
+    bytes32 internal constant TREE_HEIGHT_SLOT = bytes32(0);
+    /// @dev The bootloader's hardcoded base slot of `_imt.tree._nodes` (`FullTree` offset 2).
+    uint256 internal constant TREE_NODES_SLOT = 2;
 
     L2InteropCommitmentTree internal tree;
 
@@ -23,19 +27,34 @@ contract L2InteropCommitmentTreeStorageTest is Test {
         tree = new L2InteropCommitmentTree();
     }
 
-    /// @notice An uninitialized (or absent) tree reads as zero — the same value the bootloader
-    /// sees on chains without the atomic stack deployed.
-    function test_uninitializedTree_slotZeroIsZero() public view {
-        assertEq(vm.load(address(tree), CURRENT_ROOT_SLOT), bytes32(0));
+    /// @dev Mirrors the bootloader's root-slot derivation: `_nodes[height][0]` for a
+    /// two-dimensional dynamic array rooted at `TREE_NODES_SLOT`.
+    function _rootSlot(uint256 _height) internal pure returns (bytes32) {
+        bytes32 nodesHeightSlot = bytes32(uint256(keccak256(abi.encode(TREE_NODES_SLOT))) + _height);
+        return keccak256(abi.encode(nodesHeightSlot));
     }
 
-    /// @notice After `initialize`, slot 0 holds the seeded root and matches `root()`.
-    function test_initialize_cachesSeedRootAtSlotZero() public {
+    /// @dev Reads the root exactly the way the bootloader does: height from slot 0, then
+    /// `_nodes[height][0]`.
+    function _readRootLikeBootloader() internal view returns (bytes32) {
+        uint256 height = uint256(vm.load(address(tree), TREE_HEIGHT_SLOT));
+        return vm.load(address(tree), _rootSlot(height));
+    }
+
+    /// @notice An uninitialized (or absent) tree reads as zero — the same value the bootloader
+    /// sees on chains without the atomic stack deployed.
+    function test_uninitializedTree_readsAsZero() public view {
+        assertEq(_readRootLikeBootloader(), bytes32(0));
+    }
+
+    /// @notice After `initialize`, the bootloader's derived slot holds the seeded root and matches
+    /// `root()`.
+    function test_initialize_bootloaderReadMatchesRoot() public {
         tree.initialize();
 
-        bytes32 cached = vm.load(address(tree), CURRENT_ROOT_SLOT);
-        assertTrue(cached != bytes32(0));
-        assertEq(cached, tree.root());
+        bytes32 read = _readRootLikeBootloader();
+        assertTrue(read != bytes32(0));
+        assertEq(read, tree.root());
     }
 
     /// @notice The freshly seeded tree's root equals `ChainBatchRootTree.EMPTY_IMT_ROOT` — the
@@ -47,22 +66,25 @@ contract L2InteropCommitmentTreeStorageTest is Test {
         assertEq(tree.root(), ChainBatchRootTree.EMPTY_IMT_ROOT);
     }
 
-    /// @notice Every insert refreshes the slot-0 cache to the engine's new root.
-    function test_insert_updatesSlotZeroCache() public {
+    /// @notice Every insert moves the engine root the bootloader reads, including across a height
+    /// change (the seeded tree starts at height 0 and grows as leaves are added), which exercises
+    /// the height-dependent slot derivation.
+    function test_insert_movesBootloaderReadRoot() public {
         tree.initialize();
-        bytes32 seedRoot = vm.load(address(tree), CURRENT_ROOT_SLOT);
+        bytes32 seedRoot = _readRootLikeBootloader();
 
         vm.prank(L2_ATOMIC_FLOW_MANAGER_ADDR);
         (, bytes32 newRoot) = tree.insert(uint256(keccak256("commit-value-1")), 0);
 
-        bytes32 cached = vm.load(address(tree), CURRENT_ROOT_SLOT);
-        assertTrue(cached != seedRoot);
-        assertEq(cached, newRoot);
-        assertEq(cached, tree.root());
+        bytes32 read = _readRootLikeBootloader();
+        assertTrue(read != seedRoot);
+        assertEq(read, newRoot);
+        assertEq(read, tree.root());
 
         // A second insert (low nullifier resolved by the engine's linked-list walk) moves it again.
         vm.prank(L2_ATOMIC_FLOW_MANAGER_ADDR);
         (, bytes32 newerRoot) = tree.insert(uint256(keccak256("commit-value-2")), 0);
-        assertEq(vm.load(address(tree), CURRENT_ROOT_SLOT), newerRoot);
+        assertEq(_readRootLikeBootloader(), newerRoot);
+        assertEq(_readRootLikeBootloader(), tree.root());
     }
 }
