@@ -21,10 +21,12 @@ import {
     MultiCallToL1NotSupported,
     NonZeroValueToL1NotSupported
 } from "contracts/interop/InteropErrors.sol";
+import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
-/// @notice `InteropCenter` send-time destination constraints: an L2->L1 bundle must be exactly one indirect,
-/// zero-value call to the L2 AssetRouter (a withdrawal), interop can never be initiated from L1 itself, and a
-/// bundle/message can never target the sending chain itself.
+/// @notice `InteropCenter` send-time destination and recipient constraints: an L2->L1 bundle must be exactly
+/// one indirect, zero-value call to the L2 AssetRouter (a withdrawal), interop can never be initiated from L1
+/// itself, a bundle/message can never target the sending chain itself, and every recipient / call-starter
+/// must carry a concrete (non-zero) address.
 /// @dev Kept in its own abstract (mixed into `L2InteropCenterTestAbstract`, i.e. the L1-context runner) rather than
 /// in `L2InteropLibraryBasicTestAbstract`, because that abstract is also inherited by the zksync `L2InteropLibraryTest`
 /// and the extra test code would push that contract over EraVM's 65536-instruction bytecode limit. These checks are
@@ -147,6 +149,29 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
             0,
             "no fixed ZK fee may be accumulated for an L1-destined bundle"
         );
+    }
+
+    /// @notice A `sendMessage` recipient must carry a concrete address: a chain-only ERC-7930 encoding
+    /// parses to address(0) and would collect value up-front for a message that can never execute and
+    /// has no refund path.
+    function test_sendMessage_RevertWhen_RecipientAddressEmpty() public {
+        vm.expectRevert(ZeroAddress.selector);
+        l2InteropCenter.sendMessage(InteroperableAddress.formatEvmV1(destinationChainId), hex"", new bytes[](0));
+    }
+
+    /// @notice A `sendBundle` call starter must carry a concrete address too: an ERC-7930 encoding with
+    /// empty chain-reference AND address fields passes `_ensureEmptyChainReference` yet parses to
+    /// address(0) — the same value-lock as the `sendMessage` case, rejected by the same guard.
+    function test_sendBundle_RevertWhen_CallStarterAddressEmpty() public {
+        InteropCallStarter[] memory calls = new InteropCallStarter[](1);
+        // Minimal ERC-7930 v1: version + chainType (0x00010000), chainReferenceLength = 0, addressLength = 0.
+        calls[0] = InteropCallStarter({
+            to: abi.encodePacked(bytes4(0x00010000), uint8(0), uint8(0)),
+            data: hex"",
+            callAttributes: new bytes[](0)
+        });
+        vm.expectRevert(ZeroAddress.selector);
+        l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(destinationChainId), calls, _l1BundleAttributes());
     }
 
     /// @notice A bundle can never target the sending chain itself.

@@ -298,6 +298,11 @@ contract InteropCenter is
             // slither-disable-next-line unused-return
             (, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_callStarters[i].to);
 
+            // Same guard as `sendMessage`: an ERC-7930 encoding with an empty address field parses to
+            // address(0), which would collect value up-front for a call that can never execute and has
+            // no refund path.
+            require(recipientAddress != address(0), ZeroAddress());
+
             // Store original attributes for MessageSent event emission
             originalCallAttributes[i] = _callStarters[i].callAttributes;
 

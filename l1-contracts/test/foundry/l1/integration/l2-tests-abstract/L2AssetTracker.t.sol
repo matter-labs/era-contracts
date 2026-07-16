@@ -32,6 +32,8 @@ import {
 } from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {L2BaseTokenZKOS} from "contracts/l2-system/zksync-os/L2BaseTokenZKOS.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
+import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
@@ -225,34 +227,30 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
     /// @notice An L2->L2 base-token recovery is accepted and mutates no accounting: the forward direction
     /// (`handleInitiateBaseTokenBridgingOnL2`) records nothing for an L2->L2 bridge-out of the
     /// never-native base token, so there is nothing to reverse.
+    /// @dev Runs against the live initialized state (the tracker and NTV are initialized with the real
+    /// base token asset id during environment genesis) — no mocks or storage writes. The environment-wide
+    /// mocks are cleared first: the shared deployer mocks `NTV.originChainId(base)` to `block.chainid`
+    /// for its chain-migration fixtures, which would shadow the NTV's real initialized state.
     function test_handleRecoverBaseTokenBridgingOnL2_noAccountingToReverse() public {
-        bytes32 baseTokenAssetId = keccak256("base_token_asset_id");
-        uint256 l1ChainId = 1;
-        uint256 destinationChainId = 505;
+        vm.clearMockedCalls();
+        L2AssetTracker tracker = L2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        bytes32 liveBaseTokenAssetId = tracker.BASE_TOKEN_ASSET_ID();
+        uint256 nonL1DestinationChainId = 505;
         uint256 amount = 300;
 
-        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
-        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("L1_CHAIN_ID()").checked_write(l1ChainId);
-        stdstore
-            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
-            .sig("originChainId(bytes32)")
-            .with_key(baseTokenAssetId)
-            .checked_write(l1ChainId);
-
-        L2AssetTracker tracker = L2AssetTracker(L2_ASSET_TRACKER_ADDR);
-        uint256 withdrawalsBefore = _readTotalWithdrawalsToL1(baseTokenAssetId);
-        uint256 chainBalanceBefore = tracker.chainBalance(block.chainid, baseTokenAssetId);
+        uint256 withdrawalsBefore = _readTotalWithdrawalsToL1(liveBaseTokenAssetId);
+        uint256 chainBalanceBefore = tracker.chainBalance(block.chainid, liveBaseTokenAssetId);
 
         vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
-        L2_ASSET_TRACKER.handleRecoverBaseTokenBridgingOnL2(destinationChainId, amount);
+        L2_ASSET_TRACKER.handleRecoverBaseTokenBridgingOnL2(nonL1DestinationChainId, amount);
 
         assertEq(
-            tracker.chainBalance(block.chainid, baseTokenAssetId),
+            tracker.chainBalance(block.chainid, liveBaseTokenAssetId),
             chainBalanceBefore,
             "no chainBalance may be re-credited: the base token is never native, so none was decreased"
         );
         assertEq(
-            _readTotalWithdrawalsToL1(baseTokenAssetId),
+            _readTotalWithdrawalsToL1(liveBaseTokenAssetId),
             withdrawalsBefore,
             "totalWithdrawalsToL1 must not move for an L2->L2 recovery"
         );
@@ -262,27 +260,42 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
     /// atomic bundles at send, and no other revert path exists) and must revert: `totalWithdrawalsToL1`
     /// is consumed once during the L1->GW migration and must stay append-only.
     function test_handleRecoverBaseTokenBridgingOnL2_revertWhenToL1() public {
-        uint256 l1ChainId = 1;
-        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("L1_CHAIN_ID()").checked_write(l1ChainId);
+        uint256 liveL1ChainId = L2AssetTracker(L2_ASSET_TRACKER_ADDR).L1_CHAIN_ID();
 
         vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
         vm.expectRevert(RecoverToL1NotSupported.selector);
-        L2_ASSET_TRACKER.handleRecoverBaseTokenBridgingOnL2(l1ChainId, 100);
+        L2_ASSET_TRACKER.handleRecoverBaseTokenBridgingOnL2(liveL1ChainId, 100);
     }
 
     /// @notice The base token can never originate from this chain (`handleFinalizeBaseTokenBridgingOnL2`
     /// hard-codes non-native); the recovery hook asserts the invariant instead of silently re-crediting
     /// a chainBalance that was never decreased.
+    /// @dev The impossible state is reached through the real initialization method rather than a storage
+    /// write: `updateL2` (pranked as the upgrader) re-writes the base token's `originChainId` while the
+    /// asset id itself stays frozen. Environment-wide mocks are cleared first (see
+    /// `test_handleRecoverBaseTokenBridgingOnL2_noAccountingToReverse`) so the revert provably comes from
+    /// the NTV's real storage, not the deployer's `originChainId` mock.
     function test_handleRecoverBaseTokenBridgingOnL2_revertWhenBaseTokenNativeToThisChain() public {
-        bytes32 baseTokenAssetId = keccak256("base_token_asset_id");
+        vm.clearMockedCalls();
+        L2NativeTokenVault ntv = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        uint256 liveL1ChainId = ntv.L1_CHAIN_ID();
+        address liveOwner = ntv.owner();
+        bytes32 liveProxyBytecodeHash = ntv.L2_TOKEN_PROXY_BYTECODE_HASH();
+        address liveWethToken = ntv.WETH_TOKEN();
+        TokenBridgingData memory bridgingData = TokenBridgingData({
+            assetId: ntv.BASE_TOKEN_ASSET_ID(),
+            originChainId: block.chainid,
+            originToken: ntv.BASE_TOKEN_ORIGIN_TOKEN()
+        });
+        TokenMetadata memory metadata = TokenMetadata({
+            name: ntv.BASE_TOKEN_NAME(),
+            symbol: ntv.BASE_TOKEN_SYMBOL(),
+            decimals: ntv.BASE_TOKEN_DECIMALS()
+        });
 
-        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
-        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("L1_CHAIN_ID()").checked_write(uint256(1));
-        stdstore
-            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
-            .sig("originChainId(bytes32)")
-            .with_key(baseTokenAssetId)
-            .checked_write(block.chainid);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        // solhint-disable-next-line func-named-parameters
+        ntv.updateL2(liveL1ChainId, liveOwner, liveProxyBytecodeHash, liveWethToken, bridgingData, metadata);
 
         vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
         vm.expectRevert(BaseTokenNativeToThisChain.selector);
