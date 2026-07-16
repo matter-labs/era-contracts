@@ -165,11 +165,6 @@ contract UtilsCallMockerTest is Test {
         vm.mockCall(genesisRegistry, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
         vm.mockCall(
             genesisRegistry,
-            abi.encodeWithSelector(ICTMRelease.protocolVersion.selector),
-            abi.encode(uint256(0))
-        );
-        vm.mockCall(
-            genesisRegistry,
             abi.encodeWithSelector(ICTMRelease.isZKsyncOS.selector),
             abi.encode(false)
         );

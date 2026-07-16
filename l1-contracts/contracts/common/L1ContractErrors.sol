@@ -372,6 +372,7 @@ error RegistryUnknownKey();
 error RegistryCodehashMismatch(address target, bytes32 expected, bytes32 actual);
 // 0x6d094179
 error RegistryWrongCTM(address expected, address actual);
+error TransitionReleaseMismatch(address expected, address actual);
 // 0x3ea1345a
 error RegistryWrongVM(bool expected, bool actual);
 // 0x667d17de

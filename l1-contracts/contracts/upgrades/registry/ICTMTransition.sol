@@ -13,11 +13,24 @@ struct L2Deployment {
 }
 
 /// @notice Immutable description of how one CTM release becomes another.
+/// @dev Owns the version-schedule identity the release deliberately omits: it pins both the
+///      release edge (`fromRelease -> newRelease`) and the version edge
+///      (`oldProtocolVersion -> newProtocolVersion`), and carries the `verifier` for the new
+///      version. "How A becomes B" therefore never identifies A through a version number alone.
 interface ICTMTransition {
     function ctmProxy() external view returns (address);
 
     function oldProtocolVersion() external view returns (uint256);
 
+    function newProtocolVersion() external view returns (uint256);
+
+    function verifier() external view returns (address);
+
+    /// @notice The release the CTM must currently be at for this transition to apply
+    ///         (`address(0)` for a transition from a pre-registry version, e.g. v31 -> v32).
+    function fromRelease() external view returns (address);
+
+    /// @notice The release the CTM ends at. A patch transition sets this equal to `fromRelease`.
     function newRelease() external view returns (address);
 
     function defaultUpgrade() external view returns (address);

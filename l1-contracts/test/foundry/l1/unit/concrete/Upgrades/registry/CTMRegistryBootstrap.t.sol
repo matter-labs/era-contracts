@@ -43,8 +43,6 @@ contract CTMRegistryBootstrapTest is Test {
             GenesisManifestLib.buildGenesisManifest(
                 GenesisManifestLib.GenesisConfig({
                     isZKsyncOS: false,
-                    protocolVersion: VERSION,
-                    verifier: address(0xBEEF),
                     facets: facets,
                     bootloaderHash: BOOTLOADER_HASH,
                     defaultAccountHash: DEFAULT_ACCOUNT_HASH,
@@ -66,8 +64,7 @@ contract CTMRegistryBootstrapTest is Test {
 
         assertTrue(release.initialized(), "initialized");
         assertEq(release.manifestHash(), keccak256(abi.encode(manifest)), "manifest hash");
-        assertEq(release.protocolVersion(), VERSION, "version");
-        assertEq(release.verifier(), address(0xBEEF), "verifier");
+        // A release is version-INDEPENDENT: it exposes no protocolVersion / verifier.
         assertFalse(release.isZKsyncOS(), "vm flavour");
 
         GenesisFacet[] memory list = release.genesisFacets();
@@ -105,9 +102,10 @@ contract CTMRegistryBootstrapTest is Test {
         release.initialize(_genesisManifest());
     }
 
-    function test_initializeRevertsOnZeroNewVersion() public {
+    function test_initializeRevertsOnZeroGenesisUpgrade() public {
+        // Version validation moved to the transition; a release still rejects a zero genesisUpgrade.
         CTMRelease.ReleaseManifest memory manifest = _genesisManifest();
-        manifest.protocolVersion = 0;
+        manifest.genesisUpgrade = address(0);
 
         vm.expectRevert();
         release.initialize(manifest);
@@ -126,8 +124,6 @@ contract CTMRegistryBootstrapTest is Test {
             GenesisManifestLib.buildGenesisManifest(
                 GenesisManifestLib.GenesisConfig({
                     isZKsyncOS: true,
-                    protocolVersion: VERSION,
-                    verifier: address(0xBEEF),
                     facets: facets,
                     bootloaderHash: 0,
                     defaultAccountHash: 0,

@@ -9,13 +9,14 @@ struct GenesisFacet {
     bytes4[] selectors;
 }
 
-/// @notice Immutable description of one CTM release: what a chain at this release is.
+/// @notice Immutable description of one CTM release: the version-INDEPENDENT, reusable
+///         genesis / post-upgrade state a chain at this release runs — facets, DiamondInit,
+///         base-system hashes, force-deployment data and genesis params.
+/// @dev A release deliberately carries NO `protocolVersion` and NO `verifier`: those are
+///      version-schedule concerns owned by `ICTMTransition`. A verifier-only patch reuses the
+///      same release unchanged, so baking version/verifier in here would make it stale at once.
 interface ICTMRelease {
     function isZKsyncOS() external view returns (bool);
-
-    function protocolVersion() external view returns (uint256);
-
-    function verifier() external view returns (address);
 
     function diamondInit() external view returns (address);
 

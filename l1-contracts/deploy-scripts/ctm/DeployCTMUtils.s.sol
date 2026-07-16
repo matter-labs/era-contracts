@@ -143,8 +143,6 @@ abstract contract DeployCTMUtils is DeployUtils {
         CTMRelease.ReleaseManifest memory manifest = GenesisManifestLib.buildGenesisManifest(
             GenesisManifestLib.GenesisConfig({
                 isZKsyncOS: config.isZKsyncOS,
-                protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
-                verifier: ctmAddresses.stateTransition.verifiers.verifier,
                 facets: ctmAddresses.stateTransition.facets,
                 bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
                 defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,

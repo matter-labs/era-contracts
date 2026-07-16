@@ -58,7 +58,7 @@ library CTMUpgradeComposer {
     ///      by `BaseZkSyncUpgrade._setL2SystemContractUpgrade`.
     function buildL2UpgradeTx(ICTMTransition _transition) internal view returns (L2CanonicalTransaction memory) {
         ICTMRelease release = ICTMRelease(_transition.newRelease());
-        uint256 newVersion = release.protocolVersion();
+        uint256 newVersion = _transition.newProtocolVersion();
         L2Deployment[] memory deploymentRows = _transition.l2Deployments();
         uint256 deployListLength = deploymentRows.length;
         if (deployListLength == 0) {
@@ -94,7 +94,7 @@ library CTMUpgradeComposer {
     function buildProposedUpgrade(
         ICTMTransition _transition
     ) internal view returns (ProposedUpgrade memory proposedUpgrade) {
-        uint256 newVersion = ICTMRelease(_transition.newRelease()).protocolVersion();
+        uint256 newVersion = _transition.newProtocolVersion();
         proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(newVersion);
         proposedUpgrade.l2ProtocolUpgradeTx = buildL2UpgradeTx(_transition);
         (

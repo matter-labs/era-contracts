@@ -272,8 +272,6 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
             GenesisManifestLib.buildGenesisManifest(
                 GenesisManifestLib.GenesisConfig({
                     isZKsyncOS: config.isZKsyncOS,
-                    protocolVersion: config.protocolVersion,
-                    verifier: contracts.stateTransition.verifiers.verifier,
                     facets: contracts.stateTransition.facets,
                     bootloaderHash: config.bootloaderHash,
                     defaultAccountHash: config.defaultAccountHash,

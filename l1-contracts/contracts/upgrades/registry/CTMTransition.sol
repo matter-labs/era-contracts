@@ -19,6 +19,9 @@ contract CTMTransition is ICTMTransition {
     struct TransitionManifest {
         address ctmProxy;
         uint256 oldProtocolVersion;
+        uint256 newProtocolVersion;
+        address verifier;
+        address fromRelease;
         address newRelease;
         address defaultUpgrade;
         uint256 oldProtocolVersionDeadline;
@@ -39,6 +42,9 @@ contract CTMTransition is ICTMTransition {
 
     address internal transitionCtmProxy;
     uint256 internal transitionOldProtocolVersion;
+    uint256 internal transitionNewProtocolVersion;
+    address internal transitionVerifier;
+    address internal transitionFromRelease;
     address internal transitionNewRelease;
     address internal transitionDefaultUpgrade;
     uint256 internal transitionOldProtocolVersionDeadline;
@@ -59,6 +65,8 @@ contract CTMTransition is ICTMTransition {
         }
         if (
             _manifest.ctmProxy == address(0) ||
+            _manifest.newProtocolVersion == 0 ||
+            _manifest.verifier == address(0) ||
             _manifest.newRelease == address(0) ||
             _manifest.defaultUpgrade == address(0)
         ) {
@@ -66,12 +74,20 @@ contract CTMTransition is ICTMTransition {
         }
 
         ICTMRelease(_manifest.newRelease).validate();
+        // `fromRelease` is `address(0)` for a transition from a pre-registry version (v31 -> v32);
+        // when set it must itself be a valid release the CTM can currently be running.
+        if (_manifest.fromRelease != address(0)) {
+            ICTMRelease(_manifest.fromRelease).validate();
+        }
         _validatePins(_manifest.codehashPins);
 
         initialized = true;
         manifestHash = keccak256(abi.encode(_manifest));
         transitionCtmProxy = _manifest.ctmProxy;
         transitionOldProtocolVersion = _manifest.oldProtocolVersion;
+        transitionNewProtocolVersion = _manifest.newProtocolVersion;
+        transitionVerifier = _manifest.verifier;
+        transitionFromRelease = _manifest.fromRelease;
         transitionNewRelease = _manifest.newRelease;
         transitionDefaultUpgrade = _manifest.defaultUpgrade;
         transitionOldProtocolVersionDeadline = _manifest.oldProtocolVersionDeadline;
@@ -102,6 +118,18 @@ contract CTMTransition is ICTMTransition {
 
     function oldProtocolVersion() external view returns (uint256) {
         return transitionOldProtocolVersion;
+    }
+
+    function newProtocolVersion() external view returns (uint256) {
+        return transitionNewProtocolVersion;
+    }
+
+    function verifier() external view returns (address) {
+        return transitionVerifier;
+    }
+
+    function fromRelease() external view returns (address) {
+        return transitionFromRelease;
     }
 
     function newRelease() external view returns (address) {

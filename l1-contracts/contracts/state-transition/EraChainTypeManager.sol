@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
 import {ICTMRelease} from "../upgrades/registry/ICTMRelease.sol";
-import {OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
 import {
     GenesisIndexStorageZero,
     GenesisBatchCommitmentZero,
@@ -40,10 +39,9 @@ contract EraChainTypeManager is ChainTypeManagerBase {
         if (release.isZKsyncOS()) {
             revert RegistryWrongVM(false, true);
         }
-        uint256 releaseVersion = release.protocolVersion();
-        if (releaseVersion != protocolVersion) {
-            revert OutdatedProtocolVersion(protocolVersion, releaseVersion);
-        }
+        // No version check here: a release is version-INDEPENDENT. The release <-> protocol-version
+        // binding is established atomically by the transition (which calls `setNewVersionUpgrade`
+        // and `setCurrentRelease` from the same pinned object), not re-derived from the release.
         (
             address genesisUpgrade,
             bytes32 genesisBatchHash,

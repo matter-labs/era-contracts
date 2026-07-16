@@ -2,12 +2,12 @@
 
 pragma solidity 0.8.28;
 
-import {ICTMRelease} from "./ICTMRelease.sol";
 import {ICTMTransition} from "./ICTMTransition.sol";
 import {CTMUpgradeComposer} from "./CTMUpgradeComposer.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {IDefaultUpgrade} from "../IDefaultUpgrade.sol";
+import {TransitionReleaseMismatch} from "../../common/L1ContractErrors.sol";
 
 /// @title CTMUpgradeModule
 /// @author Matter Labs
@@ -41,19 +41,27 @@ contract CTMUpgradeModule {
     /// @param _transition The write-once transition approved by governance.
     function applyCTMUpgrade(ICTMTransition _transition) external {
         _transition.validate();
-        ICTMRelease release = ICTMRelease(_transition.newRelease());
         IChainTypeManager ctm = IChainTypeManager(_transition.ctmProxy());
+
+        // Pin the release edge: the CTM must currently be at exactly the release this transition
+        // departs from (`address(0)` for the first, pre-registry transition e.g. v31 -> v32), so
+        // "how A becomes B" is never identified by version number alone.
+        address currentRelease = ctm.currentRelease();
+        if (currentRelease != _transition.fromRelease()) {
+            revert TransitionReleaseMismatch(_transition.fromRelease(), currentRelease);
+        }
+
         uint256 oldProtocolVersion = _transition.oldProtocolVersion();
-        uint256 newProtocolVersion = release.protocolVersion();
+        uint256 newProtocolVersion = _transition.newProtocolVersion();
 
         ctm.setNewVersionUpgrade({
             _cutData: _buildUpgradeCut(_transition),
             _oldProtocolVersion: oldProtocolVersion,
             _oldProtocolVersionDeadline: _transition.oldProtocolVersionDeadline(),
             _newProtocolVersion: newProtocolVersion,
-            _verifier: release.verifier()
+            _verifier: _transition.verifier()
         });
-        ctm.setCurrentRelease(address(release));
+        ctm.setCurrentRelease(_transition.newRelease());
 
         emit CTMUpgradeApplied(address(ctm), address(_transition), oldProtocolVersion, newProtocolVersion);
     }
@@ -75,11 +83,7 @@ contract CTMUpgradeModule {
             _buildUpgradeCut(_transition)
         );
 
-        emit ChainUpgradeApplied(
-            address(ctm),
-            _chainId,
-            ICTMRelease(_transition.newRelease()).protocolVersion()
-        );
+        emit ChainUpgradeApplied(address(ctm), _chainId, _transition.newProtocolVersion());
     }
 
     /// @dev Composes the upgrade cut: a `DefaultUpgrade.upgradeFromRegistry(registry, timestamp)`

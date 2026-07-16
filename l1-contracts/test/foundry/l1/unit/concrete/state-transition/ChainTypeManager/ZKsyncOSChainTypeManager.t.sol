@@ -136,11 +136,6 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             abi.encodeWithSelector(ICTMRelease.isZKsyncOS.selector),
             abi.encode(true)
         );
-        vm.mockCall(
-            Utils.TEST_GENESIS_REGISTRY,
-            abi.encodeWithSelector(ICTMRelease.protocolVersion.selector),
-            abi.encode(0)
-        );
     }
 
     function _deployChainTypeManager() internal returns (ZKsyncOSChainTypeManager) {

@@ -152,8 +152,6 @@ abstract contract GatewayCTMDeployerCTMBase {
             GenesisManifestLib.buildGenesisManifest(
                 GenesisManifestLib.GenesisConfig({
                     isZKsyncOS: _baseConfig.isZKsyncOS,
-                    protocolVersion: _baseConfig.protocolVersion,
-                    verifier: _verifier,
                     facets: _facets,
                     bootloaderHash: _baseConfig.bootloaderHash,
                     defaultAccountHash: _baseConfig.defaultAccountHash,

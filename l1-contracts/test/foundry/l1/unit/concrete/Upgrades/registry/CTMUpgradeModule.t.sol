@@ -63,8 +63,6 @@ contract CTMUpgradeModuleTest is ChainTypeManagerTest {
         result.initialize(
             CTMRelease.ReleaseManifest({
                 isZKsyncOS: false,
-                protocolVersion: newVersion,
-                verifier: testnetVerifier,
                 diamondInit: makeAddr("newDiamondInit"),
                 genesisFacets: new GenesisFacet[](0),
                 bootloaderHash: bytes32(uint256(0xb00)),
@@ -123,6 +121,9 @@ contract CTMUpgradeModuleTest is ChainTypeManagerTest {
             CTMTransition.TransitionManifest({
                 ctmProxy: address(chainContractAddress),
                 oldProtocolVersion: 0,
+                newProtocolVersion: newVersion,
+                verifier: testnetVerifier,
+                fromRelease: address(0),
                 newRelease: address(release),
                 defaultUpgrade: makeAddr("defaultUpgrade"),
                 oldProtocolVersionDeadline: 1000,

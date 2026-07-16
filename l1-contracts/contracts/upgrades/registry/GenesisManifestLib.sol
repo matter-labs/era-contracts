@@ -16,8 +16,9 @@ library GenesisManifestLib {
     uint256 internal constant GENESIS_FACET_COUNT = 6;
 
     /// @notice Everything the deploy flow feeds into a bootstrap manifest.
+    /// @dev A release is version-INDEPENDENT: it carries no protocol version and no verifier
+    ///      (those are transition/version-schedule concerns), only reusable genesis state.
     /// @param isZKsyncOS Whether the CTM this registry bootstraps is the ZKsyncOS one.
-    /// @param protocolVersion The packed SemVer protocol version new chains are created at.
     /// @param facets The deployed diamond facet addresses (incl. DiamondInit).
     /// @param bootloaderHash The hash of the bootloader L2 bytecode (zero on ZKsync OS).
     /// @param defaultAccountHash The hash of the default account L2 bytecode (zero on ZKsync OS).
@@ -30,8 +31,6 @@ library GenesisManifestLib {
     // solhint-disable-next-line gas-struct-packing
     struct GenesisConfig {
         bool isZKsyncOS;
-        uint256 protocolVersion;
-        address verifier;
         Facets facets;
         bytes32 bootloaderHash;
         bytes32 defaultAccountHash;
@@ -63,8 +62,6 @@ library GenesisManifestLib {
         }
 
         manifest.isZKsyncOS = _cfg.isZKsyncOS;
-        manifest.protocolVersion = _cfg.protocolVersion;
-        manifest.verifier = _cfg.verifier;
         manifest.diamondInit = _cfg.facets.diamondInit;
         manifest.genesisFacets = genesisFacets;
         manifest.bootloaderHash = _cfg.bootloaderHash;

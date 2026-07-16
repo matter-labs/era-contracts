@@ -147,8 +147,9 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         // subsequent minor upgrade correctly reverts with PreviousUpgradeNotFinalized.
         UtilsFacet(chainAddress).util_setL2SystemContractsUpgradeTxHash(bytes32(0));
 
-        transitionV32 = _makeTransition(0, V32, verifierV32, address(0));
-        transitionV33 = _makeTransition(V32, V33, verifierV33, newAdminFacet);
+        transitionV32 = _makeTransition(0, V32, verifierV32, address(0), address(0));
+        // V33 transitions from the V32 release the first hop pinned.
+        transitionV33 = _makeTransition(V32, V33, verifierV33, transitionV32.newRelease(), newAdminFacet);
     }
 
     /// @dev Builds a registry for one hop. When `_newAdminFacet` is zero the AdminFacet is
@@ -161,6 +162,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         uint256 _oldVersion,
         uint256 _newVersion,
         address _verifier,
+        address _fromRelease,
         address _newAdminFacet
     ) internal returns (CTMTransition transition) {
         address liveAdminFacet = facetCuts[1].facet;
@@ -175,8 +177,6 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         release.initialize(
             CTMRelease.ReleaseManifest({
                 isZKsyncOS: _isZKsyncOSVariant(),
-                protocolVersion: _newVersion,
-                verifier: _verifier,
                 diamondInit: diamondInit,
                 genesisFacets: genesisFacets,
                 bootloaderHash: bytes32(0),
@@ -221,6 +221,9 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             CTMTransition.TransitionManifest({
                 ctmProxy: address(chainContractAddress),
                 oldProtocolVersion: _oldVersion,
+                newProtocolVersion: _newVersion,
+                verifier: _verifier,
+                fromRelease: _fromRelease,
                 newRelease: address(release),
                 defaultUpgrade: defaultUpgrade,
                 oldProtocolVersionDeadline: 1000,

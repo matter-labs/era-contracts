@@ -35,7 +35,6 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
         );
         vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
         vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.isZKsyncOS.selector), abi.encode(false));
-        vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.protocolVersion.selector), abi.encode(0));
     }
 
     function test_SettingGenesisRegistry() public {

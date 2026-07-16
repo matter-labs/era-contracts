@@ -16,8 +16,6 @@ contract CTMRelease is ICTMRelease {
     // solhint-disable-next-line gas-struct-packing
     struct ReleaseManifest {
         bool isZKsyncOS;
-        uint256 protocolVersion;
-        address verifier;
         address diamondInit;
         GenesisFacet[] genesisFacets;
         bytes32 bootloaderHash;
@@ -35,8 +33,6 @@ contract CTMRelease is ICTMRelease {
     bytes32 public manifestHash;
 
     bool internal zksyncOS;
-    uint256 internal releaseProtocolVersion;
-    address internal releaseVerifier;
     address internal releaseDiamondInit;
     GenesisFacet[] internal releaseGenesisFacets;
     bytes32 internal bootloaderHash;
@@ -53,12 +49,7 @@ contract CTMRelease is ICTMRelease {
         if (initialized) {
             revert RegistryAlreadyInitialized();
         }
-        if (
-            _manifest.protocolVersion == 0 ||
-            _manifest.verifier == address(0) ||
-            _manifest.diamondInit == address(0) ||
-            _manifest.genesisUpgrade == address(0)
-        ) {
+        if (_manifest.diamondInit == address(0) || _manifest.genesisUpgrade == address(0)) {
             revert ZeroAddress();
         }
 
@@ -67,8 +58,6 @@ contract CTMRelease is ICTMRelease {
         initialized = true;
         manifestHash = keccak256(abi.encode(_manifest));
         zksyncOS = _manifest.isZKsyncOS;
-        releaseProtocolVersion = _manifest.protocolVersion;
-        releaseVerifier = _manifest.verifier;
         releaseDiamondInit = _manifest.diamondInit;
         uint256 length = _manifest.genesisFacets.length;
         for (uint256 i = 0; i < length; ++i) {
@@ -90,14 +79,6 @@ contract CTMRelease is ICTMRelease {
 
     function isZKsyncOS() external view returns (bool) {
         return zksyncOS;
-    }
-
-    function protocolVersion() external view returns (uint256) {
-        return releaseProtocolVersion;
-    }
-
-    function verifier() external view returns (address) {
-        return releaseVerifier;
     }
 
     function diamondInit() external view returns (address) {

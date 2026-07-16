@@ -82,8 +82,6 @@ contract StorageRegistriesTest is Test {
         return
             CTMRelease.ReleaseManifest({
                 isZKsyncOS: true,
-                protocolVersion: NEW_VERSION,
-                verifier: address(0xE002),
                 diamondInit: address(0xF204),
                 genesisFacets: facets,
                 bootloaderHash: bytes32(uint256(0xb00)),
@@ -133,6 +131,9 @@ contract StorageRegistriesTest is Test {
             CTMTransition.TransitionManifest({
                 ctmProxy: address(0xD001),
                 oldProtocolVersion: OLD_VERSION,
+                newProtocolVersion: NEW_VERSION,
+                verifier: address(0xE002),
+                fromRelease: address(0),
                 newRelease: address(release),
                 defaultUpgrade: address(0xF205),
                 oldProtocolVersionDeadline: 1000,
@@ -190,8 +191,9 @@ contract StorageRegistriesTest is Test {
     }
 
     function test_releasePinsPostUpgradeGenesis() public view {
-        assertEq(release.protocolVersion(), NEW_VERSION);
-        assertEq(release.verifier(), address(0xE002));
+        // Version + verifier are transition (version-schedule) concerns, not release concerns.
+        assertEq(transition.newProtocolVersion(), NEW_VERSION);
+        assertEq(transition.verifier(), address(0xE002));
         assertEq(release.diamondInit(), address(0xF204));
         assertEq(release.fixedForceDeploymentsData(), hex"f1f2");
         Diamond.FacetCut[] memory installations = ReleaseFacetReader.newChainInstallations(ICTMRelease(address(release)));
