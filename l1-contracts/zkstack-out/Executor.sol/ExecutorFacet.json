@@ -70,13 +70,6 @@
   },
   {
     "type": "function",
-    "name": "reportGenesisRoot",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "revertBatchesSharedBridge",
     "inputs": [
       {
@@ -217,11 +210,6 @@
   {
     "type": "error",
     "name": "EmptyData",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "GenesisRootAfterFirstBatch",
     "inputs": []
   },
   {

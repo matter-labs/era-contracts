@@ -15,6 +15,7 @@ import {
     DepthMoreThanOneForRecursiveMerkleProof,
     MessageRootNotRegistered,
     NonConsecutiveBatchNumber,
+    OnlyBridgehub,
     OnlyChainAssetHandler,
     OnlyBridgehubOrChainAssetHandler,
     OnlyChain
@@ -27,6 +28,7 @@ import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
 
 import {MessageVerification} from "../../common/MessageVerification.sol";
+import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -326,7 +328,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
 
     /// @dev Adds a single chain to the message root. The chain's tree starts empty; freshly created
     /// ZKsync OS chains report their genesis (batch 0) chain batch root themselves right after
-    /// registration via {reportGenesisRoot} (triggered by the Bridgehub in the same `createNewChain`
+    /// registration via {seedGenesisRoot} (triggered by the Bridgehub in the same `createNewChain`
     /// transaction), keeping the "chain reports its own roots" interface intact — this contract never
     /// computes a chain's batch root format.
     /// @dev Chains registered with a non-zero `_startingBatchNumber` (already-deployed chains being
@@ -355,26 +357,35 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         _recordHistoricalRoot(sharedTreeRoot);
     }
 
-    /// @notice One-time report of a freshly created chain's genesis (batch 0) chain batch root.
-    /// @param _chainId The ID of the chain reporting its genesis root.
-    /// @param _genesisChainBatchRoot The chain's genesis (batch 0) chain batch root.
-    function reportGenesisRoot(
-        uint256 _chainId,
-        bytes32 _genesisChainBatchRoot
-    ) external addChainBatchRootRestriction(_chainId) {
+    /// @notice One-time seeding of a freshly created chain's genesis (batch 0) chain batch root,
+    /// pulled from the chain itself (`l2LogsRootHash(0)`, stored by its DiamondInit). The Bridgehub
+    /// calls this right after registration in `createNewChain`; a no-op for chains that store no
+    /// genesis root (EraVM).
+    /// @param _chainId The ID of the chain whose genesis root is seeded.
+    function seedGenesisRoot(uint256 _chainId) external {
+        if (msg.sender != _bridgehub()) {
+            revert OnlyBridgehub(msg.sender, _bridgehub());
+        }
+        IGetters zkChain = IGetters(IBridgehubBase(_bridgehub()).getZKChain(_chainId));
+        if (!zkChain.getZKsyncOS()) {
+            return;
+        }
+        bytes32 genesisChainBatchRoot = zkChain.l2LogsRootHash(0);
+        if (genesisChainBatchRoot == bytes32(0)) {
+            return;
+        }
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();
         }
-        require(_genesisChainBatchRoot != bytes32(0), ChainBatchRootZero());
         // Expected next batch number must be 1: rules out chains onboarded at a non-zero starting
         // batch and chains that already pushed real batches.
         require(currentChainBatchNumber[_chainId] == 0, NonConsecutiveBatchNumber(_chainId, 0));
         require(chainBatchRoots[_chainId][0] == bytes32(0), ChainBatchRootAlreadyExists(_chainId, 0));
 
-        chainBatchRoots[_chainId][0] = _genesisChainBatchRoot;
+        chainBatchRoots[_chainId][0] = genesisChainBatchRoot;
         // `currentChainBatchNumber` stays 0: the first real batch continues at 1 exactly as without
         // the genesis leaf.
-        _pushChainBatchRoot(_chainId, 0, _genesisChainBatchRoot);
+        _pushChainBatchRoot(_chainId, 0, genesisChainBatchRoot);
     }
 
     //////////////////////////////

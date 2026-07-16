@@ -76,8 +76,8 @@ import {
 ///     `t' >= T > deadline`, so the proven batch's end root is the final IMT state reachable in time
 ///     — absence there means the leg can never finalize. This branch restores refund liveness for a
 ///     source chain that HALTS and never settles a post-deadline batch; every chain interop can
-///     target has at least one batch in the shared root (freshly created chains report a genesis
-///     batch leaf at creation — see {MessageRootBase.reportGenesisRoot} — and `ChainRegistrationSender` refuses
+///     target has at least one batch in the shared root (freshly created chains get a genesis
+///     batch leaf at creation — see {MessageRootBase.seedGenesisRoot} — and `ChainRegistrationSender` refuses
 ///     to enable interop towards a chain with an empty tree), so the required "last batch" always
 ///     exists.
 ///

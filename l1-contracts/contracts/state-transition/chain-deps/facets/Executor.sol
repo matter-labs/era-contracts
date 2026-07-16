@@ -23,7 +23,6 @@ import {
     CommitBasedInteropNotSupported,
     DependencyRootsRollingHashMismatch,
     InvalidBatchesDataLength,
-    GenesisRootAfterFirstBatch,
     InvalidInteropRootTimestamp,
     MessageRootIsZero,
     MismatchNumberOfLayer1Txs
@@ -153,28 +152,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Once the batch is executed, we include its message to the message root.
         IMessageRootBase messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
         messageRootContract.addChainBatchRootV32(s.chainId, _batchNumber, _messageRoot);
-    }
-
-    /// @notice One-time report of the chain's genesis (batch 0) chain batch root to the settlement
-    /// layer's MessageRoot — see {IZKChain.reportGenesisRoot}. The Bridgehub triggers it in the same
-    /// transaction as `createNewChain`; while the effect is fully determined by chain state (and the
-    /// MessageRoot enforces the once-only semantics), the caller is restricted to the Bridgehub as
-    /// defense in depth.
-    function reportGenesisRoot() external onlyBridgehub {
-        // Nothing to report: only fresh ZKsync OS chains store a genesis (batch 0) chain batch root
-        // in their DiamondInit; EraVM chains (and pre-v32 ZKsync OS deployments) leave the slot empty
-        // and do not participate in the genesis-leaf seeding.
-        bytes32 genesisChainBatchRoot = s.l2LogsRootHashes[0];
-        if (!s.zksyncOS || genesisChainBatchRoot == bytes32(0)) {
-            return;
-        }
-        // Only before the first real batch: the MessageRoot side additionally enforces the
-        // once-and-fresh-only semantics (expected next batch number 1, batch 0 not yet recorded).
-        if (s.totalBatchesExecuted != 0) {
-            revert GenesisRootAfterFirstBatch();
-        }
-        IMessageRootBase messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
-        messageRootContract.reportGenesisRoot(s.chainId, genesisChainBatchRoot);
     }
 
     /// @inheritdoc IExecutor

@@ -30,8 +30,6 @@ error InitialForceDeploymentMismatch(bytes32 forceDeploymentHash, bytes32 initia
 error InitializeNotAvailable();
 // 0xfbd630b8
 error InvalidBatchesDataLength(uint256 batchesDataLength, uint256 priorityOpsDataLength);
-/// @dev The genesis (batch 0) chain batch root can only be reported before the first real batch executes.
-error GenesisRootAfterFirstBatch();
 // 0xc06789fa
 error InvalidCommitment();
 // 0x15a8be2c
