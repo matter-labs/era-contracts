@@ -20,19 +20,15 @@ import {CommitmentTreeNotAppender} from "./AtomicInteropErrors.sol";
 /// the settlement layer assigns and which is re-derived from the same inclusion proof.
 ///
 /// @dev STORAGE LAYOUT IS CONSENSUS-CRITICAL. The bootloader reads the engine's root
-/// `_imt.tree._nodes[_imt.tree._height][0]` directly, the same way it reads the multichain root from
-/// the L2MessageRoot's `FullMerkle` tree: it loads `_height` from slot 0 and derives the
-/// `_nodes[_height][0]` slot from the `_nodes` base slot 2. `_imt` MUST therefore stay the first
-/// state variable ({FullMerkle.FullTree} puts `_height` at offset 0 and `_nodes` at offset 2 within
-/// it). An uninitialized tree reads as `bytes32(0)`, matching the "no tree deployed" reading on
-/// chains without the atomic stack.
+/// `_imt.tree._nodes[_imt.tree._height][0]` directly: it loads `_height` from slot 0 and derives the
+/// `_nodes[_height][0]` slot from the `_nodes` base slot 2. An uninitialized tree reads as `bytes32(0)`.
 ///
 /// Deployed in L2 userspace (no constructor); the one-time seeding is done in `initialize`.
 contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
     using IndexedMerkleTree for IMT;
 
     /// @dev The append-only indexed tree. MUST stay at slot 0 — the bootloader derives the engine's
-    /// root slot from this position (see contract doc). A non-zero `_imt.tree._leafNumber` doubles
+    /// root slot from this position (see contract doc). A non-zero `_imt.tree._leafNumber` also serves
     /// as the "initialized" flag.
     IMT internal _imt;
 
