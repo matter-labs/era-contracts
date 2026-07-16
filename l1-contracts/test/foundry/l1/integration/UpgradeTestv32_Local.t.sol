@@ -103,16 +103,11 @@ contract CoreUpgrade_v32_Test is CoreUpgrade_v32 {
     }
 }
 
-// Slot of `ZKChainBase.totalBatchesExecuted` (absolute, not relative to DIAMOND_STORAGE_POSITION).
-uint256 constant ZK_CHAIN_TOTAL_BATCHES_EXECUTED_SLOT = 11;
-// Slot of `ZKChainBase.totalBatchesCommitted` (absolute).
-uint256 constant ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT = 13;
-
 /// @notice Local (non-fork) v31 -> v32 upgrade test. Deploys a fresh ecosystem + Era chain at the
 ///         baseline version, then drives the v32 upgrade through the same Default*Upgrade harness
 ///         production uses. Unlike v31, the v32 SettlementLayer upgrade performs NO L1 storage
-///         migration, so the v31 MessageRoot reinit / per-chain placeholder machinery is gone;
-///         only the "chain has an executed batch" fixture is kept for the chain-upgrade guards.
+///         migration, so the v31 MessageRoot reinit / per-chain placeholder machinery is gone and
+///         no per-chain batch fixture is needed — the fresh chain upgrades from zero batches.
 /// @dev Heavy execution + event assertions run in `setUp -> internalTest()` (RAM constraint); the
 ///      body checks persisted state, including that the CTM is pinned to a genesis registry (the
 ///      defining property of the registry-driven v32 upgrade).
@@ -147,14 +142,10 @@ contract UpgradeIntegrationTest_v32_Local is
         ctmUpgrade.setNewProtocolVersion(newProtocolVersion);
     }
 
-    /// @notice Make the freshly-deployed Era diamond look like it has a committed + executed batch
-    ///         so the chain-upgrade guards pass. v32 does no L1 storage migration, so nothing else
-    ///         needs seeding.
-    function beforeChainUpgrade() internal override {
-        address eraChainDiamond = addresses.bridgehub.getZKChain(eraZKChainId);
-        vm.store(eraChainDiamond, bytes32(ZK_CHAIN_TOTAL_BATCHES_EXECUTED_SLOT), bytes32(uint256(1)));
-        vm.store(eraChainDiamond, bytes32(ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT), bytes32(uint256(1)));
-    }
+    // NOTE: v32 needs no `beforeChainUpgrade` fixture. v32 does no L1 storage migration and its
+    // chain upgrade (`upgradeChainFromVersion` with the committed cut) imposes no
+    // executed-batch precondition, so the freshly-deployed chain (0 committed/executed batches)
+    // upgrades cleanly. The base's no-op override is used — no storage-slot writes.
 
     function setUp() public {
         console.log("setUp: Starting");
