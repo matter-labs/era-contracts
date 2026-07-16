@@ -315,11 +315,6 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     }
 
     /// @notice The number of batch leaves in a chain's tree on this settlement layer.
-    /// @dev Non-zero means the chain has at least one batch inside the aggregated shared root —
-    /// the atomic-interop timeout-protocol precondition `ChainRegistrationSender` demands before a
-    /// chain can be registered for interop. Freshly created chains satisfy it from creation (the
-    /// seeded genesis batch leaf); onboarded/migrated chains satisfy it after their first settlement
-    /// on this layer.
     /// @param _chainId The ID of the chain whose tree is being queried.
     function chainTreeLeafCount(uint256 _chainId) external view returns (uint256) {
         return chainTree[_chainId]._nextLeafIndex;
@@ -341,9 +336,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// transaction), keeping the "chain reports its own roots" interface intact — this contract never
     /// computes a chain's batch root format.
     /// @dev Chains registered with a non-zero `_startingBatchNumber` (already-deployed chains being
-    /// onboarded, settlement-layer migrations) never report a genesis root: a real batch
-    /// `_startingBatchNumber` already exists (settled pre-onboarding / on another layer), so a
-    /// synthetic leaf would diverge from the real batch root. Such chains must settle at least one
+    /// onboarded, settlement-layer migrations) never report a genesis root. Such chains must settle at least one
     /// batch on this layer before they can be registered for interop — enforced by
     /// `ChainRegistrationSender`.
     /// @param _chainId The ID of the chain that is being added to the message root.
@@ -369,18 +362,6 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     }
 
     /// @notice One-time report of a freshly created chain's genesis (batch 0) chain batch root.
-    /// @dev The genesis root is computed and stored by the chain's DiamondInit (see there for the
-    /// preimage) and reported through the chain itself ({ExecutorFacet.reportGenesisRoot}), so this
-    /// contract keeps the plain "the chain reports a `bytes32 _chainBatchRoot`" interface for every
-    /// leaf it holds. Seeding the genesis leaf guarantees the atomic-interop timeout-protocol
-    /// precondition — every chain interop can target has at least one batch inside the shared root,
-    /// so the "chain's LAST batch inside a post-deadline aggregated root" a timeout proof for a
-    /// halted chain points at always exists.
-    /// @dev Callable only while the chain has not pushed anything yet: the expected next batch number
-    /// must be 1 (i.e. `currentChainBatchNumber == 0`, only fresh v31+ chains qualify) and batch 0
-    /// must not have been recorded before — so it can be called at most once. Note that
-    /// `_getChainBatchRoot` rejects batch 0 (`BatchZeroNotAllowed`), so recording it cannot shadow
-    /// any message-verification lookup.
     /// @param _chainId The ID of the chain reporting its genesis root.
     /// @param _genesisChainBatchRoot The chain's genesis (batch 0) chain batch root.
     function reportGenesisRoot(

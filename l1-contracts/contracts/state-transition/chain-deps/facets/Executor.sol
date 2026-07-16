@@ -102,12 +102,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @notice Verifies the dependency message roots that the chain relied on.
-    /// @dev Each imported dependency is a `(blockNumber, root, timestamp)` tuple; both the root and
-    /// its creation timestamp are double checked against the `MessageRoot` contract's historical
-    /// record (one `StoredInteropRoot` struct), and both are folded into the rolling hash the proven
-    /// batch commits to. The timestamp check is what lets L2 contracts trust the timestamps in
-    /// `L2InteropRootStorage.interopRoots` for time-sensitive proofs (e.g. the atomic-interop
-    /// timeout protocol).
     function _verifyDependencyInteropRoots(
         InteropRoot[] memory _dependencyRoots
     ) internal view returns (bytes32 dependencyRootsRollingHash) {
@@ -155,10 +149,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @notice Appends the batch's chain batch root to the L1 MessageRoot.
     /// @param _batchNumber The number of the batch
     /// @param _messageRoot The root of the merkle tree of the messages to L1.
-    /// @dev `addChainBatchRootV32` records the root (used for L2->L1 message verification), pushes
-    /// it to the chain's interop tree, and emits the interop root — chains settling on this layer
-    /// participate in interop. Runs on whichever settlement layer the chain settles on (L1 only in
-    /// this release).
     function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
         // Once the batch is executed, we include its message to the message root.
         IMessageRootBase messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();

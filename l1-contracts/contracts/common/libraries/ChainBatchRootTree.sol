@@ -27,12 +27,12 @@ library ChainBatchRootTree {
     /// @dev Height of the chain batch root tree; every leaf sits exactly this many hops below the root.
     uint256 internal constant TREE_DEPTH = 3;
 
-    /// @dev Leaf index of the batch's local L2->L1 logs tree root. Not referenced on chain today;
+    /// @dev Leaf index of the batch's local L2->L1 logs tree root. This constant may be unused in the codebase, but is
     /// kept for completeness so the library documents every leaf of the layout.
     uint256 internal constant LOGS_ROOT_LEAF_INDEX = 0;
 
-    /// @dev Leaf index of the chain's own multichain (aggregated MessageRoot) root. Not referenced
-    /// on chain today; kept for completeness so the library documents every leaf of the layout.
+    /// @dev Leaf index of the chain's own multichain (aggregated MessageRoot) root. This constant may be unused 
+    /// in the codebase, but is kept for completeness so the library documents every leaf of the layout.
     uint256 internal constant MULTICHAIN_ROOT_LEAF_INDEX = 1;
 
     /// @dev Leaf index of the interop commitment tree root at batch begin.

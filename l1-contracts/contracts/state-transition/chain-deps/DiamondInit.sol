@@ -121,13 +121,6 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
         s.zksyncOS = IS_ZKSYNC_OS;
         if (IS_ZKSYNC_OS) {
-            // The genesis (batch 0) chain batch root: no L2->L1 logs, no multichain root, and a
-            // freshly seeded (empty) interop commitment tree at both boundaries. In the v32 wire the
-            // per-batch `l2LogsTreeRoot` IS the chain batch root, so batch 0's entry is exact. The
-            // chain later reports it to the settlement layer's MessageRoot (see
-            // `ExecutorFacet.reportGenesisRoot`) so the atomic-interop timeout-protocol precondition
-            // (every registered chain has at least one batch inside the shared root) holds from
-            // creation.
             s.l2LogsRootHashes[0] = ChainBatchRootTree.genesisChainBatchRoot();
         }
 

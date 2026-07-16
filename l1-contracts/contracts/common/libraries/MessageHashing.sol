@@ -250,11 +250,11 @@ library MessageHashing {
     /// @notice Reads the aggregation-hop batch-leaf Merkle path from a proof. This is the single
     /// place that knows the proof's word layout; external libraries must consume this accessor
     /// instead of parsing the metadata themselves.
-    /// @dev The returned words are trustworthy ONLY because the caller has already run the same
+    /// @dev The returned words can be trusted ONLY if the caller has already run the same
     /// proof bytes through the leaf verifier (`proveL2LeafInclusionShared` / {_getProofData}): the
     /// identical words are folded into the reconstructed batch leaf there, which is what
-    /// authenticates them — call this AFTER that verification. A single-level / commit-based proof
-    /// (`finalProofNode`) carries no aggregation hop and is already rejected by that verification.
+    /// authenticates them — call this AFTER that verification. The function also assumes that if the proof was for a
+    /// `finalProofNode`, it has been rejected. 
     function readAggregationHopPath(bytes32[] calldata _proof) internal pure returns (AggregationHopPath memory path) {
         ProofMetadata memory metadata = parseProofMetadata(_proof);
         // Word layout after the leaf-to-batch-root section (see {_getProofData}):
