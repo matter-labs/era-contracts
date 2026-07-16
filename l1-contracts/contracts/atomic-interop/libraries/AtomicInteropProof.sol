@@ -168,15 +168,12 @@ library AtomicInteropProof {
             revert ProofSettlementLayerMismatch(_expectedSlChainId, slChainId);
         }
 
-        // The settlement-layer interop root the proof resolves against must exist and be created
-        // strictly after the deadline. A root that was never imported for `(slChainId, slBlock)`
-        // reads as timestamp 0 and is rejected explicitly; without the deadline bound, an in-time
-        // snapshot could pass the "last batch" branch below even though later in-time batches
-        // (which may contain the commit) exist.
         uint256 rootTimestamp = L2_INTEROP_ROOT_STORAGE.interopRoots(slChainId, slBlock).timestamp;
         if (rootTimestamp == 0) {
             revert ProofSettlementLayerInteropRootNotImported(slChainId, slBlock);
         }
+        // The settlement-layer interop root the proof resolves against must exist and be created
+        // strictly after the deadline.
         if (rootTimestamp <= _deadline) {
             revert ProofInteropRootNotAfterDeadline(rootTimestamp, _deadline);
         }
@@ -250,7 +247,7 @@ library AtomicInteropProof {
     ///
     /// Step 3: re-parse the same proof with {MessageHashing._getProofData} (same leaf, same mask) to
     /// read the SL metadata. A single-level / commit-based proof (`finalProofNode == true`) carries no
-    /// settlement-layer batch reference, so we reject it; a multi-hop proof exposes `pd.settlementLayerBatchNumber`,
+    /// settlement-layer block reference, so we reject it; a multi-hop proof exposes `pd.settlementLayerBatchNumber`,
     /// `pd.settlementLayerChainId`, and `pd.l1BatchTimestamp`.
     ///
     /// @return slBlock The SL snapshot block `interopRoots(slChainId, slBlock)` was resolved at.

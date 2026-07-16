@@ -65,7 +65,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
 
     /// @dev The incremental merkle tree storing the chain message roots.
     /// @dev A chain's leaves are seeded empty when the chain is added and then pushed to on every
-    /// `addChainBatchRoot`,.
+    /// `addChainBatchRoot`.
     mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) internal chainTree;
 
     /// @notice The mapping from block number to the global message root and the block timestamp at

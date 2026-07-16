@@ -40,8 +40,8 @@ contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
         _;
     }
 
-    /// @notice One-time L2 initialization performed by the genesis upgrade, like the other L2
-    /// built-ins: seeds the IMT (the `{0,0,0}` head leaf at index 0). The appender is the canonical
+    /// @notice One-time L2 initialization performed by the genesis upgrade: seeds the 
+    /// IMT (the `{0,0,0}` head leaf at index 0). The appender is the canonical
     /// {AtomicFlowManager} (a fixed built-in address), so there is no wiring parameter;
     /// `_imt.setup()` reverts if the tree was already seeded.
     function initL2() external onlyUpgrader {

@@ -56,7 +56,6 @@ error ProofDeadlineExceeded(uint256 batchTimestamp, uint64 deadline);
 /// deadline (the timestamp in `interopRoots[slChainId][slBlock]` is `<= deadline`; an unset entry
 /// reads as 0 and is rejected too).
 error ProofInteropRootNotAfterDeadline(uint256 rootTimestamp, uint64 deadline);
-
 /// @dev No interop root was ever imported for the settlement-layer block the proof resolves against.
 error ProofSettlementLayerInteropRootNotImported(uint256 slChainId, uint256 slBlock);
 /// @dev The batch used for the in-time (`t <= deadline`) branch of the timeout proof is not the source
