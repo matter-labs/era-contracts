@@ -4,9 +4,9 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {CTMRegistry} from "contracts/upgrades/registry/CTMRegistry.sol";
+import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
+import {GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
 import {GenesisManifestLib} from "contracts/upgrades/registry/GenesisManifestLib.sol";
-import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
 import {RegistryUnknownKey, RegistryAlreadyInitialized} from "contracts/common/L1ContractErrors.sol";
 
@@ -16,7 +16,7 @@ import {RegistryUnknownKey, RegistryAlreadyInitialized} from "contracts/common/L
 ///         hashes from it. Exercises the getter surface `RegistryFacetReader` / `DiamondInit`
 ///         read, the one-shot init guard, and the manifest-hash commitment.
 contract CTMRegistryBootstrapTest is Test {
-    CTMRegistry internal registry;
+    CTMRelease internal release;
 
     uint256 internal constant VERSION = 42;
     bytes32 internal constant BOOTLOADER_HASH = bytes32(uint256(0xB001));
@@ -35,15 +35,16 @@ contract CTMRegistryBootstrapTest is Test {
         });
 
     function setUp() public {
-        registry = new CTMRegistry();
+        release = new CTMRelease();
     }
 
-    function _genesisManifest() internal view returns (CTMRegistry.CTMRegistryManifest memory) {
+    function _genesisManifest() internal view returns (CTMRelease.ReleaseManifest memory) {
         return
             GenesisManifestLib.buildGenesisManifest(
                 GenesisManifestLib.GenesisConfig({
                     isZKsyncOS: false,
                     protocolVersion: VERSION,
+                    verifier: address(0xBEEF),
                     facets: facets,
                     bootloaderHash: BOOTLOADER_HASH,
                     defaultAccountHash: DEFAULT_ACCOUNT_HASH,
@@ -60,105 +61,73 @@ contract CTMRegistryBootstrapTest is Test {
     // ---- Happy path ----
 
     function test_initializePinsGenesisManifest() public {
-        CTMRegistry.CTMRegistryManifest memory manifest = _genesisManifest();
-        registry.initialize(manifest);
+        CTMRelease.ReleaseManifest memory manifest = _genesisManifest();
+        release.initialize(manifest);
 
-        assertTrue(registry.initialized(), "initialized");
-        assertEq(registry.manifestHash(), keccak256(abi.encode(manifest)), "manifest hash");
-        assertEq(registry.newProtocolVersion(), VERSION, "version");
-        assertEq(registry.oldProtocolVersion(), 0, "no old version at genesis");
-        assertFalse(registry.isZKsyncOS(), "vm flavour");
+        assertTrue(release.initialized(), "initialized");
+        assertEq(release.manifestHash(), keccak256(abi.encode(manifest)), "manifest hash");
+        assertEq(release.protocolVersion(), VERSION, "version");
+        assertEq(release.verifier(), address(0xBEEF), "verifier");
+        assertFalse(release.isZKsyncOS(), "vm flavour");
 
-        CTMContract[] memory list = registry.facetList(VERSION);
+        GenesisFacet[] memory list = release.genesisFacets();
         assertEq(list.length, 6, "list length");
-        assertEq(uint256(list[0]), uint256(CTMContract.AdminFacet), "facet[0]");
-        assertEq(uint256(list[5]), uint256(CTMContract.CommitterFacet), "facet[5]");
-
-        assertEq(registry.ctmAddress(CTMContract.AdminFacet, VERSION), facets.adminFacet, "admin addr");
-        assertEq(registry.ctmAddress(CTMContract.GettersFacet, VERSION), facets.gettersFacet, "getters addr");
+        assertEq(list[0].facet, facets.adminFacet, "admin addr");
+        assertEq(list[1].facet, facets.gettersFacet, "getters addr");
+        assertEq(list[5].facet, facets.committerFacet, "committer addr");
 
         // Canonical freezability: Mailbox/Executor/Committer freezable, the rest not.
-        assertFalse(registry.facetIsFreezable(CTMContract.AdminFacet), "admin freezable");
-        assertTrue(registry.facetIsFreezable(CTMContract.MailboxFacet), "mailbox freezable");
-        assertTrue(registry.facetIsFreezable(CTMContract.CommitterFacet), "committer freezable");
+        assertFalse(list[0].isFreezable, "admin freezable");
+        assertTrue(list[2].isFreezable, "mailbox freezable");
+        assertTrue(list[5].isFreezable, "committer freezable");
 
         // Selectors are always empty at genesis: DiamondInit self-describes from the facet's own
         // bytecode.
-        assertEq(registry.facetSelectors(CTMContract.AdminFacet, VERSION).length, 0, "selectors empty");
+        assertEq(list[0].selectors.length, 0, "selectors empty");
 
-        (bytes32 bootloaderHash, bytes32 defaultAccountHash, bytes32 evmEmulatorHash) = registry
-            .baseSystemContractHashes(VERSION);
+        (bytes32 bootloaderHash, bytes32 defaultAccountHash, bytes32 evmEmulatorHash) = release
+            .baseSystemContractHashes();
         assertEq(bootloaderHash, BOOTLOADER_HASH, "bootloader hash");
         assertEq(defaultAccountHash, DEFAULT_ACCOUNT_HASH, "default account hash");
         assertEq(evmEmulatorHash, EVM_EMULATOR_HASH, "evm emulator hash");
 
         // No codehash pins in a bootstrap manifest: trivially verified.
-        assertTrue(registry.verifyAll(), "verifyAll");
+        release.validate();
+        assertTrue(release.verifyAll(), "verifyAll");
     }
 
     // ---- Unhappy path ----
 
     function test_initializeRevertsOnSecondCall() public {
-        registry.initialize(_genesisManifest());
+        release.initialize(_genesisManifest());
 
         vm.expectRevert(RegistryAlreadyInitialized.selector);
-        registry.initialize(_genesisManifest());
+        release.initialize(_genesisManifest());
     }
 
     function test_initializeRevertsOnZeroNewVersion() public {
-        CTMRegistry.CTMRegistryManifest memory manifest = _genesisManifest();
-        manifest.newProtocolVersion = 0;
+        CTMRelease.ReleaseManifest memory manifest = _genesisManifest();
+        manifest.protocolVersion = 0;
 
-        vm.expectRevert(RegistryUnknownKey.selector);
-        registry.initialize(manifest);
+        vm.expectRevert();
+        release.initialize(manifest);
     }
 
-    function test_gettersRevertOnUnknownVersion() public {
-        registry.initialize(_genesisManifest());
-
+    function test_validateRevertsBeforeInitialization() public {
         vm.expectRevert(RegistryUnknownKey.selector);
-        registry.facetList(VERSION + 1);
-
-        vm.expectRevert(RegistryUnknownKey.selector);
-        registry.ctmAddress(CTMContract.AdminFacet, VERSION + 1);
-
-        vm.expectRevert(RegistryUnknownKey.selector);
-        registry.facetSelectors(CTMContract.AdminFacet, VERSION + 1);
-
-        vm.expectRevert(RegistryUnknownKey.selector);
-        registry.baseSystemContractHashes(VERSION + 1);
-    }
-
-    // ---- Edge cases ----
-
-    /// @dev Before initialization both pinned versions are zero, so every version (including
-    ///      zero) is unanswerable — the registry must never masquerade as an empty-but-valid
-    ///      genesis set. The same holds for version 0 AFTER genesis init, where
-    ///      `oldProtocolVersion == 0` means "there is no old version".
-    function test_versionZeroNeverAnswerable() public {
-        vm.expectRevert(RegistryUnknownKey.selector);
-        registry.facetList(0);
-
-        vm.expectRevert(RegistryUnknownKey.selector);
-        registry.facetList(VERSION);
-
-        registry.initialize(_genesisManifest());
-
-        vm.expectRevert(RegistryUnknownKey.selector);
-        registry.facetList(0);
-
-        vm.expectRevert(RegistryUnknownKey.selector);
-        registry.baseSystemContractHashes(0);
+        release.validate();
+        assertFalse(release.verifyAll(), "uninitialized release must not verify");
     }
 
     /// @dev ZKsync OS pins all-zero hashes; the registry must store and serve them as-is (the
     ///      zero-check lives in DiamondInit and is skipped for ZKsync OS chains).
     function test_zeroHashesAreServedForPinnedVersion() public {
-        registry.initialize(
+        release.initialize(
             GenesisManifestLib.buildGenesisManifest(
                 GenesisManifestLib.GenesisConfig({
                     isZKsyncOS: true,
                     protocolVersion: VERSION,
+                    verifier: address(0xBEEF),
                     facets: facets,
                     bootloaderHash: 0,
                     defaultAccountHash: 0,
@@ -172,12 +141,12 @@ contract CTMRegistryBootstrapTest is Test {
             )
         );
 
-        (bytes32 bootloaderHash, bytes32 defaultAccountHash, bytes32 evmEmulatorHash) = registry
-            .baseSystemContractHashes(VERSION);
+        (bytes32 bootloaderHash, bytes32 defaultAccountHash, bytes32 evmEmulatorHash) = release
+            .baseSystemContractHashes();
         assertEq(bootloaderHash, bytes32(0), "bootloader hash");
         assertEq(defaultAccountHash, bytes32(0), "default account hash");
         assertEq(evmEmulatorHash, bytes32(0), "evm emulator hash");
-        assertTrue(registry.isZKsyncOS(), "vm flavour");
-        assertEq(registry.facetList(VERSION).length, 6, "facet list");
+        assertTrue(release.isZKsyncOS(), "vm flavour");
+        assertEq(release.genesisFacets().length, 6, "facet list");
     }
 }

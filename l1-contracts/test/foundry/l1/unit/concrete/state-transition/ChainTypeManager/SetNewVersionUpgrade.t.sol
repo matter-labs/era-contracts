@@ -24,7 +24,7 @@ contract setNewVersionUpgradeTest is ChainTypeManagerTest {
         bytes32 newCutHash = keccak256(abi.encode(newDiamondCutData));
 
         vm.prank(governor);
-        chainContractAddress.setNewVersionUpgrade(newDiamondCutData, 0, 999999999999, 1, testnetVerifier, address(0));
+        chainContractAddress.setNewVersionUpgrade(newDiamondCutData, 0, 999999999999, 1, testnetVerifier);
 
         assertEq(chainContractAddress.upgradeCutHash(0), newCutHash, "Diamond cut upgrade was not successful");
         assertEq(chainContractAddress.protocolVersion(), 1, "New protocol version is not correct");

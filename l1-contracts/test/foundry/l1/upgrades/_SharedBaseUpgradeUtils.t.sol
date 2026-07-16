@@ -17,14 +17,6 @@ contract BaseUpgradeUtils is Test, ZKChainBase {
             abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, _protocolVersion),
             abi.encode(_verifier)
         );
-        // `BaseZkSyncUpgrade.upgrade` also reads the upgrade registry pointer from the CTM (like
-        // the verifier). These upgrade-unit fixtures perform no facet changes, so the CTM pins no
-        // registry (BaseZkSyncUpgrade sees a zero address and skips the facet cut).
-        vm.mockCall(
-            s.chainTypeManager,
-            abi.encodeWithSelector(IChainTypeManager.upgradeRegistryForVersion.selector),
-            abi.encode(address(0))
-        );
     }
     function setL2SystemContractsUpgradeTxHash(bytes32 _l2SystemContractsUpgradeTxHash) public {
         s.l2SystemContractsUpgradeTxHash = _l2SystemContractsUpgradeTxHash;

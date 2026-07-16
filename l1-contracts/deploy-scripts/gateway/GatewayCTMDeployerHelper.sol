@@ -428,8 +428,8 @@ library GatewayCTMDeployerHelper {
         // initializes it with the genesis manifest.
         (addresses.bootstrapRegistry, data.bootstrapRegistryCalldata) = _calculateCreate2AddressAndCalldata(
             _create2Salt,
-            "CTMRegistry.sol",
-            "CTMRegistry",
+            "CTMRelease.sol",
+            "CTMRelease",
             hex"",
             config.isZKsyncOS,
             true
@@ -721,12 +721,12 @@ library GatewayCTMDeployerHelper {
         GatewayCTMDeployerConfig memory baseConfig,
         address ctmImplementation,
         address serverNotifierProxy,
-        address genesisRegistry
+        address currentRelease
     ) private pure returns (bytes memory) {
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
             owner: baseConfig.aliasedGovernanceAddress,
             validatorTimelock: config.validatorTimelockProxy,
-            genesisRegistry: genesisRegistry,
+            currentRelease: currentRelease,
             protocolVersion: baseConfig.protocolVersion,
             verifier: config.verifier,
             serverNotifier: serverNotifierProxy
@@ -763,7 +763,7 @@ library GatewayCTMDeployerHelper {
         contracts.stateTransition.facets = directAddresses.facets;
         contracts.stateTransition.genesisUpgrade = directAddresses.genesisUpgrade;
         contracts.multicall3 = directAddresses.multicall3;
-        contracts.stateTransition.genesisRegistry = directAddresses.bootstrapRegistry;
+        contracts.stateTransition.currentRelease = directAddresses.bootstrapRegistry;
 
         // From CTM deployer
         contracts.stateTransition.implementations.serverNotifier = ctmResult.serverNotifierImplementation;
@@ -898,7 +898,7 @@ library GatewayCTMDeployerHelper {
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Committer.sol", "CommitterFacet");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "DiamondInit.sol", "DiamondInit");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "L1GenesisUpgrade.sol", "L1GenesisUpgrade");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "CTMRegistry.sol", "CTMRegistry");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "CTMRelease.sol", "CTMRelease");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Multicall3.sol", "Multicall3");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "DiamondProxy.sol", "DiamondProxy");
     }

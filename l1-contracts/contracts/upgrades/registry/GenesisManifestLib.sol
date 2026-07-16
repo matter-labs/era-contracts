@@ -2,20 +2,14 @@
 
 pragma solidity 0.8.28;
 
-import {CTMContract} from "./ContractIdentifiers.sol";
-import {CTMRegistry} from "./CTMRegistry.sol";
+import {CTMRelease} from "./CTMRelease.sol";
+import {GenesisFacet} from "./ICTMRelease.sol";
 import {Facets} from "../../common/StateTransitionTypes.sol";
 
 /// @title Genesis (bootstrap) manifest builder.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Builds the `CTMRegistryManifest` a freshly deployed CTM's bootstrap registry is
-///         initialized with. The registry is the CTM's single source of genesis data, so the
-///         manifest pins everything chain creation reads: the new-version facet set (canonical
-///         freezability, empty selector lists so facets self-describe), the DiamondInit address,
-///         the base system contract hashes, the genesis params (`genesisParams`) and the fixed
-///         force-deployments data. Everything upgrade-related is empty; `oldProtocolVersion` is
-///         zero ("there is no old version").
+/// @notice Builds the release manifest a freshly deployed CTM uses for chain genesis.
 /// @dev Shared by the on-chain `GatewayCTMDeployerCTMBase` (zksync-os) and the L1 deploy
 ///      scripts, so the two genesis paths cannot drift apart.
 library GenesisManifestLib {
@@ -37,6 +31,7 @@ library GenesisManifestLib {
     struct GenesisConfig {
         bool isZKsyncOS;
         uint256 protocolVersion;
+        address verifier;
         Facets facets;
         bytes32 bootloaderHash;
         bytes32 defaultAccountHash;
@@ -50,40 +45,28 @@ library GenesisManifestLib {
 
     function buildGenesisManifest(
         GenesisConfig memory _cfg
-    ) internal pure returns (CTMRegistry.CTMRegistryManifest memory manifest) {
-        CTMRegistry.FacetRow[] memory facetRows = new CTMRegistry.FacetRow[](GENESIS_FACET_COUNT);
-        CTMRegistry.FreezabilityRow[] memory freezabilityRows = new CTMRegistry.FreezabilityRow[](GENESIS_FACET_COUNT);
+    ) internal pure returns (CTMRelease.ReleaseManifest memory manifest) {
+        GenesisFacet[] memory genesisFacets = new GenesisFacet[](GENESIS_FACET_COUNT);
 
         // The canonical facet set of a new chain diamond; empty selector lists mean DiamondInit
         // reads each facet's own `ISelfDescribingFacet.selectors()`.
         (
-            CTMContract[GENESIS_FACET_COUNT] memory ids,
             address[GENESIS_FACET_COUNT] memory addrs,
             bool[GENESIS_FACET_COUNT] memory freezable
         ) = _genesisFacets(_cfg.facets);
         for (uint256 i = 0; i < GENESIS_FACET_COUNT; ++i) {
-            facetRows[i] = CTMRegistry.FacetRow({
-                facet: ids[i],
-                protocolVersion: _cfg.protocolVersion,
-                facetAddress: addrs[i],
-                selectorList: new bytes4[](0)
+            genesisFacets[i] = GenesisFacet({
+                facet: addrs[i],
+                isFreezable: freezable[i],
+                selectors: new bytes4[](0)
             });
-            freezabilityRows[i] = CTMRegistry.FreezabilityRow({facet: ids[i], isFreezable: freezable[i]});
         }
 
-        // The CTM reads the DiamondInit address from the registry to build every genesis cut.
-        CTMRegistry.AddressRow[] memory addressRows = new CTMRegistry.AddressRow[](1);
-        addressRows[0] = CTMRegistry.AddressRow({
-            key: CTMContract.DiamondInit,
-            protocolVersion: _cfg.protocolVersion,
-            value: _cfg.facets.diamondInit
-        });
-
         manifest.isZKsyncOS = _cfg.isZKsyncOS;
-        manifest.newProtocolVersion = _cfg.protocolVersion;
-        manifest.ctmAddressRows = addressRows;
-        manifest.facetRows = facetRows;
-        manifest.freezabilityRows = freezabilityRows;
+        manifest.protocolVersion = _cfg.protocolVersion;
+        manifest.verifier = _cfg.verifier;
+        manifest.diamondInit = _cfg.facets.diamondInit;
+        manifest.genesisFacets = genesisFacets;
         manifest.bootloaderHash = _cfg.bootloaderHash;
         manifest.defaultAccountHash = _cfg.defaultAccountHash;
         manifest.evmEmulatorHash = _cfg.evmEmulatorHash;
@@ -92,8 +75,6 @@ library GenesisManifestLib {
         manifest.genesisBatchHash = _cfg.genesisBatchHash;
         manifest.genesisBatchCommitment = _cfg.genesisBatchCommitment;
         manifest.genesisIndexRepeatedStorageChanges = _cfg.genesisIndexRepeatedStorageChanges;
-        // All other sections stay empty/zero: a bootstrap registry serves genesis only; the
-        // first protocol upgrade repoints the CTM at that upgrade's own registry.
     }
 
     function _genesisFacets(
@@ -102,32 +83,25 @@ library GenesisManifestLib {
         private
         pure
         returns (
-            CTMContract[GENESIS_FACET_COUNT] memory ids,
             address[GENESIS_FACET_COUNT] memory addrs,
             bool[GENESIS_FACET_COUNT] memory freezable
         )
     {
-        ids[0] = CTMContract.AdminFacet;
         addrs[0] = _facets.adminFacet;
         freezable[0] = false;
 
-        ids[1] = CTMContract.GettersFacet;
         addrs[1] = _facets.gettersFacet;
         freezable[1] = false;
 
-        ids[2] = CTMContract.MailboxFacet;
         addrs[2] = _facets.mailboxFacet;
         freezable[2] = true;
 
-        ids[3] = CTMContract.ExecutorFacet;
         addrs[3] = _facets.executorFacet;
         freezable[3] = true;
 
-        ids[4] = CTMContract.MigratorFacet;
         addrs[4] = _facets.migratorFacet;
         freezable[4] = false;
 
-        ids[5] = CTMContract.CommitterFacet;
         addrs[5] = _facets.committerFacet;
         freezable[5] = true;
     }

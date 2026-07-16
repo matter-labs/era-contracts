@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.28;
 
-import {CTMContract} from "./ContractIdentifiers.sol";
-import {ICTMRegistry} from "./ICTMRegistry.sol";
+import {ICTMRelease} from "./ICTMRelease.sol";
+import {ICTMTransition} from "./ICTMTransition.sol";
 import {CTMUpgradeComposer} from "./CTMUpgradeComposer.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
@@ -37,38 +37,25 @@ contract CTMUpgradeModule {
     /// @notice Emitted (from the executor's address) after a chain diamond was upgraded.
     event ChainUpgradeApplied(address indexed ctm, uint256 indexed chainId, uint256 newProtocolVersion);
 
-    /// @notice Moves the registry's CTM to its new protocol version: sets the composed upgrade
-    ///         cut (for existing chains) and the composed chain-creation params (for new chains)
-    ///         from the same registry constants, so the two cannot drift apart.
-    /// @param _registry The pinned per-CTM registry implementation approved by governance.
-    /// @param _oldProtocolVersionDeadline The deadline until which the old protocol version stays
-    ///        usable by chains that have not upgraded yet.
-    /// @param _upgradeTimestamp The timestamp after which chains may execute the upgrade.
-    function applyCTMUpgrade(
-        ICTMRegistry _registry,
-        uint256 _oldProtocolVersionDeadline,
-        uint256 _upgradeTimestamp
-    ) external {
-        IChainTypeManager ctm = IChainTypeManager(_registry.ctmProxy());
-        uint256 oldProtocolVersion = _registry.oldProtocolVersion();
-        uint256 newProtocolVersion = _registry.newProtocolVersion();
+    /// @notice Installs the transition and points new-chain genesis at its target release.
+    /// @param _transition The write-once transition approved by governance.
+    function applyCTMUpgrade(ICTMTransition _transition) external {
+        _transition.validate();
+        ICTMRelease release = ICTMRelease(_transition.newRelease());
+        IChainTypeManager ctm = IChainTypeManager(_transition.ctmProxy());
+        uint256 oldProtocolVersion = _transition.oldProtocolVersion();
+        uint256 newProtocolVersion = release.protocolVersion();
 
         ctm.setNewVersionUpgrade({
-            _cutData: _buildUpgradeCut(_registry, _upgradeTimestamp),
+            _cutData: _buildUpgradeCut(_transition),
             _oldProtocolVersion: oldProtocolVersion,
-            _oldProtocolVersionDeadline: _oldProtocolVersionDeadline,
+            _oldProtocolVersionDeadline: _transition.oldProtocolVersionDeadline(),
             _newProtocolVersion: newProtocolVersion,
-            _verifier: _registry.verifier(newProtocolVersion),
-            // The CTM pins this registry for the new version; the upgrade contract reads the
-            // facet-swap plan straight from it at execution — same model as the verifier above,
-            // nothing copied into CTM state.
-            _registry: address(_registry)
+            _verifier: release.verifier()
         });
-        // New chains are created at the new version straight from this same registry (facet set,
-        // base system contract hashes, verifier and genesis params all live in it).
-        ctm.setGenesisRegistry(address(_registry));
+        ctm.setCurrentRelease(address(release));
 
-        emit CTMUpgradeApplied(address(ctm), address(_registry), oldProtocolVersion, newProtocolVersion);
+        emit CTMUpgradeApplied(address(ctm), address(_transition), oldProtocolVersion, newProtocolVersion);
     }
 
     /// @notice Upgrades a single chain diamond to the registry's new protocol version with the
@@ -76,18 +63,23 @@ contract CTMUpgradeModule {
     /// @dev The cut is recomposed from the registry; since `upgradeChainFromVersion` checks it
     ///      against the stored `upgradeCutHash`, recomposition and commitment must agree — which
     ///      they do by construction, both deriving from the same constants.
-    /// @param _upgradeTimestamp Must equal the value passed to `applyCTMUpgrade` (it is part of
-    ///        the committed cut).
-    function upgradeChain(ICTMRegistry _registry, uint256 _chainId, uint256 _upgradeTimestamp) external {
-        IChainTypeManager ctm = IChainTypeManager(_registry.ctmProxy());
+    /// @param _transition The same transition committed by `applyCTMUpgrade`.
+    /// @param _chainId The chain to upgrade.
+    function upgradeChain(ICTMTransition _transition, uint256 _chainId) external {
+        _transition.validate();
+        IChainTypeManager ctm = IChainTypeManager(_transition.ctmProxy());
 
         ctm.upgradeChainFromVersion(
             _chainId,
-            _registry.oldProtocolVersion(),
-            _buildUpgradeCut(_registry, _upgradeTimestamp)
+            _transition.oldProtocolVersion(),
+            _buildUpgradeCut(_transition)
         );
 
-        emit ChainUpgradeApplied(address(ctm), _chainId, _registry.newProtocolVersion());
+        emit ChainUpgradeApplied(
+            address(ctm),
+            _chainId,
+            ICTMRelease(_transition.newRelease()).protocolVersion()
+        );
     }
 
     /// @dev Composes the upgrade cut: a `DefaultUpgrade.upgradeFromRegistry(registry, timestamp)`
@@ -97,13 +89,12 @@ contract CTMUpgradeModule {
     ///      address and timestamp. Both remain chain-independent, so a single cut is committed once
     ///      and applied to every chain; per-chain L2-tx arguments are injected in the executor.
     function _buildUpgradeCut(
-        ICTMRegistry _registry,
-        uint256 _upgradeTimestamp
+        ICTMTransition _transition
     ) private view returns (Diamond.DiamondCutData memory) {
         return
             CTMUpgradeComposer.buildUpgradeCutData(
-                _registry.ctmAddress(CTMContract.DefaultUpgrade, _registry.newProtocolVersion()),
-                abi.encodeCall(IDefaultUpgrade.upgradeFromRegistry, (address(_registry), _upgradeTimestamp))
+                _transition.defaultUpgrade(),
+                abi.encodeCall(IDefaultUpgrade.upgradeFromTransition, (address(_transition)))
             );
     }
 }

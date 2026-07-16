@@ -5,7 +5,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
-import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/ICTMRelease.sol";
 import {
     GenesisBatchCommitmentZero,
     GenesisBatchHashZero,
@@ -38,14 +38,14 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
     ) internal {
         vm.mockCall(
             Utils.TEST_GENESIS_REGISTRY,
-            abi.encodeWithSelector(ICTMRegistry.genesisParams.selector),
+            abi.encodeWithSelector(ICTMRelease.genesisParams.selector),
             abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisBatchCommitment, _genesisIndexRepeatedStorageChanges)
         );
 
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            genesisRegistry: Utils.TEST_GENESIS_REGISTRY,
+            currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             verifier: testnetVerifier,
             serverNotifier: serverNotifier

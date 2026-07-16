@@ -133,7 +133,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         // `ChainCreationParams.registry` and DiamondInit reads the facet set + base system
         // contract hashes from it. The inherited helper uses the facet addresses deployed above
         // and the fixture's chain-creation config.
-        ctmAddresses.stateTransition.genesisRegistry = deployGenesisRegistry();
+        ctmAddresses.stateTransition.currentRelease = deployCurrentRelease();
         // Deploy ChainTypeManager implementation
         if (config.isZKsyncOS) {
             ctmAddresses.stateTransition.implementations.chainTypeManager = address(

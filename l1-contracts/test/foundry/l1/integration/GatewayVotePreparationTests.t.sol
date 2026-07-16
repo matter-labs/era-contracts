@@ -19,7 +19,7 @@ import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.s
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {CTMRegistry} from "contracts/upgrades/registry/CTMRegistry.sol";
+import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
 import {GenesisManifestLib} from "contracts/upgrades/registry/GenesisManifestLib.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
@@ -194,7 +194,7 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         _simulateCreate2(create2Factory, directCalldata.diamondInitCalldata, "DiamondInit");
         _simulateCreate2(create2Factory, directCalldata.genesisUpgradeCalldata, "GenesisUpgrade");
         _simulateCreate2(create2Factory, directCalldata.multicall3Calldata, "Multicall3");
-        _simulateCreate2(create2Factory, directCalldata.bootstrapRegistryCalldata, "CTMRegistry");
+        _simulateCreate2(create2Factory, directCalldata.bootstrapRegistryCalldata, "CTMRelease");
 
         // Mock the CTM calls that DiamondInit.initialize() makes. The CTM is `msg.sender`
         // during the proxy construction, so the deploy below pranks as this mock.
@@ -244,7 +244,7 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         // mock here) has its pointer mocked.
         vm.mockCall(
             mockCTM,
-            abi.encodeWithSelector(IChainTypeManager.genesisRegistry.selector),
+            abi.encodeWithSelector(IChainTypeManager.currentRelease.selector),
             abi.encode(_deployGatewayGenesisRegistry(contracts, config))
         );
 
@@ -267,12 +267,13 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         DeployedContracts memory contracts,
         GatewayCTMDeployerConfig memory config
     ) internal returns (address) {
-        CTMRegistry registry = new CTMRegistry();
-        registry.initialize(
+        CTMRelease release = new CTMRelease();
+        release.initialize(
             GenesisManifestLib.buildGenesisManifest(
                 GenesisManifestLib.GenesisConfig({
                     isZKsyncOS: config.isZKsyncOS,
                     protocolVersion: config.protocolVersion,
+                    verifier: contracts.stateTransition.verifiers.verifier,
                     facets: contracts.stateTransition.facets,
                     bootloaderHash: config.bootloaderHash,
                     defaultAccountHash: config.defaultAccountHash,
@@ -285,7 +286,7 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
                 })
             )
         );
-        return address(registry);
+        return address(release);
     }
 
     /// @notice Simulates a CREATE2 deployment by calling the deterministic CREATE2 factory.

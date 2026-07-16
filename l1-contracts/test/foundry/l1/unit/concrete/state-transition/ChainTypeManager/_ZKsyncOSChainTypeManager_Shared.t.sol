@@ -10,8 +10,7 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
-import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
-import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/ICTMRelease.sol";
 
 /// @notice Reusable fixture for tests that need a `ZKsyncOSChainTypeManager` together with the
 ///         full chain-creation plumbing (`createNewChain`, bridgehub mocks, real facet cuts) of
@@ -41,8 +40,13 @@ contract ZKsyncOSChainTypeManagerSharedTest is ChainTypeManagerTest {
         diamondInit = address(new DiamondInit(true));
         vm.mockCall(
             Utils.TEST_GENESIS_REGISTRY,
-            abi.encodeWithSelector(ICTMRegistry.ctmAddress.selector, CTMContract.DiamondInit),
+            abi.encodeWithSelector(ICTMRelease.diamondInit.selector),
             abi.encode(diamondInit)
+        );
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.isZKsyncOS.selector),
+            abi.encode(true)
         );
 
         ZKsyncOSChainTypeManager implementation = new ZKsyncOSChainTypeManager(
@@ -57,7 +61,7 @@ contract ZKsyncOSChainTypeManagerSharedTest is ChainTypeManagerTest {
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            genesisRegistry: Utils.TEST_GENESIS_REGISTRY,
+            currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             verifier: testnetVerifier,
             serverNotifier: serverNotifier

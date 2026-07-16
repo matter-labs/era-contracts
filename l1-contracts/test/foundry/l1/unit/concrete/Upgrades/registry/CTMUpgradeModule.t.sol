@@ -3,32 +3,31 @@
 pragma solidity 0.8.28;
 
 import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
-import {TestCTMRegistry} from "./TestRegistries.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {UpgradeExecutor} from "contracts/governance/UpgradeExecutor.sol";
+import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
+import {CTMTransition} from "contracts/upgrades/registry/CTMTransition.sol";
 import {CTMUpgradeModule} from "contracts/upgrades/registry/CTMUpgradeModule.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/CTMUpgradeComposer.sol";
-import {L2EcosystemContract, CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
-import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
+import {ICTMTransition, L2Deployment} from "contracts/upgrades/registry/ICTMTransition.sol";
+import {GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
+import {L2EcosystemContract, CodehashPin} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {UpgradeFacetSwap} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {HashMismatch} from "contracts/common/L1ContractErrors.sol";
 
-/// @notice Tests the CTM-scoped orchestrator module end-to-end against a real
-///         EraChainTypeManager: a CTM-scoped UpgradeExecutor takes over CTM ownership and
-///         delegatecalls the module, which composes everything from the per-CTM registry.
-/// @dev CTM authority is intentionally separate from ecosystem authority — see
-///      EcosystemUpgradeModule.t.sol, where a differently-owned executor drives the ecosystem
-///      scope. The registry here is a storage-backed test double (see TestRegistries.sol)
-///      because the fixture deploys at dynamic addresses; production registries are generated
-///      constants-in-bytecode contracts with the identical interface.
+/// @notice Exercises the CTM-scoped orchestrator against real write-once release and transition
+///         objects. Release data describes new-chain genesis; transition data describes the one
+///         movement from the fixture's current version to that release.
 contract CTMUpgradeModuleTest is ChainTypeManagerTest {
     UpgradeExecutor internal ctmExecutor;
     CTMUpgradeModule internal module;
-    TestCTMRegistry internal ctmRegistry;
+    CTMRelease internal release;
+    CTMTransition internal transition;
 
     uint256 internal newVersion;
     address internal chainAddress;
@@ -42,8 +41,6 @@ contract CTMUpgradeModuleTest is ChainTypeManagerTest {
         module = new CTMUpgradeModule();
         ctmExecutor = new UpgradeExecutor(governor);
 
-        // Hand CTM ownership to the CTM-scoped executor; the acceptOwnership leg exercises the
-        // raw-call escape hatch, which is exactly how the real handover would run.
         vm.prank(governor);
         chainContractAddress.transferOwnership(address(ctmExecutor));
         Call[] memory calls = new Call[](1);
@@ -57,99 +54,125 @@ contract CTMUpgradeModuleTest is ChainTypeManagerTest {
         assertEq(chainContractAddress.owner(), address(ctmExecutor));
 
         newVersion = SemVer.packSemVer(0, 1, 0);
-        _setUpRegistry();
+        release = _deployRelease();
+        transition = _deployTransition(777);
     }
 
-    function _setUpRegistry() internal {
-        ctmRegistry = new TestCTMRegistry();
-        ctmRegistry.setBase(false, 0, newVersion, address(chainContractAddress));
-        ctmRegistry.setVerifier(newVersion, testnetVerifier);
-        ctmRegistry.setCtmAddress(CTMContract.DefaultUpgrade, newVersion, makeAddr("defaultUpgrade"));
-        ctmRegistry.setCtmAddress(CTMContract.DiamondInit, newVersion, makeAddr("newDiamondInit"));
+    function _deployRelease() internal returns (CTMRelease result) {
+        result = new CTMRelease();
+        result.initialize(
+            CTMRelease.ReleaseManifest({
+                isZKsyncOS: false,
+                protocolVersion: newVersion,
+                verifier: testnetVerifier,
+                diamondInit: makeAddr("newDiamondInit"),
+                genesisFacets: new GenesisFacet[](0),
+                bootloaderHash: bytes32(uint256(0xb00)),
+                defaultAccountHash: bytes32(uint256(0xda0)),
+                evmEmulatorHash: bytes32(0),
+                fixedForceDeploymentsData: hex"f1f2",
+                genesisUpgrade: makeAddr("genesisUpgrade"),
+                genesisBatchHash: bytes32(uint256(1)),
+                genesisBatchCommitment: bytes32(uint256(2)),
+                genesisIndexRepeatedStorageChanges: 54,
+                codehashPins: new CodehashPin[](0)
+            })
+        );
+    }
 
-        // Facet plan (the old-side rows): AdminFacet is swapped, ExecutorFacet is added (zero
-        // old address). The new-side rows are the complete post-upgrade facet set.
+    function _deployTransition(uint256 _upgradeTimestamp) internal returns (CTMTransition result) {
+        UpgradeFacetSwap[] memory facetTransitions = new UpgradeFacetSwap[](2);
         bytes4[] memory adminOld = new bytes4[](2);
         adminOld[0] = bytes4(uint32(1));
         adminOld[1] = bytes4(uint32(2));
         bytes4[] memory adminNew = new bytes4[](2);
         adminNew[0] = bytes4(uint32(2));
         adminNew[1] = bytes4(uint32(3));
+        facetTransitions[0] = UpgradeFacetSwap({
+            oldFacet: makeAddr("adminFacetOld"),
+            newFacet: makeAddr("adminFacetNew"),
+            isFreezable: false,
+            oldSelectors: adminOld,
+            newSelectors: adminNew
+        });
         bytes4[] memory executorNew = new bytes4[](1);
         executorNew[0] = bytes4(uint32(0x20));
-        ctmRegistry.addFacet(0, CTMContract.AdminFacet, makeAddr("adminFacetOld"), adminOld);
-        ctmRegistry.addFacet(0, CTMContract.ExecutorFacet, address(0), new bytes4[](0));
-        ctmRegistry.addFacet(newVersion, CTMContract.AdminFacet, makeAddr("adminFacetNew"), adminNew);
-        ctmRegistry.addFacet(newVersion, CTMContract.ExecutorFacet, makeAddr("executorFacetNew"), executorNew);
-        ctmRegistry.setFreezable(CTMContract.ExecutorFacet, true);
+        facetTransitions[1] = UpgradeFacetSwap({
+            oldFacet: address(0),
+            newFacet: makeAddr("executorFacetNew"),
+            isFreezable: true,
+            oldSelectors: new bytes4[](0),
+            newSelectors: executorNew
+        });
 
-        // L2 side.
-        ctmRegistry.addL2ForceDeployment(
-            L2EcosystemContract.L2Bridgehub,
-            IComplexUpgrader.UniversalContractUpgradeInfo({
+        L2Deployment[] memory deployments = new L2Deployment[](1);
+        deployments[0] = L2Deployment({
+            key: L2EcosystemContract.L2Bridgehub,
+            info: IComplexUpgrader.UniversalContractUpgradeInfo({
                 upgradeType: IComplexUpgrader.ContractUpgradeType.EraForceDeployment,
                 deployedBytecodeInfo: hex"aa01",
                 newAddress: makeAddr("l2Bridgehub")
             }),
-            bytes32(uint256(1))
-        );
-        ctmRegistry.setL2UpgradeDelegate(makeAddr("l2UpgradeDelegate"), hex"beef");
+            bytecodeHash: bytes32(uint256(1))
+        });
         uint256[] memory factoryDeps = new uint256[](1);
         factoryDeps[0] = 1;
-        ctmRegistry.setFactoryDepHashes(factoryDeps);
-        ctmRegistry.setBaseSystemContractHashes(bytes32(uint256(0xb00)), bytes32(uint256(0xda0)), bytes32(0));
-        ctmRegistry.setChainCreationData(hex"f1f2");
-        ctmRegistry.setGenesis(makeAddr("genesisUpgrade"), bytes32(uint256(1)), bytes32(uint256(2)), 54);
+
+        result = new CTMTransition();
+        result.initialize(
+            CTMTransition.TransitionManifest({
+                ctmProxy: address(chainContractAddress),
+                oldProtocolVersion: 0,
+                newRelease: address(release),
+                defaultUpgrade: makeAddr("defaultUpgrade"),
+                oldProtocolVersionDeadline: 1000,
+                upgradeTimestamp: _upgradeTimestamp,
+                facetTransitions: facetTransitions,
+                l2Deployments: deployments,
+                l2UpgradeDelegateTo: makeAddr("l2UpgradeDelegate"),
+                l2UpgradeDelegateCalldata: hex"beef",
+                factoryDepHashes: factoryDeps,
+                bootloaderHash: bytes32(uint256(0xb00)),
+                defaultAccountHash: bytes32(uint256(0xda0)),
+                evmEmulatorHash: bytes32(0),
+                codehashPins: new CodehashPin[](0)
+            })
+        );
     }
 
-    /// @dev Recomposes the cut exactly as the module does, for hash assertions. The committed cut
-    ///      carries only `(registry, timestamp)`; the executor composes the `ProposedUpgrade` from
-    ///      the registry at execution time.
-    function _expectedUpgradeCut(uint256 _upgradeTimestamp) internal view returns (Diamond.DiamondCutData memory) {
+    function _expectedUpgradeCut(
+        ICTMTransition _transition
+    ) internal view returns (Diamond.DiamondCutData memory) {
         return
             CTMUpgradeComposer.buildUpgradeCutData(
-                ctmRegistry.ctmAddress(CTMContract.DefaultUpgrade, newVersion),
-                abi.encodeCall(IDefaultUpgrade.upgradeFromRegistry, (address(ctmRegistry), _upgradeTimestamp))
+                _transition.defaultUpgrade(),
+                abi.encodeCall(IDefaultUpgrade.upgradeFromTransition, (address(_transition)))
             );
     }
 
-    function _applyCTMUpgrade(uint256 _deadline, uint256 _timestamp) internal {
+    function _applyCTMUpgrade() internal {
         vm.prank(governor);
         ctmExecutor.execute(
             address(module),
-            abi.encodeCall(
-                CTMUpgradeModule.applyCTMUpgrade,
-                (ICTMRegistry(address(ctmRegistry)), _deadline, _timestamp)
-            )
+            abi.encodeCall(CTMUpgradeModule.applyCTMUpgrade, (ICTMTransition(address(transition))))
         );
     }
 
-    /*//////////////////////////////////////////////////////////////
-                           applyCTMUpgrade
-    //////////////////////////////////////////////////////////////*/
+    function test_applyCTMUpgrade_setsVersionCutAndCurrentRelease() public {
+        _applyCTMUpgrade();
 
-    function test_applyCTMUpgrade_setsVersionCutAndGenesisRegistry() public {
-        _applyCTMUpgrade(1000, 777);
-
-        // Version bookkeeping.
         assertEq(chainContractAddress.protocolVersion(), newVersion);
         assertEq(chainContractAddress.protocolVersionDeadline(0), 1000);
         assertEq(chainContractAddress.protocolVersionDeadline(newVersion), type(uint256).max);
         assertEq(chainContractAddress.protocolVersionVerifier(newVersion), testnetVerifier);
-
-        // The committed upgrade cut is exactly the registry-composed one.
-        bytes32 expectedCutHash = keccak256(abi.encode(_expectedUpgradeCut(777)));
-        assertEq(chainContractAddress.upgradeCutHash(0), expectedCutHash);
-
-        // The CTM is now pinned to the upgrade's registry, from which it derives all genesis data.
-        assertEq(chainContractAddress.genesisRegistry(), address(ctmRegistry));
+        assertEq(chainContractAddress.upgradeCutHash(0), keccak256(abi.encode(_expectedUpgradeCut(transition))));
+        assertEq(chainContractAddress.currentRelease(), address(release));
         assertEq(chainContractAddress.l1GenesisUpgrade(), makeAddr("genesisUpgrade"));
     }
 
     function test_revertWhen_moduleCalledDirectly() public {
-        // Without the executor's identity the module has no authority over the CTM.
         vm.expectRevert("Ownable: caller is not the owner");
-        module.applyCTMUpgrade(ICTMRegistry(address(ctmRegistry)), 1000, 777);
+        module.applyCTMUpgrade(ICTMTransition(address(transition)));
     }
 
     function test_revertWhen_executorCalledByNonGovernance() public {
@@ -157,36 +180,28 @@ contract CTMUpgradeModuleTest is ChainTypeManagerTest {
         vm.prank(makeAddr("stranger"));
         ctmExecutor.execute(
             address(module),
-            abi.encodeCall(CTMUpgradeModule.applyCTMUpgrade, (ICTMRegistry(address(ctmRegistry)), 1000, 777))
+            abi.encodeCall(CTMUpgradeModule.applyCTMUpgrade, (ICTMTransition(address(transition))))
         );
     }
 
-    /*//////////////////////////////////////////////////////////////
-                             upgradeChain
-    //////////////////////////////////////////////////////////////*/
+    function test_upgradeChain_rejectsDifferentTransition() public {
+        _applyCTMUpgrade();
+        CTMTransition differentTransition = _deployTransition(778);
 
-    function test_upgradeChain_recomposesTheCommittedCut() public {
-        _applyCTMUpgrade(1000, 777);
-
-        // Deterministic recomposition: the cut recomposed later for per-chain execution hashes to
-        // exactly what applyCTMUpgrade committed.
-        assertEq(chainContractAddress.upgradeCutHash(0), keccak256(abi.encode(_expectedUpgradeCut(777))));
-
-        // A mismatched upgradeTimestamp recomposes a different cut, and the chain's own
-        // hash check rejects it. (Successful end-to-end cut execution requires the full
-        // DefaultUpgrade environment — bytecode publication, tx validation — and is covered by
-        // integration flows, not this unit test.)
         vm.expectRevert(
             abi.encodeWithSelector(
                 HashMismatch.selector,
-                keccak256(abi.encode(_expectedUpgradeCut(777))),
-                keccak256(abi.encode(_expectedUpgradeCut(778)))
+                keccak256(abi.encode(_expectedUpgradeCut(transition))),
+                keccak256(abi.encode(_expectedUpgradeCut(differentTransition)))
             )
         );
         vm.prank(governor);
         ctmExecutor.execute(
             address(module),
-            abi.encodeCall(CTMUpgradeModule.upgradeChain, (ICTMRegistry(address(ctmRegistry)), chainId, 778))
+            abi.encodeCall(
+                CTMUpgradeModule.upgradeChain,
+                (ICTMTransition(address(differentTransition)), chainId)
+            )
         );
     }
 }

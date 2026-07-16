@@ -13,7 +13,7 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
-import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/ICTMRelease.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {
@@ -127,8 +127,19 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
     ) internal {
         vm.mockCall(
             Utils.TEST_GENESIS_REGISTRY,
-            abi.encodeWithSelector(ICTMRegistry.genesisParams.selector),
+            abi.encodeWithSelector(ICTMRelease.genesisParams.selector),
             abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisBatchCommitment, _genesisIndexRepeatedStorageChanges)
+        );
+        vm.mockCall(Utils.TEST_GENESIS_REGISTRY, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.isZKsyncOS.selector),
+            abi.encode(true)
+        );
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.protocolVersion.selector),
+            abi.encode(0)
         );
     }
 
@@ -137,7 +148,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            genesisRegistry: Utils.TEST_GENESIS_REGISTRY,
+            currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             verifier: testnetVerifier,
             serverNotifier: serverNotifier
@@ -157,7 +168,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            genesisRegistry: Utils.TEST_GENESIS_REGISTRY,
+            currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             verifier: testnetVerifier,
             serverNotifier: serverNotifier
@@ -244,8 +255,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             oldProtocolVersion,
             oldProtocolVersionDeadline,
             newProtocolVersion,
-            testnetVerifier,
-            address(0)
+            testnetVerifier
         );
 
         // Verify that the protocol version deadline was set
@@ -277,8 +287,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             oldProtocolVersion,
             oldProtocolVersionDeadline,
             newProtocolVersion,
-            testnetVerifier,
-            address(0)
+            testnetVerifier
         );
     }
 

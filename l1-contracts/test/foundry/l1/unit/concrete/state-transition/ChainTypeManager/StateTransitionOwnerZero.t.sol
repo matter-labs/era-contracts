@@ -17,7 +17,7 @@ contract initializingCTMOwnerZeroTest is ChainTypeManagerTest {
         ChainTypeManagerInitializeData memory ctmInitializeDataNoOwner = ChainTypeManagerInitializeData({
             owner: address(0),
             validatorTimelock: validator,
-            genesisRegistry: Utils.TEST_GENESIS_REGISTRY,
+            currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             verifier: testnetVerifier,
             serverNotifier: serverNotifier

@@ -36,6 +36,7 @@ contract EcosystemUpgradeModule {
     ///      change between the check and the upgrade. It also makes the call idempotent.
     /// @param _coreRegistry The pinned core-registry implementation approved by governance.
     function applyL1Upgrade(ICoreRegistry _coreRegistry) external {
+        _coreRegistry.validate();
         ProxyAdmin proxyAdmin = ProxyAdmin(_coreRegistry.proxyAdmin());
 
         L1EcosystemContract[] memory contracts = _coreRegistry.ecosystemContractList();

@@ -3,11 +3,13 @@
 pragma solidity 0.8.28;
 
 import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
-import {ICTMRegistry} from "../upgrades/registry/ICTMRegistry.sol";
+import {ICTMRelease} from "../upgrades/registry/ICTMRelease.sol";
+import {OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
 import {
     GenesisBatchHashZero,
     GenesisBatchCommitmentIncorrect,
     GenesisUpgradeZero,
+    RegistryWrongVM,
     ZeroAddress
 } from "../common/L1ContractErrors.sol";
 
@@ -28,15 +30,20 @@ contract ZKsyncOSChainTypeManager is ChainTypeManagerBase {
         return true;
     }
 
-    /// @notice Points chain creation at a new genesis `CTMRegistry`, validating the
-    /// ZKsync-OS-specific genesis params it pins before storing it.
-    /// @param _registry The genesis registry to pin.
-    function _setGenesisRegistry(address _registry) internal override {
-        if (_registry == address(0)) {
+    function _setCurrentRelease(address _release) internal override {
+        if (_release == address(0)) {
             revert ZeroAddress();
         }
-        (address genesisUpgrade, bytes32 genesisBatchHash, bytes32 genesisBatchCommitment, ) = ICTMRegistry(_registry)
-            .genesisParams(protocolVersion);
+        ICTMRelease release = ICTMRelease(_release);
+        release.validate();
+        if (!release.isZKsyncOS()) {
+            revert RegistryWrongVM(true, false);
+        }
+        uint256 releaseVersion = release.protocolVersion();
+        if (releaseVersion != protocolVersion) {
+            revert OutdatedProtocolVersion(protocolVersion, releaseVersion);
+        }
+        (address genesisUpgrade, bytes32 genesisBatchHash, bytes32 genesisBatchCommitment, ) = release.genesisParams();
 
         if (genesisUpgrade == address(0)) {
             revert GenesisUpgradeZero();
@@ -49,6 +56,6 @@ contract ZKsyncOSChainTypeManager is ChainTypeManagerBase {
             revert GenesisBatchCommitmentIncorrect();
         }
 
-        _storeGenesisRegistry(_registry);
+        _storeCurrentRelease(_release);
     }
 }

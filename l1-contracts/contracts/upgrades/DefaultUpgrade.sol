@@ -5,8 +5,6 @@ pragma solidity 0.8.28;
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {ProposedUpgradeLib} from "../state-transition/libraries/ProposedUpgradeLib.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
-import {CTMUpgradeComposer} from "./registry/CTMUpgradeComposer.sol";
-import {ICTMRegistry} from "./registry/ICTMRegistry.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -28,17 +26,4 @@ contract DefaultUpgrade is BaseZkSyncUpgrade {
         return upgrade(ProposedUpgradeLib.emptyProposedUpgrade(_newProtocolVersion));
     }
 
-    /// @notice Registry-driven upgrade: composes the `ProposedUpgrade` on-chain from the pinned
-    ///         registry instead of receiving it pre-built in calldata, then applies it via
-    ///         {upgrade}. Same rationale as {patchUpgrade}: the committed upgrade cut carries only
-    ///         `(registry, timestamp)`, so the CTM's `upgradeCutHash` commits to the registry
-    ///         address (whose bytecode is the audited manifest — see `ICTMRegistry.verifyAll`)
-    ///         rather than a serialized `ProposedUpgrade`. Composition happens at execution time
-    ///         inside the chain diamond, where {upgrade} may be overridden to inject per-chain
-    ///         L2-transaction arguments.
-    /// @param _registry The pinned per-CTM registry implementation approved by governance.
-    /// @param _upgradeTimestamp The timestamp after which the upgrade may execute.
-    function upgradeFromRegistry(address _registry, uint256 _upgradeTimestamp) external returns (bytes32) {
-        return upgrade(CTMUpgradeComposer.buildProposedUpgrade(ICTMRegistry(_registry), _upgradeTimestamp));
-    }
 }

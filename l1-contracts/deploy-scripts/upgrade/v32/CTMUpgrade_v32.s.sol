@@ -156,9 +156,9 @@ contract CTMUpgrade_v32 is Script, DefaultCTMUpgrade {
         Call[] memory setVersionCalls = super.provideSetNewVersionUpgradeCall();
 
         address ctm = ctmAddresses.stateTransition.proxies.chainTypeManager;
-        address registry = ctmAddresses.stateTransition.genesisRegistry;
+        address release = ctmAddresses.stateTransition.currentRelease;
         require(ctm != address(0), "v32: chainTypeManager proxy is zero");
-        require(registry != address(0), "v32: genesis registry not deployed");
+        require(release != address(0), "v32: current release not deployed");
 
         calls = new Call[](setVersionCalls.length + 1);
         for (uint256 i = 0; i < setVersionCalls.length; ++i) {
@@ -166,7 +166,7 @@ contract CTMUpgrade_v32 is Script, DefaultCTMUpgrade {
         }
         calls[setVersionCalls.length] = Call({
             target: ctm,
-            data: abi.encodeCall(IChainTypeManager.setGenesisRegistry, (registry)),
+            data: abi.encodeCall(IChainTypeManager.setCurrentRelease, (release)),
             value: 0
         });
     }

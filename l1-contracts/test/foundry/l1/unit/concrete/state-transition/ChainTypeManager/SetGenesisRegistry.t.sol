@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/ICTMRelease.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
@@ -30,9 +30,12 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
     ) internal {
         vm.mockCall(
             _registry,
-            abi.encodeWithSelector(ICTMRegistry.genesisParams.selector),
+            abi.encodeWithSelector(ICTMRelease.genesisParams.selector),
             abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisBatchCommitment, _genesisIndexRepeatedStorageChanges)
         );
+        vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
+        vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.isZKsyncOS.selector), abi.encode(false));
+        vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.protocolVersion.selector), abi.encode(0));
     }
 
     function test_SettingGenesisRegistry() public {
@@ -51,12 +54,12 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
         );
 
         vm.expectEmit(true, true, false, false);
-        emit IChainTypeManager.NewGenesisRegistry(0, newRegistry);
+        emit IChainTypeManager.NewCurrentRelease(0, newRegistry);
 
         vm.prank(governor);
-        chainContractAddress.setGenesisRegistry(newRegistry);
+        chainContractAddress.setCurrentRelease(newRegistry);
 
-        assertEq(chainContractAddress.genesisRegistry(), newRegistry, "Genesis registry was not set correctly");
+        assertEq(chainContractAddress.currentRelease(), newRegistry, "Current release was not set correctly");
         assertEq(chainContractAddress.l1GenesisUpgrade(), newGenesisUpgrade, "Genesis upgrade was not set correctly");
 
         // storedBatchZero() is derived from the new registry's genesis params.
@@ -83,7 +86,7 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
     function test_RevertWhen_SettingZeroRegistry() public {
         vm.expectRevert(ZeroAddress.selector);
         vm.prank(governor);
-        chainContractAddress.setGenesisRegistry(address(0));
+        chainContractAddress.setCurrentRelease(address(0));
     }
 
     function test_RevertWhen_NotOwner() public {
@@ -92,6 +95,6 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
 
         vm.expectRevert();
         vm.prank(makeAddr("notOwner"));
-        chainContractAddress.setGenesisRegistry(newRegistry);
+        chainContractAddress.setCurrentRelease(newRegistry);
     }
 }

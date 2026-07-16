@@ -11,8 +11,7 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
-import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+import {ICTMRelease, GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -148,7 +147,7 @@ contract UtilsCallMockerTest is Test {
     function mockGenesisRegistry(address chainTypeManager) public {
         vm.mockCall(
             chainTypeManager,
-            abi.encodeWithSelector(IChainTypeManager.genesisRegistry.selector),
+            abi.encodeWithSelector(IChainTypeManager.currentRelease.selector),
             abi.encode(Utils.TEST_GENESIS_REGISTRY)
         );
         mockGenesisRegistryContract();
@@ -163,21 +162,30 @@ contract UtilsCallMockerTest is Test {
     ///      only serves the base system contract hashes DiamondInit reads at genesis.
     function mockGenesisRegistryContract() public {
         address genesisRegistry = Utils.TEST_GENESIS_REGISTRY;
-        // Selector-only matches: the fixtures use several protocol versions, and the registry
-        // answers all of them identically.
+        vm.mockCall(genesisRegistry, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
         vm.mockCall(
             genesisRegistry,
-            abi.encodeWithSelector(ICTMRegistry.newProtocolVersion.selector),
+            abi.encodeWithSelector(ICTMRelease.protocolVersion.selector),
             abi.encode(uint256(0))
         );
         vm.mockCall(
             genesisRegistry,
-            abi.encodeWithSelector(ICTMRegistry.facetList.selector),
-            abi.encode(new CTMContract[](0))
+            abi.encodeWithSelector(ICTMRelease.isZKsyncOS.selector),
+            abi.encode(false)
         );
         vm.mockCall(
             genesisRegistry,
-            abi.encodeWithSelector(ICTMRegistry.baseSystemContractHashes.selector),
+            abi.encodeWithSelector(ICTMRelease.diamondInit.selector),
+            abi.encode(Utils.TEST_GENESIS_REGISTRY)
+        );
+        vm.mockCall(
+            genesisRegistry,
+            abi.encodeWithSelector(ICTMRelease.genesisFacets.selector),
+            abi.encode(new GenesisFacet[](0))
+        );
+        vm.mockCall(
+            genesisRegistry,
+            abi.encodeWithSelector(ICTMRelease.baseSystemContractHashes.selector),
             abi.encode(
                 Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
                 Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
@@ -190,7 +198,7 @@ contract UtilsCallMockerTest is Test {
         // through the CTM) re-mock `genesisParams` with their real genesis-upgrade address.
         vm.mockCall(
             genesisRegistry,
-            abi.encodeWithSelector(ICTMRegistry.genesisParams.selector),
+            abi.encodeWithSelector(ICTMRelease.genesisParams.selector),
             abi.encode(
                 Utils.TEST_GENESIS_REGISTRY, // genesisUpgrade (placeholder non-zero)
                 bytes32(uint256(0x01)), // genesisBatchHash
@@ -201,7 +209,7 @@ contract UtilsCallMockerTest is Test {
         // New chains read their force-deployments blob from the registry (empty in fixtures).
         vm.mockCall(
             genesisRegistry,
-            abi.encodeWithSelector(ICTMRegistry.fixedForceDeploymentsData.selector),
+            abi.encodeWithSelector(ICTMRelease.fixedForceDeploymentsData.selector),
             abi.encode(bytes(""))
         );
     }

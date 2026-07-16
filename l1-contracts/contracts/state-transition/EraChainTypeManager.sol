@@ -3,12 +3,14 @@
 pragma solidity 0.8.28;
 
 import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
-import {ICTMRegistry} from "../upgrades/registry/ICTMRegistry.sol";
+import {ICTMRelease} from "../upgrades/registry/ICTMRelease.sol";
+import {OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
 import {
     GenesisIndexStorageZero,
     GenesisBatchCommitmentZero,
     GenesisBatchHashZero,
     GenesisUpgradeZero,
+    RegistryWrongVM,
     ZeroAddress
 } from "../common/L1ContractErrors.sol";
 
@@ -29,19 +31,25 @@ contract EraChainTypeManager is ChainTypeManagerBase {
         return false;
     }
 
-    /// @notice Points chain creation at a new genesis `CTMRegistry`, validating the Era-specific
-    /// genesis params it pins before storing it.
-    /// @param _registry The genesis registry to pin.
-    function _setGenesisRegistry(address _registry) internal override {
-        if (_registry == address(0)) {
+    function _setCurrentRelease(address _release) internal override {
+        if (_release == address(0)) {
             revert ZeroAddress();
+        }
+        ICTMRelease release = ICTMRelease(_release);
+        release.validate();
+        if (release.isZKsyncOS()) {
+            revert RegistryWrongVM(false, true);
+        }
+        uint256 releaseVersion = release.protocolVersion();
+        if (releaseVersion != protocolVersion) {
+            revert OutdatedProtocolVersion(protocolVersion, releaseVersion);
         }
         (
             address genesisUpgrade,
             bytes32 genesisBatchHash,
             bytes32 genesisBatchCommitment,
             uint64 genesisIndexRepeatedStorageChanges
-        ) = ICTMRegistry(_registry).genesisParams(protocolVersion);
+        ) = release.genesisParams();
 
         if (genesisUpgrade == address(0)) {
             revert GenesisUpgradeZero();
@@ -57,6 +65,6 @@ contract EraChainTypeManager is ChainTypeManagerBase {
             revert GenesisIndexStorageZero();
         }
 
-        _storeGenesisRegistry(_registry);
+        _storeCurrentRelease(_release);
     }
 }

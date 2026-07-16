@@ -10,7 +10,7 @@ import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
 /// @param owner The address who can manage non-critical updates in the contract
 /// @param validatorTimelock The address that serves as consensus, i.e. can submit blocks to be processed
-/// @param genesisRegistry The genesis `CTMRegistry` new chains read their genesis data from
+/// @param currentRelease The `CTMRelease` new chains read their genesis data from
 /// @param protocolVersion The initial protocol version on the newly deployed chain
 /// @param verifier The verifier address for the initial protocol version
 /// @param serverNotifier The address that serves as server notifier
@@ -18,9 +18,7 @@ import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 struct ChainTypeManagerInitializeData {
     address owner;
     address validatorTimelock;
-    /// @dev The genesis `CTMRegistry` new chains read their facet set, base system contract
-    ///      hashes and genesis params from (pinned in the CTM as `genesisRegistry`).
-    address genesisRegistry;
+    address currentRelease;
     uint256 protocolVersion;
     address verifier;
     address serverNotifier;
@@ -56,10 +54,8 @@ interface IChainTypeManager {
     /// @notice ServerNotifier changed
     event NewServerNotifier(address indexed oldServerNotifier, address indexed newServerNotifier);
 
-    /// @notice The genesis registry for chain creation changed. All genesis data (facet set,
-    ///         base system contract hashes, verifier, genesis params, force deployments) lives in
-    ///         the registry; off-chain trackers read it from there.
-    event NewGenesisRegistry(uint256 indexed protocolVersion, address indexed registry);
+    /// @notice The release used for new-chain genesis changed.
+    event NewCurrentRelease(uint256 indexed protocolVersion, address indexed release);
 
     /// @notice New UpgradeCutHash
     event NewUpgradeCutHash(uint256 indexed protocolVersion, bytes32 indexed upgradeCutHash);
@@ -108,16 +104,7 @@ interface IChainTypeManager {
 
     function setProtocolVersionVerifier(uint256 _protocolVersion, address _verifier) external;
 
-    /// @notice The genesis `CTMRegistry` a newly created chain reads everything from — facet set,
-    ///         base system contract hashes, verifier and genesis params — for the current protocol
-    ///         version. A single value updated by `setGenesisRegistry`. Read by `DiamondInit` and
-    ///         the CTM itself at chain creation; the CTM stores no other genesis data.
-    function genesisRegistry() external view returns (address);
-
-    /// @notice The CTM registry the upgrade contract reads the facet-swap plan from when a chain
-    ///         upgrades to `_protocolVersion`. Version-keyed, parallel to `upgradeCutHash`; zero
-    ///         for versions with no facet changes (patch upgrades) or the legacy in-cut path.
-    function upgradeRegistryForVersion(uint256 _protocolVersion) external view returns (address);
+    function currentRelease() external view returns (address);
 
     function getProtocolVersion(uint256 _chainId) external view returns (uint256);
 
@@ -133,14 +120,14 @@ interface IChainTypeManager {
 
     function setValidatorTimelockPostV29(address _validatorTimelockPostV29) external;
 
-    function setGenesisRegistry(address _registry) external;
+    function setCurrentRelease(address _release) external;
 
     function getChainAdmin(uint256 _chainId) external view returns (address);
 
     /// @notice Deploys a new chain. The bridgehub passes only the minimal chain-specific data
     ///         (id + admin); everything else (base token asset id, genesis facet set, base system
     ///         hashes, genesis params, force deployments) is derived from the bridgehub and the
-    ///         CTM's genesis registry.
+    ///         CTM's current release.
     function createNewChain(uint256 _chainId, address _admin) external returns (address);
 
     function setNewVersionUpgrade(
@@ -148,8 +135,7 @@ interface IChainTypeManager {
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion,
-        address _verifier,
-        address _registry
+        address _verifier
     ) external;
 
     function createNewPatchUpgrade(

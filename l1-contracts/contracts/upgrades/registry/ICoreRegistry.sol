@@ -42,4 +42,6 @@ interface ICoreRegistry {
     ///         pinned at generation time. Anyone can call this to check that deployed bytecode
     ///         matches what was audited. Each registry (core + per-CTM) is verified independently.
     function verifyAll() external view returns (bool);
+
+    function validate() external view;
 }

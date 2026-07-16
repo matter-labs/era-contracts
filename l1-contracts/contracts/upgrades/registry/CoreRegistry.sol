@@ -4,7 +4,11 @@ pragma solidity 0.8.28;
 
 import {L1EcosystemContract, CodehashPin} from "./ContractIdentifiers.sol";
 import {ICoreRegistry} from "./ICoreRegistry.sol";
-import {RegistryAlreadyInitialized, RegistryUnknownKey} from "../../common/L1ContractErrors.sol";
+import {
+    RegistryAlreadyInitialized,
+    RegistryCodehashMismatch,
+    RegistryUnknownKey
+} from "../../common/L1ContractErrors.sol";
 
 /// @title Core (ecosystem-wide) registry — one instance per protocol upgrade.
 /// @author Matter Labs
@@ -139,5 +143,22 @@ contract CoreRegistry is ICoreRegistry {
             }
         }
         return true;
+    }
+
+    function validate() external view {
+        if (!initialized) {
+            revert RegistryUnknownKey();
+        }
+        uint256 pinsLength = codehashPins.length;
+        for (uint256 i = 0; i < pinsLength; ++i) {
+            bytes32 actualCodehash = codehashPins[i].target.codehash;
+            if (actualCodehash != codehashPins[i].expectedCodehash) {
+                revert RegistryCodehashMismatch(
+                    codehashPins[i].target,
+                    codehashPins[i].expectedCodehash,
+                    actualCodehash
+                );
+            }
+        }
     }
 }

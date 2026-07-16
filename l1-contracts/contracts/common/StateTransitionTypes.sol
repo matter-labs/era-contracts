@@ -68,7 +68,6 @@ struct StateTransitionDeployedAddresses {
     address genesisUpgrade;
     address defaultUpgrade;
     address chainTypeManagerProxyAdmin;
-    /// @notice The bootstrap `CTMRegistry` pinned in `ChainCreationParams.registry`;
-    ///         `DiamondInit` reads the facet set and base system contract hashes from it.
-    address genesisRegistry;
+    /// @notice The bootstrap `CTMRelease` that defines chain genesis.
+    address currentRelease;
 }

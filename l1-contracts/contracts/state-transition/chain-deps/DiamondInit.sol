@@ -18,8 +18,8 @@ import {
 import {IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../IChainTypeManager.sol";
-import {ICTMRegistry} from "../../upgrades/registry/ICTMRegistry.sol";
-import {RegistryFacetReader} from "../../upgrades/registry/RegistryFacetReader.sol";
+import {ICTMRelease} from "../../upgrades/registry/ICTMRelease.sol";
+import {ReleaseFacetReader} from "../../upgrades/registry/ReleaseFacetReader.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
 import {EmptyAssetId, EmptyBytes32, ZeroAddress} from "../../common/L1ContractErrors.sol";
@@ -74,16 +74,18 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
             revert EmptyAssetId();
         }
 
-        // Everything chain-independent is read from the genesis registry the CTM pins — the
+        // Everything chain-independent is read from the current release the CTM pins — the
         // committed chain-creation cut carries no init payload. Facets are installed here, by
         // the init itself (their selector lists come from each facet's own bytecode at execution
         // time), and the base system contract hashes are pinned per protocol version, so the
         // registry reverts if the CTM's protocol version disagrees with the registry's pin.
-        address genesisRegistry = ctm.genesisRegistry();
-        if (genesisRegistry == address(0)) {
+        address currentRelease = ctm.currentRelease();
+        if (currentRelease == address(0)) {
             revert ZeroAddress();
         }
-        Diamond.FacetCut[] memory facetCuts = RegistryFacetReader.newChainInstallations(ICTMRegistry(genesisRegistry));
+        ICTMRelease release = ICTMRelease(currentRelease);
+        release.validate();
+        Diamond.FacetCut[] memory facetCuts = ReleaseFacetReader.newChainInstallations(release);
         if (facetCuts.length != 0) {
             Diamond.diamondCut(
                 Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: ""})
@@ -94,7 +96,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
             bytes32 l2BootloaderBytecodeHash,
             bytes32 l2DefaultAccountBytecodeHash,
             bytes32 l2EvmEmulatorBytecodeHash
-        ) = ICTMRegistry(genesisRegistry).baseSystemContractHashes(protocolVersion);
+        ) = release.baseSystemContractHashes();
 
         if (!IS_ZKSYNC_OS) {
             if (l2BootloaderBytecodeHash == bytes32(0)) {

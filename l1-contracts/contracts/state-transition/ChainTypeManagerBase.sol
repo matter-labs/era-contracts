@@ -12,8 +12,7 @@ import {IMigrator} from "./chain-interfaces/IMigrator.sol";
 import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {ChainTypeManagerInitializeData, IChainTypeManager} from "./IChainTypeManager.sol";
-import {ICTMRegistry} from "../upgrades/registry/ICTMRegistry.sol";
-import {CTMContract} from "../upgrades/registry/ContractIdentifiers.sol";
+import {ICTMRelease} from "../upgrades/registry/ICTMRelease.sol";
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
@@ -110,18 +109,14 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev Emergency verifier changes still require a chain upgrade (diamond cut).
     mapping(uint256 protocolVersion => address) public protocolVersionVerifier;
 
-    /// @dev The genesis `CTMRegistry` for the CURRENT protocol version — the single source of
-    /// everything a new chain needs: facet set, base system contract hashes, verifier and
-    /// genesis params. New chains are always created at the current version, so this is one
-    /// value, updated by `setGenesisRegistry`. `DiamondInit` and the CTM read it at chain
-    /// creation; the CTM stores no other genesis data.
-    address public genesisRegistry;
+    /// @dev The release whose post-upgrade state is used for new-chain genesis. A release is not
+    /// version-keyed at read time, so patch upgrades can reuse it without making genesis data
+    /// unanswerable.
+    address public currentRelease;
 
-    /// @dev The CTM registry the upgrade contract reads the facet-swap plan from when a chain
-    /// upgrades TO a protocol version. Version-keyed, parallel to `upgradeCutHash`, since chains
-    /// upgrade at different times. Set by `setNewVersionUpgrade`; zero for versions with no facet
-    /// changes (patch upgrades, or the legacy in-cut path).
-    mapping(uint256 protocolVersion => address registry) public upgradeRegistryForVersion;
+    /// @dev Retained only to preserve the upgradeable storage layout. Transitions are committed
+    /// directly in the upgrade cut and are never looked up through CTM storage.
+    mapping(uint256 protocolVersion => address transition) internal __DEPRECATED_upgradeRegistryForVersion;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -225,38 +220,29 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         validatorTimelockPostV29 = _initializeData.validatorTimelock;
         serverNotifierAddress = _initializeData.serverNotifier;
 
-        _setGenesisRegistry(_initializeData.genesisRegistry);
+        _setCurrentRelease(_initializeData.currentRelease);
     }
 
-    /// @notice Points chain creation at a new genesis `CTMRegistry` for the current protocol
-    ///         version. The registry is the single source of the facet set, base system contract
-    ///         hashes, verifier and genesis params a new chain is created with.
-    /// @dev Overridden per VM to validate the registry's pinned genesis params before storing it.
-    /// @param _registry The genesis registry to pin.
-    function _setGenesisRegistry(address _registry) internal virtual;
+    /// @dev Overridden per VM to validate release compatibility and genesis params.
+    function _setCurrentRelease(address _release) internal virtual;
 
-    /// @notice Points chain creation at a new genesis `CTMRegistry`.
-    /// @param _registry The genesis registry to pin.
-    function setGenesisRegistry(address _registry) external onlyOwner {
-        _setGenesisRegistry(_registry);
+    function setCurrentRelease(address _release) external onlyOwner {
+        _setCurrentRelease(_release);
     }
 
-    /// @notice Stores the validated genesis registry pointer. Called by the per-VM
-    ///         `_setGenesisRegistry` after its validation.
-    /// @param _registry The genesis registry to pin.
-    function _storeGenesisRegistry(address _registry) internal {
-        if (_registry == address(0)) {
+    function _storeCurrentRelease(address _release) internal {
+        if (_release == address(0)) {
             revert ZeroAddress();
         }
-        genesisRegistry = _registry;
+        currentRelease = _release;
         newChainCreationParamsBlock[protocolVersion] = block.number;
-        emit NewGenesisRegistry(protocolVersion, _registry);
+        emit NewCurrentRelease(protocolVersion, _release);
     }
 
     /// @notice The L1 genesis upgrade contract new chains run at creation, read from the genesis
     ///         registry (used to set chainId + force-deploy the L2 system contracts).
     function l1GenesisUpgrade() public view returns (address genesisUpgrade) {
-        (genesisUpgrade, , , ) = ICTMRegistry(genesisRegistry).genesisParams(protocolVersion);
+        (genesisUpgrade, , , ) = ICTMRelease(currentRelease).genesisParams();
     }
 
     /// @notice The genesis (batch zero) stored-batch hash new chains start from — derived from
@@ -267,7 +253,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             bytes32 genesisBatchHash,
             bytes32 genesisBatchCommitment,
             uint64 genesisIndexRepeatedStorageChanges
-        ) = ICTMRegistry(genesisRegistry).genesisParams(protocolVersion);
+        ) = ICTMRelease(currentRelease).genesisParams();
         IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo({
             batchNumber: 0,
             batchHash: genesisBatchHash,
@@ -365,16 +351,14 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion,
-        address _verifier,
-        address _registry
+        address _verifier
     ) external onlyOwner {
         _setNewVersionUpgrade({
             _cutData: _cutData,
             _oldProtocolVersion: _oldProtocolVersion,
             _oldProtocolVersionDeadline: _oldProtocolVersionDeadline,
             _newProtocolVersion: _newProtocolVersion,
-            _verifier: _verifier,
-            _registry: _registry
+            _verifier: _verifier
         });
     }
 
@@ -423,8 +407,8 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             initCalldata: upgradeCalldata
         });
 
-        // For patch upgrades, chain creation params don't change — `genesisRegistry` stays as-is
-        // (a patch changes no facets, so new chains at the patch version install the same set).
+        // A patch changes no genesis state, so `currentRelease` remains valid by identity even
+        // though the CTM protocol version advances.
         newChainCreationParamsBlock[_newProtocolVersion] = newChainCreationParamsBlock[_oldProtocolVersion];
 
         _setNewVersionUpgrade({
@@ -432,10 +416,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             _oldProtocolVersion: _oldProtocolVersion,
             _oldProtocolVersionDeadline: _oldProtocolVersionDeadline,
             _newProtocolVersion: _newProtocolVersion,
-            _verifier: _verifier,
-            // A patch upgrade changes no facets: no upgrade registry (the upgrade contract reads
-            // a zero address and performs no cut).
-            _registry: address(0)
+            _verifier: _verifier
         });
     }
 
@@ -451,8 +432,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion,
-        address _verifier,
-        address _registry
+        address _verifier
     ) internal {
         // Migrations must be paused before setting new version upgrades
         if (!IChainAssetHandlerBase(IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()).migrationPaused()) {
@@ -469,9 +449,6 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
         setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
         _setProtocolVersionVerifier(_newProtocolVersion, _verifier);
-        // The registry the upgrade contract reads the facet-swap plan from when a chain upgrades
-        // to the new version — pinned in CTM state like the verifier, not committed in the cut.
-        upgradeRegistryForVersion[_newProtocolVersion] = _registry;
         // Emit event with backward compatible hack.
         emit NewUpgradeCutData(_newProtocolVersion, _cutData);
     }
@@ -607,7 +584,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             revert ChainAlreadyLive();
         }
 
-        address diamondInit = ICTMRegistry(genesisRegistry).ctmAddress(CTMContract.DiamondInit, protocolVersion);
+        address diamondInit = ICTMRelease(currentRelease).diamondInit();
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
             initAddress: diamondInit,
@@ -634,7 +611,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
         // genesis upgrade, deploys some contracts, sets chainId. The force-deployments data and
         // the genesis-upgrade address are read from the registry (single source of truth).
-        bytes memory forceDeploymentsData = ICTMRegistry(genesisRegistry).fixedForceDeploymentsData(protocolVersion);
+        bytes memory forceDeploymentsData = ICTMRelease(currentRelease).fixedForceDeploymentsData();
         IAdmin(zkChainAddress).genesisUpgrade(
             l1GenesisUpgrade(),
             address(IL1Bridgehub(BRIDGE_HUB).l1CtmDeployer()),

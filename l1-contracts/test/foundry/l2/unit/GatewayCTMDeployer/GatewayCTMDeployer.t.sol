@@ -46,7 +46,7 @@ import {ValidatorTimelock} from "contracts/state-transition/validators/Validator
 
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {CTMRegistry} from "contracts/upgrades/registry/CTMRegistry.sol";
+import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
 
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
@@ -169,7 +169,7 @@ contract GatewayCTMDeployerTest is Test {
         new MigratorFacet(1, false);
         new DiamondInit(false);
         new L1GenesisUpgrade();
-        new CTMRegistry();
+        new CTMRelease();
         new Multicall3();
 
         // This call will likely fail due to various checks, but we just need to get the bytecode published
@@ -223,7 +223,7 @@ contract GatewayCTMDeployerTest is Test {
         // exist before the CTM deployer runs.
         address bootstrapRegistry = tester.deployDirect(directCalldata.bootstrapRegistryCalldata);
         require(
-            bootstrapRegistry == calculatedContracts.stateTransition.genesisRegistry,
+            bootstrapRegistry == calculatedContracts.stateTransition.currentRelease,
             "bootstrap registry address mismatch"
         );
 
@@ -331,7 +331,7 @@ contract GatewayCTMDeployerTest is Test {
             // This publish-run actually EXECUTES the deployer constructor, which initializes
             // (write-once) whatever registry the config points at — so point it at a throwaway
             // instance, keeping the real bootstrap registry uninitialized for the factory run.
-            bootstrapRegistry: address(new CTMRegistry())
+            bootstrapRegistry: address(new CTMRelease())
         });
         new GatewayCTMDeployerCTM(ctmConfig);
     }

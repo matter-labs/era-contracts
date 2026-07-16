@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.28;
 
-import {L2EcosystemContract} from "./ContractIdentifiers.sol";
-import {ICTMRegistry} from "./ICTMRegistry.sol";
+import {ICTMRelease} from "./ICTMRelease.sol";
+import {ICTMTransition, L2Deployment} from "./ICTMTransition.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
@@ -56,11 +56,11 @@ library CTMUpgradeComposer {
     /// @dev The transaction calls `ComplexUpgrader.forceDeployAndUpgradeUniversal` (the universal
     ///      Era + ZKsyncOS path). Its nonce is derived from the new protocol version, as enforced
     ///      by `BaseZkSyncUpgrade._setL2SystemContractUpgrade`.
-    function buildL2UpgradeTx(ICTMRegistry _registry) internal view returns (L2CanonicalTransaction memory) {
-        uint256 newVersion = _registry.newProtocolVersion();
-
-        L2EcosystemContract[] memory deployList = _registry.l2ForceDeployList(newVersion);
-        uint256 deployListLength = deployList.length;
+    function buildL2UpgradeTx(ICTMTransition _transition) internal view returns (L2CanonicalTransaction memory) {
+        ICTMRelease release = ICTMRelease(_transition.newRelease());
+        uint256 newVersion = release.protocolVersion();
+        L2Deployment[] memory deploymentRows = _transition.l2Deployments();
+        uint256 deployListLength = deploymentRows.length;
         if (deployListLength == 0) {
             // The upgrade has no L2 side (patch upgrades, or L1-only minor upgrades): an all-zero
             // transaction (txType == 0) makes `BaseZkSyncUpgrade` skip the L2 protocol upgrade
@@ -70,13 +70,13 @@ library CTMUpgradeComposer {
         IComplexUpgrader.UniversalContractUpgradeInfo[]
             memory deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](deployListLength);
         for (uint256 i = 0; i < deployListLength; ++i) {
-            deployments[i] = _registry.l2ForceDeployment(deployList[i], newVersion);
+            deployments[i] = deploymentRows[i].info;
         }
 
-        (address delegateTo, bytes memory delegateCalldata) = _registry.l2UpgradeDelegate(newVersion);
+        (address delegateTo, bytes memory delegateCalldata) = _transition.l2UpgradeDelegate();
 
         L2CanonicalTransaction memory transaction = ProposedUpgradeLib.emptyL2CanonicalTransaction();
-        transaction.txType = _registry.isZKsyncOS() ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
+        transaction.txType = release.isZKsyncOS() ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
         transaction.from = uint256(uint160(L2_FORCE_DEPLOYER_ADDR));
         transaction.to = uint256(uint160(L2_COMPLEX_UPGRADER_ADDR));
         transaction.gasLimit = PRIORITY_TX_MAX_GAS_LIMIT;
@@ -86,24 +86,23 @@ library CTMUpgradeComposer {
             IComplexUpgrader.forceDeployAndUpgradeUniversal,
             (deployments, delegateTo, delegateCalldata)
         );
-        transaction.factoryDeps = _registry.factoryDepHashes(newVersion);
+        transaction.factoryDeps = _transition.factoryDepHashes();
         return transaction;
     }
 
     /// @notice Builds the `ProposedUpgrade` embedded in the upgrade cut's init calldata.
     function buildProposedUpgrade(
-        ICTMRegistry _registry,
-        uint256 _upgradeTimestamp
+        ICTMTransition _transition
     ) internal view returns (ProposedUpgrade memory proposedUpgrade) {
-        uint256 newVersion = _registry.newProtocolVersion();
+        uint256 newVersion = ICTMRelease(_transition.newRelease()).protocolVersion();
         proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(newVersion);
-        proposedUpgrade.l2ProtocolUpgradeTx = buildL2UpgradeTx(_registry);
+        proposedUpgrade.l2ProtocolUpgradeTx = buildL2UpgradeTx(_transition);
         (
             proposedUpgrade.bootloaderHash,
             proposedUpgrade.defaultAccountHash,
             proposedUpgrade.evmEmulatorHash
-        ) = _registry.baseSystemContractHashes(newVersion);
-        proposedUpgrade.upgradeTimestamp = _upgradeTimestamp;
+        ) = _transition.baseSystemContractHashChanges();
+        proposedUpgrade.upgradeTimestamp = _transition.upgradeTimestamp();
     }
 
     /// @notice The nonce of the L2 protocol upgrade transaction for a packed SemVer version.

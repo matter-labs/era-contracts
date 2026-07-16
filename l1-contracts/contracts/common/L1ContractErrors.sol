@@ -368,6 +368,12 @@ error Reentrancy();
 error RegistryAlreadyInitialized();
 // 0x1f20dafa
 error RegistryUnknownKey();
+// 0xfc83be31
+error RegistryCodehashMismatch(address target, bytes32 expected, bytes32 actual);
+// 0x6d094179
+error RegistryWrongCTM(address expected, address actual);
+// 0x3ea1345a
+error RegistryWrongVM(bool expected, bool actual);
 // 0x667d17de
 error RemoveFunctionFacetAddressNotZero(address facet);
 // 0xa2d4b16c

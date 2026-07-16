@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {ICTMRegistry} from "../upgrades/registry/ICTMRegistry.sol";
+import {ICTMTransition} from "../upgrades/registry/ICTMTransition.sol";
 import {CTMUpgradeComposer} from "../upgrades/registry/CTMUpgradeComposer.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 
@@ -18,14 +18,14 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 ///      TypeScript tooling does not have to replicate the encoding.
 contract RegistryComposerHarness {
     /// @notice The L2 protocol upgrade transaction composed from the registry's constants.
-    function l2UpgradeTx(ICTMRegistry _registry) public view returns (L2CanonicalTransaction memory) {
-        return CTMUpgradeComposer.buildL2UpgradeTx(_registry);
+    function l2UpgradeTx(ICTMTransition _transition) public view returns (L2CanonicalTransaction memory) {
+        return CTMUpgradeComposer.buildL2UpgradeTx(_transition);
     }
 
     /// @notice keccak256 of the ABI-encoded composed transaction — the exact value that
     ///         `BaseZkSyncUpgrade._setL2SystemContractUpgrade` stores on the chain diamond as
     ///         `l2SystemContractsUpgradeTxHash`.
-    function l2UpgradeTxHash(ICTMRegistry _registry) external view returns (bytes32) {
-        return keccak256(abi.encode(l2UpgradeTx(_registry)));
+    function l2UpgradeTxHash(ICTMTransition _transition) external view returns (bytes32) {
+        return keccak256(abi.encode(l2UpgradeTx(_transition)));
     }
 }

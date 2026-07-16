@@ -202,7 +202,7 @@ contract UpgradeIntegrationTest_v32_Local is
 
         // v32 is registry-driven: the CTM must be pinned to a genesis registry that new chains
         // read all their genesis data from.
-        assertTrue(IChainTypeManager(ctm).genesisRegistry() != address(0), "CTM genesis registry not pinned");
+        assertTrue(IChainTypeManager(ctm).currentRelease() != address(0), "CTM release not pinned");
 
         // New chain created from the registry, bound to the upgraded CTM.
         assertTrue(_newChainDiamond != address(0), "New chain ID not registered");

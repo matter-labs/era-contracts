@@ -649,10 +649,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
                     previousProtocolVersion,
                     deadline,
                     newProtocolVersion,
-                    ctmAddresses.stateTransition.verifiers.verifier,
-                    // Legacy pipeline: facet changes ride in the cut's own facetCuts, so no
-                    // upgrade registry is pinned (BaseZkSyncUpgrade reads a zero address, no-op).
-                    address(0)
+                    ctmAddresses.stateTransition.verifiers.verifier
                 )
             ),
             value: 0

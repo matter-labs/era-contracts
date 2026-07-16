@@ -26,8 +26,7 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
-import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
-import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+import {ICTMRelease, GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -199,19 +198,19 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         // it while creating a chain) and pin this fixture's `DiamondInit` in the registry.
         vm.mockCall(
             Utils.TEST_GENESIS_REGISTRY,
-            abi.encodeWithSelector(ICTMRegistry.genesisParams.selector),
+            abi.encodeWithSelector(ICTMRelease.genesisParams.selector),
             abi.encode(address(genesisUpgradeContract), bytes32(uint256(0x01)), bytes32(uint256(0x01)), uint64(0x01))
         );
         vm.mockCall(
             Utils.TEST_GENESIS_REGISTRY,
-            abi.encodeWithSelector(ICTMRegistry.ctmAddress.selector, CTMContract.DiamondInit),
+            abi.encodeWithSelector(ICTMRelease.diamondInit.selector),
             abi.encode(diamondInit)
         );
 
         ChainTypeManagerInitializeData memory ctmInitializeDataNoGovernor = ChainTypeManagerInitializeData({
             owner: address(0),
             validatorTimelock: validator,
-            genesisRegistry: Utils.TEST_GENESIS_REGISTRY,
+            currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             verifier: testnetVerifier,
             serverNotifier: serverNotifier
@@ -227,7 +226,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            genesisRegistry: Utils.TEST_GENESIS_REGISTRY,
+            currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             verifier: testnetVerifier,
             serverNotifier: serverNotifier
@@ -287,40 +286,20 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         return chainContractAddress.createNewChain({_chainId: chainId, _admin: newChainAdmin});
     }
 
-    /// @notice Mocks the genesis registry so `DiamondInit.newChainInstallations` reconstructs the
-    ///         given facet set. Each facet is keyed by a distinct `CTMContract` enum value (any
-    ///         value except `DiamondInit`, which the registry maps to the init contract itself);
-    ///         since this is a pure mock the mapping is arbitrary.
+    /// @notice Mocks the release's typed genesis facet rows from the requested cut.
     function _mockGenesisRegistryFacets(Diamond.FacetCut[] memory _facetCuts) internal {
-        CTMContract[] memory keys = new CTMContract[](_facetCuts.length);
-        uint256 v = 0;
+        GenesisFacet[] memory facets = new GenesisFacet[](_facetCuts.length);
         for (uint256 i = 0; i < _facetCuts.length; ++i) {
-            if (v == uint256(CTMContract.DiamondInit)) {
-                ++v;
-            }
-            CTMContract key = CTMContract(v);
-            keys[i] = key;
-            ++v;
-            vm.mockCall(
-                Utils.TEST_GENESIS_REGISTRY,
-                abi.encodeWithSelector(ICTMRegistry.ctmAddress.selector, key),
-                abi.encode(_facetCuts[i].facet)
-            );
-            vm.mockCall(
-                Utils.TEST_GENESIS_REGISTRY,
-                abi.encodeWithSelector(ICTMRegistry.facetSelectors.selector, key),
-                abi.encode(_facetCuts[i].selectors)
-            );
-            vm.mockCall(
-                Utils.TEST_GENESIS_REGISTRY,
-                abi.encodeWithSelector(ICTMRegistry.facetIsFreezable.selector, key),
-                abi.encode(_facetCuts[i].isFreezable)
-            );
+            facets[i] = GenesisFacet({
+                facet: _facetCuts[i].facet,
+                isFreezable: _facetCuts[i].isFreezable,
+                selectors: _facetCuts[i].selectors
+            });
         }
         vm.mockCall(
             Utils.TEST_GENESIS_REGISTRY,
-            abi.encodeWithSelector(ICTMRegistry.facetList.selector),
-            abi.encode(keys)
+            abi.encodeWithSelector(ICTMRelease.genesisFacets.selector),
+            abi.encode(facets)
         );
         // `createNewChain` runs the genesis upgrade against `genesisParams.genesisUpgrade`, so it
         // must be the fixture's real upgrade contract. The generic mocker (re-invoked via
@@ -329,7 +308,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         // both Era and ZKsyncOS genesis validation happy.
         vm.mockCall(
             Utils.TEST_GENESIS_REGISTRY,
-            abi.encodeWithSelector(ICTMRegistry.genesisParams.selector),
+            abi.encodeWithSelector(ICTMRelease.genesisParams.selector),
             abi.encode(address(genesisUpgradeContract), bytes32(uint256(0x01)), bytes32(uint256(0x01)), uint64(0x01))
         );
     }

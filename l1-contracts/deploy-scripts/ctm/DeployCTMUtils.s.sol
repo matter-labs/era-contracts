@@ -9,7 +9,7 @@ import {console2 as console} from "forge-std/Script.sol";
 import {ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainCreationParams} from "contracts/state-transition/ILegacyChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {CTMRegistry} from "contracts/upgrades/registry/CTMRegistry.sol";
+import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
 import {GenesisManifestLib} from "contracts/upgrades/registry/GenesisManifestLib.sol";
 
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
@@ -118,7 +118,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         ctmAddresses.stateTransition.facets.migratorFacet = deploySimpleContract("MigratorFacet", false);
         ctmAddresses.stateTransition.facets.committerFacet = deploySimpleContract("CommitterFacet", false);
         ctmAddresses.stateTransition.facets.diamondInit = deploySimpleContract("DiamondInit", false);
-        ctmAddresses.stateTransition.genesisRegistry = deployGenesisRegistry();
+        ctmAddresses.stateTransition.currentRelease = deployCurrentRelease();
     }
 
     /// @notice Deploys the storage-backed genesis registry and pins the freshly deployed facet
@@ -129,7 +129,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     /// with the shared salt would land every run (Era CTM, ZKsyncOS CTM, later upgrades) on the
     /// same, already-initialized address. A deterministic address buys nothing here — the CTM
     /// stores the pointer — and the manifest hash is verified after initialization.
-    function deployGenesisRegistry() internal returns (address) {
+    function deployCurrentRelease() internal returns (address) {
         if (!config.isZKsyncOS) {
             require(config.contracts.chainCreationParams.bootloaderHash != bytes32(0), "bootloader hash is zero");
             require(
@@ -140,10 +140,11 @@ abstract contract DeployCTMUtils is DeployUtils {
         }
 
         require(generatedData.forceDeploymentsData.length != 0, "force deployments data is empty");
-        CTMRegistry.CTMRegistryManifest memory manifest = GenesisManifestLib.buildGenesisManifest(
+        CTMRelease.ReleaseManifest memory manifest = GenesisManifestLib.buildGenesisManifest(
             GenesisManifestLib.GenesisConfig({
                 isZKsyncOS: config.isZKsyncOS,
                 protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
+                verifier: ctmAddresses.stateTransition.verifiers.verifier,
                 facets: ctmAddresses.stateTransition.facets,
                 bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
                 defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,
@@ -157,17 +158,17 @@ abstract contract DeployCTMUtils is DeployUtils {
         );
 
         vm.broadcast(getBroadcasterAddress());
-        CTMRegistry registry = new CTMRegistry();
+        CTMRelease release = new CTMRelease();
 
         vm.broadcast(getBroadcasterAddress());
-        registry.initialize(manifest);
+        release.initialize(manifest);
 
         // The initializer is unauthenticated (one-shot, no constructor), so confirm nobody
         // front-ran it with different contents before this address gets pinned anywhere.
-        require(registry.manifestHash() == keccak256(abi.encode(manifest)), "genesis registry manifest mismatch");
+        require(release.manifestHash() == keccak256(abi.encode(manifest)), "release manifest mismatch");
 
-        console.log("Bootstrap CTMRegistry (genesis) deployed at:", address(registry));
-        return address(registry);
+        console.log("Bootstrap CTMRelease deployed at:", address(release));
+        return address(release);
     }
 
     function chainCreationParamsPath(bool _isZKsyncOS) internal virtual returns (string memory) {
@@ -236,7 +237,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (ChainCreationParams memory) {
         require(generatedData.forceDeploymentsData.length != 0, "force deployments data is empty");
-        require(stateTransition.genesisRegistry != address(0), "genesis registry is not deployed");
+        require(stateTransition.currentRelease != address(0), "current release is not deployed");
         Diamond.DiamondCutData memory diamondCut = getChainCreationDiamondCutData(stateTransition);
         config.contracts.diamondCutData = abi.encode(diamondCut);
         return
@@ -247,21 +248,21 @@ abstract contract DeployCTMUtils is DeployUtils {
                 genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
                 diamondCut: diamondCut,
                 forceDeploymentsData: generatedData.forceDeploymentsData,
-                registry: stateTransition.genesisRegistry
+                registry: stateTransition.currentRelease
             });
     }
 
     function getChainTypeManagerInitializeData(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (ChainTypeManagerInitializeData memory) {
-        require(stateTransition.genesisRegistry != address(0), "genesis registry is not deployed");
+        require(stateTransition.currentRelease != address(0), "current release is not deployed");
         // Populate `config.contracts.diamondCutData` (a legacy output field) for serialization.
         getChainCreationParams(stateTransition);
         return
             ChainTypeManagerInitializeData({
                 owner: getBroadcasterAddress(),
                 validatorTimelock: stateTransition.proxies.validatorTimelock,
-                genesisRegistry: stateTransition.genesisRegistry,
+                currentRelease: stateTransition.currentRelease,
                 protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
                 verifier: stateTransition.verifiers.verifier,
                 serverNotifier: stateTransition.proxies.serverNotifier

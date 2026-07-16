@@ -9,7 +9,7 @@ import {ChainTypeManagerInitializeData, IChainTypeManager} from "../../IChainTyp
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
 
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
-import {CTMRegistry} from "../../../upgrades/registry/CTMRegistry.sol";
+import {CTMRelease} from "../../../upgrades/registry/CTMRelease.sol";
 import {GenesisManifestLib} from "../../../upgrades/registry/GenesisManifestLib.sol";
 import {GatewayCTMDeployerConfig, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "./GatewayCTMDeployer.sol";
 
@@ -96,9 +96,10 @@ abstract contract GatewayCTMDeployerCTMBase {
         // CREATE2 (no constructor, so its address is independent of the pinned values — the
         // off-chain helper can put it in the cut before any facet exists) and initialized HERE,
         // in the same deployer flow governance approved.
-        address genesisRegistry = _initializeGenesisRegistry(
+        address currentRelease = _initializeCurrentRelease(
             _config.bootstrapRegistry,
             _config.genesisUpgrade,
+            _config.verifier,
             baseConfig,
             facets
         );
@@ -114,7 +115,7 @@ abstract contract GatewayCTMDeployerCTMBase {
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
             owner: baseConfig.aliasedGovernanceAddress,
             validatorTimelock: _config.validatorTimelockProxy,
-            genesisRegistry: genesisRegistry,
+            currentRelease: currentRelease,
             protocolVersion: baseConfig.protocolVersion,
             verifier: _config.verifier,
             serverNotifier: _result.serverNotifierProxy
@@ -134,22 +135,25 @@ abstract contract GatewayCTMDeployerCTMBase {
     /// @notice Initializes the (directly deployed, still-uninitialized) bootstrap registry with
     ///         the genesis manifest. The facet order and freezability mirror the diamond's
     ///         installed set.
-    /// @param _registry The pre-deployed bootstrap `CTMRegistry` address.
+    /// @param _release The pre-deployed bootstrap `CTMRelease` address.
     /// @param _genesisUpgrade The L1 genesis upgrade contract new chains run at creation.
+    /// @param _verifier The verifier pinned by the release.
     /// @param _baseConfig The deployment config (protocol version, base system hashes, genesis).
     /// @param _facets The deployed diamond facet addresses.
-    /// @return registry The initialized bootstrap registry (echoed back).
-    function _initializeGenesisRegistry(
-        address _registry,
+    /// @return release The initialized bootstrap release (echoed back).
+    function _initializeCurrentRelease(
+        address _release,
         address _genesisUpgrade,
+        address _verifier,
         GatewayCTMDeployerConfig memory _baseConfig,
         Facets memory _facets
-    ) internal returns (address registry) {
-        CTMRegistry(_registry).initialize(
+    ) internal returns (address release) {
+        CTMRelease(_release).initialize(
             GenesisManifestLib.buildGenesisManifest(
                 GenesisManifestLib.GenesisConfig({
                     isZKsyncOS: _baseConfig.isZKsyncOS,
                     protocolVersion: _baseConfig.protocolVersion,
+                    verifier: _verifier,
                     facets: _facets,
                     bootloaderHash: _baseConfig.bootloaderHash,
                     defaultAccountHash: _baseConfig.defaultAccountHash,
@@ -162,7 +166,7 @@ abstract contract GatewayCTMDeployerCTMBase {
                 })
             )
         );
-        registry = _registry;
+        release = _release;
     }
 
     /// @notice Sets the previously deployed CTM inside the ServerNotifier and transfers ownership.

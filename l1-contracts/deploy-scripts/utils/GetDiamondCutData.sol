@@ -7,7 +7,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/ICTMRelease.sol";
 import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 
 library GetDiamondCutData {
@@ -119,16 +119,15 @@ library GetDiamondCutData {
         address ctm
     ) internal view returns (bytes memory diamondCutData, bytes memory forceDeploymentsData) {
         ChainTypeManagerBase chainTypeManager = ChainTypeManagerBase(ctm);
-        uint256 protocolVersion = chainTypeManager.protocolVersion();
-        ICTMRegistry registry = ICTMRegistry(chainTypeManager.genesisRegistry());
+        ICTMRelease release = ICTMRelease(chainTypeManager.currentRelease());
 
         Diamond.DiamondCutData memory cut = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
-            initAddress: registry.ctmAddress(CTMContract.DiamondInit, protocolVersion),
+            initAddress: release.diamondInit(),
             initCalldata: ""
         });
 
         diamondCutData = abi.encode(cut);
-        forceDeploymentsData = registry.fixedForceDeploymentsData(protocolVersion);
+        forceDeploymentsData = release.fixedForceDeploymentsData();
     }
 }

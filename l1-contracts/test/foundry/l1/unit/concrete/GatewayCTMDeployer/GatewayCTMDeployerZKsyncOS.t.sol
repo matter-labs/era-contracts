@@ -264,7 +264,7 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
         deployed = tester.deployDirect(directCalldata.bootstrapRegistryCalldata);
         assertEq(
             deployed,
-            calculatedContracts.stateTransition.genesisRegistry,
+            calculatedContracts.stateTransition.currentRelease,
             "bootstrap CTMRegistry address mismatch"
         );
     }

@@ -4,15 +4,17 @@ pragma solidity 0.8.28;
 
 import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
 import {ZKsyncOSChainTypeManagerSharedTest} from "../../state-transition/ChainTypeManager/_ZKsyncOSChainTypeManager_Shared.t.sol";
-import {TestCTMRegistry} from "./TestRegistries.sol";
-
 import {Call} from "contracts/governance/Common.sol";
 import {UpgradeExecutor} from "contracts/governance/UpgradeExecutor.sol";
 import {CTMUpgradeModule} from "contracts/upgrades/registry/CTMUpgradeModule.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/CTMUpgradeComposer.sol";
-import {CTMContract, L2EcosystemContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
-import {ICTMRegistry} from "contracts/upgrades/registry/ICTMRegistry.sol";
+import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
+import {CTMTransition} from "contracts/upgrades/registry/CTMTransition.sol";
+import {ICTMTransition, L2Deployment} from "contracts/upgrades/registry/ICTMTransition.sol";
+import {GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
+import {L2EcosystemContract, CodehashPin} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {UpgradeFacetSwap} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
@@ -55,8 +57,8 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     UpgradeExecutor internal ctmExecutor;
     CTMUpgradeModule internal module;
-    TestCTMRegistry internal registryV32;
-    TestCTMRegistry internal registryV33;
+    CTMTransition internal transitionV32;
+    CTMTransition internal transitionV33;
 
     address internal chainAddress;
     address internal newAdminFacet;
@@ -145,8 +147,8 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         // subsequent minor upgrade correctly reverts with PreviousUpgradeNotFinalized.
         UtilsFacet(chainAddress).util_setL2SystemContractsUpgradeTxHash(bytes32(0));
 
-        registryV32 = _makeRegistry(0, V32, verifierV32, address(0));
-        registryV33 = _makeRegistry(V32, V33, verifierV33, newAdminFacet);
+        transitionV32 = _makeTransition(0, V32, verifierV32, address(0));
+        transitionV33 = _makeTransition(V32, V33, verifierV33, newAdminFacet);
     }
 
     /// @dev Builds a registry for one hop. When `_newAdminFacet` is zero the AdminFacet is
@@ -155,67 +157,96 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     ///      row replacing the chain's REAL AdminFacet by the given implementation. A non-zero
     ///      `_newAdminFacet` hop also carries an L2 force-deployment, making it a full minor
     ///      upgrade.
-    function _makeRegistry(
+    function _makeTransition(
         uint256 _oldVersion,
         uint256 _newVersion,
         address _verifier,
         address _newAdminFacet
-    ) internal returns (TestCTMRegistry registry) {
-        registry = new TestCTMRegistry();
-        registry.setBase(_isZKsyncOSVariant(), _oldVersion, _newVersion, address(chainContractAddress));
-        registry.setVerifier(_newVersion, _verifier);
-        registry.setCtmAddress(CTMContract.DefaultUpgrade, _newVersion, defaultUpgrade);
-        registry.setCtmAddress(CTMContract.DiamondInit, _newVersion, diamondInit);
-
-        // The live AdminFacet the fixture installed at chain creation.
+    ) internal returns (CTMTransition transition) {
         address liveAdminFacet = facetCuts[1].facet;
         bytes4[] memory adminSelectors = Utils.getAdminSelectors();
-        if (_newAdminFacet == address(0)) {
-            // Unchanged facet: NO old-side (plan) row — the upgrade cut is empty. The facet
-            // still appears in the new-side set (with the fixture's pinned selector subset), so
-            // chain-creation params stay complete.
-            registry.addFacet(_newVersion, CTMContract.AdminFacet, liveAdminFacet, adminSelectors);
-        } else {
-            // Old side (the plan): pinned list (the bootstrap override — the fixture installs a
-            // subset of the facet's full ABI, and old facet versions may predate
-            // ISelfDescribingFacet anyway).
-            registry.addFacet(_oldVersion, CTMContract.AdminFacet, liveAdminFacet, adminSelectors);
-            // New side: NO pinned list — the composer reads the replacement facet's own
-            // ISelfDescribingFacet.selectors() (its full ABI), exercising the facet-default path.
-            registry.addFacet(_newVersion, CTMContract.AdminFacet, _newAdminFacet, new bytes4[](0));
+        GenesisFacet[] memory genesisFacets = new GenesisFacet[](1);
+        genesisFacets[0] = GenesisFacet({
+            facet: _newAdminFacet == address(0) ? liveAdminFacet : _newAdminFacet,
+            isFreezable: false,
+            selectors: _newAdminFacet == address(0) ? adminSelectors : new bytes4[](0)
+        });
+        CTMRelease release = new CTMRelease();
+        release.initialize(
+            CTMRelease.ReleaseManifest({
+                isZKsyncOS: _isZKsyncOSVariant(),
+                protocolVersion: _newVersion,
+                verifier: _verifier,
+                diamondInit: diamondInit,
+                genesisFacets: genesisFacets,
+                bootloaderHash: bytes32(0),
+                defaultAccountHash: bytes32(0),
+                evmEmulatorHash: bytes32(0),
+                fixedForceDeploymentsData: hex"f1f2",
+                genesisUpgrade: makeAddr("genesisUpgrade"),
+                genesisBatchHash: bytes32(uint256(1)),
+                genesisBatchCommitment: _registryGenesisBatchCommitment(),
+                genesisIndexRepeatedStorageChanges: 54,
+                codehashPins: new CodehashPin[](0)
+            })
+        );
+
+        UpgradeFacetSwap[] memory facetTransitions = new UpgradeFacetSwap[](_newAdminFacet == address(0) ? 0 : 1);
+        if (_newAdminFacet != address(0)) {
+            facetTransitions[0] = UpgradeFacetSwap({
+                oldFacet: liveAdminFacet,
+                newFacet: _newAdminFacet,
+                isFreezable: false,
+                oldSelectors: adminSelectors,
+                newSelectors: new bytes4[](0)
+            });
         }
 
-        registry.setBaseSystemContractHashes(bytes32(0), bytes32(0), bytes32(0)); // no updates
-        registry.setChainCreationData(hex"f1f2");
-        registry.setGenesis(makeAddr("genesisUpgrade"), bytes32(uint256(1)), _registryGenesisBatchCommitment(), 54);
-        registry.setL2UpgradeDelegate(address(0), hex"");
+        L2Deployment[] memory deployments = new L2Deployment[](_newAdminFacet == address(0) ? 0 : 1);
 
         if (_newAdminFacet != address(0)) {
-            // Full minor upgrade: one L2 force-deployment rides in the upgrade transaction,
-            // shaped per VM (EraForceDeployment vs ZKsyncOSSystemProxyUpgrade).
-            registry.addL2ForceDeployment(
-                L2EcosystemContract.L2Bridgehub,
-                IComplexUpgrader.UniversalContractUpgradeInfo({
+            deployments[0] = L2Deployment({
+                key: L2EcosystemContract.L2Bridgehub,
+                info: IComplexUpgrader.UniversalContractUpgradeInfo({
                     upgradeType: _l2DeploymentType(),
                     deployedBytecodeInfo: _l2DeployedBytecodeInfo(),
                     newAddress: makeAddr("l2Bridgehub")
                 }),
-                bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001))
-            );
+                bytecodeHash: bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001))
+            });
         }
-        // No factory dependencies: their hashes are validated on L2, not here, and none of the
-        // pinned deployments require new bytecode publication in this test.
+
+        transition = new CTMTransition();
+        transition.initialize(
+            CTMTransition.TransitionManifest({
+                ctmProxy: address(chainContractAddress),
+                oldProtocolVersion: _oldVersion,
+                newRelease: address(release),
+                defaultUpgrade: defaultUpgrade,
+                oldProtocolVersionDeadline: 1000,
+                upgradeTimestamp: 0,
+                facetTransitions: facetTransitions,
+                l2Deployments: deployments,
+                l2UpgradeDelegateTo: address(0),
+                l2UpgradeDelegateCalldata: hex"",
+                factoryDepHashes: new uint256[](0),
+                bootloaderHash: bytes32(0),
+                defaultAccountHash: bytes32(0),
+                evmEmulatorHash: bytes32(0),
+                codehashPins: new CodehashPin[](0)
+            })
+        );
     }
 
-    function _runHop(TestCTMRegistry _registry) internal {
+    function _runHop(CTMTransition _transition) internal {
         vm.startPrank(governor);
         ctmExecutor.execute(
             address(module),
-            abi.encodeCall(CTMUpgradeModule.applyCTMUpgrade, (ICTMRegistry(address(_registry)), 1000, 0))
+            abi.encodeCall(CTMUpgradeModule.applyCTMUpgrade, (ICTMTransition(address(_transition))))
         );
         ctmExecutor.execute(
             address(module),
-            abi.encodeCall(CTMUpgradeModule.upgradeChain, (ICTMRegistry(address(_registry)), chainId, 0))
+            abi.encodeCall(CTMUpgradeModule.upgradeChain, (ICTMTransition(address(_transition)), chainId))
         );
         vm.stopPrank();
     }
@@ -224,7 +255,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         // Hop 1 (0.0.0 -> 0.32.0): L1-only registry-driven upgrade — no facet changes, no L2
         // transaction, new verifier. The cut executes on the real chain with the real
         // DefaultUpgrade init.
-        _runHop(registryV32);
+        _runHop(transitionV32);
 
         assertEq(chainContractAddress.protocolVersion(), V32, "hop 1 must bump the CTM to v32");
         assertEq(IGetters(chainAddress).getProtocolVersion(), V32, "hop 1 must bump the chain to v32");
@@ -237,7 +268,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
 
         // Hop 2 (0.32.0 -> 0.33.0): the full minor upgrade — AdminFacet actually replaced and
         // the composed L2 protocol upgrade transaction (nonce = 33) committed on the chain.
-        _runHop(registryV33);
+        _runHop(transitionV33);
 
         assertEq(chainContractAddress.protocolVersion(), V33, "hop 2 must bump the CTM to v33");
         assertEq(IGetters(chainAddress).getProtocolVersion(), V33, "hop 2 must bump the chain to v33");
@@ -253,7 +284,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         // The committed L2 upgrade transaction is exactly the registry-composed one, carrying
         // the VM's upgrade-transaction type (254 for Era, 126 for ZKsyncOS).
         L2CanonicalTransaction memory expectedTx = CTMUpgradeComposer.buildL2UpgradeTx(
-            ICTMRegistry(address(registryV33))
+            ICTMTransition(address(transitionV33))
         );
         assertEq(expectedTx.txType, _expectedL2UpgradeTxType(), "the upgrade tx must carry the VM's upgrade tx type");
         assertEq(expectedTx.nonce, 33, "upgrade tx nonce must equal the new minor version");
@@ -265,14 +296,14 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     }
 
     function test_revertWhen_hopReplayed() public {
-        _runHop(registryV32);
+        _runHop(transitionV32);
 
         // Replaying the chain upgrade of a completed hop fails the chain's own version check.
         vm.expectRevert(abi.encodeWithSelector(ProtocolIdMismatch.selector, V32, 0));
         vm.prank(governor);
         ctmExecutor.execute(
             address(module),
-            abi.encodeCall(CTMUpgradeModule.upgradeChain, (ICTMRegistry(address(registryV32)), chainId, 0))
+            abi.encodeCall(CTMUpgradeModule.upgradeChain, (ICTMTransition(address(transitionV32)), chainId))
         );
     }
 }

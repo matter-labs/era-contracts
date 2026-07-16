@@ -8,8 +8,8 @@ import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ISelfDescribingFacet} from "../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
-import {ICTMRegistry} from "./registry/ICTMRegistry.sol";
-import {RegistryFacetReader} from "./registry/RegistryFacetReader.sol";
+import {ICTMTransition} from "./registry/ICTMTransition.sol";
+import {CTMUpgradeComposer} from "./registry/CTMUpgradeComposer.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
@@ -32,7 +32,12 @@ import {
     ProtocolVersionTooSmall,
     SettlementLayerUpgradeMustPrecedeChainUpgrade
 } from "./ZkSyncUpgradeErrors.sol";
-import {TimeNotReached, TooManyFactoryDeps, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {
+    RegistryWrongCTM,
+    TimeNotReached,
+    TooManyFactoryDeps,
+    ZeroAddress
+} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
@@ -74,17 +79,6 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         // as the permitted delay window is reduced in the future.
         if (block.timestamp < _proposedUpgrade.upgradeTimestamp) {
             revert TimeNotReached(_proposedUpgrade.upgradeTimestamp, block.timestamp);
-        }
-
-        // Facet swaps are applied first, mirroring the legacy path where the outer cut's
-        // `facetCuts` execute before this init delegatecall runs. The CTM pins the upgrade
-        // registry for the new version (like the verifier below); the swap plan is read straight
-        // from that registry. Zero means no facet changes (patch, or the legacy in-cut path).
-        address upgradeRegistry = IChainTypeManager(s.chainTypeManager).upgradeRegistryForVersion(
-            _proposedUpgrade.newProtocolVersion
-        );
-        if (upgradeRegistry != address(0)) {
-            _upgradeFacets(RegistryFacetReader.facetSwapPlan(ICTMRegistry(upgradeRegistry)));
         }
 
         // If settlement layer is 0, it means that this diamond proxy is located on the settlement layer.
@@ -392,6 +386,19 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
 
         s.protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
+    }
+
+    /// @notice Executes one committed transition. The transition address is the sole source for
+    /// both facet changes and proposal composition.
+    function upgradeFromTransition(address _transition) external returns (bytes32) {
+        ICTMTransition transition = ICTMTransition(_transition);
+        transition.validate();
+        address transitionCtm = transition.ctmProxy();
+        if (transitionCtm != s.chainTypeManager) {
+            revert RegistryWrongCTM(s.chainTypeManager, transitionCtm);
+        }
+        _upgradeFacets(transition.facetTransitions());
+        return upgrade(CTMUpgradeComposer.buildProposedUpgrade(transition));
     }
 
     /// @notice Placeholder function for custom logic for upgrading L1 contract.
