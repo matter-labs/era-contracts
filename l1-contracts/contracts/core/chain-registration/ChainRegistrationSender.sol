@@ -82,7 +82,7 @@ contract ChainRegistrationSender is
 
     /// @inheritdoc IL1CrossChainSender
     /// @notice Registers a chain on the L2 via a normal deposit.
-    /// @notice this is can be called by anyone (via the bridgehub), but baseTokens need to be provided.
+    /// @notice This can be called by anyone (via the bridgehub), but base tokens need to be provided.
     // slither-disable-next-line locked-ether
     function bridgehubDeposit(
         uint256 chainRegisteredOn,
@@ -142,7 +142,8 @@ contract ChainRegistrationSender is
         return abi.encodeCall(IL2Bridgehub.registerChainForInterop, (chainToBeRegistered, baseTokenAssetId));
     }
 
-    /// @notice Checks that both chains are settling on the same settlement layer, which must not be the L1
+    /// @notice Checks that both chains are settling on the same settlement layer (settling
+    /// directly on L1 is permitted — see the body note).
     /// @param chainToBeRegistered the chain to be registered
     /// @param chainRegisteredOn the chain to register on
     function _checkSettlementLayers(uint256 chainToBeRegistered, uint256 chainRegisteredOn) internal view {

@@ -152,7 +152,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// @notice The chain itself appends its batch root, both on L1 and on Gateway. On Gateway the
     /// chain's `Executor` calls this directly while settling (it no longer routes through the asset
     /// tracker). Asset correctness across chains is guaranteed by ZK proofs.
-    /// @dev Note, that at the moment of the v31 upgrade we no chains to settle on top of the old
+    /// @dev Note that at the moment of the v31 upgrade no chains settle on top of the old
     /// Era-based Gateway, and so no special handling is needed for pre-v31 chains.
     modifier addChainBatchRootRestriction(uint256 _chainId) {
         if (msg.sender != IBridgehubBase(_bridgehub()).getZKChain(_chainId)) {
@@ -209,7 +209,8 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// @notice Adds a new chainBatchRoot to the chainTree and updates the aggregated shared tree — the
     /// v32 flow.
     /// @dev Runs on both settlement layers: on L1 the chain's DiamondProxy calls it directly during
-    /// batch execution, on Gateway the GW asset tracker calls it (see `addChainBatchRootRestriction`).
+    /// batch execution, and the same holds on Gateway — the chain's `Executor` calls it directly
+    /// while settling (see `addChainBatchRootRestriction`).
     /// In both cases the chainBatchRoot is recorded, pushed to the chain tree, the shared tree leaf is
     /// updated, and a new interop root is emitted — so chains settling on either layer participate in
     /// interop. Only v32 executors call this entry point (v31 chains keep using the record-only

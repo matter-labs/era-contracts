@@ -77,8 +77,8 @@ import {
 ///     `t' >= T > deadline`, so the proven batch's end root is the final IMT state reachable in time
 ///     — absence there means the leg can never finalize. This branch restores refund liveness for a
 ///     source chain that HALTS and never settles a post-deadline batch; every chain interop can
-///     target has at least one batch in the shared root (freshly created chains get a genesis batch
-///     leaf at creation — see {MessageRootBase._addNewChain} — and `ChainRegistrationSender` refuses
+///     target has at least one batch in the shared root (freshly created chains report a genesis
+///     batch leaf at creation — see {MessageRootBase.reportGenesisRoot} — and `ChainRegistrationSender` refuses
 ///     to enable interop towards a chain with an empty tree), so the required "last batch" always
 ///     exists.
 ///
@@ -170,9 +170,9 @@ library AtomicInteropProof {
         }
 
         // The aggregated root the proof resolves against must be created strictly after the deadline.
-        // Roots imported without a timestamp (legacy path) read as 0 and are rejected. Without this
-        // bound, an in-time snapshot could pass the "last batch" branch below even though later
-        // in-time batches (which may contain the commit) exist.
+        // A never-imported anchor key reads as timestamp 0 and is rejected. Without this bound, an
+        // in-time snapshot could pass the "last batch" branch below even though later in-time
+        // batches (which may contain the commit) exist.
         uint256 rootTimestamp = L2_INTEROP_ROOT_STORAGE.interopRoots(slChainId, slBlock).timestamp;
         if (rootTimestamp <= _deadline) {
             revert ProofInteropRootNotAfterDeadline(rootTimestamp, _deadline);

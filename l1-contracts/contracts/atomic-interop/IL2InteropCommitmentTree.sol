@@ -44,6 +44,6 @@ interface IL2InteropCommitmentTree {
     /// @notice The fixed-depth Merkle path (siblings, leaf level up) for the leaf at `_index`.
     function merklePath(uint256 _index) external view returns (bytes32[] memory);
 
-    /// @notice The address allowed to insert (the escrow).
+    /// @notice The address allowed to insert (the canonical {AtomicFlowManager}).
     function appender() external view returns (address);
 }

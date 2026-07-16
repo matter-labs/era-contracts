@@ -15,8 +15,7 @@ interface IL2InteropRootStorage {
 
     /// @notice Returns the imported message root and its creation timestamp (the
     /// `(blockOrBatchNumber, root, timestamp)` tuple) for a chain ID and block or batch number.
-    /// @dev The timestamp is zero when the root was imported through the timestamp-less entry point
-    /// (used by the EraVM bootloader); such roots cannot be used for time-sensitive proofs (e.g. the
-    /// atomic-interop timeout protocol).
+    /// @dev Every import entry point carries the creation timestamp, so stored roots always hold the
+    /// full tuple; a zero timestamp only ever means "nothing imported at this key".
     function interopRoots(uint256 chainId, uint256 blockOrBatchNumber) external view returns (StoredInteropRoot memory);
 }
