@@ -76,7 +76,19 @@ struct Config {
     bool testnetVerifier;
     bool supportL2LegacySharedBridgeTest;
     bool isZKsyncOS;
+    bool multiProofVerifier;
+    address ziskPlonkVerifierAddr;
+    address ziskRangeVerifierAddr;
     ContractsConfig contracts;
+}
+
+/// @notice Addresses of the ZiSK multi-proof verifiers. They stay outside
+///         `CTMDeployedAddresses` because only the L1 CTM deployment creates
+///         them: the Gateway CTM deployer has no ZiSK lane.
+// solhint-disable-next-line gas-struct-packing
+struct MultiProofAddresses {
+    address ziskVerifier;
+    address multiProofVerifier;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -104,6 +116,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     // Note: This variable is initialized by concrete implementations before use
     GeneratedData internal generatedData; //slither-disable-line uninitialized-state
     CTMDeployedAddresses internal ctmAddresses;
+    MultiProofAddresses internal multiProofAddresses;
     // Note: Addresses discovered from already deployed core contracts (Bridgehub, AssetRouter, etc.)
     // This variable is initialized by concrete implementations before use
     CoreDeployedAddresses internal coreAddresses; //slither-disable-line uninitialized-state
@@ -138,6 +151,19 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
         if (toml.keyExists("$.is_zk_sync_os")) {
             config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
+        }
+        if (toml.keyExists("$.multi_proof_verifier")) {
+            config.multiProofVerifier = toml.readBool("$.multi_proof_verifier");
+        }
+        if (toml.keyExists("$.zisk_plonk_verifier_addr")) {
+            config.ziskPlonkVerifierAddr = toml.readAddress("$.zisk_plonk_verifier_addr");
+        }
+        // The aggregation verifier for the single-VK ZiSK lane. It pins the
+        // AGGREGATOR guest programVK and checks the SNARK for every range
+        // size. The aggregator VK is a deferred step, so this defaults to
+        // zero; when set, the deploy wires it with setZiskRangeVerifier.
+        if (toml.keyExists("$.zisk_range_verifier_addr")) {
+            config.ziskRangeVerifierAddr = toml.readAddress("$.zisk_range_verifier_addr");
         }
         if (toml.keyExists("$.era_chain_id")) {
             config.eraChainId = toml.readUint("$.era_chain_id");
@@ -322,6 +348,14 @@ abstract contract DeployCTMUtils is DeployUtils {
             compareStrings(contractName, "EraVerifierPlonk") || compareStrings(contractName, "ZKsyncOSVerifierPlonk")
         ) {
             return abi.encode();
+        } else if (compareStrings(contractName, "ZiskVerifier")) {
+            // The standalone snarkJS Plonk verifier this wraps; deployed
+            // beforehand (see verifiers/README.md) and passed by address.
+            return abi.encode(config.ziskPlonkVerifierAddr);
+        } else if (compareStrings(contractName, "MultiProofVerifier")) {
+            return abi.encode(ctmAddresses.stateTransition.verifiers.verifierPlonk, getBroadcasterAddress());
+        } else if (compareStrings(contractName, "MultiProofTestnetVerifier")) {
+            return abi.encode(multiProofAddresses.multiProofVerifier);
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
