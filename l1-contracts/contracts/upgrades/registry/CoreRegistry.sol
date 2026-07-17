@@ -19,9 +19,10 @@ import {
 ///         DATA check (read the getters or compare {manifestHash} against the audited manifest).
 contract CoreRegistry is ICoreRegistry {
     /// @notice Everything a core registry instance pins, set exactly once by {initialize}.
+    /// @dev Carries NO protocol version: version-schedule identity is owned by {CTMTransition}
+    ///      (mirroring how {ICTMRelease} deliberately omits it). A core registry only pins the
+    ///      ecosystem contract rows and the proxy admin they upgrade through.
     struct CoreRegistryManifest {
-        uint256 oldProtocolVersion;
-        uint256 newProtocolVersion;
         address proxyAdmin;
         EcosystemContractRow[] contractRows;
         CodehashPin[] codehashPins;
@@ -38,8 +39,6 @@ contract CoreRegistry is ICoreRegistry {
     ///         commitment to every value this registry serves.
     bytes32 public manifestHash;
 
-    uint256 internal oldProtocolVersion_;
-    uint256 internal newProtocolVersion_;
     address internal proxyAdmin_;
     EcosystemContractRow[] internal contractRows;
     CodehashPin[] internal codehashPins;
@@ -55,14 +54,14 @@ contract CoreRegistry is ICoreRegistry {
         if (initialized) {
             revert RegistryAlreadyInitialized();
         }
-        if (_manifest.newProtocolVersion == 0) {
+        // Sentinel against pinning an empty manifest: a core registry must name the proxy admin
+        // its ecosystem rows are upgraded through.
+        if (_manifest.proxyAdmin == address(0)) {
             revert RegistryUnknownKey();
         }
         initialized = true;
         manifestHash = keccak256(abi.encode(_manifest));
 
-        oldProtocolVersion_ = _manifest.oldProtocolVersion;
-        newProtocolVersion_ = _manifest.newProtocolVersion;
         proxyAdmin_ = _manifest.proxyAdmin;
         uint256 length = _manifest.contractRows.length;
         for (uint256 i = 0; i < length; ++i) {
@@ -77,16 +76,6 @@ contract CoreRegistry is ICoreRegistry {
     /*//////////////////////////////////////////////////////////////
                         ICoreRegistry (lookup logic)
     //////////////////////////////////////////////////////////////*/
-
-    /// @inheritdoc ICoreRegistry
-    function oldProtocolVersion() external view returns (uint256) {
-        return oldProtocolVersion_;
-    }
-
-    /// @inheritdoc ICoreRegistry
-    function newProtocolVersion() external view returns (uint256) {
-        return newProtocolVersion_;
-    }
 
     /// @inheritdoc ICoreRegistry
     function ecosystemRows() external view returns (EcosystemContractRow[] memory) {

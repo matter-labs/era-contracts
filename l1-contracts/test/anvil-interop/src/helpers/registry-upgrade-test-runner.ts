@@ -273,10 +273,12 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
         live.newVersion.toString(),
         "transition pins the new protocol version"
       );
+      // The core registry carries no protocol version by design — version-schedule identity is
+      // owned by the transition; the registry pins only rows + proxy admin.
       assertEq(
-        (await coreRegistryContract.newProtocolVersion()).toString(),
-        live.newVersion.toString(),
-        "core registry pins the new protocol version"
+        await coreRegistryContract.proxyAdmin(),
+        live.ecosystemProxyAdmin,
+        "core registry pins the live ecosystem ProxyAdmin"
       );
     } catch (error) {
       throw regenRegistries ? error : staleRegistriesError(error);
@@ -775,14 +777,13 @@ async function buildRegistryManifest(
           upgradeTimestamp: 0,
           facetSwaps,
           l2: {
+            // Only the universal upgrade info survives on-chain (`L2Deployment` carries no
+            // key/bytecode-hash fields; the composer consumes `info` alone).
             forceDeployments: [
               {
-                // L2EcosystemContract identifier of the per-upgrade L2 upgrade implementation slot.
-                contract: "L2V31Upgrade",
                 upgradeType: "ZKsyncOSUnsafeForceDeployment",
                 deployedBytecodeInfo,
                 newAddress: L2_UPGRADE_DELEGATE_ADDR,
-                bytecodeHash: delegateCodeHash,
               },
             ],
             delegateTo: L2_UPGRADE_DELEGATE_ADDR,
@@ -887,10 +888,12 @@ function assertCommittedManifestMatchesLiveDeployment(
 
 /**
  * Deploy the fixed release/transition/core-registry implementations and initialize them
- * (write-once) from the committed manifest. The release deploys first — transition
- * initialization validates its target release, so the ordering is functional, not stylistic.
- * Their artifacts come from the regular forge build; the incremental build below makes sure
- * they are present and current.
+ * (write-once) from the committed manifest, THROUGH the atomic deploy-and-initialize factories
+ * — the production surface (`new <Type>Factory()` then `factory.deploy<Type>(manifest)` in one
+ * transaction, so no uninitialized, front-runnable instance ever exists). The release deploys
+ * first — transition initialization validates its target release, so the ordering is
+ * functional, not stylistic. Artifacts come from the regular forge build; the incremental
+ * build below makes sure they are present and current.
  */
 async function deployUpgradeObjectsFromManifest(
   deployer: ethers.Wallet,
@@ -904,20 +907,32 @@ async function deployUpgradeObjectsFromManifest(
     throw new Error(`manifest has no "${CTM_REGISTRY_NAME}" CTM entry`);
   }
 
-  const deployAndInit = async (name: "CTMRelease" | "CTMTransition" | "CoreRegistry", initArgs: unknown) => {
-    const factory = new ethers.ContractFactory(getAbi(name), getCreationBytecode(name), deployer);
-    const contract = await factory.deploy();
-    await contract.deployed();
-    const initTx = await contract.initialize(initArgs);
-    await initTx.wait();
-    return contract.address;
+  const deployViaFactory = async (
+    factoryName: "CTMReleaseFactory" | "CTMTransitionFactory" | "CoreRegistryFactory",
+    method: string,
+    initArgs: unknown
+  ): Promise<string> => {
+    const contractFactory = new ethers.ContractFactory(getAbi(factoryName), getCreationBytecode(factoryName), deployer);
+    const factory = await contractFactory.deploy();
+    await factory.deployed();
+    const receipt = await (await factory[method](initArgs)).wait();
+    // Every factory emits exactly one <Type>Deployed(address, manifestHash) event.
+    const deployedEvent = receipt.events?.find((e: { event?: string }) => e.event);
+    if (!deployedEvent?.args?.[0]) {
+      throw new Error(`${factoryName}.${method} emitted no deployment event`);
+    }
+    return deployedEvent.args[0] as string;
   };
 
-  const release = await deployAndInit("CTMRelease", releaseInitArgs(ctm));
+  const release = await deployViaFactory("CTMReleaseFactory", "deployRelease", releaseInitArgs(ctm));
   return {
     release,
-    transition: await deployAndInit("CTMTransition", transitionInitArgs(manifest, ctm, release)),
-    coreRegistry: await deployAndInit("CoreRegistry", coreInitArgs(manifest)),
+    transition: await deployViaFactory(
+      "CTMTransitionFactory",
+      "deployTransition",
+      transitionInitArgs(manifest, ctm, release)
+    ),
+    coreRegistry: await deployViaFactory("CoreRegistryFactory", "deployCoreRegistry", coreInitArgs(manifest)),
   };
 }
 

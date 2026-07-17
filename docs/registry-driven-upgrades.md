@@ -153,18 +153,34 @@ semantics: it matches only a pre-registry CTM whose `currentRelease` is still un
 v31 → v32 hop). Because every applied transition pins a non-zero release, a zero-`fromRelease`
 transition can never apply again afterwards — zero has no permanent meaning.
 
-**Patches.** A verifier-only patch does not use a transition at all:
-`ChainTypeManagerBase.createNewPatchUpgrade` commits a cut whose init is
-`DefaultUpgrade.patchUpgrade(newVersion)` (empty proposal, verifier from the CTM) and keeps
-`currentRelease` unchanged — a patch's installed state _is_ the base release's, so genesis for
-new chains keeps resolving by identity. When a patch IS encoded as a transition, two invariants
-are enforced at initialization: a SemVer patch bump must reuse the departing release
-(`PatchMustReuseRelease`), and any same-release transition is verifier/schedule-only — no facet
-swaps, L2 deployments, delegate call, factory deps, or base-system hash changes
-(`SameReleaseTransitionHasPayload`). Transitions also refuse to exist with
-`newProtocolVersion <= oldProtocolVersion` (`ProtocolVersionTooSmall`) — the same rule chains
-enforce at execution and the CTM enforces in `setNewVersionUpgrade`, so an
+**Patches.** There is exactly ONE patch representation: a same-release transition. (The old
+side-door — `ChainTypeManagerBase.createNewPatchUpgrade` + `DefaultUpgrade.patchUpgrade`, which
+accepted an arbitrary delegatecalled upgrade contract outside the transition model — is
+removed.) Two invariants are enforced at transition initialization: a SemVer patch bump must
+reuse the departing release (`PatchMustReuseRelease`), and any same-release transition is
+verifier/schedule-only — no facet swaps, L2 deployments, delegate call, factory deps, or
+base-system hash changes (`SameReleaseTransitionHasPayload`). A patch keeps `currentRelease` at
+the same release, so genesis for new chains keeps resolving by identity. Transitions also
+refuse to exist with `newProtocolVersion <= oldProtocolVersion` (`ProtocolVersionTooSmall`) —
+the same rule chains enforce at execution and the CTM enforces in `setNewVersionUpgrade`, so an
 unexecutable version schedule can never be committed at any layer.
+
+**Convergence (transitions are proven edges, not independent descriptions).** A transition
+carries its own facet swaps and hash changes (consumed by existing chains), while new chains
+install straight from the target release. `TransitionConvergenceLib` closes the gap between the
+two at transition initialization: replaying the swaps over `fromRelease`'s routing must
+reproduce `newRelease`'s routing selector-for-selector (including freezability), and the
+applied base-system hash changes must reconcile with the release's complete pinned values. A
+transition that would install anything a fresh chain at `newRelease` never runs refuses to
+exist. The pre-registry migration hop (`fromRelease == 0`) is the one exception — no release
+object describes the pre-v32 chain state — and is covered by manual migration audit.
+
+**Atomic deployment.** The registry objects have unauthenticated one-shot initializers, so
+deploying and initializing in separate transactions would open a first-caller-wins window.
+`CTMReleaseFactory` / `CTMTransitionFactory` / `CoreRegistryFactory` (one factory per type —
+combined they would exceed the EIP-170 size limit) deploy + initialize an object within a
+single transaction, so no uninitialized instance is ever observable on-chain; `DeployCTMUtils`
+uses the release factory for the genesis release.
 
 **Legacy path.** `deploy-scripts/upgrade/default-upgrade/*` still targets _pre-v32_ CTMs and keeps
 encoding the old `setChainCreationParams`; the struct + entrypoint live in

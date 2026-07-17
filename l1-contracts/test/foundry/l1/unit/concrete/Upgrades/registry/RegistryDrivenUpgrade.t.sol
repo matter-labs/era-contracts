@@ -150,12 +150,29 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         transitionV33 = _makeTransition(V32, V33, verifierV33, transitionV32.newRelease(), newAdminFacet);
     }
 
-    /// @dev Builds a registry for one hop. When `_newAdminFacet` is zero the AdminFacet is
-    ///      unchanged by the hop, so it appears on the new side only (no old row — an EMPTY
-    ///      facet plan -> L1-only upgrade with empty cuts); otherwise the plan holds exactly one
-    ///      row replacing the chain's REAL AdminFacet by the given implementation. A non-zero
-    ///      `_newAdminFacet` hop also carries an L2 force-deployment, making it a full minor
-    ///      upgrade.
+    /// @dev The complete facet routing of one release: the fixture's full facet set, with the
+    ///      AdminFacet row pointing at `_adminFacet` when nonzero. The replaced row carries an
+    ///      EMPTY selector list (self-describing facet) — the same source the transition's add
+    ///      side resolves — so transition and release agree by construction.
+    function _releaseFacets(address _adminFacet) internal view returns (GenesisFacet[] memory genesisFacets) {
+        genesisFacets = new GenesisFacet[](facetCuts.length);
+        for (uint256 i = 0; i < facetCuts.length; ++i) {
+            bool replaced = _adminFacet != address(0) && facetCuts[i].facet == facetCuts[1].facet;
+            genesisFacets[i] = GenesisFacet({
+                facet: replaced ? _adminFacet : facetCuts[i].facet,
+                isFreezable: facetCuts[i].isFreezable,
+                selectors: replaced ? new bytes4[](0) : facetCuts[i].selectors
+            });
+        }
+    }
+
+    /// @dev Builds one hop's release + transition. The release always describes the COMPLETE
+    ///      post-hop chain state (full facet routing, carried base-system hashes) — transition
+    ///      initialization proves convergence: applying the hop's swaps to `fromRelease`'s
+    ///      routing must reproduce it. When `_newAdminFacet` is zero the hop changes no facets
+    ///      (empty swap plan -> L1-only upgrade with empty cuts); otherwise the plan holds
+    ///      exactly one row replacing the chain's REAL AdminFacet by the given implementation,
+    ///      and the hop also carries an L2 force-deployment, making it a full minor upgrade.
     function _makeTransition(
         uint256 _oldVersion,
         uint256 _newVersion,
@@ -164,22 +181,17 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         address _newAdminFacet
     ) internal returns (CTMTransition transition) {
         address liveAdminFacet = facetCuts[1].facet;
-        bytes4[] memory adminSelectors = Utils.getAdminSelectors();
-        GenesisFacet[] memory genesisFacets = new GenesisFacet[](1);
-        genesisFacets[0] = GenesisFacet({
-            facet: _newAdminFacet == address(0) ? liveAdminFacet : _newAdminFacet,
-            isFreezable: false,
-            selectors: _newAdminFacet == address(0) ? adminSelectors : new bytes4[](0)
-        });
         CTMRelease release = new CTMRelease();
         release.initialize(
             CTMRelease.ReleaseManifest({
                 isZKsyncOS: _isZKsyncOSVariant(),
                 diamondInit: diamondInit,
-                genesisFacets: genesisFacets,
-                bootloaderHash: bytes32(0),
-                defaultAccountHash: bytes32(0),
-                evmEmulatorHash: bytes32(0),
+                genesisFacets: _releaseFacets(_newAdminFacet),
+                // Carried unchanged from the (mocked) genesis release through every hop: the
+                // release pins the complete values, the transitions apply no changes.
+                bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
                 fixedForceDeploymentsData: hex"f1f2",
                 genesisUpgrade: makeAddr("genesisUpgrade"),
                 genesisBatchHash: bytes32(uint256(1)),
@@ -195,7 +207,9 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
                 oldFacet: liveAdminFacet,
                 newFacet: _newAdminFacet,
                 isFreezable: false,
-                oldSelectors: adminSelectors,
+                // Old side: the exact pinned list `fromRelease` routes to the live AdminFacet.
+                // New side: self-describing — the same source the target release resolves.
+                oldSelectors: facetCuts[1].selectors,
                 newSelectors: new bytes4[](0)
             });
         }
@@ -204,13 +218,11 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
 
         if (_newAdminFacet != address(0)) {
             deployments[0] = L2Deployment({
-                key: L2EcosystemContract.L2Bridgehub,
                 info: IComplexUpgrader.UniversalContractUpgradeInfo({
                     upgradeType: _l2DeploymentType(),
                     deployedBytecodeInfo: _l2DeployedBytecodeInfo(),
                     newAddress: makeAddr("l2Bridgehub")
-                }),
-                bytecodeHash: bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001))
+                })
             });
         }
 

@@ -18,17 +18,12 @@ struct EcosystemContractRow {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The lookup surface of a storage-backed, write-once registry that pins every
-///         ecosystem-wide L1 contract row for one protocol upgrade (old version -> new version).
+///         ecosystem-wide L1 contract row for one protocol upgrade.
 /// @dev The registry is initialized once from an audited manifest; `manifestHash` commits to the
 ///      pinned values and each pinned L1 address carries an `EXTCODEHASH` pin verified by
-///      `validate()` / `verifyAll()`.
+///      `validate()` / `verifyAll()`. Version-schedule identity is owned by {ICTMTransition}, not
+///      pinned here.
 interface ICoreRegistry {
-    /// @notice The packed SemVer (see `SemVer.sol`) protocol version this registry upgrades from.
-    function oldProtocolVersion() external view returns (uint256);
-
-    /// @notice The packed SemVer protocol version this registry upgrades to.
-    function newProtocolVersion() external view returns (uint256);
-
     /// @notice Every ecosystem contract participating in this upgrade, as complete typed rows —
     ///         one call, no per-key rescans. Consumers iterate these directly.
     function ecosystemRows() external view returns (EcosystemContractRow[] memory);

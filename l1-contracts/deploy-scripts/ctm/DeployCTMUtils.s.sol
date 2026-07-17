@@ -10,6 +10,7 @@ import {ChainTypeManagerInitializeData} from "contracts/state-transition/IChainT
 import {ChainCreationParams} from "contracts/state-transition/ILegacyChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
+import {CTMReleaseFactory} from "contracts/upgrades/registry/CTMRegistryFactory.sol";
 import {GenesisManifestLib} from "contracts/upgrades/registry/GenesisManifestLib.sol";
 
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
@@ -128,7 +129,10 @@ abstract contract DeployCTMUtils is DeployUtils {
     /// @dev Plain CREATE, not CREATE2: the registry has no constructor args, so a CREATE2 deploy
     /// with the shared salt would land every run (Era CTM, ZKsyncOS CTM, later upgrades) on the
     /// same, already-initialized address. A deterministic address buys nothing here — the CTM
-    /// stores the pointer — and the manifest hash is verified after initialization.
+    /// stores the pointer.
+    /// @dev Deploy + initialize happen atomically inside {CTMReleaseFactory.deployRelease} (one
+    /// transaction), so the release is already initialized when its address is returned — there is
+    /// no uninitialized, front-runnable window on the unauthenticated `initialize`.
     function deployCurrentRelease() internal returns (address) {
         if (!config.isZKsyncOS) {
             require(config.contracts.chainCreationParams.bootloaderHash != bytes32(0), "bootloader hash is zero");
@@ -156,17 +160,17 @@ abstract contract DeployCTMUtils is DeployUtils {
         );
 
         vm.broadcast(getBroadcasterAddress());
-        CTMRelease release = new CTMRelease();
+        CTMReleaseFactory factory = new CTMReleaseFactory();
 
         vm.broadcast(getBroadcasterAddress());
-        release.initialize(manifest);
+        address release = factory.deployRelease(manifest);
 
-        // The initializer is unauthenticated (one-shot, no constructor), so confirm nobody
-        // front-ran it with different contents before this address gets pinned anywhere.
-        require(release.manifestHash() == keccak256(abi.encode(manifest)), "release manifest mismatch");
+        // Deploy + initialize ran in one transaction inside the factory, so the release is already
+        // initialized here with no front-runnable window; this is now a pure sanity assertion.
+        require(CTMRelease(release).manifestHash() == keccak256(abi.encode(manifest)), "release manifest mismatch");
 
-        console.log("Bootstrap CTMRelease deployed at:", address(release));
-        return address(release);
+        console.log("Bootstrap CTMRelease deployed at:", release);
+        return release;
     }
 
     function chainCreationParamsPath(bool _isZKsyncOS) internal virtual returns (string memory) {

@@ -2,14 +2,13 @@
 
 pragma solidity 0.8.28;
 
-import {L2EcosystemContract} from "./ContractIdentifiers.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
 import {UpgradeFacetSwap} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
 
+/// @dev Only `info` is consumed on-chain ({CTMUpgradeComposer.buildL2UpgradeTx}); the previously
+///      carried `key`/`bytecodeHash` were never read, so they are dropped.
 struct L2Deployment {
-    L2EcosystemContract key;
     IComplexUpgrader.UniversalContractUpgradeInfo info;
-    bytes32 bytecodeHash;
 }
 
 /// @notice Immutable description of how one CTM release becomes another.

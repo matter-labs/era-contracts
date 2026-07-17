@@ -81,8 +81,6 @@ export function coreInitArgs(manifest: any): any {
     .map(([, e]) => ({ target: e.implNew, expectedCodehash: e.implNewCodehash }));
 
   return {
-    oldProtocolVersion: packSemVer(manifest.oldVersion),
-    newProtocolVersion: packSemVer(manifest.newVersion),
     proxyAdmin: manifest.core.proxyAdmin,
     contractRows,
     codehashPins,
@@ -131,7 +129,6 @@ export function releaseInitArgs(ctm: any): any {
  * (transition initialization validates it).
  */
 export function transitionInitArgs(manifest: any, ctm: any, newRelease: string): any {
-  const coreContract = parseSolidityEnum(IDENTIFIERS_SOL, "L2EcosystemContract");
   const upgradeType = parseSolidityEnum(COMPLEX_UPGRADER_SOL, "ContractUpgradeType");
   const transition = ctm.transition;
 
@@ -144,13 +141,11 @@ export function transitionInitArgs(manifest: any, ctm: any, newRelease: string):
   }));
 
   const l2Deployments = transition.l2.forceDeployments.map((d: any) => ({
-    key: enumValue(coreContract, d.contract, "L2EcosystemContract"),
     info: {
       upgradeType: enumValue(upgradeType, d.upgradeType, "ContractUpgradeType"),
       deployedBytecodeInfo: d.deployedBytecodeInfo,
       newAddress: d.newAddress,
     },
-    bytecodeHash: d.bytecodeHash,
   }));
 
   // The transition pins what it (and only it) makes live: the verifier and the DefaultUpgrade

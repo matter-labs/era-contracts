@@ -373,6 +373,14 @@ error RegistryWrongCTM(address expected, address actual);
 error TransitionReleaseMismatch(address expected, address actual);
 error SameReleaseTransitionHasPayload();
 error PatchMustReuseRelease(address fromRelease, address newRelease);
+// @dev Thrown when a transition's applied facet routing / base-system hashes do not reproduce its
+//      target release, i.e. the transition would install state a fresh chain at `newRelease` never runs.
+error TransitionBaseSystemHashMismatch(bytes32 target, bytes32 effective);
+error TransitionFacetRoutingMismatch(bytes4 selector, address expectedFacet, address actualFacet);
+error TransitionRemovesAbsentSelector(bytes4 selector, address oldFacet);
+error TransitionAddsPresentSelector(bytes4 selector);
+error TransitionFacetCountMismatch(uint256 expected, uint256 actual);
+error TransitionFacetFreezableMismatch(bytes4 selector);
 // 0x3ea1345a
 error RegistryWrongVM(bool expected, bool actual);
 // 0x667d17de

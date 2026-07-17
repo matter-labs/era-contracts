@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
+import {Utils} from "../../Utils/Utils.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
@@ -57,15 +58,26 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
     }
 
     function _deployRelease() internal returns (CTMRelease result) {
+        // The release describes the complete chain state after the (facet-neutral) hop this
+        // suite drives: the fixture's full facet routing and the carried base-system hashes —
+        // transition initialization proves convergence against exactly these values.
+        GenesisFacet[] memory genesisFacets = new GenesisFacet[](facetCuts.length);
+        for (uint256 i = 0; i < facetCuts.length; ++i) {
+            genesisFacets[i] = GenesisFacet({
+                facet: facetCuts[i].facet,
+                isFreezable: facetCuts[i].isFreezable,
+                selectors: facetCuts[i].selectors
+            });
+        }
         result = new CTMRelease();
         result.initialize(
             CTMRelease.ReleaseManifest({
                 isZKsyncOS: false,
                 diamondInit: makeAddr("newDiamondInit"),
-                genesisFacets: new GenesisFacet[](0),
-                bootloaderHash: bytes32(uint256(0xb00)),
-                defaultAccountHash: bytes32(uint256(0xda0)),
-                evmEmulatorHash: bytes32(0),
+                genesisFacets: genesisFacets,
+                bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
                 fixedForceDeploymentsData: hex"f1f2",
                 genesisUpgrade: makeAddr("genesisUpgrade"),
                 genesisBatchHash: bytes32(uint256(1)),
@@ -85,39 +97,19 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         address _fromRelease,
         uint256 _oldProtocolVersion
     ) internal returns (CTMTransition result) {
-        UpgradeFacetSwap[] memory facetTransitions = new UpgradeFacetSwap[](2);
-        bytes4[] memory adminOld = new bytes4[](2);
-        adminOld[0] = bytes4(uint32(1));
-        adminOld[1] = bytes4(uint32(2));
-        bytes4[] memory adminNew = new bytes4[](2);
-        adminNew[0] = bytes4(uint32(2));
-        adminNew[1] = bytes4(uint32(3));
-        facetTransitions[0] = UpgradeFacetSwap({
-            oldFacet: makeAddr("adminFacetOld"),
-            newFacet: makeAddr("adminFacetNew"),
-            isFreezable: false,
-            oldSelectors: adminOld,
-            newSelectors: adminNew
-        });
-        bytes4[] memory executorNew = new bytes4[](1);
-        executorNew[0] = bytes4(uint32(0x20));
-        facetTransitions[1] = UpgradeFacetSwap({
-            oldFacet: address(0),
-            newFacet: makeAddr("executorFacetNew"),
-            isFreezable: true,
-            oldSelectors: new bytes4[](0),
-            newSelectors: executorNew
-        });
+        // A facet-neutral hop: the swap plan is empty, so convergence holds trivially against
+        // any departing release that carries the same (fixture) routing. Facet-changing swaps
+        // are exercised end-to-end by RegistryDrivenUpgrade.t.sol; this suite focuses on the
+        // executor's authority and edge asserts.
+        UpgradeFacetSwap[] memory facetTransitions = new UpgradeFacetSwap[](0);
 
         L2Deployment[] memory deployments = new L2Deployment[](1);
         deployments[0] = L2Deployment({
-            key: L2EcosystemContract.L2Bridgehub,
             info: IComplexUpgrader.UniversalContractUpgradeInfo({
                 upgradeType: IComplexUpgrader.ContractUpgradeType.EraForceDeployment,
                 deployedBytecodeInfo: hex"aa01",
                 newAddress: makeAddr("l2Bridgehub")
-            }),
-            bytecodeHash: bytes32(uint256(1))
+            })
         });
         uint256[] memory factoryDeps = new uint256[](1);
         factoryDeps[0] = 1;
@@ -141,8 +133,10 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                 l2UpgradeDelegateTo: makeAddr("l2UpgradeDelegate"),
                 l2UpgradeDelegateCalldata: hex"beef",
                 factoryDepHashes: factoryDeps,
-                bootloaderHash: bytes32(uint256(0xb00)),
-                defaultAccountHash: bytes32(uint256(0xda0)),
+                // No hash changes: the target release pins the same carried values the
+                // departing release serves, so convergence reconciles by carry-over.
+                bootloaderHash: bytes32(0),
+                defaultAccountHash: bytes32(0),
                 evmEmulatorHash: bytes32(0),
                 codehashPins: new CodehashPin[](0)
             })

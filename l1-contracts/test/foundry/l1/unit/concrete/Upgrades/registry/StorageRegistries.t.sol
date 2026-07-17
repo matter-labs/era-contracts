@@ -28,7 +28,9 @@ import {
     PatchMustReuseRelease,
     RegistryAlreadyInitialized,
     RegistryCodehashMismatch,
-    SameReleaseTransitionHasPayload
+    SameReleaseTransitionHasPayload,
+    TransitionBaseSystemHashMismatch,
+    TransitionFacetRoutingMismatch
 } from "contracts/common/L1ContractErrors.sol";
 import {ProtocolVersionTooSmall} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 
@@ -63,14 +65,7 @@ contract StorageRegistriesTest is Test {
         });
         CodehashPin[] memory pins = new CodehashPin[](1);
         pins[0] = CodehashPin({target: address(0xB201), expectedCodehash: keccak256(hex"6001600155")});
-        return
-            CoreRegistry.CoreRegistryManifest({
-                oldProtocolVersion: OLD_VERSION,
-                newProtocolVersion: NEW_VERSION,
-                proxyAdmin: address(0xA001),
-                contractRows: rows,
-                codehashPins: pins
-            });
+        return CoreRegistry.CoreRegistryManifest({proxyAdmin: address(0xA001), contractRows: rows, codehashPins: pins});
     }
 
     function _releaseManifest() internal pure returns (CTMRelease.ReleaseManifest memory manifest) {
@@ -132,8 +127,8 @@ contract StorageRegistriesTest is Test {
         });
 
         L2Deployment[] memory deployments = new L2Deployment[](2);
-        deployments[0] = _deployment(L2EcosystemContract.L2Bridgehub, address(0x10002), hex"aa01", 1);
-        deployments[1] = _deployment(L2EcosystemContract.L2AssetRouter, address(0x10003), hex"aa02", 2);
+        deployments[0] = _deployment(address(0x10002), hex"aa01");
+        deployments[1] = _deployment(address(0x10003), hex"aa02");
         uint256[] memory factoryDeps = new uint256[](2);
         factoryDeps[0] = 1;
         factoryDeps[1] = 2;
@@ -161,21 +156,14 @@ contract StorageRegistriesTest is Test {
             });
     }
 
-    function _deployment(
-        L2EcosystemContract _key,
-        address _newAddress,
-        bytes memory _bytecodeInfo,
-        uint256 _hash
-    ) internal pure returns (L2Deployment memory) {
+    function _deployment(address _newAddress, bytes memory _bytecodeInfo) internal pure returns (L2Deployment memory) {
         return
             L2Deployment({
-                key: _key,
                 info: IComplexUpgrader.UniversalContractUpgradeInfo({
                     upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
                     deployedBytecodeInfo: _bytecodeInfo,
                     newAddress: _newAddress
-                }),
-                bytecodeHash: bytes32(_hash)
+                })
             });
     }
 
@@ -311,6 +299,80 @@ contract StorageRegistriesTest is Test {
         CTMTransition staleTransition = new CTMTransition();
         vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector, OLD_VERSION, OLD_VERSION));
         staleTransition.initialize(manifest);
+    }
+
+    /// @dev A convergent facet-changing hop: `fromRelease` = the default release, target release
+    ///      identical except facet 0xF201 -> `_newFacet`, and a swap performing exactly that move.
+    function _convergentManifest(
+        address _newFacet
+    ) internal returns (CTMTransition.TransitionManifest memory manifest) {
+        CTMRelease.ReleaseManifest memory targetManifest = _releaseManifest();
+        targetManifest.genesisFacets[0].facet = _newFacet;
+        CTMRelease targetRelease = new CTMRelease();
+        targetRelease.initialize(targetManifest);
+
+        manifest = _transitionManifest();
+        manifest.fromRelease = address(release);
+        manifest.newRelease = address(targetRelease);
+        manifest.facetTransitions = new UpgradeFacetSwap[](1);
+        manifest.facetTransitions[0] = UpgradeFacetSwap({
+            oldFacet: address(0xF201),
+            newFacet: _newFacet,
+            isFreezable: false,
+            oldSelectors: _selectors2(bytes4(uint32(2)), bytes4(uint32(3))),
+            newSelectors: _selectors2(bytes4(uint32(2)), bytes4(uint32(3)))
+        });
+        // No hash changes: both releases pin the same values, so convergence carries them over.
+        manifest.bootloaderHash = bytes32(0);
+        manifest.defaultAccountHash = bytes32(0);
+        manifest.evmEmulatorHash = bytes32(0);
+    }
+
+    function test_convergentFacetChangingTransitionInitializes() public {
+        CTMTransition convergent = new CTMTransition();
+        convergent.initialize(_convergentManifest(address(0xF999)));
+        assertEq(convergent.fromRelease(), address(release));
+    }
+
+    function test_revertWhen_transitionDoesNotProduceRelease() public {
+        // Same release pair, but WITHOUT the swap that moves 0xF201 -> 0xF999: replaying the
+        // (empty) plan over fromRelease cannot reproduce the target routing.
+        CTMTransition.TransitionManifest memory manifest = _convergentManifest(address(0xF999));
+        manifest.facetTransitions = new UpgradeFacetSwap[](0);
+
+        CTMTransition divergent = new CTMTransition();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                TransitionFacetRoutingMismatch.selector,
+                bytes4(uint32(2)),
+                address(0xF999),
+                address(0xF201)
+            )
+        );
+        divergent.initialize(manifest);
+    }
+
+    function test_revertWhen_transitionHashesDoNotConverge() public {
+        // Target release pins a different bootloader hash, but the transition applies no change:
+        // the carried-over value cannot reconcile with the target.
+        CTMRelease.ReleaseManifest memory targetManifest = _releaseManifest();
+        targetManifest.bootloaderHash = bytes32(uint256(0xbeef));
+        CTMRelease targetRelease = new CTMRelease();
+        targetRelease.initialize(targetManifest);
+
+        CTMTransition.TransitionManifest memory manifest = _convergentManifest(address(0xF201));
+        manifest.newRelease = address(targetRelease);
+        manifest.facetTransitions = new UpgradeFacetSwap[](0);
+
+        CTMTransition divergent = new CTMTransition();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                TransitionBaseSystemHashMismatch.selector,
+                bytes32(uint256(0xbeef)),
+                bytes32(uint256(0xb00))
+            )
+        );
+        divergent.initialize(manifest);
     }
 
     function test_uninitializedCoreRegistryDoesNotVerify() public {

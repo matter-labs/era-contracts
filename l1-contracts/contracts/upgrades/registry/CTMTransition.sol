@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {CodehashPin} from "./ContractIdentifiers.sol";
 import {ICTMRelease} from "./ICTMRelease.sol";
 import {ICTMTransition, L2Deployment} from "./ICTMTransition.sol";
+import {TransitionConvergenceLib} from "./TransitionConvergenceLib.sol";
 import {UpgradeFacetSwap} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
@@ -120,6 +121,19 @@ contract CTMTransition is ICTMTransition {
         ) {
             revert SameReleaseTransitionHasPayload();
         }
+        // Convergence: prove this transition actually produces `newRelease`. Applying its facet
+        // swaps to `fromRelease`'s routing must reproduce `newRelease`'s routing, and its applied
+        // base-system hash changes must reconcile with `newRelease`'s pinned hashes. Without this,
+        // the transition path (existing chains) could drift from the release path (new chains).
+        // Skipped for the pre-registry migration hop (`fromRelease == 0`), see the library docs.
+        TransitionConvergenceLib.requireTransitionProducesRelease({
+            _fromRelease: _manifest.fromRelease,
+            _swaps: _manifest.facetTransitions,
+            _newRelease: _manifest.newRelease,
+            _bootloaderChange: _manifest.bootloaderHash,
+            _defaultAccountChange: _manifest.defaultAccountHash,
+            _evmEmulatorChange: _manifest.evmEmulatorHash
+        });
         _validatePins(_manifest.codehashPins);
 
         initialized = true;

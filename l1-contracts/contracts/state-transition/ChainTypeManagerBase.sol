@@ -17,7 +17,7 @@ import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE} from "../common/Config.sol";
-import {AdminZero, NotAPatchUpgrade, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
+import {AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
 import {ProtocolVersionTooSmall} from "../upgrades/ZkSyncUpgradeErrors.sol";
 import {ChainAlreadyLive, MigrationsNotPaused, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
@@ -356,64 +356,6 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     ) external onlyOwner {
         _setNewVersionUpgrade({
             _cutData: _cutData,
-            _oldProtocolVersion: _oldProtocolVersion,
-            _oldProtocolVersionDeadline: _oldProtocolVersionDeadline,
-            _newProtocolVersion: _newProtocolVersion,
-            _verifier: _verifier
-        });
-    }
-
-    /// @notice Creates a patch upgrade for verifier-only upgrades (no facet changes)
-    /// @dev This function creates a DiamondCutData with empty facet cuts but with an upgrade contract.
-    /// @dev ChainCreationParams remain unchanged - only the upgrade cut hash is set.
-    /// @param _oldProtocolVersion the old protocol version
-    /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
-    /// @param _newProtocolVersion the new protocol version
-    /// @param _verifier the verifier address for the new protocol version
-    /// @param _upgradeContract the address of the upgrade contract to execute
-    function createNewPatchUpgrade(
-        uint256 _oldProtocolVersion,
-        uint256 _oldProtocolVersionDeadline,
-        uint256 _newProtocolVersion,
-        address _verifier,
-        address _upgradeContract
-    ) external onlyOwner {
-        if (_upgradeContract == address(0)) {
-            revert ZeroAddress();
-        }
-        // Validate this is a patch upgrade (major and minor versions must be the same).
-        // Note: Non-sequential patch jumps are allowed (e.g., 0.25.1 -> 0.25.4) to support
-        // skipping intermediate patch versions when needed.
-        {
-            (uint32 oldMajor, uint32 oldMinor, uint32 oldPatch) = SemVer.unpackSemVer(
-                SafeCast.toUint96(_oldProtocolVersion)
-            );
-            (uint32 newMajor, uint32 newMinor, uint32 newPatch) = SemVer.unpackSemVer(
-                SafeCast.toUint96(_newProtocolVersion)
-            );
-            if (oldMajor != newMajor || oldMinor != newMinor || newPatch <= oldPatch) {
-                revert NotAPatchUpgrade(_oldProtocolVersion, _newProtocolVersion);
-            }
-        }
-
-        // The empty (VK-only) proposal is composed inside the upgrade contract itself
-        // (`DefaultUpgrade.patchUpgrade`), keeping this contract free of ProposedUpgrade codecs.
-        bytes memory upgradeCalldata = abi.encodeCall(IDefaultUpgrade.patchUpgrade, (_newProtocolVersion));
-
-        // Create diamond cut data with empty facet cuts but with upgrade contract
-        Diamond.FacetCut[] memory emptyFacetCuts = new Diamond.FacetCut[](0);
-        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
-            facetCuts: emptyFacetCuts,
-            initAddress: _upgradeContract,
-            initCalldata: upgradeCalldata
-        });
-
-        // A patch changes no genesis state, so `currentRelease` remains valid by identity even
-        // though the CTM protocol version advances.
-        newChainCreationParamsBlock[_newProtocolVersion] = newChainCreationParamsBlock[_oldProtocolVersion];
-
-        _setNewVersionUpgrade({
-            _cutData: diamondCut,
             _oldProtocolVersion: _oldProtocolVersion,
             _oldProtocolVersionDeadline: _oldProtocolVersionDeadline,
             _newProtocolVersion: _newProtocolVersion,

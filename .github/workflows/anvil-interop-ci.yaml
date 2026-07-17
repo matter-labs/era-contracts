@@ -145,12 +145,13 @@ jobs:
           bash cleanup.sh
 
   # Registry-driven upgrade test: loads the current chain states, deploys the
-  # UpgradeExecutor + orchestrator modules and fresh new-version implementations,
-  # generates constants-in-bytecode registries from live on-chain data
-  # (storage registries initialized from the committed manifest, verifyAll() asserted against the deployment),
-  # hands CTM/ProxyAdmin ownership to the executor, executes the whole upgrade
-  # through executor.execute(module, ...) — no stage governance calldata — and
-  # relays the registry-composed L2 upgrade transaction through the real
+  # CTM/Ecosystem upgrade executors and fresh new-version implementations,
+  # initializes the storage-backed registry objects (CTMRelease / CTMTransition /
+  # CoreRegistry) from the committed manifest and asserts verifyAll() against the
+  # deployment, hands CTM/ProxyAdmin ownership to the executors, executes the whole
+  # upgrade through the fixed applyCTMUpgrade / applyL1Upgrade / upgradeChain entry
+  # points — no generic delegatecall modules, no stage governance calldata — and
+  # relays the transition-composed L2 upgrade transaction through the real
   # L2ComplexUpgrader on the L2 anvils.
   registry-driven-upgrade-test:
     runs-on: ubuntu-latest

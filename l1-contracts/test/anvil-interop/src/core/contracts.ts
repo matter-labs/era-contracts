@@ -43,6 +43,10 @@ const ARTIFACTS = {
   CTMRelease: "CTMRelease.sol/CTMRelease.json",
   CTMTransition: "CTMTransition.sol/CTMTransition.json",
   CoreRegistry: "CoreRegistry.sol/CoreRegistry.json",
+  // Atomic deploy-and-initialize factories (one per type — see CTMRegistryFactory.sol).
+  CTMReleaseFactory: "CTMRegistryFactory.sol/CTMReleaseFactory.json",
+  CTMTransitionFactory: "CTMRegistryFactory.sol/CTMTransitionFactory.json",
+  CoreRegistryFactory: "CTMRegistryFactory.sol/CoreRegistryFactory.json",
   BridgedStandardERC20: "BridgedStandardERC20.sol/BridgedStandardERC20.json",
   ChainAdminOwnable: "ChainAdminOwnable.sol/ChainAdminOwnable.json",
   ChainRegistrationSender: "ChainRegistrationSender.sol/ChainRegistrationSender.json",

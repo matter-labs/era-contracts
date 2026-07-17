@@ -16,7 +16,7 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0x7298422e511F0EF969b0696eBcE13E794529d93B",
+      "ctmProxy": "0xEc87EaAD65509F2Cd9a7517F714cBC971b999152",
       "release": {
         "diamondInit": {
           "address": "0x413b1AfCa96a3df5A686d8BFBF93d30688a7f7D9",
@@ -73,21 +73,21 @@
         },
         "fixedForceDeploymentsData": "0xf1f2",
         "genesis": {
-          "genesisUpgrade": "0xB58D5687135343A7630352077EbB0c946C73f70E",
+          "genesisUpgrade": "0x66544Df3FA9274f822e240c6BCf3f5645365b73d",
           "batchHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
           "batchCommitment": "0x0000000000000000000000000000000000000000000000000000000000000001",
           "indexRepeatedStorageChanges": 54
         }
       },
       "transition": {
-        "fromRelease": "0xf4B146FbA71F41E0592668ffbF264F1D186b2Ca8",
+        "fromRelease": "0xA5B0631c5B393d4BF30D2974dF121ea7E8b0e934",
         "verifier": {
           "address": "0x02df3a3F960393F5B349E40A599FEda91a7cc1A7",
           "codehash": "0x36e5d09f9182f3a618ad6c81d41b05a4a7b13f1c02004bd909729fec1c31e9e2"
         },
         "defaultUpgrade": {
           "address": "0x2b5A4e5493d4a54E717057B127cf0C000C876f9B",
-          "codehash": "0xc43829fb7bd6942adadb1d75ff385a9471fdc9b26ae6e4d4019f3ee0537d18e9"
+          "codehash": "0xe529115ec1c9a09198a808c18c215f1a45e9f7f641c68121ea296f52cb1bd9bd"
         },
         "oldProtocolVersionDeadline": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "upgradeTimestamp": 0,
@@ -136,11 +136,9 @@
         "l2": {
           "forceDeployments": [
             {
-              "contract": "L2V31Upgrade",
               "upgradeType": "ZKsyncOSUnsafeForceDeployment",
               "deployedBytecodeInfo": "0xd8ceeb1af16ce49c7c068d8b9bcbca8a80f978611cb4ec0a1c08a95b0295dce30000000000000000000000000000000000000000000000000000000000000006d8ceeb1af16ce49c7c068d8b9bcbca8a80f978611cb4ec0a1c08a95b0295dce3",
-              "newAddress": "0x00000000000000000000000000000000000ab001",
-              "bytecodeHash": "0xd8ceeb1af16ce49c7c068d8b9bcbca8a80f978611cb4ec0a1c08a95b0295dce3"
+              "newAddress": "0x00000000000000000000000000000000000ab001"
             }
           ],
           "delegateTo": "0x00000000000000000000000000000000000ab001",
