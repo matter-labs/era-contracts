@@ -321,6 +321,69 @@
   },
   {
     "type": "function",
+    "name": "previewBundleHash",
+    "inputs": [
+      {
+        "name": "_destinationChainId",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_callStarters",
+        "type": "tuple[]",
+        "internalType": "struct InteropCallStarter[]",
+        "components": [
+          {
+            "name": "to",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "callAttributes",
+            "type": "bytes[]",
+            "internalType": "bytes[]"
+          }
+        ]
+      },
+      {
+        "name": "_bundleAttributes",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "previewMessageHash",
+    "inputs": [
+      {
+        "name": "_recipient",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_payload",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_attributes",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "renounceOwnership",
     "inputs": [],
     "outputs": [],
@@ -852,11 +915,6 @@
   },
   {
     "type": "error",
-    "name": "AtomicBundleNotAllowedInSendMessage",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "AtomicBundleToL1NotSupported",
     "inputs": []
   },
@@ -964,6 +1022,17 @@
   },
   {
     "type": "error",
+    "name": "InteropPreviewHash",
+    "inputs": [
+      {
+        "name": "bundleHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InteropToSelfNotSupported",
     "inputs": []
   },
@@ -1026,6 +1095,11 @@
         "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "NonAtomicSendUnsupported",
+    "inputs": []
   },
   {
     "type": "error",
