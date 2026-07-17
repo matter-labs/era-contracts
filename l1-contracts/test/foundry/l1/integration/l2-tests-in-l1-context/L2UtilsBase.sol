@@ -34,6 +34,7 @@ import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
+import {L2ChainAssetHandlerDev} from "contracts/dev-contracts/L2ChainAssetHandlerDev.sol";
 import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
 import {ETH_TOKEN_ADDRESS, INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
@@ -118,7 +119,10 @@ library L2UtilsBase {
             vm.etch(address(L2_MESSAGE_VERIFICATION), l2messageVerification.code);
             address l2MessageRootStorage = address(new DummyL2InteropRootStorage());
             vm.etch(address(L2_INTEROP_ROOT_STORAGE), l2MessageRootStorage.code);
-            address l2ChainAssetHandler = address(new L2ChainAssetHandler());
+            // The Dev variant re-enables chain migrations, which are explicitly disabled in the
+            // production contracts for the v32 release (see `CHAIN_MIGRATIONS_ENABLED` in `Config.sol`),
+            // so that the L2 migration machinery stays covered by these tests.
+            address l2ChainAssetHandler = address(new L2ChainAssetHandlerDev());
             vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, l2ChainAssetHandler.code);
 
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
@@ -133,7 +137,9 @@ library L2UtilsBase {
             address l2AssetTrackerAddress = address(new L2AssetTracker());
             vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(_args.l1ChainId, bytes32(0), false);
+            // Initialize with the real base token asset id (the same one the NTV below is initialized
+            // with), so tests can exercise base-token paths against properly initialized state.
+            L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(_args.l1ChainId, baseTokenAssetId, false);
         }
         {
             address l2StandardTriggerAccount = address(new DummyL2StandardTriggerAccount());

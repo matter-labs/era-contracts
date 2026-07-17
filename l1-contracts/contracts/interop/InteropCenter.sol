@@ -38,6 +38,8 @@ import {MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/
 
 import {
     AtomicBundleCallCarriesValue,
+    AtomicBundleNotAllowedInSendMessage,
+    AtomicBundleToL1NotSupported,
     AttributeAlreadySet,
     AttributeViolatesRestriction,
     CannotInitiateInteropOnL1,
@@ -216,6 +218,9 @@ contract InteropCenter is
         bytes[] calldata attributes
     ) external payable whenNotPaused nonReentrant returns (bytes32 sendId) {
         (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(recipient);
+        // The recipient must carry a concrete address; a chain-only ERC-7930 encoding parses to address(0),
+        // which would collect value up-front yet never be executable and has no refund path.
+        require(recipientAddress != address(0), ZeroAddress());
 
         _ensureL2ToL2(recipientChainId);
 
@@ -223,11 +228,17 @@ contract InteropCenter is
             attributes,
             AttributeParsingRestrictions.CallAndBundleAttributes
         );
+        // A single-call send is never atomic; reject a stray `atomicBundle` attribute rather than silently
+        // ignoring it (`sendBundle` is the atomic entry point).
+        require(!_parseAtomicSend(attributes).isAtomic, AtomicBundleNotAllowedInSendMessage());
 
-        // If the unbundler was not set for a call, we set the unbundler to be equal to the original sender, so that it's
-        // still possible to unbundle the bundle containing the call. If the original sender is the contract, it'll still
-        // be able to unbundle the bundle either via direct call to `unbundleBundle`, or via `sendMessage` to `L2InteropHandler`,
-        // with specific payload. Refer to `L2InteropHandler` for details.
+        // If the unbundler was not set for a call, we set the unbundler to be equal to the original sender
+        // on this (source) chain, so that it's still possible to unbundle the bundle containing the call:
+        // the sender unbundles via an interop message to the destination `L2InteropHandler` (its
+        // `receiveMessage` rescue path — refer to `L2InteropHandler` for details). The default deliberately
+        // pins the source chain rather than using a chain-wildcard (chainId 0): a wildcard would let a
+        // same-address contract on another chain (e.g. a malicious clone) unbundle. Senders that want to
+        // unbundle directly on the destination can pass an explicit `unbundlerAddress` attribute.
         if (bundleAttributes.unbundlerAddress.length == 0) {
             bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
         }
@@ -287,6 +298,11 @@ contract InteropCenter is
             // slither-disable-next-line unused-return
             (, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_callStarters[i].to);
 
+            // Same guard as `sendMessage`: an ERC-7930 encoding with an empty address field parses to
+            // address(0), which would collect value up-front for a call that can never execute and has
+            // no refund path.
+            require(recipientAddress != address(0), ZeroAddress());
+
             // Store original attributes for MessageSent event emission
             originalCallAttributes[i] = _callStarters[i].callAttributes;
 
@@ -307,10 +323,13 @@ contract InteropCenter is
             AttributeParsingRestrictions.OnlyBundleAttributes
         );
 
-        // If the unbundler was not set for a bundle, we set the unbundler to be equal to the original sender, so
-        // that it's still possible to unbundle the bundle. If the original sender is the contract, it'll still be
-        // able to unbundle the bundle either via direct call to `unbundleBundle`, or via `sendMessage` to `L2InteropHandler`,
-        // with specific payload. Refer to `L2InteropHandler` for details.
+        // If the unbundler was not set for a bundle, we set the unbundler to be equal to the original
+        // sender on this (source) chain, so that it's still possible to unbundle the bundle: the sender
+        // unbundles via an interop message to the destination `L2InteropHandler` (its `receiveMessage`
+        // rescue path — refer to `L2InteropHandler` for details). The default deliberately pins the source
+        // chain rather than using a chain-wildcard (chainId 0): a wildcard would let a same-address
+        // contract on another chain (e.g. a malicious clone) unbundle. Senders that want to unbundle
+        // directly on the destination can pass an explicit `unbundlerAddress` attribute.
         if (bundleAttributes.unbundlerAddress.length == 0) {
             bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
         }
@@ -371,8 +390,9 @@ contract InteropCenter is
     ///      accounting path that is not supported.
     /// @dev The remaining destination-dependent requirements are enforced in `_sendBundle` once the call
     ///      attributes have been parsed: an L1-destined call must be an indirect, zero-value call to the L2
-    ///      AssetRouter (a withdrawal), and non-L1 destinations are checked against the Bridgehub registry
-    ///      (`DestinationChainNotRegistered`).
+    ///      AssetRouter (a withdrawal), an L1-destined bundle must not be atomic
+    ///      (`AtomicBundleToL1NotSupported`), and non-L1 destinations are checked against the Bridgehub
+    ///      registry (`DestinationChainNotRegistered`).
     /// @param _destinationChainId Destination chain ID.
     /// @param _callCount Number of calls in the bundle.
     function _ensureValidDestination(uint256 _destinationChainId, uint256 _callCount) internal view {
@@ -468,6 +488,16 @@ contract InteropCenter is
         bytes[][] memory _originalCallAttributes,
         AtomicSend memory _atomicSend
     ) internal returns (bytes32 bundleHash) {
+        // An atomic bundle can never target L1: it is not published as an L2->L1 message (its commit
+        // value goes to the IMT instead) and L1 has no atomic execution, so its only possible outcome
+        // would be a timeout refund — but L2->L1 withdrawals must never be revertable (their
+        // `totalWithdrawalsToL1` accounting is consumed once during the L1->GW migration and must stay
+        // append-only, see {L2AssetTracker}). Checked here, before any burn, since both entry points
+        // (`sendMessage` and `sendBundle`) funnel through `_sendBundle`.
+        if (_atomicSend.isAtomic) {
+            require(_destinationChainId != L1_CHAIN_ID, AtomicBundleToL1NotSupported());
+        }
+
         // Note: no gateway-mode requirement here — interop bundles may be sent by chains settling
         // directly on L1. Cross-layer correctness is enforced by the message-inclusion proof on the
         // receiving side (or, for atomic bundles, by the per-leg IMT inclusion proofs), not by any
@@ -670,8 +700,9 @@ contract InteropCenter is
     function _validateAtomicBundle(InteropBundle memory _bundle) internal pure {
         uint256 callsLength = _bundle.calls.length;
         for (uint256 i = 0; i < callsLength; ++i) {
-            if (_bundle.calls[i].value != 0) {
-                revert AtomicBundleCallCarriesValue(i, _bundle.calls[i].value);
+            InteropCall memory currentCall = _bundle.calls[i];
+            if (currentCall.value != 0) {
+                revert AtomicBundleCallCarriesValue(i, currentCall.value);
             }
         }
     }

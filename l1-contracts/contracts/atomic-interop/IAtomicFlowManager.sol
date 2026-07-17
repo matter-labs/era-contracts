@@ -20,7 +20,7 @@ import {LegState, AtomicFlow, ImtProof, AtomicFinalityProof} from "./IAtomicInte
 ///      the deadline. The handler then executes the bundle (and owns the double-execute guard).
 ///   3. `authorizeRefund` / `claimRefund` — the timeout path: prove (O(log n) non-inclusion) that a leg
 ///      can no longer be committed in time, then **recover** the burned source funds to the depositor
-///      by asking each of the bundle's call targets to reverse itself via
+///      by asking each burn-producing call's local sender (`InteropCall.from`) to reverse itself via
 ///      {IAtomicRecoverable.recoverAtomicCall}.
 ///
 /// `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`,

@@ -25,15 +25,25 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {MAX_TOKEN_BALANCE} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
-import {AssetAlreadyRegistered, AssetIdNotRegistered} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {
+    AssetAlreadyRegistered,
+    AssetIdNotRegistered,
+    BaseTokenNativeToThisChain
+} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {L2BaseTokenZKOS} from "contracts/l2-system/zksync-os/L2BaseTokenZKOS.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
+import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {L2UtilsBase} from "../l2-tests-in-l1-context/L2UtilsBase.sol";
 
-import {Unauthorized, BaseTokenPreV31TotalSupplyNotSet} from "contracts/common/L1ContractErrors.sol";
+import {
+    Unauthorized,
+    BaseTokenPreV31TotalSupplyNotSet,
+    RecoverToL1NotSupported
+} from "contracts/common/L1ContractErrors.sol";
 import {RAND_ADDRESS} from "test/foundry/TestConstants.sol";
 
 import {LogFinder} from "../utils/LogFinder.sol";
@@ -208,6 +218,95 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         vm.prank(RAND_ADDRESS);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, RAND_ADDRESS));
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(1, 100);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  handleRecoverBaseTokenBridgingOnL2
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// @notice An L2->L2 base-token recovery is accepted and mutates no accounting: the forward direction
+    /// (`handleInitiateBaseTokenBridgingOnL2`) records nothing for an L2->L2 bridge-out of the
+    /// never-native base token, so there is nothing to reverse.
+    /// @dev Runs against the live initialized state (the tracker and NTV are initialized with the real
+    /// base token asset id during environment genesis) — no mocks or storage writes. The environment-wide
+    /// mocks are cleared first: the shared deployer mocks `NTV.originChainId(base)` to `block.chainid`
+    /// for its chain-migration fixtures, which would shadow the NTV's real initialized state.
+    function test_handleRecoverBaseTokenBridgingOnL2_noAccountingToReverse() public {
+        vm.clearMockedCalls();
+        L2AssetTracker tracker = L2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        bytes32 liveBaseTokenAssetId = tracker.BASE_TOKEN_ASSET_ID();
+        uint256 nonL1DestinationChainId = 505;
+        uint256 amount = 300;
+
+        uint256 withdrawalsBefore = _readTotalWithdrawalsToL1(liveBaseTokenAssetId);
+        uint256 chainBalanceBefore = tracker.chainBalance(block.chainid, liveBaseTokenAssetId);
+
+        vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
+        L2_ASSET_TRACKER.handleRecoverBaseTokenBridgingOnL2(nonL1DestinationChainId, amount);
+
+        assertEq(
+            tracker.chainBalance(block.chainid, liveBaseTokenAssetId),
+            chainBalanceBefore,
+            "no chainBalance may be re-credited: the base token is never native, so none was decreased"
+        );
+        assertEq(
+            _readTotalWithdrawalsToL1(liveBaseTokenAssetId),
+            withdrawalsBefore,
+            "totalWithdrawalsToL1 must not move for an L2->L2 recovery"
+        );
+    }
+
+    /// @notice Recovering an L1-destined bridge-out is unreachable (the InteropCenter rejects L1-destined
+    /// atomic bundles at send, and no other revert path exists) and must revert: `totalWithdrawalsToL1`
+    /// is consumed once during the L1->GW migration and must stay append-only.
+    function test_handleRecoverBaseTokenBridgingOnL2_revertWhenToL1() public {
+        uint256 liveL1ChainId = L2AssetTracker(L2_ASSET_TRACKER_ADDR).L1_CHAIN_ID();
+
+        vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
+        vm.expectRevert(RecoverToL1NotSupported.selector);
+        L2_ASSET_TRACKER.handleRecoverBaseTokenBridgingOnL2(liveL1ChainId, 100);
+    }
+
+    /// @notice The base token can never originate from this chain (`handleFinalizeBaseTokenBridgingOnL2`
+    /// hard-codes non-native); the recovery hook asserts the invariant instead of silently re-crediting
+    /// a chainBalance that was never decreased.
+    /// @dev The impossible state is reached through the real initialization method rather than a storage
+    /// write: `updateL2` (pranked as the upgrader) re-writes the base token's `originChainId` while the
+    /// asset id itself stays frozen. Environment-wide mocks are cleared first (see
+    /// `test_handleRecoverBaseTokenBridgingOnL2_noAccountingToReverse`) so the revert provably comes from
+    /// the NTV's real storage, not the deployer's `originChainId` mock.
+    function test_handleRecoverBaseTokenBridgingOnL2_revertWhenBaseTokenNativeToThisChain() public {
+        vm.clearMockedCalls();
+        L2NativeTokenVault ntv = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        uint256 liveL1ChainId = ntv.L1_CHAIN_ID();
+        address liveOwner = ntv.owner();
+        bytes32 liveProxyBytecodeHash = ntv.L2_TOKEN_PROXY_BYTECODE_HASH();
+        address liveWethToken = ntv.WETH_TOKEN();
+        TokenBridgingData memory bridgingData = TokenBridgingData({
+            assetId: ntv.BASE_TOKEN_ASSET_ID(),
+            originChainId: block.chainid,
+            originToken: ntv.BASE_TOKEN_ORIGIN_TOKEN()
+        });
+        TokenMetadata memory metadata = TokenMetadata({
+            name: ntv.BASE_TOKEN_NAME(),
+            symbol: ntv.BASE_TOKEN_SYMBOL(),
+            decimals: ntv.BASE_TOKEN_DECIMALS()
+        });
+
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        // solhint-disable-next-line func-named-parameters
+        ntv.updateL2(liveL1ChainId, liveOwner, liveProxyBytecodeHash, liveWethToken, bridgingData, metadata);
+
+        vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
+        vm.expectRevert(BaseTokenNativeToThisChain.selector);
+        L2_ASSET_TRACKER.handleRecoverBaseTokenBridgingOnL2(505, 100);
+    }
+
+    /// @notice Only the BaseTokenHolder may report a base-token recovery.
+    function test_handleRecoverBaseTokenBridgingOnL2_revertUnauthorized() public {
+        vm.prank(RAND_ADDRESS);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, RAND_ADDRESS));
+        L2_ASSET_TRACKER.handleRecoverBaseTokenBridgingOnL2(505, 100);
     }
 
     // ═══════════════════════════════════════════════════════════════════

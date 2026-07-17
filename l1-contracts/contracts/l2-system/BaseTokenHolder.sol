@@ -78,6 +78,14 @@ contract BaseTokenHolder is IBaseTokenHolder {
         _;
     }
 
+    /// @notice Modifier that restricts access to the NativeTokenVault only (failed-transfer recovery).
+    modifier onlyNativeTokenVault() {
+        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @notice Modifier that restricts access to L2BaseToken only.
     /// @dev Used for receiving initial balance during initL2.
     modifier onlyL2BaseToken() {
@@ -106,6 +114,24 @@ contract BaseTokenHolder is IBaseTokenHolder {
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(_fromChainId, _amount);
         Address.sendValue(payable(_to), _amount);
         emit BaseTokenMintedInterop(_to, _amount);
+    }
+
+    /// @notice Returns base tokens escrowed by a failed/timed-out bridge-out to the original depositor.
+    /// @dev The inverse of `burnAndStartBridging`: notifies the asset tracker — which asserts the bridge-out
+    /// is recoverable (L2->L2 only; L2->L1 withdrawals are never revertable) — then returns the value.
+    /// Callable only by the NativeTokenVault (atomic-interop timeout recovery). Like `give`, this
+    /// pushes ETH and may revert if `_to` rejects it — recovery targets the original depositor by design.
+    /// @param _to The original depositor to refund.
+    /// @param _amount The amount of base tokens to return.
+    /// @param _toChainId The original bridge-out destination chain id (to reverse the matching accounting).
+    function recoverBaseToken(address _to, uint256 _amount, uint256 _toChainId) external override onlyNativeTokenVault {
+        if (_amount == 0) {
+            return;
+        }
+
+        L2_ASSET_TRACKER.handleRecoverBaseTokenBridgingOnL2(_toChainId, _amount);
+        Address.sendValue(payable(_to), _amount);
+        emit BaseTokenRecovered(_to, _amount);
     }
 
     /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.
