@@ -188,11 +188,12 @@ jobs:
           if-no-files-found: warn
           retention-days: 90
 
-      # Best-effort Etherscan verification. Replays the `forge verify-contract`
-      # commands step 1 logged, appending the chain + key + a live-tx guess for
-      # constructor args. Etherscan read APIs lag freshly deployed code, so some
-      # may need a manual re-run with explicit --constructor-args; failures here
-      # do not fail the deploy (transactions.txt / PUVT is the source of truth).
+      # Etherscan verification. Replays the `forge verify-contract` commands step
+      # 1 logged — which already carry the exact `--constructor-args <hex>` taken
+      # from the CREATE2 init code, so nothing is guessed. Etherscan read APIs lag
+      # freshly deployed code, so `--retries/--delay` ride that out; any residual
+      # failure warns (re-run once indexed) but never fails the deploy
+      # (transactions.txt / PUVT is the source of truth).
       - name: Verify contracts on Etherscan
         if: ${{ inputs.run_verify }}
         continue-on-error: true
@@ -212,16 +213,24 @@ jobs:
             mainnet) CHAIN=mainnet ;;
             *) CHAIN=sepolia ;;
           esac
-          ok=0; fail=0
-          # Each logged line is: `forge verify-contract 0xADDR ContractName`
-          grep -oE "forge verify-contract 0x[0-9a-fA-F]{40} [A-Za-z0-9_]+" "$LOG" | sort -u | while read -r _ _ addr name; do
-            echo "--- verify $name @ $addr ---"
-            if forge verify-contract "$addr" "$name" \
-                 --chain "$CHAIN" --etherscan-api-key "$ETHERSCAN_API_KEY" \
-                 --guess-constructor-args --watch; then
-              echo "  OK"
-            else
-              echo "::warning::verification failed for $name @ $addr (may need explicit --constructor-args)"
-            fi
-          done
-          echo "Verification pass complete (see warnings for any that need a manual re-run)."
+          # Replay each logged `forge verify-contract …` command VERBATIM. Step 1
+          # already emits the exact `--constructor-args <hex>` for every contract
+          # that has them (derived from the CREATE2 init code it deployed — see
+          # Create2FactoryUtils.notifyAboutDeployment), so there is nothing to
+          # guess. We only append the chain + `--watch`; the key comes from
+          # $ETHERSCAN_API_KEY in the env. `--retries/--delay` ride out Etherscan
+          # indexing freshly-deployed code. Best-effort: a failure warns (some may
+          # need a re-run once Etherscan has indexed the code) but never fails the
+          # deploy — transactions.txt / PUVT is the source of truth.
+          grep 'forge verify-contract' "$LOG" \
+            | sed 's/^.*forge verify-contract/forge verify-contract/' \
+            | sort -u \
+            | while IFS= read -r cmd; do
+                echo "--- $cmd"
+                if eval "$cmd --chain $CHAIN --watch --retries 8 --delay 20"; then
+                  echo "  OK"
+                else
+                  echo "::warning::verification failed (re-run once Etherscan indexes the code): $cmd"
+                fi
+              done
+          echo "Verification pass complete (constructor args come from the deploy init code; see warnings for any Etherscan-lag retries)."

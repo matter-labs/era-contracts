@@ -121,13 +121,16 @@ DEPLOYER_ADDR=$(cast wallet address --private-key "$DEPLOYER_KEY")
   --max-gas-price-gwei 500 \
   --out "$OUT/deploy-executed.json"
 
-# Verify on Etherscan (best-effort; replays the logged forge verify-contract cmds)
+# Verify on Etherscan — replay the logged forge verify-contract commands VERBATIM.
+# Step 1 already wrote the exact `--constructor-args <hex>` for every contract
+# (from the CREATE2 init code it deployed), so nothing is guessed.
 cd l1-contracts
-grep -oE "forge verify-contract 0x[0-9a-fA-F]{40} [A-Za-z0-9_]+" \
+export ETHERSCAN_API_KEY   # forge reads it from the env
+grep 'forge verify-contract' \
     "upgrade-envs/v0.31.0-interopB/output/mainnet/extra-verification-logs.txt" | sort -u |
-  while read -r _ _ addr name; do
-    forge verify-contract "$addr" "$name" --chain mainnet \
-      --etherscan-api-key "$ETHERSCAN_API_KEY" --guess-constructor-args --watch || true
+  while IFS= read -r cmd; do
+    cmd="forge verify-contract${cmd#*forge verify-contract}"
+    eval "$cmd --chain mainnet --watch --retries 8 --delay 20" || true
   done
 ```
 
