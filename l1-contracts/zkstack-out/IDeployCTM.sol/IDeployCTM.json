@@ -158,7 +158,7 @@
                 "internalType": "address"
               },
               {
-                "name": "genesisRegistry",
+                "name": "currentRelease",
                 "type": "address",
                 "internalType": "address"
               }

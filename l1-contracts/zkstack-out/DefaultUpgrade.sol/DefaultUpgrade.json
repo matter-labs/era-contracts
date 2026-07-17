@@ -190,17 +190,12 @@
   },
   {
     "type": "function",
-    "name": "upgradeFromRegistry",
+    "name": "upgradeFromTransition",
     "inputs": [
       {
-        "name": "_registry",
+        "name": "_transition",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "_upgradeTimestamp",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "outputs": [
@@ -718,6 +713,22 @@
         "name": "length",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "RegistryWrongCTM",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "actual",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   },

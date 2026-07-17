@@ -24,22 +24,24 @@ const ARTIFACTS = {
   AdminFacet: "Admin.sol/AdminFacet.json",
   BaseTokenHolder: "BaseTokenHolder.sol/BaseTokenHolder.json",
   // ── Registry-driven upgrade machinery (see registry-upgrade-test-runner.ts) ──
-  UpgradeExecutor: "UpgradeExecutor.sol/UpgradeExecutor.json",
-  CTMUpgradeModule: "CTMUpgradeModule.sol/CTMUpgradeModule.json",
-  EcosystemUpgradeModule: "EcosystemUpgradeModule.sol/EcosystemUpgradeModule.json",
+  CTMUpgradeExecutor: "CTMUpgradeExecutor.sol/CTMUpgradeExecutor.json",
+  EcosystemUpgradeExecutor: "EcosystemUpgradeExecutor.sol/EcosystemUpgradeExecutor.json",
   RegistryComposerHarness: "RegistryComposerHarness.sol/RegistryComposerHarness.json",
   IChainTypeManager: "IChainTypeManager.sol/IChainTypeManager.json",
-  ICTMRegistry: "ICTMRegistry.sol/ICTMRegistry.json",
+  ICTMRelease: "ICTMRelease.sol/ICTMRelease.json",
+  ICTMTransition: "ICTMTransition.sol/ICTMTransition.json",
   ICoreRegistry: "ICoreRegistry.sol/ICoreRegistry.json",
   DefaultUpgrade: "DefaultUpgrade.sol/DefaultUpgrade.json",
   DiamondInit: "DiamondInit.sol/DiamondInit.json",
   ZKsyncOSTestnetVerifier: "ZKsyncOSTestnetVerifier.sol/ZKsyncOSTestnetVerifier.json",
   ProxyAdmin: "ProxyAdmin.sol/ProxyAdmin.json",
   L1MessageRoot: "L1MessageRoot.sol/L1MessageRoot.json",
-  // Committed generated registries (contracts/upgrades/registry/v32, tag "V32"). They compile
-  // with the regular forge build; regenerate via `yarn regen:v32-registries` (emit mode of the
-  // registry upgrade runner).
-  CTMRegistry: "CTMRegistry.sol/CTMRegistry.json",
+  // Fixed write-once release/transition/core-registry implementations
+  // (contracts/upgrades/registry). They compile with the regular forge build; the committed
+  // manifest they are initialized from regenerates via `yarn regen:v32-registries` (emit mode
+  // of the registry upgrade runner).
+  CTMRelease: "CTMRelease.sol/CTMRelease.json",
+  CTMTransition: "CTMTransition.sol/CTMTransition.json",
   CoreRegistry: "CoreRegistry.sol/CoreRegistry.json",
   BridgedStandardERC20: "BridgedStandardERC20.sol/BridgedStandardERC20.json",
   ChainAdminOwnable: "ChainAdminOwnable.sol/ChainAdminOwnable.json",

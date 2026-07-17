@@ -4,42 +4,48 @@
  * Proves the NEW registry-driven upgrade process end-to-end on live anvil chains, mirroring
  * the foundry e2e test `test/foundry/l1/unit/concrete/Upgrades/registry/RegistryDrivenUpgrade.t.sol`
  * but against a fully deployed ecosystem (the pre-generated anvil-interop chain states) and
- * with REAL storage-backed, write-once registries initialized from the committed manifest:
+ * with REAL storage-backed, write-once upgrade objects initialized from the committed manifest:
  *
  *   1. Boot the pre-generated ecosystem (current branch's code) from chain-states/.
- *   2. Deploy the registry-driven machinery on the anvil L1: `UpgradeExecutor`,
- *      `CTMUpgradeModule`, `EcosystemUpgradeModule`, plus the new-version implementations of a
- *      synthetic minor version bump (fresh `AdminFacet` as the facet change, `DefaultUpgrade`
- *      as the init contract, fresh `ZKsyncOSTestnetVerifier`, fresh `DiamondInit`, and a fresh
- *      `L1MessageRoot` implementation for the ecosystem leg). Every codehash-pinned
- *      implementation is deployed from the `registry-deterministic` forge profile output
- *      (CBOR-metadata-free ⇒ byte-identical across platforms), and the deployer key + starting
- *      nonce are fixed by the committed chain states, so all addresses AND codehashes are
- *      reproducible run-to-run and machine-to-machine.
- *   3. Deploy the fixed `CTMRegistry` + `CoreRegistry` implementations and initialize them
- *      (write-once) from the COMMITTED manifest scripts/registry-manifests/v32-local.json —
- *      the reviewable per-upgrade artifact — then assert `verifyAll()` against the live
- *      deployment. This is the default CONSUME mode: the manifest is never regenerated here,
- *      so any drift between the committed data and the live/freshly-deployed addresses or
- *      codehashes fails loudly. With `REGEN_REGISTRIES=1` (EMIT mode, `yarn
- *      regen:v32-registries`) the runner instead rebuilds the manifest from the LIVE
- *      deployment (live facet addresses, live genesis-upgrade address, freshly deployed
- *      implementations, pinned codehashes) and writes it to the committed path, then
- *      continues exactly like consume mode — the regenerated manifest is meant to be
- *      committed.
- *   4. Hand the CTM to the executor through the production surface
+ *   2. Deploy the registry-driven machinery on the anvil L1: the two domain-specific executors
+ *      (`CTMUpgradeExecutor`, `EcosystemUpgradeExecutor`), plus the new-version implementations
+ *      of a synthetic minor version bump (fresh `AdminFacet` as the facet change,
+ *      `DefaultUpgrade` as the init contract, fresh `ZKsyncOSTestnetVerifier`, fresh
+ *      `DiamondInit`, and a fresh `L1MessageRoot` implementation for the ecosystem leg). Every
+ *      codehash-pinned implementation is deployed from the `registry-deterministic` forge
+ *      profile output (CBOR-metadata-free ⇒ byte-identical across platforms), and the deployer
+ *      key + starting nonce are fixed by the committed chain states, so all addresses AND
+ *      codehashes are reproducible run-to-run and machine-to-machine.
+ *   3. Deploy the fixed `CTMRelease` + `CTMTransition` + `CoreRegistry` implementations and
+ *      initialize them (write-once) from the COMMITTED manifest
+ *      scripts/registry-manifests/v32-local.json — the reviewable per-upgrade artifact:
+ *      - the RELEASE describes what a chain at the target version IS (complete facet set,
+ *        DiamondInit, base-system hashes, genesis params) — version-independent;
+ *      - the TRANSITION describes how the CURRENT release becomes that release (facet swaps,
+ *        L2 leg, schedule, verifier) and pins both edges: `fromRelease -> newRelease` and
+ *        `oldProtocolVersion -> newProtocolVersion`.
+ *      Then assert `verifyAll()` against the live deployment. This is the default CONSUME mode:
+ *      the manifest is never regenerated here, so any drift between the committed data and the
+ *      live/freshly-deployed addresses or codehashes fails loudly. With `REGEN_REGISTRIES=1`
+ *      (EMIT mode, `yarn regen:v32-registries`) the runner instead rebuilds the manifest from
+ *      the LIVE deployment and writes it to the committed path, then continues exactly like
+ *      consume mode — the regenerated manifest is meant to be committed.
+ *   4. Hand the CTM to the `CTMUpgradeExecutor` through the production surface
  *      (`transferOwnership` + `executor.forward(acceptOwnership)`) and the ecosystem
- *      `ProxyAdmin` through its 1-step `transferOwnership`.
- *   5. Execute the upgrade purely through `executor.execute(module, ...)` calls
- *      (`applyCTMUpgrade`, `applyL1Upgrade`, per-chain `upgradeChain`) — no stage-0/1/2
- *      governance calldata is generated or replayed anywhere.
- *   6. Assert the end state: CTM protocol version bumped, upgrade cut hash committed, new
- *      verifier registered, chain diamonds re-pointed to the fresh AdminFacet, chain protocol
- *      versions bumped, the committed L2 upgrade tx hash equal to the registry-composed
- *      transaction, and the MessageRoot proxy re-pointed by the ecosystem module.
- *   7. Relay the registry-composed L2 upgrade transaction to each target L2 anvil chain through
- *      the real `L2ComplexUpgrader` (impersonating the force deployer), reusing the existing
- *      runner's L2 patching approach.
+ *      `ProxyAdmin` to the `EcosystemUpgradeExecutor` through its 1-step `transferOwnership`.
+ *   5. Execute the upgrade purely through the executors' fixed entrypoints
+ *      (`applyCTMUpgrade(transition)`, `applyL1Upgrade(coreRegistry)`, per-chain
+ *      `upgradeChain(transition, chainId)`) — no generic delegatecall modules and no
+ *      stage-0/1/2 governance calldata anywhere. The schedule (upgrade timestamp, old-version
+ *      deadline) lives IN the transition, not in call arguments.
+ *   6. Assert the end state: CTM protocol version bumped, `currentRelease` moved to the target
+ *      release, upgrade cut hash committed, new verifier registered, chain diamonds re-pointed
+ *      to the fresh facets, chain protocol versions bumped, the committed L2 upgrade tx hash
+ *      equal to the transition-composed transaction, and the MessageRoot proxy re-pointed by
+ *      the ecosystem executor.
+ *   7. Relay the transition-composed L2 upgrade transaction to each target L2 anvil chain
+ *      through the real `L2ComplexUpgrader` (impersonating the force deployer), reusing the
+ *      existing runner's L2 patching approach.
  *
  * ── Harness patches (deviations from production, mirroring v31-upgrade-test-runner) ──
  *
@@ -49,16 +55,16 @@
  *   `BaseZkSyncUpgrade._setNewProtocolVersion` correctly reverts with
  *   `PreviousUpgradeNotFinalized` otherwise. Same patch (and justification) as the existing
  *   v31 runner — there is no public API to execute a batch on a sequencer-less anvil chain.
- * - L2 delegate target: the registry pins `delegateTo` (the per-upgrade L2 upgrade
+ * - L2 delegate target: the transition pins `delegateTo` (the per-upgrade L2 upgrade
  *   implementation which production force-deploys within the same transaction) at a fixed
  *   address; the harness places a no-op contract there via `anvil_setCode` because the L2
  *   contract deployer built-in on the anvil L2 chains is a silent no-op stub (bytecode cannot
  *   be force-deployed from within the EVM). This synthetic minor bump has no L2 init logic, so
  *   a no-op stand-in is the faithful equivalent.
  *
- * Everything else — ownership handover, migration pausing, registry composition, diamond cuts,
- * `DefaultUpgrade` init delegatecall, L2 tx commitment, `L2ComplexUpgrader` execution — runs
- * through unpatched production code paths.
+ * Everything else — ownership handover, migration pausing, transition composition, diamond
+ * cuts, `DefaultUpgrade.upgradeFromTransition` init delegatecall, L2 tx commitment,
+ * `L2ComplexUpgrader` execution — runs through unpatched production code paths.
  */
 
 import { execSync } from "child_process";
@@ -75,7 +81,7 @@ import {
   getDeterministicCreationBytecode,
 } from "../core/contracts";
 import { impersonateAndRun } from "../core/utils";
-import { coreInitArgs, ctmInitArgs } from "./registry-manifest";
+import { coreInitArgs, releaseInitArgs, transitionInitArgs } from "./registry-manifest";
 import type { ChainRole } from "../core/types";
 import { clearGenesisUpgradeTxHash, selectUpgradeChains, traceFailedTx } from "./v31-upgrade-test-runner";
 
@@ -91,12 +97,12 @@ const SEMVER_MINOR_SHIFT = 32;
 const REGISTRY_TAG = "V32";
 const CTM_REGISTRY_NAME = "ZKsyncOS";
 
-// The fixed registry implementations live here; the incremental forge build below keeps their
-// artifacts current before deployment.
+// The fixed release/transition/core-registry implementations live here; the incremental forge
+// build below keeps their artifacts current before deployment.
 const REGISTRY_CONTRACTS_DIR_REL = "contracts/upgrades/registry";
 // Committed manifest for the local (chain-states) environment — the reviewable per-upgrade
-// artifact the registries are initialized from. The default CONSUME mode reads it as-is; the
-// EMIT mode (REGEN_REGISTRIES=1) rewrites it so the diff can be reviewed and committed.
+// artifact the upgrade objects are initialized from. The default CONSUME mode reads it as-is;
+// the EMIT mode (REGEN_REGISTRIES=1) rewrites it so the diff can be reviewed and committed.
 const REGISTRY_MANIFEST_REL = "scripts/registry-manifests/v32-local.json";
 
 // Set REGEN_REGISTRIES=1 to run in EMIT mode (see module docs).
@@ -108,8 +114,8 @@ const STALE_REGISTRIES_HINT =
   `(${REGISTRY_MANIFEST_REL}).`;
 
 // Sources compiled with the `registry-deterministic` forge profile (CBOR-metadata-free ⇒
-// byte-identical across platforms; see foundry.toml). Everything the committed registries pin
-// a codehash/bytecode-hash for MUST be deployed from this build, otherwise registries
+// byte-identical across platforms; see foundry.toml). Everything the committed manifest pins
+// a codehash/bytecode-hash for MUST be deployed from this build, otherwise a manifest
 // regenerated on one machine would fail verifyAll() on another.
 const DETERMINISTIC_FOUNDRY_PROFILE = "registry-deterministic";
 const DETERMINISTIC_SOURCES = [
@@ -125,7 +131,7 @@ const DETERMINISTIC_SOURCES = [
   "contracts/dev-contracts/MockContractDeployer.sol",
 ];
 
-// Fixed L2 address the registry pins for the upgrade's L2 delegate target (and its unsafe
+// Fixed L2 address the transition pins for the upgrade's L2 delegate target (and its unsafe
 // force-deployment entry). In production this is where the per-upgrade L2 upgrade
 // implementation gets force-deployed by the same transaction; the harness places a no-op
 // contract there via anvil_setCode (see module docs above). Any free address works — this one
@@ -215,10 +221,11 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     const live = await readLiveUpgradeInputs(l1Provider, ctm, upgradeChains, l1Addresses.messageRoot);
     console.log(`  old protocol version: ${live.oldVersionString} (${live.oldVersion.toString()})`);
     console.log(`  new protocol version: ${live.newVersionString} (${live.newVersion.toString()})`);
+    console.log(`  current release: ${live.fromRelease}`);
     console.log(`  live AdminFacet: ${live.oldAdminFacet} (${live.adminSelectors.length} selectors)`);
 
-    // ── 3. Deploy the registry-driven upgrade machinery + new implementations ──
-    console.log("\n── Deploying UpgradeExecutor, modules and new-version implementations ──");
+    // ── 3. Deploy the executors + new implementations ──
+    console.log("\n── Deploying executors and new-version implementations ──");
     buildDeterministicArtifacts();
     const deployed = await deployUpgradeMachinery(deployer, {
       l1ChainId,
@@ -229,7 +236,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     });
 
     // ── 4. Regenerate (EMIT mode) or validate (CONSUME mode) the committed manifest, then
-    //       deploy + initialize the registries from it ──
+    //       deploy + initialize the release/transition/core registry from it ──
     const manifestPath = path.join(l1ContractsDir, REGISTRY_MANIFEST_REL);
     if (regenRegistries) {
       console.log(`\n── ${REGEN_ENV_VAR}=1: regenerating the committed v32 registry manifest ──`);
@@ -241,22 +248,30 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       console.log(`\n── Consuming the committed v32 registry manifest (${REGISTRY_MANIFEST_REL}) ──`);
       assertCommittedManifestMatchesLiveDeployment(manifestPath, live, deployed, ctmAddresses.chainTypeManager);
     }
-    const registries = await deployRegistriesFromManifest(deployer, manifestPath);
-    console.log(`  CTM registry:  ${registries.ctmRegistry}`);
-    console.log(`  core registry: ${registries.coreRegistry}`);
+    const objects = await deployUpgradeObjectsFromManifest(deployer, manifestPath);
+    console.log(`  CTM release:    ${objects.release}`);
+    console.log(`  CTM transition: ${objects.transition}`);
+    console.log(`  core registry:  ${objects.coreRegistry}`);
 
-    // The generated verifyAll() checks the pinned codehashes of every new implementation
-    // against the code actually live on this chain — the staleness gate for the committed
-    // registries.
-    const ctmRegistryContract = new ethers.Contract(registries.ctmRegistry, getAbi("ICTMRegistry"), l1Provider);
-    const coreRegistryContract = new ethers.Contract(registries.coreRegistry, getAbi("ICoreRegistry"), l1Provider);
+    // verifyAll() checks the pinned codehashes of every new implementation against the code
+    // actually live on this chain — the staleness gate for the committed manifest. (validate()
+    // is the reverting variant the executors call on the execution path.)
+    const releaseContract = new ethers.Contract(objects.release, getAbi("ICTMRelease"), l1Provider);
+    const transitionContract = new ethers.Contract(objects.transition, getAbi("ICTMTransition"), l1Provider);
+    const coreRegistryContract = new ethers.Contract(objects.coreRegistry, getAbi("ICoreRegistry"), l1Provider);
     try {
-      assertTrue(await ctmRegistryContract.verifyAll(), "CTM registry verifyAll() passes on the live deployment");
+      assertTrue(await releaseContract.verifyAll(), "CTM release verifyAll() passes on the live deployment");
+      assertTrue(await transitionContract.verifyAll(), "CTM transition verifyAll() passes on the live deployment");
       assertTrue(await coreRegistryContract.verifyAll(), "core registry verifyAll() passes on the live deployment");
       assertEq(
-        (await ctmRegistryContract.newProtocolVersion()).toString(),
+        await transitionContract.fromRelease(),
+        live.fromRelease,
+        "transition departs from the CTM's live current release"
+      );
+      assertEq(
+        (await transitionContract.newProtocolVersion()).toString(),
         live.newVersion.toString(),
-        "CTM registry pins the new protocol version"
+        "transition pins the new protocol version"
       );
       assertEq(
         (await coreRegistryContract.newProtocolVersion()).toString(),
@@ -268,9 +283,10 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     }
 
     // ── 5. Authority handover ──
-    console.log("\n── Handing CTM + ProxyAdmin authority to the UpgradeExecutor ──");
+    console.log("\n── Handing CTM + ProxyAdmin authority to the executors ──");
     await handOverAuthority(l1Provider, deployer, {
-      executor: deployed.executor,
+      ctmExecutor: deployed.ctmExecutor,
+      ecoExecutor: deployed.ecoExecutor,
       ctmAddr: ctmAddresses.chainTypeManager,
       proxyAdminAddr: live.ecosystemProxyAdmin,
     });
@@ -279,35 +295,22 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     console.log("\n── Pausing chain migrations ──");
     await setMigrationPaused(l1Provider, live.chainAssetHandler, true);
 
-    // ── 7. Execute the registry-driven upgrade through the executor ──
-    console.log("\n── Executing registry-driven upgrade via UpgradeExecutor ──");
-    const executor = new ethers.Contract(deployed.executor, getAbi("UpgradeExecutor"), deployer);
-    const ctmModuleIface = new ethers.utils.Interface(getAbi("CTMUpgradeModule"));
-    const ecoModuleIface = new ethers.utils.Interface(getAbi("EcosystemUpgradeModule"));
+    // ── 7. Execute the registry-driven upgrade through the domain executors ──
+    console.log("\n── Executing registry-driven upgrade via the domain executors ──");
+    const ctmExecutor = new ethers.Contract(deployed.ctmExecutor, getAbi("CTMUpgradeExecutor"), deployer);
+    const ecoExecutor = new ethers.Contract(deployed.ecoExecutor, getAbi("EcosystemUpgradeExecutor"), deployer);
 
     await sendAndCheck(
       l1Provider,
-      executor.execute(
-        deployed.ctmModule,
-        ctmModuleIface.encodeFunctionData("applyCTMUpgrade", [
-          registries.ctmRegistry,
-          ethers.constants.MaxUint256, // old protocol version stays usable
-          0, // upgrade timestamp: immediately executable
-        ]),
-        { gasLimit: DEFAULT_GAS_LIMIT }
-      ),
-      "executor.execute(CTMUpgradeModule.applyCTMUpgrade)"
+      ctmExecutor.applyCTMUpgrade(objects.transition, { gasLimit: DEFAULT_GAS_LIMIT }),
+      "ctmExecutor.applyCTMUpgrade(transition)"
     );
     console.log("  ✓ applyCTMUpgrade executed");
 
     await sendAndCheck(
       l1Provider,
-      executor.execute(
-        deployed.ecoModule,
-        ecoModuleIface.encodeFunctionData("applyL1Upgrade", [registries.coreRegistry]),
-        { gasLimit: DEFAULT_GAS_LIMIT }
-      ),
-      "executor.execute(EcosystemUpgradeModule.applyL1Upgrade)"
+      ecoExecutor.applyL1Upgrade(objects.coreRegistry, { gasLimit: DEFAULT_GAS_LIMIT }),
+      "ecoExecutor.applyL1Upgrade(coreRegistry)"
     );
     console.log("  ✓ applyL1Upgrade executed");
 
@@ -318,12 +321,8 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     for (const chain of upgradeChains) {
       await sendAndCheck(
         l1Provider,
-        executor.execute(
-          deployed.ctmModule,
-          ctmModuleIface.encodeFunctionData("upgradeChain", [registries.ctmRegistry, chain.chainId, 0]),
-          { gasLimit: DEFAULT_GAS_LIMIT }
-        ),
-        `executor.execute(CTMUpgradeModule.upgradeChain) for chain ${chain.chainId}`
+        ctmExecutor.upgradeChain(objects.transition, chain.chainId, { gasLimit: DEFAULT_GAS_LIMIT }),
+        `ctmExecutor.upgradeChain(transition) for chain ${chain.chainId}`
       );
       console.log(`  ✓ chain ${chain.chainId} upgraded`);
     }
@@ -339,12 +338,17 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       getAbi("RegistryComposerHarness"),
       l1Provider
     );
-    const expectedL2TxHash: string = await composerHarness.l2UpgradeTxHash(registries.ctmRegistry);
+    const expectedL2TxHash: string = await composerHarness.l2UpgradeTxHash(objects.transition);
 
     assertEq(
       (await ctm.protocolVersion()).toString(),
       live.newVersion.toString(),
-      "CTM protocol version bumped to the registry's new version"
+      "CTM protocol version bumped to the transition's new version"
+    );
+    assertEq(
+      await ctm.currentRelease(),
+      objects.release,
+      "CTM currentRelease moved to the transition's target release"
     );
     assertTrue(
       (await ctm.upgradeCutHash(live.oldVersion)) !== ethers.constants.HashZero,
@@ -383,19 +387,19 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       assertEq(
         await diamond.getL2SystemContractsUpgradeTxHash(),
         expectedL2TxHash,
-        `chain ${chain.chainId}: committed L2 upgrade tx hash equals the registry-composed transaction`
+        `chain ${chain.chainId}: committed L2 upgrade tx hash equals the transition-composed transaction`
       );
     }
     const implSlot = await l1Provider.getStorageAt(l1Addresses.messageRoot, EIP1967_IMPL_SLOT);
     assertEq(
       ethers.utils.getAddress("0x" + implSlot.slice(26)),
       deployed.newMessageRootImpl,
-      "MessageRoot proxy re-pointed to the fresh implementation by EcosystemUpgradeModule"
+      "MessageRoot proxy re-pointed to the fresh implementation by EcosystemUpgradeExecutor"
     );
 
     // ── 10. Relay the composed L2 upgrade tx to each target L2 chain ──
-    console.log("\n── Relaying the registry-composed L2 upgrade transaction ──");
-    const composedTx = await composerHarness.l2UpgradeTx(registries.ctmRegistry);
+    console.log("\n── Relaying the transition-composed L2 upgrade transaction ──");
+    const composedTx = await composerHarness.l2UpgradeTx(objects.transition);
     for (const chain of upgradeChains) {
       const l2Chain = anvilManager.getL2Chains().find((c) => c.chainId === chain.chainId);
       if (!l2Chain) {
@@ -423,6 +427,8 @@ type LiveUpgradeInputs = {
   newVersion: ethers.BigNumber;
   oldVersionString: string;
   newVersionString: string;
+  /** The CTM's live `currentRelease` — the release edge the transition must depart from. */
+  fromRelease: string;
   oldAdminFacet: string;
   adminSelectors: string[];
   otherFacets: { name: string; address: string }[];
@@ -433,6 +439,10 @@ type LiveUpgradeInputs = {
   eraGatewayChainId: ethers.BigNumber;
   ecosystemProxyAdmin: string;
   messageRootProxy: string;
+  /** Live complete base-system hashes — the release carries complete target values. */
+  bootloaderHash: string;
+  defaultAccountHash: string;
+  evmEmulatorHash: string;
 };
 
 /** The probed live facet address by name (see readLiveUpgradeInputs facet probes). */
@@ -459,18 +469,25 @@ async function readLiveUpgradeInputs(
   const oldMinor = oldVersion.div(minorShift).toNumber();
   const newVersion = ethers.BigNumber.from(oldMinor + 1).mul(minorShift);
 
+  // The release edge: the chain states are a registry-era deployment, so the CTM must already
+  // carry a genesis release. (A zero fromRelease is migration-only semantics — v31 -> v32.)
+  const fromRelease: string = await ctm.currentRelease();
+  if (fromRelease === ethers.constants.AddressZero) {
+    throw new Error("live CTM has no currentRelease — regenerate the chain states from registry-era code");
+  }
+
   const adminIface = new ethers.utils.Interface(getAbi("AdminFacet"));
   const acceptAdminSelector = adminIface.getSighash(ACCEPT_ADMIN_FRAGMENT);
 
   // Locate the live AdminFacet (address + installed selectors) on the first target chain and
-  // check that every target chain shares it — the registry pins ONE facet set per version.
+  // check that every target chain shares it — the release pins ONE facet set.
   const firstDiamond = new ethers.Contract(upgradeChains[0].diamondProxy, getAbi("GettersFacet"), l1Provider);
   const oldAdminFacet: string = await firstDiamond.facetAddress(acceptAdminSelector);
   const adminSelectors: string[] = await firstDiamond.facetFunctionSelectors(oldAdminFacet);
 
   // Locate the remaining live facets by probing one representative selector each, so the
-  // registry can pin (and verifyAll() can cover) the complete facet surface, not only the
-  // facet this synthetic bump replaces.
+  // release can pin (and verifyAll() can cover) the complete facet surface, not only the
+  // facets this synthetic bump replaces.
   const facetProbes: { name: string; selector: string }[] = [
     { name: "GettersFacet", selector: "0x33ce93fe" }, // getProtocolVersion()
     { name: "MailboxFacet", selector: "0x12f43dab" }, // bridgehubRequestL2Transaction(...)
@@ -490,7 +507,7 @@ async function readLiveUpgradeInputs(
     const diamond = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), l1Provider);
     const facet: string = await diamond.facetAddress(acceptAdminSelector);
     if (facet.toLowerCase() !== oldAdminFacet.toLowerCase()) {
-      throw new Error(`Chain ${chain.chainId} has a different AdminFacet (${facet}); registries pin one facet set`);
+      throw new Error(`Chain ${chain.chainId} has a different AdminFacet (${facet}); the release pins one facet set`);
     }
     const isZKsyncOS: boolean = await diamond.getZKsyncOS();
     if (!isZKsyncOS) {
@@ -501,6 +518,12 @@ async function readLiveUpgradeInputs(
       throw new Error(`Chain ${chain.chainId} does not settle on L1; only L1-settled chains are supported`);
     }
   }
+
+  // Live complete base-system hashes: the release describes the complete post-upgrade state,
+  // and this synthetic bump does not change them.
+  const bootloaderHash: string = await firstDiamond.getL2BootloaderBytecodeHash();
+  const defaultAccountHash: string = await firstDiamond.getL2DefaultAccountBytecodeHash();
+  const evmEmulatorHash: string = await firstDiamond.getL2EvmEmulatorBytecodeHash();
 
   const adminFacetView = new ethers.Contract(upgradeChains[0].diamondProxy, getAbi("AdminFacet"), l1Provider);
   const rollupDAManager: string = await adminFacetView.getRollupDAManager();
@@ -526,6 +549,7 @@ async function readLiveUpgradeInputs(
     newVersion,
     oldVersionString: toVersionString(oldVersion),
     newVersionString: toVersionString(newVersion),
+    fromRelease,
     oldAdminFacet,
     adminSelectors,
     otherFacets,
@@ -536,15 +560,17 @@ async function readLiveUpgradeInputs(
     eraGatewayChainId,
     ecosystemProxyAdmin,
     messageRootProxy,
+    bootloaderHash,
+    defaultAccountHash,
+    evmEmulatorHash,
   };
 }
 
 // ── Deployment ───────────────────────────────────────────────────────
 
 type DeployedMachinery = {
-  executor: string;
-  ctmModule: string;
-  ecoModule: string;
+  ctmExecutor: string;
+  ecoExecutor: string;
   composerHarness: string;
   newAdminFacet: string;
   newGettersFacet: string;
@@ -580,20 +606,19 @@ async function deployUpgradeMachinery(
   };
   const deploy = (name: Parameters<typeof getAbi>[0], args: unknown[]) =>
     deployFrom(name, getCreationBytecode(name), args);
-  // The committed registries pin these contracts' codehashes, so they are deployed from the
+  // The committed manifest pins these contracts' codehashes, so they are deployed from the
   // deterministic (CBOR-metadata-free) build — see buildDeterministicArtifacts().
   const deployPinned = (name: Parameters<typeof getAbi>[0], args: unknown[]) =>
     deployFrom(name, getDeterministicCreationBytecode(name), args);
 
-  // NOTE: the deploy ORDER below is part of the committed registries' contract: the deployer
+  // NOTE: the deploy ORDER below is part of the committed manifest's contract: the deployer
   // key + starting nonce are fixed by the chain states, so each contract's address is a pure
   // function of its position in this sequence. Reordering/inserting deploys invalidates the
-  // committed registries (rerun with REGEN_REGISTRIES=1).
+  // committed manifest (rerun with REGEN_REGISTRIES=1).
   return {
-    // The deployer plays the role of protocol governance: it owns the executor.
-    executor: await deploy("UpgradeExecutor", [deployer.address]),
-    ctmModule: await deploy("CTMUpgradeModule", []),
-    ecoModule: await deploy("EcosystemUpgradeModule", []),
+    // The deployer plays the role of protocol governance: it owns both domain executors.
+    ctmExecutor: await deploy("CTMUpgradeExecutor", [deployer.address]),
+    ecoExecutor: await deploy("EcosystemUpgradeExecutor", [deployer.address]),
     composerHarness: await deploy("RegistryComposerHarness", []),
     // The synthetic v-bump's "changed facet": a fresh AdminFacet built from the same source,
     // constructed with the live RollupDAManager so DA-validation behavior is unchanged.
@@ -625,7 +650,7 @@ async function deployUpgradeMachinery(
   };
 }
 
-// ── Registry generation ──────────────────────────────────────────────
+// ── Manifest generation ──────────────────────────────────────────────
 
 async function buildRegistryManifest(
   l1Provider: ethers.providers.JsonRpcProvider,
@@ -646,10 +671,22 @@ async function buildRegistryManifest(
     [delegateCodeHash, ethers.utils.hexDataLength(delegateBytecode), delegateCodeHash]
   );
 
-  // The facet PLAN (old-side rows): the five facets this synthetic bump replaces, each with its
-  // live (old) address — the one irreducible old-side datum (the composed cut diffs against the
-  // old facet's own ISelfDescribingFacet.selectors()). MailboxFacet is NOT replaced (see
-  // deployUpgradeMachinery) so it has no plan row.
+  // Production freezability flags (DeployCTMUtils facet cuts).
+  const freezability: Record<string, boolean> = {
+    AdminFacet: false,
+    GettersFacet: false,
+    MailboxFacet: true,
+    ExecutorFacet: true,
+    MigratorFacet: false,
+    CommitterFacet: true,
+  };
+
+  // The TRANSITION's facet swaps: the five facets this synthetic bump replaces, each with its
+  // live (old) address. Selector lists are empty everywhere: every facet on the (regenerated)
+  // chain states implements ISelfDescribingFacet, so selectors are read from the facets
+  // themselves at execution time. Pinned lists remain only as the bootstrap override for
+  // environments whose old facets predate that interface (e.g. real v31 -> v32 upgrades).
+  // MailboxFacet is NOT replaced (see deployUpgradeMachinery) so it has no swap row.
   const replacedFacets = [
     { name: "AdminFacet", oldAddress: live.oldAdminFacet, newAddress: deployed.newAdminFacet },
     { name: "GettersFacet", oldAddress: liveFacet(live, "GettersFacet"), newAddress: deployed.newGettersFacet },
@@ -657,16 +694,30 @@ async function buildRegistryManifest(
     { name: "MigratorFacet", oldAddress: liveFacet(live, "MigratorFacet"), newAddress: deployed.newMigratorFacet },
     { name: "CommitterFacet", oldAddress: liveFacet(live, "CommitterFacet"), newAddress: deployed.newCommitterFacet },
   ];
-  // The INSTALLED set (new-side rows): the complete post-upgrade facet surface, all
-  // codehash-pinned so verifyAll() covers it. MailboxFacet keeps its live address — unchanged
-  // by this bump, installed-side only.
+  const facetSwaps = replacedFacets.map(({ name, oldAddress, newAddress }) => ({
+    name,
+    oldFacet: oldAddress,
+    newFacet: newAddress,
+    isFreezable: freezability[name],
+    oldSelectors: [],
+    newSelectors: [],
+  }));
+
+  // The RELEASE's genesis facets: the complete post-upgrade facet surface, all codehash-pinned
+  // so verifyAll() covers it. MailboxFacet keeps its live address — unchanged by this bump.
   const installedFacets = [
     ...replacedFacets.map(({ name, newAddress }) => ({ name, address: newAddress })),
     { name: "MailboxFacet", address: liveFacet(live, "MailboxFacet") },
   ];
-  const installed = [];
+  const genesisFacets = [];
   for (const { name, address } of installedFacets) {
-    installed.push({ name, address, codehash: await codehash(address), selectors: [] });
+    genesisFacets.push({
+      name,
+      address,
+      codehash: await codehash(address),
+      isFreezable: freezability[name],
+      selectors: [],
+    });
   }
 
   return {
@@ -688,62 +739,63 @@ async function buildRegistryManifest(
         name: CTM_REGISTRY_NAME,
         isZKsyncOS: true,
         ctmProxy,
-        verifierNew: deployed.newVerifier,
-        // Non-facet CTM contracts (new implementations only; facets live in `facets`).
-        contracts: {
-          DefaultUpgrade: { new: deployed.newDefaultUpgrade, newCodehash: await codehash(deployed.newDefaultUpgrade) },
-          DiamondInit: { new: deployed.newDiamondInit, newCodehash: await codehash(deployed.newDiamondInit) },
-        },
-        // Empty selector lists everywhere: every facet on the (regenerated) chain states
-        // implements ISelfDescribingFacet, so the composer reads selectors from the facets
-        // themselves. Registry-pinned lists remain only as the bootstrap override for
-        // environments whose old facets predate that interface (e.g. real mainnet/testnet
-        // upgrades from v31).
-        facets: {
-          plan: replacedFacets.map(({ name, oldAddress }) => ({ name, oldAddress, selectors: [] })),
-          installed,
-        },
-        // Production freezability flags (DeployCTMUtils facet cuts).
-        facetFreezability: {
-          AdminFacet: false,
-          GettersFacet: false,
-          MailboxFacet: true,
-          ExecutorFacet: true,
-          MigratorFacet: false,
-          CommitterFacet: true,
-        },
-        l2: {
-          forceDeployments: [
-            {
-              // L2EcosystemContract identifier of the per-upgrade L2 upgrade implementation slot.
-              contract: "L2V31Upgrade",
-              upgradeType: "ZKsyncOSUnsafeForceDeployment",
-              deployedBytecodeInfo,
-              newAddress: L2_UPGRADE_DELEGATE_ADDR,
-              bytecodeHash: delegateCodeHash,
-            },
-          ],
-          delegateTo: L2_UPGRADE_DELEGATE_ADDR,
-          delegateCalldata: "0x",
-          factoryDepHashes: [],
-          // No base-system-contract updates in this synthetic bump (all-zero hashes are
-          // skipped by BaseZkSyncUpgrade).
+        // What a chain at the target release IS — version-independent reusable chain state.
+        release: {
+          diamondInit: { address: deployed.newDiamondInit, codehash: await codehash(deployed.newDiamondInit) },
+          genesisFacets,
+          // Complete target values (this bump changes none of them, so they equal the live ones).
           baseSystemContracts: {
-            bootloader: ethers.constants.HashZero,
-            defaultAccount: ethers.constants.HashZero,
-            evmEmulator: ethers.constants.HashZero,
+            bootloader: live.bootloaderHash,
+            defaultAccount: live.defaultAccountHash,
+            evmEmulator: live.evmEmulatorHash,
           },
-          // Chain-creation payloads for chains created at the new version. Only their hashes
-          // are stored by setChainCreationParams; no new chain is created in this test, so
-          // synthetic payloads (mirroring the foundry e2e test) suffice.
+          // Chain-creation payload for chains created at this release. No new chain is created
+          // in this test, so a synthetic payload (mirroring the foundry e2e test) suffices.
           fixedForceDeploymentsData: "0xf1f2",
+          genesis: {
+            genesisUpgrade: live.genesisUpgrade,
+            batchHash: ethers.utils.hexZeroPad("0x01", 32),
+            // ZKsyncOSChainTypeManager requires the genesis batch commitment to be exactly 1.
+            batchCommitment: ethers.utils.hexZeroPad("0x01", 32),
+            indexRepeatedStorageChanges: 54,
+          },
         },
-        genesis: {
-          genesisUpgrade: live.genesisUpgrade,
-          batchHash: ethers.utils.hexZeroPad("0x01", 32),
-          // ZKsyncOSChainTypeManager requires the genesis batch commitment to be exactly 1.
-          batchCommitment: ethers.utils.hexZeroPad("0x01", 32),
-          indexRepeatedStorageChanges: 54,
+        // How the current release becomes that release. The `newRelease` edge is the deployed
+        // CTMRelease address (nonce-deterministic, passed by the runner at initialization);
+        // `fromRelease` is the CTM's live current release.
+        transition: {
+          fromRelease: live.fromRelease,
+          verifier: { address: deployed.newVerifier, codehash: await codehash(deployed.newVerifier) },
+          defaultUpgrade: {
+            address: deployed.newDefaultUpgrade,
+            codehash: await codehash(deployed.newDefaultUpgrade),
+          },
+          // Schedule: immediately executable, old version stays usable indefinitely.
+          oldProtocolVersionDeadline: ethers.constants.MaxUint256.toHexString(),
+          upgradeTimestamp: 0,
+          facetSwaps,
+          l2: {
+            forceDeployments: [
+              {
+                // L2EcosystemContract identifier of the per-upgrade L2 upgrade implementation slot.
+                contract: "L2V31Upgrade",
+                upgradeType: "ZKsyncOSUnsafeForceDeployment",
+                deployedBytecodeInfo,
+                newAddress: L2_UPGRADE_DELEGATE_ADDR,
+                bytecodeHash: delegateCodeHash,
+              },
+            ],
+            delegateTo: L2_UPGRADE_DELEGATE_ADDR,
+            delegateCalldata: "0x",
+            factoryDepHashes: [],
+            // Hash CHANGES applied by this hop — none (all-zero = leave unchanged; the release
+            // above carries the complete values).
+            baseSystemContractChanges: {
+              bootloader: ethers.constants.HashZero,
+              defaultAccount: ethers.constants.HashZero,
+              evmEmulator: ethers.constants.HashZero,
+            },
+          },
         },
       },
     ],
@@ -774,7 +826,7 @@ function staleRegistriesError(cause: unknown): Error {
  * CONSUME mode gate: the committed manifest must describe exactly the live deployment this run
  * produced — same protocol versions, same live (old) addresses from the chain states, and the
  * same nonce-deterministic freshly deployed implementation addresses. Any drift means the
- * committed registries were generated against different code/states and must be regenerated.
+ * committed manifest was generated against different code/states and must be regenerated.
  */
 function assertCommittedManifestMatchesLiveDeployment(
   manifestPath: string,
@@ -788,9 +840,10 @@ function assertCommittedManifestMatchesLiveDeployment(
   // Same shape as the object built by buildRegistryManifest (the emit-mode output).
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
   const ctm = (manifest.ctms || []).find((c: { name?: string }) => c.name === CTM_REGISTRY_NAME);
-  const planFacet = (name: string) => (ctm?.facets?.plan || []).find((f: { name?: string }) => f.name === name);
-  const installedFacet = (name: string) =>
-    (ctm?.facets?.installed || []).find((f: { name?: string }) => f.name === name);
+  const genesisFacet = (name: string) =>
+    (ctm?.release?.genesisFacets || []).find((f: { name?: string }) => f.name === name);
+  const facetSwap = (name: string) =>
+    (ctm?.transition?.facetSwaps || []).find((f: { name?: string }) => f.name === name);
   const checks: Array<[string, unknown, unknown]> = [
     ["tag", manifest.tag, REGISTRY_TAG],
     ["oldVersion", manifest.oldVersion, live.oldVersionString],
@@ -803,19 +856,22 @@ function assertCommittedManifestMatchesLiveDeployment(
       deployed.newMessageRootImpl,
     ],
     ["ctm.ctmProxy", ctm?.ctmProxy, ctmProxy],
-    ["ctm.verifierNew", ctm?.verifierNew, deployed.newVerifier],
-    ["ctm.facets.plan[AdminFacet].oldAddress", planFacet("AdminFacet")?.oldAddress, live.oldAdminFacet],
-    ["ctm.facets.installed[AdminFacet].address", installedFacet("AdminFacet")?.address, deployed.newAdminFacet],
-    // MailboxFacet is unchanged by this bump: installed-side only, at its live address.
-    ["ctm.facets.plan[MailboxFacet]", planFacet("MailboxFacet") === undefined, true],
+    ["ctm.transition.fromRelease", ctm?.transition?.fromRelease, live.fromRelease],
+    ["ctm.transition.verifier.address", ctm?.transition?.verifier?.address, deployed.newVerifier],
+    ["ctm.transition.defaultUpgrade.address", ctm?.transition?.defaultUpgrade?.address, deployed.newDefaultUpgrade],
+    ["ctm.transition.facetSwaps[AdminFacet].oldFacet", facetSwap("AdminFacet")?.oldFacet, live.oldAdminFacet],
+    ["ctm.transition.facetSwaps[AdminFacet].newFacet", facetSwap("AdminFacet")?.newFacet, deployed.newAdminFacet],
+    // MailboxFacet is unchanged by this bump: genesis-facet (installed) side only, at its live
+    // address — never a swap row.
+    ["ctm.transition.facetSwaps[MailboxFacet]", facetSwap("MailboxFacet") === undefined, true],
+    ["ctm.release.genesisFacets[AdminFacet].address", genesisFacet("AdminFacet")?.address, deployed.newAdminFacet],
     [
-      "ctm.facets.installed[MailboxFacet].address",
-      installedFacet("MailboxFacet")?.address,
+      "ctm.release.genesisFacets[MailboxFacet].address",
+      genesisFacet("MailboxFacet")?.address,
       liveFacet(live, "MailboxFacet"),
     ],
-    ["ctm.contracts.DefaultUpgrade.new", ctm?.contracts?.DefaultUpgrade?.new, deployed.newDefaultUpgrade],
-    ["ctm.contracts.DiamondInit.new", ctm?.contracts?.DiamondInit?.new, deployed.newDiamondInit],
-    ["ctm.genesis.genesisUpgrade", ctm?.genesis?.genesisUpgrade, live.genesisUpgrade],
+    ["ctm.release.diamondInit.address", ctm?.release?.diamondInit?.address, deployed.newDiamondInit],
+    ["ctm.release.genesis.genesisUpgrade", ctm?.release?.genesis?.genesisUpgrade, live.genesisUpgrade],
   ];
   const mismatches = checks
     .filter(([, actual, expected]) => String(actual).toLowerCase() !== String(expected).toLowerCase())
@@ -830,14 +886,16 @@ function assertCommittedManifestMatchesLiveDeployment(
 }
 
 /**
- * Deploy the fixed registry implementations and initialize them (write-once) from the
- * committed manifest. Their artifacts come from the regular forge build; the incremental
- * build below makes sure they are present and current.
+ * Deploy the fixed release/transition/core-registry implementations and initialize them
+ * (write-once) from the committed manifest. The release deploys first — transition
+ * initialization validates its target release, so the ordering is functional, not stylistic.
+ * Their artifacts come from the regular forge build; the incremental build below makes sure
+ * they are present and current.
  */
-async function deployRegistriesFromManifest(
+async function deployUpgradeObjectsFromManifest(
   deployer: ethers.Wallet,
   manifestPath: string
-): Promise<{ ctmRegistry: string; coreRegistry: string }> {
+): Promise<{ release: string; transition: string; coreRegistry: string }> {
   execSync(`forge build ${REGISTRY_CONTRACTS_DIR_REL}`, { cwd: l1ContractsDir, stdio: "inherit" });
 
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
@@ -846,7 +904,7 @@ async function deployRegistriesFromManifest(
     throw new Error(`manifest has no "${CTM_REGISTRY_NAME}" CTM entry`);
   }
 
-  const deployAndInit = async (name: "CTMRegistry" | "CoreRegistry", initArgs: unknown) => {
+  const deployAndInit = async (name: "CTMRelease" | "CTMTransition" | "CoreRegistry", initArgs: unknown) => {
     const factory = new ethers.ContractFactory(getAbi(name), getCreationBytecode(name), deployer);
     const contract = await factory.deploy();
     await contract.deployed();
@@ -855,8 +913,10 @@ async function deployRegistriesFromManifest(
     return contract.address;
   };
 
+  const release = await deployAndInit("CTMRelease", releaseInitArgs(ctm));
   return {
-    ctmRegistry: await deployAndInit("CTMRegistry", ctmInitArgs(manifest, ctm)),
+    release,
+    transition: await deployAndInit("CTMTransition", transitionInitArgs(manifest, ctm, release)),
     coreRegistry: await deployAndInit("CoreRegistry", coreInitArgs(manifest)),
   };
 }
@@ -866,7 +926,7 @@ async function deployRegistriesFromManifest(
 async function handOverAuthority(
   l1Provider: ethers.providers.JsonRpcProvider,
   deployer: ethers.Wallet,
-  params: { executor: string; ctmAddr: string; proxyAdminAddr: string }
+  params: { ctmExecutor: string; ecoExecutor: string; ctmAddr: string; proxyAdminAddr: string }
 ): Promise<void> {
   // CTM (Ownable2Step): transferOwnership from the current owner, then accept THROUGH the
   // executor's forward() escape hatch — the exact handover a production migration would ship.
@@ -875,14 +935,14 @@ async function handOverAuthority(
   await impersonateAndRun(l1Provider, ctmOwner, async (signer) => {
     await sendAndCheck(
       l1Provider,
-      ctmOwnable.connect(signer).transferOwnership(params.executor, { gasLimit: DEFAULT_GAS_LIMIT }),
-      "CTM transferOwnership(executor)"
+      ctmOwnable.connect(signer).transferOwnership(params.ctmExecutor, { gasLimit: DEFAULT_GAS_LIMIT }),
+      "CTM transferOwnership(ctmExecutor)"
     );
   });
-  const executor = new ethers.Contract(params.executor, getAbi("UpgradeExecutor"), deployer);
+  const ctmExecutor = new ethers.Contract(params.ctmExecutor, getAbi("CTMUpgradeExecutor"), deployer);
   await sendAndCheck(
     l1Provider,
-    executor.forward(
+    ctmExecutor.forward(
       [
         {
           target: params.ctmAddr,
@@ -892,24 +952,24 @@ async function handOverAuthority(
       ],
       { gasLimit: DEFAULT_GAS_LIMIT }
     ),
-    "executor.forward(CTM.acceptOwnership)"
+    "ctmExecutor.forward(CTM.acceptOwnership)"
   );
-  console.log("  ✓ CTM ownership accepted through executor.forward");
+  console.log("  ✓ CTM ownership accepted through ctmExecutor.forward");
 
   // Ecosystem ProxyAdmin (1-step Ownable): the current owner (governance in the pre-generated
-  // states) hands it to the executor directly.
+  // states) hands it to the ecosystem executor directly.
   const proxyAdmin = new ethers.Contract(params.proxyAdminAddr, getAbi("ProxyAdmin"), l1Provider);
   const proxyAdminOwner: string = await proxyAdmin.owner();
-  if (proxyAdminOwner.toLowerCase() !== params.executor.toLowerCase()) {
+  if (proxyAdminOwner.toLowerCase() !== params.ecoExecutor.toLowerCase()) {
     await impersonateAndRun(l1Provider, proxyAdminOwner, async (signer) => {
       await sendAndCheck(
         l1Provider,
-        proxyAdmin.connect(signer).transferOwnership(params.executor, { gasLimit: DEFAULT_GAS_LIMIT }),
-        "ProxyAdmin transferOwnership(executor)"
+        proxyAdmin.connect(signer).transferOwnership(params.ecoExecutor, { gasLimit: DEFAULT_GAS_LIMIT }),
+        "ProxyAdmin transferOwnership(ecoExecutor)"
       );
     });
   }
-  console.log("  ✓ ecosystem ProxyAdmin owned by executor");
+  console.log("  ✓ ecosystem ProxyAdmin owned by ecoExecutor");
 }
 
 async function setMigrationPaused(
@@ -934,10 +994,10 @@ async function setMigrationPaused(
 // ── L2 relay ─────────────────────────────────────────────────────────
 
 /**
- * Relay the registry-composed L2 upgrade transaction to an L2 anvil chain through the real
+ * Relay the transition-composed L2 upgrade transaction to an L2 anvil chain through the real
  * `L2ComplexUpgrader` (at 0x800f in the pre-generated states).
  *
- * The only patch: the no-op L2 upgrade implementation is placed at the registry-pinned
+ * The only patch: the no-op L2 upgrade implementation is placed at the transition-pinned
  * delegate address via anvil_setCode, because the contract-deployer built-in at 0x8006 is a
  * silent no-op stub on the anvil L2 chains (EVM contracts cannot force-deploy bytecode). The
  * transaction data itself is the UNCHANGED composed calldata: the real ComplexUpgrader

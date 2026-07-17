@@ -1,15 +1,23 @@
 /**
  * Registry manifest -> initialize() arguments.
  *
- * The storage-backed registries (`CTMRegistry` / `CoreRegistry`,
- * contracts/upgrades/registry) are fixed, audited-once implementations initialized exactly
- * once with a full manifest struct. This module translates the committed manifest JSON
- * (scripts/registry-manifests/*.json — the reviewable per-upgrade artifact) into the
- * `initialize()` argument objects ethers encodes against the contract ABI.
+ * The storage-backed, write-once upgrade objects (`CTMRelease` / `CTMTransition` /
+ * `CoreRegistry`, contracts/upgrades/registry) are fixed, audited-once implementations
+ * initialized exactly once with a full manifest struct. This module translates the committed
+ * manifest JSON (scripts/registry-manifests/*.json — the reviewable per-upgrade artifact) into
+ * the `initialize()` argument objects ethers encodes against the contract ABIs:
+ *
+ *   - `CTMRelease.ReleaseManifest`     — what a chain at the target release IS (facets,
+ *     DiamondInit, base-system hashes, force-deployments, genesis params). Version-independent.
+ *   - `CTMTransition.TransitionManifest` — how the current release becomes the target release
+ *     (facet swaps, L2 leg, schedule, verifier, `fromRelease -> newRelease` and
+ *     `oldProtocolVersion -> newProtocolVersion` edges).
+ *   - `CoreRegistry.CoreRegistryManifest` — the ecosystem-wide proxy -> new-implementation rows.
  *
  * Enum identifiers in the manifest are NAMES; their numeric values are parsed from the
  * canonical Solidity sources at runtime (never hardcoded), so enum reordering upstream cannot
- * silently skew the encoding.
+ * silently skew the encoding. Facet rows need no enum at all — `GenesisFacet` and
+ * `UpgradeFacetSwap` are address-based; manifest facet names are human labels only.
  */
 
 import * as fs from "fs";
@@ -81,47 +89,61 @@ export function coreInitArgs(manifest: any): any {
   };
 }
 
-/** `CTMRegistry.CTMRegistryManifest` initialize argument from one `manifest.ctms[]` entry. */
-export function ctmInitArgs(manifest: any, ctm: any): any {
-  const ctmContract = parseSolidityEnum(IDENTIFIERS_SOL, "CTMContract");
-  const coreContract = parseSolidityEnum(IDENTIFIERS_SOL, "L2EcosystemContract");
-  const upgradeType = parseSolidityEnum(COMPLEX_UPGRADER_SOL, "ContractUpgradeType");
+/** `CTMRelease.ReleaseManifest` initialize argument from one `manifest.ctms[]` entry. */
+export function releaseInitArgs(ctm: any): any {
+  const release = ctm.release;
 
-  const oldV = packSemVer(manifest.oldVersion);
-  const newV = packSemVer(manifest.newVersion);
-
-  // Non-facet CTM contracts, new-version addresses only.
-  const contractEntries: Array<[string, any]> = Object.entries(ctm.contracts);
-  const ctmAddressRows = contractEntries
-    .filter(([, e]) => e.new)
-    .map(([name, e]) => ({
-      key: enumValue(ctmContract, name, "CTMContract"),
-      protocolVersion: newV,
-      value: e.new,
-    }));
-
-  // Old side: the upgrade PLAN (zero address = added). New side: the complete installed set.
-  const facetRows = [
-    ...ctm.facets.plan.map((f: any) => ({
-      facet: enumValue(ctmContract, f.name, "CTMContract"),
-      protocolVersion: oldV,
-      facetAddress: f.oldAddress,
-      selectorList: f.selectors ?? [],
-    })),
-    ...ctm.facets.installed.map((f: any) => ({
-      facet: enumValue(ctmContract, f.name, "CTMContract"),
-      protocolVersion: newV,
-      facetAddress: f.address,
-      selectorList: f.selectors ?? [],
-    })),
-  ];
-
-  const freezabilityRows = Object.entries(ctm.facetFreezability).map(([name, freezable]) => ({
-    facet: enumValue(ctmContract, name, "CTMContract"),
-    isFreezable: freezable,
+  const genesisFacets = release.genesisFacets.map((f: any) => ({
+    facet: f.address,
+    isFreezable: f.isFreezable,
+    selectors: f.selectors ?? [],
   }));
 
-  const l2DeploymentRows = ctm.l2.forceDeployments.map((d: any) => ({
+  // The release pins the codehash of everything it makes live on new chains: the complete
+  // installed facet set and the DiamondInit.
+  const codehashPins = [
+    ...release.genesisFacets
+      .filter((f: any) => f.codehash)
+      .map((f: any) => ({ target: f.address, expectedCodehash: f.codehash })),
+    { target: release.diamondInit.address, expectedCodehash: release.diamondInit.codehash },
+  ];
+
+  return {
+    isZKsyncOS: ctm.isZKsyncOS,
+    diamondInit: release.diamondInit.address,
+    genesisFacets,
+    bootloaderHash: release.baseSystemContracts.bootloader,
+    defaultAccountHash: release.baseSystemContracts.defaultAccount,
+    evmEmulatorHash: release.baseSystemContracts.evmEmulator,
+    fixedForceDeploymentsData: release.fixedForceDeploymentsData,
+    genesisUpgrade: release.genesis.genesisUpgrade,
+    genesisBatchHash: release.genesis.batchHash,
+    genesisBatchCommitment: release.genesis.batchCommitment,
+    genesisIndexRepeatedStorageChanges: release.genesis.indexRepeatedStorageChanges,
+    codehashPins,
+  };
+}
+
+/**
+ * `CTMTransition.TransitionManifest` initialize argument from one `manifest.ctms[]` entry.
+ * `newRelease` is the just-deployed (nonce-deterministic) `CTMRelease` address — passed in by
+ * the runner rather than read from the JSON, since the release must be deployed first anyway
+ * (transition initialization validates it).
+ */
+export function transitionInitArgs(manifest: any, ctm: any, newRelease: string): any {
+  const coreContract = parseSolidityEnum(IDENTIFIERS_SOL, "L2EcosystemContract");
+  const upgradeType = parseSolidityEnum(COMPLEX_UPGRADER_SOL, "ContractUpgradeType");
+  const transition = ctm.transition;
+
+  const facetTransitions = transition.facetSwaps.map((f: any) => ({
+    oldFacet: f.oldFacet ?? ethers.constants.AddressZero,
+    newFacet: f.newFacet,
+    isFreezable: f.isFreezable,
+    oldSelectors: f.oldSelectors ?? [],
+    newSelectors: f.newSelectors ?? [],
+  }));
+
+  const l2Deployments = transition.l2.forceDeployments.map((d: any) => ({
     key: enumValue(coreContract, d.contract, "L2EcosystemContract"),
     info: {
       upgradeType: enumValue(upgradeType, d.upgradeType, "ContractUpgradeType"),
@@ -131,36 +153,32 @@ export function ctmInitArgs(manifest: any, ctm: any): any {
     bytecodeHash: d.bytecodeHash,
   }));
 
+  // The transition pins what it (and only it) makes live: the verifier and the DefaultUpgrade
+  // init contract. The new facets are pinned by the target release, which transition
+  // initialization/validation checks transitively.
   const codehashPins = [
-    ...contractEntries
-      .filter(([, e]) => e.new && e.newCodehash)
-      .map(([, e]) => ({ target: e.new, expectedCodehash: e.newCodehash })),
-    ...ctm.facets.installed
-      .filter((f: any) => f.codehash)
-      .map((f: any) => ({ target: f.address, expectedCodehash: f.codehash })),
+    { target: transition.verifier.address, expectedCodehash: transition.verifier.codehash },
+    { target: transition.defaultUpgrade.address, expectedCodehash: transition.defaultUpgrade.codehash },
   ];
 
   return {
-    isZKsyncOS: ctm.isZKsyncOS,
-    oldProtocolVersion: oldV,
-    newProtocolVersion: newV,
     ctmProxy: ctm.ctmProxy,
-    ctmAddressRows,
-    verifierRows: [{ protocolVersion: newV, verifier: ctm.verifierNew }],
-    facetRows,
-    freezabilityRows,
-    l2DeploymentRows,
-    l2UpgradeDelegateTo: ctm.l2.delegateTo,
-    l2UpgradeDelegateCalldata: ctm.l2.delegateCalldata,
-    factoryDepHashes: ctm.l2.factoryDepHashes.map((h: string) => ethers.BigNumber.from(h)),
-    bootloaderHash: ctm.l2.baseSystemContracts.bootloader,
-    defaultAccountHash: ctm.l2.baseSystemContracts.defaultAccount,
-    evmEmulatorHash: ctm.l2.baseSystemContracts.evmEmulator,
-    fixedForceDeploymentsData: ctm.l2.fixedForceDeploymentsData,
-    genesisUpgrade: ctm.genesis.genesisUpgrade,
-    genesisBatchHash: ctm.genesis.batchHash,
-    genesisBatchCommitment: ctm.genesis.batchCommitment,
-    genesisIndexRepeatedStorageChanges: ctm.genesis.indexRepeatedStorageChanges,
+    oldProtocolVersion: packSemVer(manifest.oldVersion),
+    newProtocolVersion: packSemVer(manifest.newVersion),
+    verifier: transition.verifier.address,
+    fromRelease: transition.fromRelease,
+    newRelease,
+    defaultUpgrade: transition.defaultUpgrade.address,
+    oldProtocolVersionDeadline: ethers.BigNumber.from(transition.oldProtocolVersionDeadline),
+    upgradeTimestamp: transition.upgradeTimestamp,
+    facetTransitions,
+    l2Deployments,
+    l2UpgradeDelegateTo: transition.l2.delegateTo,
+    l2UpgradeDelegateCalldata: transition.l2.delegateCalldata,
+    factoryDepHashes: transition.l2.factoryDepHashes.map((h: string) => ethers.BigNumber.from(h)),
+    bootloaderHash: transition.l2.baseSystemContractChanges.bootloader,
+    defaultAccountHash: transition.l2.baseSystemContractChanges.defaultAccount,
+    evmEmulatorHash: transition.l2.baseSystemContractChanges.evmEmulator,
     codehashPins,
   };
 }

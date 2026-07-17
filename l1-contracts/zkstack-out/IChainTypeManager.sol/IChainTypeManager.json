@@ -141,6 +141,19 @@
   },
   {
     "type": "function",
+    "name": "currentRelease",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "deactivatePriorityMode",
     "inputs": [
       {
@@ -305,19 +318,6 @@
   },
   {
     "type": "function",
-    "name": "genesisRegistry",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getChainAdmin",
     "inputs": [
       {
@@ -454,7 +454,7 @@
             "internalType": "address"
           },
           {
-            "name": "genesisRegistry",
+            "name": "currentRelease",
             "type": "address",
             "internalType": "address"
           },
@@ -590,10 +590,10 @@
   },
   {
     "type": "function",
-    "name": "setGenesisRegistry",
+    "name": "setCurrentRelease",
     "inputs": [
       {
-        "name": "_registry",
+        "name": "_release",
         "type": "address",
         "internalType": "address"
       }
@@ -679,11 +679,6 @@
       },
       {
         "name": "_verifier",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_registry",
         "type": "address",
         "internalType": "address"
       }
@@ -983,25 +978,6 @@
   },
   {
     "type": "function",
-    "name": "upgradeRegistryForVersion",
-    "inputs": [
-      {
-        "name": "_protocolVersion",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "validatorTimelock",
     "inputs": [],
     "outputs": [
@@ -1154,7 +1130,7 @@
   },
   {
     "type": "event",
-    "name": "NewGenesisRegistry",
+    "name": "NewCurrentRelease",
     "inputs": [
       {
         "name": "protocolVersion",
@@ -1163,7 +1139,7 @@
         "internalType": "uint256"
       },
       {
-        "name": "registry",
+        "name": "release",
         "type": "address",
         "indexed": true,
         "internalType": "address"

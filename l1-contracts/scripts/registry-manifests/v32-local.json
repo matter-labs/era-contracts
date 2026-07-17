@@ -7,7 +7,7 @@
     "contracts": {
       "L1MessageRoot": {
         "proxy": "0x2E4712F914db9d9433Bff8919792da5f720751E1",
-        "implNew": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C",
+        "implNew": "0x821f3361D454cc98b7555221A06Be563a7E2E0A6",
         "implNewCodehash": "0xa93e8cca40a75b15ddfa88e5fc0e3e2bbeef73b0fa35d58d277c41f33362a2e8"
       }
     }
@@ -16,118 +16,142 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0xAa3A3437e35EE3aaCA6DC51A5A52EDA89F0B37f1",
-      "verifierNew": "0xAD523115cd35a8d4E60B3C0953E0E0ac10418309",
-      "contracts": {
-        "DefaultUpgrade": {
-          "new": "0xB06c856C8eaBd1d8321b687E188204C1018BC4E5",
-          "newCodehash": "0x5faf1d86a01c82bee946ad7c5ec15ced0660650a4778dae50f4c5a0cc056a1d9"
+      "ctmProxy": "0x7298422e511F0EF969b0696eBcE13E794529d93B",
+      "release": {
+        "diamondInit": {
+          "address": "0x413b1AfCa96a3df5A686d8BFBF93d30688a7f7D9",
+          "codehash": "0x0a50ff7c0deaf7955ae8736dde33ae10e2825fb91b7dae39f0742998ab29c53e"
         },
-        "DiamondInit": {
-          "new": "0xaB7B4c595d3cE8C85e16DA86630f2fc223B05057",
-          "newCodehash": "0xe5ce2f41109b984168b7eea2d2c4e5cb75e1fb069917142c5bd249ae7658abf9"
-        }
-      },
-      "facets": {
-        "plan": [
+        "genesisFacets": [
           {
             "name": "AdminFacet",
-            "oldAddress": "0x1834220Ad2494f02d62E5A66a8ebBF92e47Caa09",
-            "selectors": []
-          },
-          {
-            "name": "GettersFacet",
-            "oldAddress": "0x08CAeBAD34Fc471ddA5DcE669a2EB1D3dEeab945",
-            "selectors": []
-          },
-          {
-            "name": "ExecutorFacet",
-            "oldAddress": "0x860BD61Cd9206a6492b6947342c19E045C353510",
-            "selectors": []
-          },
-          {
-            "name": "MigratorFacet",
-            "oldAddress": "0x7c413EaaF1aC4fC0cD39D44c307b9A20985416F9",
-            "selectors": []
-          },
-          {
-            "name": "CommitterFacet",
-            "oldAddress": "0x6BAA73ed8dbEA5Ef75193d005b91A0b5Bdf8aDD1",
-            "selectors": []
-          }
-        ],
-        "installed": [
-          {
-            "name": "AdminFacet",
-            "address": "0x70bDA08DBe07363968e9EE53d899dFE48560605B",
-            "codehash": "0xe8e31854a39f59042ebdf56730808bd85eabdff0c2a16bd8e67afbccb7425836",
-            "selectors": []
-          },
-          {
-            "name": "GettersFacet",
-            "address": "0x26B862f640357268Bd2d9E95bc81553a2Aa81D7E",
-            "codehash": "0x6eb8cfdb1a91fd28763e291cfe354d2bedbd8cbf7bbc01b1c30b60329c4f33f5",
-            "selectors": []
-          },
-          {
-            "name": "ExecutorFacet",
-            "address": "0xA56F946D6398Dd7d9D4D9B337Cf9E0F68982ca5B",
-            "codehash": "0x44eafc4ee037764abdaf3c51b011ad76b212bed96171391036b5fa825b16674e",
-            "selectors": []
-          },
-          {
-            "name": "MigratorFacet",
-            "address": "0x5D42EBdBBa61412295D7b0302d6F50aC449Ddb4F",
-            "codehash": "0x0cb6b357a2495ebad9edbde1e8aed66c507e5c57376b1ca0c10fe06907be1305",
-            "selectors": []
-          },
-          {
-            "name": "CommitterFacet",
             "address": "0xddE78e6202518FF4936b5302cC2891ec180E8bFf",
+            "codehash": "0xe8e31854a39f59042ebdf56730808bd85eabdff0c2a16bd8e67afbccb7425836",
+            "isFreezable": false,
+            "selectors": []
+          },
+          {
+            "name": "GettersFacet",
+            "address": "0xB06c856C8eaBd1d8321b687E188204C1018BC4E5",
+            "codehash": "0x6eb8cfdb1a91fd28763e291cfe354d2bedbd8cbf7bbc01b1c30b60329c4f33f5",
+            "isFreezable": false,
+            "selectors": []
+          },
+          {
+            "name": "ExecutorFacet",
+            "address": "0xaB7B4c595d3cE8C85e16DA86630f2fc223B05057",
+            "codehash": "0x44eafc4ee037764abdaf3c51b011ad76b212bed96171391036b5fa825b16674e",
+            "isFreezable": true,
+            "selectors": []
+          },
+          {
+            "name": "MigratorFacet",
+            "address": "0xAD523115cd35a8d4E60B3C0953E0E0ac10418309",
+            "codehash": "0x0cb6b357a2495ebad9edbde1e8aed66c507e5c57376b1ca0c10fe06907be1305",
+            "isFreezable": false,
+            "selectors": []
+          },
+          {
+            "name": "CommitterFacet",
+            "address": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C",
             "codehash": "0xd4c360992416dd82f883f8e7eb3fb160326825598f56f93ded25035e2b63bfd9",
+            "isFreezable": true,
             "selectors": []
           },
           {
             "name": "MailboxFacet",
             "address": "0xC50818d1ffF2E42d42618E71E753A22cB5a98c9E",
             "codehash": "0x5d43a5a8143f4b0b62a6dfc9d35b6c2498180f06546cd1fcb0b6c33bcac2cf67",
+            "isFreezable": true,
             "selectors": []
           }
-        ]
-      },
-      "facetFreezability": {
-        "AdminFacet": false,
-        "GettersFacet": false,
-        "MailboxFacet": true,
-        "ExecutorFacet": true,
-        "MigratorFacet": false,
-        "CommitterFacet": true
-      },
-      "l2": {
-        "forceDeployments": [
-          {
-            "contract": "L2V31Upgrade",
-            "upgradeType": "ZKsyncOSUnsafeForceDeployment",
-            "deployedBytecodeInfo": "0xd8ceeb1af16ce49c7c068d8b9bcbca8a80f978611cb4ec0a1c08a95b0295dce30000000000000000000000000000000000000000000000000000000000000006d8ceeb1af16ce49c7c068d8b9bcbca8a80f978611cb4ec0a1c08a95b0295dce3",
-            "newAddress": "0x00000000000000000000000000000000000ab001",
-            "bytecodeHash": "0xd8ceeb1af16ce49c7c068d8b9bcbca8a80f978611cb4ec0a1c08a95b0295dce3"
-          }
         ],
-        "delegateTo": "0x00000000000000000000000000000000000ab001",
-        "delegateCalldata": "0x",
-        "factoryDepHashes": [],
         "baseSystemContracts": {
           "bootloader": "0x0000000000000000000000000000000000000000000000000000000000000000",
           "defaultAccount": "0x0000000000000000000000000000000000000000000000000000000000000000",
           "evmEmulator": "0x0000000000000000000000000000000000000000000000000000000000000000"
         },
-        "fixedForceDeploymentsData": "0xf1f2"
+        "fixedForceDeploymentsData": "0xf1f2",
+        "genesis": {
+          "genesisUpgrade": "0xB58D5687135343A7630352077EbB0c946C73f70E",
+          "batchHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "batchCommitment": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "indexRepeatedStorageChanges": 54
+        }
       },
-      "genesis": {
-        "genesisUpgrade": "0xda2f0cC90FDB3a22F1E517Ba7aaaB926eb125344",
-        "batchHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
-        "batchCommitment": "0x0000000000000000000000000000000000000000000000000000000000000001",
-        "indexRepeatedStorageChanges": 54
+      "transition": {
+        "fromRelease": "0xf4B146FbA71F41E0592668ffbF264F1D186b2Ca8",
+        "verifier": {
+          "address": "0x02df3a3F960393F5B349E40A599FEda91a7cc1A7",
+          "codehash": "0x36e5d09f9182f3a618ad6c81d41b05a4a7b13f1c02004bd909729fec1c31e9e2"
+        },
+        "defaultUpgrade": {
+          "address": "0x2b5A4e5493d4a54E717057B127cf0C000C876f9B",
+          "codehash": "0xc43829fb7bd6942adadb1d75ff385a9471fdc9b26ae6e4d4019f3ee0537d18e9"
+        },
+        "oldProtocolVersionDeadline": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "upgradeTimestamp": 0,
+        "facetSwaps": [
+          {
+            "name": "AdminFacet",
+            "oldFacet": "0x1834220Ad2494f02d62E5A66a8ebBF92e47Caa09",
+            "newFacet": "0xddE78e6202518FF4936b5302cC2891ec180E8bFf",
+            "isFreezable": false,
+            "oldSelectors": [],
+            "newSelectors": []
+          },
+          {
+            "name": "GettersFacet",
+            "oldFacet": "0x08CAeBAD34Fc471ddA5DcE669a2EB1D3dEeab945",
+            "newFacet": "0xB06c856C8eaBd1d8321b687E188204C1018BC4E5",
+            "isFreezable": false,
+            "oldSelectors": [],
+            "newSelectors": []
+          },
+          {
+            "name": "ExecutorFacet",
+            "oldFacet": "0x860BD61Cd9206a6492b6947342c19E045C353510",
+            "newFacet": "0xaB7B4c595d3cE8C85e16DA86630f2fc223B05057",
+            "isFreezable": true,
+            "oldSelectors": [],
+            "newSelectors": []
+          },
+          {
+            "name": "MigratorFacet",
+            "oldFacet": "0x7c413EaaF1aC4fC0cD39D44c307b9A20985416F9",
+            "newFacet": "0xAD523115cd35a8d4E60B3C0953E0E0ac10418309",
+            "isFreezable": false,
+            "oldSelectors": [],
+            "newSelectors": []
+          },
+          {
+            "name": "CommitterFacet",
+            "oldFacet": "0x6BAA73ed8dbEA5Ef75193d005b91A0b5Bdf8aDD1",
+            "newFacet": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C",
+            "isFreezable": true,
+            "oldSelectors": [],
+            "newSelectors": []
+          }
+        ],
+        "l2": {
+          "forceDeployments": [
+            {
+              "contract": "L2V31Upgrade",
+              "upgradeType": "ZKsyncOSUnsafeForceDeployment",
+              "deployedBytecodeInfo": "0xd8ceeb1af16ce49c7c068d8b9bcbca8a80f978611cb4ec0a1c08a95b0295dce30000000000000000000000000000000000000000000000000000000000000006d8ceeb1af16ce49c7c068d8b9bcbca8a80f978611cb4ec0a1c08a95b0295dce3",
+              "newAddress": "0x00000000000000000000000000000000000ab001",
+              "bytecodeHash": "0xd8ceeb1af16ce49c7c068d8b9bcbca8a80f978611cb4ec0a1c08a95b0295dce3"
+            }
+          ],
+          "delegateTo": "0x00000000000000000000000000000000000ab001",
+          "delegateCalldata": "0x",
+          "factoryDepHashes": [],
+          "baseSystemContractChanges": {
+            "bootloader": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "defaultAccount": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "evmEmulator": "0x0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        }
       }
     }
   ]
