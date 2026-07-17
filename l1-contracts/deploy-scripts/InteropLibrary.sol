@@ -157,11 +157,16 @@ library InteropLibrary {
             );
         }
         attributes[attributesPointer++] = abi.encodeCall(IERC7786Attributes.useFixedFee, (useFixedFee));
-        // Every interop send is atomic: attach the ERC-7786 `atomicBundle` metadata so `InteropCenter`
-        // does not reject the send with `NonAtomicSendUnsupported`. The flow metadata (flowId / deadline /
-        // lowNullifierIndex) is a placeholder here — in the Foundry unit tests the `AtomicFlowManager.append`
-        // gate is mocked, so the concrete values are irrelevant; the real IMT flow is exercised end-to-end in
-        // the anvil-interop atomic-swap spec.
+        // L2->L2 interop is atomic, so an `atomicBundle` attribute is mandatory or `InteropCenter` reverts
+        // `NonAtomicSendUnsupported`. The flow metadata below (flowId=1, deadline=max, lowNullifierIndex=0)
+        // is a PLACEHOLDER that is only valid when the `AtomicFlowManager.append`/`requireFlowFinalized`
+        // gate is mocked — which it is in the Foundry tests that use this helper. It is NOT usable for a real
+        // send: a real `flowId` commits to the `bundleHash`, which is not known until the bundle is assembled
+        // during the send, so a valid single-leg flow cannot be built on-chain ahead of time. Production
+        // atomic L2->L2 sends must therefore derive the flow off-chain (predict the hash via the static
+        // `previewBundleHash` quoter, compute `flowId`, and find the IMT `lowNullifierIndex`) — see the
+        // anvil-interop `buildSingleLegAtomicSend` helper. Callers that need a real flow should pass the
+        // resulting `atomicBundle` attribute themselves rather than relying on this placeholder.
         attributes[attributesPointer++] = abi.encodeCall(
             IERC7786Attributes.atomicBundle,
             (bytes32(uint256(1)), type(uint64).max, uint256(0))
@@ -245,7 +250,13 @@ library InteropLibrary {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = buildSecondBridgeCall(secondBridgeCalldata, L2_ASSET_ROUTER_ADDR); // Using the default address as second bridge.
 
-        bytes[] memory bundleAttrs = buildBundleAttributes(address(0), unbundlerAddress, useFixedFee, salt);
+        // An L1 destination is an L2->L1 withdrawal: it must be NON-atomic (L1 has no atomic execution and
+        // withdrawals are never revertable), so it carries only the salt attribute — never the `atomicBundle`
+        // attribute, which `InteropCenter` rejects for L1 with `AtomicBundleToL1NotSupported`. Any other
+        // (L2) destination is atomic interop and carries the full attribute set.
+        bytes[] memory bundleAttrs = destinationChainId == L2_INTEROP_CENTER.L1_CHAIN_ID()
+            ? buildWithdrawalBundleAttributes(salt)
+            : buildBundleAttributes(address(0), unbundlerAddress, useFixedFee, salt);
 
         return L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(destinationChainId), calls, bundleAttrs);
     }
