@@ -805,6 +805,17 @@
   },
   {
     "type": "error",
+    "name": "AssetDeploymentTrackerNotSet",
+    "inputs": [
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "AssetHandlerDoesNotExist",
     "inputs": [
       {
