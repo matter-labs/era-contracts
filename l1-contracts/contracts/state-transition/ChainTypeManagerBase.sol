@@ -18,6 +18,7 @@ import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE} from "../common/Config.sol";
 import {AdminZero, NotAPatchUpgrade, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
+import {ProtocolVersionTooSmall} from "../upgrades/ZkSyncUpgradeErrors.sol";
 import {ChainAlreadyLive, MigrationsNotPaused, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
@@ -442,6 +443,12 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         // Explicitly verify that _oldProtocolVersion matches the current one.
         if (previousProtocolVersion != _oldProtocolVersion) {
             revert OutdatedProtocolVersion(previousProtocolVersion, _oldProtocolVersion);
+        }
+        // The version only ever moves forward. Chains enforce this individually at execution
+        // (`BaseZkSyncUpgrade._setNewProtocolVersion`); without this check the CTM could commit
+        // to a downgrade/no-op version that every chain would later reject.
+        if (_newProtocolVersion <= _oldProtocolVersion) {
+            revert ProtocolVersionTooSmall(_oldProtocolVersion, _newProtocolVersion);
         }
         _setProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
         _setProtocolVersionDeadline(_newProtocolVersion, type(uint256).max);

@@ -157,10 +157,14 @@ transition can never apply again afterwards — zero has no permanent meaning.
 `ChainTypeManagerBase.createNewPatchUpgrade` commits a cut whose init is
 `DefaultUpgrade.patchUpgrade(newVersion)` (empty proposal, verifier from the CTM) and keeps
 `currentRelease` unchanged — a patch's installed state _is_ the base release's, so genesis for
-new chains keeps resolving by identity. Independently, a same-release transition
-(`fromRelease == newRelease`) must carry all-zero base-system hash changes — enforced at
-initialization (`PatchTransitionChangesHashes`): targeting the same release cannot imply fresh
-system-contract changes.
+new chains keeps resolving by identity. When a patch IS encoded as a transition, two invariants
+are enforced at initialization: a SemVer patch bump must reuse the departing release
+(`PatchMustReuseRelease`), and any same-release transition is verifier/schedule-only — no facet
+swaps, L2 deployments, delegate call, factory deps, or base-system hash changes
+(`SameReleaseTransitionHasPayload`). Transitions also refuse to exist with
+`newProtocolVersion <= oldProtocolVersion` (`ProtocolVersionTooSmall`) — the same rule chains
+enforce at execution and the CTM enforces in `setNewVersionUpgrade`, so an
+unexecutable version schedule can never be committed at any layer.
 
 **Legacy path.** `deploy-scripts/upgrade/default-upgrade/*` still targets _pre-v32_ CTMs and keeps
 encoding the old `setChainCreationParams`; the struct + entrypoint live in

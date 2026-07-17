@@ -6,11 +6,16 @@ import {CodehashPin} from "./ContractIdentifiers.sol";
 import {ICTMRelease} from "./ICTMRelease.sol";
 import {ICTMTransition, L2Deployment} from "./ICTMTransition.sol";
 import {UpgradeFacetSwap} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
+
+import {SemVer} from "../../common/libraries/SemVer.sol";
+import {ProtocolVersionTooSmall} from "../ZkSyncUpgradeErrors.sol";
 import {
-    PatchTransitionChangesHashes,
+    PatchMustReuseRelease,
     RegistryAlreadyInitialized,
     RegistryCodehashMismatch,
     RegistryUnknownKey,
+    SameReleaseTransitionHasPayload,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
 
@@ -74,6 +79,13 @@ contract CTMTransition is ICTMTransition {
             revert ZeroAddress();
         }
 
+        // A transition only ever moves the version forward. Chains enforce this individually at
+        // execution (`BaseZkSyncUpgrade._setNewProtocolVersion`); enforcing it here keeps the
+        // CTM from ever committing to a transition its chains would later reject.
+        if (_manifest.newProtocolVersion <= _manifest.oldProtocolVersion) {
+            revert ProtocolVersionTooSmall(_manifest.oldProtocolVersion, _manifest.newProtocolVersion);
+        }
+
         ICTMRelease(_manifest.newRelease).validate();
         // `fromRelease` is `address(0)` ONLY for the migration hop from a pre-registry version
         // (v31 -> v32): the executor matches it against a CTM whose `currentRelease` is still
@@ -82,16 +94,31 @@ contract CTMTransition is ICTMTransition {
         if (_manifest.fromRelease != address(0)) {
             ICTMRelease(_manifest.fromRelease).validate();
         }
-        // A patch transition (same release on both edges) changes no chain state beyond the
-        // version schedule: the target release already holds the complete base-system hashes, so
-        // the hop must not smuggle in fresh system-contract changes.
+        // A SemVer patch bump changes no chain state by definition, so it must reuse the
+        // departing release — a patch targeting a different release would let new-chain genesis
+        // state diverge from what existing chains run.
+        {
+            (uint32 oldMajor, uint32 oldMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_manifest.oldProtocolVersion));
+            (uint32 newMajor, uint32 newMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_manifest.newProtocolVersion));
+            if (oldMajor == newMajor && oldMinor == newMinor && _manifest.fromRelease != _manifest.newRelease) {
+                revert PatchMustReuseRelease(_manifest.fromRelease, _manifest.newRelease);
+            }
+        }
+        // A same-release transition (patch or otherwise) is verifier/schedule-only: targeting
+        // the same release cannot imply ANY chain-state payload — no facet swaps, no L2
+        // deployments or delegate call, no factory deps, no base-system hash changes.
         if (
             _manifest.fromRelease == _manifest.newRelease &&
-            (_manifest.bootloaderHash != bytes32(0) ||
+            (_manifest.facetTransitions.length != 0 ||
+                _manifest.l2Deployments.length != 0 ||
+                _manifest.l2UpgradeDelegateTo != address(0) ||
+                _manifest.l2UpgradeDelegateCalldata.length != 0 ||
+                _manifest.factoryDepHashes.length != 0 ||
+                _manifest.bootloaderHash != bytes32(0) ||
                 _manifest.defaultAccountHash != bytes32(0) ||
                 _manifest.evmEmulatorHash != bytes32(0))
         ) {
-            revert PatchTransitionChangesHashes();
+            revert SameReleaseTransitionHasPayload();
         }
         _validatePins(_manifest.codehashPins);
 
@@ -187,11 +214,18 @@ contract CTMTransition is ICTMTransition {
             revert RegistryUnknownKey();
         }
         ICTMRelease(transitionNewRelease).validate();
+        // Both pinned edges must be live at execution, not only the target (zero = migration hop).
+        if (transitionFromRelease != address(0)) {
+            ICTMRelease(transitionFromRelease).validate();
+        }
         _validateStoredPins();
     }
 
     function verifyAll() external view returns (bool) {
         if (!initialized || !ICTMRelease(transitionNewRelease).verifyAll()) {
+            return false;
+        }
+        if (transitionFromRelease != address(0) && !ICTMRelease(transitionFromRelease).verifyAll()) {
             return false;
         }
         uint256 length = codehashPins.length;

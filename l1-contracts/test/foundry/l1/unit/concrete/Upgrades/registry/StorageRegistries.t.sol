@@ -25,10 +25,12 @@ import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
-    PatchTransitionChangesHashes,
+    PatchMustReuseRelease,
     RegistryAlreadyInitialized,
-    RegistryCodehashMismatch
+    RegistryCodehashMismatch,
+    SameReleaseTransitionHasPayload
 } from "contracts/common/L1ContractErrors.sol";
+import {ProtocolVersionTooSmall} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 
 contract StorageRegistriesTest is Test {
     CoreRegistry internal coreRegistry;
@@ -247,29 +249,74 @@ contract StorageRegistriesTest is Test {
         assertEq(proposedUpgrade.bootloaderHash, bytes32(uint256(0xb00)));
     }
 
-    function test_patchTransitionWithZeroHashesInitializes() public {
-        // A patch transition targets the SAME release on both edges and changes no base-system
-        // hashes: the release already holds the complete values.
-        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+    /// @dev A verifier/schedule-only SemVer patch: same release on both edges, +1 patch
+    ///      version, and NO chain-state payload — the only shape a same-release hop may take.
+    function _patchManifest() internal view returns (CTMTransition.TransitionManifest memory manifest) {
+        manifest = _transitionManifest();
+        manifest.oldProtocolVersion = NEW_VERSION;
+        manifest.newProtocolVersion = NEW_VERSION + 1;
         manifest.fromRelease = manifest.newRelease;
+        manifest.facetTransitions = new UpgradeFacetSwap[](0);
+        manifest.l2Deployments = new L2Deployment[](0);
+        manifest.l2UpgradeDelegateTo = address(0);
+        manifest.l2UpgradeDelegateCalldata = "";
+        manifest.factoryDepHashes = new uint256[](0);
         manifest.bootloaderHash = bytes32(0);
         manifest.defaultAccountHash = bytes32(0);
         manifest.evmEmulatorHash = bytes32(0);
-
-        CTMTransition patchTransition = new CTMTransition();
-        patchTransition.initialize(manifest);
-        assertEq(patchTransition.fromRelease(), patchTransition.newRelease());
     }
 
-    function test_revertWhen_patchTransitionChangesHashes() public {
-        // Targeting the same release cannot imply fresh system-contract changes: a nonzero hash
-        // "change" on a same-release hop must be rejected at initialization.
+    function test_patchTransitionVerifierOnlyInitializes() public {
+        CTMTransition patchTransition = new CTMTransition();
+        patchTransition.initialize(_patchManifest());
+        assertEq(patchTransition.fromRelease(), patchTransition.newRelease());
+        // Both edges are live releases, so runtime validation holds.
+        patchTransition.validate();
+        assertTrue(patchTransition.verifyAll());
+    }
+
+    function test_revertWhen_sameReleaseTransitionCarriesPayload() public {
+        // Targeting the same release cannot imply ANY chain-state change — facet swaps, L2
+        // deployments, delegate calldata, factory deps and hash changes are all rejected.
         CTMTransition.TransitionManifest memory manifest = _transitionManifest();
         manifest.fromRelease = manifest.newRelease;
 
+        CTMTransition sameReleaseTransition = new CTMTransition();
+        vm.expectRevert(SameReleaseTransitionHasPayload.selector);
+        sameReleaseTransition.initialize(manifest);
+    }
+
+    function test_revertWhen_patchTargetsDifferentRelease() public {
+        // A SemVer patch changes no chain state by definition, so it must reuse the departing
+        // release; departing from a different (here: freshly deployed) release is rejected.
+        CTMRelease otherRelease = new CTMRelease();
+        otherRelease.initialize(_releaseManifest());
+
+        CTMTransition.TransitionManifest memory manifest = _patchManifest();
+        manifest.fromRelease = address(otherRelease);
+
         CTMTransition patchTransition = new CTMTransition();
-        vm.expectRevert(PatchTransitionChangesHashes.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(PatchMustReuseRelease.selector, address(otherRelease), manifest.newRelease)
+        );
         patchTransition.initialize(manifest);
+    }
+
+    function test_revertWhen_transitionVersionNotIncreasing() public {
+        // A transition only moves the version forward; chains would reject anything else at
+        // execution, so the object refuses to exist at all.
+        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        manifest.newProtocolVersion = manifest.oldProtocolVersion;
+
+        CTMTransition staleTransition = new CTMTransition();
+        vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector, OLD_VERSION, OLD_VERSION));
+        staleTransition.initialize(manifest);
+    }
+
+    function test_uninitializedCoreRegistryDoesNotVerify() public {
+        // An uninitialized registry has nothing pinned — it must never read as verified.
+        CoreRegistry blankRegistry = new CoreRegistry();
+        assertFalse(blankRegistry.verifyAll());
     }
 
     function test_validateRejectsCodehashDrift() public {

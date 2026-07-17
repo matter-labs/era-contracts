@@ -100,6 +100,10 @@ contract CoreRegistry is ICoreRegistry {
 
     /// @inheritdoc ICoreRegistry
     function verifyAll() external view returns (bool) {
+        // An uninitialized registry has nothing pinned — it must not read as verified.
+        if (!initialized) {
+            return false;
+        }
         uint256 pinsLength = codehashPins.length;
         for (uint256 i = 0; i < pinsLength; ++i) {
             if (codehashPins[i].target.codehash != codehashPins[i].expectedCodehash) {
