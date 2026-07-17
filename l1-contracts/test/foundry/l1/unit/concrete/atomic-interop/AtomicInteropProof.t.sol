@@ -554,7 +554,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
             slBlock,
             _batchTimestamp
         );
-        // The builder declares the branch against the fixed test DEADLINE; re-declare it against the
+        // The builder declares the branch against the fixed test DEADLINE; redeclare it against the
         // fuzzed deadline the way an honest prover would.
         absence.provesAgainstBeginRoot = uint256(_batchTimestamp) > uint256(_deadline);
         uint256 imtRootLeafIndex = absence.provesAgainstBeginRoot
