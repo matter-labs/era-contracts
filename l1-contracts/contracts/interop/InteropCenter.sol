@@ -585,13 +585,12 @@ contract InteropCenter is
         //    would be a timeout refund — but L2->L1 withdrawals must never be revertable (their
         //    `totalWithdrawalsToL1` accounting is consumed once during the L1->GW migration and must stay
         //    append-only, see {L2AssetTracker}).
-        //  - A non-atomic bundle is only ever an L2->L1 withdrawal; public (L1-published) L2->L2 interop
-        //    has been removed, so a non-atomic L2->L2 send has no delivery path and is rejected here rather
-        //    than after burning value in the bundle assembly below.
+        // A non-atomic L2->L2 send (public interop was removed) is likewise unsupported, but it is rejected
+        // in `_dispatchBundle` rather than here so that destination-validity checks (`DestinationChainNotRegistered`,
+        // empty-address `ZeroAddress`) surface first; any burn done in the assembly below is rolled back by the
+        // revert regardless.
         if (_atomicSend.isAtomic) {
             require(_destinationChainId != L1_CHAIN_ID, AtomicBundleToL1NotSupported());
-        } else {
-            require(_destinationChainId == L1_CHAIN_ID, NonAtomicSendUnsupported());
         }
 
         // Note: no gateway-mode requirement here — interop bundles may be sent by chains settling
@@ -789,8 +788,13 @@ contract InteropCenter is
             return (bundleHash, msgHash);
         }
 
-        // L2->L2 interop: atomic-only. Public (L1-published) L2->L2 interop has been removed.
-        // (Non-atomic L2->L2 and atomic L2->L1 are already rejected in `_sendBundle`, before any burn.)
+        // L2->L2 interop: atomic-only. Public (L1-published) L2->L2 interop has been removed, so a send
+        // without the `atomicBundle` attribute has no delivery path. (Atomic L2->L1 is rejected earlier in
+        // `_sendBundle`.) This runs after bundle assembly so destination-validity errors surface first; the
+        // assembly's burn is rolled back by this revert.
+        if (!_atomicSend.isAtomic) {
+            revert NonAtomicSendUnsupported();
+        }
         _validateAtomicBundle(_bundle);
         IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
             _flowId: _atomicSend.flowId,
