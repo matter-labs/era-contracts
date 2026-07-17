@@ -90,9 +90,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// rather than by on-chain balance enforcement. It mirrors `L1NativeTokenVault.bridgedOut`:
     /// it increases on outbound flows and decreases on inbound ones, so unlike the vault's raw
     /// `balanceOf` it cannot be skewed by direct transfers into the vault.
-    /// @dev For tokens that were bridged before this bookkeeping was introduced (including via the
-    /// retired L2AssetTracker, which chains upgraded in place retain at its reserved address), the
-    /// value is seeded with the vault's escrow balance on the token's first tracked bridge operation;
+    /// @dev For tokens that were bridged before this bookkeeping was introduced, the value is
+    /// seeded with the vault's escrow balance on the token's first tracked bridge operation;
     /// see `_trackLegacyTokenIfNeeded`.
     mapping(bytes32 assetId => uint256 amount) public bridgedOut;
 
@@ -106,8 +105,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// bridged (non-native) token. Together with `interopInfo` it allows reconstructing the amount of a
     /// token attributable to L1 if per-chain accounting is ever reintroduced.
     /// @dev For L2-native tokens no snapshot is stored: their bridged-out accounting is carried by
-    /// `bridgedOut`. For chains upgraded in place, snapshots recorded before the upgrade remain in the
-    /// retired L2AssetTracker at its reserved address.
+    /// `bridgedOut`.
     mapping(bytes32 assetId => SavedTotalSupply snapshot) public preTrackingTotalSupply;
 
     /// @notice L2-side accounting of L1 <-> L2 flows. All chains are assumed to settle on L1, so no

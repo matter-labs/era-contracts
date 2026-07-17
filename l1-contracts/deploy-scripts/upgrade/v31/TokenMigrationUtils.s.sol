@@ -14,7 +14,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 /// @notice Shared token-registration utilities for the v31 upgrade.
 /// @dev Used by `CoreUpgrade_v31.stage3` (post-governance NTV bridged-token registration).
-/// The pre-v31 token-balance migration was removed together with the asset trackers.
+/// The pre-v31 token-balance migration has been removed; only the NTV token registration remains.
 library TokenMigrationUtils {
     using stdToml for string;
 

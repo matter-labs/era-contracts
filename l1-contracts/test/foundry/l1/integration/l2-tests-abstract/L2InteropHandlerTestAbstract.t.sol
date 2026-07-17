@@ -717,7 +717,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         bytes memory bundle = abi.encode(interopBundle);
         MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
 
-        // Standard mocks for bundle verification and messenger (not related to asset tracker)
+        // Standard mocks for bundle verification and messenger (not related to the bookkeeping under test)
         vm.mockCall(
             address(L2_MESSAGE_VERIFICATION),
             abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),

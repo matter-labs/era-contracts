@@ -95,7 +95,7 @@ function collectSkipStorageAccounts(versionDir: string): Set<string> {
 
 // Specific storage slots (keccak-derived, so collision-free across contracts)
 // that hold an L2 block/batch number in the interop bookkeeping contracts
-// (L2InteropRootStorage / ChainAssetHandler / AssetTracker instances). These
+// (L2InteropRootStorage / ChainAssetHandler instances). These
 // were the only common-slot value diffs between two fresh runs, each differing
 // by exactly the block-count delta. Ignored in whichever account they appear.
 const BLOCK_NUMBER_STORAGE_SLOTS = new Set([
@@ -109,9 +109,8 @@ const BLOCK_NUMBER_STORAGE_SLOTS = new Set([
 // run-to-run by the same tiny margin as a native balance (the harness bridges a
 // gas-dependent mintValue on L1->L2 deposits). They are compared with the same
 // BALANCE_TOLERANCE_WEI slack as native balances rather than skipped outright, so
-// large (real) drift is still caught. Before the asset trackers were removed this
-// drift lived in the L1AssetTracker, whose storage was skipped wholesale; it now
-// lives in the L1NativeTokenVault's `bridgedOut[ETH]` entry.
+// large (real) drift is still caught. This drift lives in the L1NativeTokenVault's
+// `bridgedOut[ETH]` entry.
 //   slot = keccak256(abi.encode(ethAssetId, 253)), where 253 is the `bridgedOut`
 //   mapping's storage index. Recompute with `cast index bytes32 <ethAssetId> 253`
 //   if the L1NativeTokenVault layout changes.

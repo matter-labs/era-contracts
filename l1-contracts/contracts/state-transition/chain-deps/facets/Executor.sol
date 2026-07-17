@@ -162,8 +162,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _processTo,
         bytes calldata _executeData
     ) external nonReentrant onlyValidatorOrPriorityMode onlySettlementLayer {
-        // The trailing decoded value (settlementFeePayer) is intentionally omitted: the gateway
-        // interop settlement fees were removed together with the asset tracker.
+        // The trailing decoded value (settlementFeePayer) is intentionally omitted: gateway
+        // interop settlement fees are not collected.
         // slither-disable-next-line unused-return
         (
             StoredBatchInfo[] memory batchesData,

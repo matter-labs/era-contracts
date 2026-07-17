@@ -82,10 +82,10 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
 
 /// @notice Test-only Core upgrade that skips problematic governance calls
 contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
-    /// @notice Override to skip setAssetTracker call (requires NTV ownership in test)
+    /// @notice Override to skip the stage1 governance calls (they wire proxies that require live
+    /// ownership not present in the test fork)
     function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
-        console.log("Test mode: Skipping setAssetTracker governance call (requires proper NTV ownership)");
-        // Return empty array - setAssetTracker will be called via stage3 with proper owner
+        console.log("Test mode: Skipping v31-specific stage1 governance calls");
         calls = new Call[](0);
     }
 }
@@ -132,7 +132,7 @@ contract UpgradeIntegrationTest_Local is
     address private _serverNotifierProxyAdmin;
     address private _expectedServerNotifierProxyAdminOwner;
 
-    /// @notice Override to inject the mocked Core upgrade (skips setAssetTracker call).
+    /// @notice Override to inject the mocked Core upgrade (skips the stage1 governance calls).
     function createCoreUpgrade() internal override returns (CoreUpgrade_v31) {
         return new CoreUpgrade_v31_Test();
     }

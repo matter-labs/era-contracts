@@ -70,9 +70,7 @@ contract BaseTokenHolder is IBaseTokenHolder {
     /// L1, so no settlement-layer distinction is made.
     /// @dev This is write-only bookkeeping kept for future use; it is not consulted by any bridging
     /// decision. It is the base-token counterpart of `L2NativeTokenVault.interopInfo` (the base token
-    /// is escrowed here rather than in the vault, so all its flows converge in this contract). For
-    /// chains upgraded in place, counters recorded before the upgrade remain in the retired
-    /// L2AssetTracker at its reserved address.
+    /// is escrowed here rather than in the vault, so all its flows converge in this contract).
     /// @dev For the base token, failed deposits are refunded on L2 to the refundRecipient rather than
     /// later claimed on L1, so the gap between initiated deposits and `totalSuccessfulDepositsFromL1`
     /// should not be interpreted as uniformly "claimable on L1" across all asset types.

@@ -30,9 +30,9 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {RAND_ADDRESS} from "test/foundry/TestConstants.sol";
 
-/// @notice Tests for the chain-local write-only bookkeeping that replaced the removed
-/// L2AssetTracker: `bridgedOut` / `preTrackingTotalSupply` / `interopInfo` on the
-/// L2NativeTokenVault and `baseTokenInteropInfo` on the BaseTokenHolder.
+/// @notice Tests for the chain-local write-only bookkeeping: `bridgedOut` /
+/// `preTrackingTotalSupply` / `interopInfo` on the L2NativeTokenVault and
+/// `baseTokenInteropInfo` on the BaseTokenHolder.
 abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
 

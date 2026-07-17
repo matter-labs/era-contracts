@@ -178,11 +178,10 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     }
 
     /// @notice Adds a new chainBatchRoot to the chainTree and updates the aggregated shared tree.
-    /// @dev Runs on both settlement layers: on L1 the chain's DiamondProxy calls it directly during
-    /// batch execution, on Gateway the GW asset tracker calls it (see `addChainBatchRootRestriction`).
-    /// In both cases the chainBatchRoot is recorded, pushed to the chain tree, the shared tree leaf is
-    /// updated, and a new interop root is emitted — so chains settling on either layer participate in
-    /// interop.
+    /// @dev Runs on both settlement layers: the chain's DiamondProxy calls it directly during batch
+    /// execution (see `addChainBatchRootRestriction`). The chainBatchRoot is recorded, pushed to the
+    /// chain tree, the shared tree leaf is updated, and a new interop root is emitted — so chains
+    /// settling on either layer participate in interop.
     /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
     /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
     /// @param _chainBatchRoot The value of chainBatchRoot which is being added.

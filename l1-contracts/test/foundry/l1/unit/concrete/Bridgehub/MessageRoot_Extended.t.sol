@@ -34,13 +34,13 @@ contract MessageRoot_Extended_Test is Test {
     uint256 gatewayChainId;
     L1MessageRoot messageRoot;
     L2MessageRoot l2MessageRoot;
-    address assetTracker;
+    address bridgehubOwner;
     address chainAssetHandler;
 
     function setUp() public {
         bridgeHub = address(new L1Bridgehub(makeAddr("owner"), 10));
         chainAssetHandler = makeAddr("chainAssetHandler");
-        assetTracker = makeAddr("assetTracker");
+        bridgehubOwner = makeAddr("bridgehubOwner");
         L1_CHAIN_ID = 1;
         gatewayChainId = 506;
 
@@ -50,7 +50,7 @@ contract MessageRoot_Extended_Test is Test {
             abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
             abi.encode(chainAssetHandler)
         );
-        vm.mockCall(address(bridgeHub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(assetTracker));
+        vm.mockCall(address(bridgeHub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(bridgehubOwner));
 
         vm.mockCall(
             bridgeHub,

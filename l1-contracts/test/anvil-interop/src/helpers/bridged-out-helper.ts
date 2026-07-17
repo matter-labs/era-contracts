@@ -5,14 +5,14 @@ import { getAbi } from "../core/contracts";
 /**
  * Helpers for asserting L1NativeTokenVault.bridgedOut in bridge tests.
  *
- * `bridgedOut[assetId]` is the net amount of an L1-native asset currently bridged out of L1.
- * It replaces the removed L1AssetTracker.chainBalance as the on-L1 record of how much has been
- * bridged: it increases on outbound flows (deposits / interop sends) and decreases on inbound
- * ones (withdrawal finalizations / failed-deposit refunds). Unlike a raw balanceOf it only moves
- * through real bridge flows, so it is the value to assert bridge accounting against.
+ * `bridgedOut[assetId]` is the net amount of an L1-native asset currently bridged out of L1,
+ * the on-L1 record of how much has been bridged: it increases on outbound flows (deposits /
+ * interop sends) and decreases on inbound ones (withdrawal finalizations / failed-deposit
+ * refunds). Unlike a raw balanceOf it only moves through real bridge flows, so it is the value
+ * to assert bridge accounting against.
  *
- * Note it is per-asset (aggregate across chains), not per-chain like the old chainBalance, so tests
- * assert the delta around a single operation rather than an absolute per-chain balance.
+ * Note it is per-asset (aggregate across chains), not per-chain, so tests assert the delta
+ * around a single operation rather than an absolute per-chain balance.
  */
 function l1NativeTokenVault(l1RpcUrl: string, l1NativeTokenVaultAddr: string): Contract {
   return new Contract(l1NativeTokenVaultAddr, getAbi("L1NativeTokenVault"), new providers.JsonRpcProvider(l1RpcUrl));

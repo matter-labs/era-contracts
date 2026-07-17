@@ -202,9 +202,8 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
 
     /// @notice Requests that deposits be paused on the settlement layer (Gateway) for a chain that is
     /// about to migrate away from it. Callable only by the chain itself (its diamond).
-    /// @dev Re-homes the cross-layer message that previously went through the asset tracker. The
-    /// ChainAssetHandler is an authorized service-transaction sender on the settlement layer chain,
-    /// so it forwards the request to the settlement layer's `L2ChainAssetHandler`.
+    /// @dev The ChainAssetHandler is an authorized service-transaction sender on the settlement
+    /// layer chain, so it forwards the request to the settlement layer's `L2ChainAssetHandler`.
     /// @param _chainId The chain whose deposits should be paused on the settlement layer.
     function requestPauseDepositsForChainOnGateway(uint256 _chainId) external {
         require(msg.sender == BRIDGEHUB.getZKChain(_chainId), ZKChainNotRegistered());
