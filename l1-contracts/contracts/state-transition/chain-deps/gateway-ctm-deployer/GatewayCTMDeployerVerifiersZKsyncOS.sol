@@ -48,16 +48,14 @@ contract GatewayCTMDeployerVerifiersZKsyncOS {
             result.verifier = address(
                 new ZKsyncOSTestnetVerifier{salt: salt}(
                     IVerifierV2(result.verifierFflonk),
-                    IVerifier(result.verifierPlonk),
-                    _config.aliasedGovernanceAddress
+                    IVerifier(result.verifierPlonk)
                 )
             );
         } else {
             result.verifier = address(
                 new ZKsyncOSDualVerifier{salt: salt}(
                     IVerifierV2(result.verifierFflonk),
-                    IVerifier(result.verifierPlonk),
-                    _config.aliasedGovernanceAddress
+                    IVerifier(result.verifierPlonk)
                 )
             );
         }
