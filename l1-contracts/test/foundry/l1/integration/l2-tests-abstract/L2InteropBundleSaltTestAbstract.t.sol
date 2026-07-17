@@ -14,7 +14,8 @@ import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.
 import {
     AttributeAlreadySet,
     AttributeViolatesRestriction,
-    InteropBundleSaltAlreadyUsed
+    InteropBundleSaltAlreadyUsed,
+    InteropPreviewHash
 } from "contracts/interop/InteropErrors.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
@@ -91,9 +92,11 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
         (, , bundle) = abi.decode(data, (bytes32, bytes32, InteropBundle));
     }
 
-    /// @notice `previewBundleHash` returns exactly the `bundleHash` the matching `sendBundle` emits, so the
+    /// @notice `previewBundleHash` reports exactly the `bundleHash` the matching `sendBundle` emits, so the
     ///         off-chain atomic `flowId` (which commits to `bundleHash`) can be derived before the real send.
-    /// @dev The anvil-interop helpers rely on this equivalence to build atomic flows. The preview must run
+    /// @dev `previewBundleHash` follows the quoter pattern: it ALWAYS reverts with `InteropPreviewHash(hash)`
+    ///      (so its stateful assembly can never commit on-chain), and callers read the hash from the revert.
+    ///      The anvil-interop helpers rely on this equivalence to build atomic flows. The preview must run
     ///      from the same sender (its address feeds both the salt derivation and each call's `from`) and must
     ///      not consume the salt-uniqueness slot, so the real send below can reuse the same salt.
     function test_previewBundleHash_matchesSentBundleHash() public {
@@ -105,7 +108,19 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
         bytes memory destination = InteroperableAddress.formatEvmV1(destinationChainId);
 
         vm.prank(sender);
-        bytes32 predicted = l2InteropCenter.previewBundleHash(destination, calls, attrs);
+        // Low-level call so we can read the hash out of the quoter revert (see {previewBundleHash}).
+        (bool ok, bytes memory ret) = address(l2InteropCenter).call(
+            abi.encodeCall(l2InteropCenter.previewBundleHash, (destination, calls, attrs))
+        );
+        assertFalse(ok, "previewBundleHash must revert with InteropPreviewHash (quoter pattern)");
+        assertEq(ret.length, 36, "revert reason must be InteropPreviewHash(bytes32)");
+        assertEq(bytes4(ret), InteropPreviewHash.selector, "unexpected preview revert selector");
+        bytes32 predicted;
+        // ret layout: 4-byte selector followed by the abi-encoded bytes32 hash.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            predicted := mload(add(ret, 0x24))
+        }
 
         (, bytes32 emitted) = _sendAndDecodeBundle(sender, attrs);
         assertEq(predicted, emitted, "previewBundleHash must equal the emitted bundleHash");

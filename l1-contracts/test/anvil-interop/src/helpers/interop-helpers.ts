@@ -195,21 +195,46 @@ async function ensureUniqueBundleSalt(attributes: string[], wallet: Wallet): Pro
 }
 
 /**
+ * Pull the ABI-encoded revert data (`0x<selector><args>`) out of an ethers v5 `eth_call` rejection.
+ * Different providers nest it differently, so probe the common shapes.
+ */
+function extractRevertData(_err: unknown): string | undefined {
+  const err = _err as { error?: { data?: unknown }; data?: unknown; body?: string };
+  const candidates: unknown[] = [err?.error && (err.error as { data?: unknown }).data, err?.data];
+  if (typeof err?.body === "string") {
+    try {
+      candidates.push((JSON.parse(err.body) as { error?: { data?: unknown } })?.error?.data);
+    } catch {
+      // body was not JSON
+    }
+  }
+  for (const c of candidates) {
+    if (typeof c === "string" && c.startsWith("0x") && c.length >= 10) return c;
+    if (c && typeof c === "object") {
+      const nested = (c as { data?: unknown }).data;
+      if (typeof nested === "string" && nested.startsWith("0x") && nested.length >= 10) return nested;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Statically evaluate `previewBundleHash` / `previewMessageHash` (the two functions that predict a bundle's
- * hash before the real send) with the InteropCenter's balance overridden to a large value.
+ * hash before the real send) and return the predicted bundle hash.
  *
- * Both preview functions run the identical bundle assembly as the real send, including
- * `_processCallStarter`, which for an INDIRECT call with a non-zero `indirectCallMessageValue` (e.g. a
- * cross-base-token deposit that bridges native base-token value) forwards that value into
- * `L2AssetRouter.initiateIndirectCall{value: ...}`. The preview functions are intentionally non-payable —
- * the caller cannot send `msg.value` to them — so during a plain `callStatic` the InteropCenter holds no
- * balance and the value-carrying forward reverts (empty revert). Overriding the InteropCenter's balance for
- * this read-only `eth_call` lets its own balance cover the forwarded value, faithfully reproducing the real
- * send's assembly (the forwarded amount is fixed by `interopCallValue`, so the predicted hash is identical).
- * The state override is discarded with the call; nothing is persisted.
+ * Both preview functions follow the quoter pattern: they run the identical bundle assembly as the real send
+ * (including, for an INDIRECT leg, the value-burning `L2AssetRouter.initiateIndirectCall{value: ...}`) and
+ * then ALWAYS revert with `InteropPreviewHash(bundleHash)` rather than returning it — so the burn can never
+ * be committed on-chain regardless of caller/context. We therefore invoke them via `eth_call` (expecting the
+ * revert) and decode the hash out of the `InteropPreviewHash` reason.
  *
- * `_from` MUST be the address that will submit the real send: the preview derives the bundle salt and each
- * call's `from` from `msg.sender`, so a mismatch would predict a different hash.
+ * Two `eth_call` details make the assembly faithful:
+ *  - The InteropCenter's balance is overridden to a large value so it can fund the forwarded
+ *    `indirectCallMessageValue` of a cross-base-token indirect leg (msg.value is not forwarded to a preview);
+ *    the forwarded amount is fixed by the call, so the predicted hash is identical to the real send's.
+ *  - `_from` MUST be the address that will submit the real send: the preview derives the bundle salt and each
+ *    call's `from` from `msg.sender`, so a mismatch would predict a different hash.
+ * The state override and the reverted assembly are both discarded with the call; nothing persists.
  */
 // ~3.4e38 wei — far larger than any interop value leg, so the InteropCenter can always fund the
 // forwarded `indirectCallMessageValue` during the read-only preview.
@@ -222,12 +247,20 @@ export async function staticPreviewHash(
   _args: unknown[]
 ): Promise<string> {
   const data = _interopCenter.interface.encodeFunctionData(_fnName, _args);
-  const raw: string = await _provider.send("eth_call", [
-    { to: INTEROP_CENTER_ADDR, from: _from, data },
-    "latest",
-    { [INTEROP_CENTER_ADDR]: { balance: PREVIEW_INTEROP_CENTER_BALANCE_OVERRIDE } },
-  ]);
-  return _interopCenter.interface.decodeFunctionResult(_fnName, raw)[0] as string;
+  let revertData: string | undefined;
+  try {
+    await _provider.send("eth_call", [
+      { to: INTEROP_CENTER_ADDR, from: _from, data },
+      "latest",
+      { [INTEROP_CENTER_ADDR]: { balance: PREVIEW_INTEROP_CENTER_BALANCE_OVERRIDE } },
+    ]);
+    throw new Error(`${_fnName} was expected to revert with InteropPreviewHash (quoter pattern) but returned`);
+  } catch (e) {
+    revertData = extractRevertData(e);
+    if (!revertData) throw e;
+  }
+  // The revert reason is `InteropPreviewHash(bytes32 bundleHash)`; decode via the imported InteropCenter ABI.
+  return _interopCenter.interface.decodeErrorResult("InteropPreviewHash", revertData)[0] as string;
 }
 
 // ── Token transfer data encoding ───────────────────────────────

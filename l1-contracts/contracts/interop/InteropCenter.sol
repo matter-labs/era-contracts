@@ -40,6 +40,7 @@ import {
     NonAtomicSendUnsupported,
     AtomicBundleCallCarriesValue,
     AtomicBundleToL1NotSupported,
+    InteropPreviewHash,
     AttributeAlreadySet,
     AttributeViolatesRestriction,
     CannotInitiateInteropOnL1,
@@ -307,7 +308,7 @@ contract InteropCenter is
         bytes calldata _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
-    ) external returns (bytes32 bundleHash) {
+    ) external {
         _ensureEmptyAddress(_destinationChainId);
         // slither-disable-next-line unused-return
         (uint256 destinationChainId, ) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
@@ -329,7 +330,12 @@ contract InteropCenter is
             bundleAttributes,
             msg.sender
         );
-        bundleHash = _hashBundle(bundle);
+        // Quoter pattern: this function runs the same stateful bundle assembly as `sendBundle` (including the
+        // value-burning `initiateIndirectCall` for indirect legs), so it MUST NOT be able to commit that burn
+        // on-chain. Reverting with the computed hash — instead of returning it — guarantees every state change
+        // made while assembling the bundle is rolled back, no matter who calls it and in what context. Callers
+        // read the hash out of the `InteropPreviewHash` revert reason via a static `eth_call`.
+        revert InteropPreviewHash(_hashBundle(bundle));
     }
 
     /// @inheritdoc IInteropCenter
@@ -337,7 +343,7 @@ contract InteropCenter is
         bytes calldata _recipient,
         bytes calldata _payload,
         bytes[] calldata _attributes
-    ) external returns (bytes32 bundleHash) {
+    ) external {
         // slither-disable-next-line unused-return
         (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_recipient);
         _ensureL2ToL2(recipientChainId);
@@ -364,7 +370,9 @@ contract InteropCenter is
             bundleAttributes,
             msg.sender
         );
-        bundleHash = _hashBundle(bundle);
+        // Quoter pattern: reverts with the computed hash so the stateful assembly above (including any
+        // value-burning indirect call) can never be committed on-chain. See {previewBundleHash}.
+        revert InteropPreviewHash(_hashBundle(bundle));
     }
 
     /*//////////////////////////////////////////////////////////////

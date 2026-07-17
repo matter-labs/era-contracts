@@ -39,6 +39,8 @@ error InteropCallToL1NotToAssetRouter(address target);
 error InteroperableAddressChainReferenceNotEmpty(bytes interoperableAddress);
 // 0x884f49ba
 error InteroperableAddressNotEmpty(bytes interoperableAddress);
+// 0x290dc1c0
+error InteropPreviewHash(bytes32 bundleHash);
 // 0x9b021130
 error InteropToSelfNotSupported();
 // 0x2d48e8cf

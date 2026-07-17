@@ -5,6 +5,7 @@ pragma solidity ^0.8.24;
 import {L2_BASE_TOKEN_HOLDER, L2_NATIVE_TOKEN_VAULT} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {L2_ATOMIC_FLOW_MANAGER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {InteropHandlerBase} from "./InteropHandlerBase.sol";
+import {IL2InteropHandler} from "./IL2InteropHandler.sol";
 import {IAtomicFlowManager} from "../../atomic-interop/IAtomicFlowManager.sol";
 import {AtomicFinalityProof} from "../../atomic-interop/IAtomicInterop.sol";
 import {BundleStatus, InteropBundle} from "../../common/Messaging.sol";
@@ -19,7 +20,7 @@ import {Unauthorized} from "../../common/L1ContractErrors.sol";
 /// The generic bundle logic lives in `InteropHandlerBase`; this contract wires in the L2 system-contract
 /// behaviour and the **atomic** execution model: L2->L2 interop is proven via the AtomicFlowManager's IMT
 /// (`AtomicFinalityProof`), not via L1 message inclusion (public L2->L2 interop was removed).
-contract L2InteropHandler is InteropHandlerBase {
+contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
     /// @dev Only allows calls from the complex upgrader contract on L2.
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -47,7 +48,7 @@ contract L2InteropHandler is InteropHandlerBase {
     /// block legitimate nested interop.
     /// @param _bundle ABI-encoded InteropBundle to execute (carries the `atomicBundle` attribute at send time).
     /// @param _finality The flow definition (`flowId`, legs, deadline) + one IMT inclusion proof per leg.
-    function executeBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public {
+    function executeBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public override {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
         // Shared pre-gate validation. An atomic bundle is never published to L1, so it self-binds its own
@@ -65,7 +66,7 @@ contract L2InteropHandler is InteropHandlerBase {
     /// @notice Verifies receipt of an atomic bundle without executing its calls, enabling the verify->unbundle flow.
     /// @param _bundle ABI-encoded InteropBundle to verify.
     /// @param _finality The flow definition + one IMT inclusion proof per leg.
-    function verifyBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public {
+    function verifyBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public override {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
         _validateVerifiable(bundleHash, interopBundle, interopBundle.sourceChainId, status);
