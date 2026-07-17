@@ -305,11 +305,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         return true;
     }
 
-    /// @notice Refunds a timed-out atomic-interop native-`value` leg that was funded via the different-base-token
-    /// path (`bridgehubDepositBaseToken`), re-crediting the destination base-token asset to the depositor.
-    /// @dev Manager-gated wrapper symmetric with {bridgehubDepositBaseToken}; forwards to the NTV, which
-    /// reverses the `bridgeBurn` done at send time. The same-base path is refunded directly by the
-    /// {BaseTokenHolder} instead (see {AtomicFlowManager._recoverBundle}).
+    /// @notice Refunds a timed-out atomic-interop value leg, re-crediting the destination base-token asset
+    /// to the depositor.
+    /// @dev Manager-gated wrapper symmetric with {bridgehubDepositBaseToken} and the same-base
+    /// BaseTokenHolder path; forwards to the NTV, which dispatches through the existing failed-transfer
+    /// recovery logic.
     /// @param _chainId The chain the asset was being bridged to at burn time.
     /// @param _assetId The destination base-token asset id that was burned.
     /// @param _receiver The original depositor to refund.
@@ -320,6 +320,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         address _receiver,
         uint256 _amount
     ) external onlyAtomicFlowManager nonReentrant {
+        require(_chainId != L1_CHAIN_ID, RecoverToL1NotSupported());
         // Reuse the generic failed-transfer recovery. The base-token deposit (bridgehubDepositBaseToken)
         // discarded its bridge-mint data, so reconstruct the minimal form: `bridgeRecoverFailedTransfer`
         // refunds the mint data's `originalCaller` for `amount`, and the asset is already registered on

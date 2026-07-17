@@ -899,22 +899,6 @@
   },
   {
     "type": "error",
-    "name": "AtomicBundleCallCarriesValue",
-    "inputs": [
-      {
-        "name": "callIndex",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "value",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "AtomicBundleToL1NotSupported",
     "inputs": []
   },

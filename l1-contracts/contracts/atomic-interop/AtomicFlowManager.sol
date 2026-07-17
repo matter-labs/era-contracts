@@ -9,7 +9,6 @@ import {LegState, AtomicFlow, AtomicTimeoutProof, AtomicFinalityProof} from "./I
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
 import {InteropDataEncoding} from "../interop/InteropDataEncoding.sol";
 import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol";
-import {L2_BASE_TOKEN_HOLDER, L2_NATIVE_TOKEN_VAULT} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_INTEROP_CENTER_ADDR,
@@ -190,61 +189,53 @@ contract AtomicFlowManager is IAtomicFlowManager {
         return L2_INTEROP_HANDLER_ADDR;
     }
 
-    /// @dev Reverses every recoverable call embedded in `_bundle`, re-crediting the original depositor. Each
-    /// call is recovered along (up to) two axes:
-    /// 1. Native base-token `value` refund: a call carrying `value` had that base token collected at send
-    ///    time — held by the {BaseTokenHolder} (same base token) or deposited through the asset router (a
-    ///    different base token). The manager reverses whichever path was taken, returning `value` to the
-    ///    call's local sender (`InteropCall.from`, the depositor for a direct call).
-    /// 2. Burn-produced call reversal: a call whose local sender (`InteropCall.from`) is the asset router
-    ///    burned a bridgeable asset via `initiateIndirectCall` and owns its own reversal via
-    ///    {IAtomicRecoverable.recoverAtomicCall}. The manager forwards `(destinationChainId, data)` to that
-    ///    sender and counts the ones that report a recovery. Only the asset router is asked (its `from` is a
-    ///    known {IAtomicRecoverable}); a direct call's `from` is the original sender (possibly an EOA) that
-    ///    need not implement the interface, so it is skipped — its value, if any, is handled by axis 1.
+    /// @dev Reverses every recoverable call embedded in `_bundle`, re-crediting the original depositor.
+    /// Each call's local sender (`InteropCall.from`) owns its own reversal via
+    /// {IAtomicRecoverable.recoverAtomicCall}: it is the contract that authorized (and burned for) the call
+    /// on this chain, while the call's target (`InteropCall.to`) lives on the destination chain and need
+    /// not even exist here. The manager is agnostic to the call/encoding format and simply forwards
+    /// `(destinationChainId, data)`, counting the calls that report a recovery. Senders must return `false`
+    /// (not revert) for calls they do not recognise.
+    ///
+    /// A second reversal applies to native base-token value. A call carrying `value` had that base token
+    /// collected at send time (see {InteropCenter._ensureCorrectTotalValue}) — held by the {BaseTokenHolder}
+    /// when the destination shares this chain's base token, or deposited via the asset router otherwise.
+    /// For direct calls, the refund routes through the asset router/NTV recovery path so the existing
+    /// base-token recovery accounting is reused, returning `value` to the call's `from` (the depositor).
+    /// Router-produced calls do not take this branch: their value is part of the burn recovered by
+    /// {IAtomicRecoverable.recoverAtomicCall}. Every direct value leg counts as a recovery.
     ///
     /// Recovery is best-effort by design. An atomic bundle may mix fund-moving calls with calls that move no
     /// funds and have nothing to reverse (e.g. flipping a flag). The latter contribute nothing. We only
     /// require that *some* call recovered (`recovered != 0`): a bundle where nothing is recoverable has no
     /// source funds to return, so a refund would be a no-op and we reject it.
     ///
-    /// Consequence: the protocol does not guarantee full refundability of an arbitrary bundle. Native-`value`
-    /// legs are always refundable (axis 1); a bespoke fund-moving call that neither carries `value` nor routes
-    /// through the asset router would strand its funds — making such a leg recoverable is the flow author's
-    /// responsibility. Send-time ({InteropCenter}) additionally blocks L1-destined atomic bundles (L2->L1
-    /// withdrawals are never revertable).
+    /// Consequence: the protocol does not guarantee full refundability of an arbitrary bundle. A flow author
+    /// must make any bespoke fund-moving leg that does not carry `value` recoverable; otherwise it would
+    /// strand its funds. L1-destined atomic bundles remain blocked at send time because L2->L1 withdrawals
+    /// are never revertable.
     function _recoverBundle(bytes32 _flowId, bytes32 _bundleHash, InteropBundle memory _bundle) internal {
         uint256 destChainId = _bundle.destinationChainId;
         bytes32 destBaseTokenAssetId = _bundle.destinationBaseTokenAssetId;
-        // The send side collects a call's native `value` two ways, keyed on base-token identity: the same
-        // base token is escrowed in the {BaseTokenHolder} (`burnAndStartBridging`), a different base token is
-        // deposited as the destination base-token asset through the asset router (`bridgehubDepositBaseToken`).
-        // The refund below reverses whichever path was taken.
-        bool sameBaseToken = destBaseTokenAssetId == L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID();
         uint256 callsLen = _bundle.calls.length;
         uint256 recovered = 0;
         for (uint256 i = 0; i < callsLen; ++i) {
             InteropCall memory c = _bundle.calls[i];
-            // 1. Native base-token value refund. A call carrying `value` had that base token collected at
-            //    send time; return it to the call's local sender (`from` — the depositor for a direct call).
-            if (c.value != 0) {
-                if (sameBaseToken) {
-                    L2_BASE_TOKEN_HOLDER.refundBridgedBaseToken(c.from, c.value, destChainId);
-                } else {
-                    IAssetRouterShared(L2_ASSET_ROUTER_ADDR).bridgehubRecoverBaseToken(
-                        destChainId,
-                        destBaseTokenAssetId,
-                        c.from,
-                        c.value
-                    );
+            // Only ask burn-producing calls (from == asset router, as set by `initiateIndirectCall`) to
+            // reverse themselves. A direct call never burned through a recoverable sender, so its `from`
+            // (possibly an EOA) is skipped here; any base-token value it carried is handled below.
+            if (c.from == L2_ASSET_ROUTER_ADDR) {
+                if (IAtomicRecoverable(c.from).recoverAtomicCall(destChainId, c.data)) {
+                    ++recovered;
                 }
-                ++recovered;
             }
-            // 2. Burn-produced (asset-router) call recovery: only a call whose local sender is the asset
-            //    router (as set by `initiateIndirectCall`) burned a bridgeable asset, and only it implements
-            //    {IAtomicRecoverable}. A direct call's `from` (possibly an EOA) does not, so it is skipped
-            //    here — any native value it carried was already refunded above.
-            if (c.from == L2_ASSET_ROUTER_ADDR && IAtomicRecoverable(c.from).recoverAtomicCall(destChainId, c.data)) {
+            if (c.from != L2_ASSET_ROUTER_ADDR && c.value != 0) {
+                IAssetRouterShared(L2_ASSET_ROUTER_ADDR).bridgehubRecoverBaseToken(
+                    destChainId,
+                    destBaseTokenAssetId,
+                    c.from,
+                    c.value
+                );
                 ++recovered;
             }
         }

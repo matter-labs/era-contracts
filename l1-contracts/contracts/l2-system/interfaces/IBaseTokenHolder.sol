@@ -47,12 +47,6 @@ interface IBaseTokenHolder {
     /// @param amount The amount of base tokens returned.
     event BaseTokenRecovered(address indexed to, uint256 amount);
 
-    /// @notice Emitted when a timed-out atomic-interop native-`value` leg is refunded to its depositor.
-    /// @param to The original depositor refunded.
-    /// @param toChainId The original bridge-out destination chain id.
-    /// @param amount The amount of base tokens returned.
-    event BaseTokenRefundedInterop(address indexed to, uint256 toChainId, uint256 amount);
-
     /// @notice Gives out base tokens from the holder to a recipient.
     /// @param _to The address to receive the base tokens.
     /// @param _amount The amount of base tokens to give out.
@@ -66,13 +60,6 @@ interface IBaseTokenHolder {
     /// @param _amount The amount of base tokens to return.
     /// @param _toChainId The original bridge-out destination chain id.
     function recoverBaseToken(address _to, uint256 _amount, uint256 _toChainId) external;
-
-    /// @notice Refunds a timed-out atomic-interop native-`value` leg escrowed by `burnAndStartBridging` to
-    /// its depositor. AtomicFlowManager-driven counterpart of `recoverBaseToken`.
-    /// @param _to The original depositor to refund.
-    /// @param _amount The amount of base tokens to return.
-    /// @param _toChainId The original bridge-out destination chain id.
-    function refundBridgedBaseToken(address _to, uint256 _amount, uint256 _toChainId) external;
 
     /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.
     /// @dev Called by InteropCenter and NativeTokenVault during bridging operations.
