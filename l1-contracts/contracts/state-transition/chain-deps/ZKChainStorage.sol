@@ -264,6 +264,6 @@ struct ZKChainStorage {
     /// public input. A chain may raise the cap above the Ethereum limit but must not set it below.
     /// `0` means the default (`ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`) for chains that existed before
     /// this field was introduced.
-    /// @dev STORAGE SLOT: 69
+    /// @dev STORAGE SLOT: 68
     uint64 zksyncOSMaxTxGasLimit;
 }

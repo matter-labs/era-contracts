@@ -104,8 +104,8 @@ uint256 constant PRICE_REFERENCE_L1_GAS = 1 gwei;
 /// @dev The intrinsic cost of the L1->L2 transaction in computational L2 gas for ZKsync OS.
 uint256 constant L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS = 21000;
 
-/// @dev The cost of calldata byte for the L1->L2 transaction in computational L2 gas for ZKsync OS.
-uint256 constant L1_TX_CALLDATA_PRICE_L2_GAS_ZKSYNC_OS = 16;
+/// @dev The floor cost(EIP-7623) of non-zero calldata byte for the L1->L2 transaction in computational L2 gas for ZKsync OS.
+uint256 constant L1_TX_CALLDATA_FLOOR_PRICE_L2_GAS_ZKSYNC_OS = 40;
 
 /// @dev The maximal computational native limit for transaction in ZKsync OS.
 uint256 constant MAX_NATIVE_COMPUTATIONAL_ZKSYNC_OS = 1 << 35;
