@@ -560,7 +560,8 @@ export function encodeCommitBatchesData(
     [STORED_BATCH_INFO_ABI_STRING, `${COMMIT_BATCH_INFO_ABI_STRING}[]`],
     [storedBatchInfo, commitBatchInfos]
   );
-  const commitData = hexConcat(["0x00", encodedCommitDataWithoutVersion]);
+  // Commit wire encoding version (BatchDecoder.SUPPORTED_ENCODING_VERSION).
+  const commitData = hexConcat(["0x01", encodedCommitDataWithoutVersion]);
   return [commitBatchInfos[0].batchNumber, commitBatchInfos[commitBatchInfos.length - 1].batchNumber, commitData];
 }
 
@@ -573,7 +574,8 @@ export function encodeProveBatchesData(
     [STORED_BATCH_INFO_ABI_STRING, `${STORED_BATCH_INFO_ABI_STRING}[]`, "uint256[]"],
     [prevBatch, committedBatches, proof]
   );
-  const proveData = hexConcat(["0x00", encodedProveDataWithoutVersion]);
+  // Prove wire encoding version (BatchDecoder.SUPPORTED_ENCODING_VERSION).
+  const proveData = hexConcat(["0x01", encodedProveDataWithoutVersion]);
   return [committedBatches[0].batchNumber, committedBatches[committedBatches.length - 1].batchNumber, proveData];
 }
 
@@ -599,6 +601,7 @@ export function encodeExecuteBatchesData(
       },
     ]
   );
-  const executeData = hexConcat(["0x01", encodedExecuteDataWithoutVersion]);
+  // Execute wire encoding version (BatchDecoder.SUPPORTED_ENCODING_VERSION_EXECUTE).
+  const executeData = hexConcat(["0x02", encodedExecuteDataWithoutVersion]);
   return [batchesData[0].batchNumber, batchesData[batchesData.length - 1].batchNumber, executeData];
 }
