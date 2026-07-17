@@ -7,6 +7,6 @@ import {IVerifier} from "./IVerifier.sol";
 
 /// @notice Interface for ZKsyncOSDualVerifier sub-verifier getters
 interface IZKsyncOSDualVerifier {
-    function fflonkVerifiers(uint32 version) external view returns (IVerifierV2);
-    function plonkVerifiers(uint32 version) external view returns (IVerifier);
+    function FFLONK_VERIFIER() external view returns (IVerifierV2);
+    function PLONK_VERIFIER() external view returns (IVerifier);
 }

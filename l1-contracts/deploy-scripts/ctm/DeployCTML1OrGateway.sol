@@ -2,9 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
-import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IEraDualVerifier} from "contracts/state-transition/chain-interfaces/IEraDualVerifier.sol";
 import {IZKsyncOSDualVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSDualVerifier.sol";
 
@@ -21,7 +18,6 @@ struct CTMCoreDeploymentConfig {
     address eip7702Checker;
     address verifierFflonk;
     address verifierPlonk;
-    address verifierOwner;
     address permissionlessValidator;
 }
 
@@ -102,8 +98,7 @@ library DeployCTML1OrGateway {
         } else if (_contractName == CTMContract.DiamondInit) {
             return abi.encode(_isZKsyncOS);
         } else if (_contractName == CTMContract.DualVerifier || _contractName == CTMContract.TestnetVerifier) {
-            return
-                verifierCreationArgs(_isZKsyncOS, _config.verifierFflonk, _config.verifierPlonk, _config.verifierOwner);
+            return abi.encode(_config.verifierFflonk, _config.verifierPlonk);
         } else if (_contractName == CTMContract.ChainTypeManager) {
             return
                 abi.encode(
@@ -159,69 +154,6 @@ library DeployCTML1OrGateway {
 
     // ======================== Verifier helpers ========================
 
-    // TODO: pass this value from zkstack_cli
-    uint32 internal constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 6;
-
-    /// @notice Encode constructor arguments for the main verifier.
-    ///         ZKsyncOS verifiers require an extra `_owner` argument.
-    function verifierCreationArgs(
-        bool _isZKsyncOS,
-        address _fflonk,
-        address _plonk,
-        address _owner
-    ) internal pure returns (bytes memory) {
-        if (_isZKsyncOS) {
-            return abi.encode(_fflonk, _plonk, _owner);
-        }
-        return abi.encode(_fflonk, _plonk);
-    }
-
-    /// @notice Perform any post-deploy steps required for the verifier.
-    ///         For ZKsyncOS: registers sub-verifiers at the default version and
-    ///         transfers ownership. For Era: no-op.
-    /// @dev Caller must handle vm.startBroadcast / vm.stopBroadcast around this call.
-    ///      Idempotent — `addVerifier` reverts with `AddressAlreadySet` on the
-    ///      second call, and `transferOwnership` is a no-op when the owner /
-    ///      pendingOwner is already what we'd set. We pre-check both so a
-    ///      partial prior broadcast (deploy + addVerifier landed on real chain,
-    ///      but ownership flow didn't finish) can be replayed cleanly.
-    function initializeVerifier(
-        address _verifier,
-        address _fflonk,
-        address _plonk,
-        address _owner,
-        bool _isZKsyncOS
-    ) internal {
-        if (!_isZKsyncOS) {
-            return;
-        }
-
-        ZKsyncOSDualVerifier verifier = ZKsyncOSDualVerifier(_verifier);
-
-        IVerifierV2 currentFflonk = verifier.fflonkVerifiers(DEFAULT_ZKSYNC_OS_VERIFIER_VERSION);
-        IVerifier currentPlonk = verifier.plonkVerifiers(DEFAULT_ZKSYNC_OS_VERIFIER_VERSION);
-        if (address(currentFflonk) == address(0) && address(currentPlonk) == address(0)) {
-            verifier.addVerifier(DEFAULT_ZKSYNC_OS_VERIFIER_VERSION, IVerifierV2(_fflonk), IVerifier(_plonk));
-        } else {
-            require(
-                address(currentFflonk) == _fflonk && address(currentPlonk) == _plonk,
-                "ZKsyncOSDualVerifier already initialised at the default version with a different (fflonk, plonk) pair"
-            );
-        }
-
-        if (verifier.owner() != _owner && verifier.pendingOwner() != _owner) {
-            verifier.transferOwnership(_owner);
-        }
-    }
-
-    /// @notice Transfer ownership of a ZKsyncOS dual verifier. No-op for Era verifiers.
-    function transferVerifierOwnership(address _verifier, address _newOwner, bool _isZKsyncOS) internal {
-        if (!_isZKsyncOS) {
-            return;
-        }
-        ZKsyncOSDualVerifier(_verifier).transferOwnership(_newOwner);
-    }
-
     /// @notice Retrieve sub-verifier addresses from a deployed dual verifier.
     function getSubVerifiers(
         address _verifier,
@@ -233,8 +165,8 @@ library DeployCTML1OrGateway {
 
         if (_isZKsyncOS) {
             IZKsyncOSDualVerifier verifier = IZKsyncOSDualVerifier(_verifier);
-            fflonk = address(verifier.fflonkVerifiers(0));
-            plonk = address(verifier.plonkVerifiers(0));
+            fflonk = address(verifier.FFLONK_VERIFIER());
+            plonk = address(verifier.PLONK_VERIFIER());
         } else {
             IEraDualVerifier verifier = IEraDualVerifier(_verifier);
             fflonk = address(verifier.FFLONK_VERIFIER());

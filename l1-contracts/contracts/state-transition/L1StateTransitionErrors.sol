@@ -109,7 +109,6 @@ error SettlementLayerChainIdMismatch();
 // 0x97f58c80
 error TotalPriorityTxsIsZero();
 // 0x0baf1d48
-error UnknownVerifierVersion();
 // 0x79274f04
 error UnsupportedProofMetadataVersion(uint256 metadataVersion);
 // 0x52595598

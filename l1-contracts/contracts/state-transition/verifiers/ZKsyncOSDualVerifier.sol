@@ -2,20 +2,15 @@
 
 pragma solidity 0.8.28;
 
-import {UnknownVerifierVersion} from "../L1StateTransitionErrors.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {
     EmptyProofLength,
     UnknownVerifierType,
     MockVerifierNotSupported,
-    InvalidProofFormat,
-    ZeroAddress,
-    AddressAlreadySet,
     EmptyPublicInputsLength
 } from "../../common/L1ContractErrors.sol";
 import {IZKsyncOSDualVerifier} from "../chain-interfaces/IZKsyncOSDualVerifier.sol";
-import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 /// @title ZKsync OS Dual Verifier
 /// @author Matter Labs
@@ -24,48 +19,24 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 /// to the verifier based on the provided proof type.
 /// It reuses the same interface as on the original `Verifier` contract, while abusing one of the fields
 /// (`_recursiveAggregationInput`) for proof verification type.
-contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier, IZKsyncOSDualVerifier {
+contract ZKsyncOSDualVerifier is IVerifier, IZKsyncOSDualVerifier {
+    /// @notice The FFLONK verifier contract.
+    IVerifierV2 public immutable FFLONK_VERIFIER;
+
+    /// @notice The PLONK verifier contract.
+    IVerifier public immutable PLONK_VERIFIER;
+
     /// @dev Type of verification for ZKsync OS PLONK verifier.
     uint256 internal constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
 
     // @notice This is proof-skipping verifier (mock), it's only checking the correctness of the public inputs.
     uint256 internal constant ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
 
-    /// @notice Mapping of different FFLONK verifiers dependent on their version.
-    mapping(uint32 => IVerifierV2) public fflonkVerifiers;
-
-    /// @notice Mapping of different PLONK verifiers dependent on their version.
-    mapping(uint32 => IVerifier) public plonkVerifiers;
-
     /// @param _fflonkVerifier The address of the FFLONK verifier contract.
     /// @param _plonkVerifier The address of the PLONK verifier contract.
-    /// @param _initialOwner The address of the initial owner of this contract.
-    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address _initialOwner) {
-        fflonkVerifiers[0] = _fflonkVerifier;
-        plonkVerifiers[0] = _plonkVerifier;
-        _transferOwnership(_initialOwner);
-    }
-
-    /// @notice Adds new verifiers for the specified version.
-    /// @param version The version number for the verifiers.
-    /// @param _fflonkVerifier The address of the FFLONK verifier contract.
-    /// @param _plonkVerifier The address of the PLONK verifier contract.
-    function addVerifier(uint32 version, IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) external onlyOwner {
-        require(address(_plonkVerifier) != address(0), ZeroAddress());
-        require(
-            fflonkVerifiers[version] == IVerifierV2(address(0)),
-            AddressAlreadySet(address(fflonkVerifiers[version]))
-        );
-        require(plonkVerifiers[version] == IVerifier(address(0)), AddressAlreadySet(address(plonkVerifiers[version])));
-        fflonkVerifiers[version] = _fflonkVerifier;
-        plonkVerifiers[version] = _plonkVerifier;
-    }
-
-    /// @notice Removes the verifiers for the specified version.
-    /// @param version The version number of the verifiers to remove.
-    function removeVerifier(uint32 version) external onlyOwner {
-        delete fflonkVerifiers[version];
-        delete plonkVerifiers[version];
+    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) {
+        FFLONK_VERIFIER = _fflonkVerifier;
+        PLONK_VERIFIER = _plonkVerifier;
     }
 
     /// @notice Routes zk-SNARK proof verification to the appropriate verifier based on the proof type.
@@ -88,23 +59,13 @@ contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier, IZKsyncOSDualVerifier 
         }
 
         // The first element of `_proof` determines the verifier type.
-        uint256 verifierType = _proof[0] & 255;
-        uint32 verifierVersion = uint32(_proof[0] >> 8);
-
-        // Validate that unused bits (40-255) are zero.
-        if (_proof[0] >> 40 != 0) {
-            revert InvalidProofFormat();
-        }
-
-        if (plonkVerifiers[verifierVersion] == IVerifier(address(0))) {
-            revert UnknownVerifierVersion();
-        }
+        uint256 verifierType = _proof[0];
 
         if (verifierType == ZKSYNC_OS_PLONK_VERIFICATION_TYPE) {
             uint256[] memory args = new uint256[](1);
             args[0] = computeZKsyncOSHash(_proof[1], _publicInputs);
 
-            return plonkVerifiers[verifierVersion].verify(args, _extractZKsyncOSProof(_proof));
+            return PLONK_VERIFIER.verify(args, _extractZKsyncOSProof(_proof));
         } else if (verifierType == ZKSYNC_OS_MOCK_VERIFICATION_TYPE) {
             uint256[] memory args = new uint256[](1);
             args[0] = computeZKsyncOSHash(_proof[1], _publicInputs);
@@ -125,26 +86,14 @@ contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier, IZKsyncOSDualVerifier 
     /// @inheritdoc IVerifier
     /// @dev Used for backward compatibility with older Verifier implementation. Returns PLONK verification key hash.
     function verificationKeyHash() external view returns (bytes32) {
-        return plonkVerifiers[0].verificationKeyHash();
+        return PLONK_VERIFIER.verificationKeyHash();
     }
 
     /// @notice Calculates a keccak256 hash of the runtime loaded verification keys from the selected verifier.
     /// @return The keccak256 hash of the loaded verification keys based on the verifier.
     function verificationKeyHash(uint256 _verifierType) external view returns (bytes32) {
-        uint256 verifierType = _verifierType & 255;
-        uint32 verifierVersion = uint32(_verifierType >> 8);
-
-        // Validate that unused bits (40-255) are zero.
-        if (_verifierType >> 40 != 0) {
-            revert InvalidProofFormat();
-        }
-
-        if (plonkVerifiers[verifierVersion] == IVerifier(address(0))) {
-            revert UnknownVerifierVersion();
-        }
-
-        if (verifierType == ZKSYNC_OS_PLONK_VERIFICATION_TYPE) {
-            return plonkVerifiers[verifierVersion].verificationKeyHash();
+        if (_verifierType == ZKSYNC_OS_PLONK_VERIFICATION_TYPE) {
+            return PLONK_VERIFIER.verificationKeyHash();
         }
         // If the verifier type is unknown, revert with an error.
         else {

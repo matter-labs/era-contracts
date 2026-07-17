@@ -131,7 +131,7 @@ mod ctm_signatures {
             constructor(address _fflonkVerifier, address _plonkVerifier);
         }
         contract V31ZKsyncOSDualVerifier {
-            constructor(address _fflonkVerifier, address _plonkVerifier, address _initialOwner);
+            constructor(address _fflonkVerifier, address _plonkVerifier);
         }
         contract V31GovernanceUpgradeTimer {
             constructor(
@@ -1022,7 +1022,7 @@ async fn verify_ctm_provenance(
 ) -> Result<()> {
     use ctm_signatures::*;
 
-    verify_ctm_base_provenance(artifact, ctm, verifiers, l1_chain_id, result)?;
+    verify_ctm_base_provenance(ctm, verifiers, l1_chain_id, result)?;
 
     let bridgehub_addr = context.bridgehub_addr;
     let label = ctm.flavor.label();
@@ -1182,7 +1182,6 @@ async fn verify_ctm_provenance(
 /// All required addresses come from the CTM's own `[ctms.<flavor>]`
 /// section via `required_address`.
 fn verify_ctm_base_provenance(
-    artifact: &EcosystemUpgradeArtifact,
     ctm: &CtmArtifact,
     verifiers: &Verifiers,
     l1_chain_id: u64,
@@ -1316,8 +1315,6 @@ fn verify_ctm_base_provenance(
     // The choice is fixed by the env: mainnet expects `*DualVerifier`;
     // stage/testnet expect the `*TestnetVerifier` flavor instead.
     //
-    // ZKsyncOS verifiers take a third `_initialOwner` constructor arg: the
-    // deployer EOA from `DeployCTMUtils.verifierOwner = getBroadcasterAddress()`.
     let verifier = required_address(&ctm.value, &scope, &["state_transition", "verifier_addr"])?;
     let fflonk = required_address(
         &ctm.value,
@@ -1335,8 +1332,7 @@ fn verify_ctm_base_provenance(
         dual_verifier_file
     };
     let encoded = if is_zksync_os {
-        let initial_owner = required_address(&artifact.misc, "misc", &["deployer_addr"])?;
-        V31ZKsyncOSDualVerifier::constructorCall::new((fflonk, plonk, initial_owner)).abi_encode()
+        V31ZKsyncOSDualVerifier::constructorCall::new((fflonk, plonk)).abi_encode()
     } else {
         V31DualVerifier::constructorCall::new((fflonk, plonk)).abi_encode()
     };
