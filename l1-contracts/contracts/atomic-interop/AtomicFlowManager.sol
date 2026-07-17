@@ -5,7 +5,7 @@ import {IAtomicFlowManager} from "./IAtomicFlowManager.sol";
 import {IL2InteropCommitmentTree} from "./IL2InteropCommitmentTree.sol";
 import {IAtomicRecoverable} from "./IAtomicRecoverable.sol";
 import {AtomicInteropProof} from "./libraries/AtomicInteropProof.sol";
-import {LegState, AtomicFlow, ImtProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
+import {LegState, AtomicFlow, AtomicFlowPreimage, ImtProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
 import {InteropDataEncoding} from "../interop/InteropDataEncoding.sol";
 import {
@@ -23,6 +23,8 @@ import {
     ManagerLegNotRevertable,
     ManagerFlowIdMismatch,
     ManagerBundleHashesNotSorted,
+    ManagerCommittedBundleNotInFlow,
+    ManagerCommittedLegSourceChainMismatch,
     ManagerLegSourceChainIdsLengthMismatch,
     ManagerProofCountMismatch,
     ManagerExecutingBundleNotInFlow,
@@ -86,20 +88,50 @@ contract AtomicFlowManager is IAtomicFlowManager {
 
     /// @inheritdoc IAtomicFlowManager
     function append(
-        bytes32 _flowId,
         bytes32 _bundleHash,
-        uint64 _deadline,
-        uint256 _lowNullifierIndex
+        uint256 _lowNullifierIndex,
+        AtomicFlowPreimage calldata _flowPreimage
     ) external onlyInteropCenter {
-        if (_state[_flowId][_bundleHash] != LegState.Unset) revert ManagerLegAlreadyCommitted(_flowId, _bundleHash);
-        // Effects before interaction: mark committed before touching the tree.
-        _state[_flowId][_bundleHash] = LegState.Committed;
+        // A flow with a non-L1 settlement layer could neither finalize nor refund (both proof paths
+        // enforce SL == L1), so reject it before committing anything.
+        _checkSettlementLayerIsL1(_flowPreimage.settlementLayerChainId);
+        bytes32 flowId = _validateAndComputeFlowId(
+            _flowPreimage.legBundleHashes,
+            _flowPreimage.legSourceChainIds,
+            _flowPreimage.deadline,
+            _flowPreimage.settlementLayerChainId
+        );
 
-        uint256 value = AtomicInteropProof.commitValue(_flowId, _bundleHash);
+        // The committing bundle must be one of the flow's legs, declared with this chain as its
+        // source. This is the coupling guarantee the preimage exists for: a bundle can never be
+        // committed under a `flowId` that does not contain it (see {AtomicFlowPreimage}).
+        // `legBundleHashes` is strictly ascending (checked above), so `_bundleHash` occurs at most once.
+        uint256 n = _flowPreimage.legBundleHashes.length;
+        uint256 legIndex = n;
+        for (uint256 i = 0; i < n; ++i) {
+            if (_flowPreimage.legBundleHashes[i] == _bundleHash) {
+                legIndex = i;
+                break;
+            }
+        }
+        if (legIndex == n) revert ManagerCommittedBundleNotInFlow(flowId, _bundleHash);
+        if (_flowPreimage.legSourceChainIds[legIndex] != block.chainid) {
+            revert ManagerCommittedLegSourceChainMismatch(
+                flowId,
+                block.chainid,
+                _flowPreimage.legSourceChainIds[legIndex]
+            );
+        }
+
+        if (_state[flowId][_bundleHash] != LegState.Unset) revert ManagerLegAlreadyCommitted(flowId, _bundleHash);
+        // Effects before interaction: mark committed before touching the tree.
+        _state[flowId][_bundleHash] = LegState.Committed;
+
+        uint256 value = AtomicInteropProof.commitValue(flowId, _bundleHash);
         // slither-disable-next-line unused-return
         (uint256 index, ) = IL2InteropCommitmentTree(commitmentTree()).insert(value, _lowNullifierIndex);
 
-        emit FlowCommitted(_flowId, _bundleHash, _deadline, index);
+        emit FlowCommitted(flowId, _bundleHash, _flowPreimage.deadline, index);
     }
 
     /// @inheritdoc IAtomicFlowManager
@@ -242,30 +274,48 @@ contract AtomicFlowManager is IAtomicFlowManager {
 
     /// @dev In this release interop operates against roots imported from L1 only (see
     /// `ChainAssetHandlerBase` — only the L1 message root is assumed for interop), so every flow must
-    /// declare L1 as its settlement layer. Checked wherever the settlement layer is consumed
-    /// (finality and refund verification); send-time `append` only sees the opaque `flowId`.
+    /// declare L1 as its settlement layer. Checked wherever the settlement layer is consumed: at
+    /// send time (`append`, which receives the full flowId preimage) and at finality and refund
+    /// verification.
     function _checkSettlementLayerIsL1(uint256 _settlementLayerChainId) internal view {
         if (_settlementLayerChainId != L1_CHAIN_ID) {
             revert ManagerSettlementLayerNotL1(L1_CHAIN_ID, _settlementLayerChainId);
         }
     }
 
-    /// @dev Recomputes `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline,
-    /// settlementLayerChainId))` and asserts it matches `_flow.flowId`. `legBundleHashes` must be strictly
-    /// ascending (canonical order + dedup). `legSourceChainIds` is positional, aligned 1:1 with
-    /// `legBundleHashes`; it may repeat and need not be ascending, so only its length is checked. Treating
-    /// it as an ascending set instead would let a sibling chain in the set still enable a wrong-chain refund.
+    /// @dev Recomputes `flowId` from the flow definition's own fields (see {_validateAndComputeFlowId})
+    /// and asserts it matches `_flow.flowId`.
     function _checkFlowId(AtomicFlow calldata _flow) internal pure {
-        uint256 n = _flow.legBundleHashes.length;
-        for (uint256 i = 1; i < n; ++i) {
-            if (_flow.legBundleHashes[i] <= _flow.legBundleHashes[i - 1]) revert ManagerBundleHashesNotSorted();
-        }
-        if (_flow.legSourceChainIds.length != n) {
-            revert ManagerLegSourceChainIdsLengthMismatch(n, _flow.legSourceChainIds.length);
-        }
-        bytes32 computed = keccak256(
-            abi.encode(_flow.legBundleHashes, _flow.legSourceChainIds, _flow.deadline, _flow.settlementLayerChainId)
+        bytes32 computed = _validateAndComputeFlowId(
+            _flow.legBundleHashes,
+            _flow.legSourceChainIds,
+            _flow.deadline,
+            _flow.settlementLayerChainId
         );
         if (computed != _flow.flowId) revert ManagerFlowIdMismatch(_flow.flowId, computed);
+    }
+
+    /// @dev Canonicalizes and hashes a flowId preimage:
+    /// `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`.
+    /// `legBundleHashes` must be strictly ascending (canonical order + dedup). `legSourceChainIds` is
+    /// positional, aligned 1:1 with `legBundleHashes`; it may repeat and need not be ascending, so only its
+    /// length is checked. Treating it as an ascending set instead would let a sibling chain in the set
+    /// still enable a wrong-chain refund. The single implementation is shared by the send path (`append`)
+    /// and the finalize/refund paths (`_checkFlowId`), so the preimage canonicalization cannot drift
+    /// between them.
+    function _validateAndComputeFlowId(
+        bytes32[] calldata _legBundleHashes,
+        uint256[] calldata _legSourceChainIds,
+        uint64 _deadline,
+        uint256 _settlementLayerChainId
+    ) internal pure returns (bytes32) {
+        uint256 n = _legBundleHashes.length;
+        for (uint256 i = 1; i < n; ++i) {
+            if (_legBundleHashes[i] <= _legBundleHashes[i - 1]) revert ManagerBundleHashesNotSorted();
+        }
+        if (_legSourceChainIds.length != n) {
+            revert ManagerLegSourceChainIdsLengthMismatch(n, _legSourceChainIds.length);
+        }
+        return keccak256(abi.encode(_legBundleHashes, _legSourceChainIds, _deadline, _settlementLayerChainId));
     }
 }

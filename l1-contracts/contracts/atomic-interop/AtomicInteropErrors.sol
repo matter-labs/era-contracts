@@ -32,6 +32,15 @@ error ManagerLegSourceChainIdsLengthMismatch(uint256 legs, uint256 chainIds);
 error ManagerProofCountMismatch(uint256 legs, uint256 proofs);
 /// @dev The bundle being executed on the destination is not one of the flow's legs.
 error ManagerExecutingBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
+/// @dev The bundle being committed at send time is not one of the supplied flow preimage's legs.
+/// Reverting here — rather than committing the leg under a `flowId` that does not contain it — is what
+/// keeps a wrong or stale preimage from stranding the burned funds (such a leg could neither finalize
+/// nor be refunded, since both paths require the leg to be inside the preimage).
+error ManagerCommittedBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
+/// @dev The committing bundle's aligned `legSourceChainIds` entry is not this chain. The finality and
+/// refund proofs bind each leg to its declared source chain, so a leg committed under a wrong source
+/// declaration could never finalize and its funds would be stranded.
+error ManagerCommittedLegSourceChainMismatch(bytes32 flowId, uint256 thisChainId, uint256 declaredSourceChainId);
 /// @dev The reverted bundle has no recoverable calls, so there are no source funds to return.
 error ManagerNoRecoverableCalls(bytes32 flowId, bytes32 bundleHash);
 

@@ -8,11 +8,13 @@
  *
  * Id derivations:
  *   - `bundleHash = keccak256(abi.encode(sourceChainId, abi.encode(InteropBundle)))`. The atomic send
- *     params (flowId, deadline, lowNullifierIndex) travel via the `atomicBundle` attribute, not the
- *     InteropBundle, so `bundleHash` does not depend on `flowId`.
+ *     params (the full flowId preimage + lowNullifierIndex) travel via the `atomicBundle` attribute, not
+ *     the InteropBundle, so `bundleHash` does not depend on the preimage.
  *   - `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`,
  *     bundle hashes strictly ascending with source chain ids positionally aligned. Since `bundleHash` is
- *     independent of `flowId`, `flowId` is computable off-chain before the send.
+ *     independent of the preimage, each leg's `bundleHash` (and thus the preimage) is computable off-chain
+ *     before the send; on-chain the AtomicFlowManager recomputes `flowId` from the attribute-supplied
+ *     preimage and requires the sent bundle to be one of its legs.
  *   - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
  *
  * Tree specifics (match IndexedMerkleTree.sol + FullMerkle.sol, the dynamic-height tree):

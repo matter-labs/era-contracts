@@ -21,9 +21,15 @@ message — finality is proven, not dispatched.
   leaf value for a leg. It bakes in `flowId` (hence all legs) and the chain-specific `bundleHash`, so a
   leg's commit value can only ever be inserted into its own source chain's IMT.
 
-The atomic-send parameters (`flowId`, `deadline`, `lowNullifierIndex`) travel out-of-band as the
-ERC-7786 `atomicBundle(bytes32,uint64,uint256)` bundle attribute — deliberately **not** part of the
-bundle, so `bundleHash` does not depend on `flowId` (which would be circular).
+The atomic-send parameters (the full `flowId` **preimage** — `deadline`, `settlementLayerChainId`,
+`legBundleHashes`, `legSourceChainIds` — plus `lowNullifierIndex`) travel out-of-band as the ERC-7786
+`atomicBundle((uint64,uint256,bytes32[],uint256[]),uint256)` bundle attribute — deliberately **not**
+part of the bundle, so `bundleHash` does not depend on the preimage (which would be circular: the
+preimage's leg hashes include the bundle's own hash). The attribute carries the preimage rather than
+an opaque `flowId` so that `AtomicFlowManager.append` can recompute the id on-chain and verify the
+sent bundle is actually one of the flow's legs (declared with the sending chain as its source) — a
+wrong or stale preimage reverts the send instead of committing a leg that could neither finalize nor
+be refunded.
 
 ## Flow
 

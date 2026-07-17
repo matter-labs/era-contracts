@@ -82,9 +82,9 @@ export const TEST_TOKEN_MINT_AMOUNT_UNITS = "1000";
 
 // Mirrors the InteropBundle struct in contracts/common/Messaging.sol. The trailing BundleAttributes
 // tuple is the original 3 fields (executionAddress, unbundlerAddress, useFixedFee). Atomic-send params
-// (flowId, deadline, lowNullifierIndex) do NOT live in the bundle — they travel via the `atomicBundle`
-// ERC-7786 attribute and are parsed by the InteropCenter into an internal AtomicSend struct, so they
-// never affect the bundle bytes / bundleHash.
+// (the full flowId preimage + lowNullifierIndex) do NOT live in the bundle — they travel via the
+// `atomicBundle` ERC-7786 attribute and are parsed by the InteropCenter into an internal AtomicSend
+// struct, so they never affect the bundle bytes / bundleHash.
 export const INTEROP_BUNDLE_TUPLE_TYPE =
   "tuple(bytes1,uint256,uint256,bytes32,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes,bool,bytes32))";
 // Canonical signature of `InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle)`,

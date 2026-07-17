@@ -4,24 +4,41 @@
     "name": "append",
     "inputs": [
       {
-        "name": "_flowId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
         "name": "_bundleHash",
         "type": "bytes32",
         "internalType": "bytes32"
       },
       {
-        "name": "_deadline",
-        "type": "uint64",
-        "internalType": "uint64"
-      },
-      {
         "name": "_lowNullifierIndex",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "_flowPreimage",
+        "type": "tuple",
+        "internalType": "struct AtomicFlowPreimage",
+        "components": [
+          {
+            "name": "deadline",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "settlementLayerChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "legBundleHashes",
+            "type": "bytes32[]",
+            "internalType": "bytes32[]"
+          },
+          {
+            "name": "legSourceChainIds",
+            "type": "uint256[]",
+            "internalType": "uint256[]"
+          }
+        ]
       }
     ],
     "outputs": [],
