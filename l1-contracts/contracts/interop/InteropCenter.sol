@@ -38,7 +38,6 @@ import {MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/
 
 import {
     NonAtomicSendUnsupported,
-    AtomicBundleCallCarriesValue,
     AtomicBundleToL1NotSupported,
     InteropPreviewHash,
     AttributeAlreadySet,
@@ -768,9 +767,10 @@ contract InteropCenter is
     /// - **L2->L2 interop (atomic):** the bundle's commit value is appended to the interop IMT via the
     ///   {AtomicFlowManager} and is NOT published to L1 — the burn already happened through the normal
     ///   `initiateIndirectCall` path, and the destination executes it via {L2InteropHandler.executeBundle}.
-    ///   Native-`value` legs are rejected ({_validateAtomicBundle}): the base-token holder path that funds
-    ///   them cannot be reversed on timeout, so the value would be locked. Atomicity/destination validity
-    ///   (atomic must be L2, non-atomic must be L1) is already enforced up front in {_sendBundle}.
+    ///   Native-`value` legs are allowed: the base-token value collected at send time (via the base-token
+    ///   holder for the same base token, or the asset router for a different one) is refunded to the payer on
+    ///   timeout by {AtomicFlowManager._recoverBundle}. Atomicity/destination validity (atomic must be L2,
+    ///   non-atomic must be L1) is already enforced up front in {_sendBundle}.
     /// - **L2->L1 withdrawal:** the `BUNDLE_IDENTIFIER`-prefixed bundle is published to L1 via the L2->L1
     ///   messenger and finalized there by {L1InteropHandler}, which proves the message inclusion. Withdrawals
     ///   are not atomic (they inherently target L1), so they carry no `atomicBundle` attribute.
@@ -800,32 +800,12 @@ contract InteropCenter is
         if (!_atomicSend.isAtomic) {
             revert NonAtomicSendUnsupported();
         }
-        _validateAtomicBundle(_bundle);
         IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
             _flowId: _atomicSend.flowId,
             _bundleHash: bundleHash,
             _deadline: _atomicSend.deadline,
             _lowNullifierIndex: _atomicSend.lowNullifierIndex
         });
-    }
-
-    /// @notice Rejects atomic-bundle calls that carry native base-token `value`. Such a leg is bridged via
-    /// the base-token holder, which {IAtomicRecoverable.recoverAtomicCall} cannot reverse, so it would lock
-    /// on timeout with no way to return the funds. Everything else is allowed: an atomic bundle may mix
-    /// recoverable fund calls (asset-router deposits) with calls that move no funds (e.g. flipping a flag),
-    /// and timeout recovery is best-effort (see {AtomicFlowManager._recoverBundle}). Refund safety for a
-    /// fund-moving leg is therefore the flow author's responsibility; only native-`value` legs — which no
-    /// one can reverse — are blocked here.
-    /// @dev `pure`, since it inspects only the bundle's own calls. Every atomic send passes through
-    /// {_dispatchBundle}, so this covers all atomic bundles regardless of entry path.
-    function _validateAtomicBundle(InteropBundle memory _bundle) internal pure {
-        uint256 callsLength = _bundle.calls.length;
-        for (uint256 i = 0; i < callsLength; ++i) {
-            InteropCall memory currentCall = _bundle.calls[i];
-            if (currentCall.value != 0) {
-                revert AtomicBundleCallCarriesValue(i, currentCall.value);
-            }
-        }
     }
 
     /// @notice Emits ERC-7786 MessageSent events for each call in a bundle.

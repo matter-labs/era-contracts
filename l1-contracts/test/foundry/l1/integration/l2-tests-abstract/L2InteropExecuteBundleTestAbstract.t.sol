@@ -23,20 +23,11 @@ abstract contract L2InteropExecuteBundleTestAbstract is L2InteropTestUtils {
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
 
-        // A value-less direct call is enough to produce a bundle to execute; native-`value` legs are no
-        // longer supported by atomic interop (see {L2InteropNativeTokenSimpleTestAbstract}).
-        InteropLibrary.sendDirectCall(
-            destinationChainId,
-            interopTargetContract,
-            hex"",
-            address(0),
-            UNBUNDLER_ADDRESS,
-            bytes32(0)
-        );
+        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100, false, bytes32(0));
         Vm.Log[] memory logs1 = vm.getRecordedLogs();
 
         // Verify the first bundle emission
-        assertTrue(logs1.length > 0, "Expected logs to be emitted for the interop send");
+        assertTrue(logs1.length > 0, "Expected logs to be emitted for sendNative");
 
         bytes memory logsData = extractFirstBundleFromLogs(logs1);
         assertTrue(logsData.length > 0, "Expected bundle data to be extracted");

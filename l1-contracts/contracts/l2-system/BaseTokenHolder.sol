@@ -12,6 +12,7 @@ import {
     L2_INTEROP_HANDLER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {Unauthorized} from "../common/L1ContractErrors.sol";
 
 /**
@@ -86,6 +87,14 @@ contract BaseTokenHolder is IBaseTokenHolder {
         _;
     }
 
+    /// @notice Modifier that restricts access to the AtomicFlowManager only (atomic-interop value-leg refund).
+    modifier onlyAtomicFlowManager() {
+        if (msg.sender != L2_ATOMIC_FLOW_MANAGER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @notice Modifier that restricts access to L2BaseToken only.
     /// @dev Used for receiving initial balance during initL2.
     modifier onlyL2BaseToken() {
@@ -132,6 +141,30 @@ contract BaseTokenHolder is IBaseTokenHolder {
         L2_ASSET_TRACKER.handleRecoverBaseTokenBridgingOnL2(_toChainId, _amount);
         Address.sendValue(payable(_to), _amount);
         emit BaseTokenRecovered(_to, _amount);
+    }
+
+    /// @notice Refunds a timed-out atomic-interop native-`value` leg whose base token was escrowed here by
+    /// `burnAndStartBridging` at send time, returning it to the original depositor.
+    /// @dev The AtomicFlowManager-driven counterpart of `recoverBaseToken` (which the NativeTokenVault drives
+    /// for bridged-asset failed transfers). Same inverse accounting via the asset tracker — which asserts the
+    /// bridge-out was recoverable (L2->L2 only; L2->L1 withdrawals are never revertable) — then returns the
+    /// value. Like `give`, this pushes ETH and may revert if `_to` rejects it; recovery targets the original
+    /// depositor by design.
+    /// @param _to The original depositor to refund.
+    /// @param _amount The amount of base tokens to return.
+    /// @param _toChainId The original bridge-out destination chain id (to reverse the matching accounting).
+    function refundBridgedBaseToken(
+        address _to,
+        uint256 _amount,
+        uint256 _toChainId
+    ) external override onlyAtomicFlowManager {
+        if (_amount == 0) {
+            return;
+        }
+
+        L2_ASSET_TRACKER.handleRecoverBaseTokenBridgingOnL2(_toChainId, _amount);
+        Address.sendValue(payable(_to), _amount);
+        emit BaseTokenRefundedInterop(_to, _toChainId, _amount);
     }
 
     /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.

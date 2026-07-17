@@ -16,10 +16,14 @@ import { encodeEvmChainAddress } from "../../src/helpers/erc7930";
 import {
   sendInteropMessage,
   executeBundle,
+  interopCallValueAttr,
   indirectCallAttr,
+  useFixedFeeAttr,
   getTokenTransferData,
   getInteropProtocolFee,
   setInteropProtocolFee,
+  snapshotAccumulatedProtocolFees,
+  expectAccumulatedProtocolFeeDelta,
   getZkInteropFee,
   getZkTokenAssetId,
   getZkTokenAddress,
@@ -32,6 +36,7 @@ import {
   getTokenBalance,
   getTokenAddressForAsset,
   getAssetIdForToken,
+  approveToken,
   approveTokenForNtv,
   expectNativeSpend,
   expectBalanceDelta,
@@ -169,10 +174,96 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     }
   });
 
-  // NOTE: the two direct base-token "message (direct call with value)" tests were removed. A direct call
-  // carrying `interopCallValue` is a native-`value` leg, which atomic interop no longer supports (value
-  // legs cannot be reversed on a timeout); the InteropCenter rejects them with `AtomicBundleCallCarriesValue`.
-  // Base-token value still crosses chains via the indirect AssetRouter path exercised by the tests below.
+  it("can send and receive a base token message (direct call with value)", async function () {
+    const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
+    const interopFee = await currentInteropFee();
+    const recipient = encodeEvmChainAddress(dummyRecipient, destChainId);
+    const payload = "0x";
+    const attributes = [interopCallValueAttr(amount)];
+    const msgValue = interopFee.add(amount);
+
+    const balBefore = await captureBalance(sourceProvider);
+    const protocolFeesBefore = !isLiveInteropMode() ? await snapshotAccumulatedProtocolFees(sourceProvider) : undefined;
+
+    const result = await sendInteropMessage({
+      sourceProvider,
+      recipient,
+      payload,
+      attributes,
+      value: msgValue,
+    });
+
+    expect(result.txHash).to.be.a("string").and.not.equal("");
+    expect(result.interopBundle).to.not.be.null;
+
+    const balAfter = await captureBalance(sourceProvider);
+    expectNativeSpend(balBefore, balAfter, msgValue, result.receipt, "base token message");
+    if (protocolFeesBefore) {
+      await expectAccumulatedProtocolFeeDelta(
+        sourceProvider,
+        protocolFeesBefore,
+        result.receipt,
+        interopFee,
+        "base token message"
+      );
+    }
+
+    console.log(`   Base token message sent: ${result.txHash}`);
+
+    // ── Execute on destination ──
+    const recipientBalBefore = await getNativeBalance(destProvider, dummyRecipient);
+
+    const receipt = await executeBundle(destProvider, result.bundleData, sourceChainId);
+    expect(receipt.status).to.equal(1);
+
+    const recipientBalAfter = await getNativeBalance(destProvider, dummyRecipient);
+    expectBalanceDelta(recipientBalBefore, recipientBalAfter, amount, "base token message: recipient native");
+
+    const balDelta = recipientBalAfter.sub(recipientBalBefore);
+    console.log(`   Base token received on destination: +${ethers.utils.formatEther(balDelta)} ETH`);
+  });
+
+  it("can send and receive a base token message with fixed ZK fees", async function () {
+    if (!fixedZkFeeTestsEnabled) {
+      this.skip();
+    }
+
+    const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
+    const recipient = encodeEvmChainAddress(dummyRecipient, destChainId);
+    const payload = "0x";
+    const attributes = [interopCallValueAttr(amount), useFixedFeeAttr(true)];
+
+    const zkBalance = await getTokenBalance(sourceProvider, sourceZkTokenAddress, getInteropSourceAddress());
+    expect(
+      zkBalance.gte(zkInteropFee),
+      `fixed-fee base token message: sender ZK token balance ${zkBalance.toString()} is below required fee ${zkInteropFee.toString()}`
+    ).to.be.true;
+
+    await approveToken(sourceProvider, sourceZkTokenAddress, INTEROP_CENTER_ADDR, zkInteropFee);
+
+    const balBefore = await captureBalance(sourceProvider, sourceZkTokenAddress);
+    const result = await sendInteropMessage({
+      sourceProvider,
+      recipient,
+      payload,
+      attributes,
+      value: amount,
+    });
+    const balAfter = await captureBalance(sourceProvider, sourceZkTokenAddress);
+
+    expectNativeSpend(balBefore, balAfter, amount, result.receipt, "fixed-fee base token message");
+    expect(
+      balAfter.token!.eq(balBefore.token!.sub(zkInteropFee)),
+      "fixed-fee base token message: sender ZK token should decrease by the fixed fee"
+    ).to.be.true;
+
+    const recipientBalBefore = await getNativeBalance(destProvider, dummyRecipient);
+    const receipt = await executeBundle(destProvider, result.bundleData, sourceChainId);
+    expect(receipt.status).to.equal(1);
+
+    const recipientBalAfter = await getNativeBalance(destProvider, dummyRecipient);
+    expectBalanceDelta(recipientBalBefore, recipientBalAfter, amount, "fixed-fee base token message: recipient native");
+  });
 
   it("can send and receive a native ERC20 token message (indirect call via AssetRouter)", async function () {
     const erc20Amount = randomBigNumber(ERC20_MIN, ERC20_MAX);
