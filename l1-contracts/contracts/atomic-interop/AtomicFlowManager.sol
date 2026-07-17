@@ -214,6 +214,13 @@ contract AtomicFlowManager is IAtomicFlowManager {
         uint256 recovered = 0;
         for (uint256 i = 0; i < callsLen; ++i) {
             InteropCall memory c = _bundle.calls[i];
+            // Only recover burn-produced calls (from == asset router, as set by `initiateIndirectCall`).
+            // A direct call never burned, so recovering it would mint funds with no matching burn — and its
+            // `from` (the original sender, possibly an EOA) need not implement {IAtomicRecoverable}, so
+            // calling it would brick the refund of the whole bundle. Skip instead.
+            if (c.from != L2_ASSET_ROUTER_ADDR) {
+                continue;
+            }
             if (IAtomicRecoverable(c.from).recoverAtomicCall(destChainId, c.data)) {
                 ++recovered;
             }
