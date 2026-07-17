@@ -9,7 +9,7 @@ import {LegState, AtomicFlow, AtomicTimeoutProof, AtomicFinalityProof} from "./I
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
 import {InteropDataEncoding} from "../interop/InteropDataEncoding.sol";
 import {
-    L2_INTEROP_CENTER_ADDR,
+        L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_INTEROP_HANDLER_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
