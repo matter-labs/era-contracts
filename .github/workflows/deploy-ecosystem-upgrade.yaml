@@ -1,0 +1,227 @@
+name: "Ecosystem Upgrade: Deploy + Verify (v31)"
+
+# Step 2 of the two-step v31 ecosystem-upgrade flow. Step 1
+# (`generate-ecosystem-upgrade-calldata.yaml`) produces the calldata + the
+# deployer prepare bundles on a fork; THIS workflow takes those deployer
+# bundles and actually BROADCASTS them to a real L1, producing the
+# `transactions.txt` the PUVT (`ecosystem verify-upgrade`) consumes, then
+# verifies the freshly deployed contracts on Etherscan.
+#
+# It runs the SAME `protocol_ops` commands you'd run locally (see
+# `docs/ecosystem-upgrade-deploy.md`), so a local deploy and a CI deploy are
+# byte-for-byte the same tool — CI is just a convenience wrapper.
+#
+# What gets broadcast: ONLY the deployer's (Camp-A) bundles — the ones whose
+# `manifest.bundles[].target` is the deployer EOA. The legacy-Governance /
+# ProtocolUpgradeHandler (Camp-B) bundles are the governance ceremony and are
+# executed separately by their own multisig; `--skip-unkeyed` drops them here.
+#
+# The sender broadcasts strictly one tx at a time and is robust to public-L1
+# hazards: a stuck (underpriced) tx is re-broadcast at a higher gas price up to
+# `max_gas_price_gwei`, and if the sender's nonce is grabbed by another tx the
+# calldata is resubmitted at the next free nonce (see `submit_and_confirm` in
+# `protocol-ops/src/commands/dev/execute_safe.rs`).
+#
+# ─── SECRETS ───
+# Unlike step 1 (a fork rehearsal that impersonates the deployer and signs
+# nothing), this step signs REAL transactions, so it needs the deployer key.
+# Required repository secrets:
+#   L1_RPC_URL_SEPOLIA / L1_RPC_URL_MAINNET   — L1 RPC (carries an API key; masked)
+#   DEPLOYER_PRIVATE_KEY_SEPOLIA / _MAINNET   — deployer EOA key (real signer)
+# Optional:
+#   ETHERSCAN_API_KEY                         — for the Etherscan verify step
+# The L1 RPC URL comes from the secret (never a plaintext input) so its API key
+# is never shown in the run-summary UI.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - stage
+          - testnet
+          - mainnet
+      generate_run_id:
+        description: "Run ID of the 'Ecosystem Upgrade Calldata' (step 1) run to download the deployer bundles from"
+        required: true
+        type: string
+      max_gas_price_gwei:
+        description: "Gas-price ceiling (gwei) for the stuck-tx bump loop"
+        required: false
+        default: "500"
+        type: string
+      run_verify:
+        description: "Verify the deployed contracts on Etherscan after broadcasting"
+        required: false
+        default: true
+        type: boolean
+      zksync_foundry_version:
+        description: "foundry-zksync version (forge --zksync), used for the verify build"
+        required: false
+        default: "v0.1.5"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Foundry (cast + forge for verify)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Install foundry-zksync (for the verify build)
+        if: ${{ inputs.run_verify }}
+        uses: ./.github/actions/install-zksync-foundry
+        with:
+          version: ${{ inputs.zksync_foundry_version }}
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.91.1
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build protocol_ops
+        working-directory: protocol-ops
+        run: cargo build --release
+
+      # forge verify-contract compiles the source to compare against the
+      # on-chain bytecode, so it needs the EVM (out/) artifacts. Skipped when
+      # not verifying — the broadcast itself needs no contract build.
+      - name: Build contracts (for Etherscan verify)
+        if: ${{ inputs.run_verify }}
+        run: |
+          yarn da build:foundry
+          yarn l1 build:foundry
+
+      # The deployer bundles + verify log produced by step 1.
+      - name: Download deploy inputs from the calldata (step 1) run
+        uses: actions/download-artifact@v4
+        with:
+          name: ecosystem-upgrade-deploy-inputs-${{ inputs.environment }}
+          path: ${{ github.workspace }}/deploy-inputs
+          run-id: ${{ inputs.generate_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Select + mask RPC and deployer key
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          RPC_SEPOLIA: ${{ secrets.L1_RPC_URL_SEPOLIA }}
+          RPC_MAINNET: ${{ secrets.L1_RPC_URL_MAINNET }}
+          PK_SEPOLIA: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
+          PK_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
+        run: |
+          set -euo pipefail
+          if [ "$ENVIRONMENT" = "mainnet" ]; then
+            rpc="$RPC_MAINNET"; pk="$PK_MAINNET"
+          else
+            rpc="$RPC_SEPOLIA"; pk="$PK_SEPOLIA"
+          fi
+          if [ -z "$rpc" ]; then
+            echo "::error::Missing L1 RPC secret for '$ENVIRONMENT' (L1_RPC_URL_SEPOLIA / L1_RPC_URL_MAINNET)"; exit 1
+          fi
+          if [ -z "$pk" ]; then
+            echo "::error::Missing deployer key secret for '$ENVIRONMENT' (DEPLOYER_PRIVATE_KEY_SEPOLIA / DEPLOYER_PRIVATE_KEY_MAINNET)"; exit 1
+          fi
+          echo "::add-mask::$rpc"
+          echo "::add-mask::$pk"
+          deployer="$(cast wallet address --private-key "$pk")"
+          echo "Deployer (real signer): $deployer"
+          {
+            echo "L1_RPC_URL=$rpc"
+            echo "DEPLOYER_PK=$pk"
+            echo "DEPLOYER_ADDR=$deployer"
+          } >> "$GITHUB_ENV"
+
+      # Broadcast ONLY the deployer bundles (target == deployer), robustly, one
+      # at a time. Writes transactions.txt next to --out for the PUVT.
+      - name: Broadcast deployer bundles to L1
+        run: |
+          set -euo pipefail
+          MANIFEST="$(find "$GITHUB_WORKSPACE/deploy-inputs" -name manifest.json | head -1)"
+          if [ -z "$MANIFEST" ]; then
+            echo "::error::manifest.json not found in the downloaded deploy inputs"; exit 1
+          fi
+          OUTDIR="$(dirname "$MANIFEST")/.."
+          echo "Manifest: $MANIFEST"
+          ./protocol-ops/target/release/protocol_ops ecosystem upgrade-broadcast \
+            --manifest "$MANIFEST" \
+            --l1-rpc-url "$L1_RPC_URL" \
+            --key "${DEPLOYER_ADDR}=${DEPLOYER_PK}" \
+            --skip-unkeyed \
+            --max-gas-price-gwei "${{ inputs.max_gas_price_gwei }}" \
+            --out "$OUTDIR/deploy-executed.json"
+          echo "TXLOG=$OUTDIR/transactions.txt" >> "$GITHUB_ENV"
+          echo "=== transactions.txt ==="
+          cat "$OUTDIR/transactions.txt" || true
+
+      - name: Upload transactions.txt + executed log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecosystem-upgrade-deploy-result-${{ inputs.environment }}
+          path: |
+            ${{ env.TXLOG }}
+            ${{ github.workspace }}/deploy-inputs/**/deploy-executed.json
+          if-no-files-found: warn
+          retention-days: 90
+
+      # Best-effort Etherscan verification. Replays the `forge verify-contract`
+      # commands step 1 logged, appending the chain + key + a live-tx guess for
+      # constructor args. Etherscan read APIs lag freshly deployed code, so some
+      # may need a manual re-run with explicit --constructor-args; failures here
+      # do not fail the deploy (transactions.txt / PUVT is the source of truth).
+      - name: Verify contracts on Etherscan
+        if: ${{ inputs.run_verify }}
+        continue-on-error: true
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+        working-directory: l1-contracts
+        run: |
+          set -uo pipefail
+          if [ -z "${ETHERSCAN_API_KEY:-}" ]; then
+            echo "::warning::ETHERSCAN_API_KEY not set; skipping verification"; exit 0
+          fi
+          LOG="$(find "$GITHUB_WORKSPACE/deploy-inputs" -name extra-verification-logs.txt | head -1)"
+          if [ -z "$LOG" ]; then
+            echo "::warning::extra-verification-logs.txt not found; skipping"; exit 0
+          fi
+          case "${{ inputs.environment }}" in
+            mainnet) CHAIN=mainnet ;;
+            *) CHAIN=sepolia ;;
+          esac
+          ok=0; fail=0
+          # Each logged line is: `forge verify-contract 0xADDR ContractName`
+          grep -oE "forge verify-contract 0x[0-9a-fA-F]{40} [A-Za-z0-9_]+" "$LOG" | sort -u | while read -r _ _ addr name; do
+            echo "--- verify $name @ $addr ---"
+            if forge verify-contract "$addr" "$name" \
+                 --chain "$CHAIN" --etherscan-api-key "$ETHERSCAN_API_KEY" \
+                 --guess-constructor-args --watch; then
+              echo "  OK"
+            else
+              echo "::warning::verification failed for $name @ $addr (may need explicit --constructor-args)"
+            fi
+          done
+          echo "Verification pass complete (see warnings for any that need a manual re-run)."

@@ -64,6 +64,20 @@ pub struct UpgradeBroadcastArgs {
     /// can reconstruct CREATE2 / TUPP deployments from a fork rehearsal.
     #[clap(long)]
     pub out: Option<PathBuf>,
+
+    /// Broadcast only the bundles whose `target` has a `--key` supplied, and
+    /// silently skip the rest. Use this for a REAL deploy where you sign only
+    /// the deployer's (Camp-A) bundles and leave the governance / legacy-Gov
+    /// (Camp-B) bundles for their own multisig ceremony. Without it, a missing
+    /// key for any bundle is a hard pre-flight error (the default, safest for
+    /// a full replay). Ignored under `--unlocked`.
+    #[clap(long)]
+    pub skip_unkeyed: bool,
+
+    /// Gas-price ceiling (gwei) for the stuck-tx bump loop, forwarded to the
+    /// per-bundle sender.
+    #[clap(long, default_value_t = crate::commands::dev::execute_safe::DEFAULT_MAX_GAS_PRICE_GWEI)]
+    pub max_gas_price_gwei: u128,
 }
 
 #[derive(Debug, Deserialize)]
@@ -110,9 +124,11 @@ pub async fn run(args: UpgradeBroadcastArgs) -> anyhow::Result<()> {
     };
 
     // Pre-flight: in keyed mode every required signer must have a key
-    // supplied. Fail before we send any tx — partial broadcast on real L1 is
-    // the worst outcome.
-    if !args.unlocked {
+    // supplied — unless `--skip-unkeyed`, where unkeyed bundles are skipped
+    // (deployer-only real deploy; governance bundles run their own ceremony).
+    // Fail before we send any tx — partial broadcast on real L1 is the worst
+    // outcome.
+    if !args.unlocked && !args.skip_unkeyed {
         let mut missing: Vec<Address> = Vec::new();
         for bundle in &manifest.bundles {
             if !key_map.contains_key(&bundle.target) && !missing.contains(&bundle.target) {
@@ -121,7 +137,7 @@ pub async fn run(args: UpgradeBroadcastArgs) -> anyhow::Result<()> {
         }
         if !missing.is_empty() {
             anyhow::bail!(
-                "no `--key` supplied for signer(s): {}",
+                "no `--key` supplied for signer(s): {}. Pass their keys, or `--skip-unkeyed` to broadcast only the keyed (e.g. deployer) bundles.",
                 missing
                     .iter()
                     .map(|a| format!("{a:#x}"))
@@ -144,7 +160,20 @@ pub async fn run(args: UpgradeBroadcastArgs) -> anyhow::Result<()> {
     ));
 
     let out_path = args.out.as_deref();
+    let max_gas_price_wei =
+        crate::commands::dev::execute_safe::gwei_to_wei(args.max_gas_price_gwei);
+    let mut broadcast = 0usize;
+    let mut skipped = 0usize;
     for bundle in &manifest.bundles {
+        // In keyed mode with --skip-unkeyed, skip bundles we hold no key for.
+        if !args.unlocked && args.skip_unkeyed && !key_map.contains_key(&bundle.target) {
+            logger::info(format!(
+                "Skipping bundle {} (target {:#x}, {}) — no key supplied",
+                bundle.index, bundle.target, bundle.file,
+            ));
+            skipped += 1;
+            continue;
+        }
         let bundle_path = manifest_dir.join(&bundle.file);
         logger::info(format!(
             "Bundle {} / {} (target {:#x}, file {})",
@@ -159,13 +188,27 @@ pub async fn run(args: UpgradeBroadcastArgs) -> anyhow::Result<()> {
                 .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
         } else {
             let key = &key_map[&bundle.target];
-            execute_one_bundle(&bundle_path, &args.l1_rpc_url, key, out_path)
-                .await
-                .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
+            execute_one_bundle(
+                &bundle_path,
+                &args.l1_rpc_url,
+                key,
+                out_path,
+                max_gas_price_wei,
+            )
+            .await
+            .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
         }
+        broadcast += 1;
     }
 
-    logger::success("All bundles broadcast successfully");
+    logger::success(format!(
+        "Broadcast {broadcast} bundle(s){}",
+        if skipped > 0 {
+            format!(", skipped {skipped} unkeyed")
+        } else {
+            String::new()
+        }
+    ));
     Ok(())
 }
 

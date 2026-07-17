@@ -277,6 +277,23 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      # Inputs the "Deploy" workflow (step 2) consumes: the deployer prepare
+      # bundles it broadcasts to real L1, and the forge verify-contract command
+      # log it replays for Etherscan verification. Safe to publish — these hold
+      # only tx calldata + addresses, never keys or the RPC URL. NOT anvil.log.
+      - name: Upload deploy inputs (for the Deploy workflow)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecosystem-upgrade-deploy-inputs-${{ inputs.environment }}
+          path: |
+            l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/prepare/manifest.json
+            l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/prepare/*.safe.json
+            l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/extra-verification-logs.txt
+            l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/ecosystem.toml
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Cleanup anvil
         if: always()
         working-directory: l1-contracts/test/anvil-interop

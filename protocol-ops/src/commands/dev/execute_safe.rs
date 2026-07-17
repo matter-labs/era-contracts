@@ -53,6 +53,23 @@ const GAS_PRICE_FLOOR_WEI: u128 = 1_000_000_000;
 /// within 1-2 blocks instead of hanging in the mempool for 30+ minutes.
 const GAS_PRICE_MULTIPLIER_BPS: u128 = 30_000;
 
+/// Per-retry gas-price bump (basis points) when a tx is stuck. 11500 = +15%.
+/// Must exceed 110% so geth/reth accept the replacement — they require a ≥10%
+/// bump over the tx being replaced at the same nonce.
+const GAS_BUMP_BPS: u128 = 11_500;
+/// How long to wait for a receipt before treating a tx as stuck (then bump its
+/// gas / check for a nonce takeover). ~7 mainnet blocks.
+const STUCK_WAIT_MS: u128 = 90_000;
+/// Poll interval while waiting for a receipt on a public chain.
+const CONFIRM_POLL_MS: u64 = 4_000;
+/// Overall per-tx deadline. Once gas hits the ceiling we keep re-broadcasting
+/// at the ceiling until this elapses, then give up so a genuinely un-includable
+/// tx can't hang a deploy forever.
+const MAX_TX_WAIT_MS: u128 = 1_200_000; // 20 min
+/// Default gas-price ceiling (gwei) for the bump loop, overridable per command
+/// via `--max-gas-price-gwei`.
+pub const DEFAULT_MAX_GAS_PRICE_GWEI: u128 = 500;
+
 /// Receipt polling interval. Alloy's default is tuned for public chains;
 /// tighten it so per-tx receipt polling doesn't dominate bundle latency on
 /// anvil's instamine or reth's sub-second block time.
@@ -76,6 +93,174 @@ async fn resolve_gas_price<P: Provider>(provider: &P) -> anyhow::Result<u128> {
 fn format_gwei(gas_price: u128) -> String {
     alloy::primitives::utils::format_units(gas_price, "gwei")
         .unwrap_or_else(|_| gas_price.to_string())
+}
+
+/// Next gas price for a stuck-tx retry, or `None` once at/above the ceiling.
+/// Guarantees a strictly higher value (≥ `current + 1`) so the bump is never a
+/// no-op due to integer rounding, and never exceeds `max`.
+fn bump_gas(current: u128, max: u128) -> Option<u128> {
+    if current >= max {
+        return None;
+    }
+    let bumped = current.saturating_mul(GAS_BUMP_BPS) / 10_000;
+    Some(std::cmp::min(std::cmp::max(bumped, current + 1), max))
+}
+
+/// Submit one tx and confirm it, robust to the two public-chain hazards a naive
+/// send-and-await hits:
+///
+///  * **Stuck (underpriced) tx** — if no receipt lands within `STUCK_WAIT_MS`,
+///    bump the legacy gas price (≥ +15%) and re-broadcast the SAME nonce (a
+///    replacement), up to `max_gas_price_wei`, until it mines or `MAX_TX_WAIT_MS`.
+///  * **Nonce takeover** — if the sender's on-chain nonce advances past ours
+///    without our tx landing (some other tx grabbed the nonce), re-fetch the
+///    next free nonce and re-broadcast our calldata there.
+///
+/// Callers award this before submitting the next tx, so the pending nonce is
+/// always the next free one (strict one-at-a-time). Returns `(hash, status)` of
+/// the submission that actually mined.
+#[allow(clippy::too_many_arguments)]
+async fn submit_and_confirm<P: Provider>(
+    provider: &P,
+    from: Address,
+    to: Address,
+    data: &Bytes,
+    value: U256,
+    gas_limit: u64,
+    max_gas_price_wei: u128,
+) -> anyhow::Result<(B256, u64)> {
+    use alloy::eips::BlockNumberOrTag;
+
+    async fn pending_nonce<P: Provider>(provider: &P, from: Address) -> anyhow::Result<u64> {
+        provider
+            .get_transaction_count(from)
+            .block_id(BlockNumberOrTag::Pending.into())
+            .await
+            .context("eth_getTransactionCount(pending)")
+    }
+
+    let mut nonce = pending_nonce(provider, from).await?;
+    let mut gas_price = std::cmp::min(resolve_gas_price(provider).await?, max_gas_price_wei);
+    let started = std::time::Instant::now();
+    let mut last_hash: Option<B256> = None;
+
+    loop {
+        let req = TransactionRequest::default()
+            .with_from(from)
+            .with_to(to)
+            .with_input(data.clone())
+            .with_value(value)
+            .with_nonce(nonce)
+            .with_gas_limit(gas_limit)
+            .with_gas_price(gas_price);
+
+        match provider.send_transaction(req).await {
+            Ok(p) => {
+                let h = *p.tx_hash();
+                last_hash = Some(h);
+                logger::info(format!(
+                    "  submitted {h:#x} (nonce {nonce}, {} gwei)",
+                    format_gwei(gas_price)
+                ));
+            }
+            Err(e) => {
+                let es = e.to_string().to_lowercase();
+                if es.contains("nonce too low") || es.contains("nonce_too_low") {
+                    // Our nonce was consumed. If our own last submission actually
+                    // landed, take it; otherwise resubmit our calldata at the
+                    // next free nonce.
+                    if let Some(h) = last_hash {
+                        if let Some(r) = provider.get_transaction_receipt(h).await? {
+                            return Ok((h, u64::from(r.status())));
+                        }
+                    }
+                    let old = nonce;
+                    nonce = pending_nonce(provider, from).await?;
+                    logger::info(format!(
+                        "  nonce {old} taken by another tx; resubmitting at nonce {nonce}"
+                    ));
+                    continue;
+                }
+                if es.contains("underpriced") || es.contains("already known") {
+                    // Replacement needs a bigger bump, or the tx is already in
+                    // the mempool. Bump for the next attempt; if we have an
+                    // in-flight hash fall through to wait on it, else back off.
+                    if let Some(g) = bump_gas(gas_price, max_gas_price_wei) {
+                        gas_price = g;
+                    }
+                    if last_hash.is_none() {
+                        if started.elapsed().as_millis() >= MAX_TX_WAIT_MS {
+                            return Err(e).context("eth_sendTransaction (gave up after retries)");
+                        }
+                        tokio::time::sleep(std::time::Duration::from_millis(CONFIRM_POLL_MS)).await;
+                        continue;
+                    }
+                } else {
+                    return Err(e).with_context(|| format!("eth_sendTransaction (to {to:#x})"));
+                }
+            }
+        }
+
+        let hash = last_hash.expect("a hash is set once we reach the wait loop");
+
+        // Wait up to STUCK_WAIT_MS for a receipt.
+        let wait_start = std::time::Instant::now();
+        loop {
+            if let Some(r) = provider
+                .get_transaction_receipt(hash)
+                .await
+                .context("eth_getTransactionReceipt")?
+            {
+                return Ok((hash, u64::from(r.status())));
+            }
+            if wait_start.elapsed().as_millis() >= STUCK_WAIT_MS {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(CONFIRM_POLL_MS)).await;
+        }
+
+        if started.elapsed().as_millis() >= MAX_TX_WAIT_MS {
+            anyhow::bail!(
+                "tx to {to:#x} not mined within {}s (last {hash:#x}, nonce {nonce}, {} gwei)",
+                MAX_TX_WAIT_MS / 1000,
+                format_gwei(gas_price),
+            );
+        }
+
+        // Stuck: did a different tx take our nonce, or are we just underpriced?
+        let latest = provider
+            .get_transaction_count(from)
+            .block_id(BlockNumberOrTag::Latest.into())
+            .await
+            .context("eth_getTransactionCount(latest)")?;
+        if latest > nonce {
+            // Our nonce is spent. Our tx (edge race), or someone else's?
+            if let Some(r) = provider.get_transaction_receipt(hash).await? {
+                return Ok((hash, u64::from(r.status())));
+            }
+            let old = nonce;
+            nonce = pending_nonce(provider, from).await?;
+            logger::info(format!(
+                "  nonce {old} taken by another tx; resubmitting at nonce {nonce}"
+            ));
+            continue;
+        }
+        // Still ours, still stuck → bump and replace (same nonce).
+        match bump_gas(gas_price, max_gas_price_wei) {
+            Some(g) => {
+                logger::info(format!(
+                    "  stuck; bumping gas {} -> {} gwei",
+                    format_gwei(gas_price),
+                    format_gwei(g)
+                ));
+                gas_price = g;
+            }
+            None => logger::info(format!(
+                "  stuck at gas ceiling {} gwei; re-broadcasting and waiting",
+                format_gwei(gas_price)
+            )),
+        }
+    }
 }
 
 /// Execute a Gnosis Safe Transaction Builder JSON bundle: parse the
@@ -122,6 +307,11 @@ pub struct DevExecuteSafeArgs {
     /// can reconstruct CREATE2 / TUPP deployments from the prepare output.
     #[clap(long)]
     pub out: Option<PathBuf>,
+
+    /// Gas-price ceiling (gwei) for the stuck-tx bump loop. A tx that doesn't
+    /// mine promptly is re-broadcast at a higher gas price up to this cap.
+    #[clap(long, default_value_t = DEFAULT_MAX_GAS_PRICE_GWEI)]
+    pub max_gas_price_gwei: u128,
 }
 
 pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
@@ -130,8 +320,14 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
         &args.l1_rpc_url,
         args.private_key.expose(),
         args.out.as_deref(),
+        gwei_to_wei(args.max_gas_price_gwei),
     )
     .await
+}
+
+/// Convert a gwei ceiling to wei for the sender.
+pub fn gwei_to_wei(gwei: u128) -> u128 {
+    gwei.saturating_mul(1_000_000_000)
 }
 
 /// Replay a single Safe bundle file under one signer. Despite the file
@@ -145,6 +341,7 @@ pub async fn execute_one_bundle(
     l1_rpc_url: &str,
     private_key: &str,
     out_path: Option<&Path>,
+    max_gas_price_wei: u128,
 ) -> anyhow::Result<()> {
     logger::step(format!("Execute Safe file: {}", safe_file.display()));
 
@@ -181,24 +378,10 @@ pub async fn execute_one_bundle(
         from,
     ));
 
-    // Fetch starting nonce once and assign nonces locally — avoids a
-    // serialised `eth_getTransactionCount(pending)` round-trip per tx.
-    // Must use Pending (not Latest) so in-flight txs from this address
-    // don't cause nonce reuse if the signer already has pending mempool txs.
-    let base_nonce = provider
-        .get_transaction_count(from)
-        .block_id(alloy::eips::BlockNumberOrTag::Pending.into())
-        .await
-        .context("eth_getTransactionCount(pending)")?;
-
-    // Resolve gas price once for the whole bundle. We dispatch back-to-back
-    // so a single snapshot is fine; if Sepolia gas spikes mid-bundle we'll
-    // see slow blocks rather than dropped txs (still better than the old
-    // hardcoded 1-gwei sub-base-fee behaviour).
-    let gas_price = resolve_gas_price(&provider)
-        .await
-        .context("resolve gas price")?;
-    logger::info(format!("Using gas price {} gwei", format_gwei(gas_price)));
+    logger::info(format!(
+        "Gas-price ceiling {} gwei (bumps stuck txs up to this)",
+        format_gwei(max_gas_price_wei)
+    ));
 
     // Per-bundle tx log loaded from `--out`; we only flush additions after
     // the entire bundle succeeds so failed bundles do not pollute outputs.
@@ -230,7 +413,6 @@ pub async fn execute_one_bundle(
     // await-on-receipt also means later txs' estimateGas sees the
     // side-effects of earlier ones, and a revert in tx N stops the loop
     // before any tx N+1 hits the wire.
-    let mut skipped: usize = 0;
     for (idx, tx) in safe_txs.iter().enumerate() {
         let to: Address = tx
             .get("to")
@@ -277,7 +459,6 @@ pub async fn execute_one_bundle(
                     logger::info(format!(
                         "Skipping Safe tx #{idx} (to {to:#x}) — already deployed / idempotent"
                     ));
-                    skipped += 1;
                     continue;
                 }
                 // Check revert data for known idempotent errors from prior
@@ -301,7 +482,6 @@ pub async fn execute_one_bundle(
                     logger::info(format!(
                         "Skipping Safe tx #{idx} (to {to:#x}) — idempotent revert ({sig})"
                     ));
-                    skipped += 1;
                     continue;
                 }
                 // For CREATE2 factory calls that aren't skippable (target has
@@ -323,26 +503,21 @@ pub async fn execute_one_bundle(
             }
         };
 
-        let req = TransactionRequest::default()
-            .with_from(from)
-            .with_to(to)
-            .with_input(data)
-            .with_value(value)
-            .with_nonce(base_nonce + (idx - skipped) as u64)
-            .with_gas_limit(gas_limit)
-            .with_gas_price(gas_price);
-
-        let pending = provider
-            .send_transaction(req)
-            .await
-            .with_context(|| format!("eth_sendTransaction for Safe tx #{idx} (to {to:#x})"))?;
-        let tx_hash = *pending.tx_hash();
-        let receipt = pending
-            .get_receipt()
-            .await
-            .with_context(|| format!("await receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?;
+        // Submit + confirm, re-fetching the nonce each time and bumping gas on
+        // stuck txs (see `submit_and_confirm`). Strictly one at a time.
+        let (tx_hash, status) = submit_and_confirm(
+            &provider,
+            from,
+            to,
+            &data,
+            value,
+            gas_limit,
+            max_gas_price_wei,
+        )
+        .await
+        .with_context(|| format!("Safe tx #{idx} (to {to:#x})"))?;
         anyhow::ensure!(
-            receipt.status(),
+            status == 1,
             "Safe tx #{idx} (hash {tx_hash:#x}) reverted (status=0)",
         );
 
@@ -352,7 +527,7 @@ pub async fn execute_one_bundle(
                 to: format!("{to:#x}"),
                 data: format!("0x{}", alloy::hex::encode(receipt_input(tx)?)),
                 value: format!("{value}"),
-                status: u64::from(receipt.status()),
+                status,
             });
             bundle_hashes.push(tx_hash);
         }
@@ -662,5 +837,36 @@ fn parse_decimal_or_hex_u256(raw: &str) -> anyhow::Result<U256> {
         trimmed
             .parse::<U256>()
             .with_context(|| format!("invalid decimal u256 {trimmed:?}"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{bump_gas, gwei_to_wei, GAS_BUMP_BPS};
+
+    #[test]
+    fn bump_gas_increases_by_at_least_the_replacement_threshold() {
+        // +15% keeps replacements above geth's ≥10% requirement.
+        let start = gwei_to_wei(10);
+        let next = bump_gas(start, gwei_to_wei(500)).unwrap();
+        assert_eq!(next, start * GAS_BUMP_BPS / 10_000);
+        assert!(next >= start + start / 10, "bump must clear the +10% floor");
+    }
+
+    #[test]
+    fn bump_gas_is_strictly_monotonic_even_for_tiny_values() {
+        // Integer rounding must never yield a no-op bump.
+        assert_eq!(bump_gas(1, 1_000), Some(2));
+        assert_eq!(bump_gas(7, 1_000), Some(8));
+    }
+
+    #[test]
+    fn bump_gas_caps_at_ceiling_then_stops() {
+        let max = gwei_to_wei(100);
+        // A bump that would overshoot is clamped to the ceiling...
+        assert_eq!(bump_gas(gwei_to_wei(95), max), Some(max));
+        // ...and once at/above the ceiling, no further bump is offered.
+        assert_eq!(bump_gas(max, max), None);
+        assert_eq!(bump_gas(max + 1, max), None);
     }
 }
