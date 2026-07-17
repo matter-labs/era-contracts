@@ -440,7 +440,7 @@ async function waitForInteropRootNonZero(
   const start = Date.now();
   const gwChainId = (await getGatewayProvider().getNetwork()).chainId;
   const interopRootStorage = new Contract(L2_INTEROP_ROOT_STORAGE_ADDR, getAbi("L2InteropRootStorage"), destProvider);
-  const currentRoot = ethers.constants.HashZero;
+  let currentRoot = ethers.constants.HashZero;
 
   while (currentRoot === ethers.constants.HashZero) {
     if (Date.now() - start > timeoutMs) {
@@ -452,7 +452,8 @@ async function waitForInteropRootNonZero(
     }
 
     const interopRootInfo = await interopRootStorage.interopRoots(gwChainId, gwBlockNumber);
-    if (interopRootInfo.root === ethers.constants.HashZero) {
+    currentRoot = interopRootInfo.root;
+    if (currentRoot === ethers.constants.HashZero) {
       await sleep(destProvider.pollingInterval);
     }
   }
