@@ -281,6 +281,9 @@ abstract contract NativeTokenVaultBase is
     /// @param _isNative Whether `_assetId` is native to this chain (unlock) or bridged (re-mint).
     /// @param _originToken The origin token address, used to deploy the bridged token if it is not yet known.
     /// @param _erc20Data The ERC20 metadata, used to deploy the bridged token if it is not yet known.
+    /// @dev Virtual: on L2 the base token is escrowed off-vault (in `BaseTokenHolder`), so
+    /// {L2NativeTokenVault} overrides this to route the base token there. On L1 the ETH base token flows
+    /// through the normal native path below.
     function _disburseFailedTransfer(
         uint256 _chainId,
         bytes32 _assetId,
@@ -289,7 +292,7 @@ abstract contract NativeTokenVaultBase is
         bool _isNative,
         address _originToken,
         bytes memory _erc20Data
-    ) internal {
+    ) internal virtual {
         // IMPORTANT: We must handle chain balance decrease before giving out funds to the user,
         // because otherwise the latter operation (via a malicious token or ETH recipient)
         // could've overwritten the transient values from L1Nullifier.

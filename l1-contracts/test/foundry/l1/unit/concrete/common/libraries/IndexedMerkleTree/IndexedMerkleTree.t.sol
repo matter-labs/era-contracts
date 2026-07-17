@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {MAX_LOW_INDEX_SEARCH_ATTEMPTS} from "contracts/common/Config.sol";
+import {IMT_EMPTY_LEAF_HASH, MAX_LOW_INDEX_SEARCH_ATTEMPTS} from "contracts/common/Config.sol";
 import {
     IMTAlreadyInitialized,
     IMTLeafValueMismatch,
@@ -228,6 +228,48 @@ contract IndexedMerkleTreeTest is Test {
 
         (uint256 secondIndex, ) = tree.insert(20, firstIndex);
         assertEq(tree.merklePath(secondIndex).length, 2);
+    }
+
+    /// @notice Regression test for the domain-separated empty-leaf padding: an unused *padded* leaf index must
+    /// not be usable to forge a non-inclusion proof. The empty-leaf padding value is domain-separated
+    /// (`IMT_EMPTY_LEAF_HASH`), distinct from the real `hashLeaf({0,0,0})` sentinel, so a padded slot can no
+    /// longer be presented as a `{0,0,0}` low leaf that brackets any value. Were the padding equal to
+    /// `hashLeaf({0,0,0})`, a padded index would verify as a `{0,0,0}` tail low leaf and could prove a
+    /// *present* value absent (a double-mint / atomicity break).
+    /// @notice The empty-leaf padding must not equal `hashLeaf({0,0,0})`; that inequality is what makes a
+    /// padded slot unforgeable as a real leaf (guards against reintroducing `hashLeaf({0,0,0})` as the zero).
+    function test_emptyLeafPaddingIsNotAValidLeafHash() public view {
+        assertTrue(IMT_EMPTY_LEAF_HASH != tree.hashLeaf(IMTLeaf({value: 0, nextIndex: 0, nextValue: 0})));
+    }
+
+    function test_regression_paddedIndexCannotForgeNonInclusionOfPresentValue() public {
+        // leafCount = 3 (sentinel + 10 + 20) → not a power of two (height 2, 4 slots), so index 3 is an
+        // unused padded slot.
+        (uint256 firstIndex, ) = tree.insert(10, 0);
+        (uint256 secondIndex, ) = tree.insert(20, firstIndex);
+        assertEq(tree.leafCount(), 3);
+        assertEq(secondIndex, 2);
+        bytes32 root = tree.root();
+
+        // Forge: claim the *present* value 20 is absent, using a `{0,0,0}` low leaf at the padded index 3.
+        // The bracketing (value 0, nextValue 0 = "tail") would admit any value; the guarantee is that no
+        // `{0,0,0}` leaf actually lives at a padded index, so its Merkle proof cannot reproduce the root.
+        // The tree getter refuses to hand out a path for a padded index, so an attacker hand-builds it:
+        // index 3's level-0 sibling is leaf 2, and its upper sibling (n0) is shared with leaf 2's path.
+        IMTLeaf memory forgedLowLeaf = IMTLeaf({value: 0, nextIndex: 0, nextValue: 0});
+        uint256 paddedIndex = 3;
+        bytes32[] memory forgedProof = new bytes32[](2);
+        forgedProof[0] = tree.hashLeaf(tree.leaf(secondIndex)); // sibling leaf at index 2
+        forgedProof[1] = tree.merklePath(secondIndex)[1]; // shared upper node (n0)
+        assertFalse(
+            tree.verifyNonInclusion(root, 20, forgedLowLeaf, paddedIndex, forgedProof),
+            "padded {0,0,0} low leaf must not forge non-inclusion of a present value"
+        );
+
+        // Legit non-inclusion of a genuinely-absent value (15) via its real low leaf still works — the fix
+        // only removes forgeable padded slots, not real bracketing.
+        IMTLeaf memory realLowLeaf = tree.leaf(firstIndex); // {10, secondIndex, 20}
+        assertTrue(tree.verifyNonInclusion(root, 15, realLowLeaf, firstIndex, tree.merklePath(firstIndex)));
     }
 
     function _assertLeaf(IMTLeaf memory _leaf, uint256 _value, uint256 _nextIndex, uint256 _nextValue) internal pure {
