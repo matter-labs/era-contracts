@@ -20,7 +20,8 @@ import {InteropRoot} from "../../common/Messaging.sol";
 /// @dev This library decodes commit, proof, and execution batch data and verifies batch number bounds.
 ///      It reverts with custom errors when the data is invalid or unsupported encoding is used.
 library BatchDecoder {
-    /// @notice The currently supported encoding version.
+    /// @notice The supported encoding version for EraVM commit data, precommit data, and prove data
+    /// (prove encoding is shared by EraVM and ZKsync OS chains).
     uint8 internal constant SUPPORTED_ENCODING_VERSION = 1;
     /// @notice The currently supported encoding version for execute data. Bumped to 2 when the
     /// execute wire changed from the v31 flat tuple to `abi.encode(DecodedExecuteData)` (a breaking

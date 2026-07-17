@@ -52,7 +52,7 @@ contract L2InteropCommitmentTreeStorageTest is Test {
 
     /// @notice After `initialize`, the bootloader's derived slot holds the seeded root and matches
     /// `root()`.
-    function test_initialize_bootloaderReadMatchesRoot() public {
+    function test_initL2_bootloaderReadMatchesRoot() public {
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         tree.initL2();
 
@@ -62,10 +62,11 @@ contract L2InteropCommitmentTreeStorageTest is Test {
     }
 
     /// @notice The freshly seeded tree's root equals `ChainBatchRootTree.EMPTY_IMT_ROOT` — the
-    /// constant the settlement layer bakes into the genesis chain batch root it seeds for every
-    /// registered chain (see `MessageRootBase._addNewChain`). If the seeding or the leaf hashing
-    /// ever changes, this cross-check must be updated together with a matching bootloader change.
-    function test_initialize_seedRootMatchesEmptyImtRootConstant() public {
+    /// constant baked into the IMT leaves of `ChainBatchRootTree.genesisChainBatchRoot()`, which
+    /// `DiamondInit` stores for a fresh ZKsync OS chain (later pulled into the settlement layer via
+    /// `MessageRoot.seedGenesisRoot`). If the seeding or the leaf hashing ever changes, this
+    /// cross-check must be updated together with a matching bootloader change.
+    function test_initL2_seedRootMatchesEmptyImtRootConstant() public {
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         tree.initL2();
         assertEq(tree.root(), ChainBatchRootTree.EMPTY_IMT_ROOT);

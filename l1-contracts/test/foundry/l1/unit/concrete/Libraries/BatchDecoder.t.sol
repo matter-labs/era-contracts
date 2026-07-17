@@ -18,10 +18,6 @@ import {
 
 /// @notice Unit tests for BatchDecoder library
 contract BatchDecoderTest is Test {
-    uint8 constant SUPPORTED_ENCODING_VERSION = 1;
-    uint8 constant SUPPORTED_ENCODING_VERSION_EXECUTE = 2;
-    uint8 constant SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS = 3;
-
     // ============ decodeAndCheckCommitData Tests ============
 
     function test_decodeAndCheckCommitData_basicValues() public {
@@ -30,7 +26,10 @@ contract BatchDecoderTest is Test {
         newBatches[0] = _createCommitBatchInfo(11);
         newBatches[1] = _createCommitBatchInfo(12);
 
-        bytes memory encodedData = abi.encodePacked(SUPPORTED_ENCODING_VERSION, abi.encode(lastBatch, newBatches));
+        bytes memory encodedData = abi.encodePacked(
+            BatchDecoder.SUPPORTED_ENCODING_VERSION,
+            abi.encode(lastBatch, newBatches)
+        );
 
         (IExecutor.StoredBatchInfo memory decodedLastBatch, CommitBatchInfo[] memory decodedNewBatches) = this
             .externalDecodeAndCheckCommitData(encodedData, 11, 12);
@@ -46,7 +45,10 @@ contract BatchDecoderTest is Test {
         CommitBatchInfo[] memory newBatches = new CommitBatchInfo[](1);
         newBatches[0] = _createCommitBatchInfo(6);
 
-        bytes memory encodedData = abi.encodePacked(SUPPORTED_ENCODING_VERSION, abi.encode(lastBatch, newBatches));
+        bytes memory encodedData = abi.encodePacked(
+            BatchDecoder.SUPPORTED_ENCODING_VERSION,
+            abi.encode(lastBatch, newBatches)
+        );
 
         (IExecutor.StoredBatchInfo memory decodedLastBatch, CommitBatchInfo[] memory decodedNewBatches) = this
             .externalDecodeAndCheckCommitData(encodedData, 6, 6);
@@ -81,7 +83,10 @@ contract BatchDecoderTest is Test {
         newBatches[0] = _createCommitBatchInfo(11);
         newBatches[1] = _createCommitBatchInfo(12);
 
-        bytes memory encodedData = abi.encodePacked(SUPPORTED_ENCODING_VERSION, abi.encode(lastBatch, newBatches));
+        bytes memory encodedData = abi.encodePacked(
+            BatchDecoder.SUPPORTED_ENCODING_VERSION,
+            abi.encode(lastBatch, newBatches)
+        );
 
         // Wrong bounds
         vm.expectRevert(abi.encodeWithSelector(IncorrectBatchBounds.selector, 100, 200, 11, 12));
@@ -92,7 +97,10 @@ contract BatchDecoderTest is Test {
         IExecutor.StoredBatchInfo memory lastBatch = _createStoredBatchInfo(10);
         CommitBatchInfo[] memory newBatches = new CommitBatchInfo[](0);
 
-        bytes memory encodedData = abi.encodePacked(SUPPORTED_ENCODING_VERSION, abi.encode(lastBatch, newBatches));
+        bytes memory encodedData = abi.encodePacked(
+            BatchDecoder.SUPPORTED_ENCODING_VERSION,
+            abi.encode(lastBatch, newBatches)
+        );
 
         vm.expectRevert(EmptyData.selector);
         this.externalDecodeAndCheckCommitData(encodedData, 1, 1);
@@ -111,7 +119,7 @@ contract BatchDecoderTest is Test {
         proof[2] = 3;
 
         bytes memory encodedData = abi.encodePacked(
-            SUPPORTED_ENCODING_VERSION,
+            BatchDecoder.SUPPORTED_ENCODING_VERSION,
             abi.encode(prevBatch, provedBatches, proof)
         );
 
@@ -149,7 +157,7 @@ contract BatchDecoderTest is Test {
         uint256[] memory proof = new uint256[](0);
 
         bytes memory encodedData = abi.encodePacked(
-            SUPPORTED_ENCODING_VERSION,
+            BatchDecoder.SUPPORTED_ENCODING_VERSION,
             abi.encode(prevBatch, provedBatches, proof)
         );
 
@@ -163,7 +171,7 @@ contract BatchDecoderTest is Test {
         uint256[] memory proof = new uint256[](0);
 
         bytes memory encodedData = abi.encodePacked(
-            SUPPORTED_ENCODING_VERSION,
+            BatchDecoder.SUPPORTED_ENCODING_VERSION,
             abi.encode(prevBatch, provedBatches, proof)
         );
 
@@ -182,7 +190,7 @@ contract BatchDecoderTest is Test {
         InteropRoot[][] memory dependencyRoots = new InteropRoot[][](2);
 
         bytes memory encodedData = abi.encodePacked(
-            SUPPORTED_ENCODING_VERSION_EXECUTE,
+            BatchDecoder.SUPPORTED_ENCODING_VERSION_EXECUTE,
             abi.encode(
                 BatchDecoder.DecodedExecuteData({
                     batchesData: executeBatches,
@@ -239,7 +247,7 @@ contract BatchDecoderTest is Test {
         InteropRoot[][] memory dependencyRoots = new InteropRoot[][](2);
 
         bytes memory encodedData = abi.encodePacked(
-            SUPPORTED_ENCODING_VERSION_EXECUTE,
+            BatchDecoder.SUPPORTED_ENCODING_VERSION_EXECUTE,
             abi.encode(
                 BatchDecoder.DecodedExecuteData({
                     batchesData: executeBatches,
@@ -259,7 +267,7 @@ contract BatchDecoderTest is Test {
         InteropRoot[][] memory dependencyRoots = new InteropRoot[][](0);
 
         bytes memory encodedData = abi.encodePacked(
-            SUPPORTED_ENCODING_VERSION_EXECUTE,
+            BatchDecoder.SUPPORTED_ENCODING_VERSION_EXECUTE,
             abi.encode(
                 BatchDecoder.DecodedExecuteData({
                     batchesData: executeBatches,
@@ -278,7 +286,7 @@ contract BatchDecoderTest is Test {
     function test_decodeAndCheckPrecommitData_basicValues() public {
         PrecommitInfo memory precommitInfo = _createPrecommitInfo();
 
-        bytes memory encodedData = abi.encodePacked(SUPPORTED_ENCODING_VERSION, abi.encode(precommitInfo));
+        bytes memory encodedData = abi.encodePacked(BatchDecoder.SUPPORTED_ENCODING_VERSION, abi.encode(precommitInfo));
 
         PrecommitInfo memory decodedPrecommit = this.externalDecodeAndCheckPrecommitData(encodedData);
 

@@ -90,7 +90,7 @@ The timeout proof relies on three preconditions, each enforced on chain:
      branch always exists, even for a chain that halts before settling anything.
      Settlement-layer migration registers the chain on the new layer's message root with an empty
      tree; this is acceptable under the current assumption that only the **L1** message root anchors
-     timeout proofs (see the TODO in `ChainAssetHandlerBase._bridgeMint`).
+     timeout proofs (see the `IMPORTANT` note in `ChainAssetHandlerBase._bridgeMint`).
 2. **Interop only involves registered chains.** An unregistered chain has no chain-id leaf in the
    settlement layer's aggregated shared tree (`MessageRootBase.sharedTree`), so no proof — neither
    finality nor timeout — can be verified against it at all: every proof path terminates in the

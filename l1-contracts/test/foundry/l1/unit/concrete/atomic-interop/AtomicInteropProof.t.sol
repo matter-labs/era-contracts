@@ -7,7 +7,7 @@ import {ImtProof, ATOMIC_COMMIT_LEAF_TAG} from "contracts/atomic-interop/IAtomic
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {
     ProofImtRootInclusionFailed,
-    IMTProofInvalidChainBatchRootDepth,
+    ProofInvalidChainBatchRootDepth,
     ProofMissingSettlementLayerBatch,
     ProofDeadlineExceeded,
     ProofInteropRootNotAfterDeadline,
@@ -137,11 +137,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
             _finalProofNode: false
         });
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IMTProofInvalidChainBatchRootDepth.selector,
-                ChainBatchRootTree.TREE_DEPTH,
-                wrongDepth
-            )
+            abi.encodeWithSelector(ProofInvalidChainBatchRootDepth.selector, ChainBatchRootTree.TREE_DEPTH, wrongDepth)
         );
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }

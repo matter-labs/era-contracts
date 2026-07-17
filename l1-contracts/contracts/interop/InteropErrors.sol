@@ -41,6 +41,8 @@ error InteroperableAddressNotEmpty(bytes interoperableAddress);
 error InteropToSelfNotSupported();
 // 0x2d48e8cf
 error InteropRootAlreadyExists();
+// 0x8a011102
+error InteropRootTimestampIsZero();
 // 0xeae192ef
 error InvalidInteropBundleVersion();
 // 0xd5f13973

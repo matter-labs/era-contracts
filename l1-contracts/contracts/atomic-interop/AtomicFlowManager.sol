@@ -15,6 +15,7 @@ import {
     L2_INTEROP_HANDLER_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
 import {
+    ManagerAlreadyInitialized,
     ManagerNotInteropCenter,
     ManagerNotInteropHandler,
     ManagerLegAlreadyCommitted,
@@ -66,6 +67,9 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// @notice One-time L2 initialization performed by the genesis upgrade.
     /// @param _l1ChainId The chain ID of the L1 network.
     function initL2(uint256 _l1ChainId) external onlyUpgrader {
+        if (L1_CHAIN_ID != 0) {
+            revert ManagerAlreadyInitialized();
+        }
         L1_CHAIN_ID = _l1ChainId;
     }
 
@@ -225,11 +229,6 @@ contract AtomicFlowManager is IAtomicFlowManager {
         if (recovered == 0) revert ManagerNoRecoverableCalls(_flowId, _bundleHash);
     }
 
-    /// @dev Recomputes `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline,
-    /// settlementLayerChainId))` and asserts it matches `_flow.flowId`. `legBundleHashes` must be strictly
-    /// ascending (canonical order + dedup). `legSourceChainIds` is positional, aligned 1:1 with
-    /// `legBundleHashes`; it may repeat and need not be ascending, so only its length is checked. Treating
-    /// it as an ascending set instead would let a sibling chain in the set still enable a wrong-chain refund.
     /// @dev In this release interop operates against roots imported from L1 only (see
     /// `ChainAssetHandlerBase` — only the L1 message root is assumed for interop), so every flow must
     /// declare L1 as its settlement layer. Checked wherever the settlement layer is consumed
@@ -240,6 +239,11 @@ contract AtomicFlowManager is IAtomicFlowManager {
         }
     }
 
+    /// @dev Recomputes `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline,
+    /// settlementLayerChainId))` and asserts it matches `_flow.flowId`. `legBundleHashes` must be strictly
+    /// ascending (canonical order + dedup). `legSourceChainIds` is positional, aligned 1:1 with
+    /// `legBundleHashes`; it may repeat and need not be ascending, so only its length is checked. Treating
+    /// it as an ascending set instead would let a sibling chain in the set still enable a wrong-chain refund.
     function _checkFlowId(AtomicFlow calldata _flow) internal pure {
         uint256 n = _flow.legBundleHashes.length;
         for (uint256 i = 1; i < n; ++i) {

@@ -11,7 +11,7 @@ import {L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_VERIFICATION} from "../../common/l2-
 import {CHAIN_TREE_EMPTY_ENTRY_HASH} from "../../core/message-root/IMessageRoot.sol";
 import {
     ProofImtRootInclusionFailed,
-    IMTProofInvalidChainBatchRootDepth,
+    ProofInvalidChainBatchRootDepth,
     ProofMissingSettlementLayerBatch,
     ProofDeadlineExceeded,
     ProofInteropRootNotAfterDeadline,
@@ -259,7 +259,7 @@ library AtomicInteropProof {
     ) private view returns (uint256 slBlock, uint256 slChainId, uint256 l1BatchTimestamp) {
         MessageHashing.ProofMetadata memory metadata = MessageHashing.parseProofMetadata(_proof.settlementProof);
         if (metadata.logLeafProofLen != ChainBatchRootTree.TREE_DEPTH) {
-            revert IMTProofInvalidChainBatchRootDepth(ChainBatchRootTree.TREE_DEPTH, metadata.logLeafProofLen);
+            revert ProofInvalidChainBatchRootDepth(ChainBatchRootTree.TREE_DEPTH, metadata.logLeafProofLen);
         }
 
         bool ok = L2_MESSAGE_VERIFICATION.proveL2LeafInclusionShared({
