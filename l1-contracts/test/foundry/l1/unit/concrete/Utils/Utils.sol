@@ -389,7 +389,6 @@ library Utils {
         selectors[i++] = GettersFacet.getChainId.selector;
         selectors[i++] = GettersFacet.baseTokenGasPriceMultiplierDenominator.selector;
         selectors[i++] = GettersFacet.baseTokenGasPriceMultiplierNominator.selector;
-        // Queried by `MessageRoot.seedGenesisRoot` during `Bridgehub.createNewChain`.
         selectors[i++] = GettersFacet.getZKsyncOS.selector;
 
         return selectors;
