@@ -69,6 +69,12 @@ contract ZiskVerifierRealProofTest is Test {
             IVerifier(address(ziskVerifier)),
             address(this)
         );
+        // Every range, single batch or many, now verifies through the
+        // aggregation verifier. A real length-1 AGGREGATED vector needs the
+        // re-derived aggregator VK (a deferred step), so the multi-proof path
+        // here uses a pass mock for the SNARK check. The real STF SNARK crypto
+        // stays validated standalone by test_realProof_ziskVerifier_accepts.
+        multiProofVerifier.setZiskRangeVerifier(IVerifier(address(new MockAirbenderVerifier())));
     }
 
     /// @dev Build the 34-word ZiSK section (24 proof words + 10 public-values
@@ -122,7 +128,9 @@ contract ZiskVerifierRealProofTest is Test {
     function test_realProof_multiProof_type5_accepts() public requiresPlonkVerifier {
         // With previous_hash = 0 and a single public input, the batch public
         // input equals publicInputs[0]; it must be the ZiSK batch commitment
-        // truncated by 32 bits.
+        // truncated by 32 bits. The aggregation verifier is mocked here (see
+        // setUp): this test exercises the type-5 decode and the single-batch
+        // binding, not the aggregated SNARK check.
         uint256[] memory publicInputs = new uint256[](1);
         publicInputs[0] = uint256(BATCH_COMMITMENT) >> 32;
 
