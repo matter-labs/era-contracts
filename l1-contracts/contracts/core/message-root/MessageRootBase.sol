@@ -319,8 +319,9 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
             _proof: _proof
         });
         if (proofData.finalProofNode) {
-            // finalProofNode terminates on THIS settlement layer: the proven root must equal the settling
-            // chain/Gateway's batch root recorded here (`chainBatchRoots`) — NOT this layer's aggregate root
+            // finalProofNode terminates on the settlement layer — in this release always L1 (every chain
+            // settles on L1; SL migrations are disabled). The proven root must equal the settling chain's
+            // batch root recorded here (`chainBatchRoots`) — NOT this layer's aggregate root
             // (`historicalRoot`), which is only exported to consumers (where L2 verifiers use `interopRoots`).
             bytes32 correctBatchRoot = _getChainBatchRoot(_chainId, _batchNumber);
             return correctBatchRoot == proofData.batchSettlementRoot && correctBatchRoot != bytes32(0);
