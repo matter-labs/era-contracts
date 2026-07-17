@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: MIT
 
+// One deliberately grouped file: the three per-type factories ARE one concept (see the notice
+// below for why they cannot be one contract).
+// solhint-disable one-contract-per-file
+
 pragma solidity 0.8.28;
 
 import {CTMRelease} from "./CTMRelease.sol";

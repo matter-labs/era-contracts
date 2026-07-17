@@ -42,7 +42,7 @@ contract CoreUpgrade_v32 is Script, DefaultCoreUpgrade {
         // The v31 baseline already has a ChainRegistrationSender proxy, normally discovered by
         // introspection. On ecosystems whose FIRST registered chain is a legacy pre-v31 chain
         // (e.g. testnet's 8022832), `AddressIntrospector.shouldUseV29Introspection` — which keys
-        // off `zkChains[0].getProtocolVersion()` — mis-routes discovery through the V29 path,
+        // off `zkChains[0].getProtocolVersion()` — misroutes discovery through the V29 path,
         // which leaves the CRS proxy unset. Read it directly from the bridgehub so the upgrade
         // emits the real proxy and the force-deployments data carries the correct aliased sender.
         if (coreAddresses.bridgehub.proxies.chainRegistrationSender == address(0)) {
