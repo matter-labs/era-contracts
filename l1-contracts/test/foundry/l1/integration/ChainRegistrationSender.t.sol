@@ -80,6 +80,20 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
             abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );
+
+        _settleFirstBatchRoot(zkChainIds[0]);
+    }
+
+    /// @dev Freshly created EraVM chains have an empty tree in the MessageRoot (only ZKsync OS
+    /// chains get a seeded genesis batch leaf), so they only become registrable for interop after
+    /// their first settled batch. Settle one batch root through the real executor entry point.
+    function _settleFirstBatchRoot(uint256 _chainId) internal {
+        vm.prank(getZKChainAddress(_chainId));
+        IMessageRootBase(address(ecosystemAddresses.bridgehub.proxies.messageRoot)).addChainBatchRootV32(
+            _chainId,
+            1,
+            keccak256("first-settled-chain-batch-root")
+        );
     }
 
     /// @notice Freshly deployed chains settle directly on L1. Registration must succeed in this real
@@ -194,11 +208,11 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         );
     }
 
-    /// @notice A chain with an empty tree in the MessageRoot (onboarded with a non-zero starting
-    /// batch number and not yet settled on this layer) cannot be registered for interop: the
-    /// atomic-interop timeout protocol needs at least one batch of the source chain inside the
-    /// aggregated root. Freshly created chains pass (the seeded genesis batch leaf) — which is what
-    /// the happy-path test above exercises — so the empty tree is simulated with a mock here.
+    /// @notice A chain with an empty tree in the MessageRoot (a fresh EraVM chain before its first
+    /// settled batch, or a chain onboarded with a non-zero starting batch number that has not yet
+    /// settled on this layer) cannot be registered for interop: the atomic-interop timeout protocol
+    /// needs at least one batch of the source chain inside the aggregated root. The happy-path test
+    /// above settles a batch first; here the empty tree is simulated with a mock.
     function test_chainRegistrationSender_revertWhen_chainHasNoBatchesInMessageRoot() public {
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.proxies.messageRoot),

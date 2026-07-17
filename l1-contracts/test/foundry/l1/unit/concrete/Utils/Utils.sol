@@ -353,7 +353,7 @@ library Utils {
     }
 
     function getGettersSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](34);
+        bytes4[] memory selectors = new bytes4[](35);
         uint256 i = 0;
         selectors[i++] = GettersFacet.getVerifier.selector;
         selectors[i++] = GettersFacet.getAdmin.selector;
@@ -389,6 +389,7 @@ library Utils {
         selectors[i++] = GettersFacet.getChainId.selector;
         selectors[i++] = GettersFacet.baseTokenGasPriceMultiplierDenominator.selector;
         selectors[i++] = GettersFacet.baseTokenGasPriceMultiplierNominator.selector;
+        selectors[i++] = GettersFacet.getZKsyncOS.selector;
 
         return selectors;
     }
