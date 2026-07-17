@@ -73,7 +73,7 @@ struct DirectDeployedAddresses {
     Facets facets;
     address genesisUpgrade;
     address multicall3;
-    address bootstrapRegistry;
+    address bootstrapReleaseFactory;
 }
 
 /// @notice CREATE2 calldata for contracts deployed directly (no deployer)
@@ -87,7 +87,7 @@ struct DirectCreate2Calldata {
     bytes diamondInitCalldata;
     bytes genesisUpgradeCalldata;
     bytes multicall3Calldata;
-    bytes bootstrapRegistryCalldata;
+    bytes bootstrapReleaseFactoryCalldata;
 }
 
 struct CalculateAddressesIntermediate {
@@ -423,13 +423,14 @@ library GatewayCTMDeployerHelper {
             true
         );
 
-        // Bootstrap CTMRegistry — deployed directly (its ~12KB creation code would push the CTM
-        // deployer's initcode past the EIP-3860 cap) and left uninitialized; the CTM deployer
-        // initializes it with the genesis manifest.
-        (addresses.bootstrapRegistry, data.bootstrapRegistryCalldata) = _calculateCreate2AddressAndCalldata(
+        // Bootstrap release FACTORY — deployed directly (embedding the release's ~12KB creation
+        // code in the CTM deployer would push its initcode past the EIP-3860 cap). The CTM
+        // deployer calls its atomic `deployOrGetRelease`, so the release itself is deployed AND
+        // initialized within the deployer's transaction — no uninitialized window on Gateway.
+        (addresses.bootstrapReleaseFactory, data.bootstrapReleaseFactoryCalldata) = _calculateCreate2AddressAndCalldata(
             _create2Salt,
-            "CTMRelease.sol",
-            "CTMRelease",
+            "CTMRegistryFactory.sol",
+            "CTMReleaseFactory",
             hex"",
             config.isZKsyncOS,
             true
@@ -517,8 +518,22 @@ library GatewayCTMDeployerHelper {
                 facets: directAddresses.facets,
                 genesisUpgrade: directAddresses.genesisUpgrade,
                 verifier: verifiersResult.verifier,
-                bootstrapRegistry: directAddresses.bootstrapRegistry
+                bootstrapReleaseFactory: directAddresses.bootstrapReleaseFactory
             });
+    }
+
+    /// @dev The bootstrap release is the factory's FIRST create (fresh factory, nonce 1), so
+    ///      its address is predictable off-chain — via the EVM RLP CREATE formula on an
+    ///      EVM-equivalent Gateway, via the EraVM CREATE formula otherwise (same switch the
+    ///      CREATE2 computations follow).
+    function _predictBootstrapRelease(address _factory) internal view returns (address) {
+        if (_isGatewayEvmEquivalentInCurrentContext()) {
+            return
+                address(
+                    uint160(uint256(keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), _factory, bytes1(0x01)))))
+                );
+        }
+        return L2ContractHelper.computeCreateAddress(_factory, 1);
     }
 
     // ============ Address Calculation Helpers ============
@@ -676,10 +691,10 @@ library GatewayCTMDeployerHelper {
         );
 
         {
-            // The bootstrap registry is a DIRECT deployment (see _calculateDirectDeployments);
-            // its address rides in the final config, deterministic and independent of the facet
-            // addresses — known here, before the facets exist, for the cut.
-            address genesisRegistry = config.bootstrapRegistry;
+            // The bootstrap release is the factory's FIRST create (nonce 1), so its address is
+            // still deterministic off-chain even though it is deployed inside the CTM deployer's
+            // transaction (through the directly-deployed factory).
+            address genesisRegistry = _predictBootstrapRelease(config.bootstrapReleaseFactory);
             bytes memory proxyConstructorArgs = _buildCTMProxyConstructorArgs(
                 config,
                 baseConfig,
@@ -742,7 +757,7 @@ library GatewayCTMDeployerHelper {
         Verifiers memory verifiersResult,
         DirectDeployedAddresses memory directAddresses,
         GatewayCTMFinalResult memory ctmResult
-    ) internal pure returns (DeployedContracts memory contracts) {
+    ) internal view returns (DeployedContracts memory contracts) {
         // From DA deployer
         contracts.daContracts.rollupDAManager = daResult.rollupDAManager;
         contracts.daContracts.validiumDAValidator = daResult.validiumDAValidator;
@@ -763,7 +778,7 @@ library GatewayCTMDeployerHelper {
         contracts.stateTransition.facets = directAddresses.facets;
         contracts.stateTransition.genesisUpgrade = directAddresses.genesisUpgrade;
         contracts.multicall3 = directAddresses.multicall3;
-        contracts.stateTransition.currentRelease = directAddresses.bootstrapRegistry;
+        contracts.stateTransition.currentRelease = _predictBootstrapRelease(directAddresses.bootstrapReleaseFactory);
 
         // From CTM deployer
         contracts.stateTransition.implementations.serverNotifier = ctmResult.serverNotifierImplementation;

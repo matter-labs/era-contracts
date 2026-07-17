@@ -130,7 +130,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     /// with the shared salt would land every run (Era CTM, ZKsyncOS CTM, later upgrades) on the
     /// same, already-initialized address. A deterministic address buys nothing here — the CTM
     /// stores the pointer.
-    /// @dev Deploy + initialize happen atomically inside {CTMReleaseFactory.deployRelease} (one
+    /// @dev Deploy + initialize happen atomically inside {CTMReleaseFactory.deployOrGetRelease} (one
     /// transaction), so the release is already initialized when its address is returned — there is
     /// no uninitialized, front-runnable window on the unauthenticated `initialize`.
     function deployCurrentRelease() internal returns (address) {
@@ -146,7 +146,6 @@ abstract contract DeployCTMUtils is DeployUtils {
         require(generatedData.forceDeploymentsData.length != 0, "force deployments data is empty");
         CTMRelease.ReleaseManifest memory manifest = GenesisManifestLib.buildGenesisManifest(
             GenesisManifestLib.GenesisConfig({
-                isZKsyncOS: config.isZKsyncOS,
                 facets: ctmAddresses.stateTransition.facets,
                 bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
                 defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,
@@ -163,7 +162,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         CTMReleaseFactory factory = new CTMReleaseFactory();
 
         vm.broadcast(getBroadcasterAddress());
-        address release = factory.deployRelease(manifest);
+        address release = factory.deployOrGetRelease(manifest);
 
         // Deploy + initialize ran in one transaction inside the factory, so the release is already
         // initialized here with no front-runnable window; this is now a pure sanity assertion.

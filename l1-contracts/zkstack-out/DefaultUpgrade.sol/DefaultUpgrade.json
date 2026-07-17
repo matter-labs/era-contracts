@@ -699,22 +699,6 @@
   },
   {
     "type": "error",
-    "name": "RegistryWrongCTM",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "actual",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "RemoveFunctionFacetAddressNotZero",
     "inputs": [
       {

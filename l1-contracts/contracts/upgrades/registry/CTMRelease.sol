@@ -2,48 +2,53 @@
 
 pragma solidity 0.8.28;
 
-import {CodehashPin} from "./ContractIdentifiers.sol";
 import {GenesisFacet, ICTMRelease} from "./ICTMRelease.sol";
 import {
     RegistryAlreadyInitialized,
     RegistryCodehashMismatch,
+    RegistryEmptySelectors,
     RegistryUnknownKey,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
 
 /// @notice Storage-backed, write-once description of one CTM release.
+/// @dev Every pinned address carries its expected `EXTCODEHASH` INLINE and MANDATORILY — the
+///      facets in their `GenesisFacet` rows, `DiamondInit` and the genesis upgrade beside their
+///      addresses. Initialization refuses a manifest whose pins do not match the live code, and
+///      `validate()` / `verifyAll()` re-check the same pins afterwards. There is no optional,
+///      detached pin list: what the release names, the release pins.
 contract CTMRelease is ICTMRelease {
     // solhint-disable-next-line gas-struct-packing
     struct ReleaseManifest {
-        bool isZKsyncOS;
         address diamondInit;
+        bytes32 diamondInitCodehash;
         GenesisFacet[] genesisFacets;
         bytes32 bootloaderHash;
         bytes32 defaultAccountHash;
         bytes32 evmEmulatorHash;
         bytes fixedForceDeploymentsData;
         address genesisUpgrade;
+        bytes32 genesisUpgradeCodehash;
         bytes32 genesisBatchHash;
         bytes32 genesisBatchCommitment;
         uint64 genesisIndexRepeatedStorageChanges;
-        CodehashPin[] codehashPins;
     }
 
     bool public initialized;
     bytes32 public manifestHash;
 
-    bool internal zksyncOS;
     address internal releaseDiamondInit;
+    bytes32 internal diamondInitCodehash;
     GenesisFacet[] internal releaseGenesisFacets;
     bytes32 internal bootloaderHash;
     bytes32 internal defaultAccountHash;
     bytes32 internal evmEmulatorHash;
     bytes internal releaseFixedForceDeploymentsData;
     address internal genesisUpgrade;
+    bytes32 internal genesisUpgradeCodehash;
     bytes32 internal genesisBatchHash;
     bytes32 internal genesisBatchCommitment;
     uint64 internal genesisIndexRepeatedStorageChanges;
-    CodehashPin[] internal codehashPins;
 
     function initialize(ReleaseManifest calldata _manifest) external {
         if (initialized) {
@@ -53,13 +58,22 @@ contract CTMRelease is ICTMRelease {
             revert ZeroAddress();
         }
 
-        _validatePins(_manifest.codehashPins);
+        _requirePin(_manifest.diamondInit, _manifest.diamondInitCodehash);
+        _requirePin(_manifest.genesisUpgrade, _manifest.genesisUpgradeCodehash);
+        uint256 length = _manifest.genesisFacets.length;
+        for (uint256 i = 0; i < length; ++i) {
+            // Releases are the canonical routing source: every facet row carries its explicit,
+            // complete selector list (transitions derive their cuts from these) and its pin.
+            if (_manifest.genesisFacets[i].selectors.length == 0) {
+                revert RegistryEmptySelectors(_manifest.genesisFacets[i].facet);
+            }
+            _requirePin(_manifest.genesisFacets[i].facet, _manifest.genesisFacets[i].codehash);
+        }
 
         initialized = true;
         manifestHash = keccak256(abi.encode(_manifest));
-        zksyncOS = _manifest.isZKsyncOS;
         releaseDiamondInit = _manifest.diamondInit;
-        uint256 length = _manifest.genesisFacets.length;
+        diamondInitCodehash = _manifest.diamondInitCodehash;
         for (uint256 i = 0; i < length; ++i) {
             releaseGenesisFacets.push(_manifest.genesisFacets[i]);
         }
@@ -68,17 +82,10 @@ contract CTMRelease is ICTMRelease {
         evmEmulatorHash = _manifest.evmEmulatorHash;
         releaseFixedForceDeploymentsData = _manifest.fixedForceDeploymentsData;
         genesisUpgrade = _manifest.genesisUpgrade;
+        genesisUpgradeCodehash = _manifest.genesisUpgradeCodehash;
         genesisBatchHash = _manifest.genesisBatchHash;
         genesisBatchCommitment = _manifest.genesisBatchCommitment;
         genesisIndexRepeatedStorageChanges = _manifest.genesisIndexRepeatedStorageChanges;
-        length = _manifest.codehashPins.length;
-        for (uint256 i = 0; i < length; ++i) {
-            codehashPins.push(_manifest.codehashPins[i]);
-        }
-    }
-
-    function isZKsyncOS() external view returns (bool) {
-        return zksyncOS;
     }
 
     function diamondInit() external view returns (address) {
@@ -105,43 +112,34 @@ contract CTMRelease is ICTMRelease {
         if (!initialized) {
             revert RegistryUnknownKey();
         }
-        _validateStoredPins();
+        _requirePin(releaseDiamondInit, diamondInitCodehash);
+        _requirePin(genesisUpgrade, genesisUpgradeCodehash);
+        uint256 length = releaseGenesisFacets.length;
+        for (uint256 i = 0; i < length; ++i) {
+            _requirePin(releaseGenesisFacets[i].facet, releaseGenesisFacets[i].codehash);
+        }
     }
 
     function verifyAll() external view returns (bool) {
         if (!initialized) {
             return false;
         }
-        uint256 length = codehashPins.length;
+        if (releaseDiamondInit.codehash != diamondInitCodehash || genesisUpgrade.codehash != genesisUpgradeCodehash) {
+            return false;
+        }
+        uint256 length = releaseGenesisFacets.length;
         for (uint256 i = 0; i < length; ++i) {
-            if (codehashPins[i].target.codehash != codehashPins[i].expectedCodehash) {
+            if (releaseGenesisFacets[i].facet.codehash != releaseGenesisFacets[i].codehash) {
                 return false;
             }
         }
         return true;
     }
 
-    function _validatePins(CodehashPin[] calldata _pins) private view {
-        uint256 length = _pins.length;
-        for (uint256 i = 0; i < length; ++i) {
-            bytes32 actualCodehash = _pins[i].target.codehash;
-            if (actualCodehash != _pins[i].expectedCodehash) {
-                revert RegistryCodehashMismatch(_pins[i].target, _pins[i].expectedCodehash, actualCodehash);
-            }
-        }
-    }
-
-    function _validateStoredPins() private view {
-        uint256 length = codehashPins.length;
-        for (uint256 i = 0; i < length; ++i) {
-            bytes32 actualCodehash = codehashPins[i].target.codehash;
-            if (actualCodehash != codehashPins[i].expectedCodehash) {
-                revert RegistryCodehashMismatch(
-                    codehashPins[i].target,
-                    codehashPins[i].expectedCodehash,
-                    actualCodehash
-                );
-            }
+    function _requirePin(address _target, bytes32 _expectedCodehash) private view {
+        bytes32 actualCodehash = _target.codehash;
+        if (actualCodehash != _expectedCodehash) {
+            revert RegistryCodehashMismatch(_target, _expectedCodehash, actualCodehash);
         }
     }
 }

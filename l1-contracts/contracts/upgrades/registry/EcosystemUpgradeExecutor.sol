@@ -8,38 +8,48 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {L1EcosystemContract} from "./ContractIdentifiers.sol";
 import {ICoreRegistry, EcosystemContractRow} from "./ICoreRegistry.sol";
 import {UpgradeExecutorBase} from "../../governance/UpgradeExecutorBase.sol";
+import {EcosystemImplMismatch, ZeroAddress} from "../../common/L1ContractErrors.sol";
 
 /// @title EcosystemUpgradeExecutor
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Domain-specific executor for the ecosystem-wide (core) part of a protocol upgrade: it
-///         owns the ecosystem `ProxyAdmin` and points every ecosystem proxy at its new
-///         implementation, as pinned by the core registry. Ecosystem authority is deliberately
-///         separate from CTM authority (`CTMUpgradeExecutor`): the two scopes can be governed by
-///         different executors with different owners and upgrade on different cadences.
-/// @dev Fixed logic, no generic delegatecall: this executor calls the `ProxyAdmin` it owns
-///      directly. `forward` (from the base) remains for emergencies.
-/// @dev The registry address is a *pinned implementation address* — the exact generated contract
-///      governance approved — never a proxy, so what was signed is exactly what is read.
+/// @notice Domain-specific executor BOUND to one immutable ecosystem `ProxyAdmin`: it owns that
+///         admin and points every ecosystem proxy at its new implementation, as pinned by a
+///         write-once core registry. Ecosystem authority is deliberately separate from CTM
+///         authority (`CTMUpgradeExecutor`).
+/// @dev Fixed logic, no generic delegatecall. The break-glass `forward` (base) is gated by a
+///      SEPARATE governor. The registry address is a *pinned implementation address* — the exact
+///      generated contract governance approved — never a proxy.
 contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
+    /// @notice The one ecosystem `ProxyAdmin` this executor governs. Registries carry no proxy
+    ///         admin pointer; the binding is this immutable.
+    ProxyAdmin public immutable PROXY_ADMIN;
+
     /// @notice Emitted for every ecosystem proxy pointed at its new implementation.
     event EcosystemContractUpgraded(L1EcosystemContract indexed contractId, address indexed proxy, address newImpl);
 
-    constructor(address _initialOwner) UpgradeExecutorBase(_initialOwner) {}
+    constructor(
+        address _initialOwner,
+        address _breakGlassGovernor,
+        ProxyAdmin _proxyAdmin
+    ) UpgradeExecutorBase(_initialOwner, _breakGlassGovernor) {
+        if (address(_proxyAdmin) == address(0)) {
+            revert ZeroAddress();
+        }
+        PROXY_ADMIN = _proxyAdmin;
+    }
 
     /// @notice Points every ecosystem proxy at its new implementation, as pinned by the registry.
-    ///         Contracts with no new implementation pinned, or whose proxy already points at the
-    ///         pinned implementation, are skipped.
-    /// @dev The skip check compares against the LIVE implementation (read through the ecosystem
-    ///      `ProxyAdmin`) rather than a registry-pinned old address. That live read is safe HERE
-    ///      — unlike the CTM diamond cut, which is committed as a hash and must recompose
-    ///      identically for the whole upgrade window (so it must never read live state), this
-    ///      function reads and writes in one atomic transaction: the live implementation cannot
-    ///      change between the check and the upgrade. It also makes the call idempotent.
+    ///         Rows are SOURCE-CHECKED edges: a proxy already at `implNew` is skipped
+    ///         (idempotence); a proxy at `expectedOldImpl` is upgraded; a proxy at anything else
+    ///         reverts — replaying a stale registry can therefore never downgrade a proxy that a
+    ///         later upgrade has already moved on.
+    /// @dev The live read through the bound `ProxyAdmin` is safe here — unlike the CTM diamond
+    ///      cut (committed as a hash for a whole upgrade window), this function reads and writes
+    ///      in one atomic transaction.
     /// @param _coreRegistry The pinned core-registry implementation approved by governance.
     function applyL1Upgrade(ICoreRegistry _coreRegistry) external onlyOwner {
         _coreRegistry.validate();
-        ProxyAdmin proxyAdmin = ProxyAdmin(_coreRegistry.proxyAdmin());
 
         // One call returns complete typed rows; no per-key rescans of the registry.
         EcosystemContractRow[] memory rows = _coreRegistry.ecosystemRows();
@@ -50,10 +60,14 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
                 continue;
             }
             ITransparentUpgradeableProxy proxy = ITransparentUpgradeableProxy(rows[i].proxy);
-            if (newImpl == proxyAdmin.getProxyImplementation(proxy)) {
+            address liveImpl = PROXY_ADMIN.getProxyImplementation(proxy);
+            if (liveImpl == newImpl) {
                 continue;
             }
-            proxyAdmin.upgrade(proxy, newImpl);
+            if (liveImpl != rows[i].expectedOldImpl) {
+                revert EcosystemImplMismatch(rows[i].proxy, rows[i].expectedOldImpl, liveImpl);
+            }
+            PROXY_ADMIN.upgrade(proxy, newImpl);
             emit EcosystemContractUpgraded(rows[i].key, address(proxy), newImpl);
         }
     }

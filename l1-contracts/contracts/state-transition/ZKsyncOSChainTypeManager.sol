@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
+import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {ICTMRelease} from "../upgrades/registry/ICTMRelease.sol";
 import {
     GenesisBatchHashZero,
@@ -35,7 +36,9 @@ contract ZKsyncOSChainTypeManager is ChainTypeManagerBase {
         }
         ICTMRelease release = ICTMRelease(_release);
         release.validate();
-        if (!release.isZKsyncOS()) {
+        // VM identity is single-sourced from the release's pinned DiamondInit immutable —
+        // there is no separate manifest flag to drift from it.
+        if (!IDiamondInit(release.diamondInit()).IS_ZKSYNC_OS()) {
             revert RegistryWrongVM(true, false);
         }
         // No version check here: a release is version-INDEPENDENT. The release <-> protocol-version

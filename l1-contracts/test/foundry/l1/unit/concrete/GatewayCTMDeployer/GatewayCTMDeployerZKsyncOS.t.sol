@@ -260,12 +260,13 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
         deployed = tester.deployDirect(directCalldata.multicall3Calldata);
         assertEq(deployed, calculatedContracts.multicall3, "Multicall3 address mismatch");
 
-        // Bootstrap CTMRegistry (deployed directly, uninitialized; the CTM deployer initializes it)
-        deployed = tester.deployDirect(directCalldata.bootstrapRegistryCalldata);
+        // Bootstrap release FACTORY (deployed directly); the release itself is the factory's
+        // first CREATE, which is what the helper predicts as `currentRelease`.
+        deployed = tester.deployDirect(directCalldata.bootstrapReleaseFactoryCalldata);
         assertEq(
-            deployed,
+            vm.computeCreateAddress(deployed, 1),
             calculatedContracts.stateTransition.currentRelease,
-            "bootstrap CTMRegistry address mismatch"
+            "bootstrap release prediction mismatch"
         );
     }
 }

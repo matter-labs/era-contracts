@@ -8,6 +8,7 @@ import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
 import {GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
 import {GenesisManifestLib} from "contracts/upgrades/registry/GenesisManifestLib.sol";
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
+import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {RegistryUnknownKey, RegistryAlreadyInitialized} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Unit tests for `CTMRegistry` in its BOOTSTRAP (genesis) mode: a freshly deployed CTM
@@ -36,13 +37,31 @@ contract CTMRegistryBootstrapTest is Test {
 
     function setUp() public {
         release = new CTMRelease();
+        // The bootstrap manifest builder reads each facet's explicit routing from its own
+        // self-description at BUILD time; mock it on the synthetic facet addresses.
+        address[6] memory facetAddrs = [
+            facets.adminFacet,
+            facets.gettersFacet,
+            facets.mailboxFacet,
+            facets.executorFacet,
+            facets.migratorFacet,
+            facets.committerFacet
+        ];
+        for (uint256 i = 0; i < facetAddrs.length; ++i) {
+            bytes4[] memory selectors = new bytes4[](1);
+            selectors[0] = bytes4(uint32(0x100 + i));
+            vm.mockCall(
+                facetAddrs[i],
+                abi.encodeWithSelector(ISelfDescribingFacet.selectors.selector),
+                abi.encode(selectors)
+            );
+        }
     }
 
     function _genesisManifest() internal view returns (CTMRelease.ReleaseManifest memory) {
         return
             GenesisManifestLib.buildGenesisManifest(
                 GenesisManifestLib.GenesisConfig({
-                    isZKsyncOS: false,
                     facets: facets,
                     bootloaderHash: BOOTLOADER_HASH,
                     defaultAccountHash: DEFAULT_ACCOUNT_HASH,
@@ -64,8 +83,6 @@ contract CTMRegistryBootstrapTest is Test {
 
         assertTrue(release.initialized(), "initialized");
         assertEq(release.manifestHash(), keccak256(abi.encode(manifest)), "manifest hash");
-        // A release is version-INDEPENDENT: it exposes no protocolVersion / verifier.
-        assertFalse(release.isZKsyncOS(), "vm flavour");
 
         GenesisFacet[] memory list = release.genesisFacets();
         assertEq(list.length, 6, "list length");
@@ -78,9 +95,9 @@ contract CTMRegistryBootstrapTest is Test {
         assertTrue(list[2].isFreezable, "mailbox freezable");
         assertTrue(list[5].isFreezable, "committer freezable");
 
-        // Selectors are always empty at genesis: DiamondInit self-describes from the facet's own
-        // bytecode.
-        assertEq(list[0].selectors.length, 0, "selectors empty");
+        // Explicit routing captured from each facet's self-description at build time.
+        assertEq(list[0].selectors.length, 1, "explicit selectors");
+        assertEq(list[0].selectors[0], bytes4(uint32(0x100)), "admin selector");
 
         (bytes32 bootloaderHash, bytes32 defaultAccountHash, bytes32 evmEmulatorHash) = release
             .baseSystemContractHashes();
@@ -88,7 +105,8 @@ contract CTMRegistryBootstrapTest is Test {
         assertEq(defaultAccountHash, DEFAULT_ACCOUNT_HASH, "default account hash");
         assertEq(evmEmulatorHash, EVM_EMULATOR_HASH, "evm emulator hash");
 
-        // No codehash pins in a bootstrap manifest: trivially verified.
+        // Inline pins captured from live code at build time (zero for the codeless synthetic
+        // facets here) verify against the same live state.
         release.validate();
         assertTrue(release.verifyAll(), "verifyAll");
     }
@@ -96,10 +114,13 @@ contract CTMRegistryBootstrapTest is Test {
     // ---- Unhappy path ----
 
     function test_initializeRevertsOnSecondCall() public {
-        release.initialize(_genesisManifest());
+        // Build the manifest BEFORE arming expectRevert: the builder itself makes (mocked)
+        // external self-description calls that would otherwise consume the expectation.
+        CTMRelease.ReleaseManifest memory manifest = _genesisManifest();
+        release.initialize(manifest);
 
         vm.expectRevert(RegistryAlreadyInitialized.selector);
-        release.initialize(_genesisManifest());
+        release.initialize(manifest);
     }
 
     function test_initializeRevertsOnZeroGenesisUpgrade() public {
@@ -123,7 +144,6 @@ contract CTMRegistryBootstrapTest is Test {
         release.initialize(
             GenesisManifestLib.buildGenesisManifest(
                 GenesisManifestLib.GenesisConfig({
-                    isZKsyncOS: true,
                     facets: facets,
                     bootloaderHash: 0,
                     defaultAccountHash: 0,
@@ -142,7 +162,6 @@ contract CTMRegistryBootstrapTest is Test {
         assertEq(bootloaderHash, bytes32(0), "bootloader hash");
         assertEq(defaultAccountHash, bytes32(0), "default account hash");
         assertEq(evmEmulatorHash, bytes32(0), "evm emulator hash");
-        assertTrue(release.isZKsyncOS(), "vm flavour");
         assertEq(release.genesisFacets().length, 6, "facet list");
     }
 }

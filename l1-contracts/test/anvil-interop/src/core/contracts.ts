@@ -28,6 +28,7 @@ const ARTIFACTS = {
   EcosystemUpgradeExecutor: "EcosystemUpgradeExecutor.sol/EcosystemUpgradeExecutor.json",
   RegistryComposerHarness: "RegistryComposerHarness.sol/RegistryComposerHarness.json",
   IChainTypeManager: "IChainTypeManager.sol/IChainTypeManager.json",
+  ISelfDescribingFacet: "ISelfDescribingFacet.sol/ISelfDescribingFacet.json",
   ICTMRelease: "ICTMRelease.sol/ICTMRelease.json",
   ICTMTransition: "ICTMTransition.sol/ICTMTransition.json",
   ICoreRegistry: "ICoreRegistry.sol/ICoreRegistry.json",

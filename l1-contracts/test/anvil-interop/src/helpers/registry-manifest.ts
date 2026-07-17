@@ -7,17 +7,19 @@
  * manifest JSON (scripts/registry-manifests/*.json — the reviewable per-upgrade artifact) into
  * the `initialize()` argument objects ethers encodes against the contract ABIs:
  *
- *   - `CTMRelease.ReleaseManifest`     — what a chain at the target release IS (facets,
- *     DiamondInit, base-system hashes, force-deployments, genesis params). Version-independent.
- *   - `CTMTransition.TransitionManifest` — how the current release becomes the target release
- *     (facet swaps, L2 leg, schedule, verifier, `fromRelease -> newRelease` and
- *     `oldProtocolVersion -> newProtocolVersion` edges).
- *   - `CoreRegistry.CoreRegistryManifest` — the ecosystem-wide proxy -> new-implementation rows.
+ *   - `CTMRelease.ReleaseManifest` — what a chain at the target release IS: EXPLICIT complete
+ *     selector routing and INLINE MANDATORY codehash pins beside every address. Version- and
+ *     VM-flag-independent (VM identity lives in the pinned DiamondInit immutable).
+ *   - `CTMTransition.TransitionManifest` — how the current release becomes the target release.
+ *     Carries NO facet swaps and NO hash changes: the delta is DERIVED on-chain from the
+ *     `(fromRelease, newRelease)` pair at initialization. What is authored: version edge,
+ *     pinned verifier + upgrade engine, schedule, and the typed `L2UpgradePlan`.
+ *   - `CoreRegistry.CoreRegistryManifest` — source-checked ecosystem rows
+ *     (`expectedOldImpl -> implNew` with inline pins).
  *
  * Enum identifiers in the manifest are NAMES; their numeric values are parsed from the
  * canonical Solidity sources at runtime (never hardcoded), so enum reordering upstream cannot
- * silently skew the encoding. Facet rows need no enum at all — `GenesisFacet` and
- * `UpgradeFacetSwap` are address-based; manifest facet names are human labels only.
+ * silently skew the encoding.
  */
 
 import * as fs from "fs";
@@ -74,106 +76,74 @@ export function coreInitArgs(manifest: any): any {
   const contractRows = entries.map(([name, e]) => ({
     key: enumValue(ecosystemContract, name, "L1EcosystemContract"),
     proxy: e.proxy,
+    expectedOldImpl: e.expectedOldImpl ?? ethers.constants.AddressZero,
     implNew: e.implNew ?? ethers.constants.AddressZero,
+    implNewCodehash: e.implNewCodehash ?? ethers.constants.HashZero,
   }));
-  const codehashPins = entries
-    .filter(([, e]) => e.implNew && e.implNewCodehash)
-    .map(([, e]) => ({ target: e.implNew, expectedCodehash: e.implNewCodehash }));
 
-  return {
-    proxyAdmin: manifest.core.proxyAdmin,
-    contractRows,
-    codehashPins,
-  };
+  return { contractRows };
 }
 
 /** `CTMRelease.ReleaseManifest` initialize argument from one `manifest.ctms[]` entry. */
 export function releaseInitArgs(ctm: any): any {
   const release = ctm.release;
 
+  // Explicit complete routing + inline mandatory pin per facet row.
   const genesisFacets = release.genesisFacets.map((f: any) => ({
     facet: f.address,
     isFreezable: f.isFreezable,
-    selectors: f.selectors ?? [],
+    selectors: f.selectors,
+    codehash: f.codehash,
   }));
 
-  // The release pins the codehash of everything it makes live on new chains: the complete
-  // installed facet set and the DiamondInit.
-  const codehashPins = [
-    ...release.genesisFacets
-      .filter((f: any) => f.codehash)
-      .map((f: any) => ({ target: f.address, expectedCodehash: f.codehash })),
-    { target: release.diamondInit.address, expectedCodehash: release.diamondInit.codehash },
-  ];
-
   return {
-    isZKsyncOS: ctm.isZKsyncOS,
     diamondInit: release.diamondInit.address,
+    diamondInitCodehash: release.diamondInit.codehash,
     genesisFacets,
     bootloaderHash: release.baseSystemContracts.bootloader,
     defaultAccountHash: release.baseSystemContracts.defaultAccount,
     evmEmulatorHash: release.baseSystemContracts.evmEmulator,
     fixedForceDeploymentsData: release.fixedForceDeploymentsData,
-    genesisUpgrade: release.genesis.genesisUpgrade,
+    genesisUpgrade: release.genesis.genesisUpgrade.address,
+    genesisUpgradeCodehash: release.genesis.genesisUpgrade.codehash,
     genesisBatchHash: release.genesis.batchHash,
     genesisBatchCommitment: release.genesis.batchCommitment,
     genesisIndexRepeatedStorageChanges: release.genesis.indexRepeatedStorageChanges,
-    codehashPins,
   };
 }
 
 /**
  * `CTMTransition.TransitionManifest` initialize argument from one `manifest.ctms[]` entry.
- * `newRelease` is the just-deployed (nonce-deterministic) `CTMRelease` address — passed in by
- * the runner rather than read from the JSON, since the release must be deployed first anyway
- * (transition initialization validates it).
+ * `newRelease` is the just-deployed `CTMRelease` address — passed in by the runner rather than
+ * read from the JSON, since the release must be deployed first anyway (transition
+ * initialization validates it and derives the facet/hash delta from the release pair).
  */
 export function transitionInitArgs(manifest: any, ctm: any, newRelease: string): any {
   const upgradeType = parseSolidityEnum(COMPLEX_UPGRADER_SOL, "ContractUpgradeType");
   const transition = ctm.transition;
 
-  const facetTransitions = transition.facetSwaps.map((f: any) => ({
-    oldFacet: f.oldFacet ?? ethers.constants.AddressZero,
-    newFacet: f.newFacet,
-    isFreezable: f.isFreezable,
-    oldSelectors: f.oldSelectors ?? [],
-    newSelectors: f.newSelectors ?? [],
+  const deployments = transition.l2Plan.deployments.map((d: any) => ({
+    upgradeType: enumValue(upgradeType, d.upgradeType, "ContractUpgradeType"),
+    deployedBytecodeInfo: d.deployedBytecodeInfo,
+    newAddress: d.newAddress,
   }));
-
-  const l2Deployments = transition.l2.forceDeployments.map((d: any) => ({
-    info: {
-      upgradeType: enumValue(upgradeType, d.upgradeType, "ContractUpgradeType"),
-      deployedBytecodeInfo: d.deployedBytecodeInfo,
-      newAddress: d.newAddress,
-    },
-  }));
-
-  // The transition pins what it (and only it) makes live: the verifier and the DefaultUpgrade
-  // init contract. The new facets are pinned by the target release, which transition
-  // initialization/validation checks transitively.
-  const codehashPins = [
-    { target: transition.verifier.address, expectedCodehash: transition.verifier.codehash },
-    { target: transition.defaultUpgrade.address, expectedCodehash: transition.defaultUpgrade.codehash },
-  ];
 
   return {
-    ctmProxy: ctm.ctmProxy,
     oldProtocolVersion: packSemVer(manifest.oldVersion),
     newProtocolVersion: packSemVer(manifest.newVersion),
     verifier: transition.verifier.address,
+    verifierCodehash: transition.verifier.codehash,
     fromRelease: transition.fromRelease,
     newRelease,
-    defaultUpgrade: transition.defaultUpgrade.address,
+    upgradeEngine: transition.upgradeEngine.address,
+    upgradeEngineCodehash: transition.upgradeEngine.codehash,
     oldProtocolVersionDeadline: ethers.BigNumber.from(transition.oldProtocolVersionDeadline),
     upgradeTimestamp: transition.upgradeTimestamp,
-    facetTransitions,
-    l2Deployments,
-    l2UpgradeDelegateTo: transition.l2.delegateTo,
-    l2UpgradeDelegateCalldata: transition.l2.delegateCalldata,
-    factoryDepHashes: transition.l2.factoryDepHashes.map((h: string) => ethers.BigNumber.from(h)),
-    bootloaderHash: transition.l2.baseSystemContractChanges.bootloader,
-    defaultAccountHash: transition.l2.baseSystemContractChanges.defaultAccount,
-    evmEmulatorHash: transition.l2.baseSystemContractChanges.evmEmulator,
-    codehashPins,
+    l2Plan: {
+      deployments,
+      delegateTo: transition.l2Plan.delegateTo,
+      delegateCalldata: transition.l2Plan.delegateCalldata,
+      factoryDepHashes: transition.l2Plan.factoryDepHashes.map((h: string) => ethers.BigNumber.from(h)),
+    },
   };
 }

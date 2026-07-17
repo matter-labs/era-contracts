@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {CTMRelease} from "./CTMRelease.sol";
 import {GenesisFacet} from "./ICTMRelease.sol";
 import {Facets} from "../../common/StateTransitionTypes.sol";
+import {ISelfDescribingFacet} from "../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 
 /// @title Genesis (bootstrap) manifest builder.
 /// @author Matter Labs
@@ -12,13 +13,16 @@ import {Facets} from "../../common/StateTransitionTypes.sol";
 /// @notice Builds the release manifest a freshly deployed CTM uses for chain genesis.
 /// @dev Shared by the on-chain `GatewayCTMDeployerCTMBase` (zksync-os) and the L1 deploy
 ///      scripts, so the two genesis paths cannot drift apart.
+/// @dev The bootstrap flow deploys the facets and pins them in the same breath, so the explicit
+///      selector routing is read from each facet's own `ISelfDescribingFacet.selectors()` and
+///      the codehash pins from the live code — at BUILD time. The resulting manifest stores
+///      both explicitly; nothing self-describes at consumption time.
 library GenesisManifestLib {
     uint256 internal constant GENESIS_FACET_COUNT = 6;
 
     /// @notice Everything the deploy flow feeds into a bootstrap manifest.
-    /// @dev A release is version-INDEPENDENT: it carries no protocol version and no verifier
-    ///      (those are transition/version-schedule concerns), only reusable genesis state.
-    /// @param isZKsyncOS Whether the CTM this registry bootstraps is the ZKsyncOS one.
+    /// @dev A release is version-INDEPENDENT and VM-flag-free: version/verifier are transition
+    ///      concerns, and VM identity is single-sourced from the pinned DiamondInit immutable.
     /// @param facets The deployed diamond facet addresses (incl. DiamondInit).
     /// @param bootloaderHash The hash of the bootloader L2 bytecode (zero on ZKsync OS).
     /// @param defaultAccountHash The hash of the default account L2 bytecode (zero on ZKsync OS).
@@ -30,7 +34,6 @@ library GenesisManifestLib {
     /// @param fixedForceDeploymentsData The ecosystem-wide fixed force-deployment descriptor.
     // solhint-disable-next-line gas-struct-packing
     struct GenesisConfig {
-        bool isZKsyncOS;
         Facets facets;
         bytes32 bootloaderHash;
         bytes32 defaultAccountHash;
@@ -44,26 +47,32 @@ library GenesisManifestLib {
 
     function buildGenesisManifest(
         GenesisConfig memory _cfg
-    ) internal pure returns (CTMRelease.ReleaseManifest memory manifest) {
+    ) internal view returns (CTMRelease.ReleaseManifest memory manifest) {
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](GENESIS_FACET_COUNT);
 
-        // The canonical facet set of a new chain diamond; empty selector lists mean DiamondInit
-        // reads each facet's own `ISelfDescribingFacet.selectors()`.
+        // The canonical facet set of a new chain diamond, with explicit routing and inline pins
+        // captured from the just-deployed facets.
         (address[GENESIS_FACET_COUNT] memory addrs, bool[GENESIS_FACET_COUNT] memory freezable) = _genesisFacets(
             _cfg.facets
         );
         for (uint256 i = 0; i < GENESIS_FACET_COUNT; ++i) {
-            genesisFacets[i] = GenesisFacet({facet: addrs[i], isFreezable: freezable[i], selectors: new bytes4[](0)});
+            genesisFacets[i] = GenesisFacet({
+                facet: addrs[i],
+                isFreezable: freezable[i],
+                selectors: ISelfDescribingFacet(addrs[i]).selectors(),
+                codehash: addrs[i].codehash
+            });
         }
 
-        manifest.isZKsyncOS = _cfg.isZKsyncOS;
         manifest.diamondInit = _cfg.facets.diamondInit;
+        manifest.diamondInitCodehash = _cfg.facets.diamondInit.codehash;
         manifest.genesisFacets = genesisFacets;
         manifest.bootloaderHash = _cfg.bootloaderHash;
         manifest.defaultAccountHash = _cfg.defaultAccountHash;
         manifest.evmEmulatorHash = _cfg.evmEmulatorHash;
         manifest.fixedForceDeploymentsData = _cfg.fixedForceDeploymentsData;
         manifest.genesisUpgrade = _cfg.genesisUpgrade;
+        manifest.genesisUpgradeCodehash = _cfg.genesisUpgrade.codehash;
         manifest.genesisBatchHash = _cfg.genesisBatchHash;
         manifest.genesisBatchCommitment = _cfg.genesisBatchCommitment;
         manifest.genesisIndexRepeatedStorageChanges = _cfg.genesisIndexRepeatedStorageChanges;

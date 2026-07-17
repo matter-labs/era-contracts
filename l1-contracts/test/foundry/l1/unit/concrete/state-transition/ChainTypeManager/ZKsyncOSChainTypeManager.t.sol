@@ -13,6 +13,7 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
+import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/ICTMRelease.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -131,9 +132,16 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisBatchCommitment, _genesisIndexRepeatedStorageChanges)
         );
         vm.mockCall(Utils.TEST_GENESIS_REGISTRY, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
+        // VM identity is single-sourced from the release's DiamondInit; the mocked registry's
+        // diamondInit placeholder is the registry itself, so mock the flag there.
         vm.mockCall(
             Utils.TEST_GENESIS_REGISTRY,
-            abi.encodeWithSelector(ICTMRelease.isZKsyncOS.selector),
+            abi.encodeWithSelector(ICTMRelease.diamondInit.selector),
+            abi.encode(Utils.TEST_GENESIS_REGISTRY)
+        );
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(IDiamondInit.IS_ZKSYNC_OS.selector),
             abi.encode(true)
         );
     }

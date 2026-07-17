@@ -2,102 +2,104 @@
 
 pragma solidity 0.8.28;
 
-import {CodehashPin} from "./ContractIdentifiers.sol";
-import {ICTMRelease} from "./ICTMRelease.sol";
-import {ICTMTransition, L2Deployment} from "./ICTMTransition.sol";
-import {TransitionConvergenceLib} from "./TransitionConvergenceLib.sol";
-import {UpgradeFacetSwap} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
+import {ICTMRelease} from "./ICTMRelease.sol";
+import {ICTMTransition, L2UpgradePlan} from "./ICTMTransition.sol";
+import {TransitionDeltaLib} from "./TransitionDeltaLib.sol";
+import {UpgradeFacetSwap} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
 import {SemVer} from "../../common/libraries/SemVer.sol";
 import {ProtocolVersionTooSmall} from "../ZkSyncUpgradeErrors.sol";
 import {
+    MalformedL2UpgradePlan,
     PatchMustReuseRelease,
     RegistryAlreadyInitialized,
     RegistryCodehashMismatch,
     RegistryUnknownKey,
     SameReleaseTransitionHasPayload,
+    TransitionDeadlineBeforeUpgrade,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
 
 /// @notice Storage-backed, write-once transition between two CTM releases.
+/// @dev The facet swaps and base-system hash changes are NOT part of the manifest: they are
+///      DERIVED from the `(fromRelease, newRelease)` pair at initialization (see
+///      {TransitionDeltaLib}) and stored. Transition and release state cannot diverge because
+///      the delta is a pure function of the two pinned releases.
+/// @dev What IS authored: the version edge, verifier, upgrade engine, schedule and the L2 plan —
+///      each either derived-checked or codehash-pinned inline. The L2 plan is reviewed-and-pinned
+///      data (L1 cannot verify L2 execution effects); the on-chain convergence guarantee covers
+///      L1 diamond routing and base-system hashes only.
 contract CTMTransition is ICTMTransition {
     // solhint-disable-next-line gas-struct-packing
     struct TransitionManifest {
-        address ctmProxy;
         uint256 oldProtocolVersion;
         uint256 newProtocolVersion;
         address verifier;
+        bytes32 verifierCodehash;
         address fromRelease;
         address newRelease;
-        address defaultUpgrade;
+        address upgradeEngine;
+        bytes32 upgradeEngineCodehash;
         uint256 oldProtocolVersionDeadline;
         uint256 upgradeTimestamp;
-        UpgradeFacetSwap[] facetTransitions;
-        L2Deployment[] l2Deployments;
-        address l2UpgradeDelegateTo;
-        bytes l2UpgradeDelegateCalldata;
-        uint256[] factoryDepHashes;
-        bytes32 bootloaderHash;
-        bytes32 defaultAccountHash;
-        bytes32 evmEmulatorHash;
-        CodehashPin[] codehashPins;
+        L2UpgradePlan l2Plan;
     }
 
     bool public initialized;
     bytes32 public manifestHash;
 
-    address internal transitionCtmProxy;
     uint256 internal transitionOldProtocolVersion;
     uint256 internal transitionNewProtocolVersion;
     address internal transitionVerifier;
+    bytes32 internal verifierCodehash;
     address internal transitionFromRelease;
     address internal transitionNewRelease;
-    address internal transitionDefaultUpgrade;
+    address internal transitionUpgradeEngine;
+    bytes32 internal upgradeEngineCodehash;
     uint256 internal transitionOldProtocolVersionDeadline;
     uint256 internal transitionUpgradeTimestamp;
-    UpgradeFacetSwap[] internal transitionFacets;
-    L2Deployment[] internal transitionL2Deployments;
-    address internal l2UpgradeDelegateTo;
-    bytes internal l2UpgradeDelegateCalldata;
-    uint256[] internal transitionFactoryDepHashes;
-    bytes32 internal bootloaderHash;
-    bytes32 internal defaultAccountHash;
-    bytes32 internal evmEmulatorHash;
-    CodehashPin[] internal codehashPins;
+    L2UpgradePlan internal plan;
+
+    // Derived at initialization from (fromRelease, newRelease) — never authored.
+    UpgradeFacetSwap[] internal derivedFacetSwaps;
+    bytes32 internal derivedBootloaderChange;
+    bytes32 internal derivedDefaultAccountChange;
+    bytes32 internal derivedEvmEmulatorChange;
 
     function initialize(TransitionManifest calldata _manifest) external {
         if (initialized) {
             revert RegistryAlreadyInitialized();
         }
+        // `fromRelease` is MANDATORY: every transition departs from a real, pinned release.
+        // Pre-registry migration (v31 -> v32) is one-time migration code in the legacy upgrade
+        // scripts — it installs `currentRelease` so that every later transition has a source.
         if (
-            _manifest.ctmProxy == address(0) ||
-            _manifest.newProtocolVersion == 0 ||
             _manifest.verifier == address(0) ||
+            _manifest.fromRelease == address(0) ||
             _manifest.newRelease == address(0) ||
-            _manifest.defaultUpgrade == address(0)
+            _manifest.upgradeEngine == address(0)
         ) {
             revert ZeroAddress();
         }
-
-        // A transition only ever moves the version forward. Chains enforce this individually at
-        // execution (`BaseZkSyncUpgrade._setNewProtocolVersion`); enforcing it here keeps the
-        // CTM from ever committing to a transition its chains would later reject.
+        // A transition only ever moves the version forward — the same rule chains enforce at
+        // execution and the CTM enforces in `setNewVersionUpgrade`.
         if (_manifest.newProtocolVersion <= _manifest.oldProtocolVersion) {
             revert ProtocolVersionTooSmall(_manifest.oldProtocolVersion, _manifest.newProtocolVersion);
         }
-
-        ICTMRelease(_manifest.newRelease).validate();
-        // `fromRelease` is `address(0)` ONLY for the migration hop from a pre-registry version
-        // (v31 -> v32): the executor matches it against a CTM whose `currentRelease` is still
-        // unset, and since every applied transition pins a non-zero release, a zero `fromRelease`
-        // can never match again afterwards. When set, it must itself be a valid release.
-        if (_manifest.fromRelease != address(0)) {
-            ICTMRelease(_manifest.fromRelease).validate();
+        // The old version must stay usable at least until chains are allowed to upgrade,
+        // otherwise the schedule disables the old protocol before the new one is reachable.
+        if (_manifest.oldProtocolVersionDeadline < _manifest.upgradeTimestamp) {
+            revert TransitionDeadlineBeforeUpgrade(_manifest.oldProtocolVersionDeadline, _manifest.upgradeTimestamp);
         }
+
+        _requirePin(_manifest.verifier, _manifest.verifierCodehash);
+        _requirePin(_manifest.upgradeEngine, _manifest.upgradeEngineCodehash);
+        ICTMRelease(_manifest.newRelease).validate();
+        ICTMRelease(_manifest.fromRelease).validate();
+
         // A SemVer patch bump changes no chain state by definition, so it must reuse the
-        // departing release — a patch targeting a different release would let new-chain genesis
-        // state diverge from what existing chains run.
+        // departing release.
         {
             (uint32 oldMajor, uint32 oldMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_manifest.oldProtocolVersion));
             (uint32 newMajor, uint32 newMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_manifest.newProtocolVersion));
@@ -105,70 +107,54 @@ contract CTMTransition is ICTMTransition {
                 revert PatchMustReuseRelease(_manifest.fromRelease, _manifest.newRelease);
             }
         }
-        // A same-release transition (patch or otherwise) is verifier/schedule-only: targeting
-        // the same release cannot imply ANY chain-state payload — no facet swaps, no L2
-        // deployments or delegate call, no factory deps, no base-system hash changes.
+        // L2 plan shape: committed data must be data the composed transaction actually executes.
+        // A delegate calldata without a target, or factory deps without any L2 side, would be
+        // silently dead payload — refuse it instead.
+        bool hasL2Side = _manifest.l2Plan.deployments.length != 0 || _manifest.l2Plan.delegateTo != address(0);
         if (
-            _manifest.fromRelease == _manifest.newRelease &&
-            (_manifest.facetTransitions.length != 0 ||
-                _manifest.l2Deployments.length != 0 ||
-                _manifest.l2UpgradeDelegateTo != address(0) ||
-                _manifest.l2UpgradeDelegateCalldata.length != 0 ||
-                _manifest.factoryDepHashes.length != 0 ||
-                _manifest.bootloaderHash != bytes32(0) ||
-                _manifest.defaultAccountHash != bytes32(0) ||
-                _manifest.evmEmulatorHash != bytes32(0))
+            (_manifest.l2Plan.delegateCalldata.length != 0 && _manifest.l2Plan.delegateTo == address(0)) ||
+            (_manifest.l2Plan.factoryDepHashes.length != 0 && !hasL2Side)
         ) {
+            revert MalformedL2UpgradePlan();
+        }
+        // A same-release transition is verifier/schedule-only: the derived facet/hash delta is
+        // empty by construction, and it must not carry an L2 payload either.
+        if (_manifest.fromRelease == _manifest.newRelease && hasL2Side) {
             revert SameReleaseTransitionHasPayload();
         }
-        // Convergence: prove this transition actually produces `newRelease`. Applying its facet
-        // swaps to `fromRelease`'s routing must reproduce `newRelease`'s routing, and its applied
-        // base-system hash changes must reconcile with `newRelease`'s pinned hashes. Without this,
-        // the transition path (existing chains) could drift from the release path (new chains).
-        // Skipped for the pre-registry migration hop (`fromRelease == 0`), see the library docs.
-        TransitionConvergenceLib.requireTransitionProducesRelease({
-            _fromRelease: _manifest.fromRelease,
-            _swaps: _manifest.facetTransitions,
-            _newRelease: _manifest.newRelease,
-            _bootloaderChange: _manifest.bootloaderHash,
-            _defaultAccountChange: _manifest.defaultAccountHash,
-            _evmEmulatorChange: _manifest.evmEmulatorHash
-        });
-        _validatePins(_manifest.codehashPins);
 
         initialized = true;
         manifestHash = keccak256(abi.encode(_manifest));
-        transitionCtmProxy = _manifest.ctmProxy;
         transitionOldProtocolVersion = _manifest.oldProtocolVersion;
         transitionNewProtocolVersion = _manifest.newProtocolVersion;
         transitionVerifier = _manifest.verifier;
+        verifierCodehash = _manifest.verifierCodehash;
         transitionFromRelease = _manifest.fromRelease;
         transitionNewRelease = _manifest.newRelease;
-        transitionDefaultUpgrade = _manifest.defaultUpgrade;
+        transitionUpgradeEngine = _manifest.upgradeEngine;
+        upgradeEngineCodehash = _manifest.upgradeEngineCodehash;
         transitionOldProtocolVersionDeadline = _manifest.oldProtocolVersionDeadline;
         transitionUpgradeTimestamp = _manifest.upgradeTimestamp;
-        uint256 length = _manifest.facetTransitions.length;
-        for (uint256 i = 0; i < length; ++i) {
-            transitionFacets.push(_manifest.facetTransitions[i]);
-        }
-        length = _manifest.l2Deployments.length;
-        for (uint256 i = 0; i < length; ++i) {
-            transitionL2Deployments.push(_manifest.l2Deployments[i]);
-        }
-        l2UpgradeDelegateTo = _manifest.l2UpgradeDelegateTo;
-        l2UpgradeDelegateCalldata = _manifest.l2UpgradeDelegateCalldata;
-        transitionFactoryDepHashes = _manifest.factoryDepHashes;
-        bootloaderHash = _manifest.bootloaderHash;
-        defaultAccountHash = _manifest.defaultAccountHash;
-        evmEmulatorHash = _manifest.evmEmulatorHash;
-        length = _manifest.codehashPins.length;
-        for (uint256 i = 0; i < length; ++i) {
-            codehashPins.push(_manifest.codehashPins[i]);
-        }
-    }
 
-    function ctmProxy() external view returns (address) {
-        return transitionCtmProxy;
+        uint256 length = _manifest.l2Plan.deployments.length;
+        for (uint256 i = 0; i < length; ++i) {
+            plan.deployments.push(_manifest.l2Plan.deployments[i]);
+        }
+        plan.delegateTo = _manifest.l2Plan.delegateTo;
+        plan.delegateCalldata = _manifest.l2Plan.delegateCalldata;
+        plan.factoryDepHashes = _manifest.l2Plan.factoryDepHashes;
+
+        // Derive the L1 delta from the release pair and freeze it.
+        UpgradeFacetSwap[] memory swaps = TransitionDeltaLib.deriveFacetSwaps(
+            ICTMRelease(_manifest.fromRelease),
+            ICTMRelease(_manifest.newRelease)
+        );
+        length = swaps.length;
+        for (uint256 i = 0; i < length; ++i) {
+            derivedFacetSwaps.push(swaps[i]);
+        }
+        (derivedBootloaderChange, derivedDefaultAccountChange, derivedEvmEmulatorChange) = TransitionDeltaLib
+            .deriveHashChanges(ICTMRelease(_manifest.fromRelease), ICTMRelease(_manifest.newRelease));
     }
 
     function oldProtocolVersion() external view returns (uint256) {
@@ -191,8 +177,8 @@ contract CTMTransition is ICTMTransition {
         return transitionNewRelease;
     }
 
-    function defaultUpgrade() external view returns (address) {
-        return transitionDefaultUpgrade;
+    function upgradeEngine() external view returns (address) {
+        return transitionUpgradeEngine;
     }
 
     function oldProtocolVersionDeadline() external view returns (uint256) {
@@ -204,23 +190,15 @@ contract CTMTransition is ICTMTransition {
     }
 
     function facetTransitions() external view returns (UpgradeFacetSwap[] memory) {
-        return transitionFacets;
-    }
-
-    function l2Deployments() external view returns (L2Deployment[] memory) {
-        return transitionL2Deployments;
-    }
-
-    function l2UpgradeDelegate() external view returns (address, bytes memory) {
-        return (l2UpgradeDelegateTo, l2UpgradeDelegateCalldata);
-    }
-
-    function factoryDepHashes() external view returns (uint256[] memory) {
-        return transitionFactoryDepHashes;
+        return derivedFacetSwaps;
     }
 
     function baseSystemContractHashChanges() external view returns (bytes32, bytes32, bytes32) {
-        return (bootloaderHash, defaultAccountHash, evmEmulatorHash);
+        return (derivedBootloaderChange, derivedDefaultAccountChange, derivedEvmEmulatorChange);
+    }
+
+    function l2Plan() external view returns (L2UpgradePlan memory) {
+        return plan;
     }
 
     function validate() external view {
@@ -228,50 +206,27 @@ contract CTMTransition is ICTMTransition {
             revert RegistryUnknownKey();
         }
         ICTMRelease(transitionNewRelease).validate();
-        // Both pinned edges must be live at execution, not only the target (zero = migration hop).
-        if (transitionFromRelease != address(0)) {
-            ICTMRelease(transitionFromRelease).validate();
-        }
-        _validateStoredPins();
+        ICTMRelease(transitionFromRelease).validate();
+        _requirePin(transitionVerifier, verifierCodehash);
+        _requirePin(transitionUpgradeEngine, upgradeEngineCodehash);
     }
 
     function verifyAll() external view returns (bool) {
-        if (!initialized || !ICTMRelease(transitionNewRelease).verifyAll()) {
+        if (!initialized) {
             return false;
         }
-        if (transitionFromRelease != address(0) && !ICTMRelease(transitionFromRelease).verifyAll()) {
+        if (!ICTMRelease(transitionNewRelease).verifyAll() || !ICTMRelease(transitionFromRelease).verifyAll()) {
             return false;
         }
-        uint256 length = codehashPins.length;
-        for (uint256 i = 0; i < length; ++i) {
-            if (codehashPins[i].target.codehash != codehashPins[i].expectedCodehash) {
-                return false;
-            }
-        }
-        return true;
+        return
+            transitionVerifier.codehash == verifierCodehash &&
+            transitionUpgradeEngine.codehash == upgradeEngineCodehash;
     }
 
-    function _validatePins(CodehashPin[] calldata _pins) private view {
-        uint256 length = _pins.length;
-        for (uint256 i = 0; i < length; ++i) {
-            bytes32 actualCodehash = _pins[i].target.codehash;
-            if (actualCodehash != _pins[i].expectedCodehash) {
-                revert RegistryCodehashMismatch(_pins[i].target, _pins[i].expectedCodehash, actualCodehash);
-            }
-        }
-    }
-
-    function _validateStoredPins() private view {
-        uint256 length = codehashPins.length;
-        for (uint256 i = 0; i < length; ++i) {
-            bytes32 actualCodehash = codehashPins[i].target.codehash;
-            if (actualCodehash != codehashPins[i].expectedCodehash) {
-                revert RegistryCodehashMismatch(
-                    codehashPins[i].target,
-                    codehashPins[i].expectedCodehash,
-                    actualCodehash
-                );
-            }
+    function _requirePin(address _target, bytes32 _expectedCodehash) private view {
+        bytes32 actualCodehash = _target.codehash;
+        if (actualCodehash != _expectedCodehash) {
+            revert RegistryCodehashMismatch(_target, _expectedCodehash, actualCodehash);
         }
     }
 }

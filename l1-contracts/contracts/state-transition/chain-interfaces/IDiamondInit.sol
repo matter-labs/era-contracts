@@ -3,6 +3,12 @@
 pragma solidity ^0.8.21;
 
 interface IDiamondInit {
+    /// @notice The VM flavour this initializer genesis-installs — the SINGLE source of VM
+    ///         identity for a release: the CTM validates it against its own flavour when the
+    ///         release is pinned, and the upgrade composer derives the L2 tx type from it.
+    // solhint-disable-next-line func-name-mixedcase
+    function IS_ZKSYNC_OS() external view returns (bool);
+
     /// @notice ZK chain diamond contract initialization.
     /// @dev The two arguments are the ONLY per-chain data a chain is created with; everything
     ///      else is read from the ChainTypeManager — which is simply `msg.sender`, since the CTM

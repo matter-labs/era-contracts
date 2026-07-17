@@ -26,7 +26,6 @@ import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHan
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TxStatus} from "../common/Messaging.sol";
-import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
 
 /// @title Chain Type Manager Base contract
 /// @author Matter Labs

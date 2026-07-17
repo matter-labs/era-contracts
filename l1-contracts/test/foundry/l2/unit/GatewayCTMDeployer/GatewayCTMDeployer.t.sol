@@ -46,6 +46,7 @@ import {ValidatorTimelock} from "contracts/state-transition/validators/Validator
 
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
+import {CTMReleaseFactory} from "contracts/upgrades/registry/CTMRegistryFactory.sol";
 import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
 
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
@@ -219,13 +220,11 @@ contract GatewayCTMDeployerTest is Test {
 
         GatewayCTMDeployerTester tester = new GatewayCTMDeployerTester();
 
-        // The bootstrap CTMRegistry is a direct deployment the CTM deployer initializes; it must
-        // exist before the CTM deployer runs.
-        address bootstrapRegistry = tester.deployDirect(directCalldata.bootstrapRegistryCalldata);
-        require(
-            bootstrapRegistry == calculatedContracts.stateTransition.currentRelease,
-            "bootstrap registry address mismatch"
-        );
+        // The bootstrap release FACTORY is the direct deployment; the release itself is deployed
+        // (and initialized) by the CTM deployer through it, landing at the factory's first
+        // CREATE — asserted against the helper's prediction after the deployers run.
+        address bootstrapReleaseFactory = tester.deployDirect(directCalldata.bootstrapReleaseFactoryCalldata);
+        require(bootstrapReleaseFactory.code.length != 0, "bootstrap release factory not deployed");
 
         // Deploy all deployers and collect results
         AllDeployerResults memory results = _deployAllDeployers(
@@ -328,10 +327,10 @@ contract GatewayCTMDeployerTest is Test {
             facets: calculatedContracts.stateTransition.facets,
             genesisUpgrade: calculatedContracts.stateTransition.genesisUpgrade,
             verifier: results.verifiersResult.verifier,
-            // This publish-run actually EXECUTES the deployer constructor, which initializes
-            // (write-once) whatever registry the config points at — so point it at a throwaway
-            // instance, keeping the real bootstrap registry uninitialized for the factory run.
-            bootstrapRegistry: address(new CTMRelease())
+            // This publish-run actually EXECUTES the deployer constructor, which deploys +
+            // initializes a release through whatever factory the config points at — so point it
+            // at a throwaway factory instance.
+            bootstrapReleaseFactory: address(new CTMReleaseFactory())
         });
         new GatewayCTMDeployerCTM(ctmConfig);
     }

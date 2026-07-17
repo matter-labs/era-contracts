@@ -11,6 +11,7 @@ import {TestCoreRegistry} from "./TestRegistries.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/EcosystemUpgradeExecutor.sol";
 import {L1EcosystemContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {ICoreRegistry} from "contracts/upgrades/registry/ICoreRegistry.sol";
+import {EcosystemImplMismatch} from "contracts/common/L1ContractErrors.sol";
 
 /// @dev Minimal implementation contracts for proxy-upgrade tests.
 contract DummyImplA {
@@ -46,27 +47,34 @@ contract EcosystemUpgradeExecutorTest is Test {
     uint256 internal constant NEW_VERSION = uint256(1) << 32; // 0.1.0
 
     function setUp() public {
-        ecosystemExecutor = new EcosystemUpgradeExecutor(ecosystemGovernor);
-
         implOld = new DummyImplA();
         implNew = new DummyImplB();
 
-        // The ecosystem executor owns the ecosystem ProxyAdmin, mirroring the production
-        // ownership chain (and nothing else — no CTM authority).
+        // The ecosystem executor is BOUND to (and owns) one immutable ecosystem ProxyAdmin,
+        // mirroring the production ownership chain (and nothing else — no CTM authority).
         proxyAdmin = new ProxyAdmin();
+        ecosystemExecutor = new EcosystemUpgradeExecutor(ecosystemGovernor, makeAddr("breakGlass"), proxyAdmin);
         proxyAdmin.transferOwnership(address(ecosystemExecutor));
         bridgehubProxy = new TransparentUpgradeableProxy(address(implOld), address(proxyAdmin), hex"");
         messageRootProxy = new TransparentUpgradeableProxy(address(implOld), address(proxyAdmin), hex"");
 
         coreRegistry = new TestCoreRegistry();
-        coreRegistry.setVersions(0, NEW_VERSION);
-        coreRegistry.setProxyAdmin(address(proxyAdmin));
-        // Bridgehub gets a new implementation; MessageRoot pins its live implementation (the
-        // module's live comparison must skip it); L1AssetRouter pins no new implementation at
-        // all (zero => skipped before any proxy interaction).
-        coreRegistry.addContract(L1EcosystemContract.L1Bridgehub, address(bridgehubProxy), address(implNew));
-        coreRegistry.addContract(L1EcosystemContract.L1MessageRoot, address(messageRootProxy), address(implOld));
-        coreRegistry.addContract(L1EcosystemContract.L1AssetRouter, address(0), address(0));
+        // Bridgehub is a full source-checked edge (old -> new); MessageRoot pins its live
+        // implementation (the executor's live comparison must skip it); L1AssetRouter pins no
+        // new implementation at all (zero => skipped before any proxy interaction).
+        coreRegistry.addContract(
+            L1EcosystemContract.L1Bridgehub,
+            address(bridgehubProxy),
+            address(implOld),
+            address(implNew)
+        );
+        coreRegistry.addContract(
+            L1EcosystemContract.L1MessageRoot,
+            address(messageRootProxy),
+            address(implOld),
+            address(implOld)
+        );
+        coreRegistry.addContract(L1EcosystemContract.L1AssetRouter, address(0), address(0), address(0));
     }
 
     function _applyL1Upgrade() internal {
@@ -107,6 +115,35 @@ contract EcosystemUpgradeExecutorTest is Test {
         // are separate, and the entrypoint is owner-gated (no arbitrary-delegatecall surface).
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(makeAddr("ctmGovernor"));
+        ecosystemExecutor.applyL1Upgrade(ICoreRegistry(address(coreRegistry)));
+    }
+
+    function test_revertWhen_replayingStaleRegistryWouldDowngrade() public {
+        _applyL1Upgrade();
+
+        // A LATER upgrade moves Bridgehub further (freshest impl), then the ORIGINAL registry is
+        // replayed: the proxy is at neither that registry's source nor its target, so the replay
+        // must revert instead of silently downgrading.
+        DummyImplA implNewer = new DummyImplA();
+        TestCoreRegistry laterRegistry = new TestCoreRegistry();
+        laterRegistry.addContract(
+            L1EcosystemContract.L1Bridgehub,
+            address(bridgehubProxy),
+            address(implNew),
+            address(implNewer)
+        );
+        vm.prank(ecosystemGovernor);
+        ecosystemExecutor.applyL1Upgrade(ICoreRegistry(address(laterRegistry)));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                EcosystemImplMismatch.selector,
+                address(bridgehubProxy),
+                address(implOld),
+                address(implNewer)
+            )
+        );
+        vm.prank(ecosystemGovernor);
         ecosystemExecutor.applyL1Upgrade(ICoreRegistry(address(coreRegistry)));
     }
 }

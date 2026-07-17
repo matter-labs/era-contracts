@@ -10,25 +10,32 @@ import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/CTMTransition.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/CTMUpgradeExecutor.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/CTMUpgradeComposer.sol";
-import {ICTMTransition, L2Deployment} from "contracts/upgrades/registry/ICTMTransition.sol";
+import {ICTMTransition, L2UpgradePlan} from "contracts/upgrades/registry/ICTMTransition.sol";
 import {GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
-import {L2EcosystemContract, CodehashPin} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {UpgradeFacetSwap} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {HashMismatch, TransitionReleaseMismatch} from "contracts/common/L1ContractErrors.sol";
+import {
+    HashMismatch,
+    TransitionReleaseMismatch,
+    Unauthorized,
+    UpgradeNotPermissionlessYet
+} from "contracts/common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
-/// @notice Exercises the CTM-scoped orchestrator against real write-once release and transition
+/// @notice Exercises the CTM-BOUND executor against real write-once release and transition
 ///         objects. Release data describes new-chain genesis; transition data describes the one
-///         movement from the fixture's current version to that release.
+///         movement from the fixture's current version to that release — its facet/hash delta is
+///         DERIVED from the release pair (a facet-neutral hop here; facet-changing hops are
+///         exercised end-to-end by RegistryDrivenUpgrade.t.sol).
 contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
     CTMUpgradeExecutor internal ctmExecutor;
     CTMRelease internal release;
     CTMTransition internal transition;
 
+    address internal breakGlass;
     uint256 internal newVersion;
     address internal chainAddress;
 
@@ -38,18 +45,14 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         _mockGetZKChainFromBridgehub(chainAddress);
         _mockMigrationPausedFromBridgehub();
 
-        ctmExecutor = new CTMUpgradeExecutor(governor);
+        breakGlass = makeAddr("breakGlass");
+        ctmExecutor = new CTMUpgradeExecutor(governor, breakGlass, IChainTypeManager(address(chainContractAddress)));
 
+        // Handover through the fixed entrypoint — no break-glass involved.
         vm.prank(governor);
         chainContractAddress.transferOwnership(address(ctmExecutor));
-        Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: address(chainContractAddress),
-            value: 0,
-            data: abi.encodeCall(chainContractAddress.acceptOwnership, ())
-        });
         vm.prank(governor);
-        ctmExecutor.forward(calls);
+        ctmExecutor.acceptCTMOwnership();
         assertEq(chainContractAddress.owner(), address(ctmExecutor));
 
         newVersion = SemVer.packSemVer(0, 1, 0);
@@ -59,31 +62,32 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
 
     function _deployRelease() internal returns (CTMRelease result) {
         // The release describes the complete chain state after the (facet-neutral) hop this
-        // suite drives: the fixture's full facet routing and the carried base-system hashes —
-        // transition initialization proves convergence against exactly these values.
+        // suite drives: the fixture's full facet routing (explicit selectors, inline pins) and
+        // the carried base-system hashes — the transition derives an EMPTY delta from it.
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](facetCuts.length);
         for (uint256 i = 0; i < facetCuts.length; ++i) {
             genesisFacets[i] = GenesisFacet({
                 facet: facetCuts[i].facet,
                 isFreezable: facetCuts[i].isFreezable,
-                selectors: facetCuts[i].selectors
+                selectors: facetCuts[i].selectors,
+                codehash: facetCuts[i].facet.codehash
             });
         }
         result = new CTMRelease();
         result.initialize(
             CTMRelease.ReleaseManifest({
-                isZKsyncOS: false,
-                diamondInit: makeAddr("newDiamondInit"),
+                diamondInit: diamondInit,
+                diamondInitCodehash: diamondInit.codehash,
                 genesisFacets: genesisFacets,
                 bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
                 defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
                 evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
                 fixedForceDeploymentsData: hex"f1f2",
                 genesisUpgrade: makeAddr("genesisUpgrade"),
+                genesisUpgradeCodehash: bytes32(0),
                 genesisBatchHash: bytes32(uint256(1)),
                 genesisBatchCommitment: bytes32(uint256(2)),
-                genesisIndexRepeatedStorageChanges: 54,
-                codehashPins: new CodehashPin[](0)
+                genesisIndexRepeatedStorageChanges: 54
             })
         );
     }
@@ -97,19 +101,12 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         address _fromRelease,
         uint256 _oldProtocolVersion
     ) internal returns (CTMTransition result) {
-        // A facet-neutral hop: the swap plan is empty, so convergence holds trivially against
-        // any departing release that carries the same (fixture) routing. Facet-changing swaps
-        // are exercised end-to-end by RegistryDrivenUpgrade.t.sol; this suite focuses on the
-        // executor's authority and edge asserts.
-        UpgradeFacetSwap[] memory facetTransitions = new UpgradeFacetSwap[](0);
-
-        L2Deployment[] memory deployments = new L2Deployment[](1);
-        deployments[0] = L2Deployment({
-            info: IComplexUpgrader.UniversalContractUpgradeInfo({
-                upgradeType: IComplexUpgrader.ContractUpgradeType.EraForceDeployment,
-                deployedBytecodeInfo: hex"aa01",
-                newAddress: makeAddr("l2Bridgehub")
-            })
+        IComplexUpgrader.UniversalContractUpgradeInfo[]
+            memory deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
+        deployments[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
+            upgradeType: IComplexUpgrader.ContractUpgradeType.EraForceDeployment,
+            deployedBytecodeInfo: hex"aa01",
+            newAddress: makeAddr("l2Bridgehub")
         });
         uint256[] memory factoryDeps = new uint256[](1);
         factoryDeps[0] = 1;
@@ -117,28 +114,24 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         result = new CTMTransition();
         result.initialize(
             CTMTransition.TransitionManifest({
-                ctmProxy: address(chainContractAddress),
                 oldProtocolVersion: _oldProtocolVersion,
                 newProtocolVersion: newVersion,
                 verifier: testnetVerifier,
+                verifierCodehash: testnetVerifier.codehash,
                 // The default transition departs from whatever release the fixture CTM was
                 // genesis'd with (its current release), as the executor's release-edge pin requires.
                 fromRelease: _fromRelease,
                 newRelease: address(release),
-                defaultUpgrade: makeAddr("defaultUpgrade"),
+                upgradeEngine: makeAddr("upgradeEngine"),
+                upgradeEngineCodehash: bytes32(0),
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: _upgradeTimestamp,
-                facetTransitions: facetTransitions,
-                l2Deployments: deployments,
-                l2UpgradeDelegateTo: makeAddr("l2UpgradeDelegate"),
-                l2UpgradeDelegateCalldata: hex"beef",
-                factoryDepHashes: factoryDeps,
-                // No hash changes: the target release pins the same carried values the
-                // departing release serves, so convergence reconciles by carry-over.
-                bootloaderHash: bytes32(0),
-                defaultAccountHash: bytes32(0),
-                evmEmulatorHash: bytes32(0),
-                codehashPins: new CodehashPin[](0)
+                l2Plan: L2UpgradePlan({
+                    deployments: deployments,
+                    delegateTo: makeAddr("l2UpgradeDelegate"),
+                    delegateCalldata: hex"beef",
+                    factoryDepHashes: factoryDeps
+                })
             })
         );
     }
@@ -146,7 +139,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
     function _expectedUpgradeCut(ICTMTransition _transition) internal view returns (Diamond.DiamondCutData memory) {
         return
             CTMUpgradeComposer.buildUpgradeCutData(
-                _transition.defaultUpgrade(),
+                _transition.upgradeEngine(),
                 abi.encodeCall(IDefaultUpgrade.upgradeFromTransition, (address(_transition)))
             );
     }
@@ -172,6 +165,25 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(makeAddr("stranger"));
         ctmExecutor.applyCTMUpgrade(ICTMTransition(address(transition)));
+    }
+
+    function test_revertWhen_forwardCalledByOwner() public {
+        // Break-glass is a SEPARATE authority: even the owner cannot forward raw calls.
+        Call[] memory calls = new Call[](0);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
+        vm.prank(governor);
+        ctmExecutor.forward(calls);
+    }
+
+    function test_forwardExecutesForBreakGlassGovernor() public {
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: address(chainContractAddress),
+            value: 0,
+            data: abi.encodeCall(IChainTypeManager.setPriorityTxMaxGasLimit, (chainId, 80_000_000))
+        });
+        vm.prank(breakGlass);
+        ctmExecutor.forward(calls);
     }
 
     function test_revertWhen_applyCTMUpgradeFromWrongRelease() public {
@@ -203,8 +215,8 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
 
     function test_upgradeChain_rejectsDifferentTransition() public {
         _applyCTMUpgrade();
-        // Same edges as the committed transition (so it is a valid non-patch transition), but a
-        // different timestamp -> a different composed cut -> the chain's upgradeCutHash check trips.
+        // Same edges as the committed transition, but a different timestamp -> a different
+        // composed cut -> the chain's upgradeCutHash check trips.
         CTMTransition differentTransition = _deployTransitionFrom(778, transition.fromRelease(), 0);
 
         vm.expectRevert(
@@ -216,5 +228,17 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         );
         vm.prank(governor);
         ctmExecutor.upgradeChain(ICTMTransition(address(differentTransition)), chainId);
+    }
+
+    function test_revertWhen_strangerUpgradesChainBeforeDeadline() public {
+        _applyCTMUpgrade();
+
+        // Owner-driven during the window; permissionless only once the old-version deadline
+        // (1000, set by the transition) has passed. The happy permissionless path is exercised
+        // in RegistryDrivenUpgrade.t.sol with a real upgrade engine.
+        vm.warp(999);
+        vm.expectRevert(abi.encodeWithSelector(UpgradeNotPermissionlessYet.selector, 1000));
+        vm.prank(makeAddr("stranger"));
+        ctmExecutor.upgradeChain(ICTMTransition(address(transition)), chainId);
     }
 }

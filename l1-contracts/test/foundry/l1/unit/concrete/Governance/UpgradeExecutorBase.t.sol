@@ -29,24 +29,26 @@ contract OwnedTarget {
 }
 
 /// @dev Minimal concrete executor: exercises the shared `UpgradeExecutorBase` (ownership +
-///      `forward` + `receive`) without any domain entrypoints.
+///      break-glass `forward` + `receive`) without any domain entrypoints.
 contract TestUpgradeExecutor is UpgradeExecutorBase {
-    constructor(address _initialOwner) UpgradeExecutorBase(_initialOwner) {}
+    constructor(address _initialOwner, address _breakGlass) UpgradeExecutorBase(_initialOwner, _breakGlass) {}
 }
 
-/// @notice Tests the shared authority base: ownership, the `forward` escape hatch (the only
-///         arbitrary authority — a plain owner-gated call, no delegatecall), and `receive`.
+/// @notice Tests the shared authority base: ownership, the SEPARATELY GOVERNED break-glass
+///         `forward` hatch (the only arbitrary authority — a plain call, no delegatecall),
+///         and `receive`.
 contract UpgradeExecutorBaseTest is Test {
     event CallForwarded(address indexed target, uint256 value, bytes data);
 
     address internal governance = makeAddr("governance");
+    address internal breakGlass = makeAddr("breakGlass");
     address internal stranger = makeAddr("stranger");
 
     TestUpgradeExecutor internal executor;
     OwnedTarget internal target;
 
     function setUp() public {
-        executor = new TestUpgradeExecutor(governance);
+        executor = new TestUpgradeExecutor(governance, breakGlass);
         target = new OwnedTarget(address(executor));
     }
 
@@ -54,18 +56,27 @@ contract UpgradeExecutorBaseTest is Test {
                               constructor
     //////////////////////////////////////////////////////////////*/
 
-    function test_constructorSetsOwner() public view {
+    function test_constructorSetsOwnerAndBreakGlass() public view {
         assertEq(executor.owner(), governance);
         assertEq(executor.pendingOwner(), address(0));
+        assertEq(executor.breakGlassGovernor(), breakGlass);
     }
 
     /*//////////////////////////////////////////////////////////////
                                forward
     //////////////////////////////////////////////////////////////*/
 
-    function test_revertWhen_forwardCalledByNonOwner() public {
-        vm.expectRevert("Ownable: caller is not the owner");
+    function test_revertWhen_forwardCalledByNonBreakGlass() public {
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, stranger));
         vm.prank(stranger);
+        executor.forward(new Call[](0));
+    }
+
+    function test_revertWhen_forwardCalledByOwner() public {
+        // Break-glass is a SEPARATE authority: the owner drives only the fixed domain
+        // entrypoints and cannot bypass their invariants through raw calls.
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governance));
+        vm.prank(governance);
         executor.forward(new Call[](0));
     }
 
@@ -81,7 +92,7 @@ contract UpgradeExecutorBaseTest is Test {
         vm.expectEmit(true, true, true, true, address(executor));
         emit CallForwarded(address(target), 0, calls[1].data);
 
-        vm.prank(governance);
+        vm.prank(breakGlass);
         executor.forward(calls);
 
         // Calls execute in order: the second write wins, the value of the first arrived.
@@ -99,7 +110,7 @@ contract UpgradeExecutorBaseTest is Test {
         calls[0] = Call({target: address(foreignTarget), value: 0, data: abi.encodeCall(OwnedTarget.setValue, (1))});
 
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(executor)));
-        vm.prank(governance);
+        vm.prank(breakGlass);
         executor.forward(calls);
     }
 
@@ -136,5 +147,34 @@ contract UpgradeExecutorBaseTest is Test {
 
         assertEq(executor.owner(), newGovernance);
         assertEq(executor.pendingOwner(), address(0));
+    }
+
+    function test_breakGlassHandoverIsTwoStep() public {
+        address council = makeAddr("securityCouncil");
+
+        vm.prank(breakGlass);
+        executor.transferBreakGlassGovernor(council);
+
+        // Nothing changes until acceptance; the pending holder cannot forward yet.
+        assertEq(executor.breakGlassGovernor(), breakGlass);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, council));
+        vm.prank(council);
+        executor.forward(new Call[](0));
+
+        vm.prank(council);
+        executor.acceptBreakGlassGovernor();
+        assertEq(executor.breakGlassGovernor(), council);
+        assertEq(executor.pendingBreakGlassGovernor(), address(0));
+
+        // The old holder lost the capability.
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, breakGlass));
+        vm.prank(breakGlass);
+        executor.forward(new Call[](0));
+    }
+
+    function test_revertWhen_breakGlassTransferByNonHolder() public {
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governance));
+        vm.prank(governance);
+        executor.transferBreakGlassGovernor(governance);
     }
 }

@@ -32,7 +32,7 @@ import {
     ProtocolVersionTooSmall,
     SettlementLayerUpgradeMustPrecedeChainUpgrade
 } from "./ZkSyncUpgradeErrors.sol";
-import {RegistryWrongCTM, TimeNotReached, TooManyFactoryDeps, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {TimeNotReached, TooManyFactoryDeps, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
@@ -384,14 +384,13 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     }
 
     /// @notice Executes one committed transition. The transition address is the sole source for
-    /// both facet changes and proposal composition.
+    /// both facet changes (DERIVED from its release pair) and proposal composition.
+    /// @dev CTM binding is commitment-based: this init only runs through a cut whose hash the
+    /// chain's own CTM committed (`upgradeCutHash`), and that commitment is written exclusively
+    /// by the CTM-bound executor — a transition cannot be aimed at a foreign CTM's chains.
     function upgradeFromTransition(address _transition) external returns (bytes32) {
         ICTMTransition transition = ICTMTransition(_transition);
         transition.validate();
-        address transitionCtm = transition.ctmProxy();
-        if (transitionCtm != s.chainTypeManager) {
-            revert RegistryWrongCTM(s.chainTypeManager, transitionCtm);
-        }
         _upgradeFacets(transition.facetTransitions());
         return upgrade(CTMUpgradeComposer.buildProposedUpgrade(transition));
     }

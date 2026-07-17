@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/ICTMRelease.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
@@ -34,7 +35,10 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
             abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisBatchCommitment, _genesisIndexRepeatedStorageChanges)
         );
         vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
-        vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.isZKsyncOS.selector), abi.encode(false));
+        // VM identity is single-sourced from the release's DiamondInit; the mocked registry's
+        // diamondInit placeholder is the registry itself, so mock the flag there.
+        vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.diamondInit.selector), abi.encode(_registry));
+        vm.mockCall(_registry, abi.encodeWithSelector(IDiamondInit.IS_ZKSYNC_OS.selector), abi.encode(false));
     }
 
     function test_SettingGenesisRegistry() public {

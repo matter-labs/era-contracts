@@ -143,11 +143,13 @@ struct GatewayCTMFinalConfig {
     address genesisUpgrade;
     /// @notice Address of the Verifier contract (from Verifiers deployer).
     address verifier;
-    /// @notice Address of the (deployed directly, uninitialized) bootstrap `CTMRegistry`; this
-    ///         deployer initializes it with the genesis manifest. Deployed directly rather than
-    ///         by this deployer because embedding its creation code here would push the
-    ///         deployer's initcode past the EIP-3860 cap.
-    address bootstrapRegistry;
+    /// @notice Address of the (deployed directly) `CTMReleaseFactory`; this deployer calls its
+    ///         atomic `deployOrGetRelease` with the genesis manifest, so the bootstrap release
+    ///         is deployed AND initialized within this deployer's transaction — no
+    ///         uninitialized, front-runnable instance ever exists on Gateway. The factory (not
+    ///         the release contract) is embedded directly because embedding the release's
+    ///         creation code here would push the deployer's initcode past the EIP-3860 cap.
+    address bootstrapReleaseFactory;
 }
 
 /// @notice Result from CTM deployer.

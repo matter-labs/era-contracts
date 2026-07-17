@@ -293,7 +293,8 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             facets[i] = GenesisFacet({
                 facet: _facetCuts[i].facet,
                 isFreezable: _facetCuts[i].isFreezable,
-                selectors: _facetCuts[i].selectors
+                selectors: _facetCuts[i].selectors,
+                codehash: _facetCuts[i].facet.codehash
             });
         }
         vm.mockCall(

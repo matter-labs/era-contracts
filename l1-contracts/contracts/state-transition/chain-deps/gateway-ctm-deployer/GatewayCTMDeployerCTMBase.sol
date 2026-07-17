@@ -9,7 +9,7 @@ import {ChainTypeManagerInitializeData, IChainTypeManager} from "../../IChainTyp
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
 
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
-import {CTMRelease} from "../../../upgrades/registry/CTMRelease.sol";
+import {CTMReleaseFactory} from "../../../upgrades/registry/CTMRegistryFactory.sol";
 import {GenesisManifestLib} from "../../../upgrades/registry/GenesisManifestLib.sol";
 import {GatewayCTMDeployerConfig, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "./GatewayCTMDeployer.sol";
 
@@ -87,17 +87,15 @@ abstract contract GatewayCTMDeployerCTMBase {
         GatewayCTMDeployerConfig memory baseConfig = _config.baseConfig;
         Facets memory facets = _config.facets;
 
-        // Gateway pins a genesis registry, exactly like L1: the committed cut carries NO facet
-        // addresses (empty `facetCuts`) and NO init payload (empty `initCalldata`), only a
-        // pointer to the registry. `DiamondInit` reads the registry (via the CTM's
-        // `genesisRegistry()`) and installs the facets itself, resolving each facet's selectors
-        // from its own `ISelfDescribingFacet.selectors()` bytecode; the base system contract
-        // hashes are read from the registry too. The registry contract is deployed DIRECTLY via
-        // CREATE2 (no constructor, so its address is independent of the pinned values — the
-        // off-chain helper can put it in the cut before any facet exists) and initialized HERE,
-        // in the same deployer flow governance approved.
-        address currentRelease = _initializeCurrentRelease({
-            _release: _config.bootstrapRegistry,
+        // Gateway pins a genesis release, exactly like L1: the committed cut carries NO facet
+        // addresses (empty `facetCuts`) and NO init payload (empty `initCalldata`). `DiamondInit`
+        // installs the release's explicit facet routing and reads the base system contract
+        // hashes from it. The release is deployed AND initialized ATOMICALLY here through the
+        // directly-deployed `CTMReleaseFactory` — the same deployer flow governance approved,
+        // with no uninitialized window (the factory's first CREATE, so its address is still
+        // predictable off-chain).
+        address currentRelease = _deployCurrentRelease({
+            _releaseFactory: _config.bootstrapReleaseFactory,
             _genesisUpgrade: _config.genesisUpgrade,
             _baseConfig: baseConfig,
             _facets: facets
@@ -131,26 +129,25 @@ abstract contract GatewayCTMDeployerCTMBase {
         );
     }
 
-    /// @notice Initializes the (directly deployed, still-uninitialized) bootstrap registry with
-    ///         the genesis manifest. The facet order and freezability mirror the diamond's
-    ///         installed set.
-    /// @param _release The pre-deployed bootstrap `CTMRelease` address.
+    /// @notice Deploys + initializes the bootstrap release with the genesis manifest, in ONE
+    ///         transaction, through the directly-deployed release factory. The facet order and
+    ///         freezability mirror the diamond's installed set.
+    /// @param _releaseFactory The pre-deployed `CTMReleaseFactory` address.
     /// @param _genesisUpgrade The L1 genesis upgrade contract new chains run at creation.
     /// @param _baseConfig The deployment config (base system hashes, genesis params).
     /// @param _facets The deployed diamond facet addresses.
-    /// @return release The initialized bootstrap release (echoed back).
+    /// @return release The initialized bootstrap release.
     /// @dev A release is version-INDEPENDENT: no protocol version or verifier is pinned here;
     ///      the CTM holds those (see `diamondInitData`).
-    function _initializeCurrentRelease(
-        address _release,
+    function _deployCurrentRelease(
+        address _releaseFactory,
         address _genesisUpgrade,
         GatewayCTMDeployerConfig memory _baseConfig,
         Facets memory _facets
     ) internal returns (address release) {
-        CTMRelease(_release).initialize(
+        release = CTMReleaseFactory(_releaseFactory).deployOrGetRelease(
             GenesisManifestLib.buildGenesisManifest(
                 GenesisManifestLib.GenesisConfig({
-                    isZKsyncOS: _baseConfig.isZKsyncOS,
                     facets: _facets,
                     bootloaderHash: _baseConfig.bootloaderHash,
                     defaultAccountHash: _baseConfig.defaultAccountHash,
@@ -163,7 +160,6 @@ abstract contract GatewayCTMDeployerCTMBase {
                 })
             )
         );
-        release = _release;
     }
 
     /// @notice Sets the previously deployed CTM inside the ServerNotifier and transfers ownership.

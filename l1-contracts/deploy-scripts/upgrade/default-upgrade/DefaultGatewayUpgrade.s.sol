@@ -458,10 +458,8 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
                 previousProtocolVersion,
                 deadline,
                 newProtocolVersion,
-                gatewayConfig.gatewayStateTransition.verifiers.verifier,
-                // Legacy pipeline: facet changes ride in the cut's own facetCuts, so no
-                // upgrade registry is pinned (BaseZkSyncUpgrade reads a zero address, no-op).
-                address(0)
+                // Legacy pipeline: facet changes ride in the cut's own facetCuts.
+                gatewayConfig.gatewayStateTransition.verifiers.verifier
             )
         );
 

@@ -217,7 +217,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         // Deploy Multicall3
         runGatewayL1L2Transaction(targetAddr, directCalldata.multicall3Calldata);
 
-        runGatewayL1L2Transaction(targetAddr, directCalldata.bootstrapRegistryCalldata);
+        runGatewayL1L2Transaction(targetAddr, directCalldata.bootstrapReleaseFactoryCalldata);
     }
 
     function runGatewayL1L2TransactionWithFactoryDeps(

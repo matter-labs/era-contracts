@@ -43,11 +43,6 @@ contract ZKsyncOSChainTypeManagerSharedTest is ChainTypeManagerTest {
             abi.encodeWithSelector(ICTMRelease.diamondInit.selector),
             abi.encode(diamondInit)
         );
-        vm.mockCall(
-            Utils.TEST_GENESIS_REGISTRY,
-            abi.encodeWithSelector(ICTMRelease.isZKsyncOS.selector),
-            abi.encode(true)
-        );
 
         ZKsyncOSChainTypeManager implementation = new ZKsyncOSChainTypeManager(
             address(bridgehub),

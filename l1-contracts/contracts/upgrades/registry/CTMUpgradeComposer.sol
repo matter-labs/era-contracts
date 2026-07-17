@@ -3,9 +3,10 @@
 pragma solidity 0.8.28;
 
 import {ICTMRelease} from "./ICTMRelease.sol";
-import {ICTMTransition, L2Deployment} from "./ICTMTransition.sol";
+import {ICTMTransition, L2UpgradePlan} from "./ICTMTransition.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
+import {IDiamondInit} from "../../state-transition/chain-interfaces/IDiamondInit.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 import {
@@ -48,32 +49,29 @@ library CTMUpgradeComposer {
             });
     }
 
-    /// @notice Builds the L1 -> L2 protocol upgrade transaction from the registry's pinned
-    ///         force-deployments, delegate target and factory dependencies.
+    /// @notice Builds the L1 -> L2 protocol upgrade transaction from the transition's L2 plan
+    ///         (force-deployments, delegate target + calldata, factory dependencies).
     /// @dev The transaction calls `ComplexUpgrader.forceDeployAndUpgradeUniversal` (the universal
     ///      Era + ZKsyncOS path). Its nonce is derived from the new protocol version, as enforced
-    ///      by `BaseZkSyncUpgrade._setL2SystemContractUpgrade`.
+    ///      by `BaseZkSyncUpgrade._setL2SystemContractUpgrade`. A transaction is composed whenever
+    ///      the plan has ANY L2 side — deployments or a delegate call; `L2ComplexUpgrader`
+    ///      supports an empty deployment list followed by a delegatecall, and transition
+    ///      initialization already rejects plans whose data could never execute.
     function buildL2UpgradeTx(ICTMTransition _transition) internal view returns (L2CanonicalTransaction memory) {
-        ICTMRelease release = ICTMRelease(_transition.newRelease());
         uint256 newVersion = _transition.newProtocolVersion();
-        L2Deployment[] memory deploymentRows = _transition.l2Deployments();
-        uint256 deployListLength = deploymentRows.length;
-        if (deployListLength == 0) {
+        L2UpgradePlan memory plan = _transition.l2Plan();
+        if (plan.deployments.length == 0 && plan.delegateTo == address(0)) {
             // The upgrade has no L2 side (patch upgrades, or L1-only minor upgrades): an all-zero
             // transaction (txType == 0) makes `BaseZkSyncUpgrade` skip the L2 protocol upgrade
             // transaction entirely.
             return ProposedUpgradeLib.emptyL2CanonicalTransaction();
         }
-        IComplexUpgrader.UniversalContractUpgradeInfo[]
-            memory deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](deployListLength);
-        for (uint256 i = 0; i < deployListLength; ++i) {
-            deployments[i] = deploymentRows[i].info;
-        }
 
-        (address delegateTo, bytes memory delegateCalldata) = _transition.l2UpgradeDelegate();
+        // VM identity is single-sourced from the target release's pinned DiamondInit.
+        bool isZKsyncOS = IDiamondInit(ICTMRelease(_transition.newRelease()).diamondInit()).IS_ZKSYNC_OS();
 
         L2CanonicalTransaction memory transaction = ProposedUpgradeLib.emptyL2CanonicalTransaction();
-        transaction.txType = release.isZKsyncOS() ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
+        transaction.txType = isZKsyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
         transaction.from = uint256(uint160(L2_FORCE_DEPLOYER_ADDR));
         transaction.to = uint256(uint160(L2_COMPLEX_UPGRADER_ADDR));
         transaction.gasLimit = PRIORITY_TX_MAX_GAS_LIMIT;
@@ -81,9 +79,9 @@ library CTMUpgradeComposer {
         transaction.nonce = protocolUpgradeNonce(newVersion);
         transaction.data = abi.encodeCall(
             IComplexUpgrader.forceDeployAndUpgradeUniversal,
-            (deployments, delegateTo, delegateCalldata)
+            (plan.deployments, plan.delegateTo, plan.delegateCalldata)
         );
-        transaction.factoryDeps = _transition.factoryDepHashes();
+        transaction.factoryDeps = plan.factoryDepHashes;
         return transaction;
     }
 

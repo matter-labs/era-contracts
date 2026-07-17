@@ -3,10 +3,10 @@
   "oldVersion": "0.31.0",
   "newVersion": "0.32.0",
   "core": {
-    "proxyAdmin": "0x0FA38b5c8cb180809E0C95E2EE923eC093123285",
     "contracts": {
       "L1MessageRoot": {
         "proxy": "0x2E4712F914db9d9433Bff8919792da5f720751E1",
+        "expectedOldImpl": "0x8d2bA203B05c096570d3580B8f069C0387E1C9E3",
         "implNew": "0x821f3361D454cc98b7555221A06Be563a7E2E0A6",
         "implNewCodehash": "0xa93e8cca40a75b15ddfa88e5fc0e3e2bbeef73b0fa35d58d277c41f33362a2e8"
       }
@@ -16,11 +16,11 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0xEc87EaAD65509F2Cd9a7517F714cBC971b999152",
+      "ctmProxy": "0xB91e046a4541438FcA69b8c428DC819F1de77fD3",
       "release": {
         "diamondInit": {
           "address": "0x413b1AfCa96a3df5A686d8BFBF93d30688a7f7D9",
-          "codehash": "0x0a50ff7c0deaf7955ae8736dde33ae10e2825fb91b7dae39f0742998ab29c53e"
+          "codehash": "0x2873d08747ac660ed9af1f84812e4df8a62db26abc9397154b8fe171e0a332d1"
         },
         "genesisFacets": [
           {
@@ -28,42 +28,145 @@
             "address": "0xddE78e6202518FF4936b5302cC2891ec180E8bFf",
             "codehash": "0xe8e31854a39f59042ebdf56730808bd85eabdff0c2a16bd8e67afbccb7425836",
             "isFreezable": false,
-            "selectors": []
+            "selectors": [
+              "0xf9afb97e",
+              "0x0e18b681",
+              "0x60eae0e7",
+              "0x5b898748",
+              "0x64bf8d66",
+              "0x23b31192",
+              "0xa9f6d941",
+              "0x27ae4c16",
+              "0x2878fe74",
+              "0xb4fcb577",
+              "0x6e762e98",
+              "0x1b48b94a",
+              "0x2765d079",
+              "0x4dd18bf5",
+              "0x1cc5d103",
+              "0xc5f1f1f5",
+              "0xbe6f11cf",
+              "0xe76db865",
+              "0x235d9eb5",
+              "0x21f603d7",
+              "0x4623c91d",
+              "0x054e80a3",
+              "0x17338945",
+              "0x3b6d7534"
+            ]
           },
           {
             "name": "GettersFacet",
             "address": "0xB06c856C8eaBd1d8321b687E188204C1018BC4E5",
             "codehash": "0x6eb8cfdb1a91fd28763e291cfe354d2bedbd8cbf7bbc01b1c30b60329c4f33f5",
             "isFreezable": false,
-            "selectors": []
+            "selectors": [
+              "0x1de72e34",
+              "0xea6c029c",
+              "0x44518012",
+              "0xcdffacc6",
+              "0x52ef6b2c",
+              "0xadfca15e",
+              "0x7a0ed627",
+              "0x6e9960c3",
+              "0x98acd7a6",
+              "0x960dcf24",
+              "0x3591c1a0",
+              "0x3408e470",
+              "0x946ebad1",
+              "0x5a590335",
+              "0x79823c9a",
+              "0xd86970d8",
+              "0xfd791f3c",
+              "0xdd655bb0",
+              "0xe5355c75",
+              "0x9d1b5a81",
+              "0x7b30c8da",
+              "0xd0468156",
+              "0x631f4bac",
+              "0x39d7d4aa",
+              "0xf4ff5e2e",
+              "0x0ec6b0b7",
+              "0x33ce93fe",
+              "0x06d49e5b",
+              "0xf5c1182c",
+              "0x6a27e8b5",
+              "0xdb1f0bf9",
+              "0xb8c2f66f",
+              "0xef3f0bae",
+              "0xfe26699e",
+              "0x39607382",
+              "0xaf6a2dcd",
+              "0xa1954fc5",
+              "0x22c5cf23",
+              "0x46657fe9",
+              "0x18e3a941",
+              "0xc81838b7",
+              "0x29b98c67",
+              "0xbd7c5412",
+              "0xc3bbd2d7",
+              "0xe81e0ba1",
+              "0x8708474e",
+              "0xfacd743b",
+              "0x9cd939e4",
+              "0xb22dd78e",
+              "0x74f4d30d"
+            ]
           },
           {
             "name": "ExecutorFacet",
             "address": "0xaB7B4c595d3cE8C85e16DA86630f2fc223B05057",
             "codehash": "0x44eafc4ee037764abdaf3c51b011ad76b212bed96171391036b5fa825b16674e",
             "isFreezable": true,
-            "selectors": []
+            "selectors": ["0xa085344d", "0x9271e450", "0x7ca4eff7"]
           },
           {
             "name": "MigratorFacet",
             "address": "0xAD523115cd35a8d4E60B3C0953E0E0ac10418309",
             "codehash": "0x0cb6b357a2495ebad9edbde1e8aed66c507e5c57376b1ca0c10fe06907be1305",
             "isFreezable": false,
-            "selectors": []
+            "selectors": [
+              "0x64b554ad",
+              "0x75ceffdf",
+              "0x3f42d5dd",
+              "0x42249f9f",
+              "0x3b064e40",
+              "0x41cf49bb",
+              "0x63d8882a"
+            ]
           },
           {
             "name": "CommitterFacet",
             "address": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C",
             "codehash": "0xd4c360992416dd82f883f8e7eb3fb160326825598f56f93ded25035e2b63bfd9",
             "isFreezable": true,
-            "selectors": []
+            "selectors": ["0x0db9eb87", "0x0b6db820"]
           },
           {
             "name": "MailboxFacet",
             "address": "0xC50818d1ffF2E42d42618E71E753A22cB5a98c9E",
             "codehash": "0x5d43a5a8143f4b0b62a6dfc9d35b6c2498180f06546cd1fcb0b6c33bcac2cf67",
             "isFreezable": true,
-            "selectors": []
+            "selectors": [
+              "0x12f43dab",
+              "0xddcc9eec",
+              "0x60da3e83",
+              "0x6c0960f9",
+              "0xb473318e",
+              "0x685143b9",
+              "0x042901c7",
+              "0xda24b3ee",
+              "0x7efda2ae",
+              "0x79cf6165",
+              "0x353d7128",
+              "0x263b7f8e",
+              "0xe896760d",
+              "0xe4948f43",
+              "0x18b7fc22",
+              "0xd07b90d1",
+              "0xeb672419",
+              "0xd0772551"
+            ]
           }
         ],
         "baseSystemContracts": {
@@ -73,7 +176,10 @@
         },
         "fixedForceDeploymentsData": "0xf1f2",
         "genesis": {
-          "genesisUpgrade": "0x66544Df3FA9274f822e240c6BCf3f5645365b73d",
+          "genesisUpgrade": {
+            "address": "0x30d4672BA4A979d52319fb36c5D51159a3CdAB2C",
+            "codehash": "0xf004df3e073b31911a1645b16456e2f6bf852338f3dfca64dbe8ade6a638c437"
+          },
           "batchHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
           "batchCommitment": "0x0000000000000000000000000000000000000000000000000000000000000001",
           "indexRepeatedStorageChanges": 54
@@ -85,56 +191,14 @@
           "address": "0x02df3a3F960393F5B349E40A599FEda91a7cc1A7",
           "codehash": "0x36e5d09f9182f3a618ad6c81d41b05a4a7b13f1c02004bd909729fec1c31e9e2"
         },
-        "defaultUpgrade": {
+        "upgradeEngine": {
           "address": "0x2b5A4e5493d4a54E717057B127cf0C000C876f9B",
-          "codehash": "0xe529115ec1c9a09198a808c18c215f1a45e9f7f641c68121ea296f52cb1bd9bd"
+          "codehash": "0x86dcfae7c24e6185655bf429e15c5b745bb145ad066beb2ac22075a45a8dcb94"
         },
         "oldProtocolVersionDeadline": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "upgradeTimestamp": 0,
-        "facetSwaps": [
-          {
-            "name": "AdminFacet",
-            "oldFacet": "0x1834220Ad2494f02d62E5A66a8ebBF92e47Caa09",
-            "newFacet": "0xddE78e6202518FF4936b5302cC2891ec180E8bFf",
-            "isFreezable": false,
-            "oldSelectors": [],
-            "newSelectors": []
-          },
-          {
-            "name": "GettersFacet",
-            "oldFacet": "0x08CAeBAD34Fc471ddA5DcE669a2EB1D3dEeab945",
-            "newFacet": "0xB06c856C8eaBd1d8321b687E188204C1018BC4E5",
-            "isFreezable": false,
-            "oldSelectors": [],
-            "newSelectors": []
-          },
-          {
-            "name": "ExecutorFacet",
-            "oldFacet": "0x860BD61Cd9206a6492b6947342c19E045C353510",
-            "newFacet": "0xaB7B4c595d3cE8C85e16DA86630f2fc223B05057",
-            "isFreezable": true,
-            "oldSelectors": [],
-            "newSelectors": []
-          },
-          {
-            "name": "MigratorFacet",
-            "oldFacet": "0x7c413EaaF1aC4fC0cD39D44c307b9A20985416F9",
-            "newFacet": "0xAD523115cd35a8d4E60B3C0953E0E0ac10418309",
-            "isFreezable": false,
-            "oldSelectors": [],
-            "newSelectors": []
-          },
-          {
-            "name": "CommitterFacet",
-            "oldFacet": "0x6BAA73ed8dbEA5Ef75193d005b91A0b5Bdf8aDD1",
-            "newFacet": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C",
-            "isFreezable": true,
-            "oldSelectors": [],
-            "newSelectors": []
-          }
-        ],
-        "l2": {
-          "forceDeployments": [
+        "l2Plan": {
+          "deployments": [
             {
               "upgradeType": "ZKsyncOSUnsafeForceDeployment",
               "deployedBytecodeInfo": "0xd8ceeb1af16ce49c7c068d8b9bcbca8a80f978611cb4ec0a1c08a95b0295dce30000000000000000000000000000000000000000000000000000000000000006d8ceeb1af16ce49c7c068d8b9bcbca8a80f978611cb4ec0a1c08a95b0295dce3",
@@ -143,12 +207,7 @@
           ],
           "delegateTo": "0x00000000000000000000000000000000000ab001",
           "delegateCalldata": "0x",
-          "factoryDepHashes": [],
-          "baseSystemContractChanges": {
-            "bootloader": "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "defaultAccount": "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "evmEmulator": "0x0000000000000000000000000000000000000000000000000000000000000000"
-          }
+          "factoryDepHashes": []
         }
       }
     }
