@@ -65,6 +65,11 @@ interface IChainAssetHandlerBase is IAssetHandler {
     /// @dev Denotes whether the migrations of chains is paused.
     function migrationPaused() external view returns (bool);
 
+    /// @notice Whether chain migrations between settlement layers are enabled in the current release.
+    /// @dev Chain migrations are explicitly disabled in the v32 release, in which all chains are
+    /// required to settle on L1. See `CHAIN_MIGRATIONS_ENABLED` in `Config.sol`.
+    function migrationsEnabled() external view returns (bool);
+
     /// @notice Pauses migration functions.
     function pauseMigration() external;
 
