@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {AtomicFlow, AtomicFinalityProof, ImtProof} from "contracts/atomic-interop/IAtomicInterop.sol";
-import {ManagerSettlementLayerNotL1} from "contracts/atomic-interop/AtomicInteropErrors.sol";
+import {ManagerAlreadyInitialized, ManagerSettlementLayerNotL1} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {Unauthorized} from "contracts/l2-system/zksync-os/errors/ZKOSContractErrors.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -43,6 +43,12 @@ contract AtomicFlowManagerInitTest is Test {
 
     function test_RevertWhen_initL2NotUpgrader() public {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
+        manager.initL2(L1_CHAIN_ID);
+    }
+
+    function test_RevertWhen_initL2Twice() public {
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        vm.expectRevert(ManagerAlreadyInitialized.selector);
         manager.initL2(L1_CHAIN_ID);
     }
 

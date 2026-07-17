@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Unauthorized} from "contracts/l2-system/zksync-os/errors/ZKOSContractErrors.sol";
 import {IL2InteropRootStorage} from "./IL2InteropRootStorage.sol";
-import {InteropRootAlreadyExists, SidesLengthNotOne} from "./InteropErrors.sol";
+import {InteropRootAlreadyExists, InteropRootTimestampIsZero, SidesLengthNotOne} from "./InteropErrors.sol";
 import {MessageRootIsZero} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {InteropRoot, StoredInteropRoot} from "contracts/common/Messaging.sol";
 
@@ -87,6 +87,11 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
         }
         if (sides[0] == bytes32(0)) {
             revert MessageRootIsZero();
+        }
+        // Keeps the {IL2InteropRootStorage} invariant structural: a zero stored timestamp only ever
+        // means "nothing imported at this key" (the atomic-interop timeout path relies on it).
+        if (timestamp == 0) {
+            revert InteropRootTimestampIsZero();
         }
 
         // Make sure that interopRoots for specified chainId and blockOrBatchNumber wasn't set already.

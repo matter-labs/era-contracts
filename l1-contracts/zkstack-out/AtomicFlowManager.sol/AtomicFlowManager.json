@@ -483,28 +483,17 @@
   },
   {
     "type": "error",
-    "name": "IMTProofInvalidChainBatchRootDepth",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "actual",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "IMTValueZero",
     "inputs": []
   },
   {
     "type": "error",
     "name": "InvalidProofLengthForFinalNode",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ManagerAlreadyInitialized",
     "inputs": []
   },
   {
@@ -748,6 +737,22 @@
         "name": "deadline",
         "type": "uint64",
         "internalType": "uint64"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ProofInvalidChainBatchRootDepth",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "actual",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },

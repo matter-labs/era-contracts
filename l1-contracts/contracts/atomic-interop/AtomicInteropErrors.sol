@@ -10,6 +10,8 @@ import {LegState} from "./IAtomicInterop.sol";
 error CommitmentTreeNotAppender(address sender);
 
 // ── AtomicFlowManager errors ─────────────────────────────────────────────────────────
+/// @dev `initL2` was called on an already-initialized manager.
+error ManagerAlreadyInitialized();
 /// @dev `append` is restricted to the canonical {InteropCenter}.
 error ManagerNotInteropCenter(address sender);
 /// @dev `requireFlowFinalized` is restricted to the canonical {InteropHandler}.
@@ -44,7 +46,7 @@ error ProofImtRootInclusionFailed(uint256 chainId, uint256 batchNumber, bytes32 
 /// @dev The leaf-to-chain-batch-root section of the proof is not exactly {ChainBatchRootTree.TREE_DEPTH}
 /// hops. Pinning the depth guarantees the claimed value is a real batch-boundary IMT root leaf; a longer
 /// path could descend into the IMT itself and pass off an internal node as "the root".
-error IMTProofInvalidChainBatchRootDepth(uint256 expected, uint256 actual);
+error ProofInvalidChainBatchRootDepth(uint256 expected, uint256 actual);
 /// @dev The proof is a single-level / commit-based (final-node) proof, which carries no
 /// settlement-layer batch reference. The atomic flow requires a multi-hop / SL-global proof so the
 /// deadline can be checked against `pd.settlementLayerBatchNumber`.

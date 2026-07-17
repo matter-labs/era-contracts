@@ -23,7 +23,7 @@ import {CommitmentTreeNotAppender} from "./AtomicInteropErrors.sol";
 /// `_imt.tree._nodes[_imt.tree._height][0]` directly: it loads `_height` from slot 0 and derives the
 /// `_nodes[_height][0]` slot from the `_nodes` base slot 2. An uninitialized tree reads as `bytes32(0)`.
 ///
-/// Deployed in L2 userspace (no constructor); the one-time seeding is done in `initialize`.
+/// Deployed as an L2 genesis predeploy (no constructor); the one-time seeding is done in `initL2`.
 contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
     using IndexedMerkleTree for IMT;
 
