@@ -608,12 +608,7 @@ library GatewayCTMDeployerHelper {
                 _isZKsyncOS,
                 config.testnetVerifier
             );
-            bytes memory creationArgs = DeployCTML1OrGateway.verifierCreationArgs(
-                _isZKsyncOS,
-                result.verifierFflonk,
-                result.verifierPlonk,
-                config.aliasedGovernanceAddress
-            );
+            bytes memory creationArgs = abi.encode(result.verifierFflonk, result.verifierPlonk);
             result.verifier = _deployInternalWithParams(
                 mainVerifierName,
                 mainVerifierFile,
@@ -825,7 +820,6 @@ library GatewayCTMDeployerHelper {
                 eip7702Checker: address(0),
                 verifierFflonk: _deployedContracts.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: _deployedContracts.stateTransition.verifiers.verifierPlonk,
-                verifierOwner: _config.aliasedGovernanceAddress,
                 permissionlessValidator: address(0)
             });
     }

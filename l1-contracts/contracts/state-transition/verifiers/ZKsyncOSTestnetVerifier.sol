@@ -16,9 +16,8 @@ contract ZKsyncOSTestnetVerifier is ZKsyncOSDualVerifier {
 
     constructor(
         IVerifierV2 _fflonkVerifier,
-        IVerifier _plonkVerifier,
-        address _initialOwner
-    ) ZKsyncOSDualVerifier(_fflonkVerifier, _plonkVerifier, _initialOwner) {
+        IVerifier _plonkVerifier
+    ) ZKsyncOSDualVerifier(_fflonkVerifier, _plonkVerifier) {
         assert(block.chainid != 1);
     }
 
