@@ -148,7 +148,7 @@
   },
   {
     "type": "function",
-    "name": "handleRevertInitiateBaseTokenBridgingOnL2",
+    "name": "handleRecoverBaseTokenBridgingOnL2",
     "inputs": [
       {
         "name": "_toChainId",

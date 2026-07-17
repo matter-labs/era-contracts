@@ -42,7 +42,7 @@ contract DummyL2AssetTracker {
 
     function handleInitiateBaseTokenBridgingOnL2(uint256, uint256) external {}
 
-    function handleRevertInitiateBaseTokenBridgingOnL2(uint256, uint256) external {}
+    function handleRecoverBaseTokenBridgingOnL2(uint256, uint256) external {}
 
     function handleFinalizeBaseTokenBridgingOnL2(uint256, uint256) external {
         if (recordTarget != address(0)) {

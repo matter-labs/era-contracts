@@ -38,6 +38,8 @@ import {MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/
 
 import {
     NonAtomicSendUnsupported,
+    AtomicBundleCallCarriesValue,
+    AtomicBundleToL1NotSupported,
     AttributeAlreadySet,
     AttributeViolatesRestriction,
     CannotInitiateInteropOnL1,
@@ -216,6 +218,9 @@ contract InteropCenter is
         bytes[] calldata attributes
     ) external payable whenNotPaused nonReentrant returns (bytes32 sendId) {
         (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(recipient);
+        // The recipient must carry a concrete address; a chain-only ERC-7930 encoding parses to address(0),
+        // which would collect value up-front yet never be executable and has no refund path.
+        require(recipientAddress != address(0), ZeroAddress());
 
         _ensureL2ToL2(recipientChainId);
 
@@ -224,10 +229,13 @@ contract InteropCenter is
             AttributeParsingRestrictions.CallAndBundleAttributes
         );
 
-        // If the unbundler was not set for a call, we set the unbundler to be equal to the original sender, so that it's
-        // still possible to unbundle the bundle containing the call. If the original sender is the contract, it'll still
-        // be able to unbundle the bundle either via direct call to `unbundleBundle`, or via `sendMessage` to `L2InteropHandler`,
-        // with specific payload. Refer to `L2InteropHandler` for details.
+        // If the unbundler was not set for a call, we set the unbundler to be equal to the original sender
+        // on this (source) chain, so that it's still possible to unbundle the bundle containing the call:
+        // the sender unbundles via an interop message to the destination `L2InteropHandler` (its
+        // `receiveMessage` rescue path — refer to `L2InteropHandler` for details). The default deliberately
+        // pins the source chain rather than using a chain-wildcard (chainId 0): a wildcard would let a
+        // same-address contract on another chain (e.g. a malicious clone) unbundle. Senders that want to
+        // unbundle directly on the destination can pass an explicit `unbundlerAddress` attribute.
         if (bundleAttributes.unbundlerAddress.length == 0) {
             bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
         }
@@ -404,8 +412,9 @@ contract InteropCenter is
     ///      accounting path that is not supported.
     /// @dev The remaining destination-dependent requirements are enforced in `_sendBundle` once the call
     ///      attributes have been parsed: an L1-destined call must be an indirect, zero-value call to the L2
-    ///      AssetRouter (a withdrawal), and non-L1 destinations are checked against the Bridgehub registry
-    ///      (`DestinationChainNotRegistered`).
+    ///      AssetRouter (a withdrawal), an L1-destined bundle must not be atomic
+    ///      (`AtomicBundleToL1NotSupported`), and non-L1 destinations are checked against the Bridgehub
+    ///      registry (`DestinationChainNotRegistered`).
     /// @param _destinationChainId Destination chain ID.
     /// @param _callCount Number of calls in the bundle.
     function _ensureValidDestination(uint256 _destinationChainId, uint256 _callCount) internal view {
@@ -561,6 +570,27 @@ contract InteropCenter is
         bytes[][] memory _originalCallAttributes,
         AtomicSend memory _atomicSend
     ) internal returns (bytes32 bundleHash) {
+        // Reject invalid atomicity/destination combinations up front, before any stateful bundle assembly
+        // or value burn (both `sendMessage` and `sendBundle` funnel through here):
+        //  - An atomic bundle can never target L1: it is not published as an L2->L1 message (its commit
+        //    value goes to the IMT instead) and L1 has no atomic execution, so its only possible outcome
+        //    would be a timeout refund — but L2->L1 withdrawals must never be revertable (their
+        //    `totalWithdrawalsToL1` accounting is consumed once during the L1->GW migration and must stay
+        //    append-only, see {L2AssetTracker}).
+        //  - A non-atomic bundle is only ever an L2->L1 withdrawal; public (L1-published) L2->L2 interop
+        //    has been removed, so a non-atomic L2->L2 send has no delivery path and is rejected here rather
+        //    than after burning value in the bundle assembly below.
+        if (_atomicSend.isAtomic) {
+            require(_destinationChainId != L1_CHAIN_ID, AtomicBundleToL1NotSupported());
+        } else {
+            require(_destinationChainId == L1_CHAIN_ID, NonAtomicSendUnsupported());
+        }
+
+        // Note: no gateway-mode requirement here — interop bundles may be sent by chains settling
+        // directly on L1. Cross-layer correctness is enforced by the message-inclusion proof on the
+        // receiving side (or, for atomic bundles, by the per-leg IMT inclusion proofs), not by any
+        // gateway-mode or settlement-layer check here.
+
         // Ensure the sender has not already used this salt. Since `interopBundleSalt` (and thus the bundle hash) is
         // derived from `msg.sender` and the user-provided salt, enforcing a unique salt per sender guarantees that
         // every emitted bundle has a unique hash.
@@ -726,8 +756,9 @@ contract InteropCenter is
     /// - **L2->L2 interop (atomic):** the bundle's commit value is appended to the interop IMT via the
     ///   {AtomicFlowManager} and is NOT published to L1 — the burn already happened through the normal
     ///   `initiateIndirectCall` path, and the destination executes it via {L2InteropHandler.executeBundle}.
-    ///   Native-`value` legs are allowed; they are refunded on timeout via {AtomicFlowManager._recoverBundle}.
-    ///   Requires the `atomicBundle` attribute — a non-atomic L2->L2 send reverts {NonAtomicSendUnsupported}.
+    ///   Native-`value` legs are rejected ({_validateAtomicBundle}): the base-token holder path that funds
+    ///   them cannot be reversed on timeout, so the value would be locked. Atomicity/destination validity
+    ///   (atomic must be L2, non-atomic must be L1) is already enforced up front in {_sendBundle}.
     /// - **L2->L1 withdrawal:** the `BUNDLE_IDENTIFIER`-prefixed bundle is published to L1 via the L2->L1
     ///   messenger and finalized there by {L1InteropHandler}, which proves the message inclusion. Withdrawals
     ///   are not atomic (they inherently target L1), so they carry no `atomicBundle` attribute.
@@ -751,15 +782,33 @@ contract InteropCenter is
         }
 
         // L2->L2 interop: atomic-only. Public (L1-published) L2->L2 interop has been removed.
-        if (!_atomicSend.isAtomic) {
-            revert NonAtomicSendUnsupported();
-        }
+        // (Non-atomic L2->L2 and atomic L2->L1 are already rejected in `_sendBundle`, before any burn.)
+        _validateAtomicBundle(_bundle);
         IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
             _flowId: _atomicSend.flowId,
             _bundleHash: bundleHash,
             _deadline: _atomicSend.deadline,
             _lowNullifierIndex: _atomicSend.lowNullifierIndex
         });
+    }
+
+    /// @notice Rejects atomic-bundle calls that carry native base-token `value`. Such a leg is bridged via
+    /// the base-token holder, which {IAtomicRecoverable.recoverAtomicCall} cannot reverse, so it would lock
+    /// on timeout with no way to return the funds. Everything else is allowed: an atomic bundle may mix
+    /// recoverable fund calls (asset-router deposits) with calls that move no funds (e.g. flipping a flag),
+    /// and timeout recovery is best-effort (see {AtomicFlowManager._recoverBundle}). Refund safety for a
+    /// fund-moving leg is therefore the flow author's responsibility; only native-`value` legs — which no
+    /// one can reverse — are blocked here.
+    /// @dev `pure`, since it inspects only the bundle's own calls. Every atomic send passes through
+    /// {_dispatchBundle}, so this covers all atomic bundles regardless of entry path.
+    function _validateAtomicBundle(InteropBundle memory _bundle) internal pure {
+        uint256 callsLength = _bundle.calls.length;
+        for (uint256 i = 0; i < callsLength; ++i) {
+            InteropCall memory currentCall = _bundle.calls[i];
+            if (currentCall.value != 0) {
+                revert AtomicBundleCallCarriesValue(i, currentCall.value);
+            }
+        }
     }
 
     /// @notice Emits ERC-7786 MessageSent events for each call in a bundle.

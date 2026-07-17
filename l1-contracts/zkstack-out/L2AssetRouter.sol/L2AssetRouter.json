@@ -784,6 +784,11 @@
   },
   {
     "type": "error",
+    "name": "RecoverToL1NotSupported",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "Reentrancy",
     "inputs": []
   },

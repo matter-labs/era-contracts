@@ -65,6 +65,11 @@ uint256 constant PUBLIC_INPUT_SHIFT = 32;
 /// @dev Maximum number of linked-list leaves checked when correcting a stale indexed Merkle tree low leaf.
 uint256 constant MAX_LOW_INDEX_SEARCH_ATTEMPTS = 5;
 
+/// @dev Padding value for empty/unused leaves in an {IndexedMerkleTree}. Deliberately NOT a valid
+/// `hashLeaf(IMTLeaf)` output, so an unused padded index can't be presented as a `{0,0,0}` low leaf to forge
+/// a non-inclusion proof. The off-chain imt-engine must use the same value.
+bytes32 constant IMT_EMPTY_LEAF_HASH = keccak256("zkSync:IndexedMerkleTree:emptyLeaf");
+
 /// @dev The maximum number of L2 gas that a user can request for an L2 transaction
 uint256 constant MAX_GAS_PER_TRANSACTION = 80_000_000;
 

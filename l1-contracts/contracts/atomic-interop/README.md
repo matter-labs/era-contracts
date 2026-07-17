@@ -50,14 +50,16 @@ bundle, so `bundleHash` does not depend on `flowId` (which would be circular).
    committed by the deadline must be present in `N`, so this cannot succeed for an on-time or
    already-finalized leg. The proof is bound to the missing leg's source chain and settlement layer. It
    marks this chain's `Committed` legs `Revertable`; `claimRefund` then reverses each burn by asking the
-   call's target to recover itself via `IAtomicRecoverable.recoverAtomicCall` (implemented by
-   `L2AssetRouter`), re-minting to the original depositor. Recovery is **best-effort**: each target
-   reverses the calls it recognises (an asset-router deposit re-mints the burned funds) and returns
-   `false` for calls that move no funds and have nothing to reverse (e.g. flipping a flag); the refund
-   succeeds as long as at least one call recovered. Consequently the protocol does not guarantee full
-   refundability of an arbitrary bundle — making a fund-moving leg recoverable (an asset-router deposit)
-   is the flow author's responsibility. Atomic sends reject only native-`value` legs (`InteropCenter`),
-   since those can never be reversed.
+   call's local sender (`InteropCall.from`) to recover itself via `IAtomicRecoverable.recoverAtomicCall`
+   (implemented by `L2AssetRouter`, whose burn path produced the call), re-minting to the original
+   depositor. Recovery is **best-effort**: only burn-produced (asset-router) calls are recovered; direct
+   calls move no funds at send, have nothing to reverse, and are skipped (their `from` — possibly an
+   EOA — need not implement the interface); the refund succeeds as long as at least one call recovered.
+   Consequently the protocol does not guarantee full refundability of an arbitrary bundle — making a
+   fund-moving leg recoverable (an asset-router deposit) is the flow author's responsibility. Atomic
+   sends reject only native-`value` legs (which can never be reversed) and L1 destinations (an atomic
+   bundle is never published to L1 and could only ever time out — but L2->L1 withdrawals must never be
+   revertable, see `L2AssetTracker`).
 
 Leg state machine (`LegState`): `Unset -> Committed` (send) `-> Revertable -> Reverted` (timeout path).
 

@@ -41,7 +41,7 @@
   },
   {
     "type": "function",
-    "name": "refundBridgedBaseToken",
+    "name": "recoverBaseToken",
     "inputs": [
       {
         "name": "_to",
@@ -108,19 +108,13 @@
   },
   {
     "type": "event",
-    "name": "BaseTokenRefundedInterop",
+    "name": "BaseTokenRecovered",
     "inputs": [
       {
         "name": "to",
         "type": "address",
         "indexed": true,
         "internalType": "address"
-      },
-      {
-        "name": "toChainId",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
       },
       {
         "name": "amount",
