@@ -123,6 +123,11 @@ uint256 constant L1_TX_NATIVE_PER_GAS = 100_000_000;
 /// the cap above Ethereum's limit but must not set it below.
 uint64 constant ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT = uint64(1) << 24;
 
+/// @dev The upper bound for the ZKsync OS single-transaction gas limit (EIP-7825), matching the
+/// ZKsync OS block gas limit. It equals `type(uint64).max / 256` (`2^56 - 1`), the maximum gas
+/// representable once ZKsync OS scales gas into its `uint64` ergs counter (256 ergs/gas).
+uint64 constant ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT = type(uint64).max / 256;
+
 /// @dev The mask which should be applied to the packed batch and L2 block timestamp in order
 /// to obtain the L2 block timestamp. Applying this mask is equivalent to calculating modulo 2**128
 uint256 constant PACKED_L2_BLOCK_TIMESTAMP_MASK = 0xffffffffffffffffffffffffffffffff;

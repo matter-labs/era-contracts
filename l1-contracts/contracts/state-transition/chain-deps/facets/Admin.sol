@@ -14,7 +14,8 @@ import {
     PRICE_UPDATE_INTERVAL,
     PRIORITY_EXPIRATION,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT
+    ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
+    ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT
 } from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
@@ -52,6 +53,7 @@ import {
     UpgradeTimestampNotReached,
     NotCompatibleWithPriorityMode,
     ZKsyncOSChainConfigUpdateWithUnverifiedBatches,
+    ZKsyncOSMaxTxGasLimitTooHigh,
     ZKsyncOSMaxTxGasLimitTooLow
 } from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
@@ -177,6 +179,10 @@ contract AdminFacet is ZKChainBase, IAdmin {
         // The cap may only be raised above Ethereum's EIP-7825 single-tx gas limit, never below.
         if (_newMaxTxGasLimit < ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT) {
             revert ZKsyncOSMaxTxGasLimitTooLow();
+        }
+        // The cap must not exceed the ZKsync OS block gas limit: a higher value will halt the block production.
+        if (_newMaxTxGasLimit > ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT) {
+            revert ZKsyncOSMaxTxGasLimitTooHigh();
         }
         _enforceNoUnverifiedBatchesForChainConfigUpdate();
 
