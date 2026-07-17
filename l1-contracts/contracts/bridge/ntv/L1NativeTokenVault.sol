@@ -24,13 +24,13 @@ import {TxStatus} from "../../common/Messaging.sol";
 
 import {
     AssetIdAlreadyRegistered,
+    InsufficientChainBalance,
     NoFundsTransferred,
     OriginChainIdNotFound,
     WithdrawFailed,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
 import {OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
-import {InsufficientChainBalance} from "../asset-tracker/AssetTrackerErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

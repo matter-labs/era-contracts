@@ -59,7 +59,8 @@ bundle, so `bundleHash` does not depend on `flowId` (which would be circular).
    fund-moving leg recoverable (an asset-router deposit) is the flow author's responsibility. Atomic
    sends reject only native-`value` legs (which can never be reversed) and L1 destinations (an atomic
    bundle is never published to L1 and could only ever time out — but L2->L1 withdrawals must never be
-   revertable, see `L2AssetTracker`).
+   revertable: their `totalWithdrawalsToL1` bookkeeping in `L2NativeTokenVault`/`BaseTokenHolder`
+   must stay append-only).
 
 Leg state machine (`LegState`): `Unset -> Committed` (send) `-> Revertable -> Reverted` (timeout path).
 

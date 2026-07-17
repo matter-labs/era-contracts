@@ -476,7 +476,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     /// @dev Precompute blake2s hashes for all unique bytecodes in a single FFI call.
     function _precomputeBlakeHashes() private {
-        CoreContract[10] memory contracts = [
+        CoreContract[9] memory contracts = [
             CoreContract.L2Bridgehub,
             CoreContract.L2AssetRouter,
             CoreContract.L2NativeTokenVault,
@@ -485,7 +485,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             CoreContract.L2ChainAssetHandler,
             CoreContract.InteropCenter,
             CoreContract.L2InteropHandler,
-            CoreContract.L2AssetTracker,
             CoreContract.BaseTokenHolder
         ];
 
@@ -494,8 +493,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             : string.concat(vm.projectRoot(), "/script-out/tmp-blake-batch.txt");
         vm.writeFile(tmpFile, "");
 
-        bytes[10] memory bytecodes;
-        for (uint256 i = 0; i < 10; i++) {
+        bytes[9] memory bytecodes;
+        for (uint256 i = 0; i < 9; i++) {
             (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, contracts[i]);
             bytecodes[i] = BytecodeUtils.readDeployedBytecodeL1(true, fileName, contractName);
             vm.writeLine(tmpFile, vm.toString(bytecodes[i]));
@@ -516,9 +515,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         input[3] = tmpFile;
         bytes memory result = vm.ffi(input);
 
-        uint256 totalBytecodes = 11;
+        uint256 totalBytecodes = 10;
         require(result.length == totalBytecodes * 32, "Unexpected batch blake2s result length");
-        for (uint256 i = 0; i < 10; i++) {
+        for (uint256 i = 0; i < 9; i++) {
             bytes32 hash;
             assembly {
                 hash := mload(add(result, add(32, mul(i, 32))))
@@ -528,7 +527,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         {
             bytes32 proxyHash;
             assembly {
-                proxyHash := mload(add(result, add(32, mul(10, 32))))
+                proxyHash := mload(add(result, add(32, mul(9, 32))))
             }
             _blakeCache[keccak256(proxyBytecode)] = proxyHash;
         }
@@ -596,7 +595,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             chainAssetHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.L2ChainAssetHandler),
             interopCenterBytecodeInfo: _getBytecodeInfo(CoreContract.InteropCenter),
             interopHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.L2InteropHandler),
-            assetTrackerBytecodeInfo: _getBytecodeInfo(CoreContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(

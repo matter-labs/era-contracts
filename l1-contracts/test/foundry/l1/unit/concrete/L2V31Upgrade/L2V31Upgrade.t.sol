@@ -5,7 +5,6 @@ import {Test} from "forge-std/Test.sol";
 
 import {
     L2_ASSET_ROUTER_ADDR,
-    L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BRIDGEHUB_ADDR,
@@ -79,10 +78,6 @@ contract MockV31UpgradeNativeTokenVault {
         return address(0);
     }
 
-    function registerBaseTokenIfNeeded() external {
-        // No-op for mock
-    }
-
     function updateL2(
         uint256 _l1ChainId,
         address /* _aliasedOwner */,
@@ -110,46 +105,11 @@ contract MockV31UpgradeNativeTokenVault {
     }
 }
 
-/// @dev Mock AssetTracker that records initL2 and registerBaseTokenDuringUpgrade calls.
-contract MockV31UpgradeAssetTracker {
-    uint256 public L1_CHAIN_ID;
-    bytes32 public BASE_TOKEN_ASSET_ID;
-
-    uint256 public registerCalls;
-    bytes32 public lastRegisteredAssetId;
-    uint256 public initCalls;
-
-    function initL2(uint256 _l1ChainId, bytes32 _baseTokenAssetId, bool /* _backfillBaseTokenSupply */) external {
-        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
-
-        L1_CHAIN_ID = _l1ChainId;
-        BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
-        initCalls++;
-    }
-
-    function registerBaseTokenDuringUpgrade() external {
-        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
-
-        registerCalls++;
-        lastRegisteredAssetId = BASE_TOKEN_ASSET_ID;
-    }
-}
-
-/// @dev Mock BaseToken that records initL2 calls and checks ordering vs AssetTracker.
+/// @dev Mock BaseToken that records initL2 and backfill-enable calls.
 contract MockV31UpgradeBaseToken {
-    address private immutable _assetTracker;
-
     uint256 public initCalls;
     uint256 public lastInitializedL1ChainId;
-    bool public sawRegisteredBaseToken;
-
-    constructor(address _assetTrackerAddr) {
-        _assetTracker = _assetTrackerAddr;
-    }
+    uint256 public enableBackfillCalls;
 
     function initL2(uint256 _l1ChainId) external {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -158,7 +118,14 @@ contract MockV31UpgradeBaseToken {
 
         initCalls++;
         lastInitializedL1ChainId = _l1ChainId;
-        sawRegisteredBaseToken = MockV31UpgradeAssetTracker(_assetTracker).registerCalls() > 0;
+    }
+
+    function enableBaseTokenTotalSupplyBackfill() external {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+
+        enableBackfillCalls++;
     }
 }
 
@@ -231,8 +198,7 @@ contract L2V31UpgradeUnitTest is Test {
                 )
             )
         );
-        _etchCode(L2_ASSET_TRACKER_ADDR, address(new MockV31UpgradeAssetTracker()));
-        _etchCode(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(new MockV31UpgradeBaseToken(L2_ASSET_TRACKER_ADDR)));
+        _etchCode(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(new MockV31UpgradeBaseToken()));
 
         testUpgrade = new TestL2V31Upgrade();
     }
@@ -247,24 +213,17 @@ contract L2V31UpgradeUnitTest is Test {
             abi.encodeCall(IL2V31Upgrade.upgrade, (false, CTM_DEPLOYER, fixedData, additionalData))
         );
 
-        // Verify AssetTracker: initL2 + registerBaseTokenDuringUpgrade
-        MockV31UpgradeAssetTracker assetTracker = MockV31UpgradeAssetTracker(L2_ASSET_TRACKER_ADDR);
-        assertEq(assetTracker.initCalls(), 1, "asset tracker should be initialized exactly once");
-        assertEq(assetTracker.L1_CHAIN_ID(), L1_CHAIN_ID, "asset tracker L1 chain id mismatch");
-        assertEq(assetTracker.registerCalls(), 1, "base token should be registered exactly once");
-        assertEq(assetTracker.lastRegisteredAssetId(), BASE_TOKEN_ASSET_ID, "registered asset id mismatch");
-
         // Verify NTV: updateL2 called with correct data
         MockV31UpgradeNativeTokenVault nativeTokenVault = MockV31UpgradeNativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
         assertEq(nativeTokenVault.updateCalls(), 1, "native token vault should be updated exactly once");
         assertEq(nativeTokenVault.lastOriginChainId(), BASE_TOKEN_ORIGIN_CHAIN_ID, "origin chain id mismatch");
         assertEq(nativeTokenVault.BASE_TOKEN_ORIGIN_TOKEN(), BASE_TOKEN_ORIGIN_ADDRESS, "origin token mismatch");
 
-        // Verify BaseToken: initL2 called, and it ran AFTER registerBaseTokenDuringUpgrade
+        // Verify BaseToken: initL2 called; the ZKOS-only supply backfill is never enabled on Era
         MockV31UpgradeBaseToken baseToken = MockV31UpgradeBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
         assertEq(baseToken.initCalls(), 1, "base token should be initialized exactly once");
         assertEq(baseToken.lastInitializedL1ChainId(), L1_CHAIN_ID, "base token L1 chain id mismatch");
-        assertTrue(baseToken.sawRegisteredBaseToken(), "base token should be initialized after registration");
+        assertEq(baseToken.enableBackfillCalls(), 0, "the supply backfill must not be enabled on Era chains");
     }
 
     function _buildFixedForceDeploymentsData() private pure returns (FixedForceDeploymentsData memory) {
@@ -285,7 +244,6 @@ contract L2V31UpgradeUnitTest is Test {
                 chainAssetHandlerBytecodeInfo: dummyBytecodeInfo,
                 interopCenterBytecodeInfo: dummyBytecodeInfo,
                 interopHandlerBytecodeInfo: dummyBytecodeInfo,
-                assetTrackerBytecodeInfo: dummyBytecodeInfo,
                 beaconDeployerInfo: dummyBytecodeInfo,
                 baseTokenHolderBytecodeInfo: dummyBytecodeInfo,
                 l2SharedBridgeLegacyImpl: address(0),

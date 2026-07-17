@@ -68,6 +68,14 @@ pub const L2_INTEROP_HANDLER_ADDR: Address = Address(FixedBytes::<20>(hex_litera
     "000000000000000000000000000000000001000e"
 )));
 
+/// RESERVED ADDRESS — formerly the L2AssetTracker. The L2AssetTracker contract was removed after the
+/// withdrawal unification (its write-only bookkeeping lives in the L2NativeTokenVault and the
+/// BaseTokenHolder now), but existing chains keep whatever bytecode/storage they already have at this
+/// address (the upgrade does not purge it; on such chains the retained tracker also holds the
+/// bookkeeping recorded before the removal). To keep new chains' genesis state aligned with upgraded
+/// chains, an empty stub (`dev-contracts/L2AssetTracker.sol`) is deployed here. Treat this address as
+/// reserved: do NOT deploy anything else at it, and do NOT rely on its storage reflecting any real
+/// state — the stub has none.
 pub const L2_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "000000000000000000000000000000000001000f"
 )));
@@ -191,6 +199,9 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 24] = [
         L2_CHAIN_ASSET_HANDLER_ADDR,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2ChainAssetHandler")),
     ),
+    // Empty stub at the reserved L2AssetTracker address; see L2_ASSET_TRACKER_ADDR. Kept so new
+    // chains' genesis matches upgraded chains, which retain their old bytecode at this address. The
+    // stub holds no state — do not rely on its storage.
     (
         L2_ASSET_TRACKER_ADDR,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2AssetTracker")),

@@ -6,9 +6,9 @@ import {Test} from "forge-std/Test.sol";
 
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 import {IBaseTokenHolder} from "contracts/l2-system/interfaces/IBaseTokenHolder.sol";
-import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
+import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {
-    L2_ASSET_TRACKER_ADDR,
     L2_BOOTLOADER_ADDRESS,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_CENTER_ADDR,
@@ -16,31 +16,63 @@ import {
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {DummyL2AssetTracker} from "contracts/dev-contracts/test/DummyL2AssetTracker.sol";
+import {
+    BaseTokenNativeToThisChain,
+    L1ChainIdNotSet,
+    RecoverToL1NotSupported,
+    Unauthorized
+} from "contracts/common/L1ContractErrors.sol";
 
 /// @title BaseTokenHolderTest
 /// @notice Unit tests for BaseTokenHolder contract
+/// @dev The NativeTokenVault (the holder's source for `L1_CHAIN_ID` / base-token origin) is not
+/// deployed in this isolated unit environment, so its reads are mocked in `setUp`.
 contract BaseTokenHolderTest is Test {
     BaseTokenHolder internal baseTokenHolder;
 
     address internal recipient;
     uint256 internal constant INITIAL_BALANCE = 100 ether;
+    uint256 internal constant L1_CHAIN_ID = 9;
     uint256 internal constant ERA_CHAIN_ID = 271;
-    uint256 internal constant GATEWAY_CHAIN_ID = 505;
+    uint256 internal constant OTHER_L2_CHAIN_ID = 505;
+    bytes32 internal constant BASE_TOKEN_ASSET_ID = keccak256("base_token_asset_id");
 
     function setUp() public {
         baseTokenHolder = new BaseTokenHolder();
         recipient = makeAddr("recipient");
 
-        // Deploy dummy L2AssetTracker at system address (replaces per-test vm.mockCall)
-        vm.etch(
-            L2_ASSET_TRACKER_ADDR,
-            address(new DummyL2AssetTracker(address(0), DummyL2AssetTracker.RecordMode.None)).code
-        );
+        // The holder reads the L1 chain id and the base token's origin from the NativeTokenVault;
+        // mock them since the vault is out of scope for these unit tests.
+        _mockNtvReads(L1_CHAIN_ID, L1_CHAIN_ID);
 
         // Fund the BaseTokenHolder contract
         vm.deal(address(baseTokenHolder), INITIAL_BALANCE);
+    }
+
+    function _mockNtvReads(uint256 _l1ChainId, uint256 _baseTokenOriginChainId) internal {
+        vm.mockCall(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            abi.encodeWithSelector(IL2NativeTokenVault.L1_CHAIN_ID.selector),
+            abi.encode(_l1ChainId)
+        );
+        vm.mockCall(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            abi.encodeWithSelector(IL2NativeTokenVault.BASE_TOKEN_ASSET_ID.selector),
+            abi.encode(BASE_TOKEN_ASSET_ID)
+        );
+        vm.mockCall(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            abi.encodeCall(INativeTokenVaultBase.originChainId, (BASE_TOKEN_ASSET_ID)),
+            abi.encode(_baseTokenOriginChainId)
+        );
+    }
+
+    function _readWithdrawals() internal view returns (uint256 withdrawals) {
+        (withdrawals, ) = baseTokenHolder.baseTokenInteropInfo();
+    }
+
+    function _readDeposits() internal view returns (uint256 deposits) {
+        (, deposits) = baseTokenHolder.baseTokenInteropInfo();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -73,16 +105,33 @@ contract BaseTokenHolderTest is Test {
         assertEq(address(baseTokenHolder).balance, holderBalanceBefore, "Holder balance should not change");
     }
 
-    function test_give_notifiesAssetTracker() public {
+    /// @notice An L1-originated give is recorded in the deposit counter.
+    function test_give_fromL1RecordsDeposit() public {
         uint256 amount = 1 ether;
-
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(IL2AssetTracker.handleFinalizeBaseTokenBridgingOnL2.selector, ERA_CHAIN_ID, amount)
-        );
+        uint256 depositsBefore = _readDeposits();
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
-        baseTokenHolder.give(recipient, amount, ERA_CHAIN_ID);
+        baseTokenHolder.give(recipient, amount, L1_CHAIN_ID);
+
+        assertEq(_readDeposits() - depositsBefore, amount, "totalSuccessfulDepositsFromL1 should increase");
+        assertEq(_readWithdrawals(), 0, "withdrawal counter must not move");
+    }
+
+    /// @notice A give originating from another L2 does not touch the L1 deposit counter.
+    function test_give_fromOtherL2DoesNotRecordDeposit() public {
+        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        baseTokenHolder.give(recipient, 1 ether, ERA_CHAIN_ID);
+
+        assertEq(_readDeposits(), 0, "totalSuccessfulDepositsFromL1 must not move for L2->L2 gives");
+    }
+
+    /// @notice Recording with a non-zero amount is impossible before the L1 chain id is initialized.
+    function test_give_revertWhenL1ChainIdNotSet() public {
+        _mockNtvReads(0, L1_CHAIN_ID);
+
+        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        vm.expectRevert(L1ChainIdNotSet.selector);
+        baseTokenHolder.give(recipient, 1 ether, ERA_CHAIN_ID);
     }
 
     function test_give_revertWhenRecipientRejectsETH() public {
@@ -124,9 +173,10 @@ contract BaseTokenHolderTest is Test {
         uint256 recipientBalanceBefore = recipient.balance;
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
-        baseTokenHolder.give(recipient, amount, ERA_CHAIN_ID);
+        baseTokenHolder.give(recipient, amount, L1_CHAIN_ID);
 
         assertEq(recipient.balance, recipientBalanceBefore + amount, "Recipient should receive correct amount");
+        assertEq(_readDeposits(), amount, "deposit counter should match the given amount");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -218,11 +268,6 @@ contract BaseTokenHolderTest is Test {
 
         uint256 holderBalanceBefore = address(baseTokenHolder).balance;
 
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2.selector, _toChainId, amount)
-        );
-
         vm.expectEmit(true, false, false, true, address(baseTokenHolder));
         emit IBaseTokenHolder.BaseTokenBurntInterop(_caller, _toChainId, amount);
 
@@ -238,10 +283,34 @@ contract BaseTokenHolderTest is Test {
 
     function test_burnAndStartBridging_successFromInteropCenter() public {
         _burnAndStartBridging_success(L2_INTEROP_CENTER_ADDR, ERA_CHAIN_ID);
+        assertEq(_readWithdrawals(), 0, "an L2->L2 burn must not count as an L1 withdrawal");
     }
 
     function test_burnAndStartBridging_successFromNativeTokenVault() public {
         _burnAndStartBridging_success(L2_NATIVE_TOKEN_VAULT_ADDR, ERA_CHAIN_ID);
+        assertEq(_readWithdrawals(), 0, "an L2->L2 burn must not count as an L1 withdrawal");
+    }
+
+    /// @notice An L1-destined burn is recorded in the withdrawal counter.
+    function test_burnAndStartBridging_toL1RecordsWithdrawal() public {
+        uint256 amount = 2 ether;
+        vm.deal(L2_INTEROP_CENTER_ADDR, amount);
+
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        baseTokenHolder.burnAndStartBridging{value: amount}(L1_CHAIN_ID);
+
+        assertEq(_readWithdrawals(), amount, "totalWithdrawalsToL1 should increase for an L1-destined burn");
+        assertEq(_readDeposits(), 0, "deposit counter must not move");
+    }
+
+    /// @notice Recording with a non-zero value is impossible before the L1 chain id is initialized.
+    function test_burnAndStartBridging_revertWhenL1ChainIdNotSet() public {
+        _mockNtvReads(0, L1_CHAIN_ID);
+        vm.deal(L2_INTEROP_CENTER_ADDR, 1 ether);
+
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        vm.expectRevert(L1ChainIdNotSet.selector);
+        baseTokenHolder.burnAndStartBridging{value: 1 ether}(ERA_CHAIN_ID);
     }
 
     /// @dev L2BaseToken is no longer a bridging caller: base-token withdrawals go through the InteropCenter,
@@ -289,55 +358,61 @@ contract BaseTokenHolderTest is Test {
         baseTokenHolder.burnAndStartBridging{value: 1 ether}(ERA_CHAIN_ID);
     }
 
-    function test_burnAndStartBridging_callsAssetTrackerWithCorrectParams() public {
-        uint256 amount = 2 ether;
+    /*//////////////////////////////////////////////////////////////
+                    recordBaseTokenDeposit() TESTS
+    //////////////////////////////////////////////////////////////*/
 
-        vm.deal(L2_INTEROP_CENTER_ADDR, amount);
+    /// @notice The Era bootloader mint path: L2BaseToken records the inbound deposit here.
+    function test_recordBaseTokenDeposit_fromL1RecordsDeposit() public {
+        uint256 amount = 4 ether;
 
-        // Verify exact parameters passed to asset tracker
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(
-                IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2.selector,
-                GATEWAY_CHAIN_ID,
-                amount
-            )
-        );
+        vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        baseTokenHolder.recordBaseTokenDeposit(L1_CHAIN_ID, amount);
 
-        vm.prank(L2_INTEROP_CENTER_ADDR);
-        baseTokenHolder.burnAndStartBridging{value: amount}(GATEWAY_CHAIN_ID);
+        assertEq(_readDeposits(), amount, "totalSuccessfulDepositsFromL1 should increase");
+    }
+
+    function test_recordBaseTokenDeposit_zeroAmountIsNoop() public {
+        vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        baseTokenHolder.recordBaseTokenDeposit(L1_CHAIN_ID, 0);
+
+        assertEq(_readDeposits(), 0, "zero amounts are not recorded");
+    }
+
+    function test_recordBaseTokenDeposit_fromOtherL2DoesNotRecordDeposit() public {
+        vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        baseTokenHolder.recordBaseTokenDeposit(ERA_CHAIN_ID, 1 ether);
+
+        assertEq(_readDeposits(), 0, "non-L1 sources are not recorded");
+    }
+
+    function test_recordBaseTokenDeposit_revertUnauthorized() public {
+        address unauthorizedCaller = makeAddr("unauthorizedCaller");
+
+        vm.prank(unauthorizedCaller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, unauthorizedCaller));
+        baseTokenHolder.recordBaseTokenDeposit(L1_CHAIN_ID, 1 ether);
     }
 
     /*//////////////////////////////////////////////////////////////
                     ORDERING INVARIANT TESTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Verifies that handleFinalizeBaseTokenBridgingOnL2 is called BEFORE the ETH transfer.
-    /// @dev This ordering is critical: _needToForceSetAssetMigrationOnL2 reads totalSupply() to decide
-    /// whether to force-set the migration number. If the transfer happens first, totalSupply changes
-    /// before the tracker is notified, giving wrong results. The same ordering must be enforced in zksync-os.
-    function test_give_callsAssetTrackerBeforeTransfer() public {
+    /// @notice Verifies that the deposit is recorded BEFORE the ETH transfer: a recipient's receive
+    /// hook must already observe the updated counter, so the bookkeeping cannot be manipulated by
+    /// re-entering during the transfer.
+    function test_give_recordsBeforeTransfer() public {
         uint256 amount = 1 ether;
-        uint256 recipientBalanceBefore = recipient.balance;
-
-        // Deploy DummyL2AssetTracker in recording mode — snapshots recipient balance when called
-        DummyL2AssetTracker recorder = new DummyL2AssetTracker(recipient, DummyL2AssetTracker.RecordMode.Balance);
-        vm.etch(L2_ASSET_TRACKER_ADDR, address(recorder).code);
+        CounterObservingRecipient observer = new CounterObservingRecipient(baseTokenHolder);
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
-        baseTokenHolder.give(recipient, amount, ERA_CHAIN_ID);
+        baseTokenHolder.give(address(observer), amount, L1_CHAIN_ID);
 
-        // Read recorded values from the etched address
-        DummyL2AssetTracker etched = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
-        assertTrue(etched.wasCalled(), "Asset tracker should have been called");
         assertEq(
-            etched.recordedValue(),
-            recipientBalanceBefore,
-            "handleFinalizeBaseTokenBridgingOnL2 must be called BEFORE ETH transfer"
+            observer.observedDeposits(),
+            amount,
+            "the deposit counter must already be updated when the ETH transfer executes"
         );
-
-        // Confirm transfer actually happened
-        assertEq(recipient.balance, recipientBalanceBefore + amount, "Recipient should have received ETH after call");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -355,6 +430,10 @@ contract BaseTokenHolderTest is Test {
         vm.deal(L2_INTEROP_CENTER_ADDR, 1);
         vm.prank(L2_INTEROP_CENTER_ADDR);
         holder.burnAndStartBridging{value: 1}(ERA_CHAIN_ID);
+
+        // Verify the counters are readable through the interface
+        (uint256 withdrawals, uint256 deposits) = holder.baseTokenInteropInfo();
+        (withdrawals, deposits);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -362,9 +441,9 @@ contract BaseTokenHolderTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Regression tests for base-token bridge-out recovery: a failed/timed-out base-token bridge-out is
-    /// refunded via recoverBaseToken, which returns the escrowed value to the depositor (and reverses the
-    /// burn-side accounting). Without this path the escrowed base token would be permanently stranded on an
-    /// atomic timeout.
+    /// refunded via recoverBaseToken, which returns the escrowed value to the depositor. The forward direction
+    /// records nothing for an L2->L2 bridge-out of the never-native base token, so there is no accounting to
+    /// reverse. Without this path the escrowed base token would be permanently stranded on an atomic timeout.
     function test_recoverBaseToken_successFromNativeTokenVault() public {
         uint256 amount = 3 ether;
         uint256 recipientBalanceBefore = recipient.balance;
@@ -374,35 +453,38 @@ contract BaseTokenHolderTest is Test {
         emit IBaseTokenHolder.BaseTokenRecovered(recipient, amount);
 
         vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
-        baseTokenHolder.recoverBaseToken(recipient, amount, GATEWAY_CHAIN_ID);
+        baseTokenHolder.recoverBaseToken(recipient, amount, OTHER_L2_CHAIN_ID);
 
         assertEq(recipient.balance, recipientBalanceBefore + amount, "recipient must receive the recovered value");
         assertEq(address(baseTokenHolder).balance, holderBalanceBefore - amount, "holder balance must decrease");
+        (uint256 withdrawals, uint256 deposits) = baseTokenHolder.baseTokenInteropInfo();
+        assertEq(withdrawals, 0, "no withdrawal accounting may move on recovery");
+        assertEq(deposits, 0, "no deposit accounting may move on recovery");
     }
 
-    /// @dev The tracker hook asserts the bridge-out is recoverable (L2->L2 only); the holder must stay
-    /// wired to it so those invariants gate every recovery.
-    function test_recoverBaseToken_notifiesAssetTracker() public {
-        uint256 amount = 1 ether;
+    /// @notice Recovering an L1-destined bridge-out is unreachable (the InteropCenter rejects L1-destined
+    /// atomic bundles at send) and must revert: `totalWithdrawalsToL1` must stay append-only.
+    function test_recoverBaseToken_revertWhenToL1() public {
+        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
+        vm.expectRevert(RecoverToL1NotSupported.selector);
+        baseTokenHolder.recoverBaseToken(recipient, 1 ether, L1_CHAIN_ID);
+    }
 
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(
-                IL2AssetTracker.handleRecoverBaseTokenBridgingOnL2.selector,
-                GATEWAY_CHAIN_ID,
-                amount
-            )
-        );
+    /// @notice The base token can never originate from this chain; the recovery asserts the invariant
+    /// instead of silently skipping accounting that was never recorded.
+    function test_recoverBaseToken_revertWhenBaseTokenNativeToThisChain() public {
+        _mockNtvReads(L1_CHAIN_ID, block.chainid);
 
         vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
-        baseTokenHolder.recoverBaseToken(recipient, amount, GATEWAY_CHAIN_ID);
+        vm.expectRevert(BaseTokenNativeToThisChain.selector);
+        baseTokenHolder.recoverBaseToken(recipient, 1 ether, OTHER_L2_CHAIN_ID);
     }
 
     function test_recoverBaseToken_zeroAmountIsNoop() public {
         uint256 holderBalanceBefore = address(baseTokenHolder).balance;
 
         vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
-        baseTokenHolder.recoverBaseToken(recipient, 0, GATEWAY_CHAIN_ID);
+        baseTokenHolder.recoverBaseToken(recipient, 0, OTHER_L2_CHAIN_ID);
 
         assertEq(recipient.balance, 0);
         assertEq(address(baseTokenHolder).balance, holderBalanceBefore);
@@ -413,13 +495,13 @@ contract BaseTokenHolderTest is Test {
     function test_recoverBaseToken_revertFromInteropCenter() public {
         vm.prank(L2_INTEROP_CENTER_ADDR);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, L2_INTEROP_CENTER_ADDR));
-        baseTokenHolder.recoverBaseToken(recipient, 1 ether, GATEWAY_CHAIN_ID);
+        baseTokenHolder.recoverBaseToken(recipient, 1 ether, OTHER_L2_CHAIN_ID);
     }
 
     function test_recoverBaseToken_revertFromInteropHandler() public {
         vm.prank(L2_INTEROP_HANDLER_ADDR);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, L2_INTEROP_HANDLER_ADDR));
-        baseTokenHolder.recoverBaseToken(recipient, 1 ether, GATEWAY_CHAIN_ID);
+        baseTokenHolder.recoverBaseToken(recipient, 1 ether, OTHER_L2_CHAIN_ID);
     }
 }
 
@@ -427,5 +509,19 @@ contract BaseTokenHolderTest is Test {
 contract RejectingETHContract {
     receive() external payable {
         revert("Rejected");
+    }
+}
+
+/// @notice Helper recipient that snapshots the holder's deposit counter inside its receive hook.
+contract CounterObservingRecipient {
+    BaseTokenHolder public immutable HOLDER;
+    uint256 public observedDeposits;
+
+    constructor(BaseTokenHolder _holder) {
+        HOLDER = _holder;
+    }
+
+    receive() external payable {
+        (, observedDeposits) = HOLDER.baseTokenInteropInfo();
     }
 }

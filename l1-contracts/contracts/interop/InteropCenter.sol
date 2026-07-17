@@ -449,7 +449,7 @@ contract InteropCenter is
             if (_totalBurnedCallsValue > 0) {
                 // TODO(EVM-1395): unify same-base-token interop funding with the L2AssetRouter/L2NTV path
                 // so InteropCenter does not need a dedicated BaseTokenHolder branch here.
-                // Send tokens to BaseTokenHolder and notify L2AssetTracker via burnAndStartBridging
+                // Send tokens to BaseTokenHolder, which records the outbound flow, via burnAndStartBridging
                 L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: _totalBurnedCallsValue}(_destinationChainId);
             }
         } else {
@@ -491,9 +491,9 @@ contract InteropCenter is
         // An atomic bundle can never target L1: it is not published as an L2->L1 message (its commit
         // value goes to the IMT instead) and L1 has no atomic execution, so its only possible outcome
         // would be a timeout refund — but L2->L1 withdrawals must never be revertable (their
-        // `totalWithdrawalsToL1` accounting is consumed once during the L1->GW migration and must stay
-        // append-only, see {L2AssetTracker}). Checked here, before any burn, since both entry points
-        // (`sendMessage` and `sendBundle`) funnel through `_sendBundle`.
+        // `totalWithdrawalsToL1` accounting must stay append-only, see {L2NativeTokenVault.interopInfo}
+        // and {BaseTokenHolder.baseTokenInteropInfo}). Checked here, before any burn, since both entry
+        // points (`sendMessage` and `sendBundle`) funnel through `_sendBundle`.
         if (_atomicSend.isAtomic) {
             require(_destinationChainId != L1_CHAIN_ID, AtomicBundleToL1NotSupported());
         }

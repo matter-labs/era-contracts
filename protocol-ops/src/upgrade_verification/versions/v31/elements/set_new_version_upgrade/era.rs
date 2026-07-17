@@ -18,8 +18,8 @@ use crate::upgrade_verification::{
         ECPAIRING_SYSTEM_CONTRACT, ECRECOVER_SYSTEM_CONTRACT, EVENT_WRITER_CONTRACT,
         EVM_GAS_MANAGER, EVM_PREDEPLOYS_MANAGER, IDENTITY_SYSTEM_CONTRACT,
         KECCAK256_SYSTEM_CONTRACT, L2_ACCOUNT_CODE_STORAGE_ADDR, L2_ASSET_ROUTER_ADDR,
-        L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-        L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPRESSOR_ADDR,
+        L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS,
+        L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPRESSOR_ADDR,
         L2_CREATE2_FACTORY_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_CENTER_ADDR,
         L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE_ADDR,
         L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR,
@@ -138,7 +138,7 @@ fn expected_v31_era_force_deployments() -> Vec<EraExpectedFd> {
             "l1-contracts/SystemContractProxyAdmin",
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
         ),
-        // ── Fixed-address core contracts (FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 12; L2WrappedBaseToken excluded) ──
+        // ── Fixed-address core contracts (FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 10; L2WrappedBaseToken excluded) ──
         simple!("l1-contracts/L2Bridgehub", L2_BRIDGEHUB_ADDR),
         simple!("l1-contracts/L2AssetRouter", L2_ASSET_ROUTER_ADDR),
         simple!(
@@ -163,7 +163,6 @@ fn expected_v31_era_force_deployments() -> Vec<EraExpectedFd> {
             L2_INTEROP_ROOT_STORAGE_ADDR
         ),
         simple!("l1-contracts/BaseTokenHolder", L2_BASE_TOKEN_HOLDER_ADDR),
-        simple!("l1-contracts/L2AssetTracker", L2_ASSET_TRACKER_ADDR),
         simple!("l1-contracts/InteropCenter", L2_INTEROP_CENTER_ADDR),
         simple!("l1-contracts/InteropHandler", L2_INTEROP_HANDLER_ADDR),
         // ── Additional: L2V31Upgrade (the delegate target for this upgrade) ──
@@ -354,7 +353,6 @@ pub(super) const EXPECTED_V31_ERA_BYTECODES: &[&str] = &[
     "l1-contracts/L2ChainAssetHandler",
     "l1-contracts/L2InteropRootStorage",
     "l1-contracts/BaseTokenHolder",
-    "l1-contracts/L2AssetTracker",
     "l1-contracts/InteropCenter",
     "l1-contracts/InteropHandler",
     "l1-contracts/TransparentUpgradeableProxy",

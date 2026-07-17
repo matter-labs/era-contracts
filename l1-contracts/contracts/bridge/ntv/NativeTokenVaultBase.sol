@@ -454,8 +454,8 @@ abstract contract NativeTokenVaultBase is
         bytes32 _assetId,
         address _originalCaller
     ) internal {
-        // Note, that in order to track `totalPreV31TotalSupply` correctly in L2AssetTracker,
-        // we have to call _handleBridgeToChain before any balance changes will be performed.
+        // Note, that in order to capture the pre-tracking total-supply snapshot of legacy tokens
+        // correctly, we have to call _handleBridgeToChain before any balance changes will be performed.
         if (_assetId == _baseTokenAssetId()) {
             require(_depositAmount == msg.value, ValueMismatch(_depositAmount, msg.value));
             if (_isBridgedToken) {
@@ -525,13 +525,13 @@ abstract contract NativeTokenVaultBase is
     }
 
     /// @dev Chain-local bookkeeping hook invoked when funds are bridged out towards `_chainId`.
-    /// @dev On L2 this records outbound amounts in the L2AssetTracker; on L1 it increases the
-    /// net `bridgedOut` amount of L1-native tokens.
+    /// @dev Increases the net `bridgedOut` amount of tokens native to this chain; on L2 it
+    /// additionally records the L1-destined interop counters.
     function _handleBridgeToChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual;
 
     /// @dev Chain-local bookkeeping hook invoked when funds bridged from `_chainId` are finalized here.
-    /// @dev On L2 this records inbound amounts in the L2AssetTracker; on L1 it decreases the
-    /// net `bridgedOut` amount of L1-native tokens.
+    /// @dev Decreases the net `bridgedOut` amount of tokens native to this chain; on L2 it
+    /// additionally records the L1-originated interop counters.
     function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual;
 
     /*//////////////////////////////////////////////////////////////
@@ -593,18 +593,15 @@ abstract contract NativeTokenVaultBase is
         assetId[_tokenAddress] = _assetId;
         originChainId[_assetId] = _originChainId;
         _addTokenToTokensList(_assetId);
-        // Note, that it might be possible that the token is registered on the asset tracker, but not on the
-        // native token vault. An example is when a token is automatically registered for a token that is native to L2
-        // (i.e. registration got triggered, but the native token vault was never called since there was no actual
-        // withdrawal of the asset).
-        _registerTokenInAssetTracker(_assetId, _originChainId);
+        _registerTokenForTracking(_assetId, _originChainId);
     }
 
-    /// @dev Registers the token in the chain-local asset tracker, if one exists.
-    /// @dev On L2 this records the token in the L2AssetTracker (total-supply / outbound bookkeeping).
-    /// On L1 there is no asset tracker, so the default implementation is a no-op.
+    /// @dev Initializes the chain-local bookkeeping for a newly registered token.
+    /// @dev On L2 this records the token's total-supply snapshot / outbound accounting in the vault
+    /// itself. On L1 no per-token initialization is needed (`bridgedOut` starts at zero), so the
+    /// default implementation is a no-op.
     // solhint-disable-next-line no-empty-blocks
-    function _registerTokenInAssetTracker(bytes32 _assetId, uint256 _originChainId) internal virtual {}
+    function _registerTokenForTracking(bytes32 _assetId, uint256 _originChainId) internal virtual {}
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.
     /// @param _tokenOriginChainId The chain id of the origin token.

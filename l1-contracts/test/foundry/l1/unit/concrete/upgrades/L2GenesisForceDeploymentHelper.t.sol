@@ -115,7 +115,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         assertEq(etchedDeployer.deploymentCount(L2_NTV_BEACON_DEPLOYER_ADDR), 0);
         assertEq(etchedDeployer.deploymentCount(L2_INTEROP_CENTER_ADDR), 0);
         assertEq(etchedDeployer.deploymentCount(L2_INTEROP_HANDLER_ADDR), 0);
-        assertEq(etchedDeployer.deploymentCount(L2_ASSET_TRACKER_ADDR), 0);
 
         // Verify proxy upgrades were called - use the etched contract at the system address
         MockSystemContractProxyAdmin etchedProxyAdmin = MockSystemContractProxyAdmin(
@@ -138,7 +137,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         _deployMockContract(L2_ASSET_ROUTER_ADDR);
         _deployMockContract(L2_NATIVE_TOKEN_VAULT_ADDR);
         _deployMockContract(L2_CHAIN_ASSET_HANDLER_ADDR);
-        _deployMockContract(L2_ASSET_TRACKER_ADDR);
         _deployMockContract(L2_INTEROP_CENTER_ADDR);
         _deployMockContract(L2_INTEROP_HANDLER_ADDR);
         _deployMockContract(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
@@ -261,11 +259,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             abi.encode(keccak256("interopHandler_impl"), uint32(0), bytes32(0)),
             abi.encode(keccak256("interopHandler_proxy"), uint32(0), bytes32(0))
         );
-        data.assetTrackerBytecodeInfo = abi.encode(
-            abi.encode(keccak256("assetTracker_impl"), uint32(0), bytes32(0)),
-            abi.encode(keccak256("assetTracker_proxy"), uint32(0), bytes32(0))
-        );
-
         data.baseTokenHolderBytecodeInfo = abi.encode(
             abi.encode(keccak256("baseTokenHolder_impl"), uint32(0), bytes32(0)),
             abi.encode(keccak256("baseTokenHolder_proxy"), uint32(0), bytes32(0))
@@ -301,7 +294,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         data.chainAssetHandlerBytecodeInfo = abi.encode(keccak256("chainHandler"));
         data.interopCenterBytecodeInfo = abi.encode(keccak256("interopCenter"));
         data.interopHandlerBytecodeInfo = abi.encode(keccak256("interopHandler"));
-        data.assetTrackerBytecodeInfo = abi.encode(keccak256("assetTracker"));
         data.beaconDeployerInfo = abi.encode(keccak256("beaconDeployer"));
         data.baseTokenHolderBytecodeInfo = abi.encode(keccak256("baseTokenHolder"));
         data.zkTokenAssetId = DataEncoding.encodeNTVAssetId(ERA_CHAIN_ID, makeAddr("zkToken"));
@@ -332,7 +324,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
     function _etchAllDeferredContracts() internal {
         // Etch contracts to addresses that need function calls to work
-        address[] memory addressesToEtch = new address[](12);
+        address[] memory addressesToEtch = new address[](11);
         addressesToEtch[0] = L2_MESSAGE_ROOT_ADDR;
         addressesToEtch[1] = L2_BRIDGEHUB_ADDR;
         addressesToEtch[2] = L2_ASSET_ROUTER_ADDR;
@@ -341,11 +333,10 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         addressesToEtch[5] = L2_NTV_BEACON_DEPLOYER_ADDR;
         addressesToEtch[6] = L2_INTEROP_CENTER_ADDR;
         addressesToEtch[7] = L2_INTEROP_HANDLER_ADDR;
-        addressesToEtch[8] = L2_ASSET_TRACKER_ADDR;
-        addressesToEtch[9] = L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
+        addressesToEtch[8] = L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
         // Atomic interop predeploys (initialized in `_initializeV31Contracts` when `_isZKsyncOS`).
-        addressesToEtch[10] = L2_INTEROP_COMMITMENT_TREE_ADDR;
-        addressesToEtch[11] = L2_ATOMIC_FLOW_MANAGER_ADDR;
+        addressesToEtch[9] = L2_INTEROP_COMMITMENT_TREE_ADDR;
+        addressesToEtch[10] = L2_ATOMIC_FLOW_MANAGER_ADDR;
 
         for (uint256 i = 0; i < addressesToEtch.length; i++) {
             if (addressesToEtch[i].code.length == 0) {

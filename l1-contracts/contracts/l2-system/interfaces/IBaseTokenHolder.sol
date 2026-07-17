@@ -54,15 +54,29 @@ interface IBaseTokenHolder {
     function give(address _to, uint256 _amount, uint256 _fromChainId) external;
 
     /// @notice Returns base tokens escrowed by a failed/timed-out bridge-out to the original depositor.
-    /// @dev Callable only by the NativeTokenVault; the asset tracker asserts the bridge-out is recoverable
+    /// @dev Callable only by the NativeTokenVault; asserts the bridge-out is recoverable
     /// (L2->L2 only — L2->L1 withdrawals are never revertable).
     /// @param _to The original depositor to refund.
     /// @param _amount The amount of base tokens to return.
     /// @param _toChainId The original bridge-out destination chain id.
     function recoverBaseToken(address _to, uint256 _amount, uint256 _toChainId) external;
 
-    /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.
+    /// @notice Receives base tokens and initiates bridging, recording the outbound flow.
     /// @dev Called by InteropCenter and NativeTokenVault during bridging operations.
     /// @param _toChainId The chain ID which the funds are sent to.
     function burnAndStartBridging(uint256 _toChainId) external payable;
+
+    /// @notice Records an inbound base-token bridging operation finalized outside this contract
+    /// (the Era bootloader mints L1->L2 deposits directly via `L2BaseTokenEra.mint`).
+    /// @dev Callable only by the L2BaseToken contract.
+    /// @param _fromChainId The source chain ID of the bridging operation.
+    /// @param _amount The amount of base tokens being bridged in.
+    function recordBaseTokenDeposit(uint256 _fromChainId, uint256 _amount) external;
+
+    /// @notice L2-side accounting of base-token L1 <-> L2 flows (all chains are assumed to settle
+    /// on L1).
+    function baseTokenInteropInfo()
+        external
+        view
+        returns (uint256 totalWithdrawalsToL1, uint256 totalSuccessfulDepositsFromL1);
 }

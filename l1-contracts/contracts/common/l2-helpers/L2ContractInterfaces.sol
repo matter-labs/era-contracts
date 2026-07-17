@@ -13,7 +13,6 @@ import {IChainAssetHandlerBase} from "../../core/chain-asset-handler/IChainAsset
 import {IInteropCenter} from "../../interop/IInteropCenter.sol";
 import {IInteropHandlerBase} from "../../interop/interop-handler/IInteropHandlerBase.sol";
 import {IL2AssetRouter} from "../../bridge/asset-router/IL2AssetRouter.sol";
-import {IL2AssetTracker} from "../../bridge/asset-tracker/IL2AssetTracker.sol";
 import {IBaseTokenHolder} from "../../l2-system/interfaces/IBaseTokenHolder.sol";
 import {ISystemContext} from "../interfaces/ISystemContext.sol";
 import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
@@ -38,7 +37,6 @@ import {
     L2_CHAIN_ASSET_HANDLER_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_HANDLER_ADDR,
-    L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     MAX_BUILT_IN_CONTRACT_ADDR,
@@ -85,9 +83,6 @@ IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(L2_INTEROP_CENTER_ADD
 
 /// @dev the L2 interop handler
 IInteropHandlerBase constant L2_INTEROP_HANDLER = IInteropHandlerBase(L2_INTEROP_HANDLER_ADDR);
-
-/// @dev the L2 asset tracker
-IL2AssetTracker constant L2_ASSET_TRACKER = IL2AssetTracker(L2_ASSET_TRACKER_ADDR);
 
 /// @dev The base token holder contract that holds chain's base token reserves.
 IBaseTokenHolder constant L2_BASE_TOKEN_HOLDER = IBaseTokenHolder(payable(L2_BASE_TOKEN_HOLDER_ADDR));

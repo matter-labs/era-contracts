@@ -69,7 +69,6 @@ enum CoreContract {
     L2ChainAssetHandler,
     InteropCenter,
     L2InteropHandler,
-    L2AssetTracker,
     L2WrappedBaseToken,
     L2MessageVerification,
     L2InteropRootStorage,

@@ -5,6 +5,24 @@
   },
   {
     "type": "function",
+    "name": "baseTokenInteropInfo",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "totalWithdrawalsToL1",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "totalSuccessfulDepositsFromL1",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "burnAndStartBridging",
     "inputs": [
       {
@@ -32,6 +50,24 @@
       },
       {
         "name": "_fromChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "recordBaseTokenDeposit",
+    "inputs": [
+      {
+        "name": "_fromChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_amount",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -124,6 +160,21 @@
       }
     ],
     "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "BaseTokenNativeToThisChain",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "L1ChainIdNotSet",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "RecoverToL1NotSupported",
+    "inputs": []
   },
   {
     "type": "error",

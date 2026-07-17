@@ -16,4 +16,11 @@ interface IL2BaseTokenZKOS is IL2BaseTokenBase {
     /// @notice Sets the pre-V31 total supply for ZKOS chains during V31 upgrade.
     /// @param _totalSupply The total supply that existed before the V31 upgrade.
     function setZKsyncOSPreV31TotalSupply(uint256 _totalSupply) external;
+
+    /// @notice Marks the base token's pre-V31 total supply as pending backfill; called by the
+    /// ComplexUpgrader during the V31 upgrade of a pre-existing ZKsync OS chain.
+    function enableBaseTokenTotalSupplyBackfill() external;
+
+    /// @notice Whether the pre-V31 total supply of the base token still needs to be backfilled.
+    function needBaseTokenTotalSupplyBackfill() external view returns (bool);
 }

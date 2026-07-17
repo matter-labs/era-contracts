@@ -32,7 +32,6 @@ sol! {
         bytes chainAssetHandlerBytecodeInfo;
         bytes interopCenterBytecodeInfo;
         bytes interopHandlerBytecodeInfo;
-        bytes assetTrackerBytecodeInfo;
         bytes beaconDeployerInfo;
         bytes baseTokenHolderBytecodeInfo;
         address l2SharedBridgeLegacyImpl;
@@ -271,13 +270,6 @@ impl FixedForceDeploymentsData {
             &self.interopHandlerBytecodeInfo,
             "l1-contracts/InteropHandler",
             "l1-contracts/InteropHandler",
-        );
-        expect_bytecode_info(
-            result,
-            verifiers,
-            &self.assetTrackerBytecodeInfo,
-            "l1-contracts/L2AssetTracker",
-            "l1-contracts/L2AssetTracker",
         );
         expect_bytecode_info(
             result,
