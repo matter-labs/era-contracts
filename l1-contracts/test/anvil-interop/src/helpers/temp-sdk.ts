@@ -451,7 +451,8 @@ async function waitForInteropRootNonZero(
       );
     }
 
-    currentRoot = await interopRootStorage.interopRoots(gwChainId, gwBlockNumber);
+    const interopRootInfo = await interopRootStorage.interopRoots(gwChainId, gwBlockNumber);
+    currentRoot = interopRootInfo.root;
     if (currentRoot === ethers.constants.HashZero) {
       await sleep(destProvider.pollingInterval);
     }

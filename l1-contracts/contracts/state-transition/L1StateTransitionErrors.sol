@@ -32,6 +32,8 @@ error InitializeNotAvailable();
 error InvalidBatchesDataLength(uint256 batchesDataLength, uint256 priorityOpsDataLength);
 // 0xc06789fa
 error InvalidCommitment();
+// 0x15a8be2c
+error InvalidInteropRootTimestamp(uint256 expectedTimestamp, uint256 providedTimestamp);
 // 0xd2531c15
 error InvalidL2DAOutputHash(bytes32 l2DAValidatorOutputHash);
 // 0x30043900

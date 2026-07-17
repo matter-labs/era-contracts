@@ -140,14 +140,36 @@ struct BridgehubL2TransactionRequest {
 /// @param chainId The chain id of the dependency chain
 /// @param blockOrBatchNumber The block number or the batch number where the message root was created
 /// For proof based interop it is block number. For commit based interop it is batch number.
+/// @param timestamp The settlement-layer block timestamp at which the imported root was created
+/// (i.e. `block.timestamp` of `blockOrBatchNumber` on the dependency chain). Imported alongside the
+/// root itself so that time-sensitive proofs (e.g. the atomic-interop timeout protocol) can anchor
+/// "this aggregated root is from after the deadline" on chain. Double checked on the settlement
+/// layer during batch execution against `MessageRoot.historicalRoot`.
 /// @param sides The sides of the dynamic incremental merkle tree emitted in the L2ToL1Messenger for precommit based interop
 /// For proof and commit based interop, the sides contain a single root.
 struct InteropRoot {
     uint256 chainId;
     uint256 blockOrBatchNumber;
+    uint256 timestamp;
     // We are double overloading this. The sides of the dynamic incremental merkle tree normally contains the root, as well as the sides of the tree.
     // Second overloading: if the length is 1, we are importing a chainBatchRoot/messageRoot instead of sides.
     bytes32[] sides;
+}
+
+/// @dev An aggregated (interop) root stored together with its creation timestamp — the value half of
+/// the `(blockNumber, root, timestamp)` tuple. Used both by the settlement layer's `MessageRoot`
+/// (`historicalRoot`) and by the L2 `L2InteropRootStorage` (`interopRoots`), so the executor's
+/// double check and the L2 consumers read the same shape.
+/// @dev IMPORTANT: this logic is not compatible with EraVM, as the EraVM bootloader does not yet
+/// support the new (timestamp-carrying) add-interop-roots entry point; it is expected to be deployed
+/// on ZKsync OS chains only.
+/// @param root The aggregated root.
+/// @param timestamp The block timestamp at which the root was created on its origin chain. Note that
+/// no roots recorded under previous protocol versions exist: interop was not activated in v31, so
+/// all stored roots carry the full tuple.
+struct StoredInteropRoot {
+    bytes32 root;
+    uint256 timestamp;
 }
 
 /// @param chainId The chain ID of the transaction to check.

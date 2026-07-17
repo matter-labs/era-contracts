@@ -132,10 +132,12 @@ pub struct L1BridgehubOutput {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct L1BridgesOutput {
     // The legacy L1ERC20Bridge was removed on the atomic/v32 branch, so the deploy script no longer
-    // emits `erc20_bridge_*`. The `l1_interop_handler_*` addresses it now emits are ignored here
-    // (serde skips unknown fields) since protocol-ops doesn't consume them.
+    // emits `erc20_bridge_*`; it emits `l1_interop_handler_*` instead. Mirrors the script's
+    // [deployed_addresses.bridges] block exactly.
     pub shared_bridge_implementation_addr: Address,
     pub shared_bridge_proxy_addr: Address,
     pub l1_nullifier_implementation_addr: Address,
     pub l1_nullifier_proxy_addr: Address,
+    pub l1_interop_handler_implementation_addr: Address,
+    pub l1_interop_handler_proxy_addr: Address,
 }

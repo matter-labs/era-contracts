@@ -50,6 +50,29 @@
   },
   {
     "type": "function",
+    "name": "addChainBatchRootV32",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_batchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_chainBatchRoot",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "addNewChain",
     "inputs": [
       {
@@ -180,6 +203,25 @@
         "name": "",
         "type": "bool",
         "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "chainTreeLeafCount",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -400,16 +442,28 @@
     "name": "historicalRoot",
     "inputs": [
       {
-        "name": "blockNumber",
+        "name": "_blockNumber",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
     "outputs": [
       {
-        "name": "globalMessageRoot",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct StoredInteropRoot",
+        "components": [
+          {
+            "name": "root",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "timestamp",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
       }
     ],
     "stateMutability": "view"
@@ -770,6 +824,19 @@
   },
   {
     "type": "function",
+    "name": "seedGenesisRoot",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setMigratingChainBatchNumber",
     "inputs": [
       {
@@ -928,6 +995,12 @@
         "internalType": "uint256"
       },
       {
+        "name": "timestamp",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
         "name": "sides",
         "type": "bytes32[]",
         "indexed": false,
@@ -1058,6 +1131,22 @@
         "name": "batchNumber",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "OnlyBridgehub",
+    "inputs": [
+      {
+        "name": "msgSender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   },
