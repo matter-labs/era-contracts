@@ -92,15 +92,17 @@ contract AtomicFlowManager is IAtomicFlowManager {
         uint256 _lowNullifierIndex,
         AtomicFlowPreimage calldata _flowPreimage
     ) external onlyInteropCenter {
-        // A flow with a non-L1 settlement layer could neither finalize nor refund (both proof paths
-        // enforce SL == L1), so reject it before committing anything.
-        _checkSettlementLayerIsL1(_flowPreimage.settlementLayerChainId);
+        // Same check order as the finalize/refund paths (shape/id first, then settlement layer), so an
+        // identically malformed preimage reverts with the same reason on every path.
         bytes32 flowId = _validateAndComputeFlowId(
             _flowPreimage.legBundleHashes,
             _flowPreimage.legSourceChainIds,
             _flowPreimage.deadline,
             _flowPreimage.settlementLayerChainId
         );
+        // A flow with a non-L1 settlement layer could neither finalize nor refund (both proof paths
+        // enforce SL == L1), so reject it before committing anything.
+        _checkSettlementLayerIsL1(_flowPreimage.settlementLayerChainId);
 
         // The committing bundle must be one of the flow's legs, declared with this chain as its
         // source. This is the coupling guarantee the preimage exists for: a bundle can never be

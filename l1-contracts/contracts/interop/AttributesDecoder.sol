@@ -4,8 +4,8 @@ pragma solidity ^0.8.24;
 
 import {AtomicFlowPreimage} from "../atomic-interop/IAtomicInterop.sol";
 
-/// @title IERC7786AttributesDecoder
-/// @notice Interface for the ERC7786 attributes decoder
+/// @title AttributesDecoder
+/// @notice Library for decoding ERC7786 attribute payloads
 /// https://github.com/ethereum/ERCs/blob/023a7d657666308568d3d1391c578d5972636093/ERCS/erc-7786.md
 library AttributesDecoder {
     function decodeUint256(bytes calldata _data) internal pure returns (uint256) {

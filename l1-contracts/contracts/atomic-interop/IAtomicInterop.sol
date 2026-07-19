@@ -63,6 +63,9 @@ struct ImtProof {
 /// @notice The definition of an atomic flow: `flowId` plus the exact fields it hashes over. Grouping them
 /// keeps the finalize path ({AtomicFlowManager.requireFlowFinalized}) and the refund path
 /// ({AtomicFlowManager.authorizeRefund}) on one shape, so the `flowId` preimage cannot drift between them.
+/// @dev MUST stay field-for-field aligned with {AtomicFlowPreimage} (this struct minus `flowId`), which
+/// the send path hashes: both feed {AtomicFlowManager}'s single `_validateAndComputeFlowId` helper, and a
+/// field added to one shape but not the other would make send-time and finalize-time flowIds diverge.
 /// @param flowId `keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`.
 /// @param deadline The flow deadline (a settlement-layer timestamp).
 /// @param settlementLayerChainId The single settlement layer every leg must settle on; committed in
@@ -86,6 +89,8 @@ struct AtomicFlow {
 /// committed under a `flowId` that does not actually contain it — a wrong or stale preimage (e.g. an
 /// off-chain `bundleHash` prediction invalidated by an upgrade between preview and send) reverts the
 /// send instead of stranding the burned funds in an unfinalizable, unrefundable leg.
+/// @dev MUST stay field-for-field aligned with {AtomicFlow} (this struct plus `flowId`) — see the
+/// alignment note there.
 /// @param deadline The flow deadline (a settlement-layer timestamp).
 /// @param settlementLayerChainId The single settlement layer every leg must settle on.
 /// @param legBundleHashes All legs' bundle hashes, strictly ascending (canonical order + dedup).
