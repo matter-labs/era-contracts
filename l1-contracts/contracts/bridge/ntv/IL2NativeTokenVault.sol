@@ -4,13 +4,7 @@ pragma solidity ^0.8.20;
 
 import {INativeTokenVaultBase} from "./INativeTokenVaultBase.sol";
 
-/// @dev Token total-supply snapshot captured before the token's first tracked bridge operation.
-struct SavedTotalSupply {
-    bool isSaved;
-    uint256 amount;
-}
-
-/// @dev L2-side accounting of L1 <-> L2 flows. All chains are assumed to settle on L1.
+/// @dev L2-side accounting of L1 <-> L2 flows. All chains settle on L1.
 struct InteropL2Info {
     // Amount withdrawn to L1.
     uint256 totalWithdrawalsToL1;
@@ -52,17 +46,8 @@ interface IL2NativeTokenVault is INativeTokenVaultBase {
     /// @notice Net amount of each L2-native token currently bridged out of this chain.
     function bridgedOut(bytes32 _assetId) external view returns (uint256);
 
-    /// @notice Whether the chain-local bookkeeping for the token has been initialized.
-    function isAssetTracked(bytes32 _assetId) external view returns (bool);
-
-    /// @notice Total-supply snapshot captured before the token's first tracked bridge operation.
-    function preTrackingTotalSupply(bytes32 _assetId) external view returns (bool isSaved, uint256 amount);
-
-    /// @notice L2-side accounting of L1 <-> L2 flows (all chains are assumed to settle on L1).
+    /// @notice L2-side accounting of L1 <-> L2 flows (all chains settle on L1).
     function interopInfo(
         bytes32 _assetId
     ) external view returns (uint256 totalWithdrawalsToL1, uint256 totalSuccessfulDepositsFromL1);
-
-    /// @notice Eagerly initializes the chain-local bookkeeping for a legacy token.
-    function trackLegacyToken(bytes32 _assetId) external;
 }

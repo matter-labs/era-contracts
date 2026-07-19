@@ -178,7 +178,6 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     }
 
     /// @notice Returns whether a chain can be migrated from L1 to a settlement layer.
-    /// @dev A chain is ready only when its legacy base-token balance in L1NativeTokenVault has been migrated.
     /// @param _chainId The chain id to check.
     /// @return True if migration preconditions are met.
     function isReadyForMigration(uint256 _chainId) public view returns (bool) {
@@ -193,11 +192,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
             !IL1MessageRoot(address(_messageRoot())).isPreV31(_chainId) &&
             // The chain's base token must be registered in the NTV, as otherwise L1->L2 base-token
             // deposits (which the destination NTV relies on) would not work.
-            nativeTokenVault.tokenAddress(baseAssetId) != address(0) &&
-            // The chain's base token must support `totalSupply()`, which is the case
-            // for all chains except for pre-v31 ZKsync OS ones. For them, this value
-            // has to be backfilled. Otherwise token balance migration may not work.
-            IZKChain(zkChain).baseTokenSupportsTotalSupply();
+            nativeTokenVault.tokenAddress(baseAssetId) != address(0);
     }
 
     /// @notice Requests that deposits be paused on the settlement layer (Gateway) for a chain that is

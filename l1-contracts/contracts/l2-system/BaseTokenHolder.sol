@@ -56,7 +56,7 @@ import {
  *
  * The implicit meaning of this contract's balance is "funds that the chain can still mint".
  * On Era, totalSupply is computed as __DEPRECATED_totalSupply + INITIAL_BASE_TOKEN_HOLDER_BALANCE - eraAccountBalance[BaseTokenHolder].
- * On ZK OS, totalSupply is computed as zkosPreV31TotalSupply + (INITIAL - holder.balance).
+ * On ZK OS, totalSupply is computed as INITIAL - holder.balance.
  * If funds are force-sent to this contract (bypassing access controls), the holder balance
  * would increase, causing totalSupply() to undercount. This can happen via:
  * - Being the refund recipient of an L1->L2 transaction (both Era and ZK OS).

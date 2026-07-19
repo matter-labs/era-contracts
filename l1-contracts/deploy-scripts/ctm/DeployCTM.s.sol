@@ -494,7 +494,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.writeFile(tmpFile, "");
 
         bytes[9] memory bytecodes;
-        for (uint256 i = 0; i < 9; i++) {
+        for (uint256 i = 0; i < contracts.length; i++) {
             (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, contracts[i]);
             bytecodes[i] = BytecodeUtils.readDeployedBytecodeL1(true, fileName, contractName);
             vm.writeLine(tmpFile, vm.toString(bytecodes[i]));
@@ -515,9 +515,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         input[3] = tmpFile;
         bytes memory result = vm.ffi(input);
 
-        uint256 totalBytecodes = 10;
+        // The batch is the `contracts` list plus the SystemContractProxy appended above.
+        uint256 totalBytecodes = contracts.length + 1;
         require(result.length == totalBytecodes * 32, "Unexpected batch blake2s result length");
-        for (uint256 i = 0; i < 9; i++) {
+        for (uint256 i = 0; i < contracts.length; i++) {
             bytes32 hash;
             assembly {
                 hash := mload(add(result, add(32, mul(i, 32))))
@@ -525,9 +526,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             _blakeCache[keccak256(bytecodes[i])] = hash;
         }
         {
+            uint256 proxyIndex = contracts.length;
             bytes32 proxyHash;
             assembly {
-                proxyHash := mload(add(result, add(32, mul(9, 32))))
+                proxyHash := mload(add(result, add(32, mul(proxyIndex, 32))))
             }
             _blakeCache[keccak256(proxyBytecode)] = proxyHash;
         }

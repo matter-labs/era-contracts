@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {
@@ -22,7 +22,6 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {
-    AssetIdNotRegistered,
     BaseTokenNativeToThisChain,
     InsufficientChainBalance,
     RecoverToL1NotSupported,
@@ -30,12 +29,9 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {RAND_ADDRESS} from "test/foundry/TestConstants.sol";
 
-/// @notice Tests for the chain-local write-only bookkeeping: `bridgedOut` /
-/// `preTrackingTotalSupply` / `interopInfo` on the L2NativeTokenVault and
-/// `baseTokenInteropInfo` on the BaseTokenHolder.
+/// @notice Tests for the chain-local write-only bookkeeping: `bridgedOut` / `interopInfo` on the
+/// L2NativeTokenVault and `baseTokenInteropInfo` on the BaseTokenHolder.
 abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
-    using stdStorage for StdStorage;
-
     function _ntv() internal pure returns (L2NativeTokenVault) {
         return L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
     }
@@ -70,21 +66,6 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
         });
         vm.prank(L2_ASSET_ROUTER_ADDR);
         IAssetHandler(L2_NATIVE_TOKEN_VAULT_ADDR).bridgeMint(_fromChainId, _assetId, data);
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Token registration
-    // ═══════════════════════════════════════════════════════════════════
-
-    /// @notice Registering a fresh native token initializes its bookkeeping: tracked, nothing
-    /// bridged out yet and no supply snapshot (native tokens carry their accounting in `bridgedOut`).
-    function test_registerToken_native_initializesBookkeeping() public {
-        (, bytes32 assetId) = _deployAndRegisterNativeToken(makeAddr("caller"), 0);
-
-        assertTrue(_ntv().isAssetTracked(assetId), "native token should be tracked on registration");
-        assertEq(_ntv().bridgedOut(assetId), 0, "fresh native token has nothing bridged out");
-        (bool isSaved, ) = _ntv().preTrackingTotalSupply(assetId);
-        assertFalse(isSaved, "native tokens store no supply snapshot");
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -178,89 +159,6 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Legacy-token lazy tracking
-    // ═══════════════════════════════════════════════════════════════════
-
-    /// @notice A token registered in the vault before the bookkeeping existed (upgraded chains) is
-    /// tracked lazily: a native token's `bridgedOut` is seeded with the vault's current escrow.
-    function test_trackLegacyToken_native_seedsBridgedOutFromEscrow() public {
-        TestnetERC20Token token = new TestnetERC20Token("LegacyNative", "LGN", 18);
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
-        uint256 escrowed = 42 ether;
-        token.mint(L2_NATIVE_TOKEN_VAULT_ADDR, escrowed);
-
-        // Simulate the pre-existing vault registration of an upgraded chain (originChainId and
-        // tokenAddress set, bookkeeping empty).
-        _writeLegacyVaultRegistration(assetId, address(token), block.chainid);
-        assertFalse(_ntv().isAssetTracked(assetId), "legacy token starts untracked");
-
-        _ntv().trackLegacyToken(assetId);
-
-        assertTrue(_ntv().isAssetTracked(assetId), "legacy token should be tracked");
-        assertEq(_ntv().bridgedOut(assetId), escrowed, "bridgedOut should be seeded with the escrow");
-        (bool isSaved, ) = _ntv().preTrackingTotalSupply(assetId);
-        assertFalse(isSaved, "native tokens store no supply snapshot");
-
-        // Tracking is idempotent: a second call (or a subsequent bridge op) must not re-seed.
-        token.mint(L2_NATIVE_TOKEN_VAULT_ADDR, 1 ether);
-        _ntv().trackLegacyToken(assetId);
-        assertEq(_ntv().bridgedOut(assetId), escrowed, "re-tracking must not re-seed bridgedOut");
-    }
-
-    /// @notice A legacy bridged token captures its pre-tracking total supply on first touch.
-    function test_trackLegacyToken_bridged_capturesSupplySnapshot() public {
-        TestnetERC20Token token = new TestnetERC20Token("LegacyBridged", "LGB", 18);
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, makeAddr("legacy_l1_token"));
-        uint256 preTrackingSupply = 1000;
-        token.mint(makeAddr("someHolder"), preTrackingSupply);
-
-        _writeLegacyVaultRegistration(assetId, address(token), L1_CHAIN_ID);
-
-        _ntv().trackLegacyToken(assetId);
-
-        assertTrue(_ntv().isAssetTracked(assetId), "legacy token should be tracked");
-        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
-        assertTrue(isSaved, "snapshot should be saved for bridged tokens");
-        assertEq(savedAmount, preTrackingSupply, "snapshot should equal the pre-tracking totalSupply");
-        assertEq(_ntv().bridgedOut(assetId), 0, "bridged tokens carry no bridgedOut accounting");
-    }
-
-    /// @notice A completely unknown asset cannot be tracked.
-    function test_trackLegacyToken_revertUnknownAsset() public {
-        bytes32 assetId = keccak256("unknown_asset");
-        vm.expectRevert(abi.encodeWithSelector(AssetIdNotRegistered.selector, assetId));
-        _ntv().trackLegacyToken(assetId);
-    }
-
-    /// @notice The lazy tracking also fires inside the bridge hooks: the first outbound operation of
-    /// a legacy native token seeds `bridgedOut` from the escrow BEFORE recording the operation.
-    function test_bridgeBurn_legacyNativeToken_lazySeedHappensBeforeAccounting() public {
-        address caller = makeAddr("caller");
-        uint256 escrowed = 10 ether;
-        uint256 amount = 2 ether;
-        TestnetERC20Token token = new TestnetERC20Token("LegacyNative", "LGN", 18);
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
-        token.mint(L2_NATIVE_TOKEN_VAULT_ADDR, escrowed);
-        token.mint(caller, amount);
-        _writeLegacyVaultRegistration(assetId, address(token), block.chainid);
-        vm.prank(caller);
-        token.approve(L2_NATIVE_TOKEN_VAULT_ADDR, amount);
-
-        _bridgeBurnErc20(L1_CHAIN_ID, assetId, caller, amount);
-
-        assertEq(
-            _ntv().bridgedOut(assetId),
-            escrowed + amount,
-            "bridgedOut = pre-existing escrow seed + newly burnt amount"
-        );
-        assertEq(
-            token.balanceOf(L2_NATIVE_TOKEN_VAULT_ADDR),
-            escrowed + amount,
-            "escrow should stay in lockstep with bridgedOut"
-        );
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
     //  Base-token recovery invariants (BaseTokenHolder)
     // ═══════════════════════════════════════════════════════════════════
 
@@ -345,30 +243,5 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
         vm.prank(RAND_ADDRESS);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, RAND_ADDRESS));
         holder.recoverBaseToken(makeAddr("depositor"), 100, 505);
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    //  Helpers
-    // ═══════════════════════════════════════════════════════════════════
-
-    /// @dev Simulates the vault registration state of a token that predates the local bookkeeping
-    /// (i.e. was registered on a chain upgraded in place): `tokenAddress`/`assetId`/`originChainId`
-    /// set, `isAssetTracked` empty.
-    function _writeLegacyVaultRegistration(bytes32 _assetId, address _tokenAddress, uint256 _originChainId) internal {
-        stdstore
-            .target(L2_NATIVE_TOKEN_VAULT_ADDR)
-            .sig(INativeTokenVaultBase.tokenAddress.selector)
-            .with_key(_assetId)
-            .checked_write(_tokenAddress);
-        stdstore
-            .target(L2_NATIVE_TOKEN_VAULT_ADDR)
-            .sig(INativeTokenVaultBase.assetId.selector)
-            .with_key(_tokenAddress)
-            .checked_write(_assetId);
-        stdstore
-            .target(L2_NATIVE_TOKEN_VAULT_ADDR)
-            .sig(INativeTokenVaultBase.originChainId.selector)
-            .with_key(_assetId)
-            .checked_write(_originChainId);
     }
 }

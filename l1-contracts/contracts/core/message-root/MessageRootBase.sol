@@ -138,11 +138,8 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         _;
     }
 
-    /// @notice The chain itself appends its batch root, both on L1 and on Gateway. On Gateway the
-    /// chain's `Executor` calls this directly while settling (it no longer routes through the asset
-    /// tracker). Asset correctness across chains is guaranteed by ZK proofs.
-    /// @dev Note, that at the moment of the v31 upgrade we no chains to settle on top of the old
-    /// Era-based Gateway, and so no special handling is needed for pre-v31 chains.
+    /// @notice Only the chain itself may append its batch root. Asset correctness across chains is
+    /// guaranteed by ZK proofs.
     modifier addChainBatchRootRestriction(uint256 _chainId) {
         if (msg.sender != IBridgehubBase(_bridgehub()).getZKChain(_chainId)) {
             revert OnlyChain(msg.sender, IBridgehubBase(_bridgehub()).getZKChain(_chainId));
@@ -178,10 +175,9 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     }
 
     /// @notice Adds a new chainBatchRoot to the chainTree and updates the aggregated shared tree.
-    /// @dev Runs on both settlement layers: the chain's DiamondProxy calls it directly during batch
-    /// execution (see `addChainBatchRootRestriction`). The chainBatchRoot is recorded, pushed to the
-    /// chain tree, the shared tree leaf is updated, and a new interop root is emitted — so chains
-    /// settling on either layer participate in interop.
+    /// @dev The chain's DiamondProxy calls it directly during batch execution (see
+    /// `addChainBatchRootRestriction`). The chainBatchRoot is recorded, pushed to the chain tree, the
+    /// shared tree leaf is updated, and a new interop root is emitted.
     /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
     /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
     /// @param _chainBatchRoot The value of chainBatchRoot which is being added.

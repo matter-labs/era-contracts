@@ -454,8 +454,8 @@ abstract contract NativeTokenVaultBase is
         bytes32 _assetId,
         address _originalCaller
     ) internal {
-        // Note, that in order to capture the pre-tracking total-supply snapshot of legacy tokens
-        // correctly, we have to call _handleBridgeToChain before any balance changes will be performed.
+        // Note, that the bookkeeping is recorded before any balance changes are performed, so it
+        // cannot be manipulated from within the transfer calls below.
         if (_assetId == _baseTokenAssetId()) {
             require(_depositAmount == msg.value, ValueMismatch(_depositAmount, msg.value));
             if (_isBridgedToken) {
@@ -593,15 +593,7 @@ abstract contract NativeTokenVaultBase is
         assetId[_tokenAddress] = _assetId;
         originChainId[_assetId] = _originChainId;
         _addTokenToTokensList(_assetId);
-        _registerTokenForTracking(_assetId, _originChainId);
     }
-
-    /// @dev Initializes the chain-local bookkeeping for a newly registered token.
-    /// @dev On L2 this records the token's total-supply snapshot / outbound accounting in the vault
-    /// itself. On L1 no per-token initialization is needed (`bridgedOut` starts at zero), so the
-    /// default implementation is a no-op.
-    // solhint-disable-next-line no-empty-blocks
-    function _registerTokenForTracking(bytes32 _assetId, uint256 _originChainId) internal virtual {}
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.
     /// @param _tokenOriginChainId The chain id of the origin token.

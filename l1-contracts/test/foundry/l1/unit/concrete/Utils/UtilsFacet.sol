@@ -295,10 +295,6 @@ contract UtilsFacet is ZKChainBase {
         s.zksyncOS = _zksyncOS;
     }
 
-    function util_setBaseTokenHasTotalSupply(bool _hasTotalSupply) external {
-        s.baseTokenHasTotalSupply = _hasTotalSupply;
-    }
-
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }

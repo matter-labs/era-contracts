@@ -74,8 +74,10 @@ address constant L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDRESS = address(USER_CONTRACTS
 
 address constant L2_INTEROP_CENTER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0d);
 address constant L2_INTEROP_HANDLER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0e);
-// `USER_CONTRACTS_OFFSET + 0x0f` is intentionally unassigned: it belonged to the removed
-// L2AssetTracker and is kept as a gap so the following addresses keep their positions.
+// `USER_CONTRACTS_OFFSET + 0x0f` and `USER_CONTRACTS_OFFSET + 0x10` are intentionally unassigned:
+// they belonged to the removed L2AssetTracker and GWAssetTracker respectively and are kept as gaps
+// so any future addresses skip them (see `L2ContractAddresses.sol` in l1-contracts, where the
+// subsequent offsets are already assigned).
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.

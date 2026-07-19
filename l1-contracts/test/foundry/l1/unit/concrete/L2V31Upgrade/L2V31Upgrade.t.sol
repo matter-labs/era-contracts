@@ -105,11 +105,10 @@ contract MockV31UpgradeNativeTokenVault {
     }
 }
 
-/// @dev Mock BaseToken that records initL2 and backfill-enable calls.
+/// @dev Mock BaseToken that records initL2 calls.
 contract MockV31UpgradeBaseToken {
     uint256 public initCalls;
     uint256 public lastInitializedL1ChainId;
-    uint256 public enableBackfillCalls;
 
     function initL2(uint256 _l1ChainId) external {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -118,14 +117,6 @@ contract MockV31UpgradeBaseToken {
 
         initCalls++;
         lastInitializedL1ChainId = _l1ChainId;
-    }
-
-    function enableBaseTokenTotalSupplyBackfill() external {
-        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
-
-        enableBackfillCalls++;
     }
 }
 
@@ -219,11 +210,10 @@ contract L2V31UpgradeUnitTest is Test {
         assertEq(nativeTokenVault.lastOriginChainId(), BASE_TOKEN_ORIGIN_CHAIN_ID, "origin chain id mismatch");
         assertEq(nativeTokenVault.BASE_TOKEN_ORIGIN_TOKEN(), BASE_TOKEN_ORIGIN_ADDRESS, "origin token mismatch");
 
-        // Verify BaseToken: initL2 called; the ZKOS-only supply backfill is never enabled on Era
+        // Verify BaseToken: initL2 called
         MockV31UpgradeBaseToken baseToken = MockV31UpgradeBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
         assertEq(baseToken.initCalls(), 1, "base token should be initialized exactly once");
         assertEq(baseToken.lastInitializedL1ChainId(), L1_CHAIN_ID, "base token L1 chain id mismatch");
-        assertEq(baseToken.enableBackfillCalls(), 0, "the supply backfill must not be enabled on Era chains");
     }
 
     function _buildFixedForceDeploymentsData() private pure returns (FixedForceDeploymentsData memory) {

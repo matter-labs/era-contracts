@@ -8,7 +8,7 @@ import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-import {IL2NativeTokenVault, InteropL2Info, SavedTotalSupply} from "./IL2NativeTokenVault.sol";
+import {IL2NativeTokenVault, InteropL2Info} from "./IL2NativeTokenVault.sol";
 import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 
 import {
@@ -26,7 +26,6 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {
     AddressMismatch,
     AssetIdMismatch,
-    AssetIdNotRegistered,
     AssetIdNotSupported,
     ChainIdMismatch,
     DeployFailed,
@@ -90,28 +89,11 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// rather than by on-chain balance enforcement. It mirrors `L1NativeTokenVault.bridgedOut`:
     /// it increases on outbound flows and decreases on inbound ones, so unlike the vault's raw
     /// `balanceOf` it cannot be skewed by direct transfers into the vault.
-    /// @dev For tokens that were bridged before this bookkeeping was introduced, the value is
-    /// seeded with the vault's escrow balance on the token's first tracked bridge operation;
-    /// see `_trackLegacyTokenIfNeeded`.
     mapping(bytes32 assetId => uint256 amount) public bridgedOut;
 
-    /// @notice Denotes whether the chain-local bookkeeping for a token has been initialized: its
-    /// `bridgedOut` seed and `preTrackingTotalSupply` snapshot are set.
-    /// @dev Once we know that all legacy tokens have been tracked (and all new ones have the
-    /// corresponding logic performed automatically), this mapping can be removed. So DONT RELY ON IT!
-    mapping(bytes32 assetId => bool isTracked) public isAssetTracked;
-
-    /// @notice Token total-supply snapshot captured before the first tracked bridge operation for each
-    /// bridged (non-native) token. Together with `interopInfo` it allows reconstructing the amount of a
-    /// token attributable to L1 if per-chain accounting is ever reintroduced.
-    /// @dev For L2-native tokens no snapshot is stored: their bridged-out accounting is carried by
-    /// `bridgedOut`.
-    mapping(bytes32 assetId => SavedTotalSupply snapshot) public preTrackingTotalSupply;
-
-    /// @notice L2-side accounting of L1 <-> L2 flows. All chains are assumed to settle on L1, so no
-    /// settlement-layer distinction is made. Together with `preTrackingTotalSupply` it allows
-    /// reconstructing the amount of a token attributable to the L1 escrow if per-chain accounting is
-    /// ever reintroduced.
+    /// @notice L2-side accounting of L1 <-> L2 flows. All chains settle on L1, so no settlement-layer
+    /// distinction is made. It allows reconstructing the amount of a token attributable to the L1
+    /// escrow if per-chain accounting is ever reintroduced.
     mapping(bytes32 assetId => InteropL2Info info) public interopInfo;
 
     /// @dev Only allows calls from the complex upgrader contract on L2.
@@ -211,22 +193,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         if (owner() != _aliasedOwner) {
             require(_aliasedOwner != address(0), EmptyAddress());
             _transferOwnership(_aliasedOwner);
-        }
-    }
-
-    /// @dev Initializes the chain-local bookkeeping for a token that is registered in the vault for
-    /// the first time (total-supply snapshot / outbound accounting).
-    function _registerTokenForTracking(bytes32 _assetId, uint256 _originChainId) internal override {
-        if (isAssetTracked[_assetId]) {
-            return;
-        }
-        isAssetTracked[_assetId] = true;
-
-        // For a token native to this chain nothing is escrowed yet, so its net `bridgedOut` amount
-        // starts at zero. A bridged token registered here is deployed by the vault and has never been
-        // bridged before, so its pre-tracking total supply is zero.
-        if (_originChainId != block.chainid) {
-            preTrackingTotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: 0});
         }
     }
 
@@ -364,17 +330,13 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     }
 
     /// @dev Records the outbound flow (L2->L1 withdrawal or outgoing L2->L2 interop); see `bridgedOut`.
-    /// @dev Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
-    /// so L2NativeTokenVault doesn't have to handle balance changes on GW.
     function _handleBridgeToChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual override {
-        _trackLegacyTokenIfNeeded(_assetId);
-
         // On the L2 we only track the bridged-out amount of native tokens.
         if (originChainId[_assetId] == block.chainid) {
             bridgedOut[_assetId] += _amount;
         }
 
-        // All chains are assumed to settle on L1, so every L1-destined withdrawal is recorded.
+        // All chains settle on L1, so every L1-destined withdrawal is recorded.
         if (_chainId == L1_CHAIN_ID) {
             interopInfo[_assetId].totalWithdrawalsToL1 += _amount;
         }
@@ -386,8 +348,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// possible if bridged representations of the asset were forged somewhere upstream, so such a
     /// transfer is blocked rather than recorded.
     function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual override {
-        _trackLegacyTokenIfNeeded(_assetId);
-
         // On the L2 we only track the bridged-out amount of native tokens.
         if (originChainId[_assetId] == block.chainid) {
             if (bridgedOut[_assetId] < _amount) {
@@ -396,47 +356,9 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             bridgedOut[_assetId] -= _amount;
         }
 
-        // All chains are assumed to settle on L1, so every L1-originated deposit is recorded.
+        // All chains settle on L1, so every L1-originated deposit is recorded.
         if (_chainId == L1_CHAIN_ID) {
             interopInfo[_assetId].totalSuccessfulDepositsFromL1 += _amount;
-        }
-    }
-
-    /// @inheritdoc IL2NativeTokenVault
-    /// @dev Anyone can call this to eagerly initialize the bookkeeping of a legacy token before its
-    /// first post-upgrade bridge operation captures a stale snapshot.
-    function trackLegacyToken(bytes32 _assetId) external {
-        _trackLegacyTokenIfNeeded(_assetId);
-    }
-
-    /// @dev Initializes the chain-local bookkeeping for a token that is already registered in the
-    /// vault but has not been tracked here yet (i.e. a token registered before this bookkeeping was
-    /// introduced). Called before any balance changes of the bridge operation are performed, so the
-    /// captured values reflect the pre-operation state.
-    function _trackLegacyTokenIfNeeded(bytes32 _assetId) internal {
-        if (isAssetTracked[_assetId]) {
-            return;
-        }
-        // Note we assume that the token must be legacy, since `_registerTokenForTracking` marks any
-        // newly registered token as tracked. Legacy tokens are all expected to have the origin chain
-        // id and token address set on the vault.
-        uint256 tokenOriginChainId = originChainId[_assetId];
-        require(tokenOriginChainId != 0, AssetIdNotRegistered(_assetId));
-        address token = tokenAddress[_assetId];
-        require(token != address(0), AssetIdNotRegistered(_assetId));
-        isAssetTracked[_assetId] = true;
-
-        if (tokenOriginChainId == block.chainid) {
-            // Seed the net bridged-out amount with the vault's current escrow: tokens locked here by
-            // previous bridge operations are exactly the amount currently bridged out. Note, that this
-            // treats tokens sent directly to the vault the same way as bridged-out ones. It is okay,
-            // since the tokens that have been sent to the vault are basically frozen anyway.
-            bridgedOut[_assetId] = IERC20(token).balanceOf(address(this));
-        } else {
-            // Save the pre-tracking supply for bridged legacy tokens. Note, that here we assume that
-            // `totalSupply()` won't be affected in any way until it is used here, i.e. all deposits or
-            // withdrawals should firstly record the previous totalSupply.
-            preTrackingTotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: IERC20(token).totalSupply()});
         }
     }
 

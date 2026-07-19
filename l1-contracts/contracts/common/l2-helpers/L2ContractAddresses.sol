@@ -130,13 +130,9 @@ address constant L2_INTEROP_CENTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x
 /// @dev the address of the L2 interop handler
 address payable constant L2_INTEROP_HANDLER_ADDR = payable(address(BUILT_IN_CONTRACTS_OFFSET + 0x0e));
 
-/// @dev `BUILT_IN_CONTRACTS_OFFSET + 0x0f` is intentionally unassigned: it belonged to the removed
-/// L2AssetTracker and is kept as a gap so the following addresses keep their positions. Chains that
-/// deployed the tracker retain its bytecode and recorded bookkeeping (historic data) at this address;
-/// new recording happens in the L2NativeTokenVault and the BaseTokenHolder instead.
-
-/// @dev `BUILT_IN_CONTRACTS_OFFSET + 0x10` is intentionally unassigned: it belonged to the removed
-/// GWAssetTracker and is kept as a gap so the following addresses keep their positions.
+/// @dev `BUILT_IN_CONTRACTS_OFFSET + 0x0f` and `BUILT_IN_CONTRACTS_OFFSET + 0x10` are intentionally
+/// unassigned: they belonged to the removed L2AssetTracker and GWAssetTracker respectively and are
+/// kept as gaps so the following addresses keep their positions.
 
 /// @dev The address of the base token holder contract that holds chain's base token reserves.
 address constant L2_BASE_TOKEN_HOLDER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x11);

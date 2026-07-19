@@ -172,10 +172,6 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20Metadata.symbol, ()), abi.encode("TT"));
         vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20Metadata.decimals, ()), abi.encode(uint8(18)));
 
-        // Mock totalSupply() - called by L2NativeTokenVault._trackLegacyTokenIfNeeded for bridged
-        // tokens (originChainId != block.chainid) to capture the pre-tracking supply snapshot
-        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20.totalSupply, ()), abi.encode(uint256(0)));
-
         // Expect the bridgeBurn call on the bridged token
         vm.expectCall(
             expectedL2TokenAddress,

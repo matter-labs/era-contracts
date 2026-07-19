@@ -461,25 +461,6 @@
   },
   {
     "type": "function",
-    "name": "isAssetTracked",
-    "inputs": [
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "isTracked",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "l2TokenAddress",
     "inputs": [
       {
@@ -583,30 +564,6 @@
   },
   {
     "type": "function",
-    "name": "preTrackingTotalSupply",
-    "inputs": [
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "isSaved",
-        "type": "bool",
-        "internalType": "bool"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "registerToken",
     "inputs": [
       {
@@ -681,19 +638,6 @@
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "trackLegacyToken",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -1099,17 +1043,6 @@
       },
       {
         "name": "supplied",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "AssetIdNotRegistered",
-    "inputs": [
-      {
-        "name": "assetId",
         "type": "bytes32",
         "internalType": "bytes32"
       }

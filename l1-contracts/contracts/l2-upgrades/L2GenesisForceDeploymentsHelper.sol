@@ -18,7 +18,6 @@ import {
     L2_INTEROP_COMMITMENT_TREE_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2BaseTokenBase} from "../l2-system/interfaces/IL2BaseTokenBase.sol";
-import {IL2BaseTokenZKOS} from "../l2-system/zksync-os/interfaces/IL2BaseTokenZKOS.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {
     FixedForceDeploymentsData,
@@ -388,12 +387,6 @@ library L2GenesisForceDeploymentsHelper {
             _fixedForceDeploymentsData.aliasedL1Governance,
             _fixedForceDeploymentsData.zkTokenAssetId
         );
-
-        // The only chains that need backfill for the base token's total supply are ZKsync OS
-        // chains that existed before the v31 upgrade (i.e. isGenesis is false).
-        if (_isZKsyncOS && !_isGenesisUpgrade) {
-            IL2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).enableBaseTokenTotalSupplyBackfill();
-        }
 
         // Initialize L2BaseToken: sets L1_CHAIN_ID and initializes the BaseTokenHolder balance.
         // For Era: initializes holder balance, with __DEPRECATED_totalSupply kept in totalSupply().

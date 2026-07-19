@@ -33,8 +33,6 @@ error AssetHandlerNotRegistered(bytes32 assetId);
 error AssetIdAlreadyRegistered();
 // 0x1294e9e1
 error AssetIdMismatch(bytes32 expected, bytes32 supplied);
-// 0xda72d995
-error AssetIdNotRegistered(bytes32 assetId);
 // 0x04a0b7e9
 error AssetIdNotSupported(bytes32 assetId);
 // 0x9b821ed7
@@ -47,12 +45,6 @@ error BaseTokenHolderAlreadyInitialized();
 error BaseTokenHolderMintFailed();
 // 0x8361ff70
 error BaseTokenNativeToThisChain();
-// 0x7f9159de
-error BaseTokenPreV31TotalSupplyAlreadySet();
-// 0x00a6b592
-error BaseTokenPreV31TotalSupplyNotSet();
-// 0xca9bc458
-error BaseTokenTotalSupplyBackfillNotNeeded();
 // 0xe3ec2bc9
 error BaseTokenTransferFailed();
 // 0x55ad3fd3

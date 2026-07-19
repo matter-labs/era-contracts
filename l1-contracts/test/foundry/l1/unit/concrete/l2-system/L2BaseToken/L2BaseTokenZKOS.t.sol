@@ -6,7 +6,6 @@ import {Test} from "forge-std/Test.sol";
 
 import {L2BaseTokenZKOS} from "contracts/l2-system/zksync-os/L2BaseTokenZKOS.sol";
 import {IL2BaseTokenBase} from "contracts/l2-system/interfaces/IL2BaseTokenBase.sol";
-import {IL2BaseTokenZKOS} from "contracts/l2-system/zksync-os/interfaces/IL2BaseTokenZKOS.sol";
 import {
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -17,13 +16,10 @@ import {
     MINT_BASE_TOKEN_HOOK
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2_BASE_TOKEN_HOLDER} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {INITIAL_BASE_TOKEN_HOLDER_BALANCE, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
+import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
 import {
     BaseTokenHolderAlreadyInitialized,
     BaseTokenHolderMintFailed,
-    BaseTokenPreV31TotalSupplyAlreadySet,
-    BaseTokenPreV31TotalSupplyNotSet,
-    BaseTokenTotalSupplyBackfillNotNeeded,
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
@@ -45,13 +41,6 @@ contract L2BaseTokenZKOSTest is Test {
         // Deploy dummy BaseTokenHolder that accepts ETH from any sender.
         // Tests that need real access-control checks etch the real BaseTokenHolder instead.
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new DummyL2BaseTokenHolder()).code);
-    }
-
-    /// @dev Marks the base-token supply as pending backfill, as the V31 upgrade of an existing
-    /// ZKsync OS chain does.
-    function _enableBackfill(L2BaseTokenZKOS _token) internal {
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        _token.enableBaseTokenTotalSupplyBackfill();
     }
 
     /// @dev The BaseTokenHolder reads the L1 chain id from the NativeTokenVault, which is out of
@@ -297,136 +286,11 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                setZKsyncOSPreV31TotalSupply() TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_setZkosPreV31TotalSupply_success() public {
-        uint256 preV31Supply = 42 ether;
-        _enableBackfill(l2BaseToken);
-
-        vm.expectEmit(false, false, false, true);
-        emit IL2BaseTokenZKOS.ZKsyncOSPreV31TotalSupplySet(preV31Supply);
-
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2BaseToken.setZKsyncOSPreV31TotalSupply(preV31Supply);
-
-        assertEq(l2BaseToken.zkosPreV31TotalSupply(), preV31Supply, "zkosPreV31TotalSupply should be set");
-        assertFalse(l2BaseToken.needBaseTokenTotalSupplyBackfill(), "the backfill flag must be cleared");
-    }
-
-    function test_setZkosPreV31TotalSupply_emitsEvent() public {
-        uint256 totalSupply = 42 ether;
-        _enableBackfill(l2BaseToken);
-
-        vm.expectEmit(false, false, false, true);
-        emit IL2BaseTokenZKOS.ZKsyncOSPreV31TotalSupplySet(totalSupply);
-
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2BaseToken.setZKsyncOSPreV31TotalSupply(totalSupply);
-    }
-
-    function test_setZkosPreV31TotalSupply_revertIfNotServiceTransactionSender() public {
-        address nonServiceSender = makeAddr("nonServiceSender");
-
-        vm.prank(nonServiceSender);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonServiceSender));
-        l2BaseToken.setZKsyncOSPreV31TotalSupply(42 ether);
-    }
-
-    function test_setZkosPreV31TotalSupply_affectsTotalSupply() public {
-        uint256 preV31Supply = 10 ether;
-
-        // Deploy at system address so we can check totalSupply
-        L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
-        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
-        _enableBackfill(L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR));
-
-        // Deploy BaseTokenHolder so holder balance is known
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, hex"00");
-        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
-
-        // Set the pre-V31 total supply
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).setZKsyncOSPreV31TotalSupply(preV31Supply);
-
-        // totalSupply = preV31Supply + (INITIAL - holder.balance) = preV31Supply + 0 = preV31Supply
-        assertEq(
-            L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).totalSupply(),
-            preV31Supply,
-            "totalSupply should equal preV31Supply when holder balance equals initial"
-        );
-    }
-
-    /// @notice Backfilling is only possible once the upgrade marked it as pending.
-    function test_setZkosPreV31TotalSupply_revertWhenBackfillNotNeeded() public {
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        vm.expectRevert(BaseTokenTotalSupplyBackfillNotNeeded.selector);
-        l2BaseToken.setZKsyncOSPreV31TotalSupply(42 ether);
-    }
-
-    function test_setZkosPreV31TotalSupply_revertsOnSecondCall() public {
-        uint256 totalSupply = 42 ether;
-        _enableBackfill(l2BaseToken);
-
-        // First call succeeds
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2BaseToken.setZKsyncOSPreV31TotalSupply(totalSupply);
-
-        // Second call reverts: the backfill flag was cleared by the first one
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        vm.expectRevert(BaseTokenTotalSupplyBackfillNotNeeded.selector);
-        l2BaseToken.setZKsyncOSPreV31TotalSupply(totalSupply);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                enableBaseTokenTotalSupplyBackfill() TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_enableBackfill_success() public {
-        assertFalse(l2BaseToken.needBaseTokenTotalSupplyBackfill(), "flag starts unset");
-
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2BaseToken.enableBaseTokenTotalSupplyBackfill();
-
-        assertTrue(l2BaseToken.needBaseTokenTotalSupplyBackfill(), "flag must be set by the upgrader");
-    }
-
-    function test_enableBackfill_revertUnauthorized() public {
-        address nonUpgrader = makeAddr("nonUpgrader");
-
-        vm.prank(nonUpgrader);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonUpgrader));
-        l2BaseToken.enableBaseTokenTotalSupplyBackfill();
-    }
-
-    /// @notice The backfill cannot be re-opened once a pre-V31 supply has been recorded.
-    function test_enableBackfill_revertWhenSupplyAlreadySet() public {
-        _enableBackfill(l2BaseToken);
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2BaseToken.setZKsyncOSPreV31TotalSupply(42 ether);
-
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        vm.expectRevert(BaseTokenPreV31TotalSupplyAlreadySet.selector);
-        l2BaseToken.enableBaseTokenTotalSupplyBackfill();
-    }
-
-    /*//////////////////////////////////////////////////////////////
                         totalSupply() TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_totalSupply_revertsWhenBackfillNeeded() public {
-        // Deploy at system address
-        L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
-        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
-
-        // Mark the supply as pending backfill, exactly as the V31 upgrade of an existing chain does
-        _enableBackfill(L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR));
-
-        vm.expectRevert(BaseTokenPreV31TotalSupplyNotSet.selector);
-        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).totalSupply();
-    }
-
-    function test_totalSupply_worksWhenBackfillNotNeeded() public {
+    /// @notice totalSupply is the amount that has left the fully-seeded BaseTokenHolder.
+    function test_totalSupply_reflectsHolderBalance() public {
         // Deploy at system address
         L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
@@ -435,35 +299,19 @@ contract L2BaseTokenZKOSTest is Test {
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, hex"00");
         vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
-        // needBaseTokenTotalSupplyBackfill is false by default (genesis chains never need it)
-
-        // Without setting preV31Supply, totalSupply = 0 + (INITIAL - INITIAL) = 0
+        // Nothing has left the holder yet, so nothing is in circulation
         assertEq(
             L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).totalSupply(),
             0,
-            "totalSupply should be 0 when preV31Supply is 0 and holder has initial balance"
+            "totalSupply should be 0 when the holder still has the full initial balance"
         );
-    }
 
-    function test_totalSupply_worksWhenBaseTokenHolderBalanceGreaterThanInitial() public {
-        // Deploy at system address
-        L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
-        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
-
-        // Deploy BaseTokenHolder so holder balance is known
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, hex"00");
-        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE + 100);
-
-        // Set the pre-V31 total supply
-        _enableBackfill(L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR));
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).setZKsyncOSPreV31TotalSupply(200);
-
-        // totalSupply = preV31Supply + INITIAL - holder.balance = 200 + INITIAL - (INITIAL + 100) = 100
+        // 100 wei "minted" into circulation: totalSupply = INITIAL - (INITIAL - 100) = 100
+        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE - 100);
         assertEq(
             L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).totalSupply(),
             100,
-            "totalSupply returns wrong value"
+            "totalSupply should equal the amount that left the holder"
         );
     }
 
