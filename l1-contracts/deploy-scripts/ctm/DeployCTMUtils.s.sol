@@ -314,9 +314,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode(ctmAddresses.daAddresses.availBridge);
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
-        } else if (
-            compareStrings(contractName, "EraVerifierFflonk") || compareStrings(contractName, "ZKsyncOSVerifierFflonk")
-        ) {
+        } else if (compareStrings(contractName, "EraVerifierFflonk")) {
             return abi.encode();
         } else if (
             compareStrings(contractName, "EraVerifierPlonk") || compareStrings(contractName, "ZKsyncOSVerifierPlonk")

@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {
     EmptyProofLength,
@@ -10,36 +9,29 @@ import {
     MockVerifierNotSupported,
     EmptyPublicInputsLength
 } from "../../common/L1ContractErrors.sol";
-import {IZKsyncOSDualVerifier} from "../chain-interfaces/IZKsyncOSDualVerifier.sol";
+import {IZKsyncOSVerifier} from "../chain-interfaces/IZKsyncOSVerifier.sol";
+import {
+    ZKSYNC_OS_MOCK_VERIFICATION_TYPE,
+    ZKSYNC_OS_PLONK_VERIFICATION_TYPE,
+    ZKSYNC_OS_PROOF_METADATA_LENGTH
+} from "../../common/Config.sol";
 
-/// @title ZKsync OS Dual Verifier
+/// @title ZKsync OS Verifier
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice This contract wraps ZKsync OS specific verifiers and routes zk-SNARK proof verification
-/// to the verifier based on the provided proof type.
+/// @notice This contract wraps the ZKsync OS PLONK verifier and supports mock verification on testnets.
 /// It reuses the same interface as on the original `Verifier` contract, while abusing one of the fields
 /// (`_recursiveAggregationInput`) for proof verification type.
-contract ZKsyncOSDualVerifier is IVerifier, IZKsyncOSDualVerifier {
-    /// @notice The FFLONK verifier contract.
-    IVerifierV2 public immutable FFLONK_VERIFIER;
-
+contract ZKsyncOSVerifier is IVerifier, IZKsyncOSVerifier {
     /// @notice The PLONK verifier contract.
     IVerifier public immutable PLONK_VERIFIER;
 
-    /// @dev Type of verification for ZKsync OS PLONK verifier.
-    uint256 internal constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
-
-    // @notice This is proof-skipping verifier (mock), it's only checking the correctness of the public inputs.
-    uint256 internal constant ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
-
-    /// @param _fflonkVerifier The address of the FFLONK verifier contract.
     /// @param _plonkVerifier The address of the PLONK verifier contract.
-    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) {
-        FFLONK_VERIFIER = _fflonkVerifier;
+    constructor(IVerifier _plonkVerifier) {
         PLONK_VERIFIER = _plonkVerifier;
     }
 
-    /// @notice Routes zk-SNARK proof verification to the appropriate verifier based on the proof type.
+    /// @notice Verifies a ZKsync OS PLONK proof or delegates to the testnet mock path.
     /// @param _publicInputs The public inputs to the proof.
     /// @param _proof The zk-SNARK proof itself.
     /// @dev  The first element of the `_proof` determines the verifier type.
@@ -102,23 +94,23 @@ contract ZKsyncOSDualVerifier is IVerifier, IZKsyncOSDualVerifier {
     }
 
     function _extractZKsyncOSProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {
-        uint256 resultLength = _proof.length - 1 - 1;
+        uint256 resultLength = _proof.length - ZKSYNC_OS_PROOF_METADATA_LENGTH;
 
-        // Allocate memory for the new array (_proof.length - 1) since the first element is omitted.
+        // Allocate memory for the underlying proof after removing its type and initial hash.
         result = new uint256[](resultLength);
 
-        // Copy elements starting from index 1 (the second element) of the original array.
+        // Copy elements after the two metadata words.
         assembly {
             calldatacopy(add(result, 0x20), add(_proof.offset, 0x40), mul(resultLength, 0x20))
         }
     }
 
     function computeZKsyncOSHash(
-        uint256 initialHash,
+        uint256 _initialHash,
         uint256[] calldata _publicInputs
     ) public pure returns (uint256 result) {
         uint256 publicInputsLength = _publicInputs.length;
-        result = initialHash;
+        result = _initialHash;
 
         uint256 i = 0;
 
