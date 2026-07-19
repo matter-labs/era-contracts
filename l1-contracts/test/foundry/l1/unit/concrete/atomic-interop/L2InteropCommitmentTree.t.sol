@@ -1,85 +1,88 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-import {AtomicInteropProofBuilder} from "./AtomicInteropProofBuilder.sol";
-
+import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {IL2InteropCommitmentTree} from "contracts/atomic-interop/IL2InteropCommitmentTree.sol";
 import {IMTLeaf} from "contracts/common/libraries/IndexedMerkleTree.sol";
 import {CommitmentTreeNotAppender} from "contracts/atomic-interop/AtomicInteropErrors.sol";
+import {Unauthorized} from "contracts/l2-system/zksync-os/errors/ZKOSContractErrors.sol";
 import {
     IMTAlreadyInitialized,
     IMTNotInitialized,
     IMTValueZero,
     IMTValueAlreadyExists
 } from "contracts/common/L1ContractErrors.sol";
-import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {
+    L2_ATOMIC_FLOW_MANAGER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-/// @notice Unit tests for the thin {L2InteropCommitmentTree} shell: the appender ACL, the one-shot
-/// `initialize` seed, the L2->L1 root publication on every seed/insert, and getter pass-through. The
-/// underlying tree mechanics live in {IndexedMerkleTree} and are covered by its own suite, so here we
-/// assert only what the shell adds; a couple of engine reverts are exercised to confirm they surface
-/// unchanged through `insert`. The tree is deployed at its canonical address and left UN-initialized so
-/// `initialize` can be tested from a clean slate; the L2->L1 messenger is mocked (a system contract, not
-/// under test) so publishing does not revert.
-contract L2InteropCommitmentTreeTest is AtomicInteropProofBuilder {
+/// @notice Unit tests for the thin {L2InteropCommitmentTree} shell: the one-shot upgrader-gated `initL2`
+/// seed, the appender-gated `insert`, the `RootUpdated` event, and getter pass-through. The tree publishes
+/// nothing to L1 (the bootloader reads the root from storage at batch boundaries), so the only observable
+/// output the shell adds on top of the {IndexedMerkleTree} engine is that event; every mutation asserts its
+/// exact payload (leaf index + root) against the resulting on-chain state. The underlying tree mechanics are
+/// covered by the engine's own suite, so a couple of engine reverts are exercised only to confirm they
+/// surface unchanged through `insert`.
+///
+/// The tree is deployed and left UN-initialized so `initL2` can be tested from a clean slate. This is a
+/// standalone fixture (not the shared {AtomicInteropProofBuilder}), since the tree needs no proof machinery.
+contract L2InteropCommitmentTreeTest is Test {
     uint256 internal constant VALUE_A = 100;
     uint256 internal constant VALUE_B = 200;
-    address internal constant NOT_APPENDER = address(0xBAD);
+    address internal constant STRANGER = address(0xBAD);
+
+    L2InteropCommitmentTree internal tree;
 
     function setUp() public {
-        _deployAtomicFixtures();
+        tree = new L2InteropCommitmentTree();
     }
 
-    // ============ initialize ============
+    // ============ initL2 ============
 
-    function test_initialize_seedsSentinelLeafAndPublishes() public {
-        // The seed root is published to L1 exactly once.
-        vm.expectCall(
-            address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT),
-            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector)
-        );
+    function test_initL2_seedsSentinelLeafAndEmitsRootUpdated() public {
         vm.recordLogs();
-        tree.initialize();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        tree.initL2();
 
+        // Storage: exactly the `{0,0,0}` head leaf at index 0.
         assertEq(tree.leafCount(), 1, "seed leaf count");
         IMTLeaf memory seed = tree.leafAt(0);
         assertEq(seed.value, 0, "seed value");
         assertEq(seed.nextIndex, 0, "seed nextIndex");
         assertEq(seed.nextValue, 0, "seed nextValue");
 
-        (uint256 leafIndex, bytes32 root, bool found) = _lastRootPublished(vm.getRecordedLogs());
-        assertTrue(found, "RootPublished emitted");
+        // Event: RootUpdated carries the exact seed root at index 0.
+        (uint256 leafIndex, bytes32 root, bool found) = _lastRootUpdated(vm.getRecordedLogs());
+        assertTrue(found, "RootUpdated emitted");
         assertEq(leafIndex, 0, "seed leaf index");
-        assertEq(root, tree.root(), "published root matches tree root");
+        assertEq(root, tree.root(), "emitted root matches tree root");
     }
 
-    /// @dev `initialize` is intentionally ACL-free (the appender is a fixed built-in; there is no wiring
-    /// parameter), and the seed is deterministic, so an arbitrary caller cannot influence it.
-    function test_initialize_isPermissionless() public {
-        vm.prank(NOT_APPENDER);
-        tree.initialize();
-        assertEq(tree.leafCount(), 1, "seeded regardless of caller");
+    /// @dev `initL2` is gated to the complex upgrader (the genesis-upgrade caller); no one else can seed.
+    function test_RevertWhen_initL2NotUpgrader() public {
+        vm.prank(STRANGER);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, STRANGER));
+        tree.initL2();
     }
 
-    function test_RevertWhen_initializeTwice() public {
-        tree.initialize();
+    function test_RevertWhen_initL2Twice() public {
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        tree.initL2();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         vm.expectRevert(IMTAlreadyInitialized.selector);
-        tree.initialize();
+        tree.initL2();
     }
 
     // ============ insert ============
 
-    function test_insert_appendsLeafAndPublishes() public {
-        tree.initialize();
+    function test_insert_appendsLeafAndEmitsRootUpdated() public {
+        _initTree();
 
         uint256 low = _lowNullifierIndex(VALUE_A);
-        vm.expectCall(
-            address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT),
-            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector)
-        );
         vm.recordLogs();
         vm.prank(L2_ATOMIC_FLOW_MANAGER_ADDR);
         (uint256 newIndex, bytes32 newRoot) = tree.insert(VALUE_A, low);
@@ -96,16 +99,17 @@ contract L2InteropCommitmentTreeTest is AtomicInteropProofBuilder {
         assertEq(seed.nextIndex, 1, "seed relinked nextIndex");
         assertEq(seed.nextValue, VALUE_A, "seed relinked nextValue");
 
-        (uint256 leafIndex, bytes32 root, bool found) = _lastRootPublished(vm.getRecordedLogs());
-        assertTrue(found, "RootPublished emitted");
-        assertEq(leafIndex, 1, "published leaf index");
-        assertEq(root, newRoot, "published root matches new root");
+        // Event: RootUpdated carries the exact new index + root the insert produced.
+        (uint256 leafIndex, bytes32 root, bool found) = _lastRootUpdated(vm.getRecordedLogs());
+        assertTrue(found, "RootUpdated emitted");
+        assertEq(leafIndex, newIndex, "emitted leaf index");
+        assertEq(root, newRoot, "emitted root matches new root");
     }
 
     function test_RevertWhen_insertNotAppender() public {
-        tree.initialize();
-        vm.prank(NOT_APPENDER);
-        vm.expectRevert(abi.encodeWithSelector(CommitmentTreeNotAppender.selector, NOT_APPENDER));
+        _initTree();
+        vm.prank(STRANGER);
+        vm.expectRevert(abi.encodeWithSelector(CommitmentTreeNotAppender.selector, STRANGER));
         tree.insert(VALUE_A, 0);
         // No leaf was appended.
         assertEq(tree.leafCount(), 1, "leaf count unchanged after unauthorized insert");
@@ -113,21 +117,21 @@ contract L2InteropCommitmentTreeTest is AtomicInteropProofBuilder {
 
     /// @dev Value/low-nullifier validation lives in the engine; these confirm the errors surface through
     /// the shell unchanged rather than being swallowed or re-wrapped.
-    function test_RevertWhen_insertBeforeInitialize() public {
+    function test_RevertWhen_insertBeforeInitL2() public {
         vm.prank(L2_ATOMIC_FLOW_MANAGER_ADDR);
         vm.expectRevert(IMTNotInitialized.selector);
         tree.insert(VALUE_A, 0);
     }
 
     function test_RevertWhen_insertZeroValue() public {
-        tree.initialize();
+        _initTree();
         vm.prank(L2_ATOMIC_FLOW_MANAGER_ADDR);
         vm.expectRevert(IMTValueZero.selector);
         tree.insert(0, 0);
     }
 
     function test_RevertWhen_insertDuplicateValue() public {
-        tree.initialize();
+        _initTree();
         uint256 lowA = _lowNullifierIndex(VALUE_A);
         vm.prank(L2_ATOMIC_FLOW_MANAGER_ADDR);
         tree.insert(VALUE_A, lowA);
@@ -141,7 +145,7 @@ contract L2InteropCommitmentTreeTest is AtomicInteropProofBuilder {
     // ============ getters ============
 
     function test_getters_reflectInsertedState() public {
-        tree.initialize();
+        _initTree();
         uint256 lowA = _lowNullifierIndex(VALUE_A);
         vm.prank(L2_ATOMIC_FLOW_MANAGER_ADDR);
         tree.insert(VALUE_A, lowA);
@@ -164,11 +168,29 @@ contract L2InteropCommitmentTreeTest is AtomicInteropProofBuilder {
 
     // ============ helpers ============
 
-    /// @dev Returns the last `RootPublished(uint256 indexed leafIndex, bytes32 root)` in `_logs`.
-    function _lastRootPublished(
+    /// @dev Seeds the tree as the genesis upgrader.
+    function _initTree() internal {
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        tree.initL2();
+    }
+
+    /// @dev Finds the leaf that brackets `_value` in the sorted linked list (its low-nullifier).
+    function _lowNullifierIndex(uint256 _value) internal view returns (uint256) {
+        uint256 count = tree.leafCount();
+        for (uint256 i = 0; i < count; ++i) {
+            IMTLeaf memory leaf = tree.leafAt(i);
+            if (leaf.value < _value && (leaf.nextValue == 0 || leaf.nextValue > _value)) {
+                return i;
+            }
+        }
+        revert("no low-nullifier (value present or tree empty)");
+    }
+
+    /// @dev Returns the last `RootUpdated(uint256 indexed leafIndex, bytes32 root)` in `_logs`.
+    function _lastRootUpdated(
         Vm.Log[] memory _logs
     ) internal pure returns (uint256 leafIndex, bytes32 root, bool found) {
-        bytes32 sig = IL2InteropCommitmentTree.RootPublished.selector;
+        bytes32 sig = IL2InteropCommitmentTree.RootUpdated.selector;
         for (uint256 i = _logs.length; i > 0; --i) {
             Vm.Log memory entry = _logs[i - 1];
             if (entry.topics.length == 2 && entry.topics[0] == sig) {
