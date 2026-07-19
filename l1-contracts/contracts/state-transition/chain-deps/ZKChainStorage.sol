@@ -257,4 +257,10 @@ struct ZKChainStorage {
     /// @dev Timestamp of the last base token gas price multiplier update (setTokenMultiplier).
     /// @dev STORAGE SLOT: 67
     uint256 lastTokenMultiplierUpdateTimestamp;
+    /// @dev Deprecated: previously flagged whether the chain's base token had its total supply
+    /// tracked (the pre-v31 ZKsync OS backfill machinery). The slot is retained to preserve the
+    /// storage layout of already-deployed chains across in-place testnet upgrades; it is not read
+    /// or written.
+    /// @dev STORAGE SLOT: 68
+    bool __DEPRECATED_baseTokenHasTotalSupply;
 }

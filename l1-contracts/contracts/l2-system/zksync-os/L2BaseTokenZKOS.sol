@@ -30,6 +30,12 @@ import {BaseTokenHolderAlreadyInitialized, BaseTokenHolderMintFailed} from "../.
  * This is done in `L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit()`.
  */
 contract L2BaseTokenZKOS is L2BaseTokenBase {
+    /// @dev Deprecated: previously held the pre-V31 total supply backfilled by the chain admin on
+    /// ZKsync OS chains upgraded to v31. The slot is retained to preserve the storage layout of
+    /// already-deployed contracts across in-place testnet upgrades; it is not read or written.
+    // slither-disable-next-line unused-state
+    uint256 private __DEPRECATED_zkosPreV31TotalSupply;
+
     /// @notice Returns the total circulating supply of base tokens.
     /// @dev Computed as: INITIAL_BASE_TOKEN_HOLDER_BALANCE - BaseTokenHolder.balance — every token in
     /// circulation left the BaseTokenHolder, which was seeded with the full initial balance at genesis.
