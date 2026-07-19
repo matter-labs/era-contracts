@@ -24,7 +24,12 @@ import {
     L2_INTEROP_HANDLER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {AssetIdNotSupported, EmptyAddress, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {
+    AssetIdNotSupported,
+    EmptyAddress,
+    RecoverToL1NotSupported,
+    Unauthorized
+} from "../../common/L1ContractErrors.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
 import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 
@@ -132,7 +137,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     }
 
     /// @notice Checks that the message sender is the canonical atomic-flow manager, which drives
-    /// `recoverAtomicCall` for the L1-free atomic interop flow's timeout path. On chains without the
+    /// `recoverAtomicCall` for the atomic interop flow's timeout path. On chains without the
     /// atomic-flow stack nothing is deployed at that address, so this gate naturally never passes.
     modifier onlyAtomicFlowManager() {
         require(msg.sender == _atomicFlowManagerAddr(), Unauthorized(msg.sender));
@@ -282,6 +287,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         uint256 _destChainId,
         bytes calldata _callData
     ) external onlyAtomicFlowManager nonReentrant returns (bool recovered) {
+        // L2->L1 interop is never revertable ({InteropCenter} rejects L1-destined atomic bundles at send),
+        // so no L1-destined burn can ever be recovered. Assert it: the L1-withdrawal accounting
+        // (`totalWithdrawalsToL1`, consumed once during the L1->GW migration) must stay append-only.
+        require(_destChainId != L1_CHAIN_ID, RecoverToL1NotSupported());
         if (_callData.length < 4 || bytes4(_callData[:4]) != AssetRouterBase.finalizeDeposit.selector) {
             return false;
         }

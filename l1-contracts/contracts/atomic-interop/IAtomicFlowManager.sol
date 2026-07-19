@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
-import {LegState, AtomicFlow, AtomicTimeoutProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
+import {LegState, AtomicFlow, ImtProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Per-chain coordinator for the L1-free **atomic interop** flow. It is *not* an escrow: it
+/// @notice Per-chain coordinator for the **atomic interop** flow. It is *not* an escrow: it
 /// never custodies funds. The asset burn happens through the normal interop path
 /// ({InteropCenter.sendBundle} -> {L2AssetRouter.initiateIndirectCall}); this contract only
 /// coordinates the cross-chain atomicity and the timeout recovery, gated by **IMT proofs** against
@@ -20,7 +20,7 @@ import {LegState, AtomicFlow, AtomicTimeoutProof, AtomicFinalityProof} from "./I
 ///      the deadline. The handler then executes the bundle (and owns the double-execute guard).
 ///   3. `authorizeRefund` / `claimRefund` — the timeout path: prove (O(log n) non-inclusion) that a leg
 ///      can no longer be committed in time, then **recover** the burned source funds to the depositor
-///      by asking each of the bundle's call targets to reverse itself via
+///      by asking each burn-producing call's local sender (`InteropCall.from`) to reverse itself via
 ///      {IAtomicRecoverable.recoverAtomicCall}.
 ///
 /// `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`,
@@ -29,7 +29,7 @@ import {LegState, AtomicFlow, AtomicTimeoutProof, AtomicFinalityProof} from "./I
 /// need not be ascending). All legs settle on one `settlementLayerChainId`, so the deadline (a settlement-
 /// layer timestamp) is comparable to each batch's `l1Timestamp`.
 ///
-/// Deployed as an L2 predeploy (no constructor) — wiring is done in `initialize`.
+/// Deployed as an L2 predeploy (no constructor).
 interface IAtomicFlowManager {
     event FlowCommitted(bytes32 indexed flowId, bytes32 indexed bundleHash, uint64 deadline, uint256 leafIndex);
     event FlowRefundAuthorized(bytes32 indexed flowId, bytes32 indexed bundleHash);
@@ -44,9 +44,10 @@ interface IAtomicFlowManager {
     function append(bytes32 _flowId, bytes32 _bundleHash, uint64 _deadline, uint256 _lowNullifierIndex) external;
 
     /// @notice Revert if the flow is not fully committed in time. Callable only by the {InteropHandler}.
-    /// Verifies an inclusion proof for every leg against its source chain's IMT (each in a batch whose
-    /// `l1Timestamp <= deadline`), recomputes `flowId`, ties each proof to its source chain
-    /// and the flow's settlement layer, and asserts the bundle being executed is a leg of the flow.
+    /// Verifies an inclusion proof for every leg against its source chain's IMT (the finality
+    /// condition — see the {AtomicInteropProof} library header), recomputes `flowId`, ties each proof
+    /// to its source chain and the flow's settlement layer, and asserts the bundle being executed is
+    /// a leg of the flow.
     /// @param _executingBundleHash The bundle hash the handler is about to execute.
     /// @param _finality The flow definition + per-leg inclusion proofs.
     function requireFlowFinalized(bytes32 _executingBundleHash, AtomicFinalityProof calldata _finality) external view;
@@ -54,16 +55,12 @@ interface IAtomicFlowManager {
     /// @notice Mark this chain's committed source legs `Revertable` for a flow that can no longer
     /// finalize, proven by a timeout for one leg. Permissionless.
     /// @param _flow The flow definition ({AtomicFlow}); its `flowId` is recomputed from the other fields
-    /// and matched. The timeout proofs for the missing leg must target
+    /// and matched. The absence proof for the missing leg must target
     /// `_flow.legSourceChainIds[_missingLegIndex]`.
     /// @param _missingLegIndex Index into `_flow.legBundleHashes` of the leg proven absent.
-    /// @param _timeout Timeout proof: absence at the last batch `N` with `t_N <= deadline`, plus its
-    /// consecutive successor `N+1` with `t_{N+1} > deadline`.
-    function authorizeRefund(
-        AtomicFlow calldata _flow,
-        uint256 _missingLegIndex,
-        AtomicTimeoutProof calldata _timeout
-    ) external;
+    /// @param _absence Timeout proof for the missing leg's commit value (the timeout condition —
+    /// see {AtomicInteropProof.verifyTimeoutAbsence} and the {AtomicInteropProof} library header).
+    function authorizeRefund(AtomicFlow calldata _flow, uint256 _missingLegIndex, ImtProof calldata _absence) external;
 
     /// @notice Recover the burned source funds for a `Revertable` leg by reversing the bundle's
     /// asset-router calls (re-minting each burned asset to its depositor). Permissionless. State
@@ -73,6 +70,10 @@ interface IAtomicFlowManager {
 
     /// @notice Current source-leg state of a `(flowId, bundleHash)` on this chain.
     function legState(bytes32 _flowId, bytes32 _bundleHash) external view returns (LegState);
+
+    /// @notice One-time L2 initialization performed by the genesis upgrade; sets the L1 chain ID
+    /// every flow's settlement layer is checked against.
+    function initL2(uint256 _l1ChainId) external;
 
     /// @notice The interop commitment tree this manager inserts into.
     function commitmentTree() external view returns (address);

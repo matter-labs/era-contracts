@@ -10,6 +10,8 @@ import {LegState} from "./IAtomicInterop.sol";
 error CommitmentTreeNotAppender(address sender);
 
 // ── AtomicFlowManager errors ─────────────────────────────────────────────────────────
+/// @dev `initL2` was called on an already-initialized manager.
+error ManagerAlreadyInitialized();
 /// @dev `append` is restricted to the canonical {InteropCenter}.
 error ManagerNotInteropCenter(address sender);
 /// @dev `requireFlowFinalized` is restricted to the canonical {InteropHandler}.
@@ -33,18 +35,40 @@ error ManagerExecutingBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
 /// @dev The reverted bundle has no recoverable calls, so there are no source funds to return.
 error ManagerNoRecoverableCalls(bytes32 flowId, bytes32 bundleHash);
 
+/// @dev The flow declares a settlement layer other than L1; in this release interop legs settle on
+/// L1 only.
+error ManagerSettlementLayerNotL1(uint256 expectedL1ChainId, uint256 actual);
+
 // ── AtomicInteropProof library errors ────────────────────────────────────────────────
-/// @dev The commitment tree's `(root)` message could not be proven against the imported interop root
-/// for `(chainId, batchNumber)`.
-error ProofRootMessageInclusionFailed(uint256 chainId, uint256 batchNumber);
-/// @dev The proof is a single-level / commit-based (final-node) proof, which carries no settlement-layer
-/// block anchor. The atomic flow requires a multi-hop / SL-global proof so the deadline can be checked
-/// against `pd.settlementLayerBatchNumber`.
-error ProofMissingSettlementLayerAnchor(uint256 chainId, uint256 batchNumber);
-/// @dev The batch's `l1Timestamp` is newer than the deadline (inclusion / absence-batch path).
+/// @dev The claimed IMT root could not be proven as a chain-batch-root leaf of `(chainId, batchNumber)`
+/// against the imported interop root.
+error ProofImtRootInclusionFailed(uint256 chainId, uint256 batchNumber, bytes32 imtRoot);
+/// @dev The leaf-to-chain-batch-root section of the proof is not exactly {ChainBatchRootTree.TREE_DEPTH}
+/// hops. Pinning the depth guarantees the claimed value is a real batch-boundary IMT root leaf; a longer
+/// path could descend into the IMT itself and pass off an internal node as "the root".
+error ProofInvalidChainBatchRootDepth(uint256 expected, uint256 actual);
+/// @dev The proof is a single-level / commit-based (final-node) proof, which carries no
+/// settlement-layer batch reference. The atomic flow requires a multi-hop / SL-global proof so the
+/// deadline can be checked against `pd.settlementLayerBatchNumber`.
+error ProofMissingSettlementLayerBatch(uint256 chainId, uint256 batchNumber);
+/// @dev The batch's `l1Timestamp` is newer than the deadline (inclusion path; a batch with
+/// `t > deadline` is late).
 error ProofDeadlineExceeded(uint256 batchTimestamp, uint64 deadline);
-/// @dev The batch's `l1Timestamp` is not strictly after the deadline (adjacency-successor path).
-error ProofDeadlineNotExceeded(uint256 batchTimestamp, uint64 deadline);
+/// @dev The aggregated root the timeout proof resolves against was not created strictly after the
+/// deadline (the timestamp in `interopRoots[slChainId][slBlock]` is `<= deadline`; an unset entry
+/// reads as 0 and is rejected too).
+error ProofInteropRootNotAfterDeadline(uint256 rootTimestamp, uint64 deadline);
+/// @dev No interop root was ever imported for the settlement-layer block the proof resolves against.
+error ProofSettlementLayerInteropRootNotImported(uint256 slChainId, uint256 slBlock);
+/// @dev The batch used for the in-time (`t <= deadline`) branch of the timeout proof is not the source
+/// chain's last batch inside the aggregated root: the batch-leaf Merkle path has a populated right
+/// sibling at `level` where the empty-subtree hash was required.
+error ProofNotLastBatchInRoot(uint256 level, bytes32 sibling);
+
+/// @dev The prover-declared timeout branch does not match the authenticated batch inclusion time:
+/// the begin-root branch requires a late batch (`l1BatchTimestamp > deadline`), the end-root branch
+/// an in-time one (`l1BatchTimestamp <= deadline`).
+error ProofTimeoutBranchMismatch(bool provesAgainstBeginRoot, uint256 l1BatchTimestamp, uint256 deadline);
 /// @dev The commit value is not a member of the authenticated root.
 error ProofInclusionFailed(bytes32 root, uint256 value);
 /// @dev The low-nullifier does not certify absence of the commit value in the authenticated root.
@@ -57,7 +81,3 @@ error ProofSourceChainMismatch(uint256 expectedSourceChainId, uint256 proofSourc
 /// Legs settling on different settlement layers have incomparable deadline/timestamp scales, so rejecting
 /// them keeps the single-`deadline` comparison well-defined.
 error ProofSettlementLayerMismatch(uint256 expectedSlChainId, uint256 proofSlChainId);
-/// @dev The timeout's adjacency witness is not the consecutive successor of the absence batch
-/// (`successorBatchNumber != absenceBatchNumber + 1`). The witness must be batch N+1 so it pins N as the
-/// last batch with `l1Timestamp <= deadline`.
-error ProofAdjacencyNotConsecutive(uint256 absenceBatchNumber, uint256 successorBatchNumber);

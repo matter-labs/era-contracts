@@ -238,6 +238,32 @@ library MessageHashing {
         });
     }
 
+    /// @dev The batch-leaf Merkle path (mask + siblings) of a multi-hop proof's aggregation-hop
+    /// section, read positionally by {readAggregationHopPath}.
+    struct AggregationHopPath {
+        /// @dev The Merkle mask of the batch leaf inside the chain's batch tree.
+        uint256 batchLeafProofMask;
+        /// @dev The batch leaf's sibling path inside the chain's batch tree.
+        bytes32[] batchLeafSiblings;
+    }
+
+    /// @notice Reads the aggregation-hop batch-leaf Merkle path from a proof. This is the single
+    /// place that knows the proof's word layout; external libraries must consume this accessor
+    /// instead of parsing the metadata themselves.
+    /// @dev The returned words can be trusted ONLY if the caller has already run the same
+    /// proof bytes through the leaf verifier (`proveL2LeafInclusionShared` / {_getProofData}): the
+    /// identical words are folded into the reconstructed batch leaf there, which is what
+    /// authenticates them — call this AFTER that verification. The function also assumes that if the proof was for a
+    /// `finalProofNode`, it has been rejected.
+    function readAggregationHopPath(bytes32[] calldata _proof) internal pure returns (AggregationHopPath memory path) {
+        ProofMetadata memory metadata = parseProofMetadata(_proof);
+        // Word layout after the leaf-to-batch-root section (see {_getProofData}):
+        // [l1Timestamp][batchLeafProofMask][batchLeafProofLen siblings]...
+        uint256 ptr = metadata.proofStartIndex + metadata.logLeafProofLen;
+        path.batchLeafProofMask = uint256(_proof[ptr + 1]);
+        path.batchLeafSiblings = extractSlice(_proof, ptr + 2, ptr + 2 + metadata.batchLeafProofLen);
+    }
+
     /// @notice Extracts slice from the proof.
     /// @param _proof The proof.
     /// @param _left The left index.

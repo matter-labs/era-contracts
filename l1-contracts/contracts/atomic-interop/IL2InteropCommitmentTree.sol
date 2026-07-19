@@ -8,17 +8,21 @@ import {IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
 /// @notice Per-chain **Indexed Merkle Tree** of interop commit values. Whenever a participant does
 /// their part in a flow, the leg's commit value is inserted here. Each {IMTLeaf} points to the
 /// next-larger value in the tree, so the structure supports O(log n) proofs of both membership and
-/// non-membership (via a "low nullifier" leaf). On every insert the tree publishes `abi.encode(root)`
-/// to L1 via the L2->L1 messenger; consuming chains authenticate that message against the interop root
-/// they imported for the settling batch (see {AtomicInteropProof}), which is what makes the root
-/// trustworthy. The tree publishes no timestamp: the deadline is checked against the batch's
-/// `l1Timestamp`, which is folded into the chain batch leaf and re-derived in-module from the inclusion proof.
+/// non-membership (via a "low nullifier" leaf). The tree publishes nothing itself: the ZKsync OS
+/// bootloader reads the root directly from this contract's storage at every batch boundary and
+/// commits both snapshots (batch begin / batch end) into the batch's chain batch root (see
+/// {ChainBatchRootTree}); consuming chains authenticate a claimed root as that leaf against the
+/// interop root they imported for the settling batch (see {AtomicInteropProof}), which is what makes
+/// the root trustworthy. The tree publishes no timestamp either: the deadline is checked against the
+/// batch's `l1Timestamp`, which is folded into the chain batch leaf and re-derived from the inclusion proof.
 ///
-/// Deployed in L2 userspace (CREATE2), so it has no constructor — wiring is done in `initialize`.
+/// Deployed as an L2 genesis predeploy (no constructor); the one-time seeding is done in `initL2`,
+/// called by the genesis upgrade like the other L2 built-ins.
 interface IL2InteropCommitmentTree {
-    /// @notice Emitted after a new root is published to L1: the `{0,0,0}` head seed at `initialize`,
-    /// then one per inserted value.
-    event RootPublished(uint256 indexed leafIndex, bytes32 root);
+    /// @notice Emitted whenever the root changes: the `{0,0,0}` head seed at `initL2`, then one
+    /// per inserted value. For off-chain indexing only — cross-chain consumers read the root from the
+    /// chain batch root, not from events or messages.
+    event RootUpdated(uint256 indexed leafIndex, bytes32 root);
 
     /// @notice Insert `_value` into the indexed tree. Callable only by the configured appender.
     /// @param _value The value to insert (a domain-tagged commit value, never 0).
@@ -41,6 +45,9 @@ interface IL2InteropCommitmentTree {
     /// @notice The fixed-depth Merkle path (siblings, leaf level up) for the leaf at `_index`.
     function merklePath(uint256 _index) external view returns (bytes32[] memory);
 
-    /// @notice The address allowed to insert (the escrow).
+    /// @notice One-time L2 initialization performed by the genesis upgrade: seeds the IMT.
+    function initL2() external;
+
+    /// @notice The address allowed to insert (the canonical {AtomicFlowManager}).
     function appender() external view returns (address);
 }

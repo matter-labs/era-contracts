@@ -14,7 +14,7 @@
   },
   {
     "type": "function",
-    "name": "initialize",
+    "name": "initL2",
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
@@ -131,7 +131,7 @@
   },
   {
     "type": "event",
-    "name": "RootPublished",
+    "name": "RootUpdated",
     "inputs": [
       {
         "name": "leafIndex",
@@ -251,6 +251,17 @@
         "name": "maxNodeNumber",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "Unauthorized",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   }

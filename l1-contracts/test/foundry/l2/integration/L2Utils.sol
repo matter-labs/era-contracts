@@ -56,6 +56,7 @@ import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/_Share
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 import {BytecodeUtils} from "deploy-scripts/utils/bytecode/BytecodeUtils.s.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
+import {L2ChainAssetHandlerDev} from "contracts/dev-contracts/L2ChainAssetHandlerDev.sol";
 import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 
 library L2Utils {
@@ -152,8 +153,11 @@ library L2Utils {
     }
 
     function forceDeployChainAssetHandler(SystemContractsArgs memory _args) internal {
-        new L2ChainAssetHandler();
-        forceDeployWithoutConstructor("L2ChainAssetHandler", L2_CHAIN_ASSET_HANDLER_ADDR);
+        // The Dev variant re-enables chain migrations, which are explicitly disabled in the
+        // production contracts for the v32 release (see `CHAIN_MIGRATIONS_ENABLED` in `Config.sol`),
+        // so that the L2 migration machinery stays covered by these tests.
+        new L2ChainAssetHandlerDev();
+        forceDeployWithoutConstructor("L2ChainAssetHandlerDev", L2_CHAIN_ASSET_HANDLER_ADDR);
         L2ChainAssetHandler chainAssetHandler = L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         chainAssetHandler.initL2(_args.l1ChainId, _args.aliasedOwner);

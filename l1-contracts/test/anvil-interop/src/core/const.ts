@@ -30,7 +30,7 @@ export const L2_INTEROP_HANDLER_ADDR = "0x00000000000000000000000000000000000100
 export const L2_ASSET_TRACKER_ADDR = "0x000000000000000000000000000000000001000f";
 export const L2_BASE_TOKEN_HOLDER_ADDR = "0x0000000000000000000000000000000000010011";
 
-// L1-free atomic interop (bundle model) canonical built-in addresses. Mirrors
+// Atomic interop (bundle model) canonical built-in addresses. Mirrors
 // L2_INTEROP_COMMITMENT_TREE_ADDR / L2_ATOMIC_FLOW_MANAGER_ADDR in
 // contracts/common/l2-helpers/L2ContractAddresses.sol. Slot 0x10013 is intentionally
 // skipped: it previously hosted the removed L2GlobalInteropRootImporter.
