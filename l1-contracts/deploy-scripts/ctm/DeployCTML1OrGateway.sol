@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IEraDualVerifier} from "contracts/state-transition/chain-interfaces/IEraDualVerifier.sol";
-import {IZKsyncOSDualVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSDualVerifier.sol";
+import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
 
 struct CTMCoreDeploymentConfig {
     bool isZKsyncOS;
@@ -59,7 +59,7 @@ library DeployCTML1OrGateway {
         fileName = string.concat(contractName, ".sol");
     }
 
-    /// @notice Resolve the main verifier (dual or testnet) for the active VM.
+    /// @notice Resolve the main or testnet verifier for the active VM.
     function resolveMainVerifier(
         bool _isZKsyncOS,
         bool _testnet
@@ -98,7 +98,10 @@ library DeployCTML1OrGateway {
         } else if (_contractName == CTMContract.DiamondInit) {
             return abi.encode(_isZKsyncOS);
         } else if (_contractName == CTMContract.DualVerifier || _contractName == CTMContract.TestnetVerifier) {
-            return abi.encode(_config.verifierFflonk, _config.verifierPlonk);
+            return
+                _isZKsyncOS
+                    ? abi.encode(_config.verifierPlonk)
+                    : abi.encode(_config.verifierFflonk, _config.verifierPlonk);
         } else if (_contractName == CTMContract.ChainTypeManager) {
             return
                 abi.encode(
@@ -144,7 +147,7 @@ library DeployCTML1OrGateway {
         ) {
             return CTMContract.TestnetVerifier;
         } else if (
-            _compareStrings(_contractName, "EraDualVerifier") || _compareStrings(_contractName, "ZKsyncOSDualVerifier")
+            _compareStrings(_contractName, "EraDualVerifier") || _compareStrings(_contractName, "ZKsyncOSVerifier")
         ) {
             return CTMContract.DualVerifier;
         } else {
@@ -154,7 +157,7 @@ library DeployCTML1OrGateway {
 
     // ======================== Verifier helpers ========================
 
-    /// @notice Retrieve sub-verifier addresses from a deployed dual verifier.
+    /// @notice Retrieve sub-verifier addresses from a deployed verifier.
     function getSubVerifiers(
         address _verifier,
         bool _isZKsyncOS
@@ -164,8 +167,7 @@ library DeployCTML1OrGateway {
         }
 
         if (_isZKsyncOS) {
-            IZKsyncOSDualVerifier verifier = IZKsyncOSDualVerifier(_verifier);
-            fflonk = address(verifier.FFLONK_VERIFIER());
+            IZKsyncOSVerifier verifier = IZKsyncOSVerifier(_verifier);
             plonk = address(verifier.PLONK_VERIFIER());
         } else {
             IEraDualVerifier verifier = IEraDualVerifier(_verifier);
@@ -180,10 +182,15 @@ library DeployCTML1OrGateway {
     // solhint-disable-next-line code-complexity
     function _resolveCTMContractName(bool _isZKsyncOS, CTMContract _c) private view returns (string memory) {
         // Contracts with different names per VM
-        if (_c == CTMContract.ChainTypeManager) return _isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
-        if (_c == CTMContract.VerifierFflonk) return _isZKsyncOS ? "ZKsyncOSVerifierFflonk" : "EraVerifierFflonk";
+        if (_c == CTMContract.ChainTypeManager) {
+            return _isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
+        }
+        if (_c == CTMContract.VerifierFflonk) {
+            if (_isZKsyncOS) revert("DeployCTML1OrGateway: ZKsync OS does not use FFLONK");
+            return "EraVerifierFflonk";
+        }
         if (_c == CTMContract.VerifierPlonk) return _isZKsyncOS ? "ZKsyncOSVerifierPlonk" : "EraVerifierPlonk";
-        if (_c == CTMContract.DualVerifier) return _isZKsyncOS ? "ZKsyncOSDualVerifier" : "EraDualVerifier";
+        if (_c == CTMContract.DualVerifier) return _isZKsyncOS ? "ZKsyncOSVerifier" : "EraDualVerifier";
         if (_c == CTMContract.TestnetVerifier) return _isZKsyncOS ? "ZKsyncOSTestnetVerifier" : "EraTestnetVerifier";
         if (_c == CTMContract.GatewayCTMDeployerCTM) {
             return _isZKsyncOS ? "GatewayCTMDeployerCTMZKsyncOS" : "GatewayCTMDeployerCTM";

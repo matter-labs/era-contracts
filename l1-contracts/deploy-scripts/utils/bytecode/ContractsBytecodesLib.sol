@@ -109,7 +109,7 @@ library ContractsBytecodesLib {
             "InteropCenter",
             "L2InteropHandler",
             "EraDualVerifier",
-            "ZKsyncOSDualVerifier",
+            "ZKsyncOSVerifier",
             "L1GenesisUpgrade",
             "L2AdminFactory",
             "L2AssetRouter",
@@ -176,8 +176,6 @@ library ContractsBytecodesLib {
             return Utils.readBytecodeL1(false, "EraVerifierFflonk.sol", "EraVerifierFflonk");
         } else if (Utils.compareStrings(contractIdentifier, "EraVerifierPlonk")) {
             return Utils.readBytecodeL1(false, "EraVerifierPlonk.sol", "EraVerifierPlonk");
-        } else if (Utils.compareStrings(contractIdentifier, "ZKsyncOSVerifierFflonk")) {
-            return Utils.readBytecodeL1(false, "ZKsyncOSVerifierFflonk.sol", "ZKsyncOSVerifierFflonk");
         } else if (Utils.compareStrings(contractIdentifier, "ZKsyncOSVerifierPlonk")) {
             return Utils.readBytecodeL1(false, "ZKsyncOSVerifierPlonk.sol", "ZKsyncOSVerifierPlonk");
         }
