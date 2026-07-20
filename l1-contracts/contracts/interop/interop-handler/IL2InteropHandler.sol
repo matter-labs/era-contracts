@@ -20,7 +20,9 @@ interface IL2InteropHandler is IInteropHandlerBase {
     function executeAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) external;
 
     /// @notice Verifies receipt of an atomic bundle without executing its calls (enables verify->unbundle).
+    /// @dev Named distinctly from {L1InteropHandler.verifyBundle} (which takes a `MessageInclusionProof`),
+    /// matching {executeAtomicBundle}.
     /// @param _bundle ABI-encoded InteropBundle to verify.
     /// @param _finality The flow definition + one IMT inclusion proof per leg.
-    function verifyBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) external;
+    function verifyAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) external;
 }

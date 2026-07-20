@@ -53,7 +53,7 @@ abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
 
         vm.chainId(destinationChainId);
-        L2_INTEROP_HANDLER.verifyBundle(bundle, proof);
+        L2_INTEROP_HANDLER.verifyAtomicBundle(bundle, proof);
 
         // Verify bundle status is Verified after verifyBundle call
         assertEq(

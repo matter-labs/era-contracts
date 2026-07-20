@@ -231,7 +231,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encode(bytes32(0))
         );
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
-        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(bundle, finality);
         CallStatus[] memory callStatuses1 = new CallStatus[](3);
         callStatuses1[0] = CallStatus.Unprocessed;
         callStatuses1[1] = CallStatus.Cancelled;
@@ -411,7 +411,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encodeWithSelector(WrongDestinationChainId.selector, bundleHash, wrongChainId, block.chainid)
         );
 
-        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(bundle, finality);
     }
 
     /// @notice Test that verifyBundle works while settling on L1.
@@ -433,7 +433,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
 
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
 
-        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(bundle, finality);
 
         assertEq(
             uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
@@ -464,7 +464,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             )
         );
 
-        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(bundle, finality);
     }
 
     /// @notice Test pause functionality in InteropCenter
@@ -550,7 +550,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         vm.expectEmit(true, false, false, false);
         emit IInteropHandlerBase.BundleVerified(bundleHash);
 
-        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, finality);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(bundle, finality);
 
         // Verify the bundle status was updated correctly
         assertEq(

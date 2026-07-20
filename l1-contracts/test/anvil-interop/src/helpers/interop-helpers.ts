@@ -681,7 +681,7 @@ export async function verifyBundle(
   const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
-  const tx = await interopHandler.verifyBundle(bundleData, proof, { gasLimit: DEFAULT_TX_GAS_LIMIT });
+  const tx = await interopHandler.verifyAtomicBundle(bundleData, proof, { gasLimit: DEFAULT_TX_GAS_LIMIT });
   return tx.wait();
 }
 

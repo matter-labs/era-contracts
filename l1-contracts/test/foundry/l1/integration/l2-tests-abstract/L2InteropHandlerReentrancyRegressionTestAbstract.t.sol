@@ -50,7 +50,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         // Inner payload: verifyBundle over an EMPTY bundle. The finality gate is mocked, so `_getBundleData`'s
         // empty-bundle check — not the gate — is what reverts.
         AtomicFinalityProof memory innerFinality;
-        bytes memory innerPayload = abi.encodeCall(L2InteropHandler.verifyBundle, (new bytes(0), innerFinality));
+        bytes memory innerPayload = abi.encodeCall(L2InteropHandler.verifyAtomicBundle, (new bytes(0), innerFinality));
 
         // Outer bundle whose single call targets L2InteropHandler.receiveMessage with that payload.
         InteropCall[] memory calls = new InteropCall[](1);
@@ -179,7 +179,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
     }
 
     /// @notice `verifyBundle` must not carry a nonReentrant guard: a bundle may re-enter to verify a nested one.
-    /// @dev Positive oracle: executeAtomicBundle(outer) -> receiveMessage -> this.verifyBundle(inner) succeeds, so the
+    /// @dev Positive oracle: executeAtomicBundle(outer) -> receiveMessage -> this.verifyAtomicBundle(inner) succeeds, so the
     ///      outer bundle ends up `FullyExecuted` and the nested bundle `Verified`. Before the fix the nested
     ///      call reverted with `Reentrancy`.
     function test_regression_verifyBundleNoReentrancyGuard() public {
@@ -211,10 +211,10 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         AtomicFinalityProof memory innerProof;
 
         // Payload for receiveMessage that dispatches to verifyBundle(innerBundle)
-        bytes memory innerPayload = abi.encodeCall(L2InteropHandler.verifyBundle, (encodedInnerBundle, innerProof));
+        bytes memory innerPayload = abi.encodeCall(L2InteropHandler.verifyAtomicBundle, (encodedInnerBundle, innerProof));
 
         // Outer bundle: its call targets L2InteropHandler.receiveMessage with the above payload.
-        // Call chain: executeAtomicBundle(outer) -> _executeCalls -> receiveMessage -> this.verifyBundle(inner)
+        // Call chain: executeAtomicBundle(outer) -> _executeCalls -> receiveMessage -> this.verifyAtomicBundle(inner)
         InteropCall[] memory outerCalls = new InteropCall[](1);
         outerCalls[0] = InteropCall({
             version: INTEROP_CALL_VERSION,

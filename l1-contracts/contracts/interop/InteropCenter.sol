@@ -318,16 +318,13 @@ contract InteropCenter is
         ) = _parseBundleInputs(_callStarters, _bundleAttributes);
 
         // slither-disable-next-line unused-return
-        (InteropBundle memory bundle, , ) = _buildInteropBundle(
-            destinationChainId,
-            callStartersInternal,
-            bundleAttributes
-        );
-        // Quoter pattern: this function runs the same stateful bundle assembly as `sendBundle` (including the
-        // value-burning `initiateIndirectCall` for indirect legs), so it MUST NOT be able to commit that burn
-        // on-chain. Reverting with the computed hash — instead of returning it — guarantees every state change
-        // made while assembling the bundle is rolled back, no matter who calls it and in what context. Callers
-        // read the hash out of the `InteropPreviewHash` revert reason via a static `eth_call`.
+        (InteropBundle memory bundle, , ) = _buildInteropBundle(destinationChainId, callStartersInternal, bundleAttributes);
+        // Quoter pattern: this runs the same stateful assembly as `sendBundle` (including the value-burning
+        // `initiateIndirectCall` for indirect legs), so it MUST NOT commit that burn on-chain. Reverting with
+        // the hash — instead of returning it — rolls back every state change made while assembling, regardless
+        // of caller/context. Callers read the hash from the `InteropPreviewHash` revert via a static `eth_call`.
+        // (Kept inline rather than in a shared helper: the memory-array passing to a helper pushes this
+        // contract over the EIP-170 code-size limit.)
         revert InteropPreviewHash(_hashBundle(bundle));
     }
 
@@ -360,13 +357,9 @@ contract InteropCenter is
         });
 
         // slither-disable-next-line unused-return
-        (InteropBundle memory bundle, , ) = _buildInteropBundle(
-            recipientChainId,
-            callStartersInternal,
-            bundleAttributes
-        );
-        // Quoter pattern: reverts with the computed hash so the stateful assembly above (including any
-        // value-burning indirect call) can never be committed on-chain. See {previewBundleHash}.
+        (InteropBundle memory bundle, , ) = _buildInteropBundle(recipientChainId, callStartersInternal, bundleAttributes);
+        // Quoter pattern (see {previewBundleHash}): revert with the hash so the stateful assembly above cannot
+        // commit on-chain. Kept inline for the same EIP-170 code-size reason.
         revert InteropPreviewHash(_hashBundle(bundle));
     }
 

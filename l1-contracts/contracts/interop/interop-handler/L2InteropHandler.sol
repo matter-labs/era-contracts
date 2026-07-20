@@ -9,8 +9,6 @@ import {IL2InteropHandler} from "./IL2InteropHandler.sol";
 import {IAtomicFlowManager} from "../../atomic-interop/IAtomicFlowManager.sol";
 import {AtomicFinalityProof} from "../../atomic-interop/IAtomicInterop.sol";
 import {BundleStatus, InteropBundle} from "../../common/Messaging.sol";
-import {ExecutingNotAllowed} from "../InteropErrors.sol";
-import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 
 /// @title L2InteropHandler
@@ -70,7 +68,7 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
     /// @notice Verifies receipt of an atomic bundle without executing its calls, enabling the verify->unbundle flow.
     /// @param _bundle ABI-encoded InteropBundle to verify.
     /// @param _finality The flow definition + one IMT inclusion proof per leg.
-    function verifyBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public override {
+    function verifyAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public override {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
         _validateVerifiable(bundleHash, interopBundle, interopBundle.sourceChainId, status);
@@ -92,7 +90,7 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
 
     /// @inheritdoc InteropHandlerBase
     function _verifyBundleSelector() internal view override returns (bytes4) {
-        return this.verifyBundle.selector;
+        return this.verifyAtomicBundle.selector;
     }
 
     /// @inheritdoc InteropHandlerBase
@@ -107,17 +105,15 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
             (bytes, AtomicFinalityProof)
         );
 
-        // Decode the bundle to get execution permissions
+        // Enforce the bundle's execution-address permission against the wrapped message's sender.
         (InteropBundle memory interopBundle, bytes32 bundleHash, ) = _getBundleData(bundle);
-        if (interopBundle.bundleAttributes.executionAddress.length != 0) {
-            (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
-                interopBundle.bundleAttributes.executionAddress
-            );
-            require(
-                (executionChainId == _senderChainId || executionChainId == 0) && executionAddress == _senderAddress,
-                ExecutingNotAllowed(bundleHash, _sender, interopBundle.bundleAttributes.executionAddress)
-            );
-        }
+        _requireRescueExecutionAllowed({
+            _bundleHash: bundleHash,
+            _interopBundle: interopBundle,
+            _senderChainId: _senderChainId,
+            _senderAddress: _senderAddress,
+            _sender: _sender
+        });
 
         this.executeAtomicBundle(bundle, finality);
     }
@@ -130,7 +126,7 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
         );
 
         // Bundle verification is permissionless
-        this.verifyBundle(bundle, finality);
+        this.verifyAtomicBundle(bundle, finality);
     }
 
     /*//////////////////////////////////////////////////////////////

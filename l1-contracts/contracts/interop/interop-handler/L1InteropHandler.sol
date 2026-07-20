@@ -7,7 +7,6 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 
 import {InteropHandlerBase} from "./InteropHandlerBase.sol";
 
-import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 import {L2_INTEROP_CENTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {BUNDLE_IDENTIFIER, BundleStatus, InteropBundle, MessageInclusionProof} from "../../common/Messaging.sol";
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
@@ -15,7 +14,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
 import {InteropWithdrawalNonZeroValue} from "../../bridge/L1BridgeContractErrors.sol";
 import {ZeroAddress} from "../../common/L1ContractErrors.sol";
-import {ExecutingNotAllowed, MessageNotIncluded, UnauthorizedMessageSender} from "../InteropErrors.sol";
+import {MessageNotIncluded, UnauthorizedMessageSender} from "../InteropErrors.sol";
 
 /// @title L1InteropHandler
 /// @author Matter Labs
@@ -119,17 +118,15 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
             (bytes, MessageInclusionProof)
         );
 
-        // Decode the bundle to get execution permissions
+        // Enforce the bundle's execution-address permission against the wrapped message's sender.
         (InteropBundle memory interopBundle, bytes32 bundleHash, ) = _getBundleData(bundle);
-        if (interopBundle.bundleAttributes.executionAddress.length != 0) {
-            (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
-                interopBundle.bundleAttributes.executionAddress
-            );
-            require(
-                (executionChainId == _senderChainId || executionChainId == 0) && executionAddress == _senderAddress,
-                ExecutingNotAllowed(bundleHash, _sender, interopBundle.bundleAttributes.executionAddress)
-            );
-        }
+        _requireRescueExecutionAllowed({
+            _bundleHash: bundleHash,
+            _interopBundle: interopBundle,
+            _senderChainId: _senderChainId,
+            _senderAddress: _senderAddress,
+            _sender: _sender
+        });
 
         this.executeBundle(bundle, proof);
     }

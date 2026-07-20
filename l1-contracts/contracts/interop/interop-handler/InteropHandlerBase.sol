@@ -56,6 +56,11 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
     /// @notice Tracks the individual call statuses within a bundle.
     mapping(bytes32 bundleHash => mapping(uint256 callIndex => CallStatus callStatus)) public callStatus;
 
+    /// @dev Reserved storage to allow future additions to this shared base without shifting the storage of
+    /// the derived {L1InteropHandler}/{L2InteropHandler} (which currently declare no storage of their own).
+    // slither-disable-next-line unused-state
+    uint256[50] private __gap;
+
     /*//////////////////////////////////////////////////////////////
                         Environment-specific hooks
     //////////////////////////////////////////////////////////////*/
@@ -251,6 +256,29 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
                 InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
                 _interopBundle.bundleAttributes.executionAddress
             )
+        );
+    }
+
+    /// @notice Execution-address permission gate for the `receiveMessage` rescue path, shared by the derived
+    /// `_receiveExecuteBundle` implementations (which differ only in proof type).
+    /// @dev On the rescue path the executor is the wrapped message's sender (`_senderChainId`/`_senderAddress`),
+    /// not `msg.sender` (which is always this contract here); permissionless when no `executionAddress` is set.
+    function _requireRescueExecutionAllowed(
+        bytes32 _bundleHash,
+        InteropBundle memory _interopBundle,
+        uint256 _senderChainId,
+        address _senderAddress,
+        bytes calldata _sender
+    ) internal pure {
+        if (_interopBundle.bundleAttributes.executionAddress.length == 0) {
+            return;
+        }
+        (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
+            _interopBundle.bundleAttributes.executionAddress
+        );
+        require(
+            (executionChainId == _senderChainId || executionChainId == 0) && executionAddress == _senderAddress,
+            ExecutingNotAllowed(_bundleHash, _sender, _interopBundle.bundleAttributes.executionAddress)
         );
     }
 
