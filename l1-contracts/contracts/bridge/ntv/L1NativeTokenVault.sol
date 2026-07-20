@@ -140,19 +140,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     }
 
     /*//////////////////////////////////////////////////////////////
-                            V31 migration
-    //////////////////////////////////////////////////////////////*/
-
-    function migrateTokenBalanceToAssetTracker(
-        uint256 _chainId,
-        bytes32 _assetId
-    ) external onlyAssetTracker returns (uint256) {
-        uint256 amount = DEPRECATED_chainBalance[_chainId][_assetId];
-        DEPRECATED_chainBalance[_chainId][_assetId] = 0;
-        return amount;
-    }
-
-    /*//////////////////////////////////////////////////////////////
                             Check counterpart Functions
     //////////////////////////////////////////////////////////////*/
 
