@@ -449,8 +449,8 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     // Create a NEW bundle from the source chain that contains 2 calls to L2_INTEROP_HANDLER_ADDR
     const interopHandlerIface = new ethers.utils.Interface(getAbi("L2InteropHandler"));
 
-    // Call 1: verifyBundle(bundleData, proof)
-    const verifyCalldata = interopHandlerIface.encodeFunctionData("verifyBundle", [
+    // Call 1: verifyAtomicBundle(bundleData, proof)
+    const verifyCalldata = interopHandlerIface.encodeFunctionData("verifyAtomicBundle", [
       executionData.bundleData,
       executionData.proof,
     ]);

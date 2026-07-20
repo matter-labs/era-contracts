@@ -857,6 +857,8 @@ contract InteropCenter is
         bytes[] calldata _attributes,
         AttributeParsingRestrictions _restriction
     ) public pure returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) {
+        // The tuple IS returned to our caller; slither's unused-return misfires on `return extCall()`.
+        // slither-disable-next-line unused-return
         return _parser().parseAttributes(_attributes, _restriction);
     }
 
