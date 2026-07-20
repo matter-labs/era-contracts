@@ -92,8 +92,9 @@ contract AtomicFlowManager is IAtomicFlowManager {
         uint256 _lowNullifierIndex,
         AtomicFlowPreimage calldata _flowPreimage
     ) external onlyInteropCenter {
-        // Same check order as the finalize/refund paths (shape checks first, then settlement layer), so
-        // an identically malformed preimage reverts with the same reason on every path.
+        // The checks shared with the finalize/refund paths (preimage shape, then settlement layer) run
+        // in the same order here, so a preimage all paths reject reverts with the same reason on each
+        // of them. The send-only coupling checks (bundle-is-a-leg, source-is-this-chain) follow below.
         bytes32 flowId = _validateAndComputeFlowId(
             _flowPreimage.legBundleHashes,
             _flowPreimage.legSourceChainIds,
