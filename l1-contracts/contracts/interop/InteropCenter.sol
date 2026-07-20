@@ -326,8 +326,7 @@ contract InteropCenter is
         (InteropBundle memory bundle, , ) = _buildInteropBundle(
             destinationChainId,
             callStartersInternal,
-            bundleAttributes,
-            msg.sender
+            bundleAttributes
         );
         // Quoter pattern: this function runs the same stateful bundle assembly as `sendBundle` (including the
         // value-burning `initiateIndirectCall` for indirect legs), so it MUST NOT be able to commit that burn
@@ -369,8 +368,7 @@ contract InteropCenter is
         (InteropBundle memory bundle, , ) = _buildInteropBundle(
             recipientChainId,
             callStartersInternal,
-            bundleAttributes,
-            msg.sender
+            bundleAttributes
         );
         // Quoter pattern: reverts with the computed hash so the stateful assembly above (including any
         // value-burning indirect call) can never be committed on-chain. See {previewBundleHash}.
@@ -586,18 +584,21 @@ contract InteropCenter is
         AtomicSend memory _atomicSend
     ) internal returns (bytes32 bundleHash) {
         // Reject invalid atomicity/destination combinations up front, before any stateful bundle assembly
-        // or value burn (both `sendMessage` and `sendBundle` funnel through here):
-        //  - An atomic bundle can never target L1: it is not published as an L2->L1 message (its commit
-        //    value goes to the IMT instead) and L1 has no atomic execution, so its only possible outcome
-        //    would be a timeout refund — but L2->L1 withdrawals must never be revertable (their
-        //    `totalWithdrawalsToL1` accounting is consumed once during the L1->GW migration and must stay
-        //    append-only, see {L2AssetTracker}).
-        // A non-atomic L2->L2 send (public interop was removed) is likewise unsupported, but it is rejected
-        // in `_dispatchBundle` rather than here so that destination-validity checks (`DestinationChainNotRegistered`,
-        // empty-address `ZeroAddress`) surface first; any burn done in the assembly below is rolled back by the
-        // revert regardless.
+        // or value burn (both `sendMessage` and `sendBundle` funnel through here). Exactly one destination is
+        // valid per atomicity:
+        //  - Atomic  => an L2 destination. An atomic bundle can never target L1: it is not published as an
+        //    L2->L1 message (its commit value goes to the IMT instead) and L1 has no atomic execution, so
+        //    its only possible outcome would be a timeout refund — but L2->L1 withdrawals must never be
+        //    revertable (their `totalWithdrawalsToL1` accounting is consumed once during the L1->GW migration
+        //    and must stay append-only, see {L2AssetTracker}).
+        //  - Non-atomic => L1 (an L2->L1 withdrawal). Public (L1-published) L2->L2 interop was removed, so a
+        //    non-atomic L2->L2 send has no delivery path.
+        // The empty call-starter address (`ZeroAddress`) is already rejected earlier in `_parseBundleInputs`;
+        // `DestinationChainNotRegistered` for a bad L2 destination still surfaces from the assembly below.
         if (_atomicSend.isAtomic) {
             require(_destinationChainId != L1_CHAIN_ID, AtomicBundleToL1NotSupported());
+        } else {
+            require(_destinationChainId == L1_CHAIN_ID, NonAtomicSendUnsupported());
         }
 
         // Note: no gateway-mode requirement here — interop bundles may be sent by chains settling
@@ -620,7 +621,7 @@ contract InteropCenter is
             InteropBundle memory bundle,
             uint256 totalBurnedCallsValue,
             uint256 totalIndirectCallsValue
-        ) = _buildInteropBundle(_destinationChainId, _callStarters, _bundleAttributes, msg.sender);
+        ) = _buildInteropBundle(_destinationChainId, _callStarters, _bundleAttributes);
 
         // If using fixed fees, collect ZK tokens per-call and accumulate for coinbase.
         uint256 callStartersLength = _callStarters.length;
@@ -673,8 +674,7 @@ contract InteropCenter is
     function _buildInteropBundle(
         uint256 _destinationChainId,
         InteropCallStarterInternal[] memory _callStarters,
-        BundleAttributes memory _bundleAttributes,
-        address _sender
+        BundleAttributes memory _bundleAttributes
     ) internal returns (InteropBundle memory bundle, uint256 totalBurnedCallsValue, uint256 totalIndirectCallsValue) {
         // For an L2->L1 bundle the L1 chain is not registered as an interop destination in the L2 Bridgehub,
         // so its base-token asset id is the L1-native ETH asset id (which is NOT necessarily this L2's base
@@ -691,7 +691,7 @@ contract InteropCenter is
             // Mixing in `msg.sender` ensures bundles from different senders can never collide, while the user-provided salt
             // lets the sender control uniqueness of their own bundles. A random user-provided salt additionally keeps the
             // resulting bundle hash unpredictable, preserving the bundle's privacy.
-            interopBundleSalt: keccak256(abi.encodePacked(_sender, _bundleAttributes.salt)),
+            interopBundleSalt: keccak256(abi.encodePacked(msg.sender, _bundleAttributes.salt)),
             calls: new InteropCall[](_callStarters.length),
             bundleAttributes: _bundleAttributes
         });
@@ -718,8 +718,7 @@ contract InteropCenter is
                     NonZeroValueToL1NotSupported(_callStarters[i].callAttributes.interopCallValue)
                 );
             }
-            _validateCallStarterValue(_callStarters[i].callAttributes.interopCallValue);
-            InteropCall memory interopCall = _processCallStarter(_callStarters[i], _destinationChainId, _sender);
+            InteropCall memory interopCall = _processCallStarter(_callStarters[i], _destinationChainId);
             bundle.calls[i] = interopCall;
             totalBurnedCallsValue += _callStarters[i].callAttributes.interopCallValue;
             // For indirect calls, also account for the bridge message value that gets sent to the AssetRouter
@@ -741,10 +740,6 @@ contract InteropCenter is
         return assetId;
     }
 
-    /// @notice Validates a single call starter's interopCallValue. Any value is allowed.
-    function _validateCallStarterValue(uint256 /* _interopCallValue */) internal pure {
-        // No validation needed.
-    }
 
     /// @notice Handles base-token value collection for the bundle.
     function _handleValueCollection(
@@ -796,13 +791,8 @@ contract InteropCenter is
             return (bundleHash, msgHash);
         }
 
-        // L2->L2 interop: atomic-only. Public (L1-published) L2->L2 interop has been removed, so a send
-        // without the `atomicBundle` attribute has no delivery path. (Atomic L2->L1 is rejected earlier in
-        // `_sendBundle`.) This runs after bundle assembly so destination-validity errors surface first; the
-        // assembly's burn is rolled back by this revert.
-        if (!_atomicSend.isAtomic) {
-            revert NonAtomicSendUnsupported();
-        }
+        // L2->L2 interop: atomic-only (`_sendBundle` already guaranteed `isAtomic` for a non-L1 destination
+        // and rejected atomic-to-L1). Append the leg's commit value to the interop IMT.
         IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
             _flowId: _atomicSend.flowId,
             _bundleHash: bundleHash,
@@ -835,8 +825,7 @@ contract InteropCenter is
 
     function _processCallStarter(
         InteropCallStarterInternal memory _callStarter,
-        uint256 _destinationChainId,
-        address _sender
+        uint256 _destinationChainId
     ) internal returns (InteropCall memory interopCall) {
         // Use the already-parsed address from InteropCallStarterInternal
         address recipientAddress = _callStarter.to;
@@ -848,7 +837,7 @@ contract InteropCenter is
             // slither-disable-next-line arbitrary-send-eth
             InteropCallStarter memory actualCallStarter = IL2CrossChainSender(recipientAddress).initiateIndirectCall{
                 value: _callStarter.callAttributes.indirectCallMessageValue
-            }(_destinationChainId, _sender, _callStarter.callAttributes.interopCallValue, _callStarter.data);
+            }(_destinationChainId, msg.sender, _callStarter.callAttributes.interopCallValue, _callStarter.data);
             // solhint-disable-next-line no-unused-vars
             // slither-disable-next-line unused-return
             (CallAttributes memory indirectCallAttributes, ) = this.parseAttributes(
@@ -880,7 +869,7 @@ contract InteropCenter is
                 to: recipientAddress,
                 data: _callStarter.data,
                 value: _callStarter.callAttributes.interopCallValue,
-                from: _sender
+                from: msg.sender
             });
         }
     }

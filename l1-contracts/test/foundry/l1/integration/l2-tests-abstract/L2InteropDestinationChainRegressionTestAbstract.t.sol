@@ -55,7 +55,11 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
 
         // Attempt to send the bundle - should revert with DestinationChainNotRegistered
         vm.expectRevert(abi.encodeWithSelector(DestinationChainNotRegistered.selector, UNREGISTERED_CHAIN_ID));
-        L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(UNREGISTERED_CHAIN_ID), calls, bundleAttributes);
+        L2_INTEROP_CENTER.sendBundle(
+            InteroperableAddress.formatEvmV1(UNREGISTERED_CHAIN_ID),
+            calls,
+            _withAtomicBundle(bundleAttributes)
+        );
     }
 
     /// @notice Test that sending with value to an unregistered chain also reverts
@@ -91,7 +95,7 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
         L2_INTEROP_CENTER.sendBundle{value: interopCallValue}(
             InteroperableAddress.formatEvmV1(UNREGISTERED_CHAIN_ID),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
     }
 
@@ -156,7 +160,11 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
         bundleAttributes2[1] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (bytes32(uint256(1))));
 
         vm.expectRevert(abi.encodeWithSelector(DestinationChainNotRegistered.selector, UNREGISTERED_CHAIN_ID));
-        L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(UNREGISTERED_CHAIN_ID), calls, bundleAttributes2);
+        L2_INTEROP_CENTER.sendBundle(
+            InteroperableAddress.formatEvmV1(UNREGISTERED_CHAIN_ID),
+            calls,
+            _withAtomicBundle(bundleAttributes2)
+        );
     }
 
     /// @notice Fuzz test with various unregistered chain IDs
@@ -188,6 +196,10 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
         bundleAttributes[0] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
         vm.expectRevert(abi.encodeWithSelector(DestinationChainNotRegistered.selector, randomChainId));
-        L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(randomChainId), calls, bundleAttributes);
+        L2_INTEROP_CENTER.sendBundle(
+            InteroperableAddress.formatEvmV1(randomChainId),
+            calls,
+            _withAtomicBundle(bundleAttributes)
+        );
     }
 }
