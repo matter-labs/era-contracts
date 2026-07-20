@@ -35,6 +35,8 @@ error ManagerNotInteropHandler(address sender);
 error ManagerProofCountMismatch(uint256 legs, uint256 proofs);
 // 0xbf1e3a23
 error ManagerSettlementLayerNotL1(uint256 expectedL1ChainId, uint256 actual);
+// 0x9f73095b
+error ManagerTooManyLegs(uint256 maxLegs, uint256 actualLegs);
 // 0x2911a778
 error ProofDeadlineExceeded(uint256 batchTimestamp, uint64 deadline);
 // 0x0aa51bc5

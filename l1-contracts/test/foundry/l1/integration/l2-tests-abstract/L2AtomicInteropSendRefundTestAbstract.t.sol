@@ -14,6 +14,7 @@ import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.so
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {AtomicFlow, AtomicFlowPreimage, ImtProof, LegState} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {ManagerCommittedBundleNotInFlow} from "contracts/atomic-interop/AtomicInteropErrors.sol";
+import {AtomicBundleExecutionAddressWrongChain} from "contracts/interop/InteropErrors.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropBundle, InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
@@ -290,6 +291,108 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
             uint256(manager.legState(_flowIdOf(preimage), predicted)),
             uint256(LegState.Unset),
             "no leg state may exist after the reverted send"
+        );
+    }
+
+    /// @dev The atomic attribute set of `_atomicAttributes` plus an `executionAddress` bundle attribute.
+    function _atomicAttributesWithExecutionAddress(
+        AtomicFlowPreimage memory _preimage,
+        bytes32 _salt,
+        bytes memory _executionAddress
+    ) internal pure returns (bytes[] memory attrs) {
+        attrs = new bytes[](3);
+        attrs[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (_salt));
+        attrs[1] = abi.encodeCall(IERC7786Attributes.atomicBundle, (_preimage, 0));
+        attrs[2] = abi.encodeCall(IERC7786Attributes.executionAddress, (_executionAddress));
+    }
+
+    /// @dev Like {_predictBundleHash}, but the dry run also carries the `executionAddress` attribute —
+    /// it is part of the bundle (unlike the atomic metadata), so the prediction must include it.
+    function _predictBundleHashWithExecutionAddress(
+        InteropCallStarter[] memory _calls,
+        bytes32 _salt,
+        bytes memory _executionAddress
+    ) internal returns (bytes32 predicted) {
+        bytes[] memory attrs = new bytes[](2);
+        attrs[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (_salt));
+        attrs[1] = abi.encodeCall(IERC7786Attributes.executionAddress, (_executionAddress));
+        uint256 snapshotId = vm.snapshotState();
+        predicted = l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(destinationChainId), _calls, attrs);
+        vm.revertToState(snapshotId);
+    }
+
+    /// @notice The unreachable-executor footgun regression, through the real entry point: an atomic
+    /// bundle whose `executionAddress` is pinned to a chain other than the destination reverts the whole
+    /// `sendBundle` — burn unwound, sender's balance untouched. Atomic execution happens only via the
+    /// destination handler's `executeAtomicBundle` (no `receiveMessage` relay path), so such an executor
+    /// could never reach the bundle: it would be permanently unexecutable and, once every leg of the flow
+    /// commits, unrefundable.
+    function test_atomicSend_RevertWhen_ExecutionAddressPinnedToForeignChain() public {
+        _setUpAtomicStack();
+        address l2Token = initializeTokenByDeposit();
+        bytes32 salt = keccak256("atomic foreign execution address salt");
+        InteropCallStarter[] memory calls = _tokenCallStarter(l2Token, TRANSFER_AMOUNT);
+        // Pinned to the SOURCE chain — the natural mistake this check exists for.
+        bytes memory executionAddress = InteroperableAddress.formatEvmV1(block.chainid, makeAddr("atomic executor"));
+
+        bytes32 predicted = _predictBundleHashWithExecutionAddress(calls, salt, executionAddress);
+        (AtomicFlowPreimage memory preimage, ) = _preimageWithInvalidRemoteLeg(predicted);
+        uint256 balanceBefore = IERC20(l2Token).balanceOf(address(this));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(AtomicBundleExecutionAddressWrongChain.selector, destinationChainId, block.chainid)
+        );
+        l2InteropCenter.sendBundle(
+            InteroperableAddress.formatEvmV1(destinationChainId),
+            calls,
+            _atomicAttributesWithExecutionAddress(preimage, salt, executionAddress)
+        );
+
+        assertEq(
+            IERC20(l2Token).balanceOf(address(this)),
+            balanceBefore,
+            "the burn must be unwound with the reverted send"
+        );
+    }
+
+    /// @dev Shared happy path for the reachable `executionAddress` forms: the atomic send commits the
+    /// leg exactly as an executor-less one does.
+    function _assertAtomicSendCommitsWithExecutionAddress(bytes memory _executionAddress, bytes32 _salt) internal {
+        _setUpAtomicStack();
+        address l2Token = initializeTokenByDeposit();
+        InteropCallStarter[] memory calls = _tokenCallStarter(l2Token, TRANSFER_AMOUNT);
+
+        bytes32 predicted = _predictBundleHashWithExecutionAddress(calls, _salt, _executionAddress);
+        (AtomicFlowPreimage memory preimage, ) = _preimageWithInvalidRemoteLeg(predicted);
+
+        bytes32 bundleHash = l2InteropCenter.sendBundle(
+            InteroperableAddress.formatEvmV1(destinationChainId),
+            calls,
+            _atomicAttributesWithExecutionAddress(preimage, _salt, _executionAddress)
+        );
+
+        assertEq(bundleHash, predicted, "the atomic bundle hash must match the non-atomic prediction");
+        assertEq(
+            uint256(AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).legState(_flowIdOf(preimage), bundleHash)),
+            uint256(LegState.Committed),
+            "leg must be Committed after the send"
+        );
+    }
+
+    /// @notice An executor pinned to the destination chain is reachable and commits fine.
+    function test_atomicSend_ExecutionAddressOnDestinationChain_Commits() public {
+        _assertAtomicSendCommitsWithExecutionAddress(
+            InteroperableAddress.formatEvmV1(destinationChainId, makeAddr("atomic executor")),
+            keccak256("atomic destination execution address salt")
+        );
+    }
+
+    /// @notice A chain-agnostic executor (empty chain reference, parses to chain id 0) is admitted by
+    /// the destination handler's gate and commits fine.
+    function test_atomicSend_ChainAgnosticExecutionAddress_Commits() public {
+        _assertAtomicSendCommitsWithExecutionAddress(
+            InteroperableAddress.formatEvmV1(makeAddr("atomic executor")),
+            keccak256("atomic chain-agnostic execution address salt")
         );
     }
 }

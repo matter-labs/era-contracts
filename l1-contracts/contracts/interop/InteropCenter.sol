@@ -38,6 +38,7 @@ import {MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/
 
 import {
     AtomicBundleCallCarriesValue,
+    AtomicBundleExecutionAddressWrongChain,
     AtomicBundleNotAllowedInSendMessage,
     AtomicBundleToL1NotSupported,
     AttributeAlreadySet,
@@ -701,9 +702,25 @@ contract InteropCenter is
     /// and timeout recovery is best-effort (see {AtomicFlowManager._recoverBundle}). Refund safety for a
     /// fund-moving leg is therefore the flow author's responsibility; only native-`value` legs — which no
     /// one can reverse — are blocked here.
-    /// @dev `pure`, since it inspects only the bundle's own calls. Every atomic send passes through
+    /// @notice Also rejects an `executionAddress` pinned to a chain other than the destination. An atomic
+    /// bundle's only execution entry point is the destination handler's `executeAtomicBundle`, which — unlike
+    /// normal-bundle execution — has no `receiveMessage` relay path, so its permission gate only ever admits
+    /// the pinned address on the destination chain itself (or chain-agnostically via chain id 0). Any other
+    /// chain id names an executor that can never reach the bundle: it would be permanently unexecutable and,
+    /// once every leg of the flow commits, the absence-based timeout refund would be impossible too.
+    /// @dev `pure`, since it inspects only the bundle's own fields. Every atomic send passes through
     /// {_dispatchBundle}, so this covers all atomic bundles regardless of entry path.
     function _validateAtomicBundle(InteropBundle memory _bundle) internal pure {
+        bytes memory executionAddress = _bundle.bundleAttributes.executionAddress;
+        // An empty execution address means permissionless execution and is always reachable.
+        if (executionAddress.length != 0) {
+            // slither-disable-next-line unused-return
+            (uint256 executionChainId, ) = InteroperableAddress.parseEvmV1(executionAddress);
+            if (executionChainId != _bundle.destinationChainId && executionChainId != 0) {
+                revert AtomicBundleExecutionAddressWrongChain(_bundle.destinationChainId, executionChainId);
+            }
+        }
+
         uint256 callsLength = _bundle.calls.length;
         for (uint256 i = 0; i < callsLength; ++i) {
             InteropCall memory currentCall = _bundle.calls[i];

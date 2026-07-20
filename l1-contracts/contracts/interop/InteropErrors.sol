@@ -3,6 +3,8 @@ pragma solidity ^0.8.21;
 
 // 0x74882034
 error AtomicBundleCallCarriesValue(uint256 callIndex, uint256 value);
+// 0x0e6661c2
+error AtomicBundleExecutionAddressWrongChain(uint256 destinationChainId, uint256 executionChainId);
 // 0xcd677e60
 error AtomicBundleNotAllowedInSendMessage();
 // 0x979e85dd
@@ -41,12 +43,12 @@ error InteropCallToL1NotToAssetRouter(address target);
 error InteroperableAddressChainReferenceNotEmpty(bytes interoperableAddress);
 // 0x884f49ba
 error InteroperableAddressNotEmpty(bytes interoperableAddress);
-// 0x9b021130
-error InteropToSelfNotSupported();
 // 0x2d48e8cf
 error InteropRootAlreadyExists();
 // 0x8a011102
 error InteropRootTimestampIsZero();
+// 0x9b021130
+error InteropToSelfNotSupported();
 // 0xeae192ef
 error InvalidInteropBundleVersion();
 // 0xd5f13973

@@ -15,8 +15,10 @@ import {
     ManagerLegSourceChainIdsLengthMismatch,
     ManagerLegSourceChainNotRegistered,
     ManagerNotInteropCenter,
-    ManagerSettlementLayerNotL1
+    ManagerSettlementLayerNotL1,
+    ManagerTooManyLegs
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
+import {MAX_ATOMIC_FLOW_LEGS} from "contracts/interop/InteropConstants.sol";
 import {
     L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_BRIDGEHUB_ADDR,
@@ -249,6 +251,47 @@ contract AtomicFlowManagerAppendTest is Test {
             uint256(manager.legState(_flowId(preimage), legA)),
             uint256(LegState.Committed),
             "all-local leg must commit without any registry entry"
+        );
+    }
+
+    /// @dev A preimage with `_legCount` legs, all declared with this chain as their source (so the
+    /// Bridgehub registry is never consulted). Leg hashes are `bytes32(1..legCount)` — strictly
+    /// ascending by construction.
+    function _manyLocalLegsPreimage(uint256 _legCount) internal view returns (AtomicFlowPreimage memory preimage) {
+        preimage.deadline = DEADLINE;
+        preimage.settlementLayerChainId = L1_CHAIN_ID;
+        preimage.legBundleHashes = new bytes32[](_legCount);
+        preimage.legSourceChainIds = new uint256[](_legCount);
+        for (uint256 i = 0; i < _legCount; ++i) {
+            preimage.legBundleHashes[i] = bytes32(i + 1);
+            preimage.legSourceChainIds[i] = block.chainid;
+        }
+    }
+
+    /// @notice The unbounded-leg-count footgun regression: a preimage exceeding {MAX_ATOMIC_FLOW_LEGS}
+    /// is rejected at send time. Each `append` is individually cheap, so every leg of an oversized flow
+    /// could otherwise commit at its source while finalization — one IMT + settlement proof per leg in a
+    /// single transaction — exceeds the transaction gas/calldata limits forever; with all legs committed,
+    /// the absence-based refund would be impossible too.
+    function test_append_RevertWhen_TooManyLegs() public {
+        AtomicFlowPreimage memory preimage = _manyLocalLegsPreimage(MAX_ATOMIC_FLOW_LEGS + 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ManagerTooManyLegs.selector, MAX_ATOMIC_FLOW_LEGS, MAX_ATOMIC_FLOW_LEGS + 1)
+        );
+        _appendAsInteropCenter(preimage.legBundleHashes[0], preimage);
+    }
+
+    /// @notice Boundary: a flow with exactly {MAX_ATOMIC_FLOW_LEGS} legs commits fine.
+    function test_append_MaxLegsBoundaryCommits() public {
+        AtomicFlowPreimage memory preimage = _manyLocalLegsPreimage(MAX_ATOMIC_FLOW_LEGS);
+        bytes32 firstLeg = preimage.legBundleHashes[0];
+
+        _appendAsInteropCenter(firstLeg, preimage);
+        assertEq(
+            uint256(manager.legState(_flowId(preimage), firstLeg)),
+            uint256(LegState.Committed),
+            "a max-size flow's leg must commit"
         );
     }
 

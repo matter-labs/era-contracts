@@ -77,9 +77,12 @@ be refunded.
    EOA — need not implement the interface); the refund succeeds as long as at least one call recovered.
    Consequently the protocol does not guarantee full refundability of an arbitrary bundle — making a
    fund-moving leg recoverable (an asset-router deposit) is the flow author's responsibility. Atomic
-   sends reject only native-`value` legs (which can never be reversed) and L1 destinations (an atomic
+   sends reject only native-`value` legs (which can never be reversed), L1 destinations (an atomic
    bundle is never published to L1 and could only ever time out — but L2->L1 withdrawals must never be
-   revertable, see `L2AssetTracker`).
+   revertable, see `L2AssetTracker`), an `executionAddress` pinned to a chain other than the destination
+   (atomic execution has no relay path, so such an executor could never reach the bundle), and flows
+   with more than `MAX_ATOMIC_FLOW_LEGS` legs (finalization proves every leg in one transaction, so an
+   unbounded flow could become too large to ever finalize).
 
 Leg state machine (`LegState`): `Unset -> Committed` (send) `-> Revertable -> Reverted` (timeout path).
 

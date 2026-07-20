@@ -72,7 +72,9 @@ struct ImtProof {
 /// @param deadline The flow deadline (a settlement-layer timestamp).
 /// @param settlementLayerChainId The single settlement layer every leg must settle on; committed in
 /// `flowId` and asserted equal to each proof's resolved `slChainId`.
-/// @param legBundleHashes All legs' bundle hashes, strictly ascending (canonical order + dedup).
+/// @param legBundleHashes All legs' bundle hashes, strictly ascending (canonical order + dedup). At most
+/// {MAX_ATOMIC_FLOW_LEGS} legs: finalization proves every leg in one transaction, so an unbounded flow
+/// could become too large to ever finalize (and, fully committed, too late to refund).
 /// @param legSourceChainIds Each leg's source chain id, aligned 1:1 with `legBundleHashes`. May repeat
 /// and need not be ascending. Every entry must be the sending chain itself or a Bridgehub-registered
 /// interop chain — a chain with no MessageRoot presence could never prove its leg committed or absent,

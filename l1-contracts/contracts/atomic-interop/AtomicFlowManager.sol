@@ -8,6 +8,7 @@ import {AtomicInteropProof} from "./libraries/AtomicInteropProof.sol";
 import {LegState, AtomicFlow, AtomicFlowPreimage, ImtProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
 import {InteropDataEncoding} from "../interop/InteropDataEncoding.sol";
+import {MAX_ATOMIC_FLOW_LEGS} from "../interop/InteropConstants.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
@@ -32,6 +33,7 @@ import {
     ManagerExecutingBundleNotInFlow,
     ManagerNoRecoverableCalls,
     ManagerSettlementLayerNotL1,
+    ManagerTooManyLegs,
     ProofSourceChainMismatch
 } from "./AtomicInteropErrors.sol";
 import {Unauthorized} from "../l2-system/zksync-os/errors/ZKOSContractErrors.sol";
@@ -294,8 +296,9 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// Consequence: the protocol does not guarantee full refundability of an arbitrary bundle. A flow author
     /// must make any fund-moving leg a recoverable (asset-router) call to have it returned on timeout; a
     /// non-recoverable fund-moving call would strand its funds. Send-time ({InteropCenter}) only blocks
-    /// native-`value` legs (which no one can reverse) and L1-destined atomic bundles (L2->L1 withdrawals
-    /// are never revertable).
+    /// native-`value` legs (which no one can reverse), L1-destined atomic bundles (L2->L1 withdrawals
+    /// are never revertable), and execution addresses pinned to a chain that could never execute the
+    /// bundle (see {InteropCenter._validateAtomicBundle}).
     function _recoverBundle(bytes32 _flowId, bytes32 _bundleHash, InteropBundle memory _bundle) internal {
         uint256 destChainId = _bundle.destinationChainId;
         uint256 callsLen = _bundle.calls.length;
@@ -340,6 +343,12 @@ contract AtomicFlowManager is IAtomicFlowManager {
 
     /// @dev Canonicalizes and hashes a flowId preimage:
     /// `flowId = keccak256(abi.encode(preimage))`.
+    /// `legBundleHashes` must hold at most {MAX_ATOMIC_FLOW_LEGS} legs: finalization verifies one IMT
+    /// inclusion proof (plus its multi-hop settlement proof) per leg in a single transaction, so an
+    /// unbounded flow could commit on every source yet exceed the transaction gas / calldata limits on
+    /// every finalization attempt — unexecutable and, with all legs committed, unrefundable. Enforced
+    /// here — the shared validator — so an oversized preimage is rejected at send time (`append`),
+    /// before anything burns, rather than surfacing only at finalization.
     /// `legBundleHashes` must be strictly ascending (canonical order + dedup). `legSourceChainIds` is
     /// positional, aligned 1:1 with `legBundleHashes`; it may repeat and need not be ascending, so only its
     /// length is checked. Treating it as an ascending set instead would let a sibling chain in the set
@@ -348,6 +357,9 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// between them.
     function _validateAndComputeFlowId(AtomicFlowPreimage calldata _preimage) internal pure returns (bytes32) {
         uint256 n = _preimage.legBundleHashes.length;
+        if (n > MAX_ATOMIC_FLOW_LEGS) {
+            revert ManagerTooManyLegs(MAX_ATOMIC_FLOW_LEGS, n);
+        }
         for (uint256 i = 1; i < n; ++i) {
             if (_preimage.legBundleHashes[i] <= _preimage.legBundleHashes[i - 1]) {
                 revert ManagerBundleHashesNotSorted();

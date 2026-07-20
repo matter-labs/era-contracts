@@ -737,6 +737,22 @@
   },
   {
     "type": "error",
+    "name": "ManagerTooManyLegs",
+    "inputs": [
+      {
+        "name": "maxLegs",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "actualLegs",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "MerkleIndexOutOfBounds",
     "inputs": []
   },

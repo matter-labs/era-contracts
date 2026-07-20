@@ -852,6 +852,22 @@
   },
   {
     "type": "error",
+    "name": "AtomicBundleExecutionAddressWrongChain",
+    "inputs": [
+      {
+        "name": "destinationChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "executionChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "AtomicBundleNotAllowedInSendMessage",
     "inputs": []
   },
