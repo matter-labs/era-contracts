@@ -38,15 +38,20 @@ interface IAtomicFlowManager {
     event FlowRefunded(bytes32 indexed flowId, bytes32 indexed bundleHash);
 
     /// @notice Record an atomic source leg: recompute `flowId` from the supplied preimage, verify the
-    /// committing bundle is one of the flow's legs (declared with this chain as its source), insert the
-    /// leg's commit value into the interop IMT and mark it `Committed`. Callable only by the
-    /// {InteropCenter}. State `Unset -> Committed`.
+    /// committing bundle is one of the flow's legs (declared with this chain as its source) and that
+    /// every other leg declares an interop-registered source chain, insert the leg's commit value into
+    /// the interop IMT and mark it `Committed`. Callable only by the {InteropCenter}.
+    /// State `Unset -> Committed`.
     /// @dev Taking the full preimage — rather than an opaque, sender-supplied `flowId` — is what couples
     /// the committed leg to its flow. With an opaque id, a bundle committed under a `flowId` whose
     /// preimage does not contain its hash (e.g. because an upgrade changed the bundle encoding between
     /// the sender's off-chain hash preview and the send) would be stranded forever: it could neither
     /// finalize nor be refunded, since both paths require the leg to be inside the preimage. Here such a
     /// mismatch makes the whole send revert before any state is committed.
+    /// @dev Every non-local leg's declared source chain must be Bridgehub-registered. A leg declaring a
+    /// chain with no presence in the settlement layer's MessageRoot could never be proven committed OR
+    /// absent (the refund path binds the absence proof to the declared source chain), so committing
+    /// alongside it would strand this chain's burned leg; registration guarantees that presence.
     /// @param _bundleHash `keccak256(abi.encode(sourceChainId, interopBundleBytes))` of this leg.
     /// @param _lowNullifierIndex The low-nullifier slot for the commit value (from the IMT engine).
     /// @param _flowPreimage The full `flowId` preimage ({AtomicFlowPreimage}): the flow's deadline,

@@ -776,8 +776,28 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       customError("AtomicFlowManager", "ManagerCommittedLegSourceChainMismatch(bytes32,uint256,uint256)")
     );
 
-    // 3. The exact same bundle with a well-formed preimage still sends fine (control for 1/2: proves
-    //    the reverts above came from the coupling checks, not from the send setup).
+    // 3. Preimage whose co-leg declares a source chain the Bridgehub does not know. Such a phantom
+    //    leg could never be proven committed OR absent (no MessageRoot presence), so without this
+    //    send-time gate the local burned leg would be stranded with neither finalization nor refund.
+    const unregisteredChainId = 999_999;
+    const phantomLegs = [
+      { hash: realHash, chainId: chainA.chainId },
+      { hash: strayLeg, chainId: unregisteredChainId },
+    ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
+    await expectRevert(
+      sendWithPreimage(
+        flowPreimageOf(
+          phantomLegs.map((l) => l.hash),
+          phantomLegs.map((l) => l.chainId),
+          deadline
+        )
+      ),
+      "atomic send with unregistered co-leg source chain",
+      customError("AtomicFlowManager", "ManagerLegSourceChainNotRegistered(uint256)")
+    );
+
+    // 4. The exact same bundle with a well-formed preimage still sends fine (control for 1/2/3: proves
+    //    the reverts above came from the coupling/registration checks, not from the send setup).
     const controlLegs = [
       { hash: realHash, chainId: chainA.chainId },
       { hash: strayLeg, chainId: chainB.chainId },

@@ -15,6 +15,7 @@ import {
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_INTEROP_HANDLER_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {
     ManagerAlreadyInitialized,
     ManagerNotInteropCenter,
@@ -25,6 +26,7 @@ import {
     ManagerBundleHashesNotSorted,
     ManagerCommittedBundleNotInFlow,
     ManagerCommittedLegSourceChainMismatch,
+    ManagerLegSourceChainNotRegistered,
     ManagerLegSourceChainIdsLengthMismatch,
     ManagerProofCountMismatch,
     ManagerExecutingBundleNotInFlow,
@@ -124,6 +126,23 @@ contract AtomicFlowManager is IAtomicFlowManager {
                 block.chainid,
                 _flowPreimage.legSourceChainIds[legIndex]
             );
+        }
+
+        // Every other leg's declared source must be an interop-registered chain (this chain is always
+        // acceptable — its legs are validated by the coupling check above when committed). Registration
+        // implies presence in the settlement layer's MessageRoot (`ChainRegistrationSender` gates on
+        // `chainTreeLeafCount > 0`, fresh chains are genesis-seeded), which the refund path requires:
+        // the absence proof is bound to the missing leg's declared source chain, so a leg declaring a
+        // chain with no MessageRoot presence could never be proven absent (nor, being fabricated,
+        // committed) and every committed leg of the flow — including this one — would be stranded.
+        // This also rejects L1 as a declared source (never registered as an interop chain here), which
+        // matches send-side reality: interop bundles cannot be initiated on L1.
+        for (uint256 i = 0; i < n; ++i) {
+            uint256 legSourceChainId = _flowPreimage.legSourceChainIds[i];
+            if (legSourceChainId == block.chainid) continue;
+            if (L2_BRIDGEHUB.baseTokenAssetId(legSourceChainId) == bytes32(0)) {
+                revert ManagerLegSourceChainNotRegistered(legSourceChainId);
+            }
         }
 
         if (_state[flowId][_bundleHash] != LegState.Unset) revert ManagerLegAlreadyCommitted(flowId, _bundleHash);

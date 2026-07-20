@@ -13,15 +13,29 @@ import {
     ManagerCommittedLegSourceChainMismatch,
     ManagerLegAlreadyCommitted,
     ManagerLegSourceChainIdsLengthMismatch,
+    ManagerLegSourceChainNotRegistered,
     ManagerNotInteropCenter,
     ManagerSettlementLayerNotL1
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {
     L2_ATOMIC_FLOW_MANAGER_ADDR,
+    L2_BRIDGEHUB_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+
+/// @dev Minimal Bridgehub stand-in exposing only the `baseTokenAssetId` registry mapping the manager
+/// consults, deployed at the canonical `L2_BRIDGEHUB_ADDR`. A real Bridgehub needs the full ecosystem
+/// bootstrap, which is irrelevant to `append`'s registration gate — the mock deliberately isolates
+/// exactly the registry surface under test.
+contract MockBridgehubRegistry {
+    mapping(uint256 chainId => bytes32 assetId) public baseTokenAssetId;
+
+    function setBaseTokenAssetId(uint256 _chainId, bytes32 _assetId) external {
+        baseTokenAssetId[_chainId] = _assetId;
+    }
+}
 
 /// @notice Covers `AtomicFlowManager.append`, which now receives the full `flowId` preimage instead of
 /// an opaque, sender-supplied `flowId`. The load-bearing property under test: a bundle can only ever be
@@ -43,6 +57,7 @@ contract AtomicFlowManagerAppendTest is Test {
     function setUp() public {
         deployCodeTo("AtomicFlowManager.sol:AtomicFlowManager", L2_ATOMIC_FLOW_MANAGER_ADDR);
         deployCodeTo("L2InteropCommitmentTree.sol:L2InteropCommitmentTree", L2_INTEROP_COMMITMENT_TREE_ADDR);
+        deployCodeTo("AtomicFlowManagerAppend.t.sol:MockBridgehubRegistry", L2_BRIDGEHUB_ADDR);
         manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
         tree = L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR);
 
@@ -50,6 +65,10 @@ contract AtomicFlowManagerAppendTest is Test {
         manager.initL2(L1_CHAIN_ID);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         tree.initL2();
+
+        // The canonical remote chain used by `_twoLegPreimage` is interop-registered; tests for the
+        // registration gate use other, unregistered chain ids.
+        MockBridgehubRegistry(L2_BRIDGEHUB_ADDR).setBaseTokenAssetId(OTHER_CHAIN_ID, keccak256("remote asset id"));
     }
 
     /// @dev A canonical two-leg preimage: `_localLeg` declared with this chain as source, `_remoteLeg`
@@ -181,6 +200,64 @@ contract AtomicFlowManagerAppendTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(ManagerSettlementLayerNotL1.selector, L1_CHAIN_ID, L1_CHAIN_ID + 1));
         _appendAsInteropCenter(localLeg, preimage);
+    }
+
+    /// @notice A co-leg declaring a source chain the Bridgehub does not know is rejected: such a leg
+    /// could never be proven committed OR absent (no MessageRoot presence to prove against), so
+    /// committing alongside it would strand this chain's burned leg with neither finalization nor
+    /// refund possible.
+    function test_append_RevertWhen_CoLegSourceChainNotRegistered() public {
+        bytes32 localLeg = keccak256("local leg");
+        AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
+        uint256 unregisteredChainId = 888;
+        // Redeclare the remote leg's source as a chain id absent from the Bridgehub registry.
+        for (uint256 i = 0; i < preimage.legSourceChainIds.length; ++i) {
+            if (preimage.legSourceChainIds[i] == OTHER_CHAIN_ID) {
+                preimage.legSourceChainIds[i] = unregisteredChainId;
+            }
+        }
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotRegistered.selector, unregisteredChainId));
+        _appendAsInteropCenter(localLeg, preimage);
+    }
+
+    /// @notice L1 as a declared co-leg source is rejected via the same registration gate: interop
+    /// bundles can never be initiated on L1, and L1 is never registered as an interop chain in the L2
+    /// Bridgehub, so an "L1 leg" is exactly the unprovable-phantom-leg case.
+    function test_append_RevertWhen_CoLegSourceChainIsL1() public {
+        bytes32 localLeg = keccak256("local leg");
+        AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
+        for (uint256 i = 0; i < preimage.legSourceChainIds.length; ++i) {
+            if (preimage.legSourceChainIds[i] == OTHER_CHAIN_ID) {
+                preimage.legSourceChainIds[i] = L1_CHAIN_ID;
+            }
+        }
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotRegistered.selector, L1_CHAIN_ID));
+        _appendAsInteropCenter(localLeg, preimage);
+    }
+
+    /// @notice Legs declaring this chain itself never consult the Bridgehub registry: an all-local
+    /// flow commits fine even though `block.chainid` has no registry entry (this chain's legs are
+    /// validated by the coupling check instead).
+    function test_append_AllLocalLegsNeedNoRegistration() public {
+        bytes32 legA = keccak256("local leg A");
+        bytes32 legB = keccak256("local leg B");
+        AtomicFlowPreimage memory preimage;
+        preimage.deadline = DEADLINE;
+        preimage.settlementLayerChainId = L1_CHAIN_ID;
+        preimage.legBundleHashes = new bytes32[](2);
+        preimage.legSourceChainIds = new uint256[](2);
+        (preimage.legBundleHashes[0], preimage.legBundleHashes[1]) = legA < legB ? (legA, legB) : (legB, legA);
+        preimage.legSourceChainIds[0] = block.chainid;
+        preimage.legSourceChainIds[1] = block.chainid;
+
+        _appendAsInteropCenter(legA, preimage);
+        assertEq(
+            uint256(manager.legState(_flowId(preimage), legA)),
+            uint256(LegState.Committed),
+            "all-local leg must commit without any registry entry"
+        );
     }
 
     /// @notice A `(flowId, bundleHash)` leg can only be committed once.

@@ -97,7 +97,9 @@ struct AtomicFlow {
 /// @param settlementLayerChainId The single settlement layer every leg must settle on.
 /// @param legBundleHashes All legs' bundle hashes, strictly ascending (canonical order + dedup).
 /// @param legSourceChainIds Each leg's source chain id, aligned 1:1 with `legBundleHashes`. May repeat
-/// and need not be ascending.
+/// and need not be ascending. Every entry must be the sending chain itself or a Bridgehub-registered
+/// interop chain — a chain with no MessageRoot presence could never prove its leg committed or absent,
+/// which would strand the whole flow, so `append` rejects it at send time.
 struct AtomicFlowPreimage {
     uint64 deadline;
     uint256 settlementLayerChainId;

@@ -27,8 +27,10 @@ The atomic-send parameters (the full `flowId` **preimage** — `deadline`, `sett
 part of the bundle, so `bundleHash` does not depend on the preimage (which would be circular: the
 preimage's leg hashes include the bundle's own hash). The attribute carries the preimage rather than
 an opaque `flowId` so that `AtomicFlowManager.append` can recompute the id on-chain and verify the
-sent bundle is actually one of the flow's legs (declared with the sending chain as its source) — a
-wrong or stale preimage reverts the send instead of committing a leg that could neither finalize nor
+sent bundle is actually one of the flow's legs (declared with the sending chain as its source), and
+that every other leg declares a Bridgehub-registered source chain (registration guarantees MessageRoot
+presence, which the refund path's absence proof needs) — a wrong or stale preimage, or one naming an
+unprovable source chain, reverts the send instead of committing a leg that could neither finalize nor
 be refunded.
 
 ## Flow

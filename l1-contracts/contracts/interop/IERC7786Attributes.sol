@@ -35,8 +35,10 @@ interface IERC7786Attributes {
     ///      aligned source chain ids. The AtomicFlowManager recomputes
     ///      `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`
     ///      and requires this bundle's hash to be one of `legBundleHashes` (with this chain as its
-    ///      declared source), so a preimage that does not contain the bundle — e.g. built from a stale
-    ///      off-chain bundle-hash preview — reverts the send instead of stranding the burned funds.
+    ///      declared source) and every other leg's source chain to be interop-registered, so a preimage
+    ///      that does not contain the bundle — e.g. built from a stale off-chain bundle-hash preview —
+    ///      or that names an unprovable source chain reverts the send instead of stranding the burned
+    ///      funds.
     /// @param _lowNullifierIndex The low-nullifier slot for this leg's commit value in the IMT.
     function atomicBundle(AtomicFlowPreimage calldata _flowPreimage, uint256 _lowNullifierIndex) external pure;
 

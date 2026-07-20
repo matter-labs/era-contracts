@@ -41,6 +41,13 @@ error ManagerCommittedBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
 /// refund proofs bind each leg to its declared source chain, so a leg committed under a wrong source
 /// declaration could never finalize and its funds would be stranded.
 error ManagerCommittedLegSourceChainMismatch(bytes32 flowId, uint256 thisChainId, uint256 declaredSourceChainId);
+/// @dev A leg's declared source chain is neither this chain nor a Bridgehub-registered interop chain.
+/// Registration guarantees the chain has presence in the settlement layer's MessageRoot (see
+/// `ChainRegistrationSender` / `MessageRoot.seedGenesisRoot`), which the refund path depends on: the
+/// absence proof is bound to the missing leg's declared source chain, so a chain with no MessageRoot
+/// presence could never be proven missing — the flow could neither finalize (the phantom leg has no
+/// inclusion proof) nor refund, stranding every committed leg. Rejected at send time, before any burn.
+error ManagerLegSourceChainNotRegistered(uint256 legSourceChainId);
 /// @dev The reverted bundle has no recoverable calls, so there are no source funds to return.
 error ManagerNoRecoverableCalls(bytes32 flowId, bytes32 bundleHash);
 
