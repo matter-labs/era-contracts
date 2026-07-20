@@ -13,7 +13,7 @@ message — finality is proven, not dispatched.
 ## Key values
 
 - `bundleHash = keccak256(abi.encode(sourceChainId, bundleBytes))` — a leg's bundle, chain-specific.
-- `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))` —
+- `flowId = keccak256(abi.encode(preimage))` —
   binds all legs, each leg's source chain, the deadline, and the settlement layer. `legBundleHashes` is
   strictly ascending (canonical order + dedup); `legSourceChainIds` is positional (aligned 1:1, may
   repeat); `deadline` is a settlement-layer timestamp.

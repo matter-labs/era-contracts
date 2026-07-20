@@ -10,7 +10,7 @@
  *   - `bundleHash = keccak256(abi.encode(sourceChainId, abi.encode(InteropBundle)))`. The atomic send
  *     params (the full flowId preimage + lowNullifierIndex) travel via the `atomicBundle` attribute, not
  *     the InteropBundle, so `bundleHash` does not depend on the preimage.
- *   - `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`,
+ *   - `flowId = keccak256(abi.encode(preimage))`,
  *     bundle hashes strictly ascending with source chain ids positionally aligned. Since `bundleHash` is
  *     independent of the preimage, each leg's `bundleHash` (and thus the preimage) is computable off-chain
  *     before the send; on-chain the AtomicFlowManager recomputes `flowId` from the attribute-supplied
@@ -115,22 +115,15 @@ export interface AtomicFlowPreimage {
   legSourceChainIds: (BigNumber | number | string)[];
 }
 
+/** The Solidity tuple type of `AtomicFlowPreimage`, in struct field order. */
+const FLOW_PREIMAGE_TUPLE_TYPE = "tuple(uint64,uint256,bytes32[],uint256[])";
+
 /**
- * flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId)),
- * matching {AtomicFlowManager._validateAndComputeFlowId} over the same preimage shape.
+ * flowId = keccak256(abi.encode(preimage)) — the ABI encoding of the whole `AtomicFlowPreimage`
+ * struct, matching {AtomicFlowManager._validateAndComputeFlowId}.
  */
 export function computeFlowId(preimage: AtomicFlowPreimage): string {
-  return utils.keccak256(
-    utils.defaultAbiCoder.encode(
-      ["bytes32[]", "uint256[]", "uint64", "uint256"],
-      [
-        preimage.legBundleHashes,
-        preimage.legSourceChainIds.map((c) => BigNumber.from(c)),
-        preimage.deadline,
-        BigNumber.from(preimage.settlementLayerChainId),
-      ]
-    )
-  );
+  return utils.keccak256(utils.defaultAbiCoder.encode([FLOW_PREIMAGE_TUPLE_TYPE], [flowPreimageTuple(preimage)]));
 }
 
 /** Encode an {AtomicFlowPreimage} as its Solidity tuple: (deadline, settlementLayerChainId, legBundleHashes, legSourceChainIds). */

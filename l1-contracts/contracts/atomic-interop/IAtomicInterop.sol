@@ -61,7 +61,7 @@ struct ImtProof {
 }
 
 /// @notice The full `flowId` preimage — the single canonical field set the id is hashed over:
-/// `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`.
+/// `flowId = keccak256(abi.encode(preimage))`.
 /// It is supplied by the sender in the `atomicBundle` ERC-7786 attribute and embedded (with the id)
 /// in {AtomicFlow}, so the send and finalize/refund paths hash one shape and cannot drift. At send
 /// time the {AtomicFlowManager} recomputes `flowId` from these fields and requires the committing
@@ -88,7 +88,7 @@ struct AtomicFlowPreimage {
 /// the finalize path ({AtomicFlowManager.requireFlowFinalized}) and the refund path
 /// ({AtomicFlowManager.authorizeRefund}); the supplied `flowId` is always recomputed from `preimage`
 /// and matched before use.
-/// @param flowId `keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`.
+/// @param flowId `keccak256(abi.encode(preimage))`.
 /// @param preimage The hashed field set (see {AtomicFlowPreimage}).
 struct AtomicFlow {
     bytes32 flowId;

@@ -32,14 +32,7 @@ contract AtomicFlowManagerInitTest is Test {
         flow.preimage.legBundleHashes[0] = keccak256("leg");
         flow.preimage.legSourceChainIds = new uint256[](1);
         flow.preimage.legSourceChainIds[0] = 271;
-        flow.flowId = keccak256(
-            abi.encode(
-                flow.preimage.legBundleHashes,
-                flow.preimage.legSourceChainIds,
-                flow.preimage.deadline,
-                flow.preimage.settlementLayerChainId
-            )
-        );
+        flow.flowId = keccak256(abi.encode(flow.preimage));
     }
 
     function test_initL2_setsL1ChainId() public view {

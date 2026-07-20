@@ -91,15 +91,7 @@ contract AtomicFlowManagerAppendTest is Test {
 
     /// @dev Mirrors `AtomicFlowManager._validateAndComputeFlowId`'s hash (without the shape checks).
     function _flowId(AtomicFlowPreimage memory _preimage) internal pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    _preimage.legBundleHashes,
-                    _preimage.legSourceChainIds,
-                    _preimage.deadline,
-                    _preimage.settlementLayerChainId
-                )
-            );
+        return keccak256(abi.encode(_preimage));
     }
 
     /// @dev Mirrors `AtomicInteropProof.commitValue`.

@@ -30,7 +30,7 @@
  *     `callStatic.sendBundle`, then cross-check it against the real send's `InteropBundleSent` event and
  *     fail loudly on mismatch. On-chain, the AtomicFlowManager additionally requires the sent bundle's
  *     hash to be one of the preimage's legs, so a stale prediction reverts the send.
- *   - `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`
+ *   - `flowId = keccak256(abi.encode(preimage))`
  *     (bundle hashes ascending, source chain ids positionally aligned), recomputed on-chain from the
  *     attribute-supplied preimage rather than accepted from the sender.
  *   - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.

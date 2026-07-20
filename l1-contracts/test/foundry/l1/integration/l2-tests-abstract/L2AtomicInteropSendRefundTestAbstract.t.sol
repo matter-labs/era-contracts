@@ -69,10 +69,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
 
     /// @dev The exact single-call token-transfer starter `InteropLibrary.sendToken` sends: an indirect
     /// call through the L2 AssetRouter, which burns `_amount` of `_l2Token` from the sender.
-    function _tokenCallStarter(
-        address _l2Token,
-        uint256 _amount
-    ) internal returns (InteropCallStarter[] memory calls) {
+    function _tokenCallStarter(address _l2Token, uint256 _amount) internal returns (InteropCallStarter[] memory calls) {
         bytes memory secondBridgeCalldata = InteropLibrary.buildSecondBridgeCalldata(
             L2_NATIVE_TOKEN_VAULT.assetId(_l2Token),
             _amount,
@@ -115,15 +112,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     }
 
     function _flowIdOf(AtomicFlowPreimage memory _preimage) internal pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    _preimage.legBundleHashes,
-                    _preimage.legSourceChainIds,
-                    _preimage.deadline,
-                    _preimage.settlementLayerChainId
-                )
-            );
+        return keccak256(abi.encode(_preimage));
     }
 
     function _atomicAttributes(
@@ -231,11 +220,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
 
         vm.expectEmit(true, true, true, true, address(manager));
         emit IAtomicFlowManager.FlowRefundAuthorized(ctx.flowId, ctx.bundleHash);
-        manager.authorizeRefund(
-            AtomicFlow({flowId: ctx.flowId, preimage: ctxPreimage}),
-            ctx.missingLegIndex,
-            absence
-        );
+        manager.authorizeRefund(AtomicFlow({flowId: ctx.flowId, preimage: ctxPreimage}), ctx.missingLegIndex, absence);
         assertEq(
             uint256(manager.legState(ctx.flowId, ctx.bundleHash)),
             uint256(LegState.Revertable),
