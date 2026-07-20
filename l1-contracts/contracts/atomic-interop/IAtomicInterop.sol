@@ -64,8 +64,10 @@ struct ImtProof {
 /// keeps the finalize path ({AtomicFlowManager.requireFlowFinalized}) and the refund path
 /// ({AtomicFlowManager.authorizeRefund}) on one shape, so the `flowId` preimage cannot drift between them.
 /// @dev MUST stay field-for-field aligned with {AtomicFlowPreimage} (this struct minus `flowId`), which
-/// the send path hashes: both feed {AtomicFlowManager}'s single `_validateAndComputeFlowId` helper, and a
-/// field added to one shape but not the other would make send-time and finalize-time flowIds diverge.
+/// the send path hashes: both feed {AtomicFlowManager}'s single `_validateAndComputeFlowId` helper, so
+/// extending the flow definition means extending both shapes AND the helper together. A new field left
+/// out of the helper (or out of one of the shapes) would be silently absent from the `flowId`
+/// commitment on that path.
 /// @param flowId `keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`.
 /// @param deadline The flow deadline (a settlement-layer timestamp).
 /// @param settlementLayerChainId The single settlement layer every leg must settle on; committed in
