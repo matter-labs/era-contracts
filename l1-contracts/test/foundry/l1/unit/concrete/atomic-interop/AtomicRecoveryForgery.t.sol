@@ -66,12 +66,12 @@ contract MockRecoveringNativeTokenVault {
     }
 }
 
-/// @notice Regression tests for the atomic-interop recovery forgery: an atomic bundle can carry a
-/// `finalizeDeposit` call, but on timeout recovery only calls produced by the asset router's own burn path
-/// (`InteropCall.from == L2_ASSET_ROUTER_ADDR`, set by `_processCallStarter`'s indirect path) may be
-/// re-credited; a direct/forged call is skipped. The NTV is mocked to isolate the provenance gate from real
-/// vault accounting; the `Revertable` state is set via a harness (the full send + `authorizeRefund` proof
-/// path is covered by the anvil-interop suite) since the gate under test is at recovery.
+/// @notice Regression tests for the atomic-recovery forgery: on timeout recovery only calls produced by
+/// the asset router's own burn path (`InteropCall.from == L2_ASSET_ROUTER_ADDR`) may be re-credited;
+/// forged direct calls are skipped. See {protocol-docs/bridging.md}.
+/// @dev The NTV is mocked to isolate the provenance gate from real vault accounting; `Revertable` state
+/// is forced via a harness (the full send + `authorizeRefund` proof path is covered by the anvil-interop
+/// suite) since the gate under test is at recovery.
 contract AtomicRecoveryForgeryTest is Test {
     uint256 internal constant L1_CHAIN_ID = 1;
     uint256 internal constant ERA_CHAIN_ID = 271;
@@ -193,10 +193,9 @@ contract AtomicRecoveryForgeryTest is Test {
         assertEq(uint256(manager.legState(flowId, bundleHash)), uint256(LegState.Reverted));
     }
 
-    /// L2->L1 interop is never revertable (`InteropCenter` rejects L1-destined atomic bundles at send), so
-    /// the recovery entry point asserts the invariant: even a genuine router-backed burn is rejected when
-    /// its destination is L1 — the whole `claimRefund` reverts (leaving the leg `Revertable`) instead of
-    /// unwinding the append-only `totalWithdrawalsToL1` accounting.
+    /// L2->L1 interop is never revertable (rejected at send), so recovery asserts the invariant: even a
+    /// genuine router-backed burn reverts wholesale when destined to L1 — leaving the leg `Revertable`
+    /// instead of unwinding the append-only `totalWithdrawalsToL1` accounting.
     function test_recoverToL1IsUnreachable() external {
         // Arm the router's L1 chain id through the real upgrade entry point.
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);

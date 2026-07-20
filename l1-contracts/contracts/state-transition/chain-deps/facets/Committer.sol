@@ -267,9 +267,6 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 _lastCommittedBatchData.batchHash,
                 _lastCommittedBatchData.commitment
             );
-            // Emitting the protocol version this batch was committed with, together with the system upgrade
-            // transaction hash applied in it. `s.protocolVersion` is read here so that the value corresponds to
-            // the protocol version actually used for this batch's commitment at commit time.
             emit ReportCommittedBatchProtocolVersion(
                 _lastCommittedBatchData.batchNumber,
                 s.protocolVersion,
@@ -318,10 +315,6 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 _lastCommittedBatchData.batchHash,
                 _lastCommittedBatchData.commitment
             );
-            // Emitting the protocol version this batch was committed with, together with the system upgrade
-            // transaction hash applied in it (`upgradeTxHash`, which for ZKsync OS is also folded into the batch
-            // commitment). `s.protocolVersion` is read here so that the value corresponds to the protocol version
-            // actually used for this batch's commitment at commit time.
             emit ReportCommittedBatchProtocolVersion(
                 _lastCommittedBatchData.batchNumber,
                 s.protocolVersion,

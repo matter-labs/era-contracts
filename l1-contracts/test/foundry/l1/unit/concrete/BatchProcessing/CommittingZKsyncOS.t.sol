@@ -599,15 +599,12 @@ contract CommittingTest is ExecutorTest {
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = _encodeValidiumCommit(batch);
 
         vm.prank(validator);
-        // BlockCommit's commitment is the batch output hash computed WITH the upgrade tx hash, ...
         vm.expectEmit(true, true, true, true, address(committer));
         emit ICommitter.BlockCommit(1, batch.newStateCommitment, _batchOutputHash(batch, upgradeTxHash));
-        // ... and the new event reports that same upgrade tx hash.
         vm.expectEmit(true, true, true, true, address(committer));
         emit ICommitter.ReportCommittedBatchProtocolVersion(1, 0, upgradeTxHash);
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
 
-        // The commit records this batch as the upgrade batch, mirroring Committer._commitBatchesZKsyncOS.
         assertEq(utilsFacet.util_getL2SystemContractsUpgradeBatchNumber(), 1, "upgrade batch number recorded");
     }
 

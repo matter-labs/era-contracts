@@ -2,7 +2,7 @@
 //!
 //! Runs `CoreUpgrade_v31.stage3(bridgehubProxy)` on the env's bridgehub:
 //!   - registers ETH + every entry in the v31-bridged-tokens config in the
-//!     NTV's `bridgedTokens` list (via `TokenMigrationUtils.registerBridgedTokensInNTV`).
+//!     NTV's `bridgedTokens` list.
 //!
 //! Sequencing: runs *before* the per-chain upgrades (Phase 4), so the NTV
 //! `_requireRegistered(assetId)` gate is cleared before each chain's diamond

@@ -7,11 +7,17 @@ pragma solidity ^0.8.21;
 /// are bridged out.
 uint256 constant MAX_TOKEN_BALANCE = type(uint256).max;
 
+/// @dev A token's total-supply snapshot; `isSaved` distinguishes "not captured yet" from a zero amount.
 struct SavedTotalSupply {
     bool isSaved;
     uint256 amount;
 }
 
+/// @title L2 Asset Tracker interface
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
+/// @notice Chain-local token bookkeeping hooks called by the NTV, BaseTokenHolder and L2BaseToken.
+/// See {protocol-docs/bridging.md}.
 interface IL2AssetTracker {
     struct InteropL2Info {
         // Amount withdrawn to L1 while the chain settled on L1.
@@ -29,14 +35,31 @@ interface IL2AssetTracker {
 
     function L1_CHAIN_ID() external view returns (uint256);
 
+    /// @notice Balance tracked only for tokens native to this chain; write-mostly bookkeeping that no
+    /// bridging decision consults. May be removed in the future — don't rely on it.
     function chainBalance(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
 
+    /// @notice Whether the token's `chainBalance` and pre-v31 supply snapshot are initialized.
     function isAssetRegistered(bytes32 _assetId) external view returns (bool);
 
+    /// @notice Registers a token on its first bridge operation, initializing its `chainBalance` and
+    /// pre-v31 total-supply snapshot. No-op if already registered.
+    /// @param _assetId The asset ID of the token.
+    /// @param _originChainId The chain ID the token is native to.
     function registerNewTokenIfNeeded(bytes32 _assetId, uint256 _originChainId) external;
 
+    /// @notice Initializes the tracker during genesis or upgrade.
+    /// @param _l1ChainId The chain ID of the L1 network.
+    /// @param _baseTokenAssetId The asset ID of the chain's base token.
+    /// @param _needBaseTokenTotalSupplyBackfill Whether the base token's pre-v31 total supply still
+    /// needs to be backfilled (ZKsync OS chains only).
     function initL2(uint256 _l1ChainId, bytes32 _baseTokenAssetId, bool _needBaseTokenTotalSupplyBackfill) external;
 
+    /// @notice Records an outgoing transfer from this chain (L2 -> L1 withdrawal or L2 -> L2 interop).
+    /// @param _toChainId The destination chain id of the transfer.
+    /// @param _assetId The bridged asset id.
+    /// @param _amount The transferred amount.
+    /// @param _tokenOriginChainId Origin chain id of the bridged token.
     function handleInitiateBridgingOnL2(
         uint256 _toChainId,
         bytes32 _assetId,
@@ -44,12 +67,29 @@ interface IL2AssetTracker {
         uint256 _tokenOriginChainId
     ) external;
 
+    /// @notice Base-token counterpart of `handleInitiateBridgingOnL2`.
+    /// @param _maybeToBlockChainId The destination chain id of the transfer.
+    /// @param _amount The amount of base tokens being bridged out.
     function handleInitiateBaseTokenBridgingOnL2(uint256 _maybeToBlockChainId, uint256 _amount) external;
 
+    /// @notice Recovery-side counterpart of `handleInitiateBaseTokenBridgingOnL2`, called when a failed/
+    /// timed-out base-token bridge-out's escrow is returned via `BaseTokenHolder.recoverBaseToken`.
+    /// @param _toChainId The original bridge-out destination chain id.
+    /// @param _amount The recovered amount (unused until there is accounting to reverse; kept for hook
+    /// symmetry).
     function handleRecoverBaseTokenBridgingOnL2(uint256 _toChainId, uint256 _amount) external;
 
+    /// @notice Base-token counterpart of `handleFinalizeBridgingOnL2`.
+    /// @param _fromChainId The source chain id of the transfer.
+    /// @param _amount The amount of base tokens being bridged in.
     function handleFinalizeBaseTokenBridgingOnL2(uint256 _fromChainId, uint256 _amount) external;
 
+    /// @notice Records an incoming transfer into this chain.
+    /// @param _fromChainId The source chain id of the transfer.
+    /// @param _assetId The asset ID of the token being bridged in.
+    /// @param _amount The amount of tokens being bridged in.
+    /// @param _tokenOriginChainId The chain ID where the token was originally created.
+    /// @param _tokenAddress The contract address of the token on this chain.
     function handleFinalizeBridgingOnL2(
         uint256 _fromChainId,
         bytes32 _assetId,
@@ -58,11 +98,19 @@ interface IL2AssetTracker {
         address _tokenAddress
     ) external;
 
+    /// @notice Eagerly registers a pre-v31 (legacy) token, storing its total-supply snapshot before its
+    /// first post-v31 bridge operation. Permissionless; no-op if already registered.
     function registerLegacyToken(bytes32 _assetId) external;
 
+    /// @notice Registers the base token during the v31 upgrade of an existing chain, with a zero
+    /// pre-v31 supply placeholder to be backfilled via `backFillZKSyncOSBaseTokenV31MigrationData`.
     function registerBaseTokenDuringUpgrade() external;
 
+    /// @notice True while the ZKsync OS base token's pre-v31 total supply still needs to be backfilled.
     function needBaseTokenTotalSupplyBackfill() external view returns (bool);
 
+    /// @notice Backfills the base token's pre-v31 total supply on ZKsync OS chains, where `totalSupply()`
+    /// is not available by default.
+    /// @param _amount The pre-v31 total supply amount.
     function backFillZKSyncOSBaseTokenV31MigrationData(uint256 _amount) external;
 }

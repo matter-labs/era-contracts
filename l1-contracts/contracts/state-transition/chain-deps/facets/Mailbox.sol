@@ -568,10 +568,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     //////// Legacy Era functions
 
     /// @inheritdoc IMailboxImpl
-    /// @dev Deprecated stub. The L2->L1 base-token withdrawal message is still tagged with the
-    /// `finalizeEthWithdrawal` selector, so the selector must remain part of the facet's ABI even though funds
-    /// are now finalized through the asset-router / L1Nullifier path. The entry point itself always reverts;
-    /// full removal is tracked separately (EVM-1216).
     function finalizeEthWithdrawal(uint256, uint256, uint16, bytes calldata, bytes32[] calldata) external onlyL1 {
         revert TransactionNotAllowed();
     }

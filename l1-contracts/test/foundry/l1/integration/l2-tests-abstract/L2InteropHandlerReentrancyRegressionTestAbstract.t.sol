@@ -44,21 +44,13 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         bundleExecutor = makeAddr("bundleExecutor");
     }
 
-    /// @notice Test that a bundle can call receiveMessage on L2InteropHandler via _executeCalls
-    /// @dev This tests the basic scenario where a bundle contains a call to L2InteropHandler
-    ///      Before the fix: This would revert with ReentrancyGuard error
-    ///      After the fix: This should not revert due to reentrancy (may fail for other reasons)
+    /// @notice A bundle can call receiveMessage on L2InteropHandler via _executeCalls; before the fix this
+    /// reverted with a ReentrancyGuard error.
     function test_regression_bundleCanCallReceiveMessageOnInteropHandler() public {
-        // Create a simple bundle that targets L2InteropHandler's receiveMessage
-        // When executed, the bundle will call interopHandler.receiveMessage(...)
-        // receiveMessage requires msg.sender == address(this), which is satisfied
-        // when called from _executeCalls
-
         uint256 sourceChainId = block.chainid;
 
-        // Create the inner payload for receiveMessage
-        // We'll use verifyBundle selector with empty data - it will fail validation
-        // but the key is it shouldn't fail due to reentrancy
+        // verifyBundle with empty data: fails inner validation deterministically, but only after the
+        // (formerly blocking) reentrancy guard has been passed.
         bytes memory innerPayload = abi.encodeCall(
             IInteropHandlerBase.verifyBundle,
             (
@@ -73,7 +65,6 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             )
         );
 
-        // Create the outer bundle that calls receiveMessage on L2InteropHandler
         InteropCall[] memory calls = new InteropCall[](1);
         calls[0] = InteropCall({
             version: INTEROP_CALL_VERSION,
@@ -97,33 +88,27 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         bytes memory encodedBundle = abi.encode(bundle);
         MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
 
-        // Mock the message verification to return true
+        // Message inclusion verification is mocked to pass.
         vm.mockCall(
             address(L2_MESSAGE_VERIFICATION),
             abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
             abi.encode(true)
         );
 
-        // Switch to destination chain
         vm.chainId(destinationChainId);
 
-        // Positive oracle: the nested self-call gets PAST the (formerly blocking) reentrancy guard all the way
-        // into the inner `verifyBundle`, which then rejects the empty inner bundle with the deterministic
-        // `EmptyBundle` error that bubbles up verbatim. Before the fix this reverted with `Reentrancy` instead,
-        // before ever reaching the inner validation.
+        // Positive oracle: `EmptyBundle` proves the nested self-call got past the guard into the inner
+        // `verifyBundle`; before the fix this reverted with `Reentrancy` instead.
         vm.prank(bundleExecutor);
         vm.expectRevert(EmptyBundle.selector);
         L2_INTEROP_HANDLER.executeBundle(encodedBundle, proof);
     }
 
-    /// @notice Test that executeBundle doesn't have nonReentrant modifier blocking nested calls
-    /// @dev Creates an outer bundle that calls receiveMessage on L2InteropHandler,
-    ///      which dispatches to this.executeBundle() for an inner bundle.
-    ///      With nonReentrant present, the nested executeBundle call triggers reentrancy.
+    /// @notice A nested this.executeBundle() reached through receiveMessage must not be blocked by a
+    /// nonReentrant modifier.
     function test_regression_executeBundleNoReentrancyGuard() public {
         uint256 sourceChainId = block.chainid;
 
-        // Create the inner bundle that will be executed via receiveMessage -> executeBundle
         InteropCall[] memory innerCalls = new InteropCall[](1);
         innerCalls[0] = InteropCall({
             version: INTEROP_CALL_VERSION,
@@ -141,19 +126,16 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             destinationBaseTokenAssetId: destinationBaseTokenAssetId,
             interopBundleSalt: bytes32(uint256(1)),
             calls: innerCalls,
-            // The nested `executeBundle` is authorized against the interop-message sender, whose ERC-7930 chain
-            // id is the SOURCE chain — so the inner execution address must carry `sourceChainId` for the nested
-            // execution to be permitted (which lets this test assert full success rather than a permission revert).
+            // The nested `executeBundle` is authorized against the interop-message sender, whose ERC-7930
+            // chain id is the SOURCE chain — so the inner execution address must carry `sourceChainId`.
             bundleAttributes: _createBundleAttributes(sourceChainId, bundleExecutor)
         });
 
         bytes memory encodedInnerBundle = abi.encode(innerBundle);
         MessageInclusionProof memory innerProof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
 
-        // Payload for receiveMessage that dispatches to executeBundle(innerBundle)
         bytes memory innerPayload = abi.encodeCall(IInteropHandlerBase.executeBundle, (encodedInnerBundle, innerProof));
 
-        // Outer bundle: its call targets L2InteropHandler.receiveMessage with the above payload.
         // Call chain: executeBundle(outer) -> _executeCalls -> receiveMessage -> this.executeBundle(inner)
         InteropCall[] memory outerCalls = new InteropCall[](1);
         outerCalls[0] = InteropCall({
@@ -178,26 +160,24 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         bytes memory encodedOuterBundle = abi.encode(outerBundle);
         MessageInclusionProof memory outerProof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
 
-        // Mock the message verification to return true
+        // Message inclusion verification is mocked to pass.
         vm.mockCall(
             address(L2_MESSAGE_VERIFICATION),
             abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
             abi.encode(true)
         );
 
-        // Mock receiveMessage on recipient to return correct selector
+        // The inner recipient is mocked to accept the call (returns the receiveMessage selector).
         vm.mockCall(
             makeAddr("innerRecipient"),
             abi.encodeWithSelector(IERC7786Recipient.receiveMessage.selector),
             abi.encode(IERC7786Recipient.receiveMessage.selector)
         );
 
-        // Switch to destination chain
         vm.chainId(destinationChainId);
 
-        // Positive oracle: with no reentrancy guard blocking the nested self-call, the WHOLE chain
-        // executeBundle(outer) -> receiveMessage -> this.executeBundle(inner) succeeds and BOTH bundles end up
-        // fully executed. Before the fix this reverted with `Reentrancy` at the nested call.
+        // Positive oracle: the whole nested chain succeeds and BOTH bundles end up fully executed;
+        // before the fix this reverted with `Reentrancy` at the nested call.
         vm.prank(bundleExecutor);
         L2_INTEROP_HANDLER.executeBundle(encodedOuterBundle, outerProof);
 
@@ -215,14 +195,11 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         );
     }
 
-    /// @notice Test that verifyBundle doesn't have nonReentrant blocking it
-    /// @dev Creates an outer bundle that calls receiveMessage on L2InteropHandler,
-    ///      which dispatches to this.verifyBundle() for an inner bundle.
-    ///      With nonReentrant present, the nested verifyBundle call triggers reentrancy.
+    /// @notice A nested this.verifyBundle() reached through receiveMessage must not be blocked by a
+    /// nonReentrant modifier.
     function test_regression_verifyBundleNoReentrancyGuard() public {
         uint256 sourceChainId = block.chainid;
 
-        // Create the inner bundle that will be verified via receiveMessage -> verifyBundle
         InteropCall[] memory innerCalls = new InteropCall[](1);
         innerCalls[0] = InteropCall({
             version: INTEROP_CALL_VERSION,
@@ -246,10 +223,8 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         bytes memory encodedInnerBundle = abi.encode(innerBundle);
         MessageInclusionProof memory innerProof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
 
-        // Payload for receiveMessage that dispatches to verifyBundle(innerBundle)
         bytes memory innerPayload = abi.encodeCall(IInteropHandlerBase.verifyBundle, (encodedInnerBundle, innerProof));
 
-        // Outer bundle: its call targets L2InteropHandler.receiveMessage with the above payload.
         // Call chain: executeBundle(outer) -> _executeCalls -> receiveMessage -> this.verifyBundle(inner)
         InteropCall[] memory outerCalls = new InteropCall[](1);
         outerCalls[0] = InteropCall({
@@ -274,19 +249,17 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         bytes memory encodedOuterBundle = abi.encode(outerBundle);
         MessageInclusionProof memory outerProof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
 
-        // Mock the message verification to return true
+        // Message inclusion verification is mocked to pass.
         vm.mockCall(
             address(L2_MESSAGE_VERIFICATION),
             abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
             abi.encode(true)
         );
 
-        // Switch to destination chain
         vm.chainId(destinationChainId);
 
-        // Positive oracle: with no reentrancy guard blocking the nested self-call, the chain
-        // executeBundle(outer) -> receiveMessage -> this.verifyBundle(inner) succeeds: the outer bundle ends up
-        // fully executed and the nested bundle verified. Before the fix this reverted with `Reentrancy`.
+        // Positive oracle: the outer bundle ends up fully executed and the nested bundle verified;
+        // before the fix this reverted with `Reentrancy`.
         vm.prank(bundleExecutor);
         L2_INTEROP_HANDLER.executeBundle(encodedOuterBundle, outerProof);
 

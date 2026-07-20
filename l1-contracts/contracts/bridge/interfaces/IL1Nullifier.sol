@@ -7,9 +7,11 @@ import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
 import {ConfirmTransferResultData} from "../../common/Messaging.sol";
 
-/// @title L1 Bridge contract interface
+/// @title L1 Nullifier contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
+/// @notice Tracks initiated L1 -> L2 deposits so users can claim funds back if the L2 execution fails.
+/// See {protocol-docs/bridging.md}.
 interface IL1Nullifier {
     event BridgehubDepositFinalized(
         uint256 indexed chainId,
@@ -25,6 +27,11 @@ interface IL1Nullifier {
 
     function depositHappened(uint256 _chainId, bytes32 _l2TxHash) external view returns (bytes32);
 
+    /// @notice Records an initiated deposit (`depositHappened`), forwarded by the asset router as part of
+    /// the Bridgehub's `requestL2TransactionTwoBridges` flow. Rejects duplicates.
+    /// @param _chainId The chain ID of the ZK chain to which to confirm the deposit.
+    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
+    /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit.
     function bridgehubConfirmL2TransactionForwarded(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 
     function l1NativeTokenVault() external view returns (IL1NativeTokenVault);
@@ -35,12 +42,12 @@ interface IL1Nullifier {
 
     function setL1InteropHandler(address _l1InteropHandler) external;
 
-    /// @notice Confirms the result of a deposit, whether it was successful or not.
-    /// @dev This function is used to confirm the migration of a chain to Gateway.
+    /// @notice Confirms the result of an initiated deposit (successful or failed) with a status proof,
+    /// clears the recorded deposit and forwards the result to the asset router.
     /// @param _confirmTransferResultData The data to confirm the deposit result.
     function bridgeConfirmTransferResult(ConfirmTransferResultData calldata _confirmTransferResultData) external;
 
-    /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
+    /// @notice Withdraws funds from an initiated deposit that failed when finalizing on L2.
     /// @param _chainId The ZK chain id to which deposit was initiated.
     /// @param _depositSender The address of the entity that initiated the deposit.
     /// @param _assetId The unique identifier of the deposited L1 token.
@@ -50,7 +57,6 @@ interface IL1Nullifier {
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
     /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent.
     /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization.
-    /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         address _depositSender,

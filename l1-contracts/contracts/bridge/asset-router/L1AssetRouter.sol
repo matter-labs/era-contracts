@@ -37,8 +37,8 @@ import {TxStatus} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Handles the L1 side of asset routing for L1 <-> ZK chain bridging,
-/// supporting both ETH and ERC20 tokens.
+/// @notice The L1 side of asset routing for L1 <-> ZK chain bridging, supporting both ETH and ERC20
+/// tokens. See {protocol-docs/bridging.md}.
 /// @dev Designed for use with a proxy for upgradability.
 contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -94,7 +94,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         _;
     }
 
-    /// @notice Checks that the message sender is the legacy bridge.
     /// @notice Checks that the message sender is the native token vault.
     modifier onlyNativeTokenVault() {
         require(msg.sender == address(nativeTokenVault), Unauthorized(msg.sender));
@@ -216,6 +215,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                             INITIATE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
+    /// @inheritdoc AssetRouterBase
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         bytes32 _assetId,

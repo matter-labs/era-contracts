@@ -47,10 +47,9 @@ contract MockAssetDeploymentTracker {
 }
 
 /// @notice Regression tests for the counterpart-auth guard: `_setAssetHandlerAddressOnCounterpart` must
-/// reject an assetId whose
-/// `assetDeploymentTracker` is unset (`address(0)`) instead of invoking the no-return counterpart check on a
-/// code-less address (which silently succeeds), which would let an unregistered asset's L2 handler be set to
-/// an attacker-controlled address.
+/// reject an assetId with an unset `assetDeploymentTracker` instead of invoking the no-return counterpart
+/// check on a code-less address (which silently succeeds) — that would let an unregistered asset's L2
+/// handler be set to an attacker-controlled address.
 contract L1AssetRouterCounterpartTest is Test {
     L1AssetRouterCounterpartHarness internal router;
 

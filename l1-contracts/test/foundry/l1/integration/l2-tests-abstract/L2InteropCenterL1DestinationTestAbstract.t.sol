@@ -24,18 +24,15 @@ import {
 } from "contracts/interop/InteropErrors.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
-/// @notice `InteropCenter` send-time destination and recipient constraints: an L2->L1 bundle must be exactly
-/// one indirect, zero-value call to the L2 AssetRouter (a withdrawal), interop can never be initiated from L1
-/// itself, a bundle/message can never target the sending chain itself, and every recipient / call-starter
-/// must carry a concrete (non-zero) address.
-/// @dev Kept in its own abstract (mixed into `L2InteropCenterTestAbstract`, i.e. the L1-context runner) rather than
-/// in `L2InteropLibraryBasicTestAbstract`, because that abstract is also inherited by the zksync `L2InteropLibraryTest`
-/// and the extra test code would push that contract over EraVM's 65536-instruction bytecode limit. These checks are
-/// L2 InteropCenter logic and are fully exercised in the L1 (EVM) context, so no zksync coverage is lost.
+/// @notice Covers `InteropCenter` send-time destination and recipient restrictions (L1-destined bundles,
+/// self-destination, zero addresses). See {protocol-docs/interop.md}.
+/// @dev Kept in its own abstract (mixed into `L2InteropCenterTestAbstract`) rather than in
+/// `L2InteropLibraryBasicTestAbstract`: that abstract is also inherited by the zksync `L2InteropLibraryTest`, and
+/// the extra code would push it over EraVM's 65536-instruction bytecode limit. These checks are fully exercised
+/// in the L1 (EVM) context, so no zksync coverage is lost.
 abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils {
-    /// @notice Happy path: a single-call token withdrawal to L1 sends successfully and emits `InteropBundleSent`.
-    /// The L1 destination is not registered as an interop chain, so this also exercises the L1 base-token asset-ID
-    /// branch on the send side.
+    /// @notice A single-call token withdrawal to L1 sends and emits `InteropBundleSent`; L1 is not a registered
+    /// interop chain, so this also exercises the L1 base-token asset-ID branch on the send side.
     function test_sendToken_ToL1_Succeeds() public {
         address l2TokenAddress = initializeTokenByDeposit();
         vm.deal(address(this), 1000 ether);
@@ -75,8 +72,7 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
         l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, _l1BundleAttributes());
     }
 
-    /// @notice A DIRECT (non-indirect) call to L1 is rejected: L1 interop is restricted to withdrawals, which
-    /// must be indirect calls routed through the asset router.
+    /// @notice A direct (non-indirect) call to L1 is rejected.
     function test_sendBundle_RevertWhen_DirectCallToL1() public {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = _l1CallStarter(L2_ASSET_ROUTER_ADDR, false, 0);
@@ -84,8 +80,7 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
         l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, _l1BundleAttributes());
     }
 
-    /// @notice An indirect L1 call targeting anything other than the L2 AssetRouter is rejected: L1 interop is
-    /// withdrawals-only, so the call must route through the asset router.
+    /// @notice An indirect L1 call targeting anything other than the L2 AssetRouter is rejected.
     function test_sendBundle_RevertWhen_CallToL1NotAssetRouter() public {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = _l1CallStarter(interopTargetContract, true, 0);
@@ -109,17 +104,14 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
         l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, _l1BundleAttributes());
     }
 
-    /// @notice An L1-destined bundle carrying the `atomicBundle` attribute is rejected: an atomic bundle is
-    /// never published as an L2->L1 message and L1 has no atomic execution, so it could only ever time out —
-    /// but L2->L1 withdrawals must never be revertable (`totalWithdrawalsToL1` is consumed once during the
-    /// L1->GW migration). The check fires in `_sendBundle` before any burn or state change.
+    /// @notice An L1-destined bundle carrying the `atomicBundle` attribute is rejected (see
+    /// {protocol-docs/atomic-interop.md}); the check fires in `_sendBundle` before any burn or state change.
     function test_sendBundle_RevertWhen_AtomicBundleToL1() public {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = _l1CallStarter(L2_ASSET_ROUTER_ADDR, true, 0);
         bytes[] memory attrs = new bytes[](2);
         attrs[0] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
-        // The preimage content is irrelevant here: the L1-destination check fires in `_sendBundle`,
-        // before the AtomicFlowManager ever validates the preimage against the bundle hash.
+        // Preimage content is irrelevant: the L1-destination check fires before preimage validation.
         bytes32[] memory legBundleHashes = new bytes32[](1);
         legBundleHashes[0] = keccak256("leg bundle hash");
         uint256[] memory legSourceChainIds = new uint256[](1);
@@ -140,10 +132,8 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
         l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, attrs);
     }
 
-    /// @notice An L1-destined token withdrawal with `useFixedFee = true` still succeeds and collects NO fixed
-    /// ZK fee: L2->L1 bundles are free, so the fixed-fee flag is ignored for them. No ZK token transfer is even
-    /// attempted — the sender holds no ZK tokens and has granted no allowance, so an attempted collection would
-    /// revert the send.
+    /// @notice `useFixedFee = true` is ignored for L1-destined bundles (they are free): no ZK-fee collection is
+    /// even attempted — the sender holds no ZK tokens, so an attempted collection would revert the send.
     function test_sendToken_ToL1_WithFixedFee_SucceedsWithoutZKFee() public {
         address l2TokenAddress = initializeTokenByDeposit();
         vm.deal(address(this), 1000 ether);
@@ -166,17 +156,15 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
         );
     }
 
-    /// @notice A `sendMessage` recipient must carry a concrete address: a chain-only ERC-7930 encoding
-    /// parses to address(0) and would collect value up-front for a message that can never execute and
-    /// has no refund path.
+    /// @notice A `sendMessage` recipient must carry a concrete address: a chain-only ERC-7930 encoding parses
+    /// to address(0) and would lock value in a message that can never execute.
     function test_sendMessage_RevertWhen_RecipientAddressEmpty() public {
         vm.expectRevert(ZeroAddress.selector);
         l2InteropCenter.sendMessage(InteroperableAddress.formatEvmV1(destinationChainId), hex"", new bytes[](0));
     }
 
-    /// @notice A `sendBundle` call starter must carry a concrete address too: an ERC-7930 encoding with
-    /// empty chain-reference AND address fields passes `_ensureEmptyChainReference` yet parses to
-    /// address(0) — the same value-lock as the `sendMessage` case, rejected by the same guard.
+    /// @notice A call starter with empty chain-reference AND address fields passes `_ensureEmptyChainReference`
+    /// yet parses to address(0) — rejected by the same guard as the `sendMessage` case.
     function test_sendBundle_RevertWhen_CallStarterAddressEmpty() public {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         // Minimal ERC-7930 v1: version + chainType (0x00010000), chainReferenceLength = 0, addressLength = 0.
@@ -218,9 +206,7 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
         l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, _l1BundleAttributes());
     }
 
-    /// @dev Builds a single L1-destined call starter targeting `_to`. `_indirect` toggles the ERC-7786
-    /// indirectCall attribute; `_callValue` (when non-zero) adds an interopCallValue attribute. These starters
-    /// are only used for send-time rejection tests — each is crafted so the specific L1 guard under test is the
+    /// @dev Call starter for the send-time rejection tests: crafted so the specific L1 guard under test is the
     /// first to fire (the L1-branch requires run before `_processCallStarter`).
     function _l1CallStarter(
         address _to,

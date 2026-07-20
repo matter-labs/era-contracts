@@ -20,7 +20,7 @@ import {InvalidCaller} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
+/// @notice The MessageRoot deployment for settlement-layer L2s. See {protocol-docs/message-root.md}.
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2MessageRoot is MessageRootBase {
     using FullMerkleMemory for FullMerkleMemory.FullTree;
@@ -61,7 +61,6 @@ contract L2MessageRoot is MessageRootBase {
     }
 
     /// @notice Initializes the contract.
-    /// @dev This function is used to initialize the contract with the initial values.
     /// @dev Expected to be called only once by the ComplexUpgrader and during genesis only, while
     /// for already existing chains an `updateL2` function should be used.
     /// @param _l1ChainId The chain id of L1.
@@ -75,6 +74,8 @@ contract L2MessageRoot is MessageRootBase {
         l1ChainId = _l1ChainId;
     }
 
+    /// @notice Computes the aggregated root of a message root that contains only `_chainId` with an
+    /// empty chain tree.
     function getEmptyMultichainBatchRoot(uint256 _chainId) external pure returns (bytes32) {
         FullMerkleMemory.FullTree memory localSharedTree;
         localSharedTree.createTree(1);

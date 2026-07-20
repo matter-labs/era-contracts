@@ -58,10 +58,8 @@ export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFf
 
 // Default gas limits for test transactions
 export const INTEROP_SEND_BUNDLE_GAS_LIMIT = 500_000;
-// Atomic sends additionally append the leg's commit value to the chain's {L2InteropCommitmentTree}
-// via {AtomicFlowManager.append}. The dynamic-height IndexedMerkleTree (#2235, FullMerkle-backed)
-// insert grows the tree and rehashes the populated path, so the atomic `sendBundle` needs a much
-// larger cap than the plain L1-publish path above.
+// Atomic sends additionally perform an IMT insert (grows the tree and rehashes the populated
+// path), so they need a much larger cap than the plain-send limit above.
 export const ATOMIC_SEND_BUNDLE_GAS_LIMIT = 3_000_000;
 export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
 // 7 gwei, used by Anvil interop specs to exercise the non-zero dynamic fee path.
@@ -80,11 +78,9 @@ export const ANVIL_INTEROP_TWO_BRIDGES_PRIORITY_REQUEST_COUNT = 2;
 export const TEST_TOKEN_DECIMALS = 18;
 export const TEST_TOKEN_MINT_AMOUNT_UNITS = "1000";
 
-// Mirrors the InteropBundle struct in contracts/common/Messaging.sol. The trailing BundleAttributes
-// tuple is the 4 fields (executionAddress, unbundlerAddress, useFixedFee, salt). Atomic-send params
-// (the full flowId preimage + lowNullifierIndex) do NOT live in the bundle — they travel via the
-// `atomicBundle` ERC-7786 attribute and are parsed by the InteropCenter into an internal AtomicSend
-// struct, so they never affect the bundle bytes / bundleHash.
+// Mirrors the InteropBundle struct in contracts/common/Messaging.sol; the trailing tuple is
+// BundleAttributes (executionAddress, unbundlerAddress, useFixedFee, salt). Atomic-send params do
+// NOT live in the bundle (see {protocol-docs/atomic-interop.md}), so they never affect bundleHash.
 export const INTEROP_BUNDLE_TUPLE_TYPE =
   "tuple(bytes1,uint256,uint256,bytes32,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes,bool,bytes32))";
 // Canonical signature of `InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle)`,

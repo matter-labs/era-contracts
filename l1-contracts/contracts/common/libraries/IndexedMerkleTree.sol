@@ -35,6 +35,8 @@ struct IMT {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
+/// @notice Append-only indexed Merkle tree supporting both membership and non-membership proofs
+/// via the low-nullifier technique. See {protocol-docs/message-root.md}.
 library IndexedMerkleTree {
     using FullMerkle for FullMerkle.FullTree;
 

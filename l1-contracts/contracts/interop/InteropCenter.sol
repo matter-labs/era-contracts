@@ -68,16 +68,16 @@ import {IL2CrossChainSender} from "../bridge/interfaces/IL2CrossChainSender.sol"
 import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol";
 import {IL2NativeTokenVault} from "../bridge/ntv/IL2NativeTokenVault.sol";
 
-/// @dev Default fixed fee for interop calls: 10 ZK tokens.
-/// This is intentionally set sufficiently higher than the intended gateway settlement fee
-/// (and so the intended dynamic fee), to incentivize users to use the dynamic fee path.
+/// @dev Default fixed ZK fee per interop call; intentionally above the intended dynamic fee to
+/// incentivize the dynamic path. See {protocol-docs/interop.md} (fee model).
 uint256 constant DEFAULT_ZK_INTEROP_FEE = 10e18;
 
 /// @title InteropCenter
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev This contract serves as the primary entry point for communication between chains connected to the interop, facilitating interactions between end user and bridges.
-/// @dev as of V31 only deployed on the L2s, not on L1.
+/// @notice Primary entry point for interop between chains: forms interop bundles and dispatches them
+/// (L2->L1 message, or IMT commit for atomic bundles). Deployed on L2s only as of v31.
+/// See {protocol-docs/interop.md}.
 contract InteropCenter is
     IInteropCenter,
     IERC7786GatewaySource,
@@ -87,25 +87,21 @@ contract InteropCenter is
 {
     using SafeERC20 for IERC20;
 
-    /// @notice The chain ID of L1. This contract can be deployed on multiple layers, but this value is still equal to the
-    /// L1 that is at the most base layer.
+    /// @notice The chain ID of L1. This contract can be deployed on multiple layers, but this value
+    /// always refers to the base-most L1.
     uint256 public L1_CHAIN_ID;
 
-    /// @notice DEPRECATED. This mapping used to store the number of interop bundles sent by an individual sender,
-    ///         which was used to derive the `interopBundleSalt` in the `InteropBundle` struct. The salt is now derived
-    ///         from a user-provided value supplied via the `interopBundleSalt` ERC-7786 bundle attribute, so this nonce
-    ///         is no longer read or written. The slot is retained to preserve the storage layout.
+    /// @notice DEPRECATED. Formerly the per-sender bundle nonce the salt was derived from (now the
+    ///         salt is user-provided); the slot is retained to preserve the storage layout.
     mapping(address sender => uint256 numberOfBundlesSent) internal __DEPRECATED_interopBundleNonce;
 
     /// @notice Operator-set fee in base token per interop call (when useFixedFee=false).
     uint256 public interopProtocolFee;
 
-    /// @notice Fixed fee amount in ZK tokens per interop call (when useFixedFee=true).
-    /// @dev This is intentionally set to be the more expensive option compared to dynamic base token fees.
-    ///      The fixed ZK fee provides Stage 1 protection - it allows users to pay fees independent of chain
-    ///      operator settings, ensuring interop works even if the operator sets arbitrary dynamic fees.
-    ///      Note, that it's not changeable throughout the code. It's not constant to make it possible to change
-    ///      the exact value with protocol upgrade without redeploying contract.
+    /// @notice Fixed fee amount in ZK tokens per interop call (when useFixedFee=true). Provides Stage 1
+    ///      protection; see {protocol-docs/interop.md} (fee model).
+    /// @dev Not changeable at runtime; a storage variable (not a constant) only so a protocol upgrade
+    ///      can change the value without redeploying.
     uint256 public ZK_INTEROP_FEE;
 
     /// @notice ZK token asset ID for resolving token address via native token vault.
@@ -114,20 +110,15 @@ contract InteropCenter is
     /// @notice Cached ZK token contract address (resolved from asset ID).
     IERC20 public zkToken;
 
-    /// @notice Accumulated protocol fees (base token) per coinbase.
-    /// @dev Coinbase addresses can claim their accumulated fees via claimProtocolFees().
+    /// @notice Accumulated protocol fees (base token) per coinbase, claimable via claimProtocolFees().
     mapping(address coinbase => uint256 amount) public accumulatedProtocolFees;
 
-    /// @notice Accumulated ZK fees per coinbase.
-    /// @dev Coinbase addresses can claim their accumulated fees via claimZKFees().
+    /// @notice Accumulated ZK fees per coinbase, claimable via claimZKFees().
     mapping(address coinbase => uint256 amount) public accumulatedZKFees;
 
-    /// @notice Tracks which salts a given sender has already used for an interop bundle.
-    /// @dev Used to guarantee that each bundle has a unique hash: the bundle hash commits to `interopBundleSalt`,
-    ///      which is derived from `msg.sender` and the user-provided salt. Enforcing that each (sender, salt) pair is
-    ///      used at most once therefore makes every emitted bundle hash unique. A sender must provide a distinct salt
-    ///      for every bundle it sends, regardless of the bundle contents; reusing a salt makes `_sendBundle` revert with
-    ///      `InteropBundleSaltAlreadyUsed`.
+    /// @notice Tracks which salts a sender has already used; a (sender, salt) pair may be used at most
+    ///      once, which makes every emitted bundle hash unique. See {protocol-docs/interop.md}
+    ///      (replay protection).
     mapping(address user => mapping(bytes32 salt => bool hasBeenUsed)) public isInteropBundleSaltUsed;
 
     modifier onlySettlementLayerRelayedSender() {
@@ -159,25 +150,20 @@ contract InteropCenter is
 
     /// @inheritdoc IInteropCenter
     function getZKTokenAddress() public view returns (address) {
-        // Check cached token first
         if (address(zkToken) != address(0)) {
             return address(zkToken);
         }
-
-        // Try to resolve from asset ID
         return _nativeTokenVault().tokenAddress(ZK_TOKEN_ASSET_ID);
     }
 
-    /// @notice Resolves ZK token address from asset ID with caching.
-    /// @dev Uses native token vault to resolve asset ID to token address.
-    /// @dev Reverts with ZKTokenNotAvailable() if ZK token hasn't been bridged to this chain yet.
-    ///      This means useFixedFee=true is only available after ZK token is bridged to the source chain.
+    /// @notice Resolves the ZK token address from its asset ID (via the NTV), caching the result.
+    /// @dev Reverts with `ZKTokenNotAvailable` if the ZK token has not been bridged to this chain yet,
+    ///      so useFixedFee=true only works after it is.
     /// @return The ZK token contract interface.
     function _getZKToken() internal returns (IERC20) {
         address tokenAddress = getZKTokenAddress();
         require(tokenAddress != address(0), ZKTokenNotAvailable());
 
-        // Cache the resolved token if not already cached
         if (address(zkToken) == address(0)) {
             zkToken = IERC20(tokenAddress);
         }
@@ -192,9 +178,7 @@ contract InteropCenter is
     ) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
 
-        // Note, that it is used to query and cache the ZK token address,
-        // so in case someone tries to update it on L2, they should update the
-        // zk token address as well.
+        // Anyone updating this asset id later must also update the cached `zkToken` address.
         require(_zkTokenAssetId != bytes32(0), ZKTokenNotAvailable());
         ZK_TOKEN_ASSET_ID = _zkTokenAssetId;
 
@@ -209,9 +193,11 @@ contract InteropCenter is
     /*//////////////////////////////////////////////////////////////
                     InteropCenter entry points
     //////////////////////////////////////////////////////////////*/
-    /// @notice Sends a single ERC-7786 message to another chain.
-    /// @param recipient ERC-7930 address corresponding to the destination of a message. It must be corresponding to an EIP-155 chain.
+    /// @notice Sends a single ERC-7786 message to another chain (wrapped into a single-call bundle).
+    /// @param recipient ERC-7930 address of the message destination (must be an EIP-155 chain).
     /// @param payload Payload to send.
+    /// @param attributes ERC-7786 attributes (call- and bundle-level are both accepted here).
+    /// @return sendId `keccak256(bundleHash, 0)` — the ERC-7786 id of the single sent call.
     function sendMessage(
         bytes calldata recipient,
         bytes calldata payload,
@@ -232,13 +218,9 @@ contract InteropCenter is
         // ignoring it (`sendBundle` is the atomic entry point).
         require(!_parseAtomicSend(attributes).isAtomic, AtomicBundleNotAllowedInSendMessage());
 
-        // If the unbundler was not set for a call, we set the unbundler to be equal to the original sender
-        // on this (source) chain, so that it's still possible to unbundle the bundle containing the call:
-        // the sender unbundles via an interop message to the destination `L2InteropHandler` (its
-        // `receiveMessage` rescue path — refer to `L2InteropHandler` for details). The default deliberately
-        // pins the source chain rather than using a chain-wildcard (chainId 0): a wildcard would let a
-        // same-address contract on another chain (e.g. a malicious clone) unbundle. Senders that want to
-        // unbundle directly on the destination can pass an explicit `unbundlerAddress` attribute.
+        // Default the unbundler to the original sender pinned to this (source) chain — deliberately not
+        // a chain wildcard, which would let a same-address clone on another chain unbundle. See
+        // {protocol-docs/interop.md} (bundle attributes).
         if (bundleAttributes.unbundlerAddress.length == 0) {
             bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
         }
@@ -250,7 +232,6 @@ contract InteropCenter is
             callAttributes: callAttributes
         });
 
-        // Prepare original attributes array for the single call
         bytes[][] memory originalCallAttributes = new bytes[][](1);
         originalCallAttributes[0] = attributes;
 
@@ -264,9 +245,7 @@ contract InteropCenter is
             _atomicSend: emptyAtomicSend
         });
 
-        // We return the sendId of the only message that was sent in the bundle above. We always send messages in bundles, even if there's only one message being sent.
-        // Note, that bundleHash is unique for every bundle. Each sendId is determined as keccak256 of bundleHash where the message (call) is contained,
-        // and the index of the call inside the bundle.
+        // The sendId of the single call in the bundle (see {protocol-docs/interop.md}, identifiers).
         sendId = keccak256(abi.encodePacked(bundleHash, uint256(0)));
     }
 
@@ -276,21 +255,17 @@ contract InteropCenter is
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
     ) external payable whenNotPaused nonReentrant returns (bytes32 bundleHash) {
-        // Validate that the destination chain ERC-7930 address has an empty address field.
         _ensureEmptyAddress(_destinationChainId);
 
-        // Extract the actual chain ID from the ERC-7930 address
         // slither-disable-next-line unused-return
         (uint256 destinationChainId, ) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
 
-        // Ensure the destination is valid: L2->L2, or an L2->L1 bundle expressed as a single call (canonically a withdrawal).
         _ensureValidDestination(destinationChainId, _callStarters.length);
         InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](
             _callStarters.length
         );
         uint256 callStartersLength = _callStarters.length;
 
-        // Prepare original attributes array for all calls
         bytes[][] memory originalCallAttributes = new bytes[][](callStartersLength);
 
         for (uint256 i = 0; i < callStartersLength; ++i) {
@@ -324,13 +299,9 @@ contract InteropCenter is
             AttributeParsingRestrictions.OnlyBundleAttributes
         );
 
-        // If the unbundler was not set for a bundle, we set the unbundler to be equal to the original
-        // sender on this (source) chain, so that it's still possible to unbundle the bundle: the sender
-        // unbundles via an interop message to the destination `L2InteropHandler` (its `receiveMessage`
-        // rescue path — refer to `L2InteropHandler` for details). The default deliberately pins the source
-        // chain rather than using a chain-wildcard (chainId 0): a wildcard would let a same-address
-        // contract on another chain (e.g. a malicious clone) unbundle. Senders that want to unbundle
-        // directly on the destination can pass an explicit `unbundlerAddress` attribute.
+        // Default the unbundler to the original sender pinned to this (source) chain — deliberately not
+        // a chain wildcard, which would let a same-address clone on another chain unbundle. See
+        // {protocol-docs/interop.md} (bundle attributes).
         if (bundleAttributes.unbundlerAddress.length == 0) {
             bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
         }
@@ -381,23 +352,12 @@ contract InteropCenter is
         require(addressLength == 0, InteroperableAddressNotEmpty(_interoperableAddress));
     }
 
-    /// @notice Validates the bundle destination.
-    /// @dev The InteropCenter only runs on L2s (never on L1 itself). Destinations may be:
-    ///      - another L2 (the classic L2->L2 interop), or
-    ///      - L1, but only for a single-call asset WITHDRAWAL bundle. Multi-call bundles to L1 are not
-    ///        supported; an L1-destined bundle is exactly one call.
-    /// @dev The destination must not be this chain itself: a chain can end up registered for interop on
-    ///      its own Bridgehub, and a self-destination bundle would burn value into a self-bridging
-    ///      accounting path that is not supported.
-    /// @dev The remaining destination-dependent requirements are enforced in `_sendBundle` once the call
-    ///      attributes have been parsed: an L1-destined call must be an indirect, zero-value call to the L2
-    ///      AssetRouter (a withdrawal), an L1-destined bundle must not be atomic
-    ///      (`AtomicBundleToL1NotSupported`), and non-L1 destinations are checked against the Bridgehub
-    ///      registry (`DestinationChainNotRegistered`).
+    /// @notice Validates the bundle destination: another L2, or L1 for a single-call bundle only.
+    /// See {protocol-docs/interop.md} (restrictions) for the full destination rules; the ones that
+    /// need parsed call attributes are enforced later in `_sendBundle`.
     /// @param _destinationChainId Destination chain ID.
     /// @param _callCount Number of calls in the bundle.
     function _ensureValidDestination(uint256 _destinationChainId, uint256 _callCount) internal view {
-        // Bundles can only be initiated on an L2; the destination may be another L2 or L1.
         require(L1_CHAIN_ID != block.chainid, CannotInitiateInteropOnL1(_destinationChainId));
         require(_destinationChainId != block.chainid, InteropToSelfNotSupported());
         if (_destinationChainId == L1_CHAIN_ID) {
@@ -416,11 +376,12 @@ contract InteropCenter is
         require(_destinationChainId != block.chainid, InteropToSelfNotSupported());
     }
 
-    /// @notice Ensures the received base token value matches expected for the destination chain
-    /// @dev Handles fee collection based on useFixedFee flag. When useFixedFee is true, no base token fee is charged.
-    /// @dev When useFixedFee is false, interopProtocolFee is charged in base tokens.
-    /// @dev L2->L1 bundles (destination is L1) are not interop and are free: no protocol fee is charged.
+    /// @notice Ensures `msg.value` matches the expected total for the bundle and burns/deposits the
+    /// call value; charges the base-token protocol fee unless useFixedFee is set or the destination is
+    /// L1 (L2->L1 bundles are free). See {protocol-docs/interop.md} (fee model, send flow).
     /// @param _destinationChainId Destination chain ID.
+    /// @param _destinationBaseTokenAssetId The destination chain's base-token asset id (drives the
+    /// same-vs-cross-base-token branch).
     /// @param _totalBurnedCallsValue Sum of requested interop call values.
     /// @param _totalIndirectCallsValue Sum of requested indirect call values.
     /// @param _useFixedFee Whether fixed ZK fees were used (true) or base token fees required (false).
@@ -435,29 +396,23 @@ contract InteropCenter is
     ) internal {
         bytes32 thisChainBaseTokenAssetId = _nativeTokenVault().BASE_TOKEN_ASSET_ID();
 
-        // Calculate protocol fee - only charge base token fee if not using fixed ZK fees.
-        // Fee is charged per-call. L2->L1 withdrawals are free (they are not interop).
         uint256 protocolFee = (_useFixedFee || _destinationChainId == L1_CHAIN_ID)
             ? 0
             : interopProtocolFee * _callCount;
 
-        // We burn the value that is passed along the bundle here, on source chain.
         if (_destinationBaseTokenAssetId == thisChainBaseTokenAssetId) {
             uint256 expectedValue = _totalBurnedCallsValue + _totalIndirectCallsValue + protocolFee;
             require(msg.value == expectedValue, MsgValueMismatch(expectedValue, msg.value));
 
-            // Burn user value for interop calls.
             if (_totalBurnedCallsValue > 0) {
                 // TODO(EVM-1395): unify same-base-token interop funding with the L2AssetRouter/L2NTV path
                 // so InteropCenter does not need a dedicated BaseTokenHolder branch here.
-                // Send tokens to BaseTokenHolder and notify L2AssetTracker via burnAndStartBridging
                 L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: _totalBurnedCallsValue}(_destinationChainId);
             }
         } else {
             uint256 expectedValue = _totalIndirectCallsValue + protocolFee;
             require(msg.value == expectedValue, MsgValueMismatch(expectedValue, msg.value));
 
-            // Handle cross-chain token deposit for different base tokens
             if (_totalBurnedCallsValue > 0) {
                 IAssetRouterShared(_assetRouterAddr()).bridgehubDepositBaseToken(
                     _destinationChainId,
@@ -467,20 +422,21 @@ contract InteropCenter is
                 );
             }
         }
-        // Accumulate the fee for later withdrawal via claimProtocolFees().
-        // This is handled to not allow malicious operator to fail sending bundles by providing faulty coinbase
-        // and to avoid calls to any untrusted contracts.
+        // Accumulate (rather than push) the fee: prevents a faulty coinbase from failing sends and
+        // avoids calls to untrusted contracts during a send.
         if (protocolFee > 0) {
             accumulatedProtocolFees[block.coinbase] += protocolFee;
             emit ProtocolFeesAccumulated(block.coinbase, protocolFee);
         }
     }
 
-    /// @notice Constructs and sends an InteropBundle, that includes sending a message corresponding to the bundle via the L2 to L1 messenger.
+    /// @notice Constructs, funds and dispatches an InteropBundle (both entry points funnel here).
+    /// See {protocol-docs/interop.md} (send flow).
     /// @param _destinationChainId Chain ID to send to.
     /// @param _callStarters Array of InteropCallStarterInternal structs, corresponding to the calls in bundle.
     /// @param _bundleAttributes Attributes of the bundle.
     /// @param _originalCallAttributes Original ERC-7786 attributes for each call to emit in MessageSent events.
+    /// @param _atomicSend Atomic send metadata (empty when the bundle is not atomic).
     /// @return bundleHash Hash of the sent bundle.
     function _sendBundle(
         uint256 _destinationChainId,
@@ -489,36 +445,24 @@ contract InteropCenter is
         bytes[][] memory _originalCallAttributes,
         AtomicSend memory _atomicSend
     ) internal returns (bytes32 bundleHash) {
-        // An atomic bundle can never target L1: it is not published as an L2->L1 message (its commit
-        // value goes to the IMT instead) and L1 has no atomic execution, so its only possible outcome
-        // would be a timeout refund — but L2->L1 withdrawals must never be revertable (their
-        // `totalWithdrawalsToL1` accounting is consumed once during the L1->GW migration and must stay
-        // append-only, see {L2AssetTracker}). Checked here, before any burn, since both entry points
-        // (`sendMessage` and `sendBundle`) funnel through `_sendBundle`.
+        // An atomic bundle can never target L1 (no atomic execution there, and L2->L1 withdrawals must
+        // never be revertable — see {protocol-docs/interop.md}, restrictions). Checked before any burn.
         if (_atomicSend.isAtomic) {
             require(_destinationChainId != L1_CHAIN_ID, AtomicBundleToL1NotSupported());
         }
 
-        // Note: no gateway-mode requirement here — interop bundles may be sent by chains settling
-        // directly on L1. Cross-layer correctness is enforced by the message-inclusion proof on the
-        // receiving side (or, for atomic bundles, by the per-leg IMT inclusion proofs), not by any
-        // gateway-mode or settlement-layer check here.
+        // Deliberately no gateway-mode requirement on the send side; correctness is enforced by the
+        // receive-side proofs (see {protocol-docs/interop.md}, send flow).
 
-        // Ensure the sender has not already used this salt. Since `interopBundleSalt` (and thus the bundle hash) is
-        // derived from `msg.sender` and the user-provided salt, enforcing a unique salt per sender guarantees that
-        // every emitted bundle has a unique hash.
+        // A unique (sender, salt) pair guarantees a unique bundle hash.
         require(
             !isInteropBundleSaltUsed[msg.sender][_bundleAttributes.salt],
             InteropBundleSaltAlreadyUsed(msg.sender, _bundleAttributes.salt)
         );
         isInteropBundleSaltUsed[msg.sender][_bundleAttributes.salt] = true;
 
-        // Form an InteropBundle.
-        // For an L2->L1 bundle the L1 chain is not registered as an interop destination in the
-        // L2 Bridgehub, so `baseTokenAssetId(L1_CHAIN_ID)` is unset. L1's base token is ETH, so the
-        // destination base token asset id is the L1-native ETH asset id (which is NOT necessarily this
-        // L2's base token — they only coincide on ETH-based chains). This value drives the
-        // same/cross-base-token branch of `_ensureCorrectTotalValue`.
+        // For an L2->L1 bundle the destination base token is the L1-native ETH asset id (L1 is not
+        // registered in the L2 Bridgehub, and its base token is not necessarily this L2's).
         bytes32 destinationBaseTokenAssetId;
         if (_destinationChainId == L1_CHAIN_ID) {
             destinationBaseTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
@@ -531,10 +475,7 @@ contract InteropCenter is
             sourceChainId: block.chainid,
             destinationChainId: _destinationChainId,
             destinationBaseTokenAssetId: destinationBaseTokenAssetId,
-            // The salt is derived from the sender and a user-provided salt (from the `interopBundleSalt` bundle attribute).
-            // Mixing in `msg.sender` ensures bundles from different senders can never collide, while the user-provided salt
-            // lets the sender control uniqueness of their own bundles. A random user-provided salt additionally keeps the
-            // resulting bundle hash unpredictable, preserving the bundle's privacy.
+            // See {protocol-docs/interop.md} (replay protection) for the salt scheme.
             interopBundleSalt: keccak256(abi.encodePacked(msg.sender, _bundleAttributes.salt)),
             calls: new InteropCall[](_callStarters.length),
             bundleAttributes: _bundleAttributes
@@ -549,14 +490,8 @@ contract InteropCenter is
         for (uint256 i = 0; i < callStartersLength; ++i) {
             _validateCallStarterValue(_callStarters[i].callAttributes.interopCallValue);
             if (_destinationChainId == L1_CHAIN_ID) {
-                // Interop to L1 is restricted to asset WITHDRAWALS for this release. The single call must be
-                // an indirect call routed through the L2 AssetRouter: `_processCallStarter` invokes
-                // `L2AssetRouter.initiateIndirectCall`, which (for an L1 destination) rewrites the call to
-                // target the L1 AssetRouter's `finalizeDeposit`. Requiring `indirectCall` + `to == L2 asset
-                // router` keeps the L1-side attack surface to the asset router only, rather than allowing an
-                // arbitrary L2->L1 call to any `IERC7786Recipient`. The call must also carry no
-                // destination-side value: the withdrawn amount rides in the transfer data / indirect-call
-                // message value, and a value-bearing call could otherwise end up in an unfinalizable bundle.
+                // Interop to L1 is restricted to a single indirect, zero-value asset-router call (a
+                // withdrawal) for this release. See {protocol-docs/interop.md} (restrictions).
                 require(_callStarters[i].callAttributes.indirectCall, DirectCallToL1NotSupported());
                 require(
                     _callStarters[i].to == L2_ASSET_ROUTER_ADDR,
@@ -576,10 +511,8 @@ contract InteropCenter is
             }
         }
 
-        // If using fixed fees, collect ZK tokens per-call and accumulate for coinbase.
-        // Coinbase can later claim via claimZKFees().
-        // This is handled to not allow malicious operator to fail sending bundles by providing malicious coinbase.
-        // L2->L1 bundles are not interop and are free: no fixed ZK fee is collected for them.
+        // Fixed ZK fees are accumulated per coinbase (not pushed) like the protocol fee above; L2->L1
+        // bundles are free.
         if (_bundleAttributes.useFixedFee && _destinationChainId != L1_CHAIN_ID) {
             uint256 totalZKFee = ZK_INTEROP_FEE * callStartersLength;
             _getZKToken().safeTransferFrom(msg.sender, address(this), totalZKFee);
@@ -597,11 +530,6 @@ contract InteropCenter is
             _callCount: callStartersLength
         });
 
-        // Hash the bundle and dispatch it: an atomic bundle (one carrying the `atomicBundle` attribute)
-        // is appended to the interop IMT via the AtomicFlowManager and is NOT published to L1; a normal
-        // bundle is published to L1. The atomic send metadata travels out-of-band (`_atomicSend`), not
-        // embedded in the bundle, so `bundleHash` does not depend on the flowId preimage (a circular
-        // dependency — the preimage's `legBundleHashes` include this very bundle's hash).
         bytes32 msgHash;
         (bundleHash, msgHash) = _dispatchBundle(bundle, _atomicSend);
 
@@ -613,7 +541,6 @@ contract InteropCenter is
             _originalCallAttributes: _originalCallAttributes
         });
 
-        // Emit event stating that the bundle was sent out successfully.
         emit InteropBundleSent(msgHash, bundleHash, bundle);
     }
 
@@ -658,21 +585,11 @@ contract InteropCenter is
         msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(BUNDLE_IDENTIFIER, _interopBundleBytes));
     }
 
-    /// @notice Hashes the bundle and dispatches it. An atomic bundle (`_atomicSend.isAtomic`) has its
-    /// commit value appended to the interop IMT via the {AtomicFlowManager} and is NOT published to L1
-    /// — the burn already happened through the normal `initiateIndirectCall` path, and the destination
-    /// executes it via {InteropHandler.executeAtomicBundle}. A normal bundle is published to L1 via
-    /// {_sendBundleToL1}.
-    /// @dev `_atomicSend` (the flowId preimage + lowNullifierIndex) is passed out-of-band and is
-    /// intentionally NOT embedded in `_bundle`, so `bundleHash` is independent of the preimage. This is
-    /// required: the preimage's `legBundleHashes` include this very bundle's hash (computed off-chain
-    /// before the send, e.g. via a `callStatic` preview), which would be impossible if `bundleHash`
-    /// itself embedded the preimage.
-    /// @dev The AtomicFlowManager recomputes `flowId` from the preimage and requires `bundleHash` to be
-    /// one of its legs (with this chain as the leg's declared source). So if the off-chain prediction of
-    /// this bundle's hash was wrong or went stale (e.g. an upgrade changed the bundle encoding between
-    /// the preview and the send), the whole send reverts — nothing is burned — instead of committing a
-    /// leg under a `flowId` that does not contain it, which could neither finalize nor be refunded.
+    /// @notice Hashes the bundle and dispatches it: a normal bundle is published to L1 via
+    /// {_sendBundleToL1}; an atomic bundle instead has its commit value appended to the interop IMT
+    /// via {IAtomicFlowManager.append} (see {protocol-docs/interop.md}, atomic bundles).
+    /// @dev `_atomicSend` travels out-of-band, never embedded in `_bundle`: `bundleHash` must stay
+    /// independent of the flowId preimage (see {AtomicSend}).
     function _dispatchBundle(
         InteropBundle memory _bundle,
         AtomicSend memory _atomicSend
@@ -681,8 +598,6 @@ contract InteropCenter is
         bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
 
         if (_atomicSend.isAtomic) {
-            // Reject legs carrying irreversible native `value` before committing; timeout recovery is
-            // otherwise best-effort (see {AtomicFlowManager._recoverBundle}).
             _validateAtomicBundle(_bundle);
             IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
                 _bundleHash: bundleHash,
@@ -694,15 +609,9 @@ contract InteropCenter is
         }
     }
 
-    /// @notice Rejects atomic-bundle calls that carry native base-token `value`. Such a leg is bridged via
-    /// the base-token holder, which {IAtomicRecoverable.recoverAtomicCall} cannot reverse, so it would lock
-    /// on timeout with no way to return the funds. Everything else is allowed: an atomic bundle may mix
-    /// recoverable fund calls (asset-router deposits) with calls that move no funds (e.g. flipping a flag),
-    /// and timeout recovery is best-effort (see {AtomicFlowManager._recoverBundle}). Refund safety for a
-    /// fund-moving leg is therefore the flow author's responsibility; only native-`value` legs — which no
-    /// one can reverse — are blocked here.
-    /// @dev `pure`, since it inspects only the bundle's own calls. Every atomic send passes through
-    /// {_dispatchBundle}, so this covers all atomic bundles regardless of entry path.
+    /// @notice Rejects atomic-bundle calls that carry native base-token `value` — the one thing timeout
+    /// recovery can never reverse. See {protocol-docs/interop.md} (restrictions).
+    /// @dev Every atomic send passes through {_dispatchBundle}, so this covers all atomic bundles.
     function _validateAtomicBundle(InteropBundle memory _bundle) internal pure {
         uint256 callsLength = _bundle.calls.length;
         for (uint256 i = 0; i < callsLength; ++i) {
@@ -735,18 +644,18 @@ contract InteropCenter is
         }
     }
 
+    /// @notice Turns a call starter into an `InteropCall` — as-is for direct calls, via the target's
+    /// `initiateIndirectCall` for indirect ones. See {protocol-docs/interop.md} (direct vs indirect).
     function _processCallStarter(
         InteropCallStarterInternal memory _callStarter,
         uint256 _destinationChainId,
         address _sender
     ) internal returns (InteropCall memory interopCall) {
-        // Use the already-parsed address from InteropCallStarterInternal
         address recipientAddress = _callStarter.to;
 
         if (_callStarter.callAttributes.indirectCall) {
-            // InteropCenter supports generic indirect calls with both source-chain msg.value and destination-side
-            // interopCallValue. Whether a particular indirect path supports non-zero interopCallValue is defined by
-            // the concrete IL2CrossChainSender implementation (e.g. the current L2AssetRouter/NTV path does not).
+            // Whether a particular indirect path supports non-zero interopCallValue is defined by the
+            // concrete IL2CrossChainSender implementation (the current L2AssetRouter/NTV path does not).
             // slither-disable-next-line arbitrary-send-eth
             InteropCallStarter memory actualCallStarter = IL2CrossChainSender(recipientAddress).initiateIndirectCall{
                 value: _callStarter.callAttributes.indirectCallMessageValue
@@ -885,11 +794,8 @@ contract InteropCenter is
                     AttributeViolatesRestriction(selector, uint256(_restriction))
                 );
                 attributeUsed[5] = true;
-                // The atomic send metadata (flowId preimage/lowNullifierIndex) is parsed separately via
-                // `_parseAtomicSend` and NOT stored in `BundleAttributes` — it must stay out of the
-                // cross-chain bundle so `bundleHash` does not depend on the preimage (a circular
-                // dependency: the preimage's leg hashes include this bundle's own hash).
-                // Here we only validate it is a permitted, non-duplicate bundle attribute.
+                // Only validated here (permitted, non-duplicate); the payload is parsed separately by
+                // `_parseAtomicSend` and never stored in `BundleAttributes` (see {AtomicSend}).
             } else if (selector == IERC7786Attributes.interopBundleSalt.selector) {
                 require(!attributeUsed[6], AttributeAlreadySet(selector));
                 require(
@@ -906,10 +812,8 @@ contract InteropCenter is
     }
 
     /// @notice Extracts the `atomicBundle` send metadata from the bundle attributes (already validated
-    /// by `parseAttributes`). Returns `isAtomic = false` when the attribute is absent. Kept separate
-    /// from `parseAttributes`/`BundleAttributes` so the metadata never enters the cross-chain bundle
-    /// (which would make `bundleHash` depend on the flowId preimage — a circular dependency, since the
-    /// preimage's leg hashes include this bundle's own hash).
+    /// by `parseAttributes`); `isAtomic = false` when the attribute is absent. Kept separate from
+    /// `BundleAttributes` so the metadata never enters the cross-chain bundle (see {AtomicSend}).
     function _parseAtomicSend(bytes[] calldata _attributes) internal pure returns (AtomicSend memory atomicSend) {
         uint256 attributesLength = _attributes.length;
         for (uint256 i = 0; i < attributesLength; ++i) {

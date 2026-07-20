@@ -20,8 +20,9 @@ import {Unauthorized} from "../../common/L1ContractErrors.sol";
 /// @title L2InteropHandler
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev L2 system contract that serves as the entry-point for executing, verifying and unbundling interop bundles.
-/// The generic bundle logic lives in `InteropHandlerBase`; this contract wires in the L2 system-contract behaviour.
+/// @notice L2 entry point for executing, verifying and unbundling interop bundles. The generic bundle
+/// logic lives in `InteropHandlerBase`; this contract wires in the L2 system-contract behaviour.
+/// See {protocol-docs/interop.md} (destination-side processing).
 contract L2InteropHandler is InteropHandlerBase {
     /// @dev Only allows calls from the complex upgrader contract on L2.
     modifier onlyUpgrader() {
@@ -36,29 +37,25 @@ contract L2InteropHandler is InteropHandlerBase {
     /// initialization via `SlotOccupied`).
     function initL2() public reentrancyGuardInitializer onlyUpgrader {}
 
-    /// @notice Executes an **atomic interop** bundle (L2->L2 only). Mirrors {executeBundle}, but instead of
-    /// an L1-message inclusion proof it requires (via the AtomicFlowManager) that every leg of the flow was
-    /// committed in its source chain's IMT before the deadline. Atomic bundles are never published to L1, so
-    /// this is their only execution entry point; there is no atomic verify path.
-    /// @dev No gateway-settlement requirement (unlike public {executeBundle}): an atomic bundle's cross-chain
-    /// binding comes from the per-leg IMT inclusion proofs authenticated against the interop root, valid on any
-    /// settlement layer. No `nonReentrant` guard, matching {executeBundle}: replay safety is by CEI (status is
-    /// set to `FullyExecuted` before any call runs), so a reentrant call for this bundle hits the status check.
-    /// @param _bundle ABI-encoded InteropBundle to execute (carries the `atomicBundle` attribute at send time).
-    /// @param _finality The flow definition (`flowId`, legs, deadline) + one IMT inclusion proof per leg.
+    /// @notice Executes an **atomic interop** bundle (L2->L2 only). Mirrors {executeBundle}, but the
+    /// L1-message inclusion proof is replaced by the atomicity gate
+    /// ({IAtomicFlowManager.requireFlowFinalized}). Atomic bundles are never published to L1, so this
+    /// is their only execution entry point (no verify path). See {protocol-docs/interop.md}
+    /// (atomic bundles).
+    /// @dev No `nonReentrant` guard, matching {executeBundle}: replay safety is by CEI (status is set
+    /// to `FullyExecuted` before any call runs), so a reentrant call hits the status check.
+    /// @param _bundle ABI-encoded InteropBundle to execute (carried the `atomicBundle` attribute at send time).
+    /// @param _finality The flow definition + one IMT inclusion proof per leg.
     function executeAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public {
         _ensureNotPaused();
 
-        // Decode the bundle, compute its hash, read its status.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
-        // An atomic bundle is never published to L1, so its source chain id is the bundle's own field; the
-        // cross-chain binding comes from the IMT inclusion proof (the atomicity gate) below.
+        // The source chain id is the bundle's own field (there is no L1 message); the cross-chain
+        // binding comes from the atomicity gate below.
         _validateBundleDestinationContext(bundleHash, interopBundle, interopBundle.sourceChainId);
 
-        // Execution-address permission gate (mirrors {executeBundle}): permissionless when unset, otherwise
-        // only that address (on this chain, or chain-agnostic via chainId 0) or this contract itself (when the
-        // execution was initiated through `receiveMessage`) may execute.
+        // Execution-address permission gate, mirroring {executeBundle}.
         if (interopBundle.bundleAttributes.executionAddress.length != 0) {
             (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
                 interopBundle.bundleAttributes.executionAddress
@@ -74,12 +71,10 @@ contract L2InteropHandler is InteropHandlerBase {
             );
         }
 
-        // Atomic bundles have no verify path (they were never published to L1), so only a fresh bundle may be
-        // executed; replay is then prevented by marking it FullyExecuted below.
+        // No verify path exists, so only a fresh bundle may be executed; replay is then prevented by
+        // marking it FullyExecuted below.
         require(status == BundleStatus.Unreceived, BundleAlreadyProcessed(bundleHash));
 
-        // Atomicity gate: replaces {executeBundle}'s L1-message inclusion proof. Proves every leg of the flow
-        // was committed in its source chain's IMT before the deadline, and that this bundle is one of the legs.
         IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).requireFlowFinalized(bundleHash, _finality);
 
         // Mark fully executed (CEI) then run all calls; a failing call reverts the whole flow.

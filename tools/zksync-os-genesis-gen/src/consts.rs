@@ -72,12 +72,8 @@ pub const L2_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal:
     "000000000000000000000000000000000001000f"
 )));
 
-/// RESERVED ADDRESS — formerly the GWAssetTracker. The GWAssetTracker contract was removed with the
-/// on-chain asset-tracking enforcement, but existing chains keep whatever bytecode/storage they already
-/// have at this address (the upgrade does not purge it). To keep new chains' genesis state aligned with
-/// upgraded chains, an empty stub (`dev-contracts/GWAssetTracker.sol`) is deployed here. Treat this
-/// address as reserved: do NOT deploy anything else at it, and do NOT rely on its storage reflecting any
-/// real state — the stub has none.
+/// Reserved — formerly the GWAssetTracker; an empty stub is deployed here so new chains' genesis
+/// matches upgraded chains, which retain the old bytecode. See {protocol-docs/bridging.md}.
 pub const GW_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000010010"
 )));
@@ -130,8 +126,7 @@ const L2_MESSAGE_VERIFICATION: Address = Address(FixedBytes::<20>(hex_literal::h
 const L2_INTEROP_COMMITMENT_TREE: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000010012"
 )));
-// 0x10013 is reserved (formerly L2GlobalInteropRootImporter; removed when atomic proofs were re-based
-// on the interop-root / MessageRoot channel).
+// 0x10013 is reserved (formerly L2GlobalInteropRootImporter). See {protocol-docs/atomic-interop.md}.
 const L2_ATOMIC_FLOW_MANAGER: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000010014"
 )));
@@ -195,9 +190,7 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 24] = [
         L2_ASSET_TRACKER_ADDR,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2AssetTracker")),
     ),
-    // Empty stub at the reserved GWAssetTracker address; see GW_ASSET_TRACKER_ADDR. Kept so new
-    // chains' genesis matches upgraded chains, which retain their old bytecode at this address. The
-    // stub holds no state — do not rely on its storage.
+    // Empty stub at the reserved GWAssetTracker address; see GW_ASSET_TRACKER_ADDR.
     (
         GW_ASSET_TRACKER_ADDR,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("GWAssetTracker")),
@@ -244,7 +237,7 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 24] = [
         L2_MESSAGE_VERIFICATION,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2MessageVerification")),
     ),
-    // Atomic interop (L1-free) contracts.
+    // Atomic interop built-ins. See {protocol-docs/atomic-interop.md}.
     (
         L2_INTEROP_COMMITMENT_TREE,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2InteropCommitmentTree")),

@@ -99,9 +99,7 @@ contract MessageHashingTest is Test {
         assertEq(leafHash, expected);
     }
 
-    /// @dev The `l1Timestamp` (added for atomic interop) is folded into the batch leaf preimage, which is
-    /// what makes a batch's settlement timestamp provable via the same inclusion proof. A non-zero value
-    /// must be part of the hash and must change the leaf versus the zero-timestamp variant.
+    /// @dev `l1Timestamp` must be part of the leaf preimage. See {protocol-docs/message-root.md}.
     function test_batchLeafHash_bindsL1Timestamp() public pure {
         bytes32 batchRoot = keccak256("batchRoot");
         uint256 batchNumber = 100;

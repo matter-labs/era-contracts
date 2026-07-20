@@ -6,6 +6,8 @@ pragma solidity 0.8.28;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IAssetRouterShared {
+    /// @notice Finalizes a deposit/withdrawal and releases funds via the asset handler.
+    /// See {AssetRouterBase-finalizeDeposit}.
     function finalizeDeposit(uint256 _sourceChainId, bytes32 _assetId, bytes calldata _transferData) external payable;
 
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 and L2->L2 transactions.

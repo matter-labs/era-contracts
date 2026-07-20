@@ -140,11 +140,9 @@ struct BridgehubL2TransactionRequest {
 /// @param chainId The chain id of the dependency chain
 /// @param blockOrBatchNumber The block number or the batch number where the message root was created
 /// For proof based interop it is block number. For commit based interop it is batch number.
-/// @param timestamp The settlement-layer block timestamp at which the imported root was created
-/// (i.e. `block.timestamp` of `blockOrBatchNumber` on the dependency chain). Imported alongside the
-/// root itself so that time-sensitive proofs (e.g. the atomic-interop timeout protocol) can anchor
-/// "this aggregated root is from after the deadline" on chain. Double checked on the settlement
-/// layer during batch execution against `MessageRoot.historicalRoot`.
+/// @param timestamp The block timestamp at which the imported root was created on the dependency
+/// chain. Double checked against `MessageRoot.historicalRoot` during batch execution.
+/// See {protocol-docs/message-root.md}.
 /// @param sides The sides of the dynamic incremental merkle tree emitted in the L2ToL1Messenger for precommit based interop
 /// For proof and commit based interop, the sides contain a single root.
 struct InteropRoot {
@@ -156,17 +154,11 @@ struct InteropRoot {
     bytes32[] sides;
 }
 
-/// @dev An aggregated (interop) root stored together with its creation timestamp — the value half of
-/// the `(blockNumber, root, timestamp)` tuple. Used both by the settlement layer's `MessageRoot`
-/// (`historicalRoot`) and by the L2 `L2InteropRootStorage` (`interopRoots`), so the executor's
-/// double check and the L2 consumers read the same shape.
-/// @dev IMPORTANT: this logic is not compatible with EraVM, as the EraVM bootloader does not yet
-/// support the new (timestamp-carrying) add-interop-roots entry point; it is expected to be deployed
-/// on ZKsync OS chains only.
+/// @dev An aggregated (interop) root stored together with its creation timestamp. Shared by the
+/// settlement layer's `MessageRoot` (`historicalRoot`) and the L2 `L2InteropRootStorage`
+/// (`interopRoots`). See {protocol-docs/message-root.md}.
 /// @param root The aggregated root.
-/// @param timestamp The block timestamp at which the root was created on its origin chain. Note that
-/// no roots recorded under previous protocol versions exist: interop was not activated in v31, so
-/// all stored roots carry the full tuple.
+/// @param timestamp The block timestamp at which the root was created on its origin chain.
 struct StoredInteropRoot {
     bytes32 root;
     uint256 timestamp;
@@ -212,7 +204,9 @@ struct InteropCallStarterInternal {
 }
 
 /// @param interopCallValue Base token value on destination chain to send for interop call.
-/// @param indirectCall An indirect call first calls a contract as specified by the call starter which returns an actual call starter that will be used to form an interop call. In particular, this is used for interop token transfers. In contrast, a direct call uses the call starter to form an interop call.
+/// @param indirectCall If true, the call starter is first called on the source chain and returns
+/// the actual call starter (used e.g. for token transfers); a direct call uses the starter as-is.
+/// See {protocol-docs/interop.md}.
 /// @param indirectCallMessageValue Base token value on sending chain to send for indirect call.
 struct CallAttributes {
     uint256 interopCallValue;
@@ -222,22 +216,12 @@ struct CallAttributes {
 
 /// @param executionAddress ERC-7930 Address allowed to execute the bundle on the destination chain. If the byte array is empty then execution is permissionless.
 /// @param unbundlerAddress ERC-7930 Address allowed to unbundle the bundle on the destination chain. Note, that it is required to be nonempty, unlike `executionAddress`.
-/// @param useFixedFee If true, user pays fixed ZK fees instead of base token fees controlled by chain operator.
-///                    This is a bundle-level attribute - all calls within a bundle share the same fee mode.
-///                    Users are free to choose which fee mode to use when creating their bundle.
-///                    In more details, any user of interop functionality is able to choose between two fee options:
-///                    - Fixed fee in ZK (ZK_INTEROP_FEE constant in InteropCenter). User pays this fee directly in ZK tokens via ERC20 transfer.
-///                    - Dynamic fee in base token of source chain where the interop is initiated. This value is fully under control of chain operator via interopProtocolFee in InteropCenter.
-///                    Note on ZK-as-base-token chains: On chains where ZK is the base token, useFixedFee=true still requires wrapped ZK tokens
-///                    (paid via ERC20 transfer), while useFixedFee=false accepts native ZK via msg.value. This is intentional behavior.
-///                    IMPORTANT: useFixedFee=true requires ZK token to be bridged to the source chain. If ZK token is not yet available
-///                    in the chain's NativeTokenVault, the transaction will revert with ZKTokenNotAvailable().
-/// @param salt User-provided salt used to derive the `interopBundleSalt` of the resulting `InteropBundle`. Provide a
-///             random salt: it keeps the bundle hash unpredictable and thus preserves the bundle's privacy. The final
-///             `interopBundleSalt` is `keccak256(abi.encodePacked(msg.sender, salt))`, and each salt must be unique per
-///             sender: a sender MUST provide a distinct salt for every bundle it sends, regardless of the bundle
-///             contents. Passing `bytes32(0)` (or omitting the `interopBundleSalt` ERC-7786 attribute) is allowed but
-///             discouraged — since salts must be unique per sender, `bytes32(0)` can be used at most once per sender.
+/// @param useFixedFee If true, the user pays the fixed ZK fee (via ERC20 transfer) instead of the
+///                    operator-controlled base-token fee. Bundle-level: all calls share the fee mode.
+///                    Fee model details: {protocol-docs/interop.md}.
+/// @param salt User-provided salt used to derive `interopBundleSalt` as
+///             `keccak256(abi.encodePacked(msg.sender, salt))`. Must be unique per sender for every
+///             bundle; a random salt also keeps the bundle hash unpredictable (privacy).
 struct BundleAttributes {
     bytes executionAddress;
     bytes unbundlerAddress;
@@ -277,12 +261,9 @@ enum CallStatus {
 /// @param version Version of the InteropBundle.
 /// @param destinationChainId ChainId of the target chain.
 /// @param destinationBaseTokenAssetId Asset ID of the base token of the target chain.
-/// @param interopBundleSalt Salt of the interopBundle. It's required to ensure that all bundles have distinct hashes.
-///                          It's equal to the keccak256(abi.encodePacked(senderOfTheBundle, userProvidedSalt)), where
-///                          `userProvidedSalt` is supplied by the sender via the `interopBundleSalt` ERC-7786 bundle attribute.
-///                          Mixing in the sender ensures bundles from different senders can never collide, while letting the
-///                          sender control uniqueness of their own bundles. Each salt must be unique per sender: a sender
-///                          must provide a distinct salt for every bundle it sends, regardless of the bundle contents.
+/// @param interopBundleSalt Ensures all bundles have distinct hashes: equal to
+///                          `keccak256(abi.encodePacked(senderOfTheBundle, userProvidedSalt))`, so bundles from
+///                          different senders can never collide while each sender controls its own uniqueness.
 /// @param calls Array of InteropCall structs to execute.
 /// @param bundleAttributes Bundle execution and unbundling attributes.
 struct InteropBundle {

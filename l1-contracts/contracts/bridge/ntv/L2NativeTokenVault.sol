@@ -40,8 +40,9 @@ import {TokenBridgingData, TokenMetadata} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
-/// support any custom token logic, i.e. rebase tokens' functionality is not supported.
+/// @notice The L2 vault escrowing L2-native tokens and minting/burning bridged representations. Note,
+/// that it does not support any custom token logic, i.e. rebase tokens' functionality is not supported.
+/// See {protocol-docs/bridging.md}.
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     using SafeERC20 for IERC20;
@@ -126,9 +127,9 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), _l2TokenProxyBytecodeHash);
     }
 
+    /// @notice Registers the base token in the L2AssetTracker during genesis deployment, if needed.
     function registerBaseTokenIfNeeded() external onlyUpgrader {
         if (L2_ASSET_TRACKER.isAssetRegistered(BASE_TOKEN_ASSET_ID)) {
-            // Base token is already registered, no need to register it again
             return;
         }
         L2_ASSET_TRACKER.registerNewTokenIfNeeded(BASE_TOKEN_ASSET_ID, originChainId[BASE_TOKEN_ASSET_ID]);
@@ -228,7 +229,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         // solhint-disable-next-line no-unused-vars
         uint256 _tokenOriginChainId
     ) internal virtual override returns (BeaconProxy proxy) {
-        // Deploy the beacon proxy for the L2 token
         (bool success, bytes memory returndata) = SystemContractsCaller.systemCallWithReturndata(
             uint32(gasleft()),
             L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
@@ -239,7 +239,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             )
         );
 
-        // The deployment should be successful and return the address of the proxy
         require(success, DeployFailed());
         proxy = BeaconProxy(abi.decode(returndata, (address)));
     }
@@ -300,10 +299,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         return WETH_TOKEN;
     }
 
-    /// @notice Calculates L2 wrapped token address given the currently stored beacon proxy bytecode hash and beacon address.
-    /// @param _tokenOriginChainId The chain id of the origin token.
-    /// @param _nonNativeToken The address of token on its origin chain.
-    /// @return Address of an L2 token counterpart.
+    /// @inheritdoc NativeTokenVaultBase
+    /// @dev Uses the currently stored beacon proxy bytecode hash and beacon address.
     function calculateCreate2TokenAddress(
         uint256 _tokenOriginChainId,
         address _nonNativeToken
@@ -320,6 +317,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     }
 
     /// @notice Calculates the salt for the Create2 deployment of the L2 token.
+    /// @dev For L1-origin tokens the salt is the plain L1 token address, keeping legacy bridged-token
+    /// addresses stable.
     function _getCreate2Salt(
         uint256 _tokenOriginChainId,
         address _l1Token
@@ -330,17 +329,12 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     }
 
     function _handleBridgeToChain(uint256 _chainid, bytes32 _assetId, uint256 _amount) internal virtual override {
-        // on L2s we don't track the balance.
-        // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
-        // so L2NativeTokenVault doesn't have to handle balance changes on GW.
-        // We need to check the migration number.
+        // GW->L2 txs are not allowed and GW-bound transactions go through L1, so no GW-specific
+        // handling is needed here (same for `_handleBridgeFromChain` below).
         L2_ASSET_TRACKER.handleInitiateBridgingOnL2(_chainid, _assetId, _amount, originChainId[_assetId]);
     }
 
     function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual override {
-        // on L2s we don't track the balance.
-        // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
-        // so L2NativeTokenVault doesn't have to handle balance changes on GW.
         L2_ASSET_TRACKER.handleFinalizeBridgingOnL2({
             _fromChainId: _chainId,
             _assetId: _assetId,

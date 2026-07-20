@@ -144,10 +144,9 @@ abstract contract L2NativeTokenVaultOriginTokenRegressionTestAbstract is Test, S
         );
         bytes memory data = DataEncoding.encodeBridgeMintData(depositor, receiver, originToken, amount, erc20Metadata);
 
-        // Perform a real bridge mint: since this is the first time the asset is bridged, the NTV deploys the
-        // bridged token via CREATE2 at `expectedL2TokenAddress` and mints to the receiver. We deliberately do NOT
-        // mock the token here (a mock would inject code at the deploy target and collide with CREATE2); the legacy
-        // shared-bridge "adopt existing token" path that previously skipped the deploy has been removed.
+        // Real bridge mint: first bridging of the asset, so the NTV deploys the bridged token via CREATE2 at
+        // `expectedL2TokenAddress`. Deliberately not mocked — a mock would inject code at the deploy target and
+        // collide with CREATE2; the legacy "adopt existing token" path has been removed.
         vm.prank(L2_ASSET_ROUTER_ADDR);
         IAssetHandler(address(l2NativeTokenVault)).bridgeMint(originChainId, assetId, data);
 

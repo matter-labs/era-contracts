@@ -69,8 +69,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     function test_gatewayNonEmptyPriorityQueueMigration() public {
         ZKChainCommitment memory commitment = abi.decode(exampleChainCommitment, (ZKChainCommitment));
 
-        // Some non-zero value which would be the case if a chain existed before the
-        // priority tree was added
+        // Non-zero values, as for a chain that existed before the priority tree was added.
         commitment.priorityTree.startIndex = 101;
         commitment.priorityTree.nextLeafIndex = 102;
 
@@ -81,9 +80,8 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
 
         assertFalse(getters.isPriorityQueueActive(), "Priority queue must not be active");
 
-        // Verify the priority tree state was carried over from the commitment.
-        // PriorityTree.initFromCommitment copies startIndex / unprocessedIndex / _nextLeafIndex directly,
-        // so getTotalPriorityTxs() (== startIndex + _nextLeafIndex) equals 101 + 102.
+        // Priority tree state is copied verbatim from the commitment;
+        // getTotalPriorityTxs() == startIndex + _nextLeafIndex.
         assertEq(getters.getPriorityTreeStartIndex(), 101, "priority tree startIndex must be 101");
         assertEq(getters.getTotalPriorityTxs(), 101 + 102, "totalPriorityTxs must equal startIndex + nextLeafIndex");
         assertTrue(getters.getPriorityTreeRoot() != bytes32(0), "priority tree root must be set after migration");
@@ -92,13 +90,10 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     function test_forwardToL2OnGateway_L2() public {
         finalizeDeposit();
 
-        // Verify the chain is registered before forwarding
         address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
         assertTrue(diamondProxy != address(0), "Diamond proxy should be deployed");
 
-        // Snapshot priority-tree state on the destination diamond so the post-call asserts can
-        // verify the forward queued a priority op (rather than only that the call did not revert).
-        // Done before vm.prank so the view calls do not consume it.
+        // Snapshot before vm.prank so the view calls do not consume the prank.
         GettersFacet getters = GettersFacet(diamondProxy);
         uint256 priorityCountBefore = getters.getTotalPriorityTxs();
         uint256 queueSizeBefore = getters.getPriorityQueueSize();
@@ -114,15 +109,12 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         l2InteropCenter.forwardTransactionOnGateway(mintChainId, bytes32(0), 0);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // Verify both Mailbox events fired on the destination diamond for the forwarded priority tx.
         logs.requireOneFrom("NewPriorityRequestId(uint256,bytes32)", diamondProxy);
         logs.requireOneFrom("NewRelayedPriorityTransaction(uint256,bytes32,uint64)", diamondProxy);
 
-        // Verify the priority queue depth on the destination diamond grew by exactly one.
         assertEq(getters.getTotalPriorityTxs(), priorityCountBefore + 1, "totalPriorityTxs must increment by 1");
         assertEq(getters.getPriorityQueueSize(), queueSizeBefore + 1, "priorityQueueSize must increment by 1");
 
-        // Verify the chain is still registered on this layer after the forward.
         assertEq(
             l2Bridgehub.getZKChain(mintChainId),
             diamondProxy,
@@ -133,7 +125,6 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     function test_withdrawFromGateway() public {
         finalizeDeposit();
 
-        // Verify chain is registered before withdrawal
         address diamondProxyBefore = l2Bridgehub.getZKChain(mintChainId);
         assertTrue(diamondProxyBefore != address(0), "Diamond proxy should exist before withdrawal");
 
@@ -146,7 +137,6 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             chainData: abi.encode(chainTypeManager.protocolVersion())
         });
 
-        // Snapshot migrationNumber so the post-call assert can verify it advances by exactly one.
         uint256 migrationNumberBefore = IChainAssetHandlerBase(L2_CHAIN_ASSET_HANDLER_ADDR).migrationNumber(
             mintChainId
         );
@@ -157,14 +147,9 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             abi.encode(bytes32(uint256(1)))
         );
 
-        // The CTM-asset chain-migration withdrawal now goes through the InteropCenter as an L2->L1
-        // withdrawal bundle: a single indirect call to the L2 AssetRouter destined for L1. The
-        // indirect call runs L2AssetRouter.initiateIndirectCall, whose burn is routed to the CTM
-        // asset handler (the chain-asset-handler), which starts the migration. The transferData for a
-        // CTM asset is the ABI-encoded BridgehubBurnCTMAssetData. The bundle sender (ownerWallet) is
-        // the chain admin whose authorization the migration burn checks.
-        // The bundle salt is user-provided via the `interopBundleSalt` bundle attribute; the InteropCenter
-        // commits to it together with the sender (keccak256(sender, salt)).
+        // The CTM-asset migration withdrawal rides the InteropCenter L2->L1 withdrawal-bundle path (see
+        // {protocol-docs/chain-lifecycle.md}); the bundle sender (ownerWallet) is the chain admin whose
+        // authorization the migration burn checks.
         bytes32 withdrawalBundleSalt = keccak256("ctm-migration-withdrawal-salt");
         bytes[] memory bundleAttributes = new bytes[](1);
         bundleAttributes[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (withdrawalBundleSalt));
@@ -177,14 +162,9 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         );
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // Verify the InteropCenter emitted the withdrawal bundle (the new L2->L1 withdrawal signal,
-        // replacing the removed WithdrawalInitiatedAssetRouter event) and verify its content — the
-        // same checks the old event assertions performed (sender, assetId, destination chain, asset
-        // data).
         _assertWithdrawalBundleSent(logs, withdrawalBundleSalt, migrationNumberBefore);
 
-        // Verify the chain-asset-handler MigrationStarted event. 3 indexed params
-        // (chainId, assetId, settlementLayerChainId); migrationNumber lives in the data field.
+        // MigrationStarted has 3 indexed params; migrationNumber lives in the data field.
         Vm.Log memory migrationLog = logs.requireOneFrom(
             "MigrationStarted(uint256,uint256,bytes32,uint256)",
             L2_CHAIN_ASSET_HANDLER_ADDR
@@ -192,11 +172,10 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         assertEq(uint256(migrationLog.topics[1]), mintChainId, "MigrationStarted: chainId mismatch");
         assertEq(migrationLog.topics[2], ctmAssetId, "MigrationStarted: assetId mismatch");
 
-        // Verify migrationNumber on the chain-asset-handler advanced by exactly one.
         uint256 migrationNumberAfter = IChainAssetHandlerBase(L2_CHAIN_ASSET_HANDLER_ADDR).migrationNumber(mintChainId);
         assertEq(migrationNumberAfter, migrationNumberBefore + 1, "migrationNumber must increment by 1");
 
-        // Verify the chain registration is preserved on this settlement layer until the migration is finalized elsewhere.
+        // Registration is preserved on this settlement layer until the migration is finalized elsewhere.
         assertEq(
             l2Bridgehub.getZKChain(mintChainId),
             diamondProxyBefore,
@@ -204,11 +183,8 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         );
     }
 
-    /// @notice Verifies the content of the `InteropBundleSent` withdrawal bundle emitted for the
-    /// CTM-asset chain migration: destination, sender commitment (bundle salt), and the single inner
-    /// `finalizeDeposit` call (origin, target, assetId, mint data). The InteropBundle tuple is
-    /// (bytes1,uint256,uint256,bytes32,bytes32,InteropCall[],BundleAttributes), where InteropCall is
-    /// (bytes1,bool,address,address,uint256,bytes) and BundleAttributes is (bytes,bytes,bool,bytes32).
+    /// @notice Verifies the `InteropBundleSent` withdrawal bundle emitted for the CTM-asset chain migration:
+    /// destination, sender commitment (bundle salt), and the single inner `finalizeDeposit` call.
     function _assertWithdrawalBundleSent(
         Vm.Log[] memory logs,
         bytes32 _bundleSalt,
@@ -221,8 +197,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         (, , InteropBundle memory sentBundle) = abi.decode(bundleLog.data, (bytes32, bytes32, InteropBundle));
         assertEq(sentBundle.sourceChainId, block.chainid, "InteropBundleSent: source chain mismatch");
         assertEq(sentBundle.destinationChainId, L1_CHAIN_ID, "InteropBundleSent: destination chain must be L1");
-        // The bundle salt commits to the bundle sender and the user-provided salt attribute — the
-        // equivalent of the old event's `l2Sender == ownerWallet` check.
+        // The bundle salt commits to the sender — the equivalent of an `l2Sender == ownerWallet` check.
         assertEq(
             sentBundle.interopBundleSalt,
             keccak256(abi.encodePacked(ownerWallet, _bundleSalt)),
@@ -240,8 +215,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             address(l2AssetRouter.L1_ASSET_ROUTER()),
             "InteropBundleSent: call must target the L1 asset router"
         );
-        // The inner call is `finalizeDeposit(sourceChainId, assetId, transferData)`, with transferData
-        // being the BridgehubMintCTMAssetData produced by the chain-asset-handler burn.
+        // Inner call: finalizeDeposit(sourceChainId, assetId, transferData=BridgehubMintCTMAssetData).
         assertEq(
             bytes32(DataEncoding.getSelector(sentCall.data)),
             bytes32(AssetRouterBase.finalizeDeposit.selector),
@@ -263,13 +237,9 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     }
 
     function test_finalizeDepositWithRealChainData() public {
-        // This test verifies that finalizeDeposit works with explicitly encoded data
-        // (rather than hardcoded hex data that can become stale)
-
-        // Use the existing finalizeDeposit helper which uses explicit encoding
+        // Uses explicitly encoded commitment data rather than hardcoded hex that can become stale.
         finalizeDeposit();
 
-        // Verify the CTM was properly registered
         assertEq(
             l2Bridgehub.ctmAssetIdFromAddress(address(chainTypeManager)),
             ctmAssetId,
@@ -277,11 +247,9 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         );
         assertEq(l2Bridgehub.ctmAssetIdFromChainId(mintChainId), ctmAssetId, "CTM asset ID from chain ID should match");
 
-        // Verify the chain was deployed
         address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
         assertTrue(diamondProxy != address(0), "Diamond proxy should be deployed");
 
-        // Verify the asset handler is configured (handler address should be non-zero)
         address handlerAddress = IAssetRouterBase(L2_ASSET_ROUTER_ADDR).assetHandlerAddress(ctmAssetId);
         assertTrue(handlerAddress != address(0), "Asset handler should be configured");
     }

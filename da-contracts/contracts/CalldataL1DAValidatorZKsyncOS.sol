@@ -9,16 +9,14 @@ import {InvalidL2DAOutputHash} from "./DAContractsErrors.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The calldata-based L1 DA validator for ZKsync OS chains — the calldata counterpart of
-/// {BlobsL1DAValidatorZKsyncOS}. The operator publishes the batch's DA payload directly as L1 calldata and
-/// this validator forces it to match the proven `daCommitment` by checking
-/// `keccak256(operatorDAInput) == daCommitment`.
-/// @dev It is content-blind: whether the calldata carries the full pubdata or only a subset — e.g. just the
-/// L2->L1 region (logs + message preimages) under the `L2_TO_L1_ONLY` scheme, which atomic-interop chains use
-/// to keep their interop (IMT) data reconstructible from L1 — is decided by the STF when it builds the
-/// commitment, not here. Publishing as calldata keeps the data permanently available, unlike EIP-4844 blobs,
-/// which expire after a few weeks.
-/// @dev Like {BlobsL1DAValidatorZKsyncOS}, the returned output is unused on ZKsync OS (state diffs and blob
-/// content are bound by the batch proof), so it returns a zero state-diff hash and empty blob arrays.
+/// {BlobsL1DAValidatorZKsyncOS}: the operator publishes the batch's DA payload directly as L1 calldata and
+/// this validator checks `keccak256(operatorDAInput) == daCommitment`.
+/// @dev Content-blind: whether the calldata carries the full pubdata or only a subset (e.g. the L2->L1
+/// region under the `L2_TO_L1_ONLY` scheme, which atomic-interop chains use to keep their IMT data
+/// reconstructible from L1) is decided by the STF when it builds the commitment, not here. Calldata stays
+/// permanently available, unlike EIP-4844 blobs.
+/// @dev The returned output is unused on ZKsync OS (state diffs and blob content are bound by the batch
+/// proof), so it returns a zero state-diff hash and empty blob arrays.
 contract CalldataL1DAValidatorZKsyncOS is IL1DAValidator {
     /// @inheritdoc IL1DAValidator
     function checkDA(
@@ -28,14 +26,10 @@ contract CalldataL1DAValidatorZKsyncOS is IL1DAValidator {
         bytes calldata _operatorDAInput,
         uint256 // _maxBlobsSupported
     ) external pure returns (L1DAValidatorOutput memory output) {
-        // Force the operator to publish, as calldata, exactly the payload committed by the batch: the bytes
-        // are now available on L1 for anyone to read (e.g. to reconstruct the interop IMT).
         if (keccak256(_operatorDAInput) != _l2DAValidatorOutputHash) {
             revert InvalidL2DAOutputHash(_l2DAValidatorOutputHash);
         }
 
-        // The output is ignored on ZKsync OS (state diffs and blob content are bound by the batch proof);
-        // return empty arrays, mirroring `BlobsL1DAValidatorZKsyncOS`.
         output.stateDiffHash = bytes32(0);
         output.blobsLinearHashes = new bytes32[](0);
         output.blobsOpeningCommitments = new bytes32[](0);

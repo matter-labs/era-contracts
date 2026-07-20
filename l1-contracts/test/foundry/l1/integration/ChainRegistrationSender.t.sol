@@ -42,7 +42,6 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
     address[] public users;
     address[] public l2ContractAddresses;
 
-    // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {
         if (users.length != 0) {
             revert AddressesAlreadyGenerated();
@@ -102,7 +101,6 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         assertEq(addresses.bridgehub.settlementLayer(zkChainIds[0]), block.chainid);
         assertEq(addresses.bridgehub.settlementLayer(zkChainIds[1]), block.chainid);
 
-        // Verify chain is not registered in fresh deployment
         assertFalse(
             addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
             "Chain should not be registered before calling registerChain"
@@ -112,13 +110,12 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // Storage: chainRegisteredOnChain flag set to true
         assertTrue(
             addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
             "Chain should be registered after calling registerChain"
         );
 
-        // Event: NewPriorityRequest from the mailbox (service transaction was queued)
+        // NewPriorityRequest from the mailbox proves the registration service transaction was queued.
         logs.requireOne(NEW_PRIORITY_REQUEST_SIGNATURE);
     }
 
@@ -129,8 +126,7 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
     }
 
-    /// This function use requestL2TransactionTwoBridges function through ChainRegistrationSender.
-    /// No ERC20 tokens are involved — only ETH for base token gas.
+    /// @dev Runs requestL2TransactionTwoBridges through ChainRegistrationSender; only ETH for base-token gas.
     function _chainRegistrationSenderDeposit() private returns (bytes32, Vm.Log[] memory) {
         uint256 currentChainId = zkChainIds[0];
         address currentUser = users[0];
@@ -172,7 +168,6 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: mintValue}(requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // Balance assertion
         console2.log("balance before", userEthBefore);
         console2.log("mint value", mintValue);
         assertEq(currentUser.balance, userEthBefore - mintValue, "User ETH should decrease by mintValue");
@@ -181,38 +176,29 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
     }
 
     function test_chainRegistrationSenderDeposit() public {
-        // Verify chain is not registered initially
         assertFalse(
             addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
             "Chain should not be registered before deposit"
         );
 
-        // Perform deposit and capture the transaction hash and emitted events
         (bytes32 txHash, Vm.Log[] memory logs) = _chainRegistrationSenderDeposit();
 
-        // Verify the L2 transaction was submitted successfully
-        // The txHash is the canonical transaction hash for the L2 transaction
         assertNotEq(txHash, bytes32(0), "Transaction hash should be non-zero after successful deposit");
 
-        // Verify event: BridgehubDepositBaseTokenInitiated
         Vm.Log memory baseTokenLog = logs.requireOne(
             "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
         );
         assertEq(uint256(baseTokenLog.topics[1]), zkChainIds[0], "Base token deposit event chainId mismatch");
 
-        // The TwoBridges path through ChainRegistrationSender does NOT update
-        // chainRegisteredOnChain. Verify it remains unchanged.
+        // The TwoBridges path through ChainRegistrationSender does NOT update chainRegisteredOnChain.
         assertFalse(
             addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
             "chainRegisteredOnChain should remain false after TwoBridges deposit"
         );
     }
 
-    /// @notice A chain with an empty tree in the MessageRoot (a fresh EraVM chain before its first
-    /// settled batch, or a chain onboarded with a non-zero starting batch number that has not yet
-    /// settled on this layer) cannot be registered for interop: the atomic-interop timeout protocol
-    /// needs at least one batch of the source chain inside the aggregated root. The happy-path test
-    /// above settles a batch first; here the empty tree is simulated with a mock.
+    /// @notice A chain with an empty tree in the MessageRoot cannot be registered for interop (see
+    /// {protocol-docs/chain-lifecycle.md}). The happy path settles a batch first; here the empty tree is mocked.
     function test_chainRegistrationSender_revertWhen_chainHasNoBatchesInMessageRoot() public {
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.proxies.messageRoot),

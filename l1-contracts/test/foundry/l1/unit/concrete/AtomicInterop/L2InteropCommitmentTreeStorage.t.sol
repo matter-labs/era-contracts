@@ -10,13 +10,10 @@ import {
     L2_COMPLEX_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-/// @notice Locks the L2InteropCommitmentTree storage ABI the ZKsync OS bootloader depends on:
-/// the bootloader reads the engine's root `_imt.tree._nodes[_height][0]` directly (the same scheme
-/// it uses for the L2MessageRoot multichain root) — it loads `_height` from slot 0 and derives the
-/// `_nodes[_height][0]` slot from the `_nodes` base slot 2. The bootloader reads exactly those slots
-/// at every batch boundary to commit the batch begin/end IMT snapshots into the chain batch root, so
-/// any layout drift here is a consensus break — these tests must never be "fixed" to accommodate one
-/// without a matching bootloader change.
+/// @notice Locks the L2InteropCommitmentTree storage ABI the ZKsync OS bootloader depends on: it reads
+/// `_height` from slot 0 and `_imt.tree._nodes[_height][0]` from base slot 2 at every batch boundary to
+/// commit the begin/end IMT snapshots. Any layout drift is a consensus break — never "fix" these tests
+/// without a matching bootloader change. See {protocol-docs/atomic-interop.md}.
 contract L2InteropCommitmentTreeStorageTest is Test {
     /// @dev The bootloader's hardcoded slot of `_imt.tree._height` (the IMT is the first state
     /// variable and `FullMerkle.FullTree` puts `_height` at offset 0).
@@ -61,11 +58,9 @@ contract L2InteropCommitmentTreeStorageTest is Test {
         assertEq(read, tree.root());
     }
 
-    /// @notice The freshly seeded tree's root equals `ChainBatchRootTree.EMPTY_IMT_ROOT` — the
-    /// constant baked into the IMT leaves of `ChainBatchRootTree.genesisChainBatchRoot()`, which
-    /// `DiamondInit` stores for a fresh ZKsync OS chain (later pulled into the settlement layer via
-    /// `MessageRoot.seedGenesisRoot`). If the seeding or the leaf hashing ever changes, this
-    /// cross-check must be updated together with a matching bootloader change.
+    /// @notice The freshly seeded tree's root equals `ChainBatchRootTree.EMPTY_IMT_ROOT`, the constant
+    /// baked into `genesisChainBatchRoot()` that `DiamondInit` stores for a fresh ZKsync OS chain.
+    /// Changing seeding or leaf hashing requires a matching bootloader change.
     function test_initL2_seedRootMatchesEmptyImtRootConstant() public {
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         tree.initL2();

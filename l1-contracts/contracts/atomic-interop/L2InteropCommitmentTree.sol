@@ -11,19 +11,9 @@ import {CommitmentTreeNotAppender} from "./AtomicInteropErrors.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice See {IL2InteropCommitmentTree}. A thin shell over the shared dynamic-height Indexed Merkle
 /// Tree engine ({IndexedMerkleTree}).
-///
-/// The tree publishes nothing itself. The ZKsync OS bootloader reads the root **directly from this
-/// contract's storage** at every batch boundary and commits both snapshots (batch begin and batch end)
-/// as dedicated leaves of the batch's chain batch root (see {ChainBatchRootTree}). Consuming chains
-/// authenticate a claimed root as that leaf against the interop root they import for the settling
-/// batch (see {AtomicInteropProof}); the deadline is checked against the batch's `l1Timestamp`, which
-/// the settlement layer assigns and which is re-derived from the same inclusion proof.
-///
 /// @dev STORAGE LAYOUT IS CONSENSUS-CRITICAL. The bootloader reads the engine's root
 /// `_imt.tree._nodes[_imt.tree._height][0]` directly: it loads `_height` from slot 0 and derives the
 /// `_nodes[_height][0]` slot from the `_nodes` base slot 2. An uninitialized tree reads as `bytes32(0)`.
-///
-/// Deployed as an L2 genesis predeploy (no constructor); the one-time seeding is done in `initL2`.
 contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
     using IndexedMerkleTree for IMT;
 
@@ -40,10 +30,9 @@ contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
         _;
     }
 
-    /// @notice One-time L2 initialization performed by the genesis upgrade: seeds the
-    /// IMT (the `{0,0,0}` head leaf at index 0). The appender is the canonical
-    /// {AtomicFlowManager} (a fixed built-in address), so there is no wiring parameter;
-    /// `_imt.setup()` reverts if the tree was already seeded.
+    /// @inheritdoc IL2InteropCommitmentTree
+    /// @dev The appender is a fixed built-in address, so there is no wiring parameter; `_imt.setup()`
+    /// reverts if the tree was already seeded.
     function initL2() external onlyUpgrader {
         _imt.setup();
         emit RootUpdated(0, _imt.root());

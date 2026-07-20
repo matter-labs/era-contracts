@@ -22,7 +22,8 @@ uint256 constant V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE = uint256(
 
 /**
  * @author Matter Labs
- * @notice MessageRoot contract is responsible for storing and aggregating the roots of the batches from different chains into the MessageRoot.
+ * @notice MessageRoot contract is responsible for storing and aggregating the roots of the batches
+ * from different chains into a single interop root. See {protocol-docs/message-root.md}.
  * @custom:security-contact security@matterlabs.dev
  */
 interface IMessageRootBase is IMessageVerification {
@@ -55,13 +56,10 @@ interface IMessageRootBase is IMessageVerification {
     /// @param chainId The ID of the chain where the sharedTree was updated (the settlement layer's own chain id).
     /// @param blockNumber The block number of the block in which the sharedTree was updated.
     /// @param logId The per-block ID of the emission: all NewInteropRoot events within one block share
-    /// the same logId (it increments at most once per block), so off-chain consumers can group them.
-    /// @param timestamp The block timestamp at which the root was created — the third element of the
-    /// `(blockNumber, root, timestamp)` tuple chains import, so the event reports the full interop
-    /// root info.
-    /// @param sides The "sides" of the interop root. In this release, which uses proof-based interop, the
-    /// sides are an array of length one holding only the interop root itself. More on that in the
-    /// `L2InteropRootStorage` contract.
+    /// the same logId, so off-chain consumers can group them.
+    /// @param timestamp The block timestamp at which the root was created.
+    /// @param sides The "sides" of the interop root: with proof-based interop an array of length one
+    /// holding only the interop root itself. See {protocol-docs/message-root.md}.
     event NewInteropRoot(
         uint256 indexed chainId,
         uint256 indexed blockNumber,
@@ -72,22 +70,48 @@ interface IMessageRootBase is IMessageVerification {
 
     function BRIDGE_HUB() external view returns (address);
 
+    /// @notice Registers a chain: seeds an empty chain tree and pushes its chain-id leaf into the
+    /// shared tree. Callable by the Bridgehub or the chain asset handler.
+    /// @param _chainId The ID of the chain that is being added to the message root.
+    /// @param _startingBatchNumber The batch number the chain's numbering continues from on this layer.
     function addNewChain(uint256 _chainId, uint256 _startingBatchNumber) external;
 
+    /// @notice Records a chainBatchRoot WITHOUT pushing it into the interop trees — the v31,
+    /// record-only flow kept for pre-upgrade executor facets. See {protocol-docs/message-root.md}.
+    /// @param _chainId The ID of the chain whose chainBatchRoot is being recorded.
+    /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
+    /// @param _chainBatchRoot The value of chainBatchRoot which is being recorded.
     function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external;
 
+    /// @notice Records a chainBatchRoot AND pushes it into the chain tree and the aggregated shared
+    /// tree — the v32 flow, called by v32 executors while settling. See {protocol-docs/message-root.md}.
+    /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
+    /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
+    /// @param _chainBatchRoot The value of chainBatchRoot which is being added.
     function addChainBatchRootV32(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external;
 
+    /// @notice One-time, Bridgehub-only seeding of a freshly created chain's genesis (batch 0) chain
+    /// batch root, pulled from the chain itself; a no-op for EraVM chains.
+    /// See {protocol-docs/chain-lifecycle.md}.
+    /// @param _chainId The ID of the chain whose genesis root is seeded.
     function seedGenesisRoot(uint256 _chainId) external;
 
     function chainBatchRoots(uint256 _chainId, uint256 _batchNumber) external view returns (bytes32);
 
-    /// @notice The global message root written at `_blockNumber` together with the block timestamp at
-    /// which it was written — the `(blockNumber, root, timestamp)` tuple that chains import; the
-    /// imported tuple is double checked against this record during batch execution.
+    /// @notice The global message root written at `_blockNumber` together with the block timestamp
+    /// at which it was written — the tuple that chains import and the executor double checks during
+    /// batch execution.
     function historicalRoot(uint256 _blockNumber) external view returns (StoredInteropRoot memory);
 
-    /// @dev Used to parse the merkle proof data, this function calls a library function.
+    /// @notice Parses a Merkle proof into its components (wrapper around `MessageHashing._getProofData`).
+    /// @dev Does not itself enforce the depth-1 recursion cap; that check runs when the MessageRoot
+    /// verifies the proof.
+    /// @param _chainId The chain ID where the proof was generated.
+    /// @param _batchNumber The batch number containing the proof.
+    /// @param _leafProofMask The leaf proof mask for merkle verification.
+    /// @param _leaf The leaf hash to verify.
+    /// @param _proof The merkle proof array.
+    /// @return The extracted proof data including settlement layer information.
     function getProofData(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -96,6 +120,8 @@ interface IMessageRootBase is IMessageVerification {
         bytes32[] calldata _proof
     ) external pure returns (ProofData memory);
 
+    /// @notice Moves a migrating chain's batch counter to this settlement layer so consecutive
+    /// numbering is preserved. Callable only by the chain asset handler.
     function setMigratingChainBatchNumber(uint256 _chainId, uint256 _batchNumber) external;
 
     function currentChainBatchNumber(uint256 _chainId) external view returns (uint256);
@@ -104,5 +130,7 @@ interface IMessageRootBase is IMessageVerification {
     /// the chain has at least one batch inside the aggregated shared root).
     function chainTreeLeafCount(uint256 _chainId) external view returns (uint256);
 
+    /// @notice The Merkle path of a chain's leaf in the shared tree.
+    /// @param _chainId Id of the chain to get the merkle path for.
     function getMerklePathForChain(uint256 _chainId) external view returns (bytes32[] memory);
 }

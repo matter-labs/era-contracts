@@ -23,11 +23,9 @@ import {LogFinder} from "test-utils/LogFinder.sol";
 /// @title SharedBridgehubWithdrawal
 /// @notice Shared base for the Bridgehub invariant test harnesses that finalize base-token
 /// withdrawals from L2 to L1 via the new asset-router API.
-/// @dev De-duplicates the base-token withdrawal-finalization helpers that were previously copied
-/// into both `BridgehubInvariantTests` and `BridgehubInvariantTests_1`. Both harnesses inherit this
-/// base and share the withdrawal state (`currentUser`, `currentChainId`, `currentToken`,
-/// `currentTokenAddress`, `tokenSumWithdrawal`) and the `useGivenToken` modifier, all of which are
-/// assigned by other modifiers that remain in the subclasses (e.g. `useUser`, `useZKChain`).
+/// @dev De-duplicates helpers previously copied into both `BridgehubInvariantTests` harnesses. The
+/// shared withdrawal state (`currentUser`, `currentChainId`, `currentToken`, ...) is assigned by
+/// modifiers that remain in the subclasses (e.g. `useUser`, `useZKChain`).
 abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using LogFinder for Vm.Log[];
 
@@ -60,24 +58,15 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
         _finalizeBaseTokenWithdrawal(amountToWithdraw, true);
     }
 
-    /// @notice Drives a real `L1InteropHandler.executeBundle` for the current chain's base-token withdrawal
-    /// and asserts the balance outcomes.
-    /// @dev Replaces the removed legacy `L1AssetRouter.finalizeWithdrawal` flow. The withdrawal is
-    /// reconstructed as the single-call interop bundle emitted by the L2 InteropCenter whose only call targets
-    /// the L1 asset router's `finalizeDeposit` (the base-token assetId plus `encodeBridgeMintData` transfer
-    /// data), and is finalized on L1 via `L1InteropHandler.executeBundle`.
-    ///
-    /// Mock justification: L2 batch commitments and merkle trees are unavailable in this L1-only
-    /// integration environment, so the message-root inclusion proof that `L1InteropHandler` makes is mocked:
-    ///   - `proveL2MessageInclusionShared` -> `true` (message accepted as included)
-    /// It is mocked on the selector only (loose match) because the exact `L2Message`/leaf reconstructed inside
-    /// the handler is an implementation detail we do not want to duplicate here.
+    /// @notice Drives a real `L1InteropHandler.executeBundle` for the current chain's base-token
+    /// withdrawal (reconstructed as the single-call interop bundle the L2 InteropCenter emits) and
+    /// asserts the balance outcomes. Replaces the removed legacy `L1AssetRouter.finalizeWithdrawal` flow.
+    /// @dev Mock justification: L2 batch commitments/merkle trees are unavailable in this L1-only
+    /// environment, so `proveL2MessageInclusionShared` is mocked to `true` — on the selector only,
+    /// because the exact `L2Message`/leaf reconstructed inside the handler is an implementation detail.
     /// @param _amountToWithdraw The base-token amount to withdraw.
     /// @param _isEth Whether the chain's base token is native ETH (vs an ERC20).
     function _finalizeBaseTokenWithdrawal(uint256 _amountToWithdraw, bool _isEth) internal {
-        // The withdrawal message carries the chain's base-token assetId. It is finalized via the
-        // interop-bundle path, so the L2 sender is the L2 InteropCenter (the only sender the
-        // nullifier accepts).
         bytes32 assetId = addresses.bridgehub.baseTokenAssetId(currentChainId);
 
         uint256 beforeBridgeBalance = _isEth
@@ -89,9 +78,8 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
         _mockWithdrawalProof();
 
         if (beforeBridgeBalance < _amountToWithdraw) {
-            // Not enough escrowed balance in the vault: the L1 NTV decreases the chain balance before releasing
-            // funds (`_handleBridgeFromChain`), so the shortfall surfaces as `InsufficientChainBalance` — bubbled
-            // up verbatim through the asset-router self-call and the interop handler.
+            // Vault shortfall surfaces as `InsufficientChainBalance` from the L1 NTV, bubbled up verbatim
+            // through the asset-router self-call and the interop handler.
             vm.expectRevert(
                 abi.encodeWithSelector(InsufficientChainBalance.selector, currentChainId, assetId, _amountToWithdraw)
             );
@@ -105,7 +93,6 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         if (_isEth) {
-            // Escrowed ETH left the vault and reached the recipient.
             assertEq(
                 beforeBridgeBalance - address(addresses.l1NativeTokenVault).balance,
                 _amountToWithdraw,
@@ -113,7 +100,6 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
             );
             assertEq(currentUser.balance - beforeUserBalance, _amountToWithdraw, "User should receive withdrawn ETH");
         } else {
-            // Escrowed ERC20 left the vault and reached the recipient.
             assertEq(
                 beforeBridgeBalance - currentToken.balanceOf(address(addresses.l1NativeTokenVault)),
                 _amountToWithdraw,
@@ -126,24 +112,21 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
             );
         }
 
-        // Bundle marked as fully executed (replay protection lives in the interop handler's bundle status).
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(currentChainId, bundle);
         assertTrue(
             addresses.l1InteropHandler.bundleStatus(bundleHash) == BundleStatus.FullyExecuted,
             "Bundle should be marked as fully executed"
         );
 
-        // Verify DepositFinalizedAssetRouter event emission.
         Vm.Log memory finalizedLog = logs.requireOne("DepositFinalizedAssetRouter(uint256,bytes32,bytes)");
         assertEq(uint256(finalizedLog.topics[1]), currentChainId, "DepositFinalizedAssetRouter chainId mismatch");
     }
 
-    /// @notice Builds the withdrawal `bundle` and its `MessageInclusionProof` for a base-token withdrawal of
-    /// `_amount` to `currentUser`, as consumed by `L1InteropHandler.executeBundle`.
-    /// @dev Reconstructs the single-call interop bundle emitted by the L2 InteropCenter. For a base-token
-    /// withdrawal, the original caller and origin token are empty and the metadata is empty (see
-    /// `l2-withdrawal-helper.ts::finalizeWithdrawalOnL1`). The proof's message data is a placeholder because the
-    /// handler substitutes it with the bundle while verifying inclusion (which is mocked here anyway).
+    /// @notice Builds the withdrawal `bundle` and its `MessageInclusionProof` for a base-token
+    /// withdrawal of `_amount` to `currentUser`, as consumed by `L1InteropHandler.executeBundle`.
+    /// @dev For a base-token withdrawal the original caller, origin token, and metadata are empty (see
+    /// `l2-withdrawal-helper.ts::finalizeWithdrawalOnL1`). The proof's message data is a placeholder:
+    /// the handler substitutes the bundle while verifying inclusion (mocked here anyway).
     function _buildWithdrawal(
         bytes32 _assetId,
         uint256 _amount

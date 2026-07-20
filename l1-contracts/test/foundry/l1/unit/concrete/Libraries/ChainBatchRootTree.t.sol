@@ -5,17 +5,14 @@ import {Test} from "forge-std/Test.sol";
 
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 
-/// @notice Unit tests for the ChainBatchRootTree library. The tree must mirror the zksync-os
-/// bootloader's `compute_chain_batch_root` (a fixed height-3, 8-leaf keccak tree with leaves
-/// 4..7 reserved zero) bit-for-bit — these tests lock the hardcoded constant and the compute
-/// function against an independent naive recomputation, matching the Rust-side unit tests.
+/// @notice Locks `ChainBatchRootTree` bit-for-bit against the zksync-os bootloader's
+/// `compute_chain_batch_root` (mirrors the Rust-side unit tests). See {protocol-docs/message-root.md}.
 contract ChainBatchRootTreeTest is Test {
     function _node(bytes32 _left, bytes32 _right) internal pure returns (bytes32) {
         return keccak256(bytes.concat(_left, _right));
     }
 
-    /// @notice Locks `RESERVED_SUBTREE_NODE` against its definition: the root of the all-zero
-    /// height-2 subtree spanning reserved leaves 4..7.
+    /// @notice `RESERVED_SUBTREE_NODE` is the root of the all-zero subtree over reserved leaves 4..7.
     function test_reservedSubtreeNode_matchesRecomputation() public pure {
         bytes32 z = bytes32(0);
         bytes32 z1 = keccak256(bytes.concat(z, z));
@@ -23,8 +20,7 @@ contract ChainBatchRootTreeTest is Test {
         assertEq(ChainBatchRootTree.RESERVED_SUBTREE_NODE, z2);
     }
 
-    /// @notice `compute` must equal an independent naive recomputation of the full 8-leaf tree
-    /// (mirrors the Rust `chain_batch_root_is_height3_merkle` test).
+    /// @notice Mirrors the Rust `chain_batch_root_is_height3_merkle` test.
     function test_compute_matchesNaiveHeight3Merkle() public pure {
         bytes32 a = bytes32(uint256(0x0101010101010101010101010101010101010101010101010101010101010101));
         bytes32 b = bytes32(uint256(0x0202020202020202020202020202020202020202020202020202020202020202));
@@ -39,7 +35,6 @@ contract ChainBatchRootTreeTest is Test {
         assertEq(ChainBatchRootTree.compute(a, b, c, d), expected);
     }
 
-    /// @notice Fuzz: `compute` equals the naive recomputation for arbitrary live leaves.
     function testFuzz_compute_matchesNaiveHeight3Merkle(
         bytes32 _logsRoot,
         bytes32 _multichainRoot,
@@ -54,23 +49,19 @@ contract ChainBatchRootTreeTest is Test {
         assertEq(ChainBatchRootTree.compute(_logsRoot, _multichainRoot, _imtRootBegin, _imtRootEnd), expected);
     }
 
-    /// @notice An all-zero input (empty batch on a chain with no atomic tree) is well defined and
-    /// non-trivial (mirrors the Rust `chain_batch_root_all_zero_is_deterministic` test).
+    /// @notice Mirrors the Rust `chain_batch_root_all_zero_is_deterministic` test.
     function test_compute_allZeroIsNonZero() public pure {
         bytes32 z = bytes32(0);
         assertTrue(ChainBatchRootTree.compute(z, z, z, z) != bytes32(0));
     }
 
-    /// @notice Locks `EMPTY_IMT_ROOT` against its definition: the root of a freshly seeded
-    /// {IndexedMerkleTree} — a height-0 {FullMerkle} holding only the `{0,0,0}` sentinel head leaf,
-    /// so the root is the sentinel's leaf hash `keccak256(abi.encode(0, 0, 0))`.
+    /// @notice `EMPTY_IMT_ROOT` is a freshly seeded IMT's root: the `{0,0,0}` sentinel leaf hash.
     function test_emptyImtRoot_matchesRecomputation() public pure {
         assertEq(ChainBatchRootTree.EMPTY_IMT_ROOT, keccak256(abi.encode(uint256(0), uint256(0), uint256(0))));
     }
 
-    /// @notice Locks `genesisChainBatchRoot()` against its definition: the chain batch root of a
-    /// synthetic genesis batch — zero logs root, zero multichain root, and the freshly seeded IMT
-    /// at both batch boundaries.
+    /// @notice `genesisChainBatchRoot()` is the root of a synthetic genesis batch: zero roots plus the
+    /// freshly seeded IMT at both batch boundaries.
     function test_genesisChainBatchRoot_matchesRecomputation() public pure {
         bytes32 emptyImtRoot = keccak256(abi.encode(uint256(0), uint256(0), uint256(0)));
         assertEq(
@@ -79,10 +70,8 @@ contract ChainBatchRootTreeTest is Test {
         );
     }
 
-    /// @notice The IMT leaves sit exactly `TREE_DEPTH` hops below the root at the documented
-    /// indices: recomputing the root from leaf 2 / leaf 3 with their sibling paths must succeed.
-    /// This is the property `AtomicInteropProof._authenticateRoot` relies on when it fixes the
-    /// leaf mask and proof depth.
+    /// @notice The IMT leaves sit exactly `TREE_DEPTH` hops below the root at leaf indices 2/3 — the
+    /// property `AtomicInteropProof._authenticateRoot` relies on for its fixed leaf mask and proof depth.
     function test_imtLeafPaths_reconstructRoot() public pure {
         bytes32 logsRoot = keccak256("logs");
         bytes32 multichainRoot = keccak256("multichain");

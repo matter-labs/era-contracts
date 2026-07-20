@@ -39,9 +39,7 @@ import {IL1MessageRoot} from "../message-root/IL1MessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev The ChainAssetHandler contract is used for migrating chains between settlement layers,
-/// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
-/// between different settlement layers (for example from L1 to Gateway).
+/// @notice The L1 deployment of the chain asset handler. See {protocol-docs/chain-lifecycle.md}.
 /// @dev L1 version – keeps the cheap immutables set in the constructor.
 contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1ChainAssetHandler {
     /// @dev The assetId of the ETH.
@@ -120,10 +118,9 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         assetRouter = BRIDGEHUB.assetRouter();
     }
 
-    /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.
-    /// @param _assetId the assetId of the chain's CTM
-    /// @param _data the data for the recovery.
-    /// @param _depositSender the address of the entity that initiated the deposit.
+    /// @inheritdoc IL1AssetHandler
+    /// @dev Undoes a failed migration of a chain. Deliberately NOT gated by `whenMigrationsEnabled`:
+    /// it only ever returns a chain back to settling on L1.
     // slither-disable-next-line locked-ether
     function bridgeConfirmTransferResult(
         uint256,
@@ -177,10 +174,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         });
     }
 
-    /// @notice Returns whether a chain can be migrated from L1 to a settlement layer.
-    /// @dev A chain is ready only when its legacy base-token balance in L1NativeTokenVault has been migrated.
-    /// @param _chainId The chain id to check.
-    /// @return True if migration preconditions are met.
+    /// @inheritdoc IL1ChainAssetHandler
     function isReadyForMigration(uint256 _chainId) public view returns (bool) {
         bytes32 baseAssetId = BRIDGEHUB.baseTokenAssetId(_chainId);
         address zkChain = BRIDGEHUB.getZKChain(_chainId);
@@ -200,12 +194,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
             IZKChain(zkChain).baseTokenSupportsTotalSupply();
     }
 
-    /// @notice Requests that deposits be paused on the settlement layer (Gateway) for a chain that is
-    /// about to migrate away from it. Callable only by the chain itself (its diamond).
-    /// @dev Re-homes the cross-layer message that previously went through the asset tracker. The
-    /// ChainAssetHandler is an authorized service-transaction sender on the settlement layer chain,
-    /// so it forwards the request to the settlement layer's `L2ChainAssetHandler`.
-    /// @param _chainId The chain whose deposits should be paused on the settlement layer.
+    /// @inheritdoc IL1ChainAssetHandler
     function requestPauseDepositsForChainOnGateway(uint256 _chainId) external {
         require(msg.sender == BRIDGEHUB.getZKChain(_chainId), ZKChainNotRegistered());
         uint256 settlementLayer = BRIDGEHUB.settlementLayer(_chainId);
@@ -226,11 +215,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
                     SETTLEMENT LAYER VALIDATION
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Sets a historical migration interval for a chain.
-    /// @dev Only callable by owner. Used to set legacy GW migration data for chains that used the old GW.
-    /// @param _chainId The ID of the chain.
-    /// @param _migrationNumber The migration number to set (0 for legacy GW data).
-    /// @param _interval The migration interval data.
+    /// @inheritdoc IL1ChainAssetHandler
     function setHistoricalMigrationInterval(
         uint256 _chainId,
         uint256 _migrationNumber,
@@ -251,14 +236,9 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         _migrationInterval[_chainId][_migrationNumber] = _interval;
     }
 
-    /// @notice Validates if a claimed settlement layer is valid for a given chain and batch number.
-    /// @dev Used by MessageRoot to validate that proofs claim the correct settlement layer.
-    /// @dev Checks all migration intervals for the chain, including legacy GW data (migration number 0).
-    /// @param _chainId The ID of the chain.
-    /// @param _batchNumber The batch number to check.
-    /// @param _claimedSettlementLayer The settlement layer chain ID claimed in the proof.
-    /// @param _claimedSettlementLayerBatchNumber The batch number claimed in the settlement layer.
-    /// @return True if the claimed settlement layer is valid for this chain and batch.
+    /// @inheritdoc IL1ChainAssetHandler
+    /// @dev Used by MessageRoot to validate that proofs claim the correct settlement layer; checks
+    /// all migration intervals for the chain, including legacy GW data (migration number 0).
     function isValidSettlementLayer(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -311,10 +291,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         return _claimedSettlementLayer == _l1ChainId();
     }
 
-    /// @notice Returns the migration interval for a chain at a specific migration number.
-    /// @param _chainId The ID of the chain.
-    /// @param _migrationNumber The migration number (0 for legacy GW, 1+ for regular migrations).
-    /// @return interval The migration interval data.
+    /// @inheritdoc IL1ChainAssetHandler
     function migrationInterval(
         uint256 _chainId,
         uint256 _migrationNumber
@@ -347,11 +324,8 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     }
 
     /// @notice Records that a chain has returned from a settlement layer back to L1.
-    /// @dev The `settlementLayerBatchUpperBound` is set to the settlement layer's current batch number at the time
-    /// this function is called (during `bridgeMint` on L1). This is not a perfect upper bound — the exact settlement
-    /// layer batch number is not trivially available, so we use the current value at finalization time. The sooner the
-    /// migration is finalized, the more precise this value is, since the settlement layer continues producing batches
-    /// in the meantime. A more precise solution will be introduced in future releases.
+    /// @dev The recorded `settlementLayerBatchUpperBound` is only approximate — see its doc on
+    /// {MigrationInterval}.
     function _recordMigrationFromSL(
         uint256 _chainId,
         uint256 _batchNumber,

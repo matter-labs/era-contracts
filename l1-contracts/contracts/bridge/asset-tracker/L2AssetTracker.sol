@@ -30,18 +30,14 @@ import {
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IL2AssetTracker, SavedTotalSupply, MAX_TOKEN_BALANCE} from "./IL2AssetTracker.sol";
 
-/// @dev Inherits Ownable2StepUpgradeable and PausableUpgradeable to preserve the storage layout of the
-/// already-deployed L2AssetTracker (they occupy slots 0-200 via the former shared AssetTrackerBase, so the
-/// tracker state below must stay at slots 201+). The owner/pause features are unused on L2 — access control
-/// is enforced by the address-based modifiers below — but the slots are retained for upgrade compatibility.
+/// @notice Chain-local, write-mostly token bookkeeping; correctness of transfers is guaranteed by ZK
+/// proofs, not by these balances. See {protocol-docs/bridging.md}.
+/// @dev Inherits Ownable2StepUpgradeable and PausableUpgradeable (unused on L2) purely to preserve the
+/// storage layout of the already-deployed L2AssetTracker: they occupy slots 0-200 via the former shared
+/// AssetTrackerBase, so the tracker state below must stay at slots 201+.
 contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpgradeable, ReentrancyGuard {
-    /// @notice Maps token balances for each chain.
-    /// NOTE: this mapping may be removed in the future, don't rely on it!
-    /// @dev This is write-only bookkeeping kept for future use; it is not consulted by any
-    /// bridging decision. Correctness of transfers is guaranteed by ZK proofs (plus 2FA on
-    /// ZKsync OS chains) rather than by on-chain balance enforcement.
-    /// @dev The `chainBalance` is only used to track the balance of native tokens on the L2.
-    /// For all the other tokens it is expected to be 0.
+    /// @inheritdoc IL2AssetTracker
+    /// @dev Tracked only for tokens native to this chain; expected to be 0 for all others.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public override chainBalance;
 
     /// @dev Slot previously holding `assetMigrationNumber` from the removed Token Balance Migration.
@@ -50,10 +46,8 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber))
         private __DEPRECATED_assetMigrationNumber;
 
-    /// @notice Denotes whether a token is registered or not: the token's chainBalance is set
-    /// correctly and its `totalPreV31TotalSupply` is tracked correctly.
-    /// @dev Once we know that all legacy tokens have been registered (and all new ones have the
-    /// corresponding logic performed automatically), we can remove the mapping. So DONT RELY ON IT!
+    /// @inheritdoc IL2AssetTracker
+    /// @dev May be removed once all legacy tokens are registered — don't rely on it.
     mapping(bytes32 assetId => bool isAssetRegistered) public override isAssetRegistered;
 
     uint256 public L1_CHAIN_ID;
@@ -63,21 +57,16 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
     /// @dev L2-side accounting used to compute the amount to keep on L1 during L1 -> Gateway migration.
     mapping(bytes32 assetId => InteropL2Info info) public interopInfo;
 
-    /// @dev Token total supply snapshot captured before the first post-v31 bridge operation for each token.
-    /// @dev For tokens that existed before the chain migrated to v31, it should be equal to `totalSuccessfulDeposits - totalWithdrawalsToL1`.
-    /// - If a token is a bridged token, it is equal to its `totalSupply()`.
-    /// - If a token is a native token, it is equal to the `2^256-1 - balanceOf of the native token vault`, i.e. one
-    /// could imagine there was a big successful deposit at the inception time of 2^256-1 and then the withdrawals behaved the same way as for
-    /// the bridged L2 tokens.
-    /// @dev For native tokens, it is expected to be populated automatically with `isAssetRegistered[block.chainid]`.
-    /// @dev IMPORTANT: for base token this value may not be correct for ZKsync OS chains until the totalSupply for the base
-    /// token has been backfilled, so before using this value for the base token, one should check that it was set (`needBaseTokenTotalSupplyBackfill = false`).
+    /// @notice Token total-supply snapshot captured before the token's first post-v31 bridge operation.
+    /// See {protocol-docs/bridging.md} (v31 migration accounting).
+    /// @dev For tokens that existed before the chain migrated to v31, this should equal
+    /// `totalSuccessfulDeposits - totalWithdrawalsToL1`.
+    /// @dev IMPORTANT: for the base token on ZKsync OS chains the value is a placeholder until backfilled;
+    /// check `needBaseTokenTotalSupplyBackfill == false` before using it.
     mapping(bytes32 assetId => SavedTotalSupply snapshot) public totalPreV31TotalSupply;
 
-    /// @dev On ZKsync OS chains, the `totalSupply()` of the base token is not available by default,
-    /// so before we ever use it to do any migrations, we need to backfill it.
-    /// @dev This variable is expected to be deleted after v31 upgrade, once all the ZKsync OS chains have their base token
-    /// amount backfilled.
+    /// @inheritdoc IL2AssetTracker
+    /// @dev Expected to be deleted once every ZKsync OS chain has its base token backfilled.
     bool public needBaseTokenTotalSupplyBackfill;
 
     modifier onlyUpgrader() {
@@ -115,19 +104,15 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
         _;
     }
 
-    /// @notice Backfills the base token's pre-V31 total supply for ZKOS chains.
+    /// @inheritdoc IL2AssetTracker
     /// @dev Called by L2BaseTokenZKOS.setZKsyncOSPreV31TotalSupply() after setting the total supply.
-    /// @param _amount The pre-V31 total supply amount.
     function backFillZKSyncOSBaseTokenV31MigrationData(uint256 _amount) external onlyL2BaseToken {
         if (!needBaseTokenTotalSupplyBackfill) {
             revert BaseTokenTotalSupplyBackfillNotNeeded();
         }
 
-        // For genesis chains, the base token is registered during _finalizeDeployments() via
-        // L2NativeTokenVault.registerBaseTokenIfNeeded() → registerNewTokenIfNeeded(),
-        // which sets totalPreV31TotalSupply[assetId] = {isSaved: true, amount: 0}.
-        // For existing chains upgraded to V31, L2V31Upgrade calls registerBaseTokenDuringUpgrade()
-        // which also sets totalPreV31TotalSupply to {isSaved: true, amount: 0}.
+        // Registration (genesis or v31 upgrade) must already have stored the {isSaved: true, amount: 0}
+        // placeholder; only that placeholder may be backfilled.
         require(isAssetRegistered[BASE_TOKEN_ASSET_ID], AssetIdNotRegistered(BASE_TOKEN_ASSET_ID));
         SavedTotalSupply memory baseTokenPreV31TotalSupply = totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID];
         require(baseTokenPreV31TotalSupply.isSaved, TotalPreV31SupplyNotSaved(BASE_TOKEN_ASSET_ID));
@@ -140,10 +125,7 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
         needBaseTokenTotalSupplyBackfill = false;
     }
 
-    /// @notice Sets the L1 chain ID and base token asset ID for this L2 chain.
-    /// @dev This function is called during contract initialization or upgrades.
-    /// @param _l1ChainId The chain ID of the L1 network.
-    /// @param _baseTokenAssetId The asset ID of the base token used for gas fees on this chain.
+    /// @inheritdoc IL2AssetTracker
     function initL2(
         uint256 _l1ChainId,
         bytes32 _baseTokenAssetId,
@@ -162,29 +144,20 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
         isAssetRegistered[_assetId] = true;
 
         if (_originChainId == block.chainid) {
+            // By convention, native tokens are treated as if an infinite deposit happened at the chain's
+            // inception (see MAX_TOKEN_BALANCE).
             chainBalance[_originChainId][_assetId] = MAX_TOKEN_BALANCE;
-            // By convention, we treat native tokens as those that had an infinite deposit
-            // at the inception of the chain, so we set the `totalPreV31TotalSupply` to MAX_TOKEN_BALANCE to reflect that.
             totalPreV31TotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: MAX_TOKEN_BALANCE});
         } else {
-            // We dont track chain balance for non-native tokens.
-
-            // If a token is not a native token and is bridged for the first time,
-            // we know that it has never been bridged before v31.
+            // Chain balance is not tracked for non-native tokens. A token bridged in for the first time
+            // has never been bridged before v31, so its pre-v31 supply is zero.
             totalPreV31TotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: 0});
         }
     }
 
-    /// @notice Registers the base token in the asset tracker during a V31 upgrade
-    /// of an existing chain.
-    /// @dev Unlike `registerNewTokenIfNeeded` (used during genesis when all tokens
-    /// are truly new), this function is for upgrading existing chains where the base
-    /// token already exists on-chain but the asset tracker is deployed during the
-    /// current upgrade. The base token originates on L1 (non-native to this chain).
-    /// Reverts if the base token is already registered, since this is called first
-    /// during the upgrade and double-registration indicates a broken invariant.
-    /// The real pre-V31 total supply is backfilled later via
-    /// `backFillZKSyncOSBaseTokenV31MigrationData()`.
+    /// @inheritdoc IL2AssetTracker
+    /// @dev The base token originates on L1 (non-native to this chain). Reverts on double registration,
+    /// which would indicate a broken upgrade invariant (this is called first during the upgrade).
     function registerBaseTokenDuringUpgrade() external onlyUpgrader {
         bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
         require(!isAssetRegistered[baseTokenAssetId], AssetAlreadyRegistered(baseTokenAssetId));
@@ -194,18 +167,14 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
         emit BaseTokenRegisteredDuringUpgrade(baseTokenAssetId);
     }
 
-    /// @notice Stores token total supply snapshot used for pre-v31 migration accounting.
-    /// @dev Anyone can call this to eagerly initialize the snapshot before the first bridge operation.
+    /// @inheritdoc IL2AssetTracker
     function registerLegacyToken(bytes32 _assetId) public override {
         if (isAssetRegistered[_assetId]) {
             return;
         }
 
-        // Token is not registered, two cases:
-        // - It is not present in the system at all
-        // - It is a legacy token.
-        // We distinguish these cases by checking the origin chain id in the NTV.
-        // `_tryGetTokenAddress` is expected to revert if the token is not registered on NTV.
+        // An unregistered token is either a legacy token or not present in the system at all;
+        // `_tryGetTokenAddress` reverts in the latter case (not registered on the NTV).
         address tokenAddress = _tryGetTokenAddress(_assetId);
         _registerLegacyToken(_assetId, tokenAddress);
     }
@@ -214,11 +183,7 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice This function is called for outgoing bridging from the L2, i.e. L2->L1 withdrawals and outgoing L2->L2 interop.
-    /// @param _toChainId The destination chain id of the transfer.
-    /// @param _assetId The bridged asset id.
-    /// @param _amount The transferred amount.
-    /// @param _tokenOriginChainId Origin chain id of the bridged token.
+    /// @inheritdoc IL2AssetTracker
     function handleInitiateBridgingOnL2(
         uint256 _toChainId,
         bytes32 _assetId,
@@ -238,7 +203,7 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
         _registerLegacyTokenIfNeeded(_assetId, tokenAddress);
 
         if (_tokenOriginChainId == block.chainid) {
-            /// On the L2 we only save chainBalance for native tokens.
+            // chainBalance is only tracked for native tokens.
             _decreaseChainBalance(block.chainid, _assetId, _amount);
         }
 
@@ -250,46 +215,31 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
         }
     }
 
-    /// @notice Handles the initiation of base token bridging operations on L2.
-    /// @dev This function is specifically for the chain's native base token used for gas payments.
-    /// @param _toChainId The chain ID which the funds are sent to.
-    /// @param _amount The amount of base tokens being bridged out.
+    /// @inheritdoc IL2AssetTracker
     function handleInitiateBaseTokenBridgingOnL2(uint256 _toChainId, uint256 _amount) external onlyBaseTokenHolder {
         bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
         uint256 baseTokenOriginChainId = L2_NATIVE_TOKEN_VAULT.originChainId(baseTokenAssetId);
         _handleInitiateBridgingOnL2Inner(_toChainId, baseTokenAssetId, _amount, baseTokenOriginChainId);
     }
 
-    /// @notice Recovery-side counterpart of `handleInitiateBaseTokenBridgingOnL2`, called when a failed/
-    /// timed-out base-token bridge-out's escrow is returned via `BaseTokenHolder.recoverBaseToken`.
-    /// @dev Only L2->L2 bridge-outs are recoverable, and their forward accounting records nothing to
-    /// reverse: the base token is never native to this chain (so no `chainBalance` was decreased at
-    /// initiate) and the destination is not L1 (so no `totalWithdrawalsToL1` bump). Both invariants are
-    /// asserted below; the amount (second parameter) stays in the signature for symmetry with the
-    /// initiate/finalize hooks but is unused until there is accounting to reverse.
-    /// @param _toChainId The original bridge-out destination chain id.
+    /// @inheritdoc IL2AssetTracker
+    /// @dev Only L2->L2 bridge-outs are recoverable and their forward accounting recorded nothing to
+    /// reverse; both invariants are asserted below. See {protocol-docs/bridging.md}.
     function handleRecoverBaseTokenBridgingOnL2(
         uint256 _toChainId,
         uint256 /* _amount */
     ) external onlyBaseTokenHolder {
-        // L2->L1 interop is never revertable ({InteropCenter} rejects L1-destined atomic bundles at send):
-        // `totalWithdrawalsToL1` is consumed once during the L1->GW migration and must stay append-only.
+        // L2->L1 withdrawals are never revertable: `totalWithdrawalsToL1` must stay append-only.
+        // See {protocol-docs/bridging.md}.
         require(_toChainId != L1_CHAIN_ID, RecoverToL1NotSupported());
-        // The base token can never originate from this chain (`handleFinalizeBaseTokenBridgingOnL2`
-        // hard-codes non-native for the same reason), so there is no chainBalance to re-credit.
+        // The base token never originates from this chain, so there is no chainBalance to re-credit.
         require(
             L2_NATIVE_TOKEN_VAULT.originChainId(BASE_TOKEN_ASSET_ID) != block.chainid,
             BaseTokenNativeToThisChain()
         );
     }
 
-    /// @notice Handles the finalization of incoming token bridging operations on L2.
-    /// @dev This function is called when tokens are bridged into this L2 from another chain.
-    /// @param _fromChainId The source chain id of the transfer.
-    /// @param _assetId The asset ID of the token being bridged in.
-    /// @param _amount The amount of tokens being bridged in.
-    /// @param _tokenOriginChainId The chain ID where this token was originally created.
-    /// @param _tokenAddress The contract address of the token on this chain.
+    /// @inheritdoc IL2AssetTracker
     function handleFinalizeBridgingOnL2(
         uint256 _fromChainId,
         bytes32 _assetId,
@@ -315,7 +265,7 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
     ) internal {
         _registerLegacyTokenIfNeeded(_assetId, _tokenAddress);
 
-        /// On the L2 we only save chainBalance for native tokens.
+        // chainBalance is only tracked for native tokens.
         if (_isNativeToThisChain) {
             chainBalance[block.chainid][_assetId] += _amount;
         }
@@ -328,7 +278,7 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
         }
     }
 
-    /// @notice Populates the totalPreV31TotalSupply.
+    /// @notice Registers a legacy token, populating its `chainBalance` and `totalPreV31TotalSupply`.
     /// @dev Assumes that the token is not yet registered.
     function _registerLegacyToken(bytes32 _assetId, address _tokenAddress) internal returns (uint256 totalSupply) {
         // Legacy tokens are all expected to have the origin chain id set on the L2NativeTokenVault.
@@ -343,11 +293,9 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
                 ChainBalanceMustBeZeroBeforeMigration(originChainId, _assetId, originChainBalance)
             );
 
-            // Initialize chainBalance
-            // For origin chains, chainBalance starts at MAX_TOKEN_BALANCE and decreases as tokens are bridged out.
-            // We need to account for tokens currently locked in the NTV from previous bridge operations.
-            // Note, that this logic treats "tokens sent directly to L2NTV" and tokens bridged to L1 through NTV the same
-            // way. It is okay, since the tokens that have been sent to the L2NTV are basically frozen anyway.
+            // chainBalance starts at MAX_TOKEN_BALANCE minus tokens already escrowed in the NTV. Tokens
+            // sent directly to the NTV are treated the same as bridged-out ones — they are effectively
+            // frozen anyway.
             uint256 ntvBalance = IERC20(_tokenAddress).balanceOf(L2_NATIVE_TOKEN_VAULT_ADDR);
             uint256 chainTotalSupply = MAX_TOKEN_BALANCE - ntvBalance;
             chainBalance[originChainId][_assetId] = chainTotalSupply;
@@ -368,18 +316,14 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
         address _tokenAddress
     ) internal returns (uint256 totalSupply) {
         if (isAssetRegistered[_assetId]) {
-            // If the token is already registered, then the totalPreV31TotalSupply should be already populated, so we can just return it.
             return totalPreV31TotalSupply[_assetId].amount;
         }
 
-        // Note we assume that the token must be legacy, since we expect the NTV to call `registerNewToken` for any new tokens.
+        // The token must be legacy: the NTV calls `registerNewTokenIfNeeded` for any new token.
         return _registerLegacyToken(_assetId, _tokenAddress);
     }
 
-    /// @notice Handles the finalization of incoming base token bridging operations on L2.
-    /// @dev This function is specifically for the chain's native base token used for gas payments.
-    /// @param _fromChainId The source chain ID of the bridging operation.
-    /// @param _amount The amount of base tokens being bridged into this chain.
+    /// @inheritdoc IL2AssetTracker
     function handleFinalizeBaseTokenBridgingOnL2(
         uint256 _fromChainId,
         uint256 _amount
@@ -389,8 +333,8 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
             return;
         }
         if (baseTokenAssetId == bytes32(0)) {
-            /// this means we are before the genesis upgrade, where we don't transfer value, so we can skip.
-            /// if we don't skip we use incorrect asset id.
+            // Before the genesis upgrade no value is transferred; revert rather than record under an
+            // incorrect asset id.
             revert MissingBaseTokenAssetId();
         }
 
@@ -407,8 +351,8 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
                             Helper Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev This function is used to decrease the chain balance of a token on a chain.
-    /// @dev It makes debugging issues easier. Overflows don't usually happen, so there is no similar function to increase the chain balance.
+    /// @dev Reverts with a descriptive error instead of underflowing, to ease debugging; there is no
+    /// matching increase helper since overflow is not a realistic concern.
     function _decreaseChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
         if (chainBalance[_chainId][_assetId] < _amount) {
             revert InsufficientChainBalance(_chainId, _assetId, _amount);
@@ -417,6 +361,7 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
     }
 
     /// @notice Retrieves the token contract address for a given asset ID.
+    /// @dev Reverts if the asset is not registered on the NTV.
     /// @param _assetId The asset ID to look up.
     /// @return tokenAddress The contract address of the token.
     function _tryGetTokenAddress(bytes32 _assetId) internal view returns (address tokenAddress) {
