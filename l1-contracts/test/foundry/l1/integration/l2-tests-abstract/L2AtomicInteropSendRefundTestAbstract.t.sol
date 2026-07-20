@@ -13,7 +13,10 @@ import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol"
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {AtomicFlow, AtomicFlowPreimage, ImtProof, LegState} from "contracts/atomic-interop/IAtomicInterop.sol";
-import {ManagerCommittedBundleNotInFlow} from "contracts/atomic-interop/AtomicInteropErrors.sol";
+import {
+    ManagerCommittedBundleNotInFlow,
+    ManagerLegNotRevertable
+} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropBundle, InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
@@ -169,6 +172,22 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         _sendAtomicLegWithInvalidRemotePeer();
         _authorizeRefundForInvalidRemoteLeg();
         _claimRefundAndAssertRecovery();
+    }
+
+    /// @notice A second `claimRefund` for the same leg must revert: `claimRefund` flips the leg to
+    /// `Reverted` (CEI) before its external recovery calls, so any replay/reentrant claim hits the
+    /// `Revertable` guard — the burned funds can be recovered exactly once.
+    function test_atomicSend_RevertWhen_ClaimedTwice() public {
+        _setUpAtomicStack();
+        _sendAtomicLegWithInvalidRemotePeer();
+        _authorizeRefundForInvalidRemoteLeg();
+        _claimRefundAndAssertRecovery();
+
+        AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
+        vm.expectRevert(
+            abi.encodeWithSelector(ManagerLegNotRevertable.selector, ctx.flowId, ctx.bundleHash, LegState.Reverted)
+        );
+        manager.claimRefund(ctx.flowId, ctxBundleBytes);
     }
 
     /// @dev Phase 1+2: predict the local leg's hash, send the atomic bundle for real (asset-router
