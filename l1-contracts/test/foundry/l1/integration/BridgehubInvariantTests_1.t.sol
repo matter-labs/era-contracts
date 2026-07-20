@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {
+    IBridgehubBase,
     L2TransactionRequestDirect,
     L2TransactionRequestTwoBridgesOuter
 } from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -518,6 +519,20 @@ contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, Token
             data: message
         });
 
+        vm.mockCall(
+            addresses.bridgehubProxyAddress,
+            // solhint-disable-next-line func-named-parameters
+            abi.encodeWithSelector(
+                IBridgehubBase.proveL2MessageInclusion.selector,
+                currentChainId,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2ToL1Message,
+                merkleProof
+            ),
+            abi.encode(true)
+        );
+
         addresses.sharedBridge.finalizeWithdrawal({
             _chainId: currentChainId,
             _l2BatchNumber: l2BatchNumber,
@@ -563,6 +578,20 @@ contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, Token
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             data: message
         });
+
+        vm.mockCall(
+            addresses.bridgehubProxyAddress,
+            // solhint-disable-next-line func-named-parameters
+            abi.encodeWithSelector(
+                IBridgehubBase.proveL2MessageInclusion.selector,
+                currentChainId,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2ToL1Message,
+                merkleProof
+            ),
+            abi.encode(true)
+        );
 
         addresses.sharedBridge.finalizeWithdrawal({
             _chainId: currentChainId,

@@ -28,7 +28,7 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
-import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
+import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {
     L2_COMPLEX_UPGRADER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR
@@ -68,6 +68,8 @@ import {
     ZeroChainId
 } from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+
+import {IMessageVerification} from "contracts/common/MessageVerification.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -908,6 +910,137 @@ contract ExperimentalBridgeTest is Test {
         assertTrue(bridgehub.getZKChain(chainId) == newChainAddress);
     }
 
+    function test_proveL2MessageInclusion_new(
+        uint256 mockChainId,
+        uint256 mockBatchNumber,
+        uint256 mockIndex,
+        bytes32[] memory mockProof,
+        uint16 randomTxNumInBatch,
+        address randomSender,
+        bytes memory randomData
+    ) public {
+        _initializeBridgehub();
+        mockChainId = _setUpZKChainForChainId(mockChainId);
+
+        // Now the following statements should be true as well:
+        assertTrue(bridgehub.chainTypeManager(mockChainId) == address(mockCTM));
+        assertTrue(bridgehub.getZKChain(mockChainId) == address(mockChainContract));
+
+        // Creating a random L2Message::l2Message so that we pass the correct parameters to `proveL2MessageInclusion`
+        L2Message memory l2Message = _createMockL2Message(randomTxNumInBatch, randomSender, randomData);
+
+        // Since we have used random data for the `InteropCenter.proveL2MessageInclusion` function which basically forwards the call
+        // to the same function in the mailbox, we will mock the call to the mailbox to return true and see if it works.
+        vm.mockCall(
+            address(messageRoot),
+            // solhint-disable-next-line func-named-parameters
+            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
+            abi.encode(true)
+        );
+
+        assertTrue(
+            bridgehub.proveL2MessageInclusion({
+                _chainId: mockChainId,
+                _batchNumber: mockBatchNumber,
+                _index: mockIndex,
+                _message: l2Message,
+                _proof: mockProof
+            })
+        );
+        vm.clearMockedCalls();
+    }
+
+    function test_proveL2LogInclusion_new(
+        uint256 mockChainId,
+        uint256 mockBatchNumber,
+        uint256 mockIndex,
+        bytes32[] memory mockProof,
+        uint8 randomL2ShardId,
+        bool randomIsService,
+        uint16 randomTxNumInBatch,
+        address randomSender,
+        bytes32 randomKey,
+        bytes32 randomValue
+    ) public {
+        _initializeBridgehub();
+        mockChainId = _setUpZKChainForChainId(mockChainId);
+
+        // Now the following statements should be true as well:
+        assertTrue(bridgehub.chainTypeManager(mockChainId) == address(mockCTM));
+        assertTrue(bridgehub.getZKChain(mockChainId) == address(mockChainContract));
+
+        // Creating a random L2Log::l2Log so that we pass the correct parameters to `proveL2LogInclusion`
+        L2Log memory l2Log = _createMockL2Log({
+            randomL2ShardId: randomL2ShardId,
+            randomIsService: randomIsService,
+            randomTxNumInBatch: randomTxNumInBatch,
+            randomSender: randomSender,
+            randomKey: randomKey,
+            randomValue: randomValue
+        });
+
+        // Since we have used random data for the `interopCenter.proveL2LogInclusion` function which basically forwards the call
+        // to the same function in the mailbox, we will mock the call to the mailbox to return true and see if it works.
+        vm.mockCall(
+            address(messageRoot),
+            // solhint-disable-next-line func-named-parameters
+            abi.encodeWithSelector(IMessageVerification.proveL2LogInclusionShared.selector),
+            abi.encode(true)
+        );
+
+        assertTrue(
+            bridgehub.proveL2LogInclusion({
+                _chainId: mockChainId,
+                _batchNumber: mockBatchNumber,
+                _index: mockIndex,
+                _log: l2Log,
+                _proof: mockProof
+            })
+        );
+        vm.clearMockedCalls();
+    }
+
+    function test_proveL1ToL2TransactionStatus_new(
+        uint256 randomChainId,
+        bytes32 randomL2TxHash,
+        uint256 randomL2BatchNumber,
+        uint256 randomL2MessageIndex,
+        uint16 randomL2TxNumberInBatch,
+        bytes32[] memory randomMerkleProof,
+        bool randomResultantBool,
+        bool txStatusBool
+    ) public {
+        _initializeBridgehub();
+        randomChainId = _setUpZKChainForChainId(randomChainId);
+
+        TxStatus txStatus;
+
+        if (txStatusBool) {
+            txStatus = TxStatus.Failure;
+        } else {
+            txStatus = TxStatus.Success;
+        }
+
+        vm.mockCall(
+            address(messageRoot),
+            // solhint-disable-next-line func-named-parameters
+            abi.encodeWithSelector(IMessageVerification.proveL1ToL2TransactionStatusShared.selector),
+            abi.encode(randomResultantBool)
+        );
+
+        assertTrue(
+            bridgehub.proveL1ToL2TransactionStatus({
+                _chainId: randomChainId,
+                _l2TxHash: randomL2TxHash,
+                _l2BatchNumber: randomL2BatchNumber,
+                _l2MessageIndex: randomL2MessageIndex,
+                _l2TxNumberInBatch: randomL2TxNumberInBatch,
+                _merkleProof: randomMerkleProof,
+                _status: txStatus
+            }) == randomResultantBool
+        );
+    }
+
     function test_l2TransactionBaseCost(
         uint256 mockChainId,
         uint256 mockGasPrice,
@@ -1527,6 +1660,40 @@ contract ExperimentalBridgeTest is Test {
         return l2Req;
     }
 
+    function _createMockL2Message(
+        uint16 randomTxNumInBatch,
+        address randomSender,
+        bytes memory randomData
+    ) internal pure returns (L2Message memory) {
+        L2Message memory l2Message;
+
+        l2Message.txNumberInBatch = randomTxNumInBatch;
+        l2Message.sender = randomSender;
+        l2Message.data = randomData;
+
+        return l2Message;
+    }
+
+    function _createMockL2Log(
+        uint8 randomL2ShardId,
+        bool randomIsService,
+        uint16 randomTxNumInBatch,
+        address randomSender,
+        bytes32 randomKey,
+        bytes32 randomValue
+    ) internal pure returns (L2Log memory) {
+        L2Log memory l2Log;
+
+        l2Log.l2ShardId = randomL2ShardId;
+        l2Log.isService = randomIsService;
+        l2Log.txNumberInBatch = randomTxNumInBatch;
+        l2Log.sender = randomSender;
+        l2Log.key = randomKey;
+        l2Log.value = randomValue;
+
+        return l2Log;
+    }
+
     function _createNewChainInitData(
         bool isFreezable,
         bytes4[] memory mockSelectors,
@@ -1654,5 +1821,149 @@ contract ExperimentalBridgeTest is Test {
         }
 
         return shortArray;
+    }
+
+    /////////////////////////////////////////////////////////
+    // OLDER (HIGH-LEVEL MOCKED) TESTS
+    ////////////////////////////////////////////////////////
+
+    function test_proveL2MessageInclusion_old(
+        uint256 mockChainId,
+        uint256 mockBatchNumber,
+        uint256 mockIndex,
+        bytes32[] memory mockProof,
+        uint16 randomTxNumInBatch,
+        address randomSender,
+        bytes memory randomData
+    ) public {
+        vm.startPrank(bridgeOwner);
+        bridgehub.addChainTypeManager(address(mockCTM));
+        vm.stopPrank();
+
+        L2Message memory l2Message = _createMockL2Message(randomTxNumInBatch, randomSender, randomData);
+
+        vm.mockCall(
+            address(bridgehub),
+            // solhint-disable-next-line func-named-parameters
+            abi.encodeWithSelector(
+                bridgehub.proveL2MessageInclusion.selector,
+                mockChainId,
+                mockBatchNumber,
+                mockIndex,
+                l2Message,
+                mockProof
+            ),
+            abi.encode(true)
+        );
+
+        assertTrue(
+            bridgehub.proveL2MessageInclusion({
+                _chainId: mockChainId,
+                _batchNumber: mockBatchNumber,
+                _index: mockIndex,
+                _message: l2Message,
+                _proof: mockProof
+            })
+        );
+    }
+
+    function test_proveL2LogInclusion_old(
+        uint256 mockChainId,
+        uint256 mockBatchNumber,
+        uint256 mockIndex,
+        bytes32[] memory mockProof,
+        uint8 randomL2ShardId,
+        bool randomIsService,
+        uint16 randomTxNumInBatch,
+        address randomSender,
+        bytes32 randomKey,
+        bytes32 randomValue
+    ) public {
+        vm.startPrank(bridgeOwner);
+        bridgehub.addChainTypeManager(address(mockCTM));
+        vm.stopPrank();
+
+        L2Log memory l2Log = _createMockL2Log({
+            randomL2ShardId: randomL2ShardId,
+            randomIsService: randomIsService,
+            randomTxNumInBatch: randomTxNumInBatch,
+            randomSender: randomSender,
+            randomKey: randomKey,
+            randomValue: randomValue
+        });
+
+        vm.mockCall(
+            address(bridgehub),
+            // solhint-disable-next-line func-named-parameters
+            abi.encodeWithSelector(
+                bridgehub.proveL2LogInclusion.selector,
+                mockChainId,
+                mockBatchNumber,
+                mockIndex,
+                l2Log,
+                mockProof
+            ),
+            abi.encode(true)
+        );
+
+        assertTrue(
+            bridgehub.proveL2LogInclusion({
+                _chainId: mockChainId,
+                _batchNumber: mockBatchNumber,
+                _index: mockIndex,
+                _log: l2Log,
+                _proof: mockProof
+            })
+        );
+    }
+
+    function test_proveL1ToL2TransactionStatus_old(
+        uint256 randomChainId,
+        bytes32 randomL2TxHash,
+        uint256 randomL2BatchNumber,
+        uint256 randomL2MessageIndex,
+        uint16 randomL2TxNumberInBatch,
+        bytes32[] memory randomMerkleProof,
+        bool randomResultantBool
+    ) public {
+        vm.startPrank(bridgeOwner);
+        bridgehub.addChainTypeManager(address(mockCTM));
+        vm.stopPrank();
+
+        TxStatus txStatus;
+
+        if (randomChainId % 2 == 0) {
+            txStatus = TxStatus.Failure;
+        } else {
+            txStatus = TxStatus.Success;
+        }
+
+        vm.mockCall(
+            address(bridgehub),
+            // solhint-disable-next-line func-named-parameters
+            abi.encodeWithSelector(
+                bridgehub.proveL1ToL2TransactionStatus.selector,
+                randomChainId,
+                randomL2TxHash,
+                randomL2BatchNumber,
+                randomL2MessageIndex,
+                randomL2TxNumberInBatch,
+                randomMerkleProof,
+                txStatus
+            ),
+            abi.encode(randomResultantBool)
+        );
+
+        assertTrue(
+            bridgehub.proveL1ToL2TransactionStatus({
+                _chainId: randomChainId,
+                _l2TxHash: randomL2TxHash,
+                _l2BatchNumber: randomL2BatchNumber,
+                _l2MessageIndex: randomL2MessageIndex,
+                _l2TxNumberInBatch: randomL2TxNumberInBatch,
+                _merkleProof: randomMerkleProof,
+                _status: txStatus
+            }) == randomResultantBool
+        );
     }
 }
