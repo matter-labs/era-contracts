@@ -85,8 +85,9 @@ contract InteropAttributeParser is IInteropAttributeParser {
         uint256 attributesLength = _attributes.length;
         for (uint256 i = 0; i < attributesLength; ++i) {
             if (bytes4(_attributes[i]) == IERC7786Attributes.atomicBundle.selector) {
-                (atomicSend.flowId, atomicSend.deadline, atomicSend.lowNullifierIndex) = AttributesDecoder
-                    .decodeAtomicBundle(_attributes[i]);
+                (atomicSend.flowPreimage, atomicSend.lowNullifierIndex) = AttributesDecoder.decodeAtomicBundle(
+                    _attributes[i]
+                );
                 atomicSend.isAtomic = true;
             }
         }

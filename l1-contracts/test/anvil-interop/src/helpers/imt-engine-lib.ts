@@ -8,11 +8,13 @@
  *
  * Id derivations:
  *   - `bundleHash = keccak256(abi.encode(sourceChainId, abi.encode(InteropBundle)))`. The atomic send
- *     params (flowId, deadline, lowNullifierIndex) travel via the `atomicBundle` attribute, not the
- *     InteropBundle, so `bundleHash` does not depend on `flowId`.
- *   - `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`,
+ *     params (the full flowId preimage + lowNullifierIndex) travel via the `atomicBundle` attribute, not
+ *     the InteropBundle, so `bundleHash` does not depend on the preimage.
+ *   - `flowId = keccak256(abi.encode(preimage))`,
  *     bundle hashes strictly ascending with source chain ids positionally aligned. Since `bundleHash` is
- *     independent of `flowId`, `flowId` is computable off-chain before the send.
+ *     independent of the preimage, each leg's `bundleHash` (and thus the preimage) is computable off-chain
+ *     before the send; on-chain the AtomicFlowManager recomputes `flowId` from the attribute-supplied
+ *     preimage and requires the sent bundle to be one of its legs.
  *   - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
  *
  * Tree specifics (match IndexedMerkleTree.sol + FullMerkle.sol, the dynamic-height tree):
@@ -102,22 +104,36 @@ export function indexedLeafHash(leaf: IMTLeaf): string {
 }
 
 /**
- * flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId)),
- * matching {AtomicFlowManager}'s preimage. `bundleHashes` must be strictly ascending, `chainIds` are
- * positionally aligned, and `settlementLayerChainId` binds all legs to a single settlement layer.
+ * The full `flowId` preimage (mirrors the Solidity `AtomicFlowPreimage` struct — the field set embedded
+ * in `AtomicFlow` and carried by the `atomicBundle` attribute). `legBundleHashes` must be strictly
+ * ascending with `legSourceChainIds` positionally aligned; `deadline` is a settlement-layer timestamp.
  */
-export function computeFlowId(
-  bundleHashes: string[],
-  chainIds: (BigNumber | number | string)[],
-  deadline: number,
-  settlementLayerChainId: BigNumber | number | string = DEFAULT_SL_CHAIN_ID
-): string {
-  return utils.keccak256(
-    utils.defaultAbiCoder.encode(
-      ["bytes32[]", "uint256[]", "uint64", "uint256"],
-      [bundleHashes, chainIds.map((c) => BigNumber.from(c)), deadline, BigNumber.from(settlementLayerChainId)]
-    )
-  );
+export interface AtomicFlowPreimage {
+  deadline: number;
+  settlementLayerChainId: BigNumber | number | string;
+  legBundleHashes: string[];
+  legSourceChainIds: (BigNumber | number | string)[];
+}
+
+/** The Solidity tuple type of `AtomicFlowPreimage`, in struct field order. */
+const FLOW_PREIMAGE_TUPLE_TYPE = "tuple(uint64,uint256,bytes32[],uint256[])";
+
+/**
+ * flowId = keccak256(abi.encode(preimage)) — the ABI encoding of the whole `AtomicFlowPreimage`
+ * struct, matching {AtomicFlowManager._validateAndComputeFlowId}.
+ */
+export function computeFlowId(preimage: AtomicFlowPreimage): string {
+  return utils.keccak256(utils.defaultAbiCoder.encode([FLOW_PREIMAGE_TUPLE_TYPE], [flowPreimageTuple(preimage)]));
+}
+
+/** Encode an {AtomicFlowPreimage} as its Solidity tuple: (deadline, settlementLayerChainId, legBundleHashes, legSourceChainIds). */
+export function flowPreimageTuple(preimage: AtomicFlowPreimage): unknown[] {
+  return [
+    preimage.deadline,
+    BigNumber.from(preimage.settlementLayerChainId),
+    preimage.legBundleHashes,
+    preimage.legSourceChainIds.map((c) => BigNumber.from(c)),
+  ];
 }
 
 // ── Dynamic-height FullMerkle port (leaf hashing / root / path) ───────────────────
@@ -544,37 +560,20 @@ export function proofTuple(p: ImtProof): unknown[] {
 
 /**
  * Build the `AtomicFlow` tuple {AtomicFlowManager} consumes (the flow definition). Tuple field order
- * matches the struct: (flowId, deadline, settlementLayerChainId, legBundleHashes, legSourceChainIds).
- * `legBundleHashes` is ascending; `chainIds` is positionally aligned; `settlementLayerChainId` defaults
- * to {DEFAULT_SL_CHAIN_ID}.
+ * matches the struct: (flowId, preimage).
  */
-export function atomicFlowTuple(params: {
-  flowId: string;
-  deadline: number;
-  settlementLayerChainId?: BigNumber | number | string;
-  legBundleHashes: string[];
-  chainIds: (BigNumber | number | string)[];
-}): unknown[] {
-  return [
-    params.flowId,
-    params.deadline,
-    BigNumber.from(params.settlementLayerChainId ?? DEFAULT_SL_CHAIN_ID),
-    params.legBundleHashes,
-    params.chainIds.map((c) => BigNumber.from(c)),
-  ];
+export function atomicFlowTuple(params: { flowId: string; preimage: AtomicFlowPreimage }): unknown[] {
+  return [params.flowId, flowPreimageTuple(params.preimage)];
 }
 
 /**
  * Build the `AtomicFinalityProof` tuple {L2InteropHandler.executeAtomicBundle} consumes: the flow
- * definition ({AtomicFlow}) plus one inclusion proof per leg, in `legBundleHashes` order. Tuple field
- * order matches the struct: (flow, proofs).
+ * definition ({AtomicFlow}) plus one inclusion proof per leg, in `preimage.legBundleHashes` order.
+ * Tuple field order matches the struct: (flow, proofs).
  */
 export function atomicFinalityProofTuple(params: {
   flowId: string;
-  deadline: number;
-  settlementLayerChainId?: BigNumber | number | string;
-  legBundleHashes: string[];
-  chainIds: (BigNumber | number | string)[];
+  preimage: AtomicFlowPreimage;
   proofs: ImtProof[];
 }): unknown[] {
   return [atomicFlowTuple(params), params.proofs.map(proofTuple)];

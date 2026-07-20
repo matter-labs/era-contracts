@@ -15,6 +15,7 @@ import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 // import {IInteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
+import {AtomicFlowPreimage} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {AmountMustBeGreaterThanZero, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -169,7 +170,15 @@ library InteropLibrary {
         // resulting `atomicBundle` attribute themselves rather than relying on this placeholder.
         attributes[attributesPointer++] = abi.encodeCall(
             IERC7786Attributes.atomicBundle,
-            (bytes32(uint256(1)), type(uint64).max, uint256(0))
+            (
+                AtomicFlowPreimage({
+                    deadline: type(uint64).max,
+                    settlementLayerChainId: 0,
+                    legBundleHashes: new bytes32[](0),
+                    legSourceChainIds: new uint256[](0)
+                }),
+                uint256(0)
+            )
         );
         if (salt != bytes32(0)) {
             attributes[attributesPointer++] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (salt));

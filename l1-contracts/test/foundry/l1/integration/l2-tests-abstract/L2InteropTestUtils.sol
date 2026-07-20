@@ -15,7 +15,7 @@ import {
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {InteropBundle} from "contracts/common/Messaging.sol";
-import {AtomicFinalityProof} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {AtomicFinalityProof, AtomicFlowPreimage} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -52,7 +52,15 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
         }
         out[_attrs.length] = abi.encodeCall(
             IERC7786Attributes.atomicBundle,
-            (bytes32(uint256(1)), type(uint64).max, uint256(0))
+            (
+                AtomicFlowPreimage({
+                    deadline: type(uint64).max,
+                    settlementLayerChainId: 0,
+                    legBundleHashes: new bytes32[](0),
+                    legSourceChainIds: new uint256[](0)
+                }),
+                uint256(0)
+            )
         );
     }
 

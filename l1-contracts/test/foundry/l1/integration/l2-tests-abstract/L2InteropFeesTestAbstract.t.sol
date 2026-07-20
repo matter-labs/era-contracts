@@ -12,6 +12,7 @@ import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 import {IInteropCenter, InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
+import {AtomicFlowPreimage} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {FeeWithdrawalFailed, ZKTokenNotAvailable} from "contracts/interop/InteropErrors.sol";
@@ -894,7 +895,15 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         );
         bundleAttributes[1] = abi.encodeCall(
             IERC7786Attributes.atomicBundle,
-            (bytes32(uint256(1)), type(uint64).max, uint256(0))
+            (
+                AtomicFlowPreimage({
+                    deadline: type(uint64).max,
+                    settlementLayerChainId: 0,
+                    legBundleHashes: new bytes32[](0),
+                    legSourceChainIds: new uint256[](0)
+                }),
+                uint256(0)
+            )
         );
 
         InteropCallStarter[] memory calls = _buildSimpleCall();
@@ -935,7 +944,15 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         bytes[] memory attributes = new bytes[](1);
         attributes[0] = abi.encodeCall(
             IERC7786Attributes.atomicBundle,
-            (bytes32(uint256(1)), type(uint64).max, uint256(0))
+            (
+                AtomicFlowPreimage({
+                    deadline: type(uint64).max,
+                    settlementLayerChainId: 0,
+                    legBundleHashes: new bytes32[](0),
+                    legSourceChainIds: new uint256[](0)
+                }),
+                uint256(0)
+            )
         );
 
         // Should succeed (useFixedFee defaults to false)

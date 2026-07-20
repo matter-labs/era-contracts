@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.24;
 
+import {AtomicFlowPreimage} from "../atomic-interop/IAtomicInterop.sol";
+
 /// @title IERC7786Attributes
 /// @notice Interface for the ERC7786 gateway source
 /// @dev When adding/removing a function here the InteropCenter must be updated to reflect the changes.
@@ -28,10 +30,12 @@ interface IERC7786Attributes {
     ///      via the AtomicFlowManager (the burn still flows through the normal `initiateIndirectCall`
     ///      path). The destination executes it via `L2InteropHandler.executeAtomicBundle` once every leg
     ///      of the flow is proven committed before the deadline. Bundle-level attribute.
-    /// @param _flowId The flow identifier, keccak256 over the legs' bundle hashes and source chain ids, the deadline, and the settlement layer chain id.
-    /// @param _deadline The flow deadline, as a settlement-layer timestamp.
+    /// @param _flowPreimage The full `flowId` preimage. The AtomicFlowManager recomputes `flowId` and
+    ///      requires this bundle's hash to be one of `legBundleHashes` with this chain as its declared
+    ///      source, so a preimage that does not contain the bundle — e.g. built from a stale off-chain
+    ///      bundle-hash preview — reverts the send instead of stranding the burned funds.
     /// @param _lowNullifierIndex The low-nullifier slot for this leg's commit value in the IMT.
-    function atomicBundle(bytes32 _flowId, uint64 _deadline, uint256 _lowNullifierIndex) external pure;
+    function atomicBundle(AtomicFlowPreimage calldata _flowPreimage, uint256 _lowNullifierIndex) external pure;
 
     /// @notice Specifies a user-provided salt for the interop bundle.
     /// @param _salt Arbitrary 32-byte salt chosen by the sender.

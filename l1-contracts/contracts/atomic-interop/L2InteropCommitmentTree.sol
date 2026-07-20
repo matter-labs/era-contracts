@@ -51,7 +51,9 @@ contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
 
     /// @inheritdoc IL2InteropCommitmentTree
     function insert(uint256 _value, uint256 _lowNullifierIndex) external returns (uint256 newIndex, bytes32 newRoot) {
-        if (msg.sender != appender()) revert CommitmentTreeNotAppender(msg.sender);
+        if (msg.sender != appender()) {
+            revert CommitmentTreeNotAppender(msg.sender);
+        }
         // Value / low-nullifier validation (non-zero, no duplicates, correct bracket) is enforced by
         // the engine and surfaces its own `IMT*` errors.
         (newIndex, newRoot) = _imt.insert(_value, _lowNullifierIndex);

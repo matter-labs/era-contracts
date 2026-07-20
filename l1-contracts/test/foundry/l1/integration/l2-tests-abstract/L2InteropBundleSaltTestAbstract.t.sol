@@ -10,6 +10,7 @@ import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {BundleAttributes, InteropBundle, InteropCallStarter} from "contracts/common/Messaging.sol";
+import {AtomicFlowPreimage} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {
     AttributeAlreadySet,
@@ -66,7 +67,15 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
         }
         attrs[idx++] = abi.encodeCall(
             IERC7786Attributes.atomicBundle,
-            (bytes32(uint256(1)), type(uint64).max, uint256(0))
+            (
+                AtomicFlowPreimage({
+                    deadline: type(uint64).max,
+                    settlementLayerChainId: 0,
+                    legBundleHashes: new bytes32[](0),
+                    legSourceChainIds: new uint256[](0)
+                }),
+                uint256(0)
+            )
         );
     }
 

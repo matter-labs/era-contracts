@@ -120,6 +120,12 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         // non-interop suites (they never touch that address), so installing it unconditionally in the single
         // shared `setUp` frees every concrete entrypoint from setUp/MRO boilerplate — the alternative
         // (an overridable hook) still triggers a diamond-override on every interop concrete.
+        _mockAtomicFlowManager();
+    }
+
+    /// @notice Installs the void mocks for the AtomicFlowManager gates. Overridable so suites that deploy the
+    /// real AtomicFlowManager (e.g. the atomic send/refund tests) can opt out and exercise the real logic.
+    function _mockAtomicFlowManager() internal virtual {
         vm.mockCall(L2_ATOMIC_FLOW_MANAGER_ADDR, abi.encodeWithSelector(IAtomicFlowManager.append.selector), "");
         vm.mockCall(
             L2_ATOMIC_FLOW_MANAGER_ADDR,

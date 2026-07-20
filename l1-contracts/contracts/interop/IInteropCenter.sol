@@ -4,19 +4,20 @@ pragma solidity ^0.8.21;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {BundleAttributes, CallAttributes, InteropBundle, InteropCallStarter} from "../common/Messaging.sol";
+import {AtomicFlowPreimage} from "../atomic-interop/IAtomicInterop.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IInteropCenter {
     /// @notice Send-side metadata for an atomic bundle, parsed from the `atomicBundle` attribute. It is
     /// deliberately NOT part of the cross-chain {InteropBundle}: keeping it out of `bundleHash` avoids a
-    /// circular dependency (`flowId = keccak256(legBundleHashes, ...)` would otherwise have to be
-    /// known before computing a `bundleHash` that itself embeds `flowId`). Consumed by `_dispatchBundle`
-    /// to drive `AtomicFlowManager.append`.
+    /// circular dependency (the preimage's `legBundleHashes` include this very bundle's hash, so a
+    /// `bundleHash` that embedded the preimage could never be computed). Consumed by `_dispatchBundle`
+    /// to drive `AtomicFlowManager.append`, which recomputes `flowId` from the preimage and requires
+    /// the sent bundle's hash to be one of its legs.
     struct AtomicSend {
-        bytes32 flowId;
+        AtomicFlowPreimage flowPreimage;
         uint256 lowNullifierIndex;
-        uint64 deadline;
         bool isAtomic;
     }
 

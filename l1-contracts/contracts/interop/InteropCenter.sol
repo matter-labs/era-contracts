@@ -747,12 +747,12 @@ contract InteropCenter is
         }
 
         // L2->L2 interop: atomic-only (`_sendBundle` already guaranteed `isAtomic` for a non-L1 destination
-        // and rejected atomic-to-L1). Append the leg's commit value to the interop IMT.
+        // and rejected atomic-to-L1). Append the leg's commit value to the interop IMT. The AtomicFlowManager
+        // recomputes `flowId` from the out-of-band preimage and requires `bundleHash` to be one of its legs.
         IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
-            _flowId: _atomicSend.flowId,
             _bundleHash: bundleHash,
-            _deadline: _atomicSend.deadline,
-            _lowNullifierIndex: _atomicSend.lowNullifierIndex
+            _lowNullifierIndex: _atomicSend.lowNullifierIndex,
+            _flowPreimage: _atomicSend.flowPreimage
         });
     }
 

@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {ManagerNotInteropCenter, ManagerNotInteropHandler} from "contracts/atomic-interop/AtomicInteropErrors.sol";
-import {AtomicFinalityProof} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {AtomicFinalityProof, AtomicFlowPreimage} from "contracts/atomic-interop/IAtomicInterop.sol";
 
 /// @title AtomicFlowManagerAccessControlTest
 /// @notice Caller-authentication tests for the atomic-interop flow manager.
@@ -30,7 +30,8 @@ contract AtomicFlowManagerAccessControlTest is Test {
         address notInteropCenter = makeAddr("notInteropCenter");
         vm.prank(notInteropCenter);
         vm.expectRevert(abi.encodeWithSelector(ManagerNotInteropCenter.selector, notInteropCenter));
-        manager.append(bytes32(0), bytes32(0), 0, 0);
+        AtomicFlowPreimage memory preimage;
+        manager.append(bytes32(0), 0, preimage);
     }
 
     /// @notice The finality gate may only be invoked by the InteropHandler.

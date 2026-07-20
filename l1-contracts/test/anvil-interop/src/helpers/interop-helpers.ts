@@ -31,8 +31,12 @@ import {
   commitValue,
   commitmentTree,
   computeFlowId,
+  flowPreimageTuple,
   lowNullifierIndexFor,
+  DEFAULT_SL_CHAIN_ID,
 } from "./imt-engine-lib";
+import type { AtomicFlowPreimage } from "./imt-engine-lib";
+export type { AtomicFlowPreimage } from "./imt-engine-lib";
 import { approveTokenForNtv, expectBalanceDelta, getTokenAddressForAsset, getTokenBalance } from "./balance-helpers";
 
 const abiCoder = ethers.utils.defaultAbiCoder;
@@ -56,14 +60,21 @@ const ATOMIC_INTEROP_DEADLINE = 4_000_000_000;
 async function buildSingleLegAtomicSend(
   sourceProvider: providers.JsonRpcProvider,
   bundleHash: string
-): Promise<{ attribute: string; flowId: string; deadline: number; sourceChainId: number }> {
+): Promise<{ attribute: string; flowId: string; preimage: AtomicFlowPreimage; sourceChainId: number }> {
   const sourceChainId = (await sourceProvider.getNetwork()).chainId;
-  const deadline = ATOMIC_INTEROP_DEADLINE;
-  const flowId = computeFlowId([bundleHash], [sourceChainId], deadline);
+  // Single-leg flow preimage: this bundle is the only leg, sourced from this chain. `flowId` is
+  // recomputed on-chain from this exact preimage, so it must match byte-for-byte at execute time.
+  const preimage: AtomicFlowPreimage = {
+    deadline: ATOMIC_INTEROP_DEADLINE,
+    settlementLayerChainId: DEFAULT_SL_CHAIN_ID,
+    legBundleHashes: [bundleHash],
+    legSourceChainIds: [sourceChainId],
+  };
+  const flowId = computeFlowId(preimage);
   const value = commitValue(flowId, bundleHash);
   const tree = commitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR, sourceProvider);
   const lowNull = await lowNullifierIndexFor(tree, value);
-  return { attribute: atomicBundleAttr(flowId, deadline, lowNull), flowId, deadline, sourceChainId };
+  return { attribute: atomicBundleAttr(preimage, lowNull), flowId, preimage, sourceChainId };
 }
 
 /**
@@ -78,13 +89,11 @@ async function buildSingleLegFinality(sendResult: InteropSendResult): Promise<un
     l2Tree: tree,
     chainId: sendResult.legSourceChainId,
     value,
-    l1Timestamp: sendResult.deadline,
+    l1Timestamp: sendResult.preimage.deadline,
   });
   return atomicFinalityProofTuple({
     flowId: sendResult.flowId,
-    deadline: sendResult.deadline,
-    legBundleHashes: [sendResult.bundleHash],
-    chainIds: [sendResult.legSourceChainId],
+    preimage: sendResult.preimage,
     proofs: [proof],
   });
 }
@@ -127,14 +136,18 @@ export function useFixedFeeAttr(useFixedFee: boolean): string {
 }
 
 /**
- * Encode the ERC-7786 `atomicBundle(bytes32 flowId, uint64 deadline, uint256 lowNullifierIndex)`
- * bundle attribute. All interop is atomic: the InteropCenter appends the bundle's commit value to the
- * interop IMT via the AtomicFlowManager (public L1 publication was removed), and the destination executes
- * it via InteropHandler.executeBundle once the flow is proven committed before the deadline (per-leg IMT
- * inclusion in an {AtomicFinalityProof}). `deadline` is a settlement-layer timestamp.
+ * Encode the ERC-7786 `atomicBundle(AtomicFlowPreimage flowPreimage, uint256 lowNullifierIndex)`
+ * bundle attribute. All L2->L2 interop is atomic (public L1 publication was removed): the InteropCenter
+ * appends the bundle's commit value to the interop IMT via the AtomicFlowManager, and the destination
+ * executes it via L2InteropHandler.executeAtomicBundle once the whole flow is proven committed before
+ * the deadline. The attribute carries the full `flowId` preimage rather than an opaque `flowId`: the
+ * AtomicFlowManager recomputes `flowId` on-chain and requires the sent bundle's hash to be one of
+ * `legBundleHashes` (with the sending chain as the leg's declared source), so a preimage that does not
+ * contain the bundle (e.g. built from a stale bundle-hash prediction) reverts the send instead of
+ * committing a stranded leg.
  */
-export function atomicBundleAttr(flowId: string, deadline: number, lowNullifierIndex: number): string {
-  return erc7786Iface.encodeFunctionData("atomicBundle", [flowId, deadline, lowNullifierIndex]);
+export function atomicBundleAttr(flowPreimage: AtomicFlowPreimage, lowNullifierIndex: number): string {
+  return erc7786Iface.encodeFunctionData("atomicBundle", [flowPreimageTuple(flowPreimage), lowNullifierIndex]);
 }
 
 /** Encode an interopBundleSalt bundle attribute. */
@@ -154,14 +167,22 @@ function hasAtomicBundleAttribute(attrs: string[]): boolean {
   return attrs.some((a) => a.slice(0, 10).toLowerCase() === ATOMIC_BUNDLE_SELECTOR);
 }
 
-/** Decode `(flowId, deadline)` from a caller-provided `atomicBundle` attribute. */
-function decodeAtomicBundleAttribute(attrs: string[]): { flowId: string; deadline: number } {
+/** Decode `(flowId, preimage)` from a caller-provided `atomicBundle` attribute (which carries the full
+ * `AtomicFlowPreimage`; `flowId` is recomputed from it, matching the on-chain derivation). */
+function decodeAtomicBundleAttribute(attrs: string[]): { flowId: string; preimage: AtomicFlowPreimage } {
   const attr = attrs.find((a) => a.slice(0, 10).toLowerCase() === ATOMIC_BUNDLE_SELECTOR);
   if (!attr) {
     throw new Error("atomicBundle attribute not present");
   }
   const decoded = erc7786Iface.decodeFunctionData("atomicBundle", attr);
-  return { flowId: decoded[0] as string, deadline: Number(decoded[1]) };
+  const raw = decoded[0];
+  const preimage: AtomicFlowPreimage = {
+    deadline: Number(raw[0]),
+    settlementLayerChainId: raw[1],
+    legBundleHashes: raw[2] as string[],
+    legSourceChainIds: raw[3] as BigNumber[],
+  };
+  return { flowId: computeFlowId(preimage), preimage };
 }
 
 /** Selector of the interopBundleSalt bundle attribute, used to detect whether a salt was already supplied. */
@@ -371,8 +392,9 @@ export interface InteropSendResult {
   bundleHash: string;
   /** Atomic-flow id this bundle was committed under (single-leg flow: `[bundleHash]`). */
   flowId: string;
-  /** Settlement-layer deadline embedded in the atomic flow (see {ATOMIC_INTEROP_DEADLINE}). */
-  deadline: number;
+  /** The full flow preimage this bundle committed under; used to rebuild the AtomicFinalityProof at
+   * execute time so the on-chain `flowId` recomputation matches. Empty legs for a non-atomic withdrawal. */
+  preimage: AtomicFlowPreimage;
   /** Source chain id of the (single) leg — used to build the AtomicFinalityProof at execute time. */
   legSourceChainId: number;
 }
@@ -397,20 +419,27 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
   //    single-leg atomic flow that commits to it and attach the `atomicBundle` attribute.
   let attributes: string[];
   let flowId: string;
-  let deadline: number;
+  let preimage: AtomicFlowPreimage;
   let legSourceChainId: number;
   let predictedBundleHash: string | undefined;
+  // Empty preimage for the non-atomic withdrawal path (unused on the L1 finalization path).
+  const emptyPreimage: AtomicFlowPreimage = {
+    deadline: 0,
+    settlementLayerChainId: 0,
+    legBundleHashes: [],
+    legSourceChainIds: [],
+  };
   if (options.atomic === false) {
     // L2->L1 withdrawal: non-atomic. The bundle is published to L1 and finalized there via a
     // message-inclusion proof, so there is no atomic flow to predict — send the attributes as-is and
     // leave the atomic flow fields empty (they are unused on the withdrawal finalization path).
     attributes = baseAttributes;
     flowId = ethers.constants.HashZero;
-    deadline = 0;
+    preimage = emptyPreimage;
     legSourceChainId = (await options.sourceProvider.getNetwork()).chainId;
   } else if (hasAtomicBundleAttribute(baseAttributes)) {
     attributes = baseAttributes;
-    ({ flowId, deadline } = decodeAtomicBundleAttribute(baseAttributes));
+    ({ flowId, preimage } = decodeAtomicBundleAttribute(baseAttributes));
     legSourceChainId = (await options.sourceProvider.getNetwork()).chainId;
   } else {
     const predicted: string = await staticPreviewHash(
@@ -424,7 +453,7 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
     const atomic = await buildSingleLegAtomicSend(options.sourceProvider, predicted);
     attributes = [...baseAttributes, atomic.attribute];
     flowId = atomic.flowId;
-    deadline = atomic.deadline;
+    preimage = atomic.preimage;
     legSourceChainId = atomic.sourceChainId;
   }
 
@@ -472,7 +501,7 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
     bundleData,
     bundleHash,
     flowId,
-    deadline,
+    preimage,
     legSourceChainId,
   };
   sendResultsByBundleData.set(bundleData, result);
@@ -589,7 +618,7 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
     bundleData,
     bundleHash,
     flowId: atomic.flowId,
-    deadline: atomic.deadline,
+    preimage: atomic.preimage,
     legSourceChainId: atomic.sourceChainId,
   };
   sendResultsByBundleData.set(bundleData, result);
