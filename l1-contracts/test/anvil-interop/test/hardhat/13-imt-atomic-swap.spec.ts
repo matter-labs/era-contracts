@@ -367,12 +367,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     await ensureNtvApproval(source, amount);
 
     // Derived, not sent: mirrors the on-chain recomputation from the attribute-supplied preimage.
-    const flowId = computeFlowId(
-      flowPreimage.legBundleHashes,
-      flowPreimage.legSourceChainIds,
-      flowPreimage.deadline,
-      flowPreimage.settlementLayerChainId
-    );
+    const flowId = computeFlowId(flowPreimage);
     const value = commitValue(flowId, predictedBundleHash);
     const lowNull = await lowNullifierIndexFor(source.stack.tree, value);
 
@@ -418,8 +413,8 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
     const legHashesAsc = legs.map((l) => l.hash);
     const chainIdsAsc = legs.map((l) => l.chainId);
-    const flowId = computeFlowId(legHashesAsc, chainIdsAsc, deadline);
     const flowPreimage = flowPreimageOf(legHashesAsc, chainIdsAsc, deadline);
+    const flowId = computeFlowId(flowPreimage);
 
     // ── PHASE 1: atomic send on each source (burn + IMT insert) ──────────────────────────────
     const aBalanceBefore: BigNumber = await chainA.testToken.balanceOf(user);
@@ -485,9 +480,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const proofsAsc = BigNumber.from(hAB).lt(BigNumber.from(hBA)) ? [abProof, baProof] : [baProof, abProof];
     const finality = atomicFinalityProofTuple({
       flowId,
-      deadline,
-      legBundleHashes: legHashesAsc,
-      chainIds: chainIdsAsc,
+      preimage: flowPreimage,
       proofs: proofsAsc,
     });
 
@@ -569,7 +562,8 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
     const legHashesAsc = legs.map((l) => l.hash);
     const chainIdsAsc = legs.map((l) => l.chainId);
-    const flowId = computeFlowId(legHashesAsc, chainIdsAsc, deadline);
+    const flowPreimage = flowPreimageOf(legHashesAsc, chainIdsAsc, deadline);
+    const flowId = computeFlowId(flowPreimage);
 
     // ── Commit only the AB leg on A. B never commits BA. ─────────────────────────────────────
     const aBalanceBefore: BigNumber = await chainA.testToken.balanceOf(user);
@@ -578,7 +572,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       dest: chainB,
       amount: aTimeoutAmount,
       recipient: refundRecipient,
-      flowPreimage: flowPreimageOf(legHashesAsc, chainIdsAsc, deadline),
+      flowPreimage,
       predictedBundleHash: hAB,
       salt: saltAB,
     });
@@ -609,7 +603,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const managerA = chainA.stack.manager.connect(chainA.user);
     const refundAuth = await (
       await managerA.authorizeRefund(
-        atomicFlowTuple({ flowId, deadline, legBundleHashes: legHashesAsc, chainIds: chainIdsAsc }),
+        atomicFlowTuple({ flowId, preimage: flowPreimage }),
         missingIdx,
         proofTuple(absence),
         { gasLimit: DEFAULT_TX_GAS_LIMIT }
@@ -650,10 +644,11 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
     const legHashesAsc = legs.map((l) => l.hash);
     const chainIdsAsc = legs.map((l) => l.chainId);
-    const flowId = computeFlowId(legHashesAsc, chainIdsAsc, deadline);
+    const flowPreimage = flowPreimageOf(legHashesAsc, chainIdsAsc, deadline);
+    const flowId = computeFlowId(flowPreimage);
     // The "missing" leg is the one sourced on chain B (proofs below are against B's IMT).
     const missingIdx = chainIdsAsc.indexOf(chainB.chainId);
-    return { flowId, legHashesAsc, chainIdsAsc, missingIdx };
+    return { flowId, flowPreimage, legHashesAsc, chainIdsAsc, missingIdx };
   }
 
   it("timeout path (halted chain): in-time LAST batch + end-root absence authorizes the refund", async () => {
@@ -682,7 +677,8 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
     const legHashesAsc = legs.map((l) => l.hash);
     const chainIdsAsc = legs.map((l) => l.chainId);
-    const flowId = computeFlowId(legHashesAsc, chainIdsAsc, deadline);
+    const flowPreimage = flowPreimageOf(legHashesAsc, chainIdsAsc, deadline);
+    const flowId = computeFlowId(flowPreimage);
 
     const aBalanceBefore: BigNumber = await chainA.testToken.balanceOf(user);
     const ab = await sendAtomicLeg({
@@ -690,7 +686,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       dest: chainB,
       amount: aTimeoutAmount,
       recipient: refundRecipient,
-      flowPreimage: flowPreimageOf(legHashesAsc, chainIdsAsc, deadline),
+      flowPreimage,
       predictedBundleHash: hAB,
       salt: saltAB,
     });
@@ -714,7 +710,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const managerA = chainA.stack.manager.connect(chainA.user);
     await (
       await managerA.authorizeRefund(
-        atomicFlowTuple({ flowId, deadline, legBundleHashes: legHashesAsc, chainIds: chainIdsAsc }),
+        atomicFlowTuple({ flowId, preimage: flowPreimage }),
         missingIdx,
         proofTuple(absence),
         { gasLimit: DEFAULT_TX_GAS_LIMIT }
@@ -807,7 +803,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       controlLegs.map((l) => l.chainId),
       deadline
     );
-    const controlFlowId = computeFlowId(controlPreimage.legBundleHashes, controlPreimage.legSourceChainIds, deadline);
+    const controlFlowId = computeFlowId(controlPreimage);
     const lowNull = await lowNullifierIndexFor(chainA.stack.tree, commitValue(controlFlowId, realHash));
     const controlHash = await interopCenter.callStatic.sendBundle(
       encodeEvmChain(chainB.chainId),
@@ -820,9 +816,9 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
 
   it("timeout negatives: stale/missing settlement roots and non-last in-time batches are rejected", async () => {
     const deadline = 1_000;
-    const { flowId, legHashesAsc, chainIdsAsc, missingIdx } = fabricatedFlow(deadline);
+    const { flowId, flowPreimage, legHashesAsc, missingIdx } = fabricatedFlow(deadline);
     const missingValue = commitValue(flowId, legHashesAsc[missingIdx]);
-    const flow = atomicFlowTuple({ flowId, deadline, legBundleHashes: legHashesAsc, chainIds: chainIdsAsc });
+    const flow = atomicFlowTuple({ flowId, preimage: flowPreimage });
     const managerA = chainA.stack.manager.connect(chainA.user);
 
     // 1. Settlement interop root NOT created strictly after the deadline (added exactly AT

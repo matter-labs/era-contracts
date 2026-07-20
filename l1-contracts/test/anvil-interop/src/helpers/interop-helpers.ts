@@ -24,6 +24,10 @@ import {
 import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
 import { buildMockInteropProof, impersonateAndRun } from "../core/utils";
 import { encodeEvmChain, encodeEvmAddress } from "./erc7930";
+import { flowPreimageTuple } from "./imt-engine-lib";
+import type { AtomicFlowPreimage } from "./imt-engine-lib";
+
+export type { AtomicFlowPreimage } from "./imt-engine-lib";
 import { waitForLiveInteropProof } from "./temp-sdk";
 import { approveTokenForNtv, expectBalanceDelta, getTokenAddressForAsset, getTokenBalance } from "./balance-helpers";
 
@@ -68,39 +72,18 @@ export function useFixedFeeAttr(useFixedFee: boolean): string {
 }
 
 /**
- * The full `flowId` preimage carried by the `atomicBundle` bundle attribute (mirrors the Solidity
- * `AtomicFlowPreimage` struct). `legBundleHashes` must be strictly ascending with `legSourceChainIds`
- * positionally aligned; `deadline` is a settlement-layer timestamp.
- */
-export interface AtomicFlowPreimage {
-  deadline: number;
-  settlementLayerChainId: BigNumber | number | string;
-  legBundleHashes: string[];
-  legSourceChainIds: (BigNumber | number | string)[];
-}
-
-/**
  * Encode the ERC-7786 `atomicBundle(AtomicFlowPreimage flowPreimage, uint256 lowNullifierIndex)`
  * bundle attribute. When present, the InteropCenter appends the bundle's commit value to the interop
  * IMT via the AtomicFlowManager (in place of publishing the bundle to L1), and the destination
  * executes it via InteropHandler.executeAtomicBundle once the whole flow is proven committed before
  * the deadline. The attribute carries the full `flowId` preimage rather than an opaque `flowId`: the
- * AtomicFlowManager recomputes `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds,
- * deadline, settlementLayerChainId))` on-chain and requires the sent bundle's hash to be one of
+ * AtomicFlowManager recomputes `flowId` on-chain and requires the sent bundle's hash to be one of
  * `legBundleHashes` (with the sending chain as the leg's declared source), so a preimage that does not
  * contain the bundle (e.g. built from a stale bundle-hash prediction) reverts the send instead of
  * committing a stranded leg.
  */
 export function atomicBundleAttr(flowPreimage: AtomicFlowPreimage, lowNullifierIndex: number): string {
-  return erc7786Iface.encodeFunctionData("atomicBundle", [
-    [
-      flowPreimage.deadline,
-      flowPreimage.settlementLayerChainId,
-      flowPreimage.legBundleHashes,
-      flowPreimage.legSourceChainIds,
-    ],
-    lowNullifierIndex,
-  ]);
+  return erc7786Iface.encodeFunctionData("atomicBundle", [flowPreimageTuple(flowPreimage), lowNullifierIndex]);
 }
 
 /** Encode an interopBundleSalt bundle attribute. */

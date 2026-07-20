@@ -75,8 +75,8 @@ interface IAtomicFlowManager {
     /// finalize, proven by a timeout for one leg. Permissionless.
     /// @param _flow The flow definition ({AtomicFlow}); its `flowId` is recomputed from the other fields
     /// and matched. The absence proof for the missing leg must target
-    /// `_flow.legSourceChainIds[_missingLegIndex]`.
-    /// @param _missingLegIndex Index into `_flow.legBundleHashes` of the leg proven absent.
+    /// `_flow.preimage.legSourceChainIds[_missingLegIndex]`.
+    /// @param _missingLegIndex Index into `_flow.preimage.legBundleHashes` of the leg proven absent.
     /// @param _absence Timeout proof for the missing leg's commit value (the timeout condition —
     /// see {AtomicInteropProof.verifyTimeoutAbsence} and the {AtomicInteropProof} library header).
     function authorizeRefund(AtomicFlow calldata _flow, uint256 _missingLegIndex, ImtProof calldata _absence) external;

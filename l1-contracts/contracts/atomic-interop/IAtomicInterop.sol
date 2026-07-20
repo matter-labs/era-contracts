@@ -60,41 +60,18 @@ struct ImtProof {
     bytes32[] imtProof;
 }
 
-/// @notice The definition of an atomic flow: `flowId` plus the exact fields it hashes over. Grouping them
-/// keeps the finalize path ({AtomicFlowManager.requireFlowFinalized}) and the refund path
-/// ({AtomicFlowManager.authorizeRefund}) on one shape, so the `flowId` preimage cannot drift between them.
-/// @dev MUST stay field-for-field aligned with {AtomicFlowPreimage} (this struct minus `flowId`), which
-/// the send path hashes: both feed {AtomicFlowManager}'s single `_validateAndComputeFlowId` helper, so
-/// extending the flow definition means extending both shapes AND the helper together. A new field left
-/// out of the helper (or out of one of the shapes) would be silently absent from the `flowId`
-/// commitment on that path.
-/// @param flowId `keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`.
+/// @notice The full `flowId` preimage — the single canonical field set the id is hashed over:
+/// `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`.
+/// It is supplied by the sender in the `atomicBundle` ERC-7786 attribute and embedded (with the id)
+/// in {AtomicFlow}, so the send and finalize/refund paths hash one shape and cannot drift. At send
+/// time the {AtomicFlowManager} recomputes `flowId` from these fields and requires the committing
+/// bundle's hash to be one of `legBundleHashes` (with this chain as its declared source), so a bundle
+/// can never be committed under a `flowId` that does not actually contain it — a wrong or stale
+/// preimage (e.g. an off-chain `bundleHash` prediction invalidated by an upgrade between preview and
+/// send) reverts the send instead of stranding the burned funds in an unfinalizable, unrefundable leg.
 /// @param deadline The flow deadline (a settlement-layer timestamp).
 /// @param settlementLayerChainId The single settlement layer every leg must settle on; committed in
 /// `flowId` and asserted equal to each proof's resolved `slChainId`.
-/// @param legBundleHashes All legs' bundle hashes, strictly ascending (canonical order + dedup).
-/// @param legSourceChainIds Each leg's source chain id, aligned 1:1 with `legBundleHashes`. May repeat
-/// and need not be ascending.
-struct AtomicFlow {
-    bytes32 flowId;
-    uint64 deadline;
-    uint256 settlementLayerChainId;
-    bytes32[] legBundleHashes;
-    uint256[] legSourceChainIds;
-}
-
-/// @notice The full `flowId` preimage, as supplied by the sender in the `atomicBundle` ERC-7786
-/// attribute: exactly {AtomicFlow} minus the `flowId` itself. At send time the {AtomicFlowManager}
-/// recomputes `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline,
-/// settlementLayerChainId))` from these fields and requires the committing bundle's hash to be one of
-/// `legBundleHashes` (with this chain as its declared source). A bundle therefore can never be
-/// committed under a `flowId` that does not actually contain it — a wrong or stale preimage (e.g. an
-/// off-chain `bundleHash` prediction invalidated by an upgrade between preview and send) reverts the
-/// send instead of stranding the burned funds in an unfinalizable, unrefundable leg.
-/// @dev MUST stay field-for-field aligned with {AtomicFlow} (this struct plus `flowId`) — see the
-/// alignment note there.
-/// @param deadline The flow deadline (a settlement-layer timestamp).
-/// @param settlementLayerChainId The single settlement layer every leg must settle on.
 /// @param legBundleHashes All legs' bundle hashes, strictly ascending (canonical order + dedup).
 /// @param legSourceChainIds Each leg's source chain id, aligned 1:1 with `legBundleHashes`. May repeat
 /// and need not be ascending. Every entry must be the sending chain itself or a Bridgehub-registered
@@ -107,11 +84,22 @@ struct AtomicFlowPreimage {
     uint256[] legSourceChainIds;
 }
 
+/// @notice The definition of an atomic flow: `flowId` plus the preimage it is hashed from, consumed by
+/// the finalize path ({AtomicFlowManager.requireFlowFinalized}) and the refund path
+/// ({AtomicFlowManager.authorizeRefund}); the supplied `flowId` is always recomputed from `preimage`
+/// and matched before use.
+/// @param flowId `keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`.
+/// @param preimage The hashed field set (see {AtomicFlowPreimage}).
+struct AtomicFlow {
+    bytes32 flowId;
+    AtomicFlowPreimage preimage;
+}
+
 /// @notice The full atomicity proof a destination needs to execute an atomic bundle: the flow definition
 /// plus one IMT inclusion proof per leg. Passed as one calldata reference to
 /// `InteropHandler.executeAtomicBundle` / `AtomicFlowManager.requireFlowFinalized`.
 /// @param flow The flow definition (see {AtomicFlow}).
-/// @param proofs One inclusion proof per leg, in `flow.legBundleHashes` order.
+/// @param proofs One inclusion proof per leg, in `flow.preimage.legBundleHashes` order.
 struct AtomicFinalityProof {
     AtomicFlow flow;
     ImtProof[] proofs;

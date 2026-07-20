@@ -104,22 +104,43 @@ export function indexedLeafHash(leaf: IMTLeaf): string {
 }
 
 /**
- * flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId)),
- * matching {AtomicFlowManager}'s preimage. `bundleHashes` must be strictly ascending, `chainIds` are
- * positionally aligned, and `settlementLayerChainId` binds all legs to a single settlement layer.
+ * The full `flowId` preimage (mirrors the Solidity `AtomicFlowPreimage` struct — the field set embedded
+ * in `AtomicFlow` and carried by the `atomicBundle` attribute). `legBundleHashes` must be strictly
+ * ascending with `legSourceChainIds` positionally aligned; `deadline` is a settlement-layer timestamp.
  */
-export function computeFlowId(
-  bundleHashes: string[],
-  chainIds: (BigNumber | number | string)[],
-  deadline: number,
-  settlementLayerChainId: BigNumber | number | string = DEFAULT_SL_CHAIN_ID
-): string {
+export interface AtomicFlowPreimage {
+  deadline: number;
+  settlementLayerChainId: BigNumber | number | string;
+  legBundleHashes: string[];
+  legSourceChainIds: (BigNumber | number | string)[];
+}
+
+/**
+ * flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId)),
+ * matching {AtomicFlowManager._validateAndComputeFlowId} over the same preimage shape.
+ */
+export function computeFlowId(preimage: AtomicFlowPreimage): string {
   return utils.keccak256(
     utils.defaultAbiCoder.encode(
       ["bytes32[]", "uint256[]", "uint64", "uint256"],
-      [bundleHashes, chainIds.map((c) => BigNumber.from(c)), deadline, BigNumber.from(settlementLayerChainId)]
+      [
+        preimage.legBundleHashes,
+        preimage.legSourceChainIds.map((c) => BigNumber.from(c)),
+        preimage.deadline,
+        BigNumber.from(preimage.settlementLayerChainId),
+      ]
     )
   );
+}
+
+/** Encode an {AtomicFlowPreimage} as its Solidity tuple: (deadline, settlementLayerChainId, legBundleHashes, legSourceChainIds). */
+export function flowPreimageTuple(preimage: AtomicFlowPreimage): unknown[] {
+  return [
+    preimage.deadline,
+    BigNumber.from(preimage.settlementLayerChainId),
+    preimage.legBundleHashes,
+    preimage.legSourceChainIds.map((c) => BigNumber.from(c)),
+  ];
 }
 
 // ── Dynamic-height FullMerkle port (leaf hashing / root / path) ───────────────────
@@ -546,37 +567,20 @@ export function proofTuple(p: ImtProof): unknown[] {
 
 /**
  * Build the `AtomicFlow` tuple {AtomicFlowManager} consumes (the flow definition). Tuple field order
- * matches the struct: (flowId, deadline, settlementLayerChainId, legBundleHashes, legSourceChainIds).
- * `legBundleHashes` is ascending; `chainIds` is positionally aligned; `settlementLayerChainId` defaults
- * to {DEFAULT_SL_CHAIN_ID}.
+ * matches the struct: (flowId, preimage).
  */
-export function atomicFlowTuple(params: {
-  flowId: string;
-  deadline: number;
-  settlementLayerChainId?: BigNumber | number | string;
-  legBundleHashes: string[];
-  chainIds: (BigNumber | number | string)[];
-}): unknown[] {
-  return [
-    params.flowId,
-    params.deadline,
-    BigNumber.from(params.settlementLayerChainId ?? DEFAULT_SL_CHAIN_ID),
-    params.legBundleHashes,
-    params.chainIds.map((c) => BigNumber.from(c)),
-  ];
+export function atomicFlowTuple(params: { flowId: string; preimage: AtomicFlowPreimage }): unknown[] {
+  return [params.flowId, flowPreimageTuple(params.preimage)];
 }
 
 /**
  * Build the `AtomicFinalityProof` tuple {InteropHandler.executeAtomicBundle} consumes: the flow
- * definition ({AtomicFlow}) plus one inclusion proof per leg, in `legBundleHashes` order. Tuple field
- * order matches the struct: (flow, proofs).
+ * definition ({AtomicFlow}) plus one inclusion proof per leg, in `preimage.legBundleHashes` order.
+ * Tuple field order matches the struct: (flow, proofs).
  */
 export function atomicFinalityProofTuple(params: {
   flowId: string;
-  deadline: number;
-  settlementLayerChainId?: BigNumber | number | string;
-  legBundleHashes: string[];
-  chainIds: (BigNumber | number | string)[];
+  preimage: AtomicFlowPreimage;
   proofs: ImtProof[];
 }): unknown[] {
   return [atomicFlowTuple(params), params.proofs.map(proofTuple)];

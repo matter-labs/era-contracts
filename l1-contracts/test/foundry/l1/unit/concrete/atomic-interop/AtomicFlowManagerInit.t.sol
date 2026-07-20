@@ -26,14 +26,19 @@ contract AtomicFlowManagerInitTest is Test {
 
     /// @dev A minimal well-formed flow (correct flowId) declaring `_settlementLayerChainId`.
     function _flow(uint256 _settlementLayerChainId) internal pure returns (AtomicFlow memory flow) {
-        flow.deadline = 123;
-        flow.settlementLayerChainId = _settlementLayerChainId;
-        flow.legBundleHashes = new bytes32[](1);
-        flow.legBundleHashes[0] = keccak256("leg");
-        flow.legSourceChainIds = new uint256[](1);
-        flow.legSourceChainIds[0] = 271;
+        flow.preimage.deadline = 123;
+        flow.preimage.settlementLayerChainId = _settlementLayerChainId;
+        flow.preimage.legBundleHashes = new bytes32[](1);
+        flow.preimage.legBundleHashes[0] = keccak256("leg");
+        flow.preimage.legSourceChainIds = new uint256[](1);
+        flow.preimage.legSourceChainIds[0] = 271;
         flow.flowId = keccak256(
-            abi.encode(flow.legBundleHashes, flow.legSourceChainIds, flow.deadline, flow.settlementLayerChainId)
+            abi.encode(
+                flow.preimage.legBundleHashes,
+                flow.preimage.legSourceChainIds,
+                flow.preimage.deadline,
+                flow.preimage.settlementLayerChainId
+            )
         );
     }
 
@@ -60,13 +65,13 @@ contract AtomicFlowManagerInitTest is Test {
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
         vm.expectRevert(abi.encodeWithSelector(ManagerSettlementLayerNotL1.selector, L1_CHAIN_ID, L1_CHAIN_ID + 1));
-        manager.requireFlowFinalized(flow.legBundleHashes[0], finality);
+        manager.requireFlowFinalized(flow.preimage.legBundleHashes[0], finality);
     }
 
     function test_RevertWhen_refundSettlementLayerNotL1() public {
         AtomicFlow memory flow = _flow(L1_CHAIN_ID + 1);
         ImtProof memory absence;
-        absence.sourceChainId = flow.legSourceChainIds[0];
+        absence.sourceChainId = flow.preimage.legSourceChainIds[0];
 
         vm.expectRevert(abi.encodeWithSelector(ManagerSettlementLayerNotL1.selector, L1_CHAIN_ID, L1_CHAIN_ID + 1));
         manager.authorizeRefund(flow, 0, absence);
