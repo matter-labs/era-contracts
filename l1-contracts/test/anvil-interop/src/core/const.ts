@@ -81,7 +81,7 @@ export const TEST_TOKEN_DECIMALS = 18;
 export const TEST_TOKEN_MINT_AMOUNT_UNITS = "1000";
 
 // Mirrors the InteropBundle struct in contracts/common/Messaging.sol. The trailing BundleAttributes
-// tuple is the original 3 fields (executionAddress, unbundlerAddress, useFixedFee). Atomic-send params
+// tuple is the 4 fields (executionAddress, unbundlerAddress, useFixedFee, salt). Atomic-send params
 // (the full flowId preimage + lowNullifierIndex) do NOT live in the bundle — they travel via the
 // `atomicBundle` ERC-7786 attribute and are parsed by the InteropCenter into an internal AtomicSend
 // struct, so they never affect the bundle bytes / bundleHash.

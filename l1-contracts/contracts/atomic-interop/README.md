@@ -38,7 +38,10 @@ be refunded.
 1. **Atomic send** (each leg, on its source chain). The user calls `InteropCenter.sendBundle` with the
    `atomicBundle` attribute. The source burn flows through the normal `initiateIndirectCall` /
    `L2AssetRouter` path; instead of publishing the bundle to L1, the InteropCenter calls
-   `AtomicFlowManager.append`, which inserts `commitValue` into this chain's `L2InteropCommitmentTree`
+   `AtomicFlowManager.append`, which first recomputes `flowId` from the attribute's preimage and
+   validates it (canonical shape, L1 settlement layer, this bundle is a leg with this chain as its
+   source, co-leg source chains registered) — any violation reverts the whole send, burn included —
+   and then inserts `commitValue` into this chain's `L2InteropCommitmentTree`
    (an append-only **indexed** Merkle tree; leaves carry `{value, nextIndex, nextValue}` so both
    membership and non-membership are provable in O(log n)). The leg's local state becomes `Committed`.
 2. **Root settlement + import.** The bootloader reads the tree's root directly from storage at every
