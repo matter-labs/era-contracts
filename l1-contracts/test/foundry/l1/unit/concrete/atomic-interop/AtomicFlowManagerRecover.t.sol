@@ -7,7 +7,8 @@ import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol"
 import {ManagerNoRecoverableCalls} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {IAtomicRecoverable} from "contracts/atomic-interop/IAtomicRecoverable.sol";
 import {IAssetRouterShared} from "contracts/bridge/asset-router/IAssetRouterShared.sol";
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {RecoverToL1NotSupported} from "contracts/common/L1ContractErrors.sol";
 import {
     BundleAttributes,
     INTEROP_BUNDLE_VERSION,
@@ -121,6 +122,18 @@ contract AtomicFlowManagerRecoverTest is Test {
             )
         );
         manager.exposedRecoverBundle(FLOW_ID, BUNDLE_HASH, _bundle(OTHER_BASE_TOKEN_ASSET_ID, value));
+    }
+
+    function test_recoverBundle_revertsWhenDestinationIsL1() public {
+        // L2->L1 atomic bundles are rejected at send, so recovery must never process an L1-destined bundle:
+        // that keeps it away from the append-only L1 counters in L2AssetTracker (whose settlement-layer
+        // updates are only correct at send time). Set L1_CHAIN_ID == the builder's DEST_CHAIN_ID so the bundle
+        // is L1-destined, and assert the guard reverts before any refund dispatch.
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        manager.initL2(DEST_CHAIN_ID);
+
+        vm.expectRevert(RecoverToL1NotSupported.selector);
+        manager.exposedRecoverBundle(FLOW_ID, BUNDLE_HASH, _bundle(SOURCE_BASE_TOKEN_ASSET_ID, 5 ether));
     }
 
     function test_recoverBundle_pureValueCallCountsAsRecovered() public {
