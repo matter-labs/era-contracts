@@ -346,6 +346,9 @@ contract InteropCenter is
         // slither-disable-next-line unused-return
         (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_recipient);
         _ensureL2ToL2(recipientChainId);
+        // Mirror `sendMessage`'s guard so the preview rejects a chain-only (address(0)) recipient exactly as
+        // the real send would, keeping the previewed hash faithful to what `sendMessage` accepts.
+        require(recipientAddress != address(0), ZeroAddress());
 
         (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) = parseAttributes(
             _attributes,

@@ -5,17 +5,19 @@ import {IAtomicFlowManager} from "./IAtomicFlowManager.sol";
 import {IL2InteropCommitmentTree} from "./IL2InteropCommitmentTree.sol";
 import {IAtomicRecoverable} from "./IAtomicRecoverable.sol";
 import {AtomicInteropProof} from "./libraries/AtomicInteropProof.sol";
-import {LegState, AtomicFlow, AtomicTimeoutProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
+import {LegState, AtomicFlow, ImtProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
 import {InteropDataEncoding} from "../interop/InteropDataEncoding.sol";
 import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_INTEROP_HANDLER_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
 import {
+    ManagerAlreadyInitialized,
     ManagerNotInteropCenter,
     ManagerNotInteropHandler,
     ManagerLegAlreadyCommitted,
@@ -26,32 +28,52 @@ import {
     ManagerProofCountMismatch,
     ManagerExecutingBundleNotInFlow,
     ManagerNoRecoverableCalls,
+    ManagerSettlementLayerNotL1,
     ProofSourceChainMismatch
 } from "./AtomicInteropErrors.sol";
+import {Unauthorized} from "../l2-system/zksync-os/errors/ZKOSContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice See {IAtomicFlowManager}. Fund-touchless coordinator for the L1-free atomic interop flow.
+/// @notice See {IAtomicFlowManager}. Fund-touchless coordinator for the atomic interop flow.
 ///
 /// Send: {InteropCenter.sendBundle} burns through the normal `initiateIndirectCall` path, then — when
 /// the bundle carries the `atomicBundle` attribute — calls {append} instead of publishing the bundle
 /// to L1; `append` records the leg's commit value in this chain's {L2InteropCommitmentTree}.
-/// Receive: {InteropHandler.executeAtomicBundle} calls {requireFlowFinalized} (the atomicity gate) in
+/// Receive: {L2InteropHandler.executeBundle} calls {requireFlowFinalized} (the atomicity gate) in
 /// place of the L1-message inclusion proof, then executes the bundle (and owns the replay guard).
 /// Timeout: {authorizeRefund} + {claimRefund} recover the burned source funds to the depositor by
 /// asking each burn-producing call's local sender to reverse itself via {IAtomicRecoverable.recoverAtomicCall}.
 ///
-/// No double-spend: executing a bundle requires every leg present in a batch whose `l1Timestamp <=
-/// deadline`, while a refund requires some leg absent from the last such batch (pinned by the next batch
-/// with `l1Timestamp > deadline`). Since the per-chain trees are append-only and `l1Timestamp` is monotone, both cannot
-/// hold — but only when both proofs are checked against the leg's own source chain on the same settlement
-/// layer. Both bindings are committed in `flowId`. Without the source-chain binding a leg's commit value
-/// is trivially absent from any other chain's tree, re-opening a cross-chain force-refund double-mint.
+/// Finalization and refund cannot both succeed when their proofs use the leg's declared source chain
+/// and the flow's settlement layer. Both values are included in `flowId`. Without the source-chain
+/// check, an attacker could finalize using a valid commitment on the real source chain, then obtain a
+/// refund by proving that the same value is absent from an unrelated chain. See {AtomicInteropProof}
+/// for the full finalization and timeout conditions.
 contract AtomicFlowManager is IAtomicFlowManager {
-    /// @dev (flowId, bundleHash) => source-leg state on this chain. All collaborators
-    /// (commitment tree, interop center, interop handler) are genesis-deployed built-ins
-    /// at canonical fixed addresses, so they are referenced as constants rather than stored/initialized.
+    /// @dev (flowId, bundleHash) => source-leg state on this chain.
     mapping(bytes32 flowId => mapping(bytes32 bundleHash => LegState)) internal _state;
+
+    /// @dev The chain ID of the L1 network, set during the genesis upgrade (see `initL2`). In this
+    /// release interop legs settle on L1 only, so every flow's `settlementLayerChainId` must equal it.
+    uint256 public L1_CHAIN_ID;
+
+    /// @dev Only allows calls from the complex upgrader contract on L2.
+    modifier onlyUpgrader() {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    /// @notice One-time L2 initialization performed by the genesis upgrade.
+    /// @param _l1ChainId The chain ID of the L1 network.
+    function initL2(uint256 _l1ChainId) external onlyUpgrader {
+        if (L1_CHAIN_ID != 0) {
+            revert ManagerAlreadyInitialized();
+        }
+        L1_CHAIN_ID = _l1ChainId;
+    }
 
     modifier onlyInteropCenter() {
         if (msg.sender != interopCenter()) revert ManagerNotInteropCenter(msg.sender);
@@ -88,12 +110,13 @@ contract AtomicFlowManager is IAtomicFlowManager {
     ) external view onlyInteropHandler {
         AtomicFlow calldata flow = _finality.flow;
         _checkFlowId(flow);
+        _checkSettlementLayerIsL1(flow.settlementLayerChainId);
 
         uint256 n = flow.legBundleHashes.length;
         if (_finality.proofs.length != n) revert ManagerProofCountMismatch(n, _finality.proofs.length);
 
-        // Every leg must be present in its source chain's tree as of a root settled no later than the
-        // deadline. Each proof's `sourceChainId` must equal the leg's declared `legSourceChainIds[i]`:
+        // Every leg must satisfy the finality condition (see the {AtomicInteropProof} library
+        // header). Each proof's `sourceChainId` must equal the leg's declared `legSourceChainIds[i]`:
         // defense-in-depth here (membership already self-binds via the chain-specific `commitValue`) but
         // load-bearing for the symmetric refund path. The proof's settlement layer must match the flow's
         // `settlementLayerChainId`, checked inside {AtomicInteropProof.verifyInclusion}.
@@ -110,35 +133,24 @@ contract AtomicFlowManager is IAtomicFlowManager {
     }
 
     /// @inheritdoc IAtomicFlowManager
-    function authorizeRefund(
-        AtomicFlow calldata _flow,
-        uint256 _missingLegIndex,
-        AtomicTimeoutProof calldata _timeout
-    ) external {
+    function authorizeRefund(AtomicFlow calldata _flow, uint256 _missingLegIndex, ImtProof calldata _absence) external {
         _checkFlowId(_flow);
+        _checkSettlementLayerIsL1(_flow.settlementLayerChainId);
 
         // 1. Bind the absence proof to the missing leg's declared source chain. Without this, the leg's
         //    commit value — which exists only in its own source chain's tree — is trivially absent from
         //    any other chain's tree, so an on-time, finalized leg could be force-refunded against an
         //    unrelated chain (double-mint).
         uint256 missingLegChainId = _flow.legSourceChainIds[_missingLegIndex];
-        if (_timeout.absence.sourceChainId != missingLegChainId) {
-            revert ProofSourceChainMismatch(missingLegChainId, _timeout.absence.sourceChainId);
+        if (_absence.sourceChainId != missingLegChainId) {
+            revert ProofSourceChainMismatch(missingLegChainId, _absence.sourceChainId);
         }
 
-        // 2. Adjacency timeout: the leg's commit value is absent from the last batch with settlement
-        //    timestamp `t <= deadline` (the absence proof), pinned by the next batch with `t > deadline`
-        //    (the successor witness). This closes the stale/genesis-root force-refund: an old/empty root
-        //    can't be used because its successor would still be `<= deadline`.
+        // 2. Timeout: the leg's commit value is proven absent per the timeout protocol described in
+        //    the {AtomicInteropProof} library header, which makes the absence equivalent to "the
+        //    flow can never finalize".
         uint256 value = AtomicInteropProof.commitValue(_flow.flowId, _flow.legBundleHashes[_missingLegIndex]);
-        // solhint-disable-next-line func-named-parameters
-        AtomicInteropProof.verifyTimeoutAdjacency(
-            _timeout.absence,
-            _timeout.successor,
-            value,
-            _flow.deadline,
-            _flow.settlementLayerChainId
-        );
+        AtomicInteropProof.verifyTimeoutAbsence(_absence, value, _flow.deadline, _flow.settlementLayerChainId);
 
         // 3. Mark this chain's committed source legs Revertable (legs committed on other chains are not
         //    in this manager's state, so they are skipped).
@@ -240,6 +252,16 @@ contract AtomicFlowManager is IAtomicFlowManager {
             }
         }
         if (recovered == 0) revert ManagerNoRecoverableCalls(_flowId, _bundleHash);
+    }
+
+    /// @dev In this release interop operates against roots imported from L1 only (see
+    /// `ChainAssetHandlerBase` — only the L1 message root is assumed for interop), so every flow must
+    /// declare L1 as its settlement layer. Checked wherever the settlement layer is consumed
+    /// (finality and refund verification); send-time `append` only sees the opaque `flowId`.
+    function _checkSettlementLayerIsL1(uint256 _settlementLayerChainId) internal view {
+        if (_settlementLayerChainId != L1_CHAIN_ID) {
+            revert ManagerSettlementLayerNotL1(L1_CHAIN_ID, _settlementLayerChainId);
+        }
     }
 
     /// @dev Recomputes `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline,

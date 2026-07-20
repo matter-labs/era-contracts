@@ -1,5 +1,5 @@
 /**
- * End-to-end test for the L1-free atomic-interop stack (bundle model).
+ * End-to-end test for the atomic-interop stack (bundle model).
  *
  * Topology (two GW-settled chains):
  *   Chain A: depositor (anvil acct #0) sends aAmount of testTokenA -> recipient on B.
@@ -13,10 +13,14 @@
  *   RECEIVE `InteropHandler.executeBundle(bundleBytes, AtomicFinalityProof)`. Proves every leg
  *           was committed in its source chain's IMT before the deadline (one inclusion proof per leg),
  *           then executes the bundle's calls (the destination mint). `bundleStatus` guards double-execute.
- *   TIMEOUT `AtomicFlowManager.authorizeRefund(...)` (proves the missing leg absent from the last batch
- *           with `t <= deadline`, pinned by a successor batch with `t > deadline`) then
- *           `claimRefund(flowId, bundleBytes)` recovers the burned source funds
- *           to the depositor via L2AssetRouter's recoverAtomicCall.
+ *   TIMEOUT `AtomicFlowManager.authorizeRefund(...)`: checked against a settlement interop root created
+ *           strictly after the deadline (the timestamp in `interopRoots[slChainId][slBlock]` is
+ *           `> deadline`, added on the harness via bootloader impersonation), proves the missing leg
+ *           absent from the batch-begin IMT root of a late batch (`t > deadline`) — or, for a halted source
+ *           chain, absent from the batch-end IMT root of the chain's LAST batch inside that settlement
+ *           interop root (`t <= deadline`) — then `claimRefund(flowId, bundleBytes)` recovers the burned
+ *           source funds to the depositor via L2AssetRouter's recoverAtomicCall. See the
+ *           AtomicInteropProof.sol library header for the canonical protocol description.
  *
  * Ids:
  *   - `bundleHash = keccak256(abi.encode(sourceChainId, abi.encode(InteropBundle)))`. The atomic send
@@ -30,26 +34,35 @@
  *   - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
  *
  * The deadline is a settlement-layer timestamp, compared on-chain against each batch's settlement
- * timestamp `t` from the real `MessageHashing._getProofData` parse of `messageProof`, so the off-chain
- * builders embed a chosen `t` in format-valid multi-hop proof bytes. Root-message authentication is mocked to `true` on the
- * anvil harness. The off-chain IMT engine reconstructs the root / Merkle paths from the live leaf set
- * and asserts it matches `tree.root()` before emitting a proof, so a passing test also confirms the
- * off-chain engine agrees with the on-chain one.
+ * timestamp `t` from the real `MessageHashing._getProofData` parse of `settlementProof`, so the
+ * off-chain builders embed a chosen `t` in format-valid multi-hop proof bytes (including the exact
+ * 3-hop chain-batch-root leaf path the verifier enforces). Chain-batch-root leaf authentication is
+ * mocked to `true` on the anvil harness. The off-chain IMT engine reconstructs the root / Merkle paths
+ * from the live leaf set and asserts it matches `tree.root()` before emitting a proof, so a passing
+ * test also confirms the off-chain engine agrees with the on-chain one.
  *
  * Verifies:
  *   - HAPPY PATH: atomic send (source burn + IMT insert) on both legs -> executeBundle (every-leg
- *     inclusion proof, `t <= deadline`) on each destination. Recipients receive the bridged token;
- *     source legs stay terminal at Committed; both destination bundles end FullyExecuted.
- *   - TIMEOUT PATH: one leg commits, the other never does -> after the deadline, an adjacency proof
- *     (missing leg absent from the last batch with `t <= deadline`, pinned by a successor with
- *     `t > deadline`) authorizes a refund -> claimRefund recovers the depositor's tokens; the
- *     source leg ends Reverted.
+ *     inclusion proof, `t <= deadline` — exercised exactly AT the boundary) on each destination.
+ *     Recipients receive the bridged token; source legs stay terminal at Committed; both destination
+ *     bundles end FullyExecuted.
+ *   - TIMEOUT PATH (late batch): one leg commits, the other never does -> a single absence proof
+ *     (missing leg absent from the batch-begin IMT root of a batch with `t > deadline`, checked against
+ *     a post-deadline settlement interop root) authorizes a refund -> claimRefund recovers the
+ *     depositor's tokens; the source leg ends Reverted.
+ *   - TIMEOUT PATH (halted chain): same setup, but the absence proof uses an in-time batch
+ *     (`t <= deadline`, exercised exactly AT the boundary) that is the chain's LAST batch inside a
+ *     post-deadline settlement interop root, checked against the batch-end IMT root.
+ *   - TIMEOUT NEGATIVES: a settlement interop root not created strictly after the deadline is rejected
+ *     (`ProofInteropRootNotAfterDeadline`, exercised exactly AT the boundary `T == deadline`), and an
+ *     in-time batch that is NOT the last batch in the settlement interop root is rejected
+ *     (`ProofNotLastBatchInRoot`).
  */
 
 import { expect } from "chai";
 import { BigNumber, Contract, Wallet, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { getChainIdsByRole, getL2Chain } from "../../src/core/utils";
+import { getChainIdsByRole, getL2Chain, impersonateAndRun } from "../../src/core/utils";
 import { getAbi } from "../../src/core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
@@ -57,13 +70,16 @@ import {
   INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
   L2_ATOMIC_FLOW_MANAGER_ADDR,
+  L2_BOOTLOADER_ADDR,
   L2_INTEROP_COMMITMENT_TREE_ADDR,
   L2_INTEROP_HANDLER_ADDR,
+  L2_INTEROP_ROOT_STORAGE_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
   ATOMIC_SEND_BUNDLE_GAS_LIMIT,
   DEFAULT_TX_GAS_LIMIT,
 } from "../../src/core/const";
 import { encodeEvmAddress, encodeEvmChain } from "../../src/core/data-encoding";
+import { customError, expectRevert } from "../../src/helpers/balance-helpers";
 import {
   atomicBundleAttr,
   interopBundleSaltAttr,
@@ -74,15 +90,15 @@ import {
   staticPreviewHash,
 } from "../../src/helpers/interop-helpers";
 import {
+  DEFAULT_SL_CHAIN_ID,
   atomicFinalityProofTuple,
   atomicFlowTuple,
-  atomicTimeoutProofTuple,
   buildInclusionProof,
   buildNonInclusionProof,
-  buildSuccessorProof,
   commitValue,
   computeFlowId,
   lowNullifierIndexFor,
+  proofTuple,
   reconstructChainImt,
 } from "../../src/helpers/imt-engine-lib";
 
@@ -99,7 +115,7 @@ enum LegState {
 /**
  * Handles to the atomic-interop built-ins on one L2 chain. These contracts are predeployed into the
  * ZKsync OS genesis (see `src/core/predeploys.ts`) and the {L2InteropCommitmentTree}'s IMT is seeded
- * by the harness's relayed v31 genesis upgrade (`_initializeV31Contracts` -> `tree.initialize()`), so
+ * by the harness's relayed v31 genesis upgrade (`_initializeV31Contracts` -> `tree.initL2()`), so
  * no install/seed step is needed here — we just bind contract objects to their canonical addresses.
  */
 type AtomicStack = {
@@ -186,6 +202,42 @@ async function chainNow(provider: ethers.providers.JsonRpcProvider): Promise<num
   return (await provider.getBlock("latest")).timestamp;
 }
 
+/**
+ * Ensures the settlement interop root for `settlementBlock` exists with the requested timestamp.
+ * If an entry already exists with that timestamp, the helper leaves it unchanged. A different
+ * timestamp is an error because settlement interop roots are write-once.
+ */
+async function ensureSettlementInteropRoot(
+  provider: ethers.providers.JsonRpcProvider,
+  settlementBlock: number,
+  timestamp: number
+): Promise<void> {
+  const storage = new Contract(L2_INTEROP_ROOT_STORAGE_ADDR, getAbi("L2InteropRootStorage"), provider);
+  const existing: { root: string; timestamp: BigNumber } = await storage.interopRoots(
+    DEFAULT_SL_CHAIN_ID,
+    settlementBlock
+  );
+  if (existing.root !== ethers.constants.HashZero) {
+    const storedTs: BigNumber = existing.timestamp;
+    if (!storedTs.eq(timestamp)) {
+      throw new Error(
+        `settlement interop root (${DEFAULT_SL_CHAIN_ID}, ${settlementBlock}) already has timestamp ${storedTs}, wanted ${timestamp}`
+      );
+    }
+    return;
+  }
+  await impersonateAndRun(provider, L2_BOOTLOADER_ADDR, async (signer) => {
+    await (
+      await storage.connect(signer).addSingleInteropRoot({
+        chainId: DEFAULT_SL_CHAIN_ID,
+        blockOrBatchNumber: settlementBlock,
+        timestamp,
+        sides: [ethers.utils.keccak256(ethers.utils.toUtf8Bytes(`settlement-interop-root-${settlementBlock}`))],
+      })
+    ).wait();
+  });
+}
+
 type ParsedManagerLog = { name: string; args: ethers.utils.Result } | undefined;
 
 /** Parse an AtomicFlowManager event log, returning {name, args} or undefined for non-manager logs. */
@@ -199,7 +251,7 @@ function parseManagerLog(manager: Contract, log: ethers.providers.Log): ParsedMa
   }
 }
 
-describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
+describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
   this.timeout(0);
 
   const runner = new DeploymentRunner();
@@ -322,8 +374,8 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
   it("happy path: atomic send -> executeBundle mints both legs and leaves source Committed", async () => {
     const user = chainA.user.address; // anvil acct #0, the depositor + recipient on both chains
     const now = Math.max(await chainNow(chainA.provider), await chainNow(chainB.provider));
-    // The deadline is an SL timestamp; the harness sets each leg's batch `l1Timestamp == deadline`
-    // so every inclusion proof satisfies `l1Timestamp <= deadline`.
+    // The deadline is an SL timestamp; the harness sets each leg's batch `l1Timestamp == deadline`,
+    // pinning the inclusive `l1Timestamp <= deadline` finality bound exactly at the boundary.
     const deadline = now + 3600;
 
     // ── Predict each leg's bundleHash (no state change), then derive flowId ──────────────────
@@ -466,12 +518,13 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     );
   });
 
-  it("timeout path: one leg commits, peer never does -> authorizeRefund + claimRefund recovers depositor", async () => {
+  it("timeout path (late batch): one leg commits, peer never does -> authorizeRefund + claimRefund recovers depositor", async () => {
     const user = chainA.user.address;
-    // The deadline is an SL timestamp. The timeout proof pins the missing leg absent from the last
-    // in-time batch (`t <= deadline`), using a consecutive successor batch with `t = deadline + 1`.
-    // Both `t`s are fabricated on the harness — only the deadline/adjacency checks are exercised.
     const deadline = 1_000;
+    // The settlement interop root used by the absence proof must have been created after the deadline.
+    // This fixed block is unique within the spec. The helper makes reruns against retained state idempotent.
+    const settlementInteropRootBlock = 201;
+    await ensureSettlementInteropRoot(chainA.provider, settlementInteropRootBlock, deadline + 5);
 
     const refundRecipient = chainB.user.address; // irrelevant for refund; distinct dest recipient
     const aTimeoutAmount = ethers.utils.parseUnits("3", TEST_TOKEN_DECIMALS);
@@ -513,21 +566,19 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       "AB depositor burned tokens at commit"
     );
 
-    // ── Build the timeout proof for the missing BA leg against B's IMT: absence at the last in-time
-    //    batch N (`t_N <= deadline`) pinned by the consecutive successor N+1 (`t_{N+1} > deadline`).
+    // ── Build the timeout proof for the missing BA leg against B's IMT: non-inclusion against the
+    //    batch-begin root of a late batch (`t > deadline`), checked against the post-deadline
+    //    settlement interop root added above. The live tree root stands in for the begin-root snapshot
+    //    (leaf 2 of the chain batch root) on the harness.
     const baValue = commitValue(flowId, hBA);
     const absence = await buildNonInclusionProof({
       l2Tree: chainB.stack.tree,
       chainId: chainB.chainId,
       value: baValue,
-      l1Timestamp: deadline, // t_N <= deadline
-      batchNumber: 1, // batch N
-    });
-    const successor = await buildSuccessorProof({
-      l2Tree: chainB.stack.tree,
-      chainId: chainB.chainId,
-      l1Timestamp: deadline + 1, // t_{N+1} > deadline
-      batchNumber: 2, // batch N+1 (consecutive)
+      l1Timestamp: deadline + 1, // t > deadline: the first late batch's begin root
+      provesAgainstBeginRoot: true,
+      batchNumber: 1,
+      slBlock: settlementInteropRootBlock,
     });
     const missingIdx = legHashesAsc[0] === hBA ? 0 : 1;
 
@@ -537,7 +588,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       await managerA.authorizeRefund(
         atomicFlowTuple({ flowId, deadline, legBundleHashes: legHashesAsc, chainIds: chainIdsAsc }),
         missingIdx,
-        atomicTimeoutProofTuple(absence, successor),
+        proofTuple(absence),
         { gasLimit: DEFAULT_TX_GAS_LIMIT }
       )
     ).wait();
@@ -565,5 +616,158 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
         .some((p: ParsedManagerLog) => p?.name === "FlowRefunded" && p.args.bundleHash === hAB),
       "FlowRefunded(hAB) on A"
     ).to.be.true;
+  });
+
+  /** A fabricated (never-sent) two-leg flow for proof-validation tests: authorizeRefund verifies the
+   *  absence proof before touching any leg state, so no real sends are needed to exercise reverts. */
+  function fabricatedFlow(deadline: number) {
+    const legs = [
+      { hash: ethers.utils.id("fabricated-leg-1"), chainId: chainA.chainId },
+      { hash: ethers.utils.id("fabricated-leg-2"), chainId: chainB.chainId },
+    ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
+    const legHashesAsc = legs.map((l) => l.hash);
+    const chainIdsAsc = legs.map((l) => l.chainId);
+    const flowId = computeFlowId(legHashesAsc, chainIdsAsc, deadline);
+    // The "missing" leg is the one sourced on chain B (proofs below are against B's IMT).
+    const missingIdx = chainIdsAsc.indexOf(chainB.chainId);
+    return { flowId, legHashesAsc, chainIdsAsc, missingIdx };
+  }
+
+  it("timeout path (halted chain): in-time LAST batch + end-root absence authorizes the refund", async () => {
+    const user = chainA.user.address;
+    // Same shape as the late-batch timeout test, but the source chain "halted": its last batch inside
+    // the post-deadline settlement interop root is still in time (`t <= deadline`, pinned exactly AT
+    // the boundary). The proof then checks absence against the batch-END IMT root of that last batch
+    // (the zero-length batch-leaf path of the single-leaf chain tree trivially satisfies the
+    // last-batch check).
+    const deadline = 1_000;
+    const settlementInteropRootBlock = 202;
+    await ensureSettlementInteropRoot(chainA.provider, settlementInteropRootBlock, deadline + 5);
+
+    const refundRecipient = chainB.user.address;
+    const aTimeoutAmount = ethers.utils.parseUnits("2", TEST_TOKEN_DECIMALS);
+    const bTimeoutAmount = ethers.utils.parseUnits("4", TEST_TOKEN_DECIMALS);
+
+    const saltAB = freshBundleSalt();
+    const saltBA = freshBundleSalt();
+    const hAB = await predictLegBundleHash(chainA, chainB, aTimeoutAmount, refundRecipient, saltAB);
+    const hBA = await predictLegBundleHash(chainB, chainA, bTimeoutAmount, refundRecipient, saltBA);
+
+    const legs = [
+      { hash: hAB, chainId: chainA.chainId },
+      { hash: hBA, chainId: chainB.chainId },
+    ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
+    const legHashesAsc = legs.map((l) => l.hash);
+    const chainIdsAsc = legs.map((l) => l.chainId);
+    const flowId = computeFlowId(legHashesAsc, chainIdsAsc, deadline);
+
+    const aBalanceBefore: BigNumber = await chainA.testToken.balanceOf(user);
+    const ab = await sendAtomicLeg({
+      source: chainA,
+      dest: chainB,
+      amount: aTimeoutAmount,
+      recipient: refundRecipient,
+      flowId,
+      deadline,
+      predictedBundleHash: hAB,
+      salt: saltAB,
+    });
+    expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Committed, "AB committed on A");
+
+    // Halted-source absence proof: `t <= deadline` selects the END-root branch (t == deadline pins
+    // the boundary), and the empty batch-leaf path marks the batch as the chain's last inside the
+    // settlement interop root.
+    const baValue = commitValue(flowId, hBA);
+    const absence = await buildNonInclusionProof({
+      l2Tree: chainB.stack.tree,
+      chainId: chainB.chainId,
+      value: baValue,
+      l1Timestamp: deadline,
+      provesAgainstBeginRoot: false,
+      batchNumber: 1,
+      slBlock: settlementInteropRootBlock,
+    });
+    const missingIdx = legHashesAsc[0] === hBA ? 0 : 1;
+
+    const managerA = chainA.stack.manager.connect(chainA.user);
+    await (
+      await managerA.authorizeRefund(
+        atomicFlowTuple({ flowId, deadline, legBundleHashes: legHashesAsc, chainIds: chainIdsAsc }),
+        missingIdx,
+        proofTuple(absence),
+        { gasLimit: DEFAULT_TX_GAS_LIMIT }
+      )
+    ).wait();
+    expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Revertable, "AB revertable on A");
+
+    await (await managerA.claimRefund(flowId, ab.bundleData, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
+    expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Reverted, "AB reverted on A");
+    expect((await chainA.testToken.balanceOf(user)).toString()).to.equal(
+      aBalanceBefore.toString(),
+      "AB depositor fully recovered the burned tokens"
+    );
+  });
+
+  it("timeout negatives: stale/missing settlement roots and non-last in-time batches are rejected", async () => {
+    const deadline = 1_000;
+    const { flowId, legHashesAsc, chainIdsAsc, missingIdx } = fabricatedFlow(deadline);
+    const missingValue = commitValue(flowId, legHashesAsc[missingIdx]);
+    const flow = atomicFlowTuple({ flowId, deadline, legBundleHashes: legHashesAsc, chainIds: chainIdsAsc });
+    const managerA = chainA.stack.manager.connect(chainA.user);
+
+    // 1. Settlement interop root NOT created strictly after the deadline (added exactly AT
+    //    `T == deadline` to pin the strict bound): rejected even though the batch itself is in time
+    //    and the absence itself would hold (a stale snapshot proves nothing about the deadline moment).
+    const staleSettlementRootBlock = 203;
+    await ensureSettlementInteropRoot(chainA.provider, staleSettlementRootBlock, deadline);
+    const staleSettlementRootProof = await buildNonInclusionProof({
+      l2Tree: chainB.stack.tree,
+      chainId: chainB.chainId,
+      value: missingValue,
+      l1Timestamp: deadline - 1,
+      provesAgainstBeginRoot: false,
+      slBlock: staleSettlementRootBlock,
+    });
+    await expectRevert(
+      () => managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(staleSettlementRootProof)),
+      "stale settlement interop root",
+      customError("AtomicFlowManager", "ProofInteropRootNotAfterDeadline(uint256,uint64)")
+    );
+
+    // 2. Settlement interop root is missing, so its unset timestamp reads as 0: rejected.
+    const missingSettlementRootProof = await buildNonInclusionProof({
+      l2Tree: chainB.stack.tree,
+      chainId: chainB.chainId,
+      value: missingValue,
+      l1Timestamp: deadline + 1,
+      provesAgainstBeginRoot: true,
+      slBlock: 999_999,
+    });
+    await expectRevert(
+      () => managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(missingSettlementRootProof)),
+      "missing settlement interop root",
+      customError("AtomicFlowManager", "ProofSettlementLayerInteropRootNotImported(uint256,uint256)")
+    );
+
+    // 3. In-time batch that is NOT the chain's last inside the settlement interop root: the batch-leaf
+    //    path has a populated (non-empty-subtree) right sibling at level 0, so the last-batch check
+    //    rejects it.
+    const validSettlementRootBlock = 204;
+    await ensureSettlementInteropRoot(chainA.provider, validSettlementRootBlock, deadline + 5);
+    const notLastBatch = await buildNonInclusionProof({
+      l2Tree: chainB.stack.tree,
+      chainId: chainB.chainId,
+      value: missingValue,
+      l1Timestamp: deadline - 1,
+      provesAgainstBeginRoot: false,
+      slBlock: validSettlementRootBlock,
+      batchLeafSiblings: [ethers.utils.id("populated-right-subtree")],
+      batchLeafMask: 0, // left child at level 0 -> the sibling above must be the empty-subtree hash
+    });
+    await expectRevert(
+      () => managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(notLastBatch)),
+      "in-time batch not last in root",
+      customError("AtomicFlowManager", "ProofNotLastBatchInRoot(uint256,bytes32)")
+    );
   });
 });

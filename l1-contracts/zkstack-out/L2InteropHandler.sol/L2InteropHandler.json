@@ -113,17 +113,12 @@
                 "internalType": "bytes32"
               },
               {
-                "name": "messageTxNumberInBatch",
-                "type": "uint16",
-                "internalType": "uint16"
+                "name": "provesAgainstBeginRoot",
+                "type": "bool",
+                "internalType": "bool"
               },
               {
-                "name": "messageIndex",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "messageProof",
+                "name": "settlementProof",
                 "type": "bytes32[]",
                 "internalType": "bytes32[]"
               },
@@ -288,17 +283,12 @@
                 "internalType": "bytes32"
               },
               {
-                "name": "messageTxNumberInBatch",
-                "type": "uint16",
-                "internalType": "uint16"
+                "name": "provesAgainstBeginRoot",
+                "type": "bool",
+                "internalType": "bool"
               },
               {
-                "name": "messageIndex",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "messageProof",
+                "name": "settlementProof",
                 "type": "bytes32[]",
                 "internalType": "bytes32[]"
               },

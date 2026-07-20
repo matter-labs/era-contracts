@@ -43,22 +43,24 @@ error InteropPreviewHash(bytes32 bundleHash);
 error InteropToSelfNotSupported();
 // 0x2d48e8cf
 error InteropRootAlreadyExists();
+// 0x8a011102
+error InteropRootTimestampIsZero();
 // 0xeae192ef
 error InvalidInteropBundleVersion();
 // 0xd5f13973
 error InvalidInteropCallVersion();
-// 0x1db1b07e
-error NonAtomicSendUnsupported();
 // 0x32c2e156
 error MessageNotIncluded();
-// 0x89fd2c76
-error UnauthorizedMessageSender(address expected, address actual);
 // 0x6a430157
 error MultiCallToL1NotSupported(uint256 callCount);
+// 0x1db1b07e
+error NonAtomicSendUnsupported();
 // 0xd72e81d8
 error NonZeroValueToL1NotSupported(uint256 value);
 // 0x2f59bd0d
 error SidesLengthNotOne();
+// 0x89fd2c76
+error UnauthorizedMessageSender(address expected, address actual);
 // 0x0345c281
 error UnbundlingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes unbundlerAddress);
 // 0x801534e9

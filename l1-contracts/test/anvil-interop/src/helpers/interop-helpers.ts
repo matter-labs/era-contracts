@@ -488,26 +488,28 @@ export async function simulateInteropBundle(options: SendBundleOptions): Promise
 
   const destinationChainIdBytes = encodeEvmChain(options.destinationChainId);
   const baseAttributes = await ensureUniqueBundleSalt(options.bundleAttributes || [], wallet);
-  // Mirror the real send's atomic attribute construction so the callStatic exercises the full path
-  // (value collection included — the preview alone skips it, so reverts like MsgValueMismatch only
-  // surface on the real `sendBundle`).
-  const predictedBundleHash: string = await staticPreviewHash(
-    interopCenter,
-    options.sourceProvider,
-    wallet.address,
-    "previewBundleHash",
-    [destinationChainIdBytes, options.callStarters, baseAttributes]
-  );
-  const atomic = await buildSingleLegAtomicSend(options.sourceProvider, predictedBundleHash);
-  await interopCenter.callStatic.sendBundle(
-    destinationChainIdBytes,
-    options.callStarters,
-    [...baseAttributes, atomic.attribute],
-    {
-      gasLimit: options.gasLimit || ATOMIC_SEND_BUNDLE_GAS_LIMIT,
-      value: options.value || 0,
-    }
-  );
+  // Mirror `sendInteropBundle`'s attribute construction so the callStatic exercises the full path (value
+  // collection included — the preview alone skips it, so reverts like MsgValueMismatch only surface on the
+  // real `sendBundle`). An L2->L1 withdrawal (`atomic === false`) is non-atomic: it carries no `atomicBundle`
+  // attribute, and `previewBundleHash` (which enforces `_ensureL2ToL2`) must NOT be called for an L1 dest.
+  let attributes: string[];
+  if (options.atomic === false) {
+    attributes = baseAttributes;
+  } else {
+    const predictedBundleHash: string = await staticPreviewHash(
+      interopCenter,
+      options.sourceProvider,
+      wallet.address,
+      "previewBundleHash",
+      [destinationChainIdBytes, options.callStarters, baseAttributes]
+    );
+    const atomic = await buildSingleLegAtomicSend(options.sourceProvider, predictedBundleHash);
+    attributes = [...baseAttributes, atomic.attribute];
+  }
+  await interopCenter.callStatic.sendBundle(destinationChainIdBytes, options.callStarters, attributes, {
+    gasLimit: options.gasLimit || ATOMIC_SEND_BUNDLE_GAS_LIMIT,
+    value: options.value || 0,
+  });
 }
 
 // ── InteropCenter.sendMessage wrapper ──────────────────────────

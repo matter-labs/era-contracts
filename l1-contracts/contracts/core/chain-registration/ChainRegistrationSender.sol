@@ -17,6 +17,7 @@ import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 import {
     ChainAlreadyRegistered,
+    ChainHasNoBatchesInMessageRoot,
     ChainsSettlementLayerMismatch,
     NoEthAllowed,
     ZKChainNotRegistered
@@ -81,7 +82,7 @@ contract ChainRegistrationSender is
 
     /// @inheritdoc IL1CrossChainSender
     /// @notice Registers a chain on the L2 via a normal deposit.
-    /// @notice this is can be called by anyone (via the bridgehub), but baseTokens need to be provided.
+    /// @notice This can be called by anyone (via the bridgehub), but base tokens need to be provided.
     // slither-disable-next-line locked-ether
     function bridgehubDeposit(
         uint256 chainRegisteredOn,
@@ -118,6 +119,13 @@ contract ChainRegistrationSender is
     }
 
     /// @notice Used to get the L2 transaction calldata for the chain registration.
+    /// @dev Also enforces the atomic-interop timeout-protocol precondition: the chain being
+    /// registered must already have at least one batch inside this layer's message root (see the
+    /// {AtomicInteropProof} library docs for why).
+    /// @dev No backfill of pre-existing chains is needed: during v31 the ZK Gateway was never
+    /// activated, and registration required that a chain does NOT settle on L1 — so at the start of
+    /// v32 no chains have been registered here, and every chain passes through this gate (and gets
+    /// its tree populated) before interop can target it.
     /// @param chainToBeRegistered the chain to be registered
     /// @return the L2 transaction calldata
     function _getL2TxCalldata(uint256 chainToBeRegistered) internal view returns (bytes memory) {
@@ -125,10 +133,14 @@ contract ChainRegistrationSender is
         if (baseTokenAssetId == bytes32(0)) {
             revert ZKChainNotRegistered();
         }
+        if (BRIDGE_HUB.messageRoot().chainTreeLeafCount(chainToBeRegistered) == 0) {
+            revert ChainHasNoBatchesInMessageRoot(chainToBeRegistered);
+        }
         return abi.encodeCall(IL2Bridgehub.registerChainForInterop, (chainToBeRegistered, baseTokenAssetId));
     }
 
-    /// @notice Checks that both chains are settling on the same settlement layer, which must not be the L1
+    /// @notice Checks that both chains are settling on the same settlement layer (settling
+    /// directly on L1 is permitted — see the body note).
     /// @param chainToBeRegistered the chain to be registered
     /// @param chainRegisteredOn the chain to register on
     function _checkSettlementLayers(uint256 chainToBeRegistered, uint256 chainRegisteredOn) internal view {
@@ -138,7 +150,7 @@ contract ChainRegistrationSender is
             revert ChainsSettlementLayerMismatch(chainToBeRegisteredSettlementLayer, chainRegisteredOnSettlementLayer);
         }
         // Both chains settling directly on L1 is now permitted: L1 builds interop roots
-        // (MessageRootBase.addChainBatchRoot) and serves the corresponding inclusion proofs, so
+        // (MessageRootBase.addChainBatchRootV32) and serves the corresponding inclusion proofs, so
         // L1-settled chains can participate in interop without a gateway. The same-settlement-layer
         // check above still applies (a flow's legs must share a settlement layer).
     }

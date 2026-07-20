@@ -23,7 +23,12 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/co
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
-import {ChainsSettlementLayerMismatch, ChainAlreadyRegistered} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+import {
+    ChainsSettlementLayerMismatch,
+    ChainAlreadyRegistered,
+    ChainHasNoBatchesInMessageRoot
+} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
@@ -74,6 +79,20 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
             address(ecosystemAddresses.bridgehub.proxies.messageRoot),
             abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
+        );
+
+        _settleFirstBatchRoot(zkChainIds[0]);
+    }
+
+    /// @dev Freshly created EraVM chains have an empty tree in the MessageRoot (only ZKsync OS
+    /// chains get a seeded genesis batch leaf), so they only become registrable for interop after
+    /// their first settled batch. Settle one batch root through the real executor entry point.
+    function _settleFirstBatchRoot(uint256 _chainId) internal {
+        vm.prank(getZKChainAddress(_chainId));
+        IMessageRootBase(address(ecosystemAddresses.bridgehub.proxies.messageRoot)).addChainBatchRootV32(
+            _chainId,
+            1,
+            keccak256("first-settled-chain-batch-root")
         );
     }
 
@@ -187,6 +206,22 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
             addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
             "chainRegisteredOnChain should remain false after TwoBridges deposit"
         );
+    }
+
+    /// @notice A chain with an empty tree in the MessageRoot (a fresh EraVM chain before its first
+    /// settled batch, or a chain onboarded with a non-zero starting batch number that has not yet
+    /// settled on this layer) cannot be registered for interop: the atomic-interop timeout protocol
+    /// needs at least one batch of the source chain inside the aggregated root. The happy-path test
+    /// above settles a batch first; here the empty tree is simulated with a mock.
+    function test_chainRegistrationSender_revertWhen_chainHasNoBatchesInMessageRoot() public {
+        vm.mockCall(
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
+            abi.encodeWithSelector(IMessageRootBase.chainTreeLeafCount.selector, zkChainIds[0]),
+            abi.encode(uint256(0))
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(ChainHasNoBatchesInMessageRoot.selector, zkChainIds[0]));
+        addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
     }
 
     function test_chainRegistrationSender_revertWhen_settlementLayersMismatch() public {
