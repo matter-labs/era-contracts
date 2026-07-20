@@ -105,7 +105,7 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
         );
         vm.chainId(_destinationChainId);
         vm.prank(executionAddress);
-        L2_INTEROP_HANDLER.executeBundle(bundle, finality);
+        L2_INTEROP_HANDLER.executeAtomicBundle(bundle, finality);
 
         result = BundleExecutionResult({
             bundleHash: bundleHash,

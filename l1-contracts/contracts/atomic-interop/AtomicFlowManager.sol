@@ -40,7 +40,7 @@ import {Unauthorized} from "../l2-system/zksync-os/errors/ZKOSContractErrors.sol
 /// Send: {InteropCenter.sendBundle} burns through the normal `initiateIndirectCall` path, then — when
 /// the bundle carries the `atomicBundle` attribute — calls {append} instead of publishing the bundle
 /// to L1; `append` records the leg's commit value in this chain's {L2InteropCommitmentTree}.
-/// Receive: {L2InteropHandler.executeBundle} calls {requireFlowFinalized} (the atomicity gate) in
+/// Receive: {L2InteropHandler.executeAtomicBundle} calls {requireFlowFinalized} (the atomicity gate) in
 /// place of the L1-message inclusion proof, then executes the bundle (and owns the replay guard).
 /// Timeout: {authorizeRefund} + {claimRefund} recover the burned source funds to the depositor by
 /// asking each burn-producing call's local sender to reverse itself via {IAtomicRecoverable.recoverAtomicCall}.

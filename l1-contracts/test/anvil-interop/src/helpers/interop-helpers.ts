@@ -642,7 +642,7 @@ export async function executeBundle(
   const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
-  const tx = await interopHandler.executeBundle(bundleData, proof, {
+  const tx = await interopHandler.executeAtomicBundle(bundleData, proof, {
     gasLimit: gasLimit || DEFAULT_TX_GAS_LIMIT,
   });
   return tx.wait();
@@ -661,7 +661,7 @@ export async function simulateExecuteBundle(
   const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
-  await interopHandler.callStatic.executeBundle(bundleData, proof, {
+  await interopHandler.callStatic.executeAtomicBundle(bundleData, proof, {
     gasLimit: gasLimit || DEFAULT_TX_GAS_LIMIT,
   });
 }

@@ -178,7 +178,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         assertGt(proof.length, 0, "merkle proof must be non-empty");
     }
 
-    function test_executeBundle() public {
+    function test_executeAtomicBundle() public {
         InteropBundle memory interopBundle = getInteropBundle(1);
         bytes memory bundle = abi.encode(interopBundle);
         AtomicFinalityProof memory finality;
@@ -199,7 +199,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         vm.expectEmit(true, false, false, false);
         emit IInteropHandlerBase.BundleExecuted(bundleHash);
         vm.prank(EXECUTION_ADDRESS);
-        L2_INTEROP_HANDLER.executeBundle(bundle, finality);
+        L2_INTEROP_HANDLER.executeAtomicBundle(bundle, finality);
         // Check storage changes
         assertEq(
             uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
@@ -593,7 +593,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         emit IInteropHandlerBase.BundleExecuted(bundleHash);
 
         vm.prank(EXECUTION_ADDRESS);
-        L2_INTEROP_HANDLER.executeBundle(bundle, finality);
+        L2_INTEROP_HANDLER.executeAtomicBundle(bundle, finality);
 
         // Verify successful execution
         assertEq(
@@ -737,7 +737,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         emit IBaseTokenHolder.BaseTokenMintedInterop(L2_INTEROP_HANDLER_ADDR, callValue);
 
         vm.prank(EXECUTION_ADDRESS);
-        L2_INTEROP_HANDLER.executeBundle(bundle, finality);
+        L2_INTEROP_HANDLER.executeAtomicBundle(bundle, finality);
 
         // Interop source is ERA_CHAIN_ID (not L1), so totalSuccessfulDepositsFromL1 must NOT increase
         uint256 depositsAfter = _readTotalSuccessfulDepositsFromL1(_baseTokenAssetId);

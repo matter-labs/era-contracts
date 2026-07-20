@@ -769,7 +769,7 @@ contract InteropCenter is
     /// @notice Hashes the bundle and dispatches it along one of two paths, keyed on the destination:
     /// - **L2->L2 interop (atomic):** the bundle's commit value is appended to the interop IMT via the
     ///   {AtomicFlowManager} and is NOT published to L1 — the burn already happened through the normal
-    ///   `initiateIndirectCall` path, and the destination executes it via {L2InteropHandler.executeBundle}.
+    ///   `initiateIndirectCall` path, and the destination executes it via {L2InteropHandler.executeAtomicBundle}.
     ///   Native-`value` legs are allowed: the base-token value collected at send time (via the base-token
     ///   holder for the same base token, or the asset router for a different one) is refunded to the payer on
     ///   timeout by {AtomicFlowManager._recoverBundle}. Atomicity/destination validity (atomic must be L2,

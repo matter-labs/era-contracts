@@ -13,9 +13,11 @@ import {IInteropHandlerBase} from "./IInteropHandlerBase.sol";
 /// imports {L2ContractInterfaces}, i.e. it breaks that import cycle).
 interface IL2InteropHandler is IInteropHandlerBase {
     /// @notice Executes a full atomic interop bundle, gated by per-leg IMT inclusion proofs.
+    /// @dev Named distinctly from {L1InteropHandler.executeBundle} (which takes a `MessageInclusionProof`) so
+    /// the atomic vs L1-message-inclusion path is obvious at the call site.
     /// @param _bundle ABI-encoded InteropBundle to execute.
     /// @param _finality The flow definition (`flowId`, legs, deadline) + one IMT inclusion proof per leg.
-    function executeBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) external;
+    function executeAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) external;
 
     /// @notice Verifies receipt of an atomic bundle without executing its calls (enables verify->unbundle).
     /// @param _bundle ABI-encoded InteropBundle to verify.

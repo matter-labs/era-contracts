@@ -56,7 +56,7 @@ abstract contract L2InteropExecuteBundleTestAbstract is L2InteropTestUtils {
         InteropLibrary.sendDirectCall(
             destinationChainId,
             L2_INTEROP_HANDLER_ADDR,
-            abi.encodeCall(L2_INTEROP_HANDLER.executeBundle, (bundle, proof)),
+            abi.encodeCall(L2_INTEROP_HANDLER.executeAtomicBundle, (bundle, proof)),
             EXECUTION_ADDRESS,
             UNBUNDLER_ADDRESS,
             bytes32(uint256(1))

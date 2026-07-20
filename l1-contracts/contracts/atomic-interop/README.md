@@ -2,7 +2,7 @@
 
 This module makes a multi-leg interop flow **atomic** — every leg executes or none does — **without a
 central L1 coordinator**. It rides on the normal interop bundle path (`InteropCenter.sendBundle` ->
-`L2AssetRouter` -> `InteropHandler.executeBundle`); the only addition is an **Indexed Merkle
+`L2AssetRouter` -> `InteropHandler.executeAtomicBundle`); the only addition is an **Indexed Merkle
 Tree (IMT)** per chain that records each leg's commitment, plus per-leg **IMT proofs** authenticated
 against the regular **interop-root channel**: the ZKsync OS bootloader snapshots each chain's IMT root
 at every batch boundary and commits both snapshots as dedicated leaves of the batch's **chain batch
@@ -39,7 +39,7 @@ bundle, so `bundleHash` does not depend on `flowId` (which would be circular).
    settlement layer's `MessageRoot` and is re-imported into every chain's `L2InteropRootStorage`
    through the standard interop-root channel — the same channel used for all interop, built on both L1
    and the gateway, so it works for L1-settling chains too.
-3. **Finalize** (destination). `InteropHandler.executeBundle(bundle, finalityProof)` calls
+3. **Finalize** (destination). `InteropHandler.executeAtomicBundle(bundle, finalityProof)` calls
    `AtomicFlowManager.requireFlowFinalized`, which for **every** leg verifies an IMT **inclusion** proof
    (`AtomicInteropProof.verifyInclusion`): the leg's `commitValue` is present in its source chain's
    **batch-end** IMT root (chain-batch-root leaf 3, authenticated with an exact-depth 3-sibling path)
@@ -118,7 +118,7 @@ The timeout proof relies on three preconditions, each enforced on chain:
 | `IL2InteropCommitmentTree`, `IAtomicFlowManager`, `IAtomicInterop`, `AtomicInteropErrors` | L2    | Interfaces, shared structs (`ImtProof`, `AtomicFlow`, `AtomicFinalityProof`, `LegState`), and errors.                                                                                                                                                                                                                                           |
 
 The flow's entry points live outside this directory: `InteropCenter` (`interop/`, `0x1000d`) drives the
-send + `append`; `InteropHandler` (`interop/`, `0x1000e`) drives `executeBundle`; `L2AssetRouter`
+send + `append`; `InteropHandler` (`interop/`, `0x1000e`) drives `executeAtomicBundle`; `L2AssetRouter`
 (`bridge/asset-router/`, `0x10003`) does the burn / mint and implements `IAtomicRecoverable.recoverAtomicCall`
 for the timeout recovery, recognising the flow manager by its canonical address. The underlying IMT data structure is `common/libraries/IndexedMerkleTree.sol`.
 

@@ -48,7 +48,7 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
     /// block legitimate nested interop.
     /// @param _bundle ABI-encoded InteropBundle to execute (carries the `atomicBundle` attribute at send time).
     /// @param _finality The flow definition (`flowId`, legs, deadline) + one IMT inclusion proof per leg.
-    function executeBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public override {
+    function executeAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public override {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
         // Shared pre-gate validation. An atomic bundle is never published to L1, so it self-binds its own
@@ -87,7 +87,7 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
 
     /// @inheritdoc InteropHandlerBase
     function _executeBundleSelector() internal view override returns (bytes4) {
-        return this.executeBundle.selector;
+        return this.executeAtomicBundle.selector;
     }
 
     /// @inheritdoc InteropHandlerBase
@@ -119,7 +119,7 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
             );
         }
 
-        this.executeBundle(bundle, finality);
+        this.executeAtomicBundle(bundle, finality);
     }
 
     /// @inheritdoc InteropHandlerBase

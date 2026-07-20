@@ -10,7 +10,7 @@
  *           The bridge transfer burns via `initiateIndirectCall`; the `atomicBundle` attribute makes
  *           the InteropCenter append the leg's commit value to the L2InteropCommitmentTree instead of
  *           publishing to L1.
- *   RECEIVE `InteropHandler.executeBundle(bundleBytes, AtomicFinalityProof)`. Proves every leg
+ *   RECEIVE `L2InteropHandler.executeAtomicBundle(bundleBytes, AtomicFinalityProof)`. Proves every leg
  *           was committed in its source chain's IMT before the deadline (one inclusion proof per leg),
  *           then executes the bundle's calls (the destination mint). `bundleStatus` guards double-execute.
  *   TIMEOUT `AtomicFlowManager.authorizeRefund(...)`: checked against a settlement interop root created
@@ -42,7 +42,7 @@
  * test also confirms the off-chain engine agrees with the on-chain one.
  *
  * Verifies:
- *   - HAPPY PATH: atomic send (source burn + IMT insert) on both legs -> executeBundle (every-leg
+ *   - HAPPY PATH: atomic send (source burn + IMT insert) on both legs -> executeAtomicBundle (every-leg
  *     inclusion proof, `t <= deadline` — exercised exactly AT the boundary) on each destination.
  *     Recipients receive the bridged token; source legs stay terminal at Committed; both destination
  *     bundles end FullyExecuted.
@@ -489,8 +489,8 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
 
     const handlerB = chainB.stack.interopHandler.connect(chainB.user);
     const handlerA = chainA.stack.interopHandler.connect(chainA.user);
-    await (await handlerB.executeBundle(ab.bundleData, finality, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
-    await (await handlerA.executeBundle(ba.bundleData, finality, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
+    await (await handlerB.executeAtomicBundle(ab.bundleData, finality, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
+    await (await handlerA.executeAtomicBundle(ba.bundleData, finality, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
 
     // Destination bundles are FullyExecuted; source legs remain Committed (terminal on the happy path).
     expect(await handlerB.bundleStatus(hAB)).to.equal(BundleStatus.FullyExecuted, "AB executed on B");

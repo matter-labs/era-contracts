@@ -81,13 +81,13 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
 
         vm.prank(bundleExecutor);
         vm.expectRevert(EmptyBundle.selector);
-        L2_INTEROP_HANDLER.executeBundle(encodedBundle, proof);
+        L2_INTEROP_HANDLER.executeAtomicBundle(encodedBundle, proof);
     }
 
     /// @notice `executeBundle` must not carry a nonReentrant guard: a bundle may re-enter it (via
     ///         `receiveMessage`) to execute a nested bundle.
     /// @dev Positive oracle: with the guard gone, the whole chain
-    ///      executeBundle(outer) -> receiveMessage -> this.executeBundle(inner) succeeds and BOTH bundles end up
+    ///      executeAtomicBundle(outer) -> receiveMessage -> this.executeAtomicBundle(inner) succeeds and BOTH bundles end up
     ///      `FullyExecuted`. Before the fix the nested call reverted with `Reentrancy`.
     function test_regression_executeBundleNoReentrancyGuard() public {
         uint256 sourceChainId = block.chainid;
@@ -122,10 +122,10 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         AtomicFinalityProof memory innerProof;
 
         // Payload for receiveMessage that dispatches to executeBundle(innerBundle)
-        bytes memory innerPayload = abi.encodeCall(L2InteropHandler.executeBundle, (encodedInnerBundle, innerProof));
+        bytes memory innerPayload = abi.encodeCall(L2InteropHandler.executeAtomicBundle, (encodedInnerBundle, innerProof));
 
         // Outer bundle: its call targets L2InteropHandler.receiveMessage with the above payload.
-        // Call chain: executeBundle(outer) -> _executeCalls -> receiveMessage -> this.executeBundle(inner)
+        // Call chain: executeAtomicBundle(outer) -> _executeCalls -> receiveMessage -> this.executeAtomicBundle(inner)
         InteropCall[] memory outerCalls = new InteropCall[](1);
         outerCalls[0] = InteropCall({
             version: INTEROP_CALL_VERSION,
@@ -159,7 +159,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         vm.chainId(destinationChainId);
 
         vm.prank(bundleExecutor);
-        L2_INTEROP_HANDLER.executeBundle(encodedOuterBundle, outerProof);
+        L2_INTEROP_HANDLER.executeAtomicBundle(encodedOuterBundle, outerProof);
 
         assertTrue(
             L2_INTEROP_HANDLER.bundleStatus(
@@ -176,7 +176,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
     }
 
     /// @notice `verifyBundle` must not carry a nonReentrant guard: a bundle may re-enter to verify a nested one.
-    /// @dev Positive oracle: executeBundle(outer) -> receiveMessage -> this.verifyBundle(inner) succeeds, so the
+    /// @dev Positive oracle: executeAtomicBundle(outer) -> receiveMessage -> this.verifyBundle(inner) succeeds, so the
     ///      outer bundle ends up `FullyExecuted` and the nested bundle `Verified`. Before the fix the nested
     ///      call reverted with `Reentrancy`.
     function test_regression_verifyBundleNoReentrancyGuard() public {
@@ -211,7 +211,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         bytes memory innerPayload = abi.encodeCall(L2InteropHandler.verifyBundle, (encodedInnerBundle, innerProof));
 
         // Outer bundle: its call targets L2InteropHandler.receiveMessage with the above payload.
-        // Call chain: executeBundle(outer) -> _executeCalls -> receiveMessage -> this.verifyBundle(inner)
+        // Call chain: executeAtomicBundle(outer) -> _executeCalls -> receiveMessage -> this.verifyBundle(inner)
         InteropCall[] memory outerCalls = new InteropCall[](1);
         outerCalls[0] = InteropCall({
             version: INTEROP_CALL_VERSION,
@@ -238,7 +238,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         vm.chainId(destinationChainId);
 
         vm.prank(bundleExecutor);
-        L2_INTEROP_HANDLER.executeBundle(encodedOuterBundle, outerProof);
+        L2_INTEROP_HANDLER.executeAtomicBundle(encodedOuterBundle, outerProof);
 
         assertTrue(
             L2_INTEROP_HANDLER.bundleStatus(

@@ -48,7 +48,7 @@
   },
   {
     "type": "function",
-    "name": "executeBundle",
+    "name": "executeAtomicBundle",
     "inputs": [
       {
         "name": "_bundle",
