@@ -165,15 +165,13 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         L2_INTEROP_HANDLER.executeAtomicBundle(encodedOuterBundle, outerProof);
 
         assertTrue(
-            L2_INTEROP_HANDLER.bundleStatus(
-                InteropDataEncoding.encodeInteropBundleHash(sourceChainId, encodedOuterBundle)
-            ) == BundleStatus.FullyExecuted,
+            L2_INTEROP_HANDLER.bundleStatus(InteropDataEncoding.encodeInteropBundleHash(encodedOuterBundle)) ==
+                BundleStatus.FullyExecuted,
             "outer bundle must be fully executed"
         );
         assertTrue(
-            L2_INTEROP_HANDLER.bundleStatus(
-                InteropDataEncoding.encodeInteropBundleHash(sourceChainId, encodedInnerBundle)
-            ) == BundleStatus.FullyExecuted,
+            L2_INTEROP_HANDLER.bundleStatus(InteropDataEncoding.encodeInteropBundleHash(encodedInnerBundle)) ==
+                BundleStatus.FullyExecuted,
             "nested bundle must be fully executed through the self-call"
         );
     }
@@ -247,15 +245,13 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         L2_INTEROP_HANDLER.executeAtomicBundle(encodedOuterBundle, outerProof);
 
         assertTrue(
-            L2_INTEROP_HANDLER.bundleStatus(
-                InteropDataEncoding.encodeInteropBundleHash(sourceChainId, encodedOuterBundle)
-            ) == BundleStatus.FullyExecuted,
+            L2_INTEROP_HANDLER.bundleStatus(InteropDataEncoding.encodeInteropBundleHash(encodedOuterBundle)) ==
+                BundleStatus.FullyExecuted,
             "outer bundle must be fully executed"
         );
         assertTrue(
-            L2_INTEROP_HANDLER.bundleStatus(
-                InteropDataEncoding.encodeInteropBundleHash(sourceChainId, encodedInnerBundle)
-            ) == BundleStatus.Verified,
+            L2_INTEROP_HANDLER.bundleStatus(InteropDataEncoding.encodeInteropBundleHash(encodedInnerBundle)) ==
+                BundleStatus.Verified,
             "nested bundle must be verified through the self-call"
         );
     }

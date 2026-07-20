@@ -241,7 +241,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// @inheritdoc IAtomicFlowManager
     function claimRefund(bytes32 _flowId, bytes calldata _bundle) external {
         InteropBundle memory bundle = abi.decode(_bundle, (InteropBundle));
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle.sourceChainId, _bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(_bundle);
 
         LegState s = _state[_flowId][bundleHash];
         if (s != LegState.Revertable) {

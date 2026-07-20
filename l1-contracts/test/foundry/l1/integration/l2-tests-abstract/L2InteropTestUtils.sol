@@ -103,7 +103,7 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
         // proven via the AtomicFlowManager's IMT gate. We mock that gate to succeed here (the IMT-proof
         // machinery is exercised end-to-end in the anvil-interop atomic-swap spec, not in these unit-level
         // Foundry tests). A default AtomicFinalityProof suffices since the gate is mocked.
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
         AtomicFinalityProof memory finality;
 
         vm.mockCall(

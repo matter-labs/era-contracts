@@ -229,6 +229,11 @@ library InteropLibrary {
     ///                             but discouraged — each salt must be unique per sender (enforced by InteropCenter), so
     ///                             a sender can use `bytes32(0)` at most once.
     /// @return bundleHash Hash of the sent bundle
+    /// @dev TEST/SIMULATION HELPER (deploy-scripts + Foundry only). It attaches the PLACEHOLDER `atomicBundle`
+    /// attribute from {buildBundleAttributes}, which only finalizes while the `AtomicFlowManager` gate is
+    /// mocked. It is NOT a production send path: a real atomic L2->L2 send must derive its flow off-chain
+    /// (predict the bundle hash via the `previewBundleHash` quoter, compute `flowId`, find the IMT
+    /// `lowNullifierIndex`) and attach its own `atomicBundle` attribute — see the anvil `buildSingleLegAtomicSend`.
     function sendToken(
         uint256 destinationChainId,
         address l2TokenAddress,
@@ -345,6 +350,9 @@ library InteropLibrary {
     ///                             but discouraged — each salt must be unique per sender (enforced by InteropCenter), so
     ///                             a sender can use `bytes32(0)` at most once.
     /// @return bundleHash Hash of the sent bundle
+    /// @dev TEST/SIMULATION HELPER (deploy-scripts + Foundry only): attaches the PLACEHOLDER `atomicBundle`
+    /// attribute from {buildBundleAttributes}, finalizable only while the `AtomicFlowManager` gate is mocked.
+    /// Not a production send path — see {sendToken} and {buildBundleAttributes} for the real-flow requirement.
     function sendDirectCallBundle(
         uint256 destination,
         address[] memory targets,
@@ -422,6 +430,9 @@ library InteropLibrary {
     ///                                 allowed but discouraged — each salt must be unique per sender (enforced by
     ///                                 InteropCenter), so a sender can use `bytes32(0)` at most once.
     /// @return bundleHash Hash of the sent bundle
+    /// @dev TEST/SIMULATION HELPER (deploy-scripts + Foundry only): attaches the PLACEHOLDER `atomicBundle`
+    /// attribute from {buildBundleAttributes}, finalizable only while the `AtomicFlowManager` gate is mocked.
+    /// Not a production send path — see {sendToken} and {buildBundleAttributes} for the real-flow requirement.
     function sendNative(
         uint256 destinationChainId,
         address recipient,

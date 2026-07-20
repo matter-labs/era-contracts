@@ -233,7 +233,7 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         require(_bundle.length != 0, EmptyBundle());
         interopBundle = abi.decode(_bundle, (InteropBundle));
         require(interopBundle.version == INTEROP_BUNDLE_VERSION, InvalidInteropBundleVersion());
-        bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, _bundle);
+        bundleHash = InteropDataEncoding.encodeInteropBundleHash(_bundle);
         currentStatus = bundleStatus[bundleHash];
     }
 

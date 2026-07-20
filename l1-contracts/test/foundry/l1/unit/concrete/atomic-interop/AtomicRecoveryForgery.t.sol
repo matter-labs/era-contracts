@@ -149,7 +149,7 @@ contract AtomicRecoveryForgeryTest is Test {
         InteropBundle memory _bundle
     ) internal returns (bytes32 flowId, bytes32 bundleHash, bytes memory encodedBundle) {
         encodedBundle = abi.encode(_bundle);
-        bundleHash = InteropDataEncoding.encodeInteropBundleHash(_bundle.sourceChainId, encodedBundle);
+        bundleHash = InteropDataEncoding.encodeInteropBundleHash(encodedBundle);
         flowId = keccak256(abi.encodePacked("flow", _bundle.interopBundleSalt));
         manager.forceRevertable(flowId, bundleHash);
     }

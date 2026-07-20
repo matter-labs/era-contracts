@@ -318,19 +318,7 @@ contract InteropCenter is
 
         ) = _parseBundleInputs(_callStarters, _bundleAttributes);
 
-        // slither-disable-next-line unused-return
-        (InteropBundle memory bundle, , ) = _buildInteropBundle(
-            destinationChainId,
-            callStartersInternal,
-            bundleAttributes
-        );
-        // Quoter pattern: this runs the same stateful assembly as `sendBundle` (including the value-burning
-        // `initiateIndirectCall` for indirect legs), so it MUST NOT commit that burn on-chain. Reverting with
-        // the hash — instead of returning it — rolls back every state change made while assembling, regardless
-        // of caller/context. Callers read the hash from the `InteropPreviewHash` revert via a static `eth_call`.
-        // (Kept inline rather than in a shared helper: the memory-array passing to a helper pushes this
-        // contract over the EIP-170 code-size limit.)
-        revert InteropPreviewHash(_hashBundle(bundle));
+        _previewBundleHashAndRevert(destinationChainId, callStartersInternal, bundleAttributes);
     }
 
     /// @inheritdoc IInteropCenter
@@ -361,14 +349,25 @@ contract InteropCenter is
             callAttributes: callAttributes
         });
 
+        _previewBundleHashAndRevert(recipientChainId, callStartersInternal, bundleAttributes);
+    }
+
+    /// @notice Shared tail of the preview quoters ({previewBundleHash}/{previewMessageHash}): assembles the
+    /// bundle from already-parsed inputs and reverts with its hash.
+    /// @dev Quoter pattern: this runs the same stateful assembly as `sendBundle` (including the value-burning
+    /// `initiateIndirectCall` for indirect legs), so it MUST NOT commit that burn on-chain. Reverting with the
+    /// hash — instead of returning it — rolls back every state change made while assembling, regardless of
+    /// caller/context; callers read the hash from the `InteropPreviewHash` revert via a static `eth_call`. It
+    /// intentionally stops BEFORE the atomic append (unlike the real dispatch): the flow's `flowId` commits to
+    /// this very bundle hash, so the hash must be predictable before any flow exists (a chicken-and-egg that a
+    /// `submitBundle`-then-revert form could not satisfy).
+    function _previewBundleHashAndRevert(
+        uint256 _destinationChainId,
+        InteropCallStarterInternal[] memory _callStarters,
+        BundleAttributes memory _bundleAttributes
+    ) private {
         // slither-disable-next-line unused-return
-        (InteropBundle memory bundle, , ) = _buildInteropBundle(
-            recipientChainId,
-            callStartersInternal,
-            bundleAttributes
-        );
-        // Quoter pattern (see {previewBundleHash}): revert with the hash so the stateful assembly above cannot
-        // commit on-chain. Kept inline for the same EIP-170 code-size reason.
+        (InteropBundle memory bundle, , ) = _buildInteropBundle(_destinationChainId, _callStarters, _bundleAttributes);
         revert InteropPreviewHash(_hashBundle(bundle));
     }
 
@@ -705,7 +704,7 @@ contract InteropCenter is
 
     /// @notice Hashes an assembled {InteropBundle} into its canonical `bundleHash`.
     function _hashBundle(InteropBundle memory _bundle) internal view returns (bytes32) {
-        return InteropDataEncoding.encodeInteropBundleHash(block.chainid, abi.encode(_bundle));
+        return InteropDataEncoding.encodeInteropBundleHash(abi.encode(_bundle));
     }
 
     /// @notice Returns the base token asset ID for the destination chain. Override for pre-v31 chains.

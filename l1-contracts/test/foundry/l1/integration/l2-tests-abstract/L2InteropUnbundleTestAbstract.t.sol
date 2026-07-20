@@ -50,7 +50,7 @@ abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
         AtomicFinalityProof memory proof;
 
         // Calculate bundle hash for assertions
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
 
         vm.chainId(destinationChainId);
         L2_INTEROP_HANDLER.verifyAtomicBundle(bundle, proof);
