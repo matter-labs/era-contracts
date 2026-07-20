@@ -255,12 +255,13 @@ contract InteropCenter is
         originalCallAttributes[0] = attributes;
 
         // This single-call send path is never atomic; pass an empty AtomicSend (publishes to L1 as usual).
+        AtomicSend memory emptyAtomicSend;
         bytes32 bundleHash = _sendBundle({
             _destinationChainId: recipientChainId,
             _callStarters: callStartersInternal,
             _bundleAttributes: bundleAttributes,
             _originalCallAttributes: originalCallAttributes,
-            _atomicSend: AtomicSend({flowId: bytes32(0), lowNullifierIndex: 0, deadline: 0, isAtomic: false})
+            _atomicSend: emptyAtomicSend
         });
 
         // We return the sendId of the only message that was sent in the bundle above. We always send messages in bundles, even if there's only one message being sent.
@@ -599,7 +600,8 @@ contract InteropCenter is
         // Hash the bundle and dispatch it: an atomic bundle (one carrying the `atomicBundle` attribute)
         // is appended to the interop IMT via the AtomicFlowManager and is NOT published to L1; a normal
         // bundle is published to L1. The atomic send metadata travels out-of-band (`_atomicSend`), not
-        // embedded in the bundle, so `bundleHash` does not depend on `flowId` (a circular dependency).
+        // embedded in the bundle, so `bundleHash` does not depend on the flowId preimage (a circular
+        // dependency — the preimage's `legBundleHashes` include this very bundle's hash).
         bytes32 msgHash;
         (bundleHash, msgHash) = _dispatchBundle(bundle, _atomicSend);
 
@@ -661,11 +663,16 @@ contract InteropCenter is
     /// — the burn already happened through the normal `initiateIndirectCall` path, and the destination
     /// executes it via {InteropHandler.executeAtomicBundle}. A normal bundle is published to L1 via
     /// {_sendBundleToL1}.
-    /// @dev `_atomicSend` (flowId/deadline/lowNullifierIndex) is passed out-of-band and is intentionally
-    /// NOT embedded in `_bundle`, so `bundleHash` is independent of `flowId`. This is required:
-    /// `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`
-    /// must be computable off-chain before the send, which is impossible if a `bundleHash` (a flowId
-    /// input) embedded `flowId`.
+    /// @dev `_atomicSend` (the flowId preimage + lowNullifierIndex) is passed out-of-band and is
+    /// intentionally NOT embedded in `_bundle`, so `bundleHash` is independent of the preimage. This is
+    /// required: the preimage's `legBundleHashes` include this very bundle's hash (computed off-chain
+    /// before the send, e.g. via a `callStatic` preview), which would be impossible if `bundleHash`
+    /// itself embedded the preimage.
+    /// @dev The AtomicFlowManager recomputes `flowId` from the preimage and requires `bundleHash` to be
+    /// one of its legs (with this chain as the leg's declared source). So if the off-chain prediction of
+    /// this bundle's hash was wrong or went stale (e.g. an upgrade changed the bundle encoding between
+    /// the preview and the send), the whole send reverts — nothing is burned — instead of committing a
+    /// leg under a `flowId` that does not contain it, which could neither finalize nor be refunded.
     function _dispatchBundle(
         InteropBundle memory _bundle,
         AtomicSend memory _atomicSend
@@ -678,10 +685,9 @@ contract InteropCenter is
             // otherwise best-effort (see {AtomicFlowManager._recoverBundle}).
             _validateAtomicBundle(_bundle);
             IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
-                _flowId: _atomicSend.flowId,
                 _bundleHash: bundleHash,
-                _deadline: _atomicSend.deadline,
-                _lowNullifierIndex: _atomicSend.lowNullifierIndex
+                _lowNullifierIndex: _atomicSend.lowNullifierIndex,
+                _flowPreimage: _atomicSend.flowPreimage
             });
         } else {
             msgHash = _sendBundleToL1(interopBundleBytes, _bundle.calls.length);
@@ -879,9 +885,10 @@ contract InteropCenter is
                     AttributeViolatesRestriction(selector, uint256(_restriction))
                 );
                 attributeUsed[5] = true;
-                // The atomic send metadata (flowId/deadline/lowNullifierIndex) is parsed separately via
+                // The atomic send metadata (flowId preimage/lowNullifierIndex) is parsed separately via
                 // `_parseAtomicSend` and NOT stored in `BundleAttributes` — it must stay out of the
-                // cross-chain bundle so `bundleHash` does not depend on `flowId` (a circular dependency).
+                // cross-chain bundle so `bundleHash` does not depend on the preimage (a circular
+                // dependency: the preimage's leg hashes include this bundle's own hash).
                 // Here we only validate it is a permitted, non-duplicate bundle attribute.
             } else if (selector == IERC7786Attributes.interopBundleSalt.selector) {
                 require(!attributeUsed[6], AttributeAlreadySet(selector));
@@ -901,13 +908,15 @@ contract InteropCenter is
     /// @notice Extracts the `atomicBundle` send metadata from the bundle attributes (already validated
     /// by `parseAttributes`). Returns `isAtomic = false` when the attribute is absent. Kept separate
     /// from `parseAttributes`/`BundleAttributes` so the metadata never enters the cross-chain bundle
-    /// (which would make `bundleHash` depend on `flowId` — a circular dependency).
+    /// (which would make `bundleHash` depend on the flowId preimage — a circular dependency, since the
+    /// preimage's leg hashes include this bundle's own hash).
     function _parseAtomicSend(bytes[] calldata _attributes) internal pure returns (AtomicSend memory atomicSend) {
         uint256 attributesLength = _attributes.length;
         for (uint256 i = 0; i < attributesLength; ++i) {
             if (bytes4(_attributes[i]) == IERC7786Attributes.atomicBundle.selector) {
-                (atomicSend.flowId, atomicSend.deadline, atomicSend.lowNullifierIndex) = AttributesDecoder
-                    .decodeAtomicBundle(_attributes[i]);
+                (atomicSend.flowPreimage, atomicSend.lowNullifierIndex) = AttributesDecoder.decodeAtomicBundle(
+                    _attributes[i]
+                );
                 atomicSend.isAtomic = true;
             }
         }

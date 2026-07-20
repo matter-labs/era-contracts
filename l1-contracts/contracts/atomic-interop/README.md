@@ -13,7 +13,7 @@ message — finality is proven, not dispatched.
 ## Key values
 
 - `bundleHash = keccak256(abi.encode(sourceChainId, bundleBytes))` — a leg's bundle, chain-specific.
-- `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))` —
+- `flowId = keccak256(abi.encode(preimage))` —
   binds all legs, each leg's source chain, the deadline, and the settlement layer. `legBundleHashes` is
   strictly ascending (canonical order + dedup); `legSourceChainIds` is positional (aligned 1:1, may
   repeat); `deadline` is a settlement-layer timestamp.
@@ -21,16 +21,27 @@ message — finality is proven, not dispatched.
   leaf value for a leg. It bakes in `flowId` (hence all legs) and the chain-specific `bundleHash`, so a
   leg's commit value can only ever be inserted into its own source chain's IMT.
 
-The atomic-send parameters (`flowId`, `deadline`, `lowNullifierIndex`) travel out-of-band as the
-ERC-7786 `atomicBundle(bytes32,uint64,uint256)` bundle attribute — deliberately **not** part of the
-bundle, so `bundleHash` does not depend on `flowId` (which would be circular).
+The atomic-send parameters (the full `flowId` **preimage** — `deadline`, `settlementLayerChainId`,
+`legBundleHashes`, `legSourceChainIds` — plus `lowNullifierIndex`) travel out-of-band as the ERC-7786
+`atomicBundle((uint64,uint256,bytes32[],uint256[]),uint256)` bundle attribute — deliberately **not**
+part of the bundle, so `bundleHash` does not depend on the preimage (which would be circular: the
+preimage's leg hashes include the bundle's own hash). The attribute carries the preimage rather than
+an opaque `flowId` so that `AtomicFlowManager.append` can recompute the id on-chain and verify the
+sent bundle is actually one of the flow's legs (declared with the sending chain as its source), and
+that every other leg declares a Bridgehub-registered source chain (registration guarantees MessageRoot
+presence, which the refund path's absence proof needs) — a wrong or stale preimage, or one naming an
+unprovable source chain, reverts the send instead of committing a leg that could neither finalize nor
+be refunded.
 
 ## Flow
 
 1. **Atomic send** (each leg, on its source chain). The user calls `InteropCenter.sendBundle` with the
    `atomicBundle` attribute. The source burn flows through the normal `initiateIndirectCall` /
    `L2AssetRouter` path; instead of publishing the bundle to L1, the InteropCenter calls
-   `AtomicFlowManager.append`, which inserts `commitValue` into this chain's `L2InteropCommitmentTree`
+   `AtomicFlowManager.append`, which first recomputes `flowId` from the attribute's preimage and
+   validates it (canonical shape, L1 settlement layer, this bundle is a leg with this chain as its
+   source, co-leg source chains registered) — any violation reverts the whole send, burn included —
+   and then inserts `commitValue` into this chain's `L2InteropCommitmentTree`
    (an append-only **indexed** Merkle tree; leaves carry `{value, nextIndex, nextValue}` so both
    membership and non-membership are provable in O(log n)). The leg's local state becomes `Committed`.
 2. **Root settlement + import.** The bootloader reads the tree's root directly from storage at every
@@ -115,7 +126,7 @@ The timeout proof relies on three preconditions, each enforced on chain:
 | `L2InteropCommitmentTree`                                                                 | L2    | Per-chain append-only **Indexed** Merkle Tree (`{value, nextIndex, nextValue}` leaves). `insert` is appender-gated (the flow manager). Publishes nothing: the bootloader reads the root straight from its (consensus-critical) storage at batch boundaries. Built-in at `0x10012`.                                                              |
 | `AtomicFlowManager`                                                                       | L2    | `append` (from `InteropCenter`), `requireFlowFinalized` (from `InteropHandler`), `authorizeRefund` / `claimRefund` (timeout). Holds per-leg `LegState`. Built-in at `0x10014`.                                                                                                                                                                  |
 | `libraries/AtomicInteropProof`                                                            | L2    | `verifyInclusion` and `verifyTimeoutAbsence` (for inclusion and timeout proofs respectively), `commitValue`, and the private `_authenticateRoot` — authenticates a `chainImtRoot` as a chain-batch-root leaf (2 = begin / 3 = end, exact depth) against the imported interop root and derives the batch's `l1Timestamp` for the deadline check. |
-| `IL2InteropCommitmentTree`, `IAtomicFlowManager`, `IAtomicInterop`, `AtomicInteropErrors` | L2    | Interfaces, shared structs (`ImtProof`, `AtomicFlow`, `AtomicFinalityProof`, `LegState`), and errors.                                                                                                                                                                                                                                           |
+| `IL2InteropCommitmentTree`, `IAtomicFlowManager`, `IAtomicInterop`, `AtomicInteropErrors` | L2    | Interfaces, shared structs (`ImtProof`, `AtomicFlow`, `AtomicFlowPreimage`, `AtomicFinalityProof`, `LegState`), and errors.                                                                                                                                                                                                                     |
 
 The flow's entry points live outside this directory: `InteropCenter` (`interop/`, `0x1000d`) drives the
 send + `append`; `InteropHandler` (`interop/`, `0x1000e`) drives `executeAtomicBundle`; `L2AssetRouter`

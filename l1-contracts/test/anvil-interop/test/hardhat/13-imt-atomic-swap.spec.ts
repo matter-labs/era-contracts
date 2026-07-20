@@ -24,12 +24,15 @@
  *
  * Ids:
  *   - `bundleHash = keccak256(abi.encode(sourceChainId, abi.encode(InteropBundle)))`. The atomic send
- *     params (flowId, deadline, lowNullifierIndex) ride in the `atomicBundle` attribute and are not part
- *     of the InteropBundle, so `bundleHash` is independent of `flowId`. We predict each leg's bundleHash
- *     off-chain with a non-atomic `callStatic.sendBundle`, then cross-check it against the real send's
- *     `InteropBundleSent` event and fail loudly on mismatch.
- *   - `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`
- *     (bundle hashes ascending, source chain ids positionally aligned).
+ *     params (the full flowId preimage + lowNullifierIndex) ride in the `atomicBundle` attribute and are
+ *     not part of the InteropBundle, so `bundleHash` is independent of the preimage (whose leg hashes
+ *     include the bundle's own hash). We predict each leg's bundleHash off-chain with a non-atomic
+ *     `callStatic.sendBundle`, then cross-check it against the real send's `InteropBundleSent` event and
+ *     fail loudly on mismatch. On-chain, the AtomicFlowManager additionally requires the sent bundle's
+ *     hash to be one of the preimage's legs, so a stale prediction reverts the send.
+ *   - `flowId = keccak256(abi.encode(preimage))`
+ *     (bundle hashes ascending, source chain ids positionally aligned), recomputed on-chain from the
+ *     attribute-supplied preimage rather than accepted from the sender.
  *   - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
  *
  * The deadline is a settlement-layer timestamp, compared on-chain against each batch's settlement
@@ -88,6 +91,7 @@ import {
   indirectCallAttr,
   sendInteropBundle,
 } from "../../src/helpers/interop-helpers";
+import type { AtomicFlowPreimage } from "../../src/helpers/interop-helpers";
 import {
   DEFAULT_SL_CHAIN_ID,
   atomicFinalityProofTuple,
@@ -331,23 +335,39 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
   }
 
   /**
+   * Build the `atomicBundle` attribute's flowId preimage from the ascending leg hashes and their
+   * aligned source chain ids. The flowId itself is never sent: the AtomicFlowManager recomputes it
+   * on-chain from exactly these fields (see `computeFlowId` for the mirrored hash).
+   */
+  function flowPreimageOf(legHashesAsc: string[], chainIdsAsc: number[], deadline: number): AtomicFlowPreimage {
+    return {
+      deadline,
+      settlementLayerChainId: DEFAULT_SL_CHAIN_ID,
+      legBundleHashes: legHashesAsc,
+      legSourceChainIds: chainIdsAsc,
+    };
+  }
+
+  /**
    * Real atomic send of one leg: approve the source token, send the bundle with the `atomicBundle`
-   * attribute, and assert the emitted bundleHash matches the prediction used to build `flowId`.
+   * attribute (carrying the full flowId preimage), and assert the emitted bundleHash matches the
+   * prediction embedded in the preimage's leg hashes.
    */
   async function sendAtomicLeg(params: {
     source: ChainCtx;
     dest: ChainCtx;
     amount: BigNumber;
     recipient: string;
-    flowId: string;
-    deadline: number;
+    flowPreimage: AtomicFlowPreimage;
     predictedBundleHash: string;
     salt: string;
   }): Promise<{ bundleData: string; bundleHash: string }> {
-    const { source, dest, amount, recipient, flowId, deadline, predictedBundleHash, salt } = params;
+    const { source, dest, amount, recipient, flowPreimage, predictedBundleHash, salt } = params;
 
     await ensureNtvApproval(source, amount);
 
+    // Derived, not sent: mirrors the on-chain recomputation from the attribute-supplied preimage.
+    const flowId = computeFlowId(flowPreimage);
     const value = commitValue(flowId, predictedBundleHash);
     const lowNull = await lowNullifierIndexFor(source.stack.tree, value);
 
@@ -355,8 +375,9 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       sourceProvider: source.provider,
       destinationChainId: dest.chainId,
       callStarters: [bridgeCallStarter(source, amount, recipient)],
-      // Same salt used to predict `predictedBundleHash`, so the emitted bundleHash matches the flowId.
-      bundleAttributes: [atomicBundleAttr(flowId, deadline, lowNull), interopBundleSaltAttr(salt)],
+      // Same salt used to predict `predictedBundleHash`, so the emitted bundleHash matches the
+      // preimage's leg hash (the AtomicFlowManager rejects the send otherwise).
+      bundleAttributes: [atomicBundleAttr(flowPreimage, lowNull), interopBundleSaltAttr(salt)],
       value: fee,
       // Atomic sends append to the IMT (~1.1M gas insert) on top of the burn; the plain-send default
       // (INTEROP_SEND_BUNDLE_GAS_LIMIT) is too small.
@@ -392,7 +413,8 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
     const legHashesAsc = legs.map((l) => l.hash);
     const chainIdsAsc = legs.map((l) => l.chainId);
-    const flowId = computeFlowId(legHashesAsc, chainIdsAsc, deadline);
+    const flowPreimage = flowPreimageOf(legHashesAsc, chainIdsAsc, deadline);
+    const flowId = computeFlowId(flowPreimage);
 
     // ── PHASE 1: atomic send on each source (burn + IMT insert) ──────────────────────────────
     const aBalanceBefore: BigNumber = await chainA.testToken.balanceOf(user);
@@ -403,8 +425,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       dest: chainB,
       amount: aAmount,
       recipient: user,
-      flowId,
-      deadline,
+      flowPreimage,
       predictedBundleHash: hAB,
       salt: saltAB,
     });
@@ -413,8 +434,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       dest: chainA,
       amount: bAmount,
       recipient: user,
-      flowId,
-      deadline,
+      flowPreimage,
       predictedBundleHash: hBA,
       salt: saltBA,
     });
@@ -460,9 +480,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const proofsAsc = BigNumber.from(hAB).lt(BigNumber.from(hBA)) ? [abProof, baProof] : [baProof, abProof];
     const finality = atomicFinalityProofTuple({
       flowId,
-      deadline,
-      legBundleHashes: legHashesAsc,
-      chainIds: chainIdsAsc,
+      preimage: flowPreimage,
       proofs: proofsAsc,
     });
 
@@ -544,7 +562,8 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
     const legHashesAsc = legs.map((l) => l.hash);
     const chainIdsAsc = legs.map((l) => l.chainId);
-    const flowId = computeFlowId(legHashesAsc, chainIdsAsc, deadline);
+    const flowPreimage = flowPreimageOf(legHashesAsc, chainIdsAsc, deadline);
+    const flowId = computeFlowId(flowPreimage);
 
     // ── Commit only the AB leg on A. B never commits BA. ─────────────────────────────────────
     const aBalanceBefore: BigNumber = await chainA.testToken.balanceOf(user);
@@ -553,8 +572,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       dest: chainB,
       amount: aTimeoutAmount,
       recipient: refundRecipient,
-      flowId,
-      deadline,
+      flowPreimage,
       predictedBundleHash: hAB,
       salt: saltAB,
     });
@@ -585,7 +603,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const managerA = chainA.stack.manager.connect(chainA.user);
     const refundAuth = await (
       await managerA.authorizeRefund(
-        atomicFlowTuple({ flowId, deadline, legBundleHashes: legHashesAsc, chainIds: chainIdsAsc }),
+        atomicFlowTuple({ flowId, preimage: flowPreimage }),
         missingIdx,
         proofTuple(absence),
         { gasLimit: DEFAULT_TX_GAS_LIMIT }
@@ -626,10 +644,11 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
     const legHashesAsc = legs.map((l) => l.hash);
     const chainIdsAsc = legs.map((l) => l.chainId);
-    const flowId = computeFlowId(legHashesAsc, chainIdsAsc, deadline);
+    const flowPreimage = flowPreimageOf(legHashesAsc, chainIdsAsc, deadline);
+    const flowId = computeFlowId(flowPreimage);
     // The "missing" leg is the one sourced on chain B (proofs below are against B's IMT).
     const missingIdx = chainIdsAsc.indexOf(chainB.chainId);
-    return { flowId, legHashesAsc, chainIdsAsc, missingIdx };
+    return { flowId, flowPreimage, legHashesAsc, chainIdsAsc, missingIdx };
   }
 
   it("timeout path (halted chain): in-time LAST batch + end-root absence authorizes the refund", async () => {
@@ -658,7 +677,8 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
     const legHashesAsc = legs.map((l) => l.hash);
     const chainIdsAsc = legs.map((l) => l.chainId);
-    const flowId = computeFlowId(legHashesAsc, chainIdsAsc, deadline);
+    const flowPreimage = flowPreimageOf(legHashesAsc, chainIdsAsc, deadline);
+    const flowId = computeFlowId(flowPreimage);
 
     const aBalanceBefore: BigNumber = await chainA.testToken.balanceOf(user);
     const ab = await sendAtomicLeg({
@@ -666,8 +686,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       dest: chainB,
       amount: aTimeoutAmount,
       recipient: refundRecipient,
-      flowId,
-      deadline,
+      flowPreimage,
       predictedBundleHash: hAB,
       salt: saltAB,
     });
@@ -691,7 +710,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const managerA = chainA.stack.manager.connect(chainA.user);
     await (
       await managerA.authorizeRefund(
-        atomicFlowTuple({ flowId, deadline, legBundleHashes: legHashesAsc, chainIds: chainIdsAsc }),
+        atomicFlowTuple({ flowId, preimage: flowPreimage }),
         missingIdx,
         proofTuple(absence),
         { gasLimit: DEFAULT_TX_GAS_LIMIT }
@@ -707,11 +726,99 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     );
   });
 
+  it("send-time coupling: an atomic send whose preimage does not contain the bundle is rejected", async () => {
+    // Regression for the flowId footgun: before the attribute carried the full preimage, a sender could
+    // commit a bundle under an arbitrary flowId whose preimage did not contain the bundle's hash (e.g.
+    // built from a stale off-chain prediction), stranding the burned funds forever. Now the whole send
+    // reverts before any burn: the AtomicFlowManager recomputes flowId from the preimage and requires
+    // the sent bundle to be one of its legs, declared with the sending chain as its source.
+    const user = chainA.user.address;
+    const deadline = (await chainNow(chainA.provider)) + 3600;
+    const amount = ethers.utils.parseUnits("1", TEST_TOKEN_DECIMALS);
+    const salt = freshBundleSalt();
+    const realHash = await predictLegBundleHash(chainA, chainB, amount, user, salt);
+    const strayLeg = ethers.utils.id("stale predicted bundle hash");
+    const interopCenter = chainA.stack.interopCenter.connect(chainA.user);
+
+    const sendWithPreimage = (preimage: AtomicFlowPreimage) => () =>
+      interopCenter.callStatic.sendBundle(
+        encodeEvmChain(chainB.chainId),
+        [bridgeCallStarter(chainA, amount, user)],
+        [atomicBundleAttr(preimage, 0), interopBundleSaltAttr(salt)],
+        { gasLimit: ATOMIC_SEND_BUNDLE_GAS_LIMIT, value: fee }
+      );
+
+    // 1. Preimage whose legs do NOT include the bundle actually being sent.
+    await expectRevert(
+      sendWithPreimage(flowPreimageOf([strayLeg], [chainA.chainId], deadline)),
+      "atomic send with preimage missing the bundle",
+      customError("AtomicFlowManager", "ManagerCommittedBundleNotInFlow(bytes32,bytes32)")
+    );
+
+    // 2. Preimage that contains the bundle, but declares the wrong source chain for it.
+    const misdeclaredLegs = [
+      { hash: realHash, chainId: chainB.chainId }, // wrong: this leg is sent from chain A
+      { hash: strayLeg, chainId: chainA.chainId },
+    ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
+    await expectRevert(
+      sendWithPreimage(
+        flowPreimageOf(
+          misdeclaredLegs.map((l) => l.hash),
+          misdeclaredLegs.map((l) => l.chainId),
+          deadline
+        )
+      ),
+      "atomic send with wrong declared source chain",
+      customError("AtomicFlowManager", "ManagerCommittedLegSourceChainMismatch(bytes32,uint256,uint256)")
+    );
+
+    // 3. Preimage whose co-leg declares a source chain the Bridgehub does not know. Such a phantom
+    //    leg could never be proven committed OR absent (no MessageRoot presence), so without this
+    //    send-time gate the local burned leg would be stranded with neither finalization nor refund.
+    const unregisteredChainId = 999_999;
+    const phantomLegs = [
+      { hash: realHash, chainId: chainA.chainId },
+      { hash: strayLeg, chainId: unregisteredChainId },
+    ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
+    await expectRevert(
+      sendWithPreimage(
+        flowPreimageOf(
+          phantomLegs.map((l) => l.hash),
+          phantomLegs.map((l) => l.chainId),
+          deadline
+        )
+      ),
+      "atomic send with unregistered co-leg source chain",
+      customError("AtomicFlowManager", "ManagerLegSourceChainNotRegistered(uint256)")
+    );
+
+    // 4. The exact same bundle with a well-formed preimage still sends fine (control for 1/2/3: proves
+    //    the reverts above came from the coupling/registration checks, not from the send setup).
+    const controlLegs = [
+      { hash: realHash, chainId: chainA.chainId },
+      { hash: strayLeg, chainId: chainB.chainId },
+    ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
+    const controlPreimage = flowPreimageOf(
+      controlLegs.map((l) => l.hash),
+      controlLegs.map((l) => l.chainId),
+      deadline
+    );
+    const controlFlowId = computeFlowId(controlPreimage);
+    const lowNull = await lowNullifierIndexFor(chainA.stack.tree, commitValue(controlFlowId, realHash));
+    const controlHash = await interopCenter.callStatic.sendBundle(
+      encodeEvmChain(chainB.chainId),
+      [bridgeCallStarter(chainA, amount, user)],
+      [atomicBundleAttr(controlPreimage, lowNull), interopBundleSaltAttr(salt)],
+      { gasLimit: ATOMIC_SEND_BUNDLE_GAS_LIMIT, value: fee }
+    );
+    expect(controlHash.toLowerCase()).to.equal(realHash.toLowerCase(), "well-formed preimage sends the same bundle");
+  });
+
   it("timeout negatives: stale/missing settlement roots and non-last in-time batches are rejected", async () => {
     const deadline = 1_000;
-    const { flowId, legHashesAsc, chainIdsAsc, missingIdx } = fabricatedFlow(deadline);
+    const { flowId, flowPreimage, legHashesAsc, missingIdx } = fabricatedFlow(deadline);
     const missingValue = commitValue(flowId, legHashesAsc[missingIdx]);
-    const flow = atomicFlowTuple({ flowId, deadline, legBundleHashes: legHashesAsc, chainIds: chainIdsAsc });
+    const flow = atomicFlowTuple({ flowId, preimage: flowPreimage });
     const managerA = chainA.stack.manager.connect(chainA.user);
 
     // 1. Settlement interop root NOT created strictly after the deadline (added exactly AT
