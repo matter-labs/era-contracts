@@ -149,6 +149,11 @@ address constant L2_INTEROP_COMMITMENT_TREE_ADDR = address(BUILT_IN_CONTRACTS_OF
 /// custodies funds).
 address constant L2_ATOMIC_FLOW_MANAGER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x14);
 
+/// @dev The address of the stateless interop attribute parser. Its ERC-7786 attribute-parsing logic was split
+/// out of the InteropCenter to keep the latter under the EIP-170 runtime code-size limit; the InteropCenter
+/// calls it at this fixed address. Holds no state and has no initializer.
+address constant L2_INTEROP_ATTRIBUTE_PARSER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x15);
+
 ////////////////////////////////////////////////////////////
 // ZKsync OS genesis contracts
 ////////////////////////////////////////////////////////////

@@ -20,9 +20,13 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 
-import {SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_INTEROP_ATTRIBUTES, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {SETTLEMENT_LAYER_RELAY_SENDER, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_ATOMIC_FLOW_MANAGER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BOOTLOADER_ADDRESS,
+    L2_ATOMIC_FLOW_MANAGER_ADDR,
+    L2_INTEROP_ATTRIBUTE_PARSER_ADDR
+} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {
     BUNDLE_IDENTIFIER,
     BundleAttributes,
@@ -40,8 +44,6 @@ import {
     NonAtomicSendUnsupported,
     AtomicBundleToL1NotSupported,
     InteropPreviewHash,
-    AttributeAlreadySet,
-    AttributeViolatesRestriction,
     CannotInitiateInteropOnL1,
     DestinationChainNotRegistered,
     DirectCallToL1NotSupported,
@@ -58,8 +60,7 @@ import {
 } from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
-import {IERC7786Attributes} from "./IERC7786Attributes.sol";
-import {AttributesDecoder} from "./AttributesDecoder.sol";
+import {IInteropAttributeParser} from "./IInteropAttributeParser.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
 import {IAtomicFlowManager} from "../atomic-interop/IAtomicFlowManager.sol";
 import {ERC7930_V1_MIN_LENGTH} from "./InteropConstants.sol";
@@ -243,7 +244,7 @@ contract InteropCenter is
 
         // Every send is atomic now (public interop was removed). A single-call send is a valid
         // single-leg atomic flow: it must carry the `atomicBundle` attribute like any other send.
-        AtomicSend memory atomicSend = _parseAtomicSend(attributes);
+        AtomicSend memory atomicSend = _parser().parseAtomicSend(attributes);
 
         bytes32 bundleHash = _sendBundle({
             _destinationChainId: recipientChainId,
@@ -286,7 +287,7 @@ contract InteropCenter is
             bytes[][] memory originalCallAttributes
         ) = _parseBundleInputs(_callStarters, _bundleAttributes);
 
-        AtomicSend memory atomicSend = _parseAtomicSend(_bundleAttributes);
+        AtomicSend memory atomicSend = _parser().parseAtomicSend(_bundleAttributes);
 
         bundleHash = _sendBundle({
             _destinationChainId: destinationChainId,
@@ -794,7 +795,7 @@ contract InteropCenter is
             }(_destinationChainId, msg.sender, _callStarter.callAttributes.interopCallValue, _callStarter.data);
             // solhint-disable-next-line no-unused-vars
             // slither-disable-next-line unused-return
-            (CallAttributes memory indirectCallAttributes, ) = this.parseAttributes(
+            (CallAttributes memory indirectCallAttributes, ) = _parser().parseAttributes(
                 actualCallStarter.callAttributes,
                 AttributeParsingRestrictions.OnlyInteropCallValue
             );
@@ -851,142 +852,24 @@ contract InteropCenter is
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IInteropCenter
+    /// @dev Thin forwarder to the stateless {InteropAttributeParser} built-in. The parsing logic was moved out
+    /// of this contract to keep it under the EIP-170 runtime code-size limit; kept here for ABI compatibility.
     function parseAttributes(
         bytes[] calldata _attributes,
         AttributeParsingRestrictions _restriction
     ) public pure returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) {
-        // `callAttributes.indirectCall` defaults to `false` (direct call) via the zero-value of the
-        // returned memory struct.
-        bytes4[SUPPORTED_INTEROP_ATTRIBUTES] memory attributeSelectors = _getERC7786AttributeSelectors();
-        // Per-attribute bitmask of the `AttributeParsingRestrictions` enum values under which the attribute is
-        // permitted: bit `b` set => the attribute is allowed when `_restriction == AttributeParsingRestrictions(b)`.
-        uint8[SUPPORTED_INTEROP_ATTRIBUTES] memory allowedRestrictions = _getAttributeRestrictionMasks();
-        // We can only pass each attribute once.
-        bool[SUPPORTED_INTEROP_ATTRIBUTES] memory attributeUsed;
-
-        uint256 attributesLength = _attributes.length;
-        for (uint256 i = 0; i < attributesLength; ++i) {
-            bytes4 selector = bytes4(_attributes[i]);
-            // Reverts `UnsupportedAttribute` if the selector is not one we recognize.
-            uint256 idx = _attributeIndex(selector, attributeSelectors);
-
-            require(!attributeUsed[idx], AttributeAlreadySet(selector));
-            require(
-                (allowedRestrictions[idx] >> uint8(_restriction)) & 1 == 1,
-                AttributeViolatesRestriction(selector, uint256(_restriction))
-            );
-            attributeUsed[idx] = true;
-
-            // Decode the attribute payload into the relevant field. Ordering matches
-            // `_getERC7786AttributeSelectors()`.
-            if (idx == 0) {
-                callAttributes.interopCallValue = AttributesDecoder.decodeUint256(_attributes[i]);
-            } else if (idx == 1) {
-                callAttributes.indirectCall = true;
-                callAttributes.indirectCallMessageValue = AttributesDecoder.decodeUint256(_attributes[i]);
-            } else if (idx == 2) {
-                bundleAttributes.executionAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
-                _validateOptionalInteroperableAddress(bundleAttributes.executionAddress);
-            } else if (idx == 3) {
-                bundleAttributes.unbundlerAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
-                _validateOptionalInteroperableAddress(bundleAttributes.unbundlerAddress);
-            } else if (idx == 4) {
-                bundleAttributes.useFixedFee = AttributesDecoder.decodeBool(_attributes[i]);
-            } else if (idx == 5) {
-                // The atomic send metadata (flowId/deadline/lowNullifierIndex) is parsed separately via
-                // `_parseAtomicSend` and NOT stored in `BundleAttributes` — it must stay out of the
-                // cross-chain bundle so `bundleHash` does not depend on `flowId` (a circular dependency).
-                // Here we only validate it is a permitted, non-duplicate bundle attribute (done above).
-                continue;
-            } else {
-                // idx == 6
-                bundleAttributes.salt = AttributesDecoder.decodeBytes32(_attributes[i]);
-            }
-        }
+        return _parser().parseAttributes(_attributes, _restriction);
     }
 
-    /// @notice Returns the index of `_selector` within the supported-attribute list, reverting
-    /// `UnsupportedAttribute` if it is not supported.
-    function _attributeIndex(
-        bytes4 _selector,
-        bytes4[SUPPORTED_INTEROP_ATTRIBUTES] memory _selectors
-    ) internal pure returns (uint256) {
-        for (uint256 i = 0; i < SUPPORTED_INTEROP_ATTRIBUTES; ++i) {
-            if (_selector == _selectors[i]) {
-                return i;
-            }
-        }
-        revert IERC7786GatewaySource.UnsupportedAttribute(_selector);
-    }
-
-    /// @notice Per-attribute bitmask over the `AttributeParsingRestrictions` enum, indexed identically to
-    /// `_getERC7786AttributeSelectors()`. Bit `b` set means the attribute is permitted when the active
-    /// restriction equals enum value `b` (0=OnlyInteropCallValue, 1=OnlyCallAttributes, 2=OnlyBundleAttributes,
-    /// 3=CallAndBundleAttributes).
-    function _getAttributeRestrictionMasks() internal pure returns (uint8[SUPPORTED_INTEROP_ATTRIBUTES] memory) {
-        return
-            [
-                uint8(11), // interopCallValue: OnlyInteropCallValue | OnlyCallAttributes | CallAndBundleAttributes
-                10, // indirectCall:       OnlyCallAttributes | CallAndBundleAttributes
-                12, // executionAddress:   OnlyBundleAttributes | CallAndBundleAttributes
-                12, // unbundlerAddress:   OnlyBundleAttributes | CallAndBundleAttributes
-                12, // useFixedFee:        OnlyBundleAttributes | CallAndBundleAttributes
-                12, // atomicBundle:       OnlyBundleAttributes | CallAndBundleAttributes
-                12 // interopBundleSalt:  OnlyBundleAttributes | CallAndBundleAttributes
-            ];
-    }
-
-    /// @notice Extracts the `atomicBundle` send metadata from the bundle attributes (already validated
-    /// by `parseAttributes`). Returns `isAtomic = false` when the attribute is absent. Kept separate
-    /// from `parseAttributes`/`BundleAttributes` so the metadata never enters the cross-chain bundle
-    /// (which would make `bundleHash` depend on `flowId` — a circular dependency).
-    function _parseAtomicSend(bytes[] calldata _attributes) internal pure returns (AtomicSend memory atomicSend) {
-        uint256 attributesLength = _attributes.length;
-        for (uint256 i = 0; i < attributesLength; ++i) {
-            if (bytes4(_attributes[i]) == IERC7786Attributes.atomicBundle.selector) {
-                (atomicSend.flowId, atomicSend.deadline, atomicSend.lowNullifierIndex) = AttributesDecoder
-                    .decodeAtomicBundle(_attributes[i]);
-                atomicSend.isAtomic = true;
-            }
-        }
-    }
-
-    function _validateOptionalInteroperableAddress(bytes memory _interoperableAddress) internal pure {
-        if (_interoperableAddress.length == 0) {
-            return;
-        }
-
-        // slither-disable-next-line unused-return
-        InteroperableAddress.parseEvmV1(_interoperableAddress);
-    }
-
-    /// @notice Checks if the attribute selector is supported by the InteropCenter.
-    /// @param _attributeSelector The attribute selector to check.
-    /// @return True if the attribute selector is supported, false otherwise.
+    /// @inheritdoc IERC7786GatewaySource
+    /// @dev Thin forwarder to the stateless {InteropAttributeParser} built-in (see {parseAttributes}).
     function supportsAttribute(bytes4 _attributeSelector) external pure override returns (bool) {
-        bytes4[SUPPORTED_INTEROP_ATTRIBUTES] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
-        uint256 attributeSelectorsLength = ATTRIBUTE_SELECTORS.length;
-        for (uint256 i = 0; i < attributeSelectorsLength; ++i) {
-            if (_attributeSelector == ATTRIBUTE_SELECTORS[i]) {
-                return true;
-            }
-        }
-        return false;
+        return _parser().supportsAttribute(_attributeSelector);
     }
 
-    /// @notice Returns the attribute selectors supported by the InteropCenter.
-    /// @return The attribute selectors supported by the InteropCenter.
-    function _getERC7786AttributeSelectors() internal pure returns (bytes4[SUPPORTED_INTEROP_ATTRIBUTES] memory) {
-        return
-            [
-                IERC7786Attributes.interopCallValue.selector,
-                IERC7786Attributes.indirectCall.selector,
-                IERC7786Attributes.executionAddress.selector,
-                IERC7786Attributes.unbundlerAddress.selector,
-                IERC7786Attributes.useFixedFee.selector,
-                IERC7786Attributes.atomicBundle.selector,
-                IERC7786Attributes.interopBundleSalt.selector
-            ];
+    /// @notice The stateless attribute parser deployed at its fixed built-in address.
+    function _parser() private pure returns (IInteropAttributeParser) {
+        return IInteropAttributeParser(L2_INTEROP_ATTRIBUTE_PARSER_ADDR);
     }
 
     /*//////////////////////////////////////////////////////////////

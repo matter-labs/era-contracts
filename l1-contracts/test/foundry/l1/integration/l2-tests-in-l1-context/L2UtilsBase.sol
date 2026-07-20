@@ -20,6 +20,7 @@ import {
     L2_CHAIN_ASSET_HANDLER_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
     L2_INTEROP_HANDLER_ADDR,
     L2_INTEROP_ROOT_STORAGE,
     L2_MESSAGE_ROOT_ADDR,
@@ -40,6 +41,7 @@ import {ETH_TOKEN_ADDRESS, INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/co
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {L2MessageVerification} from "../../../../../contracts/interop/L2MessageVerification.sol";
+import {InteropAttributeParser} from "../../../../../contracts/interop/InteropAttributeParser.sol";
 import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 
 import {InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
@@ -116,6 +118,8 @@ library L2UtilsBase {
         {
             address l2messageVerification = address(new L2MessageVerification());
             vm.etch(address(L2_MESSAGE_VERIFICATION), l2messageVerification.code);
+            address l2InteropAttributeParser = address(new InteropAttributeParser());
+            vm.etch(L2_INTEROP_ATTRIBUTE_PARSER_ADDR, l2InteropAttributeParser.code);
             address l2MessageRootStorage = address(new DummyL2InteropRootStorage());
             vm.etch(address(L2_INTEROP_ROOT_STORAGE), l2MessageRootStorage.code);
             // The Dev variant re-enables chain migrations, which are explicitly disabled in the
