@@ -122,7 +122,10 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         AtomicFinalityProof memory innerProof;
 
         // Payload for receiveMessage that dispatches to executeBundle(innerBundle)
-        bytes memory innerPayload = abi.encodeCall(L2InteropHandler.executeAtomicBundle, (encodedInnerBundle, innerProof));
+        bytes memory innerPayload = abi.encodeCall(
+            L2InteropHandler.executeAtomicBundle,
+            (encodedInnerBundle, innerProof)
+        );
 
         // Outer bundle: its call targets L2InteropHandler.receiveMessage with the above payload.
         // Call chain: executeAtomicBundle(outer) -> _executeCalls -> receiveMessage -> this.executeAtomicBundle(inner)
