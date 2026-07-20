@@ -16,6 +16,7 @@ export interface CoreDeployedAddresses {
   l1SharedBridge: string;
   l1NullifierProxy: string;
   l1NativeTokenVault: string;
+  l1ERC20Bridge: string;
   governance: string;
   transparentProxyAdmin: string;
   blobVersionedHashRetriever: string;

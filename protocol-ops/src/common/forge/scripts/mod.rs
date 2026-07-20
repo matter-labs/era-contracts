@@ -8,6 +8,7 @@ use crate::common::abi::{
     AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi, ICoreUpgradeV31Abi,
     IDeployCTMAbi, IDeployL1CoreContractsAbi, IDeployPaymasterAbi, IEnableEvmEmulatorAbi,
     IFinalizeChainInitAbi, IGatewayVotePreparationAbi, IRegisterOnAllChainsAbi,
+    ISetupLegacyBridgeAbi,
 };
 
 pub mod deploy_ctm;
@@ -174,6 +175,14 @@ pub static DEPLOY_PAYMASTER_INVOCATION: ForgeScriptParams = ForgeScriptParams::n
 .with_ffi()
 .with_rpc_url();
 
+pub static SETUP_LEGACY_BRIDGE_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
+    "script-config/setup-legacy-bridge.toml",
+    "script-out/setup-legacy-bridge.toml",
+    "deploy-scripts/dev/SetupLegacyBridge.s.sol",
+)
+.with_ffi()
+.with_rpc_url();
+
 pub static ENABLE_EVM_EMULATOR_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
     "script-config/enable-evm-emulator.toml",
     "script-out/output-enable-evm-emulator.toml",
@@ -245,6 +254,7 @@ script_calls! {
     IEnableEvmEmulatorAbi::chainAllowEvmEmulationCall                   => ENABLE_EVM_EMULATOR_INVOCATION,
     IDeployPaymasterAbi::runCall                                        => DEPLOY_PAYMASTER_INVOCATION,
     IRegisterOnAllChainsAbi::registerOnOtherChainsCall                  => REGISTER_ON_ALL_CHAINS_INVOCATION,
+    ISetupLegacyBridgeAbi::runCall                                      => SETUP_LEGACY_BRIDGE_INVOCATION,
     IDeployL1CoreContractsAbi::runInnerCall                             => DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION,
     // DeployCTM
     IDeployCTMAbi::runInnerCall                                         => DEPLOY_CTM_INVOCATION,

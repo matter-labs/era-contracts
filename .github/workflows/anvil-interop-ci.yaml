@@ -92,11 +92,7 @@ jobs:
 
   # V29 → V31 upgrade test: loads v29 chain states, runs the v31 ecosystem upgrade,
   # executes governance calls, and verifies protocol version is updated.
-  # TEMPORARILY DISABLED: the legacy-bridge removal makes the upgrade-from-legacy
-  # path (v29/v30 chains that still have legacy bridges) non-applicable. Re-enable
-  # once the InteropCenter withdrawal migration lands.
   v29-to-v31-upgrade-test:
-    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -150,9 +146,7 @@ jobs:
 
   # V30 → V31 upgrade test: loads v30 ZKsync OS chain states, runs the v31 ecosystem upgrade,
   # executes governance calls, and verifies protocol version is updated.
-  # TEMPORARILY DISABLED: see the note on v29-to-v31-upgrade-test above.
   v30-to-v31-upgrade-test:
-    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 30
 

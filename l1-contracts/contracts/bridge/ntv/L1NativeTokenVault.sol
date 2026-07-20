@@ -15,6 +15,7 @@ import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
+import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {IWETH9} from "../interfaces/IWETH9.sol";
 
@@ -25,13 +26,12 @@ import {TxStatus} from "../../common/Messaging.sol";
 
 import {
     AssetIdAlreadyRegistered,
-    BaseTokenTransferFailed,
     NoFundsTransferred,
     OriginChainIdNotFound,
     WithdrawFailed,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
-import {OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
+import {ClaimFailedDepositFailed, OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
 import {InsufficientChainBalance} from "../asset-tracker/AssetTrackerErrors.sol";
 
 /// @author Matter Labs
@@ -53,7 +53,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev The chain ID of L1.
     uint256 public immutable L1_CHAIN_ID;
 
-    /// @dev L1 nullifier contract that handles finalize withdrawal and confirm l2 tx mappings
+    /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
     IL1Nullifier public immutable L1_NULLIFIER;
 
     /// @dev Maps token balances for each chain. Deprecated: per-chain balance accounting was removed;
@@ -140,6 +140,19 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     }
 
     /*//////////////////////////////////////////////////////////////
+                            V31 migration
+    //////////////////////////////////////////////////////////////*/
+
+    function migrateTokenBalanceToAssetTracker(
+        uint256 _chainId,
+        bytes32 _assetId
+    ) external onlyAssetTracker returns (uint256) {
+        uint256 amount = DEPRECATED_chainBalance[_chainId][_assetId];
+        DEPRECATED_chainBalance[_chainId][_assetId] = 0;
+        return amount;
+    }
+
+    /*//////////////////////////////////////////////////////////////
                             Check counterpart Functions
     //////////////////////////////////////////////////////////////*/
 
@@ -176,6 +189,32 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
                             Start transaction Functions
     //////////////////////////////////////////////////////////////*/
 
+    function _bridgeBurnNativeToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _originalCaller,
+        // solhint-disable-next-line no-unused-vars
+        bool _depositChecked,
+        uint256 _depositAmount,
+        address _receiver,
+        address _nativeToken
+    ) internal override returns (bytes memory _bridgeMintData) {
+        bool depositChecked = IL1AssetRouter(address(ASSET_ROUTER)).transferFundsToNTV(
+            _assetId,
+            _depositAmount,
+            _originalCaller
+        );
+        _bridgeMintData = super._bridgeBurnNativeToken({
+            _chainId: _chainId,
+            _assetId: _assetId,
+            _originalCaller: _originalCaller,
+            _depositChecked: depositChecked,
+            _depositAmount: _depositAmount,
+            _receiver: _receiver,
+            _nativeToken: _nativeToken
+        });
+    }
+
     /*//////////////////////////////////////////////////////////////
                             L1 SPECIFIC FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -204,7 +243,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             assembly {
                 callSuccess := call(gas(), _depositSender, _amount, 0, 0, 0, 0)
             }
-            require(callSuccess, BaseTokenTransferFailed());
+            require(callSuccess, ClaimFailedDepositFailed());
         } else {
             uint256 originChainId = _getOriginChainId(_assetId);
             if (originChainId == block.chainid) {
@@ -222,6 +261,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /*//////////////////////////////////////////////////////////////
                             INTERNAL & HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    function _registerTokenIfBridgedLegacy(address) internal pure override returns (bytes32) {
+        // There are no legacy tokens present on L1.
+        return bytes32(0);
+    }
 
     /// @notice Used to get the expected bridged token address corresponding to its native counterpart.
     /// @param _originChainId The chain id of the origin token.
