@@ -855,94 +855,85 @@ contract InteropCenter is
         bytes[] calldata _attributes,
         AttributeParsingRestrictions _restriction
     ) public pure returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) {
-        // Default value is direct call.
-        callAttributes.indirectCall = false;
-
-        bytes4[SUPPORTED_INTEROP_ATTRIBUTES] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
+        // `callAttributes.indirectCall` defaults to `false` (direct call) via the zero-value of the
+        // returned memory struct.
+        bytes4[SUPPORTED_INTEROP_ATTRIBUTES] memory attributeSelectors = _getERC7786AttributeSelectors();
+        // Per-attribute bitmask of the `AttributeParsingRestrictions` enum values under which the attribute is
+        // permitted: bit `b` set => the attribute is allowed when `_restriction == AttributeParsingRestrictions(b)`.
+        uint8[SUPPORTED_INTEROP_ATTRIBUTES] memory allowedRestrictions = _getAttributeRestrictionMasks();
         // We can only pass each attribute once.
-        bool[] memory attributeUsed = new bool[](ATTRIBUTE_SELECTORS.length);
+        bool[SUPPORTED_INTEROP_ATTRIBUTES] memory attributeUsed;
 
         uint256 attributesLength = _attributes.length;
         for (uint256 i = 0; i < attributesLength; ++i) {
             bytes4 selector = bytes4(_attributes[i]);
+            // Reverts `UnsupportedAttribute` if the selector is not one we recognize.
+            uint256 idx = _attributeIndex(selector, attributeSelectors);
 
-            if (selector == IERC7786Attributes.interopCallValue.selector) {
-                require(!attributeUsed[0], AttributeAlreadySet(selector));
-                require(
-                    _restriction == AttributeParsingRestrictions.OnlyInteropCallValue ||
-                        _restriction == AttributeParsingRestrictions.OnlyCallAttributes ||
-                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                attributeUsed[0] = true;
+            require(!attributeUsed[idx], AttributeAlreadySet(selector));
+            require(
+                (allowedRestrictions[idx] >> uint8(_restriction)) & 1 == 1,
+                AttributeViolatesRestriction(selector, uint256(_restriction))
+            );
+            attributeUsed[idx] = true;
+
+            // Decode the attribute payload into the relevant field. Ordering matches
+            // `_getERC7786AttributeSelectors()`.
+            if (idx == 0) {
                 callAttributes.interopCallValue = AttributesDecoder.decodeUint256(_attributes[i]);
-            } else if (selector == IERC7786Attributes.indirectCall.selector) {
-                require(!attributeUsed[1], AttributeAlreadySet(selector));
-                require(
-                    _restriction == AttributeParsingRestrictions.OnlyCallAttributes ||
-                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                attributeUsed[1] = true;
+            } else if (idx == 1) {
                 callAttributes.indirectCall = true;
                 callAttributes.indirectCallMessageValue = AttributesDecoder.decodeUint256(_attributes[i]);
-            } else if (selector == IERC7786Attributes.executionAddress.selector) {
-                require(!attributeUsed[2], AttributeAlreadySet(selector));
-                require(
-                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
-                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                attributeUsed[2] = true;
+            } else if (idx == 2) {
                 bundleAttributes.executionAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
                 _validateOptionalInteroperableAddress(bundleAttributes.executionAddress);
-            } else if (selector == IERC7786Attributes.unbundlerAddress.selector) {
-                require(!attributeUsed[3], AttributeAlreadySet(selector));
-                require(
-                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
-                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                attributeUsed[3] = true;
+            } else if (idx == 3) {
                 bundleAttributes.unbundlerAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
                 _validateOptionalInteroperableAddress(bundleAttributes.unbundlerAddress);
-            } else if (selector == IERC7786Attributes.useFixedFee.selector) {
-                require(!attributeUsed[4], AttributeAlreadySet(selector));
-                require(
-                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
-                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                attributeUsed[4] = true;
-
-                // Decode the boolean parameter using AttributesDecoder
-                bool useFixed = AttributesDecoder.decodeBool(_attributes[i]);
-                bundleAttributes.useFixedFee = useFixed;
-            } else if (selector == IERC7786Attributes.atomicBundle.selector) {
-                require(!attributeUsed[5], AttributeAlreadySet(selector));
-                require(
-                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
-                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                attributeUsed[5] = true;
+            } else if (idx == 4) {
+                bundleAttributes.useFixedFee = AttributesDecoder.decodeBool(_attributes[i]);
+            } else if (idx == 5) {
                 // The atomic send metadata (flowId/deadline/lowNullifierIndex) is parsed separately via
                 // `_parseAtomicSend` and NOT stored in `BundleAttributes` — it must stay out of the
                 // cross-chain bundle so `bundleHash` does not depend on `flowId` (a circular dependency).
-                // Here we only validate it is a permitted, non-duplicate bundle attribute.
-            } else if (selector == IERC7786Attributes.interopBundleSalt.selector) {
-                require(!attributeUsed[6], AttributeAlreadySet(selector));
-                require(
-                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
-                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                attributeUsed[6] = true;
-                bundleAttributes.salt = AttributesDecoder.decodeBytes32(_attributes[i]);
+                // Here we only validate it is a permitted, non-duplicate bundle attribute (done above).
+                continue;
             } else {
-                revert IERC7786GatewaySource.UnsupportedAttribute(selector);
+                // idx == 6
+                bundleAttributes.salt = AttributesDecoder.decodeBytes32(_attributes[i]);
             }
         }
+    }
+
+    /// @notice Returns the index of `_selector` within the supported-attribute list, reverting
+    /// `UnsupportedAttribute` if it is not supported.
+    function _attributeIndex(
+        bytes4 _selector,
+        bytes4[SUPPORTED_INTEROP_ATTRIBUTES] memory _selectors
+    ) internal pure returns (uint256) {
+        for (uint256 i = 0; i < SUPPORTED_INTEROP_ATTRIBUTES; ++i) {
+            if (_selector == _selectors[i]) {
+                return i;
+            }
+        }
+        revert IERC7786GatewaySource.UnsupportedAttribute(_selector);
+    }
+
+    /// @notice Per-attribute bitmask over the `AttributeParsingRestrictions` enum, indexed identically to
+    /// `_getERC7786AttributeSelectors()`. Bit `b` set means the attribute is permitted when the active
+    /// restriction equals enum value `b` (0=OnlyInteropCallValue, 1=OnlyCallAttributes, 2=OnlyBundleAttributes,
+    /// 3=CallAndBundleAttributes).
+    function _getAttributeRestrictionMasks() internal pure returns (uint8[SUPPORTED_INTEROP_ATTRIBUTES] memory) {
+        return
+            [
+                uint8(11), // interopCallValue: OnlyInteropCallValue | OnlyCallAttributes | CallAndBundleAttributes
+                10, // indirectCall:       OnlyCallAttributes | CallAndBundleAttributes
+                12, // executionAddress:   OnlyBundleAttributes | CallAndBundleAttributes
+                12, // unbundlerAddress:   OnlyBundleAttributes | CallAndBundleAttributes
+                12, // useFixedFee:        OnlyBundleAttributes | CallAndBundleAttributes
+                12, // atomicBundle:       OnlyBundleAttributes | CallAndBundleAttributes
+                12 // interopBundleSalt:  OnlyBundleAttributes | CallAndBundleAttributes
+            ];
     }
 
     /// @notice Extracts the `atomicBundle` send metadata from the bundle attributes (already validated
