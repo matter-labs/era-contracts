@@ -15,6 +15,7 @@ import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitm
 import {AtomicFlow, AtomicFlowPreimage, ImtProof, LegState} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {ManagerCommittedBundleNotInFlow} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {AtomicBundleExecutionAddressWrongChain} from "contracts/interop/InteropErrors.sol";
+import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropBundle, InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
@@ -342,6 +343,62 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         vm.expectRevert(
             abi.encodeWithSelector(AtomicBundleExecutionAddressWrongChain.selector, destinationChainId, block.chainid)
         );
+        l2InteropCenter.sendBundle(
+            InteroperableAddress.formatEvmV1(destinationChainId),
+            calls,
+            _atomicAttributesWithExecutionAddress(preimage, salt, executionAddress)
+        );
+
+        assertEq(
+            IERC20(l2Token).balanceOf(address(this)),
+            balanceBefore,
+            "the burn must be unwound with the reverted send"
+        );
+    }
+
+    /// @notice A chain-only ERC-7930 `executionAddress` (empty address field, parses to `address(0)`)
+    /// is rejected even when its chain id is the destination: no `msg.sender` can ever equal
+    /// `address(0)`, so the destination gate would admit no one and the bundle could never execute.
+    function test_atomicSend_RevertWhen_ExecutionAddressIsChainOnly() public {
+        _setUpAtomicStack();
+        address l2Token = initializeTokenByDeposit();
+        bytes32 salt = keccak256("atomic chain-only execution address salt");
+        InteropCallStarter[] memory calls = _tokenCallStarter(l2Token, TRANSFER_AMOUNT);
+        // Destination chain id, but no address bytes — the addressless ERC-7930 variant.
+        bytes memory executionAddress = InteroperableAddress.formatEvmV1(destinationChainId);
+
+        bytes32 predicted = _predictBundleHashWithExecutionAddress(calls, salt, executionAddress);
+        (AtomicFlowPreimage memory preimage, ) = _preimageWithInvalidRemoteLeg(predicted);
+        uint256 balanceBefore = IERC20(l2Token).balanceOf(address(this));
+
+        vm.expectRevert(ZeroAddress.selector);
+        l2InteropCenter.sendBundle(
+            InteroperableAddress.formatEvmV1(destinationChainId),
+            calls,
+            _atomicAttributesWithExecutionAddress(preimage, salt, executionAddress)
+        );
+
+        assertEq(
+            IERC20(l2Token).balanceOf(address(this)),
+            balanceBefore,
+            "the burn must be unwound with the reverted send"
+        );
+    }
+
+    /// @notice An explicit 20-byte zero executor is rejected for the same reason as the chain-only
+    /// form: it parses to `address(0)`, which no destination caller can ever match.
+    function test_atomicSend_RevertWhen_ExecutionAddressIsExplicitZero() public {
+        _setUpAtomicStack();
+        address l2Token = initializeTokenByDeposit();
+        bytes32 salt = keccak256("atomic explicit-zero execution address salt");
+        InteropCallStarter[] memory calls = _tokenCallStarter(l2Token, TRANSFER_AMOUNT);
+        bytes memory executionAddress = InteroperableAddress.formatEvmV1(destinationChainId, address(0));
+
+        bytes32 predicted = _predictBundleHashWithExecutionAddress(calls, salt, executionAddress);
+        (AtomicFlowPreimage memory preimage, ) = _preimageWithInvalidRemoteLeg(predicted);
+        uint256 balanceBefore = IERC20(l2Token).balanceOf(address(this));
+
+        vm.expectRevert(ZeroAddress.selector);
         l2InteropCenter.sendBundle(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,

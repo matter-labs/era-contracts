@@ -6,7 +6,13 @@ import {Test} from "forge-std/Test.sol";
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
-import {AtomicFlowPreimage, LegState, ATOMIC_COMMIT_LEAF_TAG} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {
+    AtomicFlow,
+    AtomicFlowPreimage,
+    ImtProof,
+    LegState,
+    ATOMIC_COMMIT_LEAF_TAG
+} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
     ManagerBundleHashesNotSorted,
     ManagerCommittedBundleNotInFlow,
@@ -16,7 +22,8 @@ import {
     ManagerLegSourceChainNotRegistered,
     ManagerNotInteropCenter,
     ManagerSettlementLayerNotL1,
-    ManagerTooManyLegs
+    ManagerTooManyLegs,
+    ProofSourceChainMismatch
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {MAX_ATOMIC_FLOW_LEGS} from "contracts/interop/InteropConstants.sol";
 import {
@@ -293,6 +300,23 @@ contract AtomicFlowManagerAppendTest is Test {
             uint256(LegState.Committed),
             "a max-size flow's leg must commit"
         );
+    }
+
+    /// @notice The leg cap is send-time admission policy ONLY: the recovery paths must keep accepting
+    /// any flow that was ever committed, so a future upgrade lowering {MAX_ATOMIC_FLOW_LEGS} cannot
+    /// strand in-flight flows admitted under the old cap. An oversized preimage passes the shared
+    /// flowId validation in `authorizeRefund` and reaches the absence-proof checks — asserted here by
+    /// expecting the proof's source-chain error rather than `ManagerTooManyLegs`.
+    function test_authorizeRefund_AcceptsOversizedPreimage() public {
+        AtomicFlowPreimage memory preimage = _manyLocalLegsPreimage(MAX_ATOMIC_FLOW_LEGS + 1);
+        AtomicFlow memory flow = AtomicFlow({flowId: _flowId(preimage), preimage: preimage});
+        // A deliberately wrong-chain absence proof: the expected revert proves the oversized preimage
+        // got PAST the flowId validation and into the proof checks.
+        ImtProof memory absence;
+        absence.sourceChainId = block.chainid + 1;
+
+        vm.expectRevert(abi.encodeWithSelector(ProofSourceChainMismatch.selector, block.chainid, block.chainid + 1));
+        manager.authorizeRefund(flow, 0, absence);
     }
 
     /// @notice A `(flowId, bundleHash)` leg can only be committed once.

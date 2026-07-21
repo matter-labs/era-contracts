@@ -702,23 +702,25 @@ contract InteropCenter is
     /// and timeout recovery is best-effort (see {AtomicFlowManager._recoverBundle}). Refund safety for a
     /// fund-moving leg is therefore the flow author's responsibility; only native-`value` legs — which no
     /// one can reverse — are blocked here.
-    /// @notice Also rejects an `executionAddress` pinned to a chain other than the destination. An atomic
-    /// bundle's only execution entry point is the destination handler's `executeAtomicBundle`, which — unlike
-    /// normal-bundle execution — has no `receiveMessage` relay path, so its permission gate only ever admits
-    /// the pinned address on the destination chain itself (or chain-agnostically via chain id 0). Any other
-    /// chain id names an executor that can never reach the bundle: it would be permanently unexecutable and,
-    /// once every leg of the flow commits, the absence-based timeout refund would be impossible too.
+    /// @notice Also rejects an `executionAddress` naming an executor that could never execute the bundle.
+    /// An atomic bundle's only execution entry point is the destination handler's `executeAtomicBundle`,
+    /// which — unlike normal-bundle execution — has no `receiveMessage` relay path, so its permission gate
+    /// only ever admits the pinned address on the destination chain itself (or chain-agnostically via
+    /// chain id 0). An executor no caller can ever match makes the bundle permanently unexecutable and,
+    /// once every leg of the flow commits, the absence-based timeout refund is impossible too. Two shapes
+    /// are rejected: a chain id that is neither the destination nor 0, and a chain-only ERC-7930 encoding
+    /// (empty address field, parses to `address(0)`) — no `msg.sender` can ever equal `address(0)`.
     /// @dev `pure`, since it inspects only the bundle's own fields. Every atomic send passes through
     /// {_dispatchBundle}, so this covers all atomic bundles regardless of entry path.
     function _validateAtomicBundle(InteropBundle memory _bundle) internal pure {
         bytes memory executionAddress = _bundle.bundleAttributes.executionAddress;
         // An empty execution address means permissionless execution and is always reachable.
         if (executionAddress.length != 0) {
-            // slither-disable-next-line unused-return
-            (uint256 executionChainId, ) = InteroperableAddress.parseEvmV1(executionAddress);
+            (uint256 executionChainId, address executorAddress) = InteroperableAddress.parseEvmV1(executionAddress);
             if (executionChainId != _bundle.destinationChainId && executionChainId != 0) {
                 revert AtomicBundleExecutionAddressWrongChain(_bundle.destinationChainId, executionChainId);
             }
+            require(executorAddress != address(0), ZeroAddress());
         }
 
         uint256 callsLength = _bundle.calls.length;

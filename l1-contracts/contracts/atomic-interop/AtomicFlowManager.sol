@@ -108,11 +108,23 @@ contract AtomicFlowManager is IAtomicFlowManager {
         // enforce SL == L1), so reject it before committing anything.
         _checkSettlementLayerIsL1(_flowPreimage.settlementLayerChainId);
 
+        // Admission policy: cap the leg count at send time. Finalization verifies one IMT inclusion
+        // proof (plus its multi-hop settlement proof) per leg in a single transaction, so an
+        // unbounded flow could commit on every source yet exceed the transaction gas / calldata
+        // limits on every finalization attempt — unexecutable and, with all legs committed,
+        // unrefundable. Deliberately enforced ONLY here and not in `_validateAndComputeFlowId`
+        // (shared with the finalize/refund paths): recovery must keep accepting every flow that was
+        // ever committed, so a future upgrade lowering {MAX_ATOMIC_FLOW_LEGS} cannot strand
+        // in-flight flows admitted under the old cap.
+        uint256 n = _flowPreimage.legBundleHashes.length;
+        if (n > MAX_ATOMIC_FLOW_LEGS) {
+            revert ManagerTooManyLegs(MAX_ATOMIC_FLOW_LEGS, n);
+        }
+
         // The committing bundle must be one of the flow's legs, declared with this chain as its
         // source. This is the coupling guarantee the preimage exists for: a bundle can never be
         // committed under a `flowId` that does not contain it (see {AtomicFlowPreimage}).
         // `legBundleHashes` is strictly ascending (checked above), so `_bundleHash` occurs at most once.
-        uint256 n = _flowPreimage.legBundleHashes.length;
         uint256 legIndex = n;
         for (uint256 i = 0; i < n; ++i) {
             if (_flowPreimage.legBundleHashes[i] == _bundleHash) {
@@ -343,23 +355,17 @@ contract AtomicFlowManager is IAtomicFlowManager {
 
     /// @dev Canonicalizes and hashes a flowId preimage:
     /// `flowId = keccak256(abi.encode(preimage))`.
-    /// `legBundleHashes` must hold at most {MAX_ATOMIC_FLOW_LEGS} legs: finalization verifies one IMT
-    /// inclusion proof (plus its multi-hop settlement proof) per leg in a single transaction, so an
-    /// unbounded flow could commit on every source yet exceed the transaction gas / calldata limits on
-    /// every finalization attempt — unexecutable and, with all legs committed, unrefundable. Enforced
-    /// here — the shared validator — so an oversized preimage is rejected at send time (`append`),
-    /// before anything burns, rather than surfacing only at finalization.
     /// `legBundleHashes` must be strictly ascending (canonical order + dedup). `legSourceChainIds` is
     /// positional, aligned 1:1 with `legBundleHashes`; it may repeat and need not be ascending, so only its
     /// length is checked. Treating it as an ascending set instead would let a sibling chain in the set
     /// still enable a wrong-chain refund. The single implementation is shared by the send path (`append`)
     /// and the finalize/refund paths (`_checkFlowId`), so the preimage canonicalization cannot drift
     /// between them.
+    /// NOTE: the {MAX_ATOMIC_FLOW_LEGS} cap is intentionally NOT checked here — it is admission
+    /// policy, enforced only in `append`, so the finalize/refund paths keep accepting flows that were
+    /// committed under an older (larger) cap.
     function _validateAndComputeFlowId(AtomicFlowPreimage calldata _preimage) internal pure returns (bytes32) {
         uint256 n = _preimage.legBundleHashes.length;
-        if (n > MAX_ATOMIC_FLOW_LEGS) {
-            revert ManagerTooManyLegs(MAX_ATOMIC_FLOW_LEGS, n);
-        }
         for (uint256 i = 1; i < n; ++i) {
             if (_preimage.legBundleHashes[i] <= _preimage.legBundleHashes[i - 1]) {
                 revert ManagerBundleHashesNotSorted();
