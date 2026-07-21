@@ -70,4 +70,7 @@ struct StateTransitionDeployedAddresses {
     address chainTypeManagerProxyAdmin;
     /// @notice The bootstrap `CTMRelease` that defines chain genesis.
     address currentRelease;
+    /// @notice The canonical `CTMReleaseFactory` that deployed (and attests) `currentRelease`.
+    ///         Transitions departing from this release pin it as their `releaseFactory`.
+    address releaseFactory;
 }

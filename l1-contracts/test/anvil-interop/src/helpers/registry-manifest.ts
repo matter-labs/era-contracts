@@ -54,7 +54,6 @@ function parseSolidityEnum(relSourcePath: string, enumName: string): Record<stri
   return Object.fromEntries(members.map((m, i) => [m, i]));
 }
 
-const IDENTIFIERS_SOL = "contracts/upgrades/registry/ContractIdentifiers.sol";
 const COMPLEX_UPGRADER_SOL = "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
 function enumValue(map: Record<string, number>, name: string, enumName: string): number {
@@ -70,11 +69,9 @@ function enumValue(map: Record<string, number>, name: string, enumName: string):
 
 /** `CoreRegistry.CoreRegistryManifest` initialize argument from the manifest JSON. */
 export function coreInitArgs(manifest: any): any {
-  const ecosystemContract = parseSolidityEnum(IDENTIFIERS_SOL, "L1EcosystemContract");
-
+  // Row identity is the proxy ADDRESS; the manifest's contract names are human labels only.
   const entries: Array<[string, any]> = Object.entries(manifest.core.contracts);
-  const contractRows = entries.map(([name, e]) => ({
-    key: enumValue(ecosystemContract, name, "L1EcosystemContract"),
+  const contractRows = entries.map(([, e]) => ({
     proxy: e.proxy,
     expectedOldImpl: e.expectedOldImpl ?? ethers.constants.AddressZero,
     implNew: e.implNew ?? ethers.constants.AddressZero,
@@ -119,6 +116,9 @@ export function releaseInitArgs(ctm: any): any {
  * initialization validates it and derives the facet/hash delta from the release pair).
  */
 export function transitionInitArgs(manifest: any, ctm: any, newRelease: string): any {
+  // The canonical release factory must attest BOTH edges: the chain-state genesis release
+  // (fromRelease) and the just-deployed target release — which is why the runner deploys the
+  // new release through the SAME factory instance the chain states were deployed with.
   const upgradeType = parseSolidityEnum(COMPLEX_UPGRADER_SOL, "ContractUpgradeType");
   const transition = ctm.transition;
 
@@ -129,6 +129,7 @@ export function transitionInitArgs(manifest: any, ctm: any, newRelease: string):
   }));
 
   return {
+    releaseFactory: transition.releaseFactory,
     oldProtocolVersion: packSemVer(manifest.oldVersion),
     newProtocolVersion: packSemVer(manifest.newVersion),
     verifier: transition.verifier.address,

@@ -245,23 +245,23 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         transition = CTMTransition(
             transitionFactory.deployOrGetTransition(
                 CTMTransition.TransitionManifest({
-                releaseFactory: address(releaseFactory),
-                oldProtocolVersion: _oldVersion,
-                newProtocolVersion: _newVersion,
-                verifier: _verifier,
-                verifierCodehash: _verifier.codehash,
-                fromRelease: _fromRelease,
-                newRelease: release,
-                upgradeEngine: defaultUpgrade,
-                upgradeEngineCodehash: defaultUpgrade.codehash,
-                oldProtocolVersionDeadline: 1000,
-                upgradeTimestamp: 0,
-                l2Plan: L2UpgradePlan({
-                    deployments: deployments,
-                    delegateTo: address(0),
-                    delegateCalldata: hex"",
-                    factoryDepHashes: new uint256[](0)
-                })
+                    releaseFactory: address(releaseFactory),
+                    oldProtocolVersion: _oldVersion,
+                    newProtocolVersion: _newVersion,
+                    verifier: _verifier,
+                    verifierCodehash: _verifier.codehash,
+                    fromRelease: _fromRelease,
+                    newRelease: release,
+                    upgradeEngine: defaultUpgrade,
+                    upgradeEngineCodehash: defaultUpgrade.codehash,
+                    oldProtocolVersionDeadline: 1000,
+                    upgradeTimestamp: 0,
+                    l2Plan: L2UpgradePlan({
+                        deployments: deployments,
+                        delegateTo: address(0),
+                        delegateCalldata: hex"",
+                        factoryDepHashes: new uint256[](0)
+                    })
                 })
             )
         );

@@ -289,6 +289,7 @@ export class DeploymentRunner {
       }),
       ctmAddresses: {
         chainTypeManager: ZERO_ADDRESS,
+        releaseFactory: ZERO_ADDRESS,
         chainAdmin: ZERO_ADDRESS,
         diamondProxy: ZERO_ADDRESS,
         adminFacet: ZERO_ADDRESS,

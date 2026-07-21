@@ -2,7 +2,6 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-
 /// @notice One ecosystem contract's upgrade row: a SOURCE-CHECKED edge, not just a target.
 /// @param key The contract's identifier (human/tooling orientation).
 /// @param proxy The ecosystem proxy this row upgrades.

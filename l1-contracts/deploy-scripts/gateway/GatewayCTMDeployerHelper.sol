@@ -459,7 +459,12 @@ library GatewayCTMDeployerHelper {
             config.isZKsyncOS,
             true
         );
-        addresses.diamondInitCodehash = _simulatedCodehash(config.isZKsyncOS, "DiamondInit.sol", "DiamondInit", diamondInitArgs);
+        addresses.diamondInitCodehash = _simulatedCodehash(
+            config.isZKsyncOS,
+            "DiamondInit.sol",
+            "DiamondInit",
+            diamondInitArgs
+        );
 
         // L1GenesisUpgrade
         (addresses.genesisUpgrade, data.genesisUpgradeCalldata) = _calculateCreate2AddressAndCalldata(
@@ -470,7 +475,12 @@ library GatewayCTMDeployerHelper {
             config.isZKsyncOS,
             true
         );
-        addresses.genesisUpgradeCodehash = _simulatedCodehash(config.isZKsyncOS, "L1GenesisUpgrade.sol", "L1GenesisUpgrade", hex"");
+        addresses.genesisUpgradeCodehash = _simulatedCodehash(
+            config.isZKsyncOS,
+            "L1GenesisUpgrade.sol",
+            "L1GenesisUpgrade",
+            hex""
+        );
 
         // Multicall3
         (addresses.multicall3, data.multicall3Calldata) = _calculateCreate2AddressAndCalldata(

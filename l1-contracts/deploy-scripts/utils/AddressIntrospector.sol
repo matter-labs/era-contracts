@@ -266,8 +266,9 @@ library AddressIntrospector {
             defaultUpgrade: address(0),
             chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(_ctmAddr),
             // Genesis registry pointer introspection is not supported: pre-registry CTM
-            // versions do not expose it.
-            currentRelease: address(0)
+            // versions do not expose it (and neither is the canonical release factory).
+            currentRelease: address(0),
+            releaseFactory: address(0)
         });
         info.l1Specific = L1SpecificStateTransitionAddresses({
             legacyValidatorTimelock: ctm.validatorTimelock(),

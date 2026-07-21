@@ -160,6 +160,7 @@ abstract contract DeployCTMUtils is DeployUtils {
 
         vm.broadcast(getBroadcasterAddress());
         CTMReleaseFactory factory = new CTMReleaseFactory();
+        ctmAddresses.stateTransition.releaseFactory = address(factory);
 
         vm.broadcast(getBroadcasterAddress());
         address release = factory.deployOrGetRelease(manifest);

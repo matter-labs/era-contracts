@@ -242,15 +242,32 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     const manifestPath = path.join(l1ContractsDir, REGISTRY_MANIFEST_REL);
     if (regenRegistries) {
       console.log(`\n── ${REGEN_ENV_VAR}=1: regenerating the committed v32 registry manifest ──`);
-      const manifest = await buildRegistryManifest(l1Provider, live, deployed, ctmAddresses.chainTypeManager);
+      const manifest = await buildRegistryManifest(
+        l1Provider,
+        live,
+        deployed,
+        ctmAddresses.chainTypeManager,
+        ctmAddresses.releaseFactory
+      );
       fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
       fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
       console.log(`  manifest written to ${REGISTRY_MANIFEST_REL}`);
     } else {
       console.log(`\n── Consuming the committed v32 registry manifest (${REGISTRY_MANIFEST_REL}) ──`);
-      assertCommittedManifestMatchesLiveDeployment(manifestPath, live, deployed, ctmAddresses.chainTypeManager);
+      assertCommittedManifestMatchesLiveDeployment(
+        manifestPath,
+        live,
+        deployed,
+        ctmAddresses.chainTypeManager,
+        ctmAddresses.releaseFactory
+      );
     }
-    const objects = await deployUpgradeObjectsFromManifest(deployer, manifestPath);
+    const objects = await deployUpgradeObjectsFromManifest(
+      deployer,
+      manifestPath,
+      deployed,
+      ctmAddresses.releaseFactory
+    );
     console.log(`  CTM release:    ${objects.release}`);
     console.log(`  CTM transition: ${objects.transition}`);
     console.log(`  core registry:  ${objects.coreRegistry}`);
@@ -575,6 +592,8 @@ async function readLiveUpgradeInputs(
 // ── Deployment ───────────────────────────────────────────────────────
 
 type DeployedMachinery = {
+  transitionFactory: string;
+  coreRegistryFactory: string;
   ctmExecutor: string;
   ecoExecutor: string;
   composerHarness: string;
@@ -623,14 +642,27 @@ async function deployUpgradeMachinery(
   // key + starting nonce are fixed by the chain states, so each contract's address is a pure
   // function of its position in this sequence. Reordering/inserting deploys invalidates the
   // committed manifest (rerun with REGEN_REGISTRIES=1).
+  // The trusted factories deploy FIRST: each executor is BOUND to its factory (and its
+  // authority target) at construction — factory provenance is what it enforces on every
+  // transition / core registry it accepts.
+  const transitionFactory = await deploy("CTMTransitionFactory", []);
+  const coreRegistryFactory = await deploy("CoreRegistryFactory", []);
   return {
+    transitionFactory,
+    coreRegistryFactory,
     // The deployer plays the role of protocol governance AND (for this harness) the break-glass
-    // governor; each executor is BOUND to its immutable authority target at construction.
-    ctmExecutor: await deploy("CTMUpgradeExecutor", [deployer.address, deployer.address, params.ctm]),
+    // governor; each executor is BOUND to its immutable authority targets at construction.
+    ctmExecutor: await deploy("CTMUpgradeExecutor", [
+      deployer.address,
+      deployer.address,
+      params.ctm,
+      transitionFactory,
+    ]),
     ecoExecutor: await deploy("EcosystemUpgradeExecutor", [
       deployer.address,
       deployer.address,
       params.ecosystemProxyAdmin,
+      coreRegistryFactory,
     ]),
     composerHarness: await deploy("RegistryComposerHarness", []),
     // The synthetic v-bump's "changed facet": a fresh AdminFacet built from the same source,
@@ -669,7 +701,8 @@ async function buildRegistryManifest(
   l1Provider: ethers.providers.JsonRpcProvider,
   live: LiveUpgradeInputs,
   deployed: DeployedMachinery,
-  ctmProxy: string
+  ctmProxy: string,
+  releaseFactoryAddr: string
 ): Promise<Record<string, unknown>> {
   const codehash = async (addr: string) => ethers.utils.keccak256(await l1Provider.getCode(addr));
 
@@ -768,6 +801,8 @@ async function buildRegistryManifest(
         // CTMRelease address (nonce-deterministic, passed by the runner at initialization);
         // `fromRelease` is the CTM's live current release.
         transition: {
+          // The canonical factory attesting BOTH release edges (the chain states' factory).
+          releaseFactory: releaseFactoryAddr,
           fromRelease: live.fromRelease,
           verifier: { address: deployed.newVerifier, codehash: await codehash(deployed.newVerifier) },
           upgradeEngine: {
@@ -827,7 +862,8 @@ function assertCommittedManifestMatchesLiveDeployment(
   manifestPath: string,
   live: LiveUpgradeInputs,
   deployed: DeployedMachinery,
-  ctmProxy: string
+  ctmProxy: string,
+  releaseFactoryAddr: string
 ): void {
   if (!fs.existsSync(manifestPath)) {
     throw new Error(`Committed registry manifest not found at ${manifestPath}.\n\n${STALE_REGISTRIES_HINT}`);
@@ -854,6 +890,7 @@ function assertCommittedManifestMatchesLiveDeployment(
     ],
     ["ctm.ctmProxy", ctm?.ctmProxy, ctmProxy],
     ["ctm.transition.fromRelease", ctm?.transition?.fromRelease, live.fromRelease],
+    ["ctm.transition.releaseFactory", ctm?.transition?.releaseFactory, releaseFactoryAddr],
     ["ctm.transition.verifier.address", ctm?.transition?.verifier?.address, deployed.newVerifier],
     ["ctm.transition.upgradeEngine.address", ctm?.transition?.upgradeEngine?.address, deployed.newDefaultUpgrade],
     // No facet swaps in the manifest at all: the delta is DERIVED on-chain from the release
@@ -891,7 +928,9 @@ function assertCommittedManifestMatchesLiveDeployment(
  */
 async function deployUpgradeObjectsFromManifest(
   deployer: ethers.Wallet,
-  manifestPath: string
+  manifestPath: string,
+  deployed: DeployedMachinery,
+  releaseFactoryAddr: string
 ): Promise<{ release: string; transition: string; coreRegistry: string }> {
   execSync(`forge build ${REGISTRY_CONTRACTS_DIR_REL}`, { cwd: l1ContractsDir, stdio: "inherit" });
 
@@ -901,32 +940,44 @@ async function deployUpgradeObjectsFromManifest(
     throw new Error(`manifest has no "${CTM_REGISTRY_NAME}" CTM entry`);
   }
 
-  const deployViaFactory = async (
+  // Atomic, idempotent deployOrGet through PRE-DEPLOYED factory instances: the release goes
+  // through the CHAIN-STATE factory (the one that attested the genesis release — the
+  // transition's `releaseFactory` must attest BOTH edges), the transition and core registry
+  // through the executor-bound factories.
+  const callFactory = async (
     factoryName: "CTMReleaseFactory" | "CTMTransitionFactory" | "CoreRegistryFactory",
+    factoryAddr: string,
     method: string,
     initArgs: unknown
   ): Promise<string> => {
-    const contractFactory = new ethers.ContractFactory(getAbi(factoryName), getCreationBytecode(factoryName), deployer);
-    const factory = await contractFactory.deploy();
-    await factory.deployed();
-    const receipt = await (await factory[method](initArgs)).wait();
-    // Every factory emits exactly one <Type>Deployed(address, manifestHash) event.
-    const deployedEvent = receipt.events?.find((e: { event?: string }) => e.event);
-    if (!deployedEvent?.args?.[0]) {
-      throw new Error(`${factoryName}.${method} emitted no deployment event`);
-    }
-    return deployedEvent.args[0] as string;
+    const factory = new ethers.Contract(factoryAddr, getAbi(factoryName), deployer);
+    // callStatic yields the instance address for BOTH branches (fresh deploy and deployOrGet
+    // hit); the real transaction then lands the state.
+    const instance = (await factory.callStatic[method](initArgs)) as string;
+    await (await factory[method](initArgs)).wait();
+    return instance;
   };
 
-  const release = await deployViaFactory("CTMReleaseFactory", "deployOrGetRelease", releaseInitArgs(ctm));
+  const release = await callFactory(
+    "CTMReleaseFactory",
+    releaseFactoryAddr,
+    "deployOrGetRelease",
+    releaseInitArgs(ctm)
+  );
   return {
     release,
-    transition: await deployViaFactory(
+    transition: await callFactory(
       "CTMTransitionFactory",
+      deployed.transitionFactory,
       "deployOrGetTransition",
       transitionInitArgs(manifest, ctm, release)
     ),
-    coreRegistry: await deployViaFactory("CoreRegistryFactory", "deployOrGetCoreRegistry", coreInitArgs(manifest)),
+    coreRegistry: await callFactory(
+      "CoreRegistryFactory",
+      deployed.coreRegistryFactory,
+      "deployOrGetCoreRegistry",
+      coreInitArgs(manifest)
+    ),
   };
 }
 

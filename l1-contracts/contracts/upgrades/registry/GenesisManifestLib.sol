@@ -65,12 +65,13 @@ library GenesisManifestLib {
             });
         }
 
-        return buildGenesisManifestFromRows(
-            _cfg,
-            genesisFacets,
-            _cfg.facets.diamondInit.codehash,
-            _cfg.genesisUpgrade.codehash
-        );
+        return
+            buildGenesisManifestFromRows(
+                _cfg,
+                genesisFacets,
+                _cfg.facets.diamondInit.codehash,
+                _cfg.genesisUpgrade.codehash
+            );
     }
 
     /// @notice Pure manifest assembly from precomputed facet rows and codehashes. Off-chain

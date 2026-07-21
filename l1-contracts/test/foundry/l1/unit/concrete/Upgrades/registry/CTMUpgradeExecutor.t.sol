@@ -105,18 +105,18 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         result = CTMRelease(
             releaseFactory.deployOrGetRelease(
                 CTMRelease.ReleaseManifest({
-                diamondInit: diamondInit,
-                diamondInitCodehash: diamondInit.codehash,
-                genesisFacets: genesisFacets,
-                bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                fixedForceDeploymentsData: hex"f1f2",
-                genesisUpgrade: makeAddr("genesisUpgrade"),
-                genesisUpgradeCodehash: bytes32(0),
-                genesisBatchHash: bytes32(uint256(1)),
-                genesisBatchCommitment: bytes32(_commitmentNonce),
-                genesisIndexRepeatedStorageChanges: 54
+                    diamondInit: diamondInit,
+                    diamondInitCodehash: diamondInit.codehash,
+                    genesisFacets: genesisFacets,
+                    bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                    defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                    evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                    fixedForceDeploymentsData: hex"f1f2",
+                    genesisUpgrade: makeAddr("genesisUpgrade"),
+                    genesisUpgradeCodehash: bytes32(0),
+                    genesisBatchHash: bytes32(uint256(1)),
+                    genesisBatchCommitment: bytes32(_commitmentNonce),
+                    genesisIndexRepeatedStorageChanges: 54
                 })
             )
         );
@@ -144,25 +144,25 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         result = CTMTransition(
             transitionFactory.deployOrGetTransition(
                 CTMTransition.TransitionManifest({
-                releaseFactory: address(releaseFactory),
-                oldProtocolVersion: _oldProtocolVersion,
-                newProtocolVersion: newVersion,
-                verifier: testnetVerifier,
-                verifierCodehash: testnetVerifier.codehash,
-                // The default transition departs from whatever release the fixture CTM was
-                // genesis'd with (its current release), as the executor's release-edge pin requires.
-                fromRelease: _fromRelease,
-                newRelease: address(release),
-                upgradeEngine: makeAddr("upgradeEngine"),
-                upgradeEngineCodehash: bytes32(0),
-                oldProtocolVersionDeadline: 1000,
-                upgradeTimestamp: _upgradeTimestamp,
-                l2Plan: L2UpgradePlan({
-                    deployments: deployments,
-                    delegateTo: makeAddr("l2UpgradeDelegate"),
-                    delegateCalldata: hex"beef",
-                    factoryDepHashes: factoryDeps
-                })
+                    releaseFactory: address(releaseFactory),
+                    oldProtocolVersion: _oldProtocolVersion,
+                    newProtocolVersion: newVersion,
+                    verifier: testnetVerifier,
+                    verifierCodehash: testnetVerifier.codehash,
+                    // The default transition departs from whatever release the fixture CTM was
+                    // genesis'd with (its current release), as the executor's release-edge pin requires.
+                    fromRelease: _fromRelease,
+                    newRelease: address(release),
+                    upgradeEngine: makeAddr("upgradeEngine"),
+                    upgradeEngineCodehash: bytes32(0),
+                    oldProtocolVersionDeadline: 1000,
+                    upgradeTimestamp: _upgradeTimestamp,
+                    l2Plan: L2UpgradePlan({
+                        deployments: deployments,
+                        delegateTo: makeAddr("l2UpgradeDelegate"),
+                        delegateCalldata: hex"beef",
+                        factoryDepHashes: factoryDeps
+                    })
                 })
             )
         );

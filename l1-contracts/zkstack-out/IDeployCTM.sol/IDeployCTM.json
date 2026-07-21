@@ -161,6 +161,11 @@
                 "name": "currentRelease",
                 "type": "address",
                 "internalType": "address"
+              },
+              {
+                "name": "releaseFactory",
+                "type": "address",
+                "internalType": "address"
               }
             ]
           },
