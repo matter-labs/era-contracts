@@ -65,6 +65,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     address internal verifierV32;
     address internal verifierV33;
     address internal defaultUpgrade;
+    address internal genesisUpgradeAddr;
 
     uint256 internal constant V32 = uint256(32) << 32; // 0.32.0
     uint256 internal constant V33 = uint256(33) << 32; // 0.33.0
@@ -127,12 +128,17 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         defaultUpgrade = address(new DefaultUpgrade());
         verifierV32 = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
         verifierV33 = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+        // The pinned genesisUpgrade must carry real code — the registry's codehash pin rejects a
+        // codeless target — so etch a stand-in and pin its actual codehash below.
+        genesisUpgradeAddr = makeAddr("genesisUpgrade");
+        vm.etch(genesisUpgradeAddr, hex"600042");
 
         // Transitions require factory-attested releases on BOTH edges, so the fixture CTM's
         // mocked genesis release is replaced by a REAL factory-deployed one describing the
         // chain's current routing — hop 1 then departs from (and, being facet-neutral, also
         // targets) exactly that release.
         address genesisRelease = releaseFactory.deployOrGetRelease(_releaseManifest(address(0)));
+        _attestReleaseOnFixtureFactory(genesisRelease);
 
         // Hand CTM ownership to the executor through its fixed entrypoint, then perform two raw
         // one-off admin actions through break-glass (exactly what the separately governed hatch
@@ -168,6 +174,17 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         transitionV33 = _makeTransition(V32, V33, verifierV33, transitionV32.newRelease(), newAdminFacet);
     }
 
+    /// @dev The fixture CTM's canonical release factory is mocked (`Utils.TEST_RELEASE_FACTORY`);
+    ///      attest a REAL release on it so the CTM's provenance check accepts it as currentRelease
+    ///      (both the bootstrap re-point and every applied transition's target pass through it).
+    function _attestReleaseOnFixtureFactory(address _release) internal {
+        vm.mockCall(
+            Utils.TEST_RELEASE_FACTORY,
+            abi.encodeWithSelector(bytes4(keccak256("deployedFor(bytes32)")), CTMRelease(_release).manifestHash()),
+            abi.encode(_release)
+        );
+    }
+
     /// @dev One release's full manifest: the fixture's routing (AdminFacet swapped for
     ///      `_adminFacet` when nonzero), carried base-system hashes, genesis params. Hop 1's
     ///      target (facet-neutral) manifest is IDENTICAL to the genesis release's, so the
@@ -185,8 +202,8 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
                 defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
                 evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
                 fixedForceDeploymentsData: hex"f1f2",
-                genesisUpgrade: makeAddr("genesisUpgrade"),
-                genesisUpgradeCodehash: bytes32(0),
+                genesisUpgrade: genesisUpgradeAddr,
+                genesisUpgradeCodehash: genesisUpgradeAddr.codehash,
                 genesisBatchHash: bytes32(uint256(1)),
                 genesisBatchCommitment: _registryGenesisBatchCommitment(),
                 genesisIndexRepeatedStorageChanges: 54
@@ -229,23 +246,31 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         address _newAdminFacet
     ) internal returns (CTMTransition transition) {
         address release = releaseFactory.deployOrGetRelease(_releaseManifest(_newAdminFacet));
+        _attestReleaseOnFixtureFactory(release);
 
+        bool hasL2Side = _newAdminFacet != address(0);
         IComplexUpgrader.UniversalContractUpgradeInfo[]
-            memory deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](
-                _newAdminFacet == address(0) ? 0 : 1
-            );
-        if (_newAdminFacet != address(0)) {
+            memory deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](hasL2Side ? 1 : 0);
+        if (hasL2Side) {
             deployments[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
                 upgradeType: _l2DeploymentType(),
                 deployedBytecodeInfo: _l2DeployedBytecodeInfo(),
                 newAddress: makeAddr("l2Bridgehub")
             });
         }
+        // A nonempty L2 plan MUST carry a delegate target: `L2ComplexUpgrader` always ends with
+        // the final delegatecall, so a deployments-only plan (no target) would revert on L2.
+        L2UpgradePlan memory l2Plan;
+        l2Plan.deployments = deployments;
+        l2Plan.factoryDepHashes = new uint256[](0);
+        if (hasL2Side) {
+            l2Plan.delegateTo = makeAddr("l2UpgradeTarget");
+            l2Plan.delegateCalldata = hex"beef";
+        }
 
         transition = CTMTransition(
             transitionFactory.deployOrGetTransition(
                 CTMTransition.TransitionManifest({
-                    releaseFactory: address(releaseFactory),
                     oldProtocolVersion: _oldVersion,
                     newProtocolVersion: _newVersion,
                     verifier: _verifier,
@@ -256,12 +281,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
                     upgradeEngineCodehash: defaultUpgrade.codehash,
                     oldProtocolVersionDeadline: 1000,
                     upgradeTimestamp: 0,
-                    l2Plan: L2UpgradePlan({
-                        deployments: deployments,
-                        delegateTo: address(0),
-                        delegateCalldata: hex"",
-                        factoryDepHashes: new uint256[](0)
-                    })
+                    l2Plan: l2Plan
                 })
             )
         );

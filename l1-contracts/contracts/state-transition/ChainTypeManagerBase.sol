@@ -13,13 +13,20 @@ import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {ChainTypeManagerInitializeData, IChainTypeManager} from "./IChainTypeManager.sol";
 import {ICTMRelease} from "../upgrades/registry/ICTMRelease.sol";
+import {CTMReleaseFactory} from "../upgrades/registry/CTMRegistryFactory.sol";
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE} from "../common/Config.sol";
 import {AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
 import {ProtocolVersionTooSmall} from "../upgrades/ZkSyncUpgradeErrors.sol";
-import {ChainAlreadyLive, MigrationsNotPaused, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {
+    ChainAlreadyLive,
+    MigrationsNotPaused,
+    NotFactoryDeployed,
+    Unauthorized,
+    ZeroAddress
+} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHandler.sol";
@@ -113,6 +120,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// version-keyed at read time, so patch upgrades can reuse it without making genesis data
     /// unanswerable.
     address public currentRelease;
+
+    /// @notice The canonical `CTMReleaseFactory` — every release this CTM pins must be attested
+    ///         by it (see `_storeCurrentRelease`). Set once at initialization.
+    address public releaseFactory;
 
     /// @dev Retained only to preserve the upgradeable storage layout. Transitions are committed
     /// directly in the upgrade cut and are never looked up through CTM storage.
@@ -220,6 +231,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         validatorTimelockPostV29 = _initializeData.validatorTimelock;
         serverNotifierAddress = _initializeData.serverNotifier;
 
+        if (_initializeData.releaseFactory == address(0)) {
+            revert ZeroAddress();
+        }
+        releaseFactory = _initializeData.releaseFactory;
         _setCurrentRelease(_initializeData.currentRelease);
     }
 
@@ -230,9 +245,28 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         _setCurrentRelease(_release);
     }
 
+    /// @notice Sets the canonical release factory. Freshly initialized CTMs receive it in
+    ///         `initialize`; CTMs MIGRATED from pre-registry versions (whose storage predates the
+    ///         field) must set it during their migration, BEFORE the first `setCurrentRelease` —
+    ///         release provenance cannot be checked against a zero factory.
+    function setReleaseFactory(address _releaseFactory) external onlyOwner {
+        if (_releaseFactory == address(0)) {
+            revert ZeroAddress();
+        }
+        releaseFactory = _releaseFactory;
+        emit NewReleaseFactory(_releaseFactory);
+    }
+
     function _storeCurrentRelease(address _release) internal {
         if (_release == address(0)) {
             revert ZeroAddress();
+        }
+        // Release provenance is enforced HERE — the single authoritative point every release
+        // passes through (bootstrap initialize and every later transition alike). The canonical
+        // factory is CTM state, never authored inside permissionless transition manifests, so a
+        // fake factory cannot attest an arbitrary (possibly mutable) ICTMRelease implementation.
+        if (CTMReleaseFactory(releaseFactory).deployedFor(ICTMRelease(_release).manifestHash()) != _release) {
+            revert NotFactoryDeployed(_release);
         }
         currentRelease = _release;
         newChainCreationParamsBlock[protocolVersion] = block.number;

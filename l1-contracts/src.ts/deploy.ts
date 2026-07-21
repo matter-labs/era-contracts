@@ -178,19 +178,17 @@ export class Deployer {
     );
 
     if (compareDiamondCutHash) {
-      const hash = ethers.utils.keccak256(
-        ethers.utils.defaultAbiCoder.encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCut])
-      );
-
-      console.log(`Diamond cut hash: ${hash}`);
+      // The pre-v32 CTM pinned an `initialCutHash` this check compared against. From v32 the
+      // committed genesis cut is empty (DiamondInit + the CTM's current release carry
+      // everything), so there is no cut hash on the CTM to compare — validate the release
+      // pointer instead.
       const ctm = ChainTypeManagerFactory.connect(
         this.addresses.StateTransition.StateTransitionProxy,
         this.deployWallet
       );
-
-      const hashFromCTM = await ctm.initialCutHash();
-      if (hash != hashFromCTM) {
-        throw new Error(`Has from CTM ${hashFromCTM} does not match the computed hash ${hash}`);
+      const currentRelease = await ctm.currentRelease();
+      if (currentRelease === ethers.constants.AddressZero) {
+        throw new Error("CTM has no currentRelease pinned — genesis would be unusable");
       }
     }
 

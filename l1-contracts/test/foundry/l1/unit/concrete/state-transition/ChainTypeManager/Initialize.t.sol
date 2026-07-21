@@ -25,8 +25,8 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
         _;
     }
 
-    /// @dev The CTM validates genesis params in `_setGenesisRegistry` by reading them from the
-    ///      genesis registry it is initialized with. We mock the (already-mocked) test registry to
+    /// @dev The CTM validates genesis params when its current release is set, reading them from the
+    ///      genesis release it is initialized with. We mock the (already-mocked) test release to
     ///      return the given — deliberately invalid — `genesisParams`, then assert the CTM proxy
     ///      initialization reverts with `err`.
     function _deployCtmExpectingRevert(
@@ -45,6 +45,7 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
+            releaseFactory: Utils.TEST_RELEASE_FACTORY,
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             verifier: testnetVerifier,

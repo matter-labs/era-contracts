@@ -56,6 +56,10 @@ library Utils {
     /// @dev The genesis-registry address the mocked CTM fixtures return; the registry itself is
     ///      mocked too (see `UtilsCallMocker`), pinning no facets and these base system hashes.
     address internal constant TEST_GENESIS_REGISTRY = address(0x9E8E5157A9);
+    /// @dev Mocked canonical CTMReleaseFactory the fixture CTMs are initialized with; its
+    ///      `deployedFor` is mocked to attest the mocked genesis release generically, and tests
+    ///      that pin REAL releases add specific-argument mocks on top (which take precedence).
+    address internal constant TEST_RELEASE_FACTORY = address(0x9E8E5157FA);
     bytes32 internal constant TEST_BASE_SYSTEM_CONTRACT_HASH =
         0x0100000000000000000000000000000000000000000000000000000000000000;
 

@@ -11,17 +11,18 @@ import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/com
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice From v32 the CTM no longer stores chain-creation params directly; it stores a pointer
-///         to a genesis `CTMRegistry` and derives all genesis data from it. This exercises
-///         `setGenesisRegistry`: repointing the CTM at a new registry updates the values it
-///         serves (`l1GenesisUpgrade`, `storedBatchZero`, `genesisRegistry`).
+///         to a genesis release and derives all genesis data from it. This exercises
+///         `setCurrentRelease`: repointing the CTM at a new release updates the values it
+///         serves (`l1GenesisUpgrade`, `storedBatchZero`, `currentRelease`).
 contract SetGenesisRegistryTest is ChainTypeManagerTest {
     function setUp() public {
         deploy();
     }
 
-    /// @dev Mocks a fresh registry returning the given genesis params, so the CTM can be repointed
-    ///      at it. Only `genesisParams` is needed here (the CTM reads it in `setGenesisRegistry`
-    ///      validation and in the `l1GenesisUpgrade`/`storedBatchZero` getters).
+    /// @dev Mocks a fresh release returning the given genesis params, so the CTM can be repointed
+    ///      at it: `genesisParams` (read by the `l1GenesisUpgrade`/`storedBatchZero` getters), the
+    ///      VM-identity surface, and the manifest-hash + factory attestation `setCurrentRelease`
+    ///      requires for release provenance.
     function _mockRegistry(
         address _registry,
         address _genesisUpgrade,
@@ -39,6 +40,16 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
         // diamondInit placeholder is the registry itself, so mock the flag there.
         vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.diamondInit.selector), abi.encode(_registry));
         vm.mockCall(_registry, abi.encodeWithSelector(IDiamondInit.IS_ZKSYNC_OS.selector), abi.encode(false));
+        // From v32 the CTM enforces release provenance via its canonical (mocked) factory: give the
+        // release a manifest hash and attest it on `TEST_RELEASE_FACTORY` so a repoint is accepted
+        // (the shared fixture's generic mock attests only the genesis release).
+        bytes32 manifestHash = keccak256(abi.encode(_registry));
+        vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.manifestHash.selector), abi.encode(manifestHash));
+        vm.mockCall(
+            Utils.TEST_RELEASE_FACTORY,
+            abi.encodeWithSelector(bytes4(keccak256("deployedFor(bytes32)")), manifestHash),
+            abi.encode(_registry)
+        );
     }
 
     function test_SettingGenesisRegistry() public {
@@ -99,5 +110,33 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
         vm.expectRevert();
         vm.prank(makeAddr("notOwner"));
         chainContractAddress.setCurrentRelease(newRegistry);
+    }
+
+    // `setReleaseFactory` is the migration path for CTMs whose storage predates the field
+    // (upgraded proxies never re-run `initialize`); v32 stage calldata invokes it right before
+    // the first `setCurrentRelease`.
+
+    function test_SettingReleaseFactory() public {
+        address newFactory = makeAddr("newReleaseFactory");
+
+        vm.expectEmit(true, false, false, false);
+        emit IChainTypeManager.NewReleaseFactory(newFactory);
+
+        vm.prank(governor);
+        chainContractAddress.setReleaseFactory(newFactory);
+
+        assertEq(chainContractAddress.releaseFactory(), newFactory, "Release factory was not set correctly");
+    }
+
+    function test_RevertWhen_SettingZeroReleaseFactory() public {
+        vm.expectRevert(ZeroAddress.selector);
+        vm.prank(governor);
+        chainContractAddress.setReleaseFactory(address(0));
+    }
+
+    function test_RevertWhen_SettingReleaseFactoryNotOwner() public {
+        vm.expectRevert();
+        vm.prank(makeAddr("notOwner"));
+        chainContractAddress.setReleaseFactory(makeAddr("newReleaseFactory"));
     }
 }

@@ -2,23 +2,6 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-/// @notice Canonical identifier for L1 ecosystem contracts shared by every CTM. Used by
-///         deploy-script config/introspection plumbing; on-chain registry rows identify
-///         contracts by their proxy ADDRESS, not by this enum.
-/// @dev The enum is APPEND-ONLY: new variants must be added at the end and existing
-///      variants must never be reordered or removed.
-enum L1EcosystemContract {
-    L1Bridgehub,
-    L1MessageRoot,
-    L1CTMDeploymentTracker,
-    L1ChainAssetHandler,
-    L1ChainRegistrationSender,
-    L1AssetTracker,
-    L1AssetRouter,
-    L1Nullifier,
-    L1NativeTokenVault
-}
-
 /// @notice Canonical identifier for core L2 contracts that participate in
 ///         force-deployments and factory-dependency publishing.
 ///         The enum value is VM-neutral; `CoreOnGatewayHelper.resolve` maps it to

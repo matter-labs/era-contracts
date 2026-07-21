@@ -6,17 +6,15 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ICTMRelease} from "./ICTMRelease.sol";
 import {ICTMTransition, L2UpgradePlan} from "./ICTMTransition.sol";
+import {CodehashPinLib} from "./CodehashPinLib.sol";
 import {TransitionDeltaLib} from "./TransitionDeltaLib.sol";
-import {CTMReleaseFactory} from "./CTMRegistryFactory.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {SemVer} from "../../common/libraries/SemVer.sol";
 import {ProtocolVersionTooSmall} from "../ZkSyncUpgradeErrors.sol";
 import {
     MalformedL2UpgradePlan,
-    NotFactoryDeployed,
     PatchMustReuseRelease,
     RegistryAlreadyInitialized,
-    RegistryCodehashMismatch,
     RegistryUnknownKey,
     SameReleaseTransitionHasPayload,
     TransitionDeadlineBeforeUpgrade,
@@ -35,11 +33,6 @@ import {
 contract CTMTransition is ICTMTransition {
     // solhint-disable-next-line gas-struct-packing
     struct TransitionManifest {
-        /// @dev The canonical release factory that deployed BOTH `fromRelease` and `newRelease`.
-        ///      Factory provenance makes the releases genuine write-once `CTMRelease` instances —
-        ///      an arbitrary (possibly mutable) contract implementing `ICTMRelease` is rejected,
-        ///      so the derived delta and the genesis data served via `currentRelease` are frozen.
-        address releaseFactory;
         uint256 oldProtocolVersion;
         uint256 newProtocolVersion;
         address verifier;
@@ -83,7 +76,6 @@ contract CTMTransition is ICTMTransition {
         // Pre-registry migration (v31 -> v32) is one-time migration code in the legacy upgrade
         // scripts — it installs `currentRelease` so that every later transition has a source.
         if (
-            _manifest.releaseFactory == address(0) ||
             _manifest.verifier == address(0) ||
             _manifest.fromRelease == address(0) ||
             _manifest.newRelease == address(0) ||
@@ -104,9 +96,12 @@ contract CTMTransition is ICTMTransition {
 
         _requirePin(_manifest.verifier, _manifest.verifierCodehash);
         _requirePin(_manifest.upgradeEngine, _manifest.upgradeEngineCodehash);
-        // Factory provenance for BOTH edges, then live validation.
-        _requireFactoryDeployedRelease(_manifest.releaseFactory, _manifest.newRelease);
-        _requireFactoryDeployedRelease(_manifest.releaseFactory, _manifest.fromRelease);
+        // Live validation of both edges. RELEASE PROVENANCE is deliberately NOT checked here: a
+        // permissionless manifest could name any "factory", so the attestation that both edges
+        // are genuine write-once CTMRelease instances comes from the CTM itself — its canonical
+        // `releaseFactory` is enforced in `_storeCurrentRelease`, which every pinned release
+        // (bootstrap and every transition target) passes through, and the executor's release
+        // edge check ties `fromRelease` to that same attested `currentRelease`.
         ICTMRelease(_manifest.newRelease).validate();
         ICTMRelease(_manifest.fromRelease).validate();
 
@@ -119,11 +114,14 @@ contract CTMTransition is ICTMTransition {
                 revert PatchMustReuseRelease(_manifest.fromRelease, _manifest.newRelease);
             }
         }
-        // L2 plan shape: committed data must be data the composed transaction actually executes.
-        // A delegate calldata without a target, or factory deps without any L2 side, would be
-        // silently dead payload — refuse it instead.
+        // L2 plan shape: committed data must be data the composed transaction actually EXECUTES.
+        // `L2ComplexUpgrader.forceDeployAndUpgradeUniversal` unconditionally ends with the
+        // delegatecall, so a nonempty plan REQUIRES a delegate target (a deployments-only plan
+        // would initialize here but revert on L2 forever); a delegate calldata without a target,
+        // or factory deps without any L2 side, would be silently dead payload — refuse all of it.
         bool hasL2Side = _manifest.l2Plan.deployments.length != 0 || _manifest.l2Plan.delegateTo != address(0);
         if (
+            (_manifest.l2Plan.deployments.length != 0 && _manifest.l2Plan.delegateTo == address(0)) ||
             (_manifest.l2Plan.delegateCalldata.length != 0 && _manifest.l2Plan.delegateTo == address(0)) ||
             (_manifest.l2Plan.factoryDepHashes.length != 0 && !hasL2Side)
         ) {
@@ -231,22 +229,11 @@ contract CTMTransition is ICTMTransition {
             return false;
         }
         return
-            transitionVerifier.codehash == verifierCodehash &&
-            transitionUpgradeEngine.codehash == upgradeEngineCodehash;
-    }
-
-    /// @dev The object at `_release` must be one `_releaseFactory` deployed for that exact
-    ///      manifest hash — genuine, write-once `CTMRelease` code.
-    function _requireFactoryDeployedRelease(address _releaseFactory, address _release) private view {
-        if (CTMReleaseFactory(_releaseFactory).deployedFor(ICTMRelease(_release).manifestHash()) != _release) {
-            revert NotFactoryDeployed(_release);
-        }
+            CodehashPinLib.pinHolds(transitionVerifier, verifierCodehash) &&
+            CodehashPinLib.pinHolds(transitionUpgradeEngine, upgradeEngineCodehash);
     }
 
     function _requirePin(address _target, bytes32 _expectedCodehash) private view {
-        bytes32 actualCodehash = _target.codehash;
-        if (actualCodehash != _expectedCodehash) {
-            revert RegistryCodehashMismatch(_target, _expectedCodehash, actualCodehash);
-        }
+        CodehashPinLib.requirePin(_target, _expectedCodehash);
     }
 }

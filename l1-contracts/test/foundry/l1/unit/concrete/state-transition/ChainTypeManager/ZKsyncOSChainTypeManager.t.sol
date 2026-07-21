@@ -117,9 +117,9 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         vm.stopPrank();
     }
 
-    /// @dev Mocks the (single) test genesis registry to return the given genesis params. These
-    ///      tests only exercise `_setGenesisRegistry` validation and never create a chain, so only
-    ///      `genesisParams` needs mocking.
+    /// @dev Mocks the (single) test genesis release: its genesis params, VM-identity surface, and
+    ///      the manifest-hash + factory attestation the CTM's release-provenance check reads during
+    ///      initialization and repointing.
     function _mockGenesisParams(
         address _genesisUpgrade,
         bytes32 _genesisBatchHash,
@@ -144,6 +144,18 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             abi.encodeWithSelector(IDiamondInit.IS_ZKSYNC_OS.selector),
             abi.encode(true)
         );
+        // From v32 the CTM enforces release provenance via its canonical (mocked) factory during
+        // initialization: give the genesis release a manifest hash and attest it on the factory.
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.manifestHash.selector),
+            abi.encode(bytes32("mock-genesis-manifest"))
+        );
+        vm.mockCall(
+            Utils.TEST_RELEASE_FACTORY,
+            abi.encodeWithSelector(bytes4(keccak256("deployedFor(bytes32)"))),
+            abi.encode(Utils.TEST_GENESIS_REGISTRY)
+        );
     }
 
     function _deployChainTypeManager() internal returns (ZKsyncOSChainTypeManager) {
@@ -151,6 +163,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
+            releaseFactory: Utils.TEST_RELEASE_FACTORY,
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             verifier: testnetVerifier,
@@ -171,6 +184,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
+            releaseFactory: Utils.TEST_RELEASE_FACTORY,
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             verifier: testnetVerifier,

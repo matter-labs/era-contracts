@@ -66,10 +66,8 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
         EcosystemContractRow[] memory rows = _coreRegistry.ecosystemRows();
         uint256 rowsLength = rows.length;
         for (uint256 i = 0; i < rowsLength; ++i) {
+            // Every row is a real edge by registry construction (no placeholder rows exist).
             address newImpl = rows[i].implNew;
-            if (newImpl == address(0)) {
-                continue;
-            }
             ITransparentUpgradeableProxy proxy = ITransparentUpgradeableProxy(rows[i].proxy);
             address liveImpl = PROXY_ADMIN.getProxyImplementation(proxy);
             if (liveImpl == newImpl) {

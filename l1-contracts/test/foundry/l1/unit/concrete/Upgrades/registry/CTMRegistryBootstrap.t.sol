@@ -23,6 +23,7 @@ contract CTMRegistryBootstrapTest is Test {
     bytes32 internal constant BOOTLOADER_HASH = bytes32(uint256(0xB001));
     bytes32 internal constant DEFAULT_ACCOUNT_HASH = bytes32(uint256(0xDEFA));
     bytes32 internal constant EVM_EMULATOR_HASH = bytes32(uint256(0xE7E7));
+    address internal constant GENESIS_UPGRADE = address(0xABCD);
 
     Facets internal facets =
         Facets({
@@ -38,7 +39,9 @@ contract CTMRegistryBootstrapTest is Test {
     function setUp() public {
         release = new CTMRelease();
         // The bootstrap manifest builder reads each facet's explicit routing from its own
-        // self-description at BUILD time; mock it on the synthetic facet addresses.
+        // self-description at BUILD time; mock it on the synthetic facet addresses. Every pinned
+        // target must also carry real code — the registry's codehash pin rejects a codeless
+        // target — so etch a distinct nonempty stand-in wherever a pin is captured.
         address[6] memory facetAddrs = [
             facets.adminFacet,
             facets.gettersFacet,
@@ -55,7 +58,11 @@ contract CTMRegistryBootstrapTest is Test {
                 abi.encodeWithSelector(ISelfDescribingFacet.selectors.selector),
                 abi.encode(selectors)
             );
+            vm.etch(facetAddrs[i], bytes.concat(hex"6000", bytes1(uint8(i))));
         }
+        // `diamondInit` and `genesisUpgrade` are pinned by the manifest too (see `_genesisManifest`).
+        vm.etch(facets.diamondInit, hex"600001");
+        vm.etch(GENESIS_UPGRADE, hex"600002");
     }
 
     function _genesisManifest() internal view returns (CTMRelease.ReleaseManifest memory) {
@@ -66,7 +73,7 @@ contract CTMRegistryBootstrapTest is Test {
                     bootloaderHash: BOOTLOADER_HASH,
                     defaultAccountHash: DEFAULT_ACCOUNT_HASH,
                     evmEmulatorHash: EVM_EMULATOR_HASH,
-                    genesisUpgrade: address(0xABCD),
+                    genesisUpgrade: GENESIS_UPGRADE,
                     genesisBatchHash: bytes32(uint256(1)),
                     genesisBatchCommitment: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 1,
@@ -105,8 +112,8 @@ contract CTMRegistryBootstrapTest is Test {
         assertEq(defaultAccountHash, DEFAULT_ACCOUNT_HASH, "default account hash");
         assertEq(evmEmulatorHash, EVM_EMULATOR_HASH, "evm emulator hash");
 
-        // Inline pins captured from live code at build time (zero for the codeless synthetic
-        // facets here) verify against the same live state.
+        // Inline pins captured from live code at build time (the etched synthetic facets carry
+        // real, nonempty code) verify against the same live state.
         release.validate();
         assertTrue(release.verifyAll(), "verifyAll");
     }
@@ -148,7 +155,7 @@ contract CTMRegistryBootstrapTest is Test {
                     bootloaderHash: 0,
                     defaultAccountHash: 0,
                     evmEmulatorHash: 0,
-                    genesisUpgrade: address(0xABCD),
+                    genesisUpgrade: GENESIS_UPGRADE,
                     genesisBatchHash: bytes32(uint256(1)),
                     genesisBatchCommitment: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 1,

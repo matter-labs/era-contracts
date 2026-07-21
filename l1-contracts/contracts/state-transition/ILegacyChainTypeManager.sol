@@ -16,7 +16,9 @@ import {Diamond} from "./libraries/Diamond.sol";
 /// @param genesisBatchCommitment The zk-proof commitment for the genesis batch
 /// @param diamondCut The diamond cut for the first upgrade transaction on the newly deployed chain
 /// @param forceDeploymentsData The genesis force-deployments descriptor
-/// @param registry The CTM registry pinned for chains created at this protocol version
+/// @dev ABI-FROZEN: this tuple must encode `setChainCreationParams` with selector 0x9b016b8b —
+///      the function LIVE pre-v32 CTM deployments expose. Never add or reorder fields
+///      (`FrozenLegacyAbi.t.sol` guards the selector).
 // solhint-disable-next-line gas-struct-packing
 struct ChainCreationParams {
     address genesisUpgrade;
@@ -25,7 +27,6 @@ struct ChainCreationParams {
     bytes32 genesisBatchCommitment;
     Diamond.DiamondCutData diamondCut;
     bytes forceDeploymentsData;
-    address registry;
 }
 
 /// @title Legacy ChainTypeManager surface.
@@ -33,7 +34,7 @@ struct ChainCreationParams {
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The pre-registry `setChainCreationParams` entrypoint, kept for the legacy
 ///         `default-upgrade` deploy-script pipeline that targets pre-v32 CTM deployments. The
-///         current CTM (`IChainTypeManager`) exposes `setGenesisRegistry` instead.
+///         current CTM (`IChainTypeManager`) exposes `setCurrentRelease` instead.
 interface ILegacyChainTypeManager {
     function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external;
 }

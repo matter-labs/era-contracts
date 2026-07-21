@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {L1EcosystemContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
 import {CoreRegistry} from "contracts/upgrades/registry/CoreRegistry.sol";
 import {EcosystemContractRow} from "contracts/upgrades/registry/ICoreRegistry.sol";
 import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
@@ -24,12 +23,13 @@ import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
     MalformedL2UpgradePlan,
-    NotFactoryDeployed,
     PatchMustReuseRelease,
     RegistryAlreadyInitialized,
     RegistryCodehashMismatch,
+    RegistryDuplicateProxyRow,
     RegistryDuplicateSelector,
     RegistryEmptySelectors,
+    RegistryPinTargetHasNoCode,
     SameReleaseTransitionHasPayload,
     TransitionDeadlineBeforeUpgrade,
     ZeroAddress
@@ -96,20 +96,14 @@ contract StorageRegistriesTest is Test {
     }
 
     function _coreManifest() internal view returns (CoreRegistry.CoreRegistryManifest memory manifest) {
-        EcosystemContractRow[] memory rows = new EcosystemContractRow[](2);
-        // A full source-checked edge...
+        // A single full source-checked edge — every core row must be a real, unique edge;
+        // placeholder (all-zero) rows are rejected at the registry boundary.
+        EcosystemContractRow[] memory rows = new EcosystemContractRow[](1);
         rows[0] = EcosystemContractRow({
             proxy: address(0xB001),
             expectedOldImpl: address(0xB101),
             implNew: coreImplNew,
             implNewCodehash: coreImplNew.codehash
-        });
-        // ...and a no-op placeholder row (nothing to upgrade).
-        rows[1] = EcosystemContractRow({
-            proxy: address(0xB003),
-            expectedOldImpl: address(0),
-            implNew: address(0),
-            implNewCodehash: bytes32(0)
         });
         return CoreRegistry.CoreRegistryManifest({contractRows: rows});
     }
@@ -193,7 +187,6 @@ contract StorageRegistriesTest is Test {
     function _transitionManifest() internal view returns (CTMTransition.TransitionManifest memory manifest) {
         return
             CTMTransition.TransitionManifest({
-                releaseFactory: address(releaseFactory),
                 oldProtocolVersion: OLD_VERSION,
                 newProtocolVersion: NEW_VERSION,
                 verifier: verifier,
@@ -433,6 +426,19 @@ contract StorageRegistriesTest is Test {
         malformed.initialize(manifest);
     }
 
+    function test_revertWhen_deploymentsWithoutDelegateTarget() public {
+        // Force-deployments but no delegate target: `L2ComplexUpgrader` always ends with the final
+        // delegatecall, so a deployments-only plan would initialize here yet revert on L2 forever.
+        // (delegateCalldata is cleared so ONLY the deployments-without-target rule can fire.)
+        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        manifest.l2Plan.delegateTo = address(0);
+        manifest.l2Plan.delegateCalldata = "";
+
+        CTMTransition malformed = new CTMTransition();
+        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        malformed.initialize(manifest);
+    }
+
     // ─────────────────────────── routing hygiene ───────────────────────────
 
     function test_revertWhen_releaseRowHasEmptySelectors() public {
@@ -444,37 +450,58 @@ contract StorageRegistriesTest is Test {
         sparse.initialize(manifest);
     }
 
+    function test_revertWhen_releaseHasNoFacets() public {
+        // A release IS a complete chain routing: an empty facet set describes an unusable chain
+        // and would derive a remove-everything delta. Rejected at the release boundary.
+        CTMRelease.ReleaseManifest memory manifest = _newReleaseManifest();
+        manifest.genesisFacets = new GenesisFacet[](0);
+
+        CTMRelease empty = new CTMRelease();
+        vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, address(0)));
+        empty.initialize(manifest);
+    }
+
+    function test_revertWhen_releasePinsCodelessFacet() public {
+        // A codehash pin must be over ACTUAL code: an address with no code is not a real
+        // implementation (its EXTCODEHASH is zero / the empty-code hash), so pinning it is refused.
+        address codeless = makeAddr("codelessFacet");
+        CTMRelease.ReleaseManifest memory manifest = _newReleaseManifest();
+        manifest.genesisFacets[0].facet = codeless;
+        manifest.genesisFacets[0].codehash = codeless.codehash;
+
+        CTMRelease pinless = new CTMRelease();
+        vm.expectRevert(abi.encodeWithSelector(RegistryPinTargetHasNoCode.selector, codeless));
+        pinless.initialize(manifest);
+    }
+
     function test_revertWhen_releaseRoutesSelectorTwice() public {
-        // The duplicate is caught when a transition derives from the malformed release (which
-        // must still be factory-deployed — provenance is checked before derivation).
+        // A release validates its OWN routing: a selector routed twice is rejected at release
+        // initialization — the release boundary, before any transition ever derives from it.
         CTMRelease.ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.genesisFacets[1].selectors[0] = bytes4(uint32(0x20)); // collides with facetFrozen
 
-        address malformed = releaseFactory.deployOrGetRelease(manifest);
-
-        CTMTransition.TransitionManifest memory transitionManifest = _transitionManifest();
-        transitionManifest.newRelease = malformed;
-        CTMTransition duplicated = new CTMTransition();
+        CTMRelease duplicated = new CTMRelease();
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateSelector.selector, bytes4(uint32(0x20))));
-        duplicated.initialize(transitionManifest);
+        duplicated.initialize(manifest);
     }
 
     // ─────────────────────────── factory provenance ───────────────────────────
 
-    function test_revertWhen_transitionReleaseNotFactoryDeployed() public {
-        // Genuine CTMRelease code, correctly initialized — but hand-deployed, so the canonical
-        // factory never attested it. A transition must refuse both edges like that: otherwise an
-        // arbitrary (possibly mutable) `ICTMRelease` implementation could feed the derivation
-        // and later serve genesis data via `currentRelease`.
+    function test_transitionDefersReleaseProvenanceToCtm() public {
+        // Release PROVENANCE is deliberately NOT a transition concern: a permissionless manifest
+        // could name any "factory", so the transition only validates each edge's routing/pins and
+        // leaves attestation to the CTM's canonical `releaseFactory` (enforced when the release
+        // becomes `currentRelease` — see the CTM-level provenance test). So a hand-deployed but
+        // VALID release is accepted here and derives a normal delta.
         CTMRelease handDeployed = new CTMRelease();
         handDeployed.initialize(_newReleaseManifest());
 
         CTMTransition.TransitionManifest memory manifest = _transitionManifest();
         manifest.newRelease = address(handDeployed);
 
-        CTMTransition unattested = new CTMTransition();
-        vm.expectRevert(abi.encodeWithSelector(NotFactoryDeployed.selector, address(handDeployed)));
-        unattested.initialize(manifest);
+        CTMTransition deferred = new CTMTransition();
+        deferred.initialize(manifest);
+        assertEq(deferred.newRelease(), address(handDeployed), "transition accepts a valid hand-deployed release");
     }
 
     // ─────────────────────────── pins ───────────────────────────
@@ -535,5 +562,30 @@ contract StorageRegistriesTest is Test {
         CoreRegistry sourceless = new CoreRegistry();
         vm.expectRevert(ZeroAddress.selector);
         sourceless.initialize(manifest);
+    }
+
+    function test_revertWhen_coreRegistryRowHasNoImplementation() public {
+        // Every core row is a real edge — a placeholder that pins no new implementation
+        // (implNew == 0) is refused; the old "skip zero rows" behavior is gone.
+        CoreRegistry.CoreRegistryManifest memory manifest = _coreManifest();
+        manifest.contractRows[0].implNew = address(0);
+        manifest.contractRows[0].implNewCodehash = bytes32(0);
+
+        CoreRegistry placeholder = new CoreRegistry();
+        vm.expectRevert(ZeroAddress.selector);
+        placeholder.initialize(manifest);
+    }
+
+    function test_revertWhen_coreRegistryHasDuplicateProxyRow() public {
+        // A proxy is routed once: two rows naming the same proxy are rejected.
+        CoreRegistry.CoreRegistryManifest memory manifest = _coreManifest();
+        EcosystemContractRow[] memory rows = new EcosystemContractRow[](2);
+        rows[0] = manifest.contractRows[0];
+        rows[1] = manifest.contractRows[0]; // same proxy again
+        manifest.contractRows = rows;
+
+        CoreRegistry duped = new CoreRegistry();
+        vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateProxyRow.selector, rows[0].proxy));
+        duped.initialize(manifest);
     }
 }

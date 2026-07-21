@@ -124,7 +124,7 @@ abstract contract DeployCTMUtils is DeployUtils {
 
     /// @notice Deploys the storage-backed genesis registry and pins the freshly deployed facet
     /// set plus the base system contract hashes into it. The chain-creation params point at it
-    /// (`ChainCreationParams.registry`), and `DiamondInit` reads everything chain-independent
+    /// (the CTM's `currentRelease`), and `DiamondInit` reads everything chain-independent
     /// from there — the committed genesis cut carries no facets and no init payload.
     /// @dev Plain CREATE, not CREATE2: the registry has no constructor args, so a CREATE2 deploy
     /// with the shared salt would land every run (Era CTM, ZKsyncOS CTM, later upgrades) on the
@@ -227,7 +227,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
         // The committed genesis cut is only the DiamondInit address: no `facetCuts` and no init
         // payload. `DiamondInit` reads the facet set and the base system contract hashes from
-        // the genesis registry pinned in `ChainCreationParams.registry` below.
+        // the CTM's pinned `currentRelease`.
         diamondCut = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
             initAddress: stateTransition.facets.diamondInit,
@@ -249,8 +249,7 @@ abstract contract DeployCTMUtils is DeployUtils {
                 genesisIndexRepeatedStorageChanges: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex),
                 genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
                 diamondCut: diamondCut,
-                forceDeploymentsData: generatedData.forceDeploymentsData,
-                registry: stateTransition.currentRelease
+                forceDeploymentsData: generatedData.forceDeploymentsData
             });
     }
 
@@ -264,6 +263,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             ChainTypeManagerInitializeData({
                 owner: getBroadcasterAddress(),
                 validatorTimelock: stateTransition.proxies.validatorTimelock,
+                releaseFactory: stateTransition.releaseFactory,
                 currentRelease: stateTransition.currentRelease,
                 protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
                 verifier: stateTransition.verifiers.verifier,

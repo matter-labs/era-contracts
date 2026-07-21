@@ -937,6 +937,7 @@ library GatewayCTMDeployerHelper {
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
             owner: baseConfig.aliasedGovernanceAddress,
             validatorTimelock: config.validatorTimelockProxy,
+            releaseFactory: config.bootstrapReleaseFactory,
             currentRelease: currentRelease,
             protocolVersion: baseConfig.protocolVersion,
             verifier: config.verifier,

@@ -20,6 +20,7 @@ import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
     HashMismatch,
+    NotFactoryDeployed,
     TransitionReleaseMismatch,
     Unauthorized,
     UpgradeNotPermissionlessYet
@@ -42,6 +43,8 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
     address internal breakGlass;
     uint256 internal newVersion;
     address internal chainAddress;
+    address internal genesisUpgradeAddr;
+    address internal upgradeEngineAddr;
 
     function setUp() public {
         deploy();
@@ -67,6 +70,13 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         assertEq(chainContractAddress.owner(), address(ctmExecutor));
 
         newVersion = SemVer.packSemVer(0, 1, 0);
+        // The pinned genesisUpgrade / upgradeEngine stand-ins must carry real code — the
+        // registry's codehash pin rejects codeless targets — so etch them and pin their real
+        // codehash below.
+        genesisUpgradeAddr = makeAddr("genesisUpgrade");
+        vm.etch(genesisUpgradeAddr, hex"600042");
+        upgradeEngineAddr = makeAddr("upgradeEngine");
+        vm.etch(upgradeEngineAddr, hex"600043");
         // Transitions require factory-attested releases on BOTH edges, so the fixture CTM's
         // mocked genesis release is replaced by a REAL factory-deployed one — through the
         // break-glass raw-call surface, which is exactly the production escape hatch for
@@ -89,10 +99,10 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
 
     /// @param _commitmentNonce Differentiates otherwise-identical release manifests (the factory
     ///        is deployOrGet per manifest hash, so identical manifests resolve to ONE instance).
-    function _deployRelease(uint256 _commitmentNonce) internal returns (CTMRelease result) {
-        // The release describes the complete chain state after the (facet-neutral) hop this
-        // suite drives: the fixture's full facet routing (explicit selectors, inline pins) and
-        // the carried base-system hashes — the transition derives an EMPTY delta from it.
+    /// @dev The release describes the complete chain state after the (facet-neutral) hop this
+    ///      suite drives: the fixture's full facet routing (explicit selectors, inline pins) and
+    ///      the carried base-system hashes — the transition derives an EMPTY delta from it.
+    function _releaseManifest(uint256 _commitmentNonce) internal view returns (CTMRelease.ReleaseManifest memory) {
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](facetCuts.length);
         for (uint256 i = 0; i < facetCuts.length; ++i) {
             genesisFacets[i] = GenesisFacet({
@@ -102,23 +112,34 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                 codehash: facetCuts[i].facet.codehash
             });
         }
-        result = CTMRelease(
-            releaseFactory.deployOrGetRelease(
-                CTMRelease.ReleaseManifest({
-                    diamondInit: diamondInit,
-                    diamondInitCodehash: diamondInit.codehash,
-                    genesisFacets: genesisFacets,
-                    bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                    defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                    evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                    fixedForceDeploymentsData: hex"f1f2",
-                    genesisUpgrade: makeAddr("genesisUpgrade"),
-                    genesisUpgradeCodehash: bytes32(0),
-                    genesisBatchHash: bytes32(uint256(1)),
-                    genesisBatchCommitment: bytes32(_commitmentNonce),
-                    genesisIndexRepeatedStorageChanges: 54
-                })
-            )
+        return
+            CTMRelease.ReleaseManifest({
+                diamondInit: diamondInit,
+                diamondInitCodehash: diamondInit.codehash,
+                genesisFacets: genesisFacets,
+                bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                fixedForceDeploymentsData: hex"f1f2",
+                genesisUpgrade: genesisUpgradeAddr,
+                genesisUpgradeCodehash: genesisUpgradeAddr.codehash,
+                genesisBatchHash: bytes32(uint256(1)),
+                genesisBatchCommitment: bytes32(_commitmentNonce),
+                genesisIndexRepeatedStorageChanges: 54
+            });
+    }
+
+    /// @dev Deploys a release through the real factory AND attests it on the CTM's mocked
+    ///      canonical factory (`Utils.TEST_RELEASE_FACTORY`), so the CTM's provenance check accepts
+    ///      it once it becomes `currentRelease` (bootstrap re-point and applied-transition target
+    ///      alike). Use `releaseFactory.deployOrGetRelease(_releaseManifest(...))` directly to get
+    ///      a valid but UNATTESTED release.
+    function _deployRelease(uint256 _commitmentNonce) internal returns (CTMRelease result) {
+        result = CTMRelease(releaseFactory.deployOrGetRelease(_releaseManifest(_commitmentNonce)));
+        vm.mockCall(
+            Utils.TEST_RELEASE_FACTORY,
+            abi.encodeWithSelector(bytes4(keccak256("deployedFor(bytes32)")), result.manifestHash()),
+            abi.encode(address(result))
         );
     }
 
@@ -144,7 +165,6 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         result = CTMTransition(
             transitionFactory.deployOrGetTransition(
                 CTMTransition.TransitionManifest({
-                    releaseFactory: address(releaseFactory),
                     oldProtocolVersion: _oldProtocolVersion,
                     newProtocolVersion: newVersion,
                     verifier: testnetVerifier,
@@ -153,8 +173,8 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                     // genesis'd with (its current release), as the executor's release-edge pin requires.
                     fromRelease: _fromRelease,
                     newRelease: address(release),
-                    upgradeEngine: makeAddr("upgradeEngine"),
-                    upgradeEngineCodehash: bytes32(0),
+                    upgradeEngine: upgradeEngineAddr,
+                    upgradeEngineCodehash: upgradeEngineAddr.codehash,
                     oldProtocolVersionDeadline: 1000,
                     upgradeTimestamp: _upgradeTimestamp,
                     l2Plan: L2UpgradePlan({
@@ -228,6 +248,23 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         );
         vm.prank(governor);
         ctmExecutor.applyCTMUpgrade(ICTMTransition(address(transition)));
+    }
+
+    function test_revertWhen_setCurrentReleaseNotFactoryDeployed() public {
+        // Release provenance is the CTM's own invariant — the transition deliberately delegates it
+        // upward. A real, valid release the CTM's canonical factory never attested is refused when
+        // set as `currentRelease`. Deploy one but do NOT attest it on the mocked factory.
+        address unattested = releaseFactory.deployOrGetRelease(_releaseManifest(99));
+        Call[] memory repoint = new Call[](1);
+        repoint[0] = Call({
+            target: address(chainContractAddress),
+            value: 0,
+            data: abi.encodeCall(IChainTypeManager.setCurrentRelease, (unattested))
+        });
+
+        vm.expectRevert(abi.encodeWithSelector(NotFactoryDeployed.selector, unattested));
+        vm.prank(breakGlass);
+        ctmExecutor.forward(repoint);
     }
 
     function test_revertWhen_applyCTMUpgradeFromWrongVersion() public {

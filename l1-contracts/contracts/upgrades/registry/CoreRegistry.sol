@@ -3,9 +3,10 @@
 pragma solidity 0.8.28;
 
 import {ICoreRegistry, EcosystemContractRow} from "./ICoreRegistry.sol";
+import {CodehashPinLib} from "./CodehashPinLib.sol";
 import {
     RegistryAlreadyInitialized,
-    RegistryCodehashMismatch,
+    RegistryDuplicateProxyRow,
     RegistryUnknownKey,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
@@ -59,12 +60,17 @@ contract CoreRegistry is ICoreRegistry {
         }
         for (uint256 i = 0; i < length; ++i) {
             EcosystemContractRow calldata row = _manifest.contractRows[i];
-            if (row.implNew != address(0)) {
-                // An upgrading row is a full edge: known source, pinned target.
-                if (row.proxy == address(0) || row.expectedOldImpl == address(0)) {
-                    revert ZeroAddress();
+            // Every row is a REAL, unique edge: known source, pinned target, one row per proxy.
+            // Placeholder rows (zero implNew) are refused — a contract not participating in the
+            // upgrade simply has no row.
+            if (row.proxy == address(0) || row.expectedOldImpl == address(0) || row.implNew == address(0)) {
+                revert ZeroAddress();
+            }
+            _requirePin(row.implNew, row.implNewCodehash);
+            for (uint256 j = 0; j < i; ++j) {
+                if (_manifest.contractRows[j].proxy == row.proxy) {
+                    revert RegistryDuplicateProxyRow(row.proxy);
                 }
-                _requirePin(row.implNew, row.implNewCodehash);
             }
         }
         initialized = true;
@@ -92,10 +98,7 @@ contract CoreRegistry is ICoreRegistry {
         }
         uint256 length = contractRows.length;
         for (uint256 i = 0; i < length; ++i) {
-            if (
-                contractRows[i].implNew != address(0) &&
-                contractRows[i].implNew.codehash != contractRows[i].implNewCodehash
-            ) {
+            if (!CodehashPinLib.pinHolds(contractRows[i].implNew, contractRows[i].implNewCodehash)) {
                 return false;
             }
         }
@@ -115,9 +118,6 @@ contract CoreRegistry is ICoreRegistry {
     }
 
     function _requirePin(address _target, bytes32 _expectedCodehash) private view {
-        bytes32 actualCodehash = _target.codehash;
-        if (actualCodehash != _expectedCodehash) {
-            revert RegistryCodehashMismatch(_target, _expectedCodehash, actualCodehash);
-        }
+        CodehashPinLib.requirePin(_target, _expectedCodehash);
     }
 }

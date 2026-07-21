@@ -114,6 +114,7 @@ abstract contract GatewayCTMDeployerCTMBase {
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
             owner: baseConfig.aliasedGovernanceAddress,
             validatorTimelock: _config.validatorTimelockProxy,
+            releaseFactory: _config.bootstrapReleaseFactory,
             currentRelease: currentRelease,
             protocolVersion: baseConfig.protocolVersion,
             verifier: _config.verifier,

@@ -3,9 +3,10 @@
 pragma solidity 0.8.28;
 
 import {GenesisFacet, ICTMRelease} from "./ICTMRelease.sol";
+import {CodehashPinLib} from "./CodehashPinLib.sol";
 import {
     RegistryAlreadyInitialized,
-    RegistryCodehashMismatch,
+    RegistryDuplicateSelector,
     RegistryEmptySelectors,
     RegistryUnknownKey,
     ZeroAddress
@@ -61,13 +62,34 @@ contract CTMRelease is ICTMRelease {
         _requirePin(_manifest.diamondInit, _manifest.diamondInitCodehash);
         _requirePin(_manifest.genesisUpgrade, _manifest.genesisUpgradeCodehash);
         uint256 length = _manifest.genesisFacets.length;
+        // A release IS a complete chain routing — an empty one would describe an unusable chain
+        // and, worse, derive a remove-everything delta in any transition that departs from a
+        // populated release toward it. Whole-routing validity is enforced at THIS boundary, not
+        // only when a transition later derives from the release.
+        if (length == 0) {
+            revert RegistryEmptySelectors(address(0));
+        }
         for (uint256 i = 0; i < length; ++i) {
             // Releases are the canonical routing source: every facet row carries its explicit,
             // complete selector list (transitions derive their cuts from these) and its pin.
-            if (_manifest.genesisFacets[i].selectors.length == 0) {
+            uint256 selectorsLength = _manifest.genesisFacets[i].selectors.length;
+            if (selectorsLength == 0) {
                 revert RegistryEmptySelectors(_manifest.genesisFacets[i].facet);
             }
             _requirePin(_manifest.genesisFacets[i].facet, _manifest.genesisFacets[i].codehash);
+            // A diamond routes each selector exactly once — reject duplicates across the whole
+            // routing (within AND across rows), not just when a transition later derives.
+            for (uint256 j = 0; j < selectorsLength; ++j) {
+                bytes4 selector = _manifest.genesisFacets[i].selectors[j];
+                for (uint256 k = 0; k <= i; ++k) {
+                    uint256 upperBound = k == i ? j : _manifest.genesisFacets[k].selectors.length;
+                    for (uint256 m = 0; m < upperBound; ++m) {
+                        if (_manifest.genesisFacets[k].selectors[m] == selector) {
+                            revert RegistryDuplicateSelector(selector);
+                        }
+                    }
+                }
+            }
         }
 
         initialized = true;
@@ -124,12 +146,15 @@ contract CTMRelease is ICTMRelease {
         if (!initialized) {
             return false;
         }
-        if (releaseDiamondInit.codehash != diamondInitCodehash || genesisUpgrade.codehash != genesisUpgradeCodehash) {
+        if (
+            !CodehashPinLib.pinHolds(releaseDiamondInit, diamondInitCodehash) ||
+            !CodehashPinLib.pinHolds(genesisUpgrade, genesisUpgradeCodehash)
+        ) {
             return false;
         }
         uint256 length = releaseGenesisFacets.length;
         for (uint256 i = 0; i < length; ++i) {
-            if (releaseGenesisFacets[i].facet.codehash != releaseGenesisFacets[i].codehash) {
+            if (!CodehashPinLib.pinHolds(releaseGenesisFacets[i].facet, releaseGenesisFacets[i].codehash)) {
                 return false;
             }
         }
@@ -137,9 +162,6 @@ contract CTMRelease is ICTMRelease {
     }
 
     function _requirePin(address _target, bytes32 _expectedCodehash) private view {
-        bytes32 actualCodehash = _target.codehash;
-        if (actualCodehash != _expectedCodehash) {
-            revert RegistryCodehashMismatch(_target, _expectedCodehash, actualCodehash);
-        }
+        CodehashPinLib.requirePin(_target, _expectedCodehash);
     }
 }

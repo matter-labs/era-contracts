@@ -67,12 +67,11 @@ contract EcosystemUpgradeExecutorTest is Test {
         messageRootProxy = new TransparentUpgradeableProxy(address(implOld), address(proxyAdmin), hex"");
 
         // Bridgehub is a full source-checked edge (old -> new); MessageRoot pins its live
-        // implementation (the executor's live comparison must skip it); the third row pins no
-        // new implementation at all (zero => skipped before any proxy interaction).
-        EcosystemContractRow[] memory rows = new EcosystemContractRow[](3);
+        // implementation (the executor's live comparison must skip it). Every row must be a real,
+        // unique edge — a placeholder (all-zero) row is rejected at the registry boundary.
+        EcosystemContractRow[] memory rows = new EcosystemContractRow[](2);
         rows[0] = _row(address(bridgehubProxy), address(implOld), address(implNew));
         rows[1] = _row(address(messageRootProxy), address(implOld), address(implOld));
-        rows[2] = _row(address(0), address(0), address(0));
         coreRegistry = _deployRegistry(rows);
     }
 

@@ -164,6 +164,18 @@ contract UtilsCallMockerTest is Test {
     function mockGenesisRegistryContract() public {
         address genesisRegistry = Utils.TEST_GENESIS_REGISTRY;
         vm.mockCall(genesisRegistry, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
+        vm.mockCall(
+            genesisRegistry,
+            abi.encodeWithSelector(ICTMRelease.manifestHash.selector),
+            abi.encode(bytes32("mock-genesis-manifest"))
+        );
+        // The mocked canonical release factory attests the mocked genesis release for ANY hash;
+        // tests pinning REAL releases add specific-argument mocks (precedence) per release.
+        vm.mockCall(
+            Utils.TEST_RELEASE_FACTORY,
+            abi.encodeWithSelector(bytes4(keccak256("deployedFor(bytes32)"))),
+            abi.encode(genesisRegistry)
+        );
         vm.mockCall(genesisRegistry, abi.encodeWithSelector(ICTMRelease.verifyAll.selector), abi.encode(true));
         // VM identity is read from the release's DiamondInit immutable; the mocked registry's
         // `diamondInit()` placeholder is the registry itself, so mock the flag there too.
@@ -187,7 +199,7 @@ contract UtilsCallMockerTest is Test {
                 Utils.TEST_BASE_SYSTEM_CONTRACT_HASH
             )
         );
-        // Genesis params the CTM validates in `_setGenesisRegistry` and reads back via
+        // Genesis params the CTM validates when its current release is set and reads back via
         // `storedBatchZero()` / `l1GenesisUpgrade()`. All non-zero so both Era and ZKsyncOS
         // validation passes; fixtures that actually run the genesis upgrade (i.e. create a chain
         // through the CTM) re-mock `genesisParams` with their real genesis-upgrade address.
