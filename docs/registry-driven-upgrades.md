@@ -294,3 +294,43 @@ v33 protocol-ops integration described above.
 - **Nothing large flows through `createNewChain`.** Genesis force-deployment bytecodes are
   published out-of-band and referenced by hash; the bridgehub → CTM call carries only
   `(chainId, admin)`.
+
+## Governance layer: self-migration (design — lives in zk-governance)
+
+The registry model's authority chain bottoms out at the governance layer
+([zk-governance](https://github.com/zksync-association/zk-governance)): the domain executors'
+`owner` is the `ProtocolUpgradeHandler` (PUH), and break-glass is separately governed. That layer
+upgrades itself by **redeploy + ownership migration**, not by proxy-impl swaps — a fresh PUH
+implementation + proxy (CREATE3), fresh **immutable** multisigs (Guardians, SecurityCouncil,
+EmergencyUpgradeBoard), and then a proposal through the OLD PUH that re-points ownership of every
+owned contract to the new one. Today that proposal is hand-authored calldata — the **last
+remaining hand-authored upgrade surface** in the system.
+
+The completion of the model is NOT a standing `GovernanceUpgradeExecutor`:
+
+- the payload is an ownership-migration set, not proxy swaps, so a ProxyAdmin-bound executor
+  does not describe it;
+- the PUH already executes arbitrary calls — a permanently-owned executor between the PUH and
+  itself adds indirection without any new authority separation (the same reasoning that removed
+  the generic delegatecall modules here).
+
+What fits is a **write-once `GovernanceMigration` object** — the same data discipline applied to
+governance succession:
+
+- **Factory-deployed** (`deployOrGet`, CREATE3-compatible for their deployment flow), write-once,
+  `validate()` reverting, `manifestHash` as the 32-byte commitment.
+- Pins the new PUH implementation and each new multisig **with inline codehashes**.
+- Carries **source-checked ownership edges** — `(target, expectedCurrentOwner → newOwner)` (plus
+  the analogous proxy-admin edges) — so a stale or replayed migration can never re-point
+  ownership backwards: the exact `expectedOldImpl` property of `EcosystemContractRow`, applied to
+  authority instead of implementations.
+- Executed by **one call in one PUH proposal** (`migration.execute()`, gated
+  `msg.sender == PUH`). The proposal collapses from a page of ownership calls to one pinned
+  object; the audit unit is the migration manifest. The EmergencyUpgradeBoard remains the
+  break-glass analogue, unchanged.
+
+Coupling to this repo: the era-contracts executor fleet's `owner` / `breakGlassGovernor` pointers
+are themselves edges such a migration must move (`CTMUpgradeExecutor`,
+`EcosystemUpgradeExecutor`), so the source-checked-edge row shape should be shared (a small
+extracted library) rather than reimplemented. The implementation itself belongs in the
+zk-governance repository (its own audit scope); nothing in this repo blocks on it.
