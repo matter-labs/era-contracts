@@ -1,8 +1,9 @@
 # Registry-Driven Protocol Upgrades
 
-**Status:** Implemented for v32 (era-contracts PR #2270). v32 is the first registry-driven
-release; the on-chain executor path drives upgrades from v33 onward (v32 itself ships through the
-legacy governance-calldata pipeline, see "Legacy path" below).
+**Status:** Architecture implemented in era-contracts PR #2270. v32 bootstraps each CTM's
+`currentRelease` through the legacy governance-calldata pipeline. Deploying the bound executors and
+handing them CTM / `ProxyAdmin` ownership is explicit v33 protocol-ops integration work; see
+"Legacy path" below.
 **Scope:** L1 + L2 era-contracts, upgrade tooling, governance proposal shape.
 
 The model separates two concepts that earlier drafts conflated:
@@ -20,10 +21,12 @@ The model separates two concepts that earlier drafts conflated:
   the schedule, and the typed `L2UpgradePlan`.
 
 Both are storage-backed, **write-once** contracts generated per upgrade, initialized exactly once
-from an audited manifest, committing `manifestHash = keccak256(manifest)`. Every address either
-object names carries its expected `EXTCODEHASH` **inline and mandatorily** — there is no
-detached, optional pin list. On-chain code reads them; governance only approves "apply this
-pinned transition".
+from an audited manifest, committing `manifestHash = keccak256(manifest)`. Canonical factories
+deploy each object with CREATE2 using that hash as the salt and attest the resulting address.
+Executors reject objects not attested by their bound factory, and transitions likewise reject
+releases not attested by the release factory named in the transition manifest. Every executable
+address the objects name carries its expected `EXTCODEHASH` **inline and mandatorily** — there is
+no detached, optional pin list. Governance only approves "apply this factory-attested transition".
 
 ## Contract map
 
@@ -32,8 +35,8 @@ flowchart TB
     subgraph auth["Authority (bound domain executors)"]
       PUH["Governance / PUH (owner)"]
       BG["Break-glass governor<br/>(separately governed)"]
-      CTMEXE["CTMUpgradeExecutor — bound to ONE CTM (immutable)<br/>applyCTMUpgrade(transition)<br/>upgradeChain(transition, chainId)<br/>acceptCTMOwnership()"]
-      ECOEXE["EcosystemUpgradeExecutor — bound to ONE ProxyAdmin (immutable)<br/>applyL1Upgrade(coreRegistry)"]
+      CTMEXE["CTMUpgradeExecutor — bound to ONE CTM +<br/>ONE TransitionFactory (immutables)<br/>applyCTMUpgrade(transition)<br/>upgradeChain(transition, chainId)<br/>acceptCTMOwnership()"]
+      ECOEXE["EcosystemUpgradeExecutor — bound to ONE ProxyAdmin +<br/>ONE CoreRegistryFactory (immutables)<br/>applyL1Upgrade(coreRegistry)"]
       PUH -->|owns| CTMEXE
       PUH -->|owns| ECOEXE
       BG -.->|"forward(Call[]) only"| CTMEXE
@@ -41,18 +44,18 @@ flowchart TB
     end
 
     subgraph objects["Write-once upgrade objects (one set per upgrade)"]
-      FACT["CTMReleaseFactory / CTMTransitionFactory /<br/>CoreRegistryFactory<br/>deployOrGet* — atomic deploy + initialize,<br/>idempotent per manifest hash"]
+      FACT["CTMReleaseFactory / CTMTransitionFactory /<br/>CoreRegistryFactory<br/>CREATE2 salt = manifest hash;<br/>atomic + idempotent deployOrGet*"]
       REL["CTMRelease<br/>explicit facet routing + inline pins,<br/>DiamondInit, system hashes,<br/>genesis params, force-deploy data<br/>(version- and VM-flag-independent)"]
-      TRA["CTMTransition<br/>DERIVED facet/hash delta (stored at init),<br/>version edge, pinned verifier + upgradeEngine,<br/>schedule, typed L2UpgradePlan"]
+      TRA["CTMTransition<br/>DERIVED final facet cuts + hash delta (stored at init),<br/>release-factory provenance, version edge,<br/>pinned verifier + upgradeEngine, schedule, typed L2UpgradePlan"]
       COREREG["CoreRegistry<br/>source-checked rows:<br/>proxy, expectedOldImpl -> implNew + pin"]
       FACT -->|"deploys + initializes"| REL
       FACT -->|"deploys + initializes"| TRA
       FACT -->|"deploys + initializes"| COREREG
-      TRA -->|"validates BOTH releases;<br/>pins fromRelease -> newRelease"| REL
+      TRA -->|"factory-attests + validates BOTH releases;<br/>pins fromRelease -> newRelease"| REL
     end
 
     subgraph libs["Readers / composers (libraries)"]
-      DELTA["TransitionDeltaLib<br/>deriveFacetSwaps / deriveHashChanges"]
+      DELTA["TransitionDeltaLib<br/>deriveFacetCuts / deriveHashChanges"]
       READER["ReleaseFacetReader<br/>newChainInstallations(release)"]
       COMPOSER["CTMUpgradeComposer<br/>buildUpgradeCutData / buildL2UpgradeTx /<br/>buildProposedUpgrade (from a transition)"]
       GENLIB["GenesisManifestLib<br/>GenesisConfig -> genesis ReleaseManifest<br/>(explicit routing + pins at build time)"]
@@ -65,9 +68,9 @@ flowchart TB
     end
 
     CTMEXE -->|owns| CTM
-    CTMEXE -->|validate + apply| TRA
+    CTMEXE -->|factory-attest + validate + apply| TRA
     CTMEXE -->|"buildUpgradeCutData<br/>(cut = upgradeEngine.upgradeFromTransition)"| COMPOSER
-    ECOEXE -->|validate + read rows| COREREG
+    ECOEXE -->|factory-attest + validate + read rows| COREREG
 
     TRA -->|"derivation at initialization"| DELTA
     DELTA -->|"reads both releases'<br/>routing + hashes"| REL
@@ -75,7 +78,7 @@ flowchart TB
     CTM -.currentRelease.-> REL
     DI -->|reads CTM.currentRelease| READER
     READER -->|genesisFacets| REL
-    BASE -->|"facetTransitions() (derived) + proposal"| TRA
+    BASE -->|"facetCuts() (derived, applied verbatim) + proposal"| TRA
     BASE -->|"buildProposedUpgrade / buildL2UpgradeTx"| COMPOSER
     COMPOSER -->|"reads L2UpgradePlan,<br/>schedule, version edge"| TRA
     COMPOSER -.->|"L2 tx type via<br/>newRelease.diamondInit().IS_ZKSYNC_OS"| REL
@@ -84,25 +87,26 @@ flowchart TB
 
 ## Contracts
 
-| Contract                                                             | Where                          | Role                                                                                                                                                                                                                                                                                               |
-| -------------------------------------------------------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CTMRelease`                                                         | `contracts/upgrades/registry/` | Write-once description of one release: `DiamondInit` + pin, complete `GenesisFacet[]` (address, freezability, **explicit non-empty selectors**, **inline pin**), base-system hashes, `fixedForceDeploymentsData`, genesis params (+ genesis-upgrade pin). **No version, no verifier, no VM flag.** |
-| `CTMTransition`                                                      | `contracts/upgrades/registry/` | Write-once description of one hop. Authored: version edge, pinned `verifier`, pinned `upgradeEngine`, schedule, `L2UpgradePlan`. **Derived at init** from `(fromRelease, newRelease)` and stored: `UpgradeFacetSwap[]` + base-system hash changes. `fromRelease` is mandatory (never zero).        |
-| `CoreRegistry`                                                       | `contracts/upgrades/registry/` | Write-once **source-checked** L1 ecosystem rows: `ecosystemRows()` returns `EcosystemContractRow[]` (key, proxy, `expectedOldImpl`, `implNew`, inline pin). No proxy admin (the executor is bound to it), no protocol versions.                                                                    |
-| `TransitionDeltaLib`                                                 | `contracts/upgrades/registry/` | DERIVES the facet swaps + hash changes from a release pair; rejects duplicate selectors within a release's routing. Replaces the previous author-then-prove convergence model.                                                                                                                     |
-| `ICTMRelease` / `ICTMTransition` / `ICoreRegistry`                   | `contracts/upgrades/registry/` | Read interfaces used by consumers (CTM, DiamondInit, `BaseZkSyncUpgrade`, composer, executors).                                                                                                                                                                                                    |
-| `ReleaseFacetReader`                                                 | `contracts/upgrades/registry/` | `newChainInstallations(release)` — genesis facet cuts straight from the release's explicit routing (no self-description fallback).                                                                                                                                                                 |
-| `GenesisManifestLib`                                                 | `contracts/upgrades/registry/` | `buildGenesisManifest(GenesisConfig)` → the genesis `ReleaseManifest`. Explicit routing + codehash pins are captured from the just-deployed facets AT BUILD TIME (`ISelfDescribingFacet.selectors()` / `EXTCODEHASH`); nothing self-describes at consumption time.                                 |
-| `CTMUpgradeComposer`                                                 | `contracts/upgrades/registry/` | Pure composition **from a transition**: `buildUpgradeCutData`, `buildL2UpgradeTx` (composed whenever the plan has ANY L2 side — deployments **or** a delegate call), `buildProposedUpgrade`. L2 tx type comes from the target release's `DiamondInit.IS_ZKSYNC_OS`.                                |
-| `CTMReleaseFactory` / `CTMTransitionFactory` / `CoreRegistryFactory` | `contracts/upgrades/registry/` | Atomic, **idempotent** deploy-and-initialize (`deployOrGet*`): one transaction, keyed by manifest hash — no uninitialized window, and a same-manifest front-run just does the caller's work. One factory per type (combined exceeds EIP-170).                                                      |
-| `CTMUpgradeExecutor`                                                 | `contracts/upgrades/registry/` | Executor **bound to one immutable CTM**. Fixed logic: `applyCTMUpgrade(transition)`, `upgradeChain(transition, chainId)` (owner during the window, **permissionless after the old-version deadline**), `acceptCTMOwnership()`.                                                                     |
-| `EcosystemUpgradeExecutor`                                           | `contracts/upgrades/registry/` | Executor **bound to one immutable ecosystem `ProxyAdmin`**. Fixed logic: `applyL1Upgrade(coreRegistry)` — source-checked: at `implNew` ⇒ skip, at `expectedOldImpl` ⇒ upgrade, anything else ⇒ revert (a stale registry can never downgrade a proxy).                                              |
-| `UpgradeExecutorBase`                                                | `contracts/governance/`        | Shared base: `Ownable2Step` (owner = PUH) drives the fixed entrypoints; `forward(Call[])` is gated by a **separately governed `breakGlassGovernor`** (own two-step handover) — raw authority that CAN bypass transition invariants, so it belongs to a distinct holder (e.g. a security council).  |
+| Contract                                                             | Where                          | Role                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CTMRelease`                                                         | `contracts/upgrades/registry/` | Write-once description of one release: `DiamondInit` + pin, complete `GenesisFacet[]` (address, freezability, **explicit non-empty selectors**, **inline pin**), base-system hashes, `fixedForceDeploymentsData`, genesis params (+ genesis-upgrade pin). **No version, no verifier, no VM flag.**                                                                      |
+| `CTMTransition`                                                      | `contracts/upgrades/registry/` | Write-once description of one hop. Authored: release factory, version edge, pinned `verifier`, pinned `upgradeEngine`, schedule, `L2UpgradePlan`. **Derived at init** from `(fromRelease, newRelease)` and stored: final `Diamond.FacetCut[]` + base-system hash changes. Both releases must be attested by the named factory; `fromRelease` is never zero.             |
+| `CoreRegistry`                                                       | `contracts/upgrades/registry/` | Write-once **source-checked** L1 ecosystem rows: `ecosystemRows()` returns `EcosystemContractRow[]` (`proxy`, `expectedOldImpl`, `implNew`, inline pin). The proxy address is the row identity; human labels live off-chain. No proxy admin or protocol version is stored.                                                                                              |
+| `TransitionDeltaLib`                                                 | `contracts/upgrades/registry/` | DERIVES final ready-to-execute facet cuts (all removals, then additions) + hash changes from a release pair; rejects duplicate selectors within either release's routing. There is no execution-time selector resolution or re-diffing.                                                                                                                                 |
+| `ICTMRelease` / `ICTMTransition` / `ICoreRegistry`                   | `contracts/upgrades/registry/` | Read interfaces used by consumers (CTM, DiamondInit, `BaseZkSyncUpgrade`, composer, executors).                                                                                                                                                                                                                                                                         |
+| `ReleaseFacetReader`                                                 | `contracts/upgrades/registry/` | `newChainInstallations(release)` — genesis facet cuts straight from the release's explicit routing (no self-description fallback).                                                                                                                                                                                                                                      |
+| `GenesisManifestLib`                                                 | `contracts/upgrades/registry/` | `buildGenesisManifest(GenesisConfig)` → the genesis `ReleaseManifest`. Explicit routing + codehash pins are captured from the just-deployed facets AT BUILD TIME (`ISelfDescribingFacet.selectors()` / `EXTCODEHASH`); nothing self-describes at consumption time.                                                                                                      |
+| `CTMUpgradeComposer`                                                 | `contracts/upgrades/registry/` | Pure composition **from a transition**: `buildUpgradeCutData`, `buildL2UpgradeTx` (composed whenever the plan has ANY L2 side — deployments **or** a delegate call), `buildProposedUpgrade`. L2 tx type comes from the target release's `DiamondInit.IS_ZKSYNC_OS`.                                                                                                     |
+| `CTMReleaseFactory` / `CTMTransitionFactory` / `CoreRegistryFactory` | `contracts/upgrades/registry/` | Atomic, **idempotent** deploy-and-initialize (`deployOrGet*`) via CREATE2 with `salt = keccak256(abi.encode(manifest))`. Addresses are manifest commitments and nonce-independent; same-manifest races return the attested instance, while different manifests cannot displace it. One factory per type because combining their embedded creation code exceeds EIP-170. |
+| `CTMUpgradeExecutor`                                                 | `contracts/upgrades/registry/` | Executor **bound to one immutable CTM and one immutable `CTMTransitionFactory`**. It rejects transitions not attested by that factory. Fixed logic: `applyCTMUpgrade`, `upgradeChain` (owner during the window, permissionless after the deadline), and `acceptCTMOwnership`.                                                                                           |
+| `EcosystemUpgradeExecutor`                                           | `contracts/upgrades/registry/` | Executor **bound to one immutable ecosystem `ProxyAdmin` and one immutable `CoreRegistryFactory`**. It rejects non-attested registries, then applies source-checked rows: at `implNew` ⇒ skip, at `expectedOldImpl` ⇒ upgrade, anything else ⇒ revert.                                                                                                                  |
+| `UpgradeExecutorBase`                                                | `contracts/governance/`        | Shared base: `Ownable2Step` (owner = PUH) drives the fixed entrypoints; `forward(Call[])` is gated by a **separately governed `breakGlassGovernor`** (own two-step handover) — raw authority that CAN bypass transition invariants, so it belongs to a distinct holder (e.g. a security council).                                                                       |
 
-**Validation API.** `validate()` **reverts** (`RegistryCodehashMismatch`, uninitialized, …) and is
-called on every execution path — executor entrypoints, transition initialization (which validates
-**both** its releases), `upgradeFromTransition`. `verifyAll()` returns `bool` for inspection and
-deployment tooling. Enforcement is never left to an advisory predicate.
+**Validation API and provenance.** Executors first require factory attestation using the object's
+`manifestHash`, then call `validate()`. A transition performs the same attestation for **both**
+releases against its manifest-pinned release factory. `validate()` **reverts**
+(`RegistryCodehashMismatch`, uninitialized, …) on execution paths; `verifyAll()` returns `bool` for
+inspection and deployment tooling. Enforcement is never left to an advisory predicate.
 
 ## Data model: the CTM stores one pointer
 
@@ -117,7 +121,7 @@ deployment tooling. Enforcement is never left to an advisory predicate.
 
 There is no per-version registry map: the upgrade cut itself carries the transition address
 (`upgradeEngine.upgradeFromTransition(transition)` as init calldata), so the committed cut and
-the facet-delta source are the _same object_ — the registry identity cannot be carried twice.
+the final-facet-cut source are the _same object_ — the registry identity cannot be carried twice.
 CTM binding is commitment-based: the cut hash is written only by the CTM-bound executor, and a
 chain accepts only the cut its own CTM committed. The old `genesisRegistry` /
 `upgradeRegistryForVersion` / inline-genesis slots are retained only as `__DEPRECATED_`
@@ -148,11 +152,13 @@ Chain migration between settlement layers: `forwardedBridgeBurn` forwards only
 Governance (PUH) owns the two bound executors, which own the CTM and the ecosystem `ProxyAdmin`
 respectively. A per-upgrade proposal is a sequence of fixed-signature executor calls:
 
-- `EcosystemUpgradeExecutor.applyL1Upgrade(coreRegistry)` — `validate()`s the registry, then
+- `EcosystemUpgradeExecutor.applyL1Upgrade(coreRegistry)` — requires attestation by the executor's
+  immutable `CoreRegistryFactory`, `validate()`s the registry, then
   walks the source-checked rows: a proxy already at `implNew` is skipped (idempotence), a proxy
   at `expectedOldImpl` is upgraded, a proxy at anything else **reverts** — replaying a stale
   registry cannot downgrade a proxy a later upgrade already moved.
-- `CTMUpgradeExecutor.applyCTMUpgrade(transition)` — `validate()`s the transition, then asserts
+- `CTMUpgradeExecutor.applyCTMUpgrade(transition)` — requires attestation by the executor's
+  immutable `CTMTransitionFactory`, `validate()`s the transition, then asserts
   **both edges independently, before any mutation**:
   - release edge: `ctm.currentRelease() == transition.fromRelease()` — rejects execution from the
     wrong release and (since the call moves `currentRelease`) replays;
@@ -171,9 +177,10 @@ respectively. A per-upgrade proposal is a sequence of fixed-signature executor c
   additionally retain their own direct execution path on the chain diamond).
 
 When a chain executes the upgrade, `BaseZkSyncUpgrade.upgradeFromTransition` validates the
-transition, applies the **derived** `transition.facetTransitions()`, then runs the
-transition-composed `ProposedUpgrade` — one object sources both the facet changes and the
-proposal, and that object's delta is a pure function of the two signed releases.
+transition, applies the **derived final** `transition.facetCuts()` verbatim, then runs the
+transition-composed `ProposedUpgrade`. Selector resolution and `DiamondCutBuilder` re-diffing no
+longer exist: one object sources both the final cuts and the proposal, and its delta is a pure
+function of two factory-attested releases.
 
 **Bootstrap (migration into this architecture).** `fromRelease` is **never zero**: one-time
 migration accommodations live in one-time migration code, not in every future transition. The
@@ -192,10 +199,12 @@ payload either (`SameReleaseTransitionHasPayload`) — verifier/schedule-only. A
 Transitions also refuse `newProtocolVersion <= oldProtocolVersion` (`ProtocolVersionTooSmall`) —
 the same rule chains enforce at execution and the CTM enforces in `setNewVersionUpgrade`.
 
-**Derivation, and the honest scope of the guarantee.** The L1-side guarantee is: _the facet
-routing and base-system hashes an existing chain ends up with are byte-for-byte what a fresh
-chain at `newRelease` gets_ — true by construction, because the delta is derived from the
-release pair (duplicate selectors in a release's routing are rejected). The **L2 side is
+**Derivation, and the honest scope of the guarantee.** For representable release pairs, the
+L1-side guarantee is: _the facet routing and base-system hashes an existing chain ends up with are
+byte-for-byte what a fresh chain at `newRelease` gets_ — the final cuts and hash changes are
+derived from the release pair (duplicate selectors in either release's routing are rejected).
+Base-system upgrade calldata uses zero as "leave unchanged", so a nonzero → zero hash transition
+is not representable and must not appear in an accepted release pair. The **L2 side is
 reviewed-and-pinned data, not proven**: L1 cannot verify L2 execution effects, so the
 `L2UpgradePlan` (typed force-deployments, delegate target + calldata, factory deps) is
 shape-validated at initialization — a plan whose data the composed transaction would never
@@ -203,25 +212,28 @@ execute is rejected (`MalformedL2UpgradePlan`), and delegate-only plans compose 
 transaction (they are never silently dropped) — but what the delegate _does_ on L2 is covered by
 review of the pinned payload, not by an on-chain proof.
 
-**Atomic, idempotent deployment.** The registry objects have unauthenticated one-shot
-initializers, so deploying and initializing in separate transactions would leave an
-uninitialized, front-runnable instance. The factories (`deployOrGetRelease` /
-`deployOrGetTransition` / `deployOrGetCoreRegistry`) do both in ONE transaction and keep a
-`manifestHash -> instance` registry: a same-manifest front-run merely does the caller's work
-(the existing, verified instance is returned), and a different manifest lands in a different
-slot. Deterministic addresses are deliberately not part of the model (CREATE2 derivation differs
-between EVM and EraVM; nothing needs the address predictable — the CTM stores the pointer).
-On Gateway, the CTM deployer calls the directly-deployed `CTMReleaseFactory` inside its own
-transaction (embedding the release's creation code would exceed the EIP-3860 initcode cap), so
-the Gateway bootstrap release also has no uninitialized window; its address stays predictable
-off-chain as the factory's first CREATE.
+**Atomic, deterministic, idempotent deployment.** The registry objects have unauthenticated
+one-shot initializers, so deploying and initializing in separate transactions would leave a
+front-runnable instance. The factories (`deployOrGetRelease` / `deployOrGetTransition` /
+`deployOrGetCoreRegistry`) deploy with CREATE2 using the manifest hash as salt, initialize in the
+same transaction, and record `manifestHash -> instance`. A same-manifest front-run merely does the
+caller's work; a different manifest has a different salt and cannot consume or displace the
+approved address. CREATE2 derivation is VM-specific, so predictors use the EVM or EraVM formula
+for the deployment chain.
+
+On Gateway, the CTM deployer calls a directly deployed `CTMReleaseFactory` (embedding the release
+creation code would exceed the EIP-3860 initcode cap). The helper rebuilds the exact genesis
+manifest from the deployment artifacts and predicts the manifest-salted release address. The
+prediction is independent of factory nonce, closing the earlier different-manifest griefing race.
 
 **Legacy path.** `deploy-scripts/upgrade/default-upgrade/*` still targets _pre-v32_ CTMs and keeps
 encoding the old `setChainCreationParams`; the struct + entrypoint live in
 `ILegacyChainTypeManager` (not on the current CTM) so those scripts still compile.
 `CTMUpgrade_v32` deploys the genesis release as part of the v32 deploy and emits
-`setCurrentRelease` in the governance calldata — v32 itself ships through this legacy pipeline;
-the executor path above is how v33+ ships.
+`setCurrentRelease` in the governance calldata — v32 itself ships through this legacy pipeline.
+Deploying the domain executors and factories, transferring CTM / `ProxyAdmin` ownership, and
+accepting the two-step CTM handover are explicit protocol-ops deliverables for the first v33+
+registry-executed upgrade; they are not performed by the v32 script in this PR.
 
 ## Manifest tooling
 
@@ -230,9 +242,12 @@ consumed by the anvil registry-driven upgrade runner
 (`test/anvil-interop/run-registry-driven-upgrade-test.ts`): `REGEN_REGISTRIES=1` rebuilds it from
 a live deployment (emit), the CI default replays it and fails on any drift (consume). The
 manifest carries the two releases' complete explicit routing and the transition's authored
-fields — **no facet swaps**: the reviewable artifact is the state, not a hand-written delta.
-Production release/transition instances for a real upgrade are deployed by the upgrade-prepare
-pipeline (`CTMUpgrade_v32` for v32).
+fields, including its release-factory address — **no facet cuts**: the reviewable artifact is the
+state, not a hand-written delta. Generated addresses use the same manifest-salted CREATE2 scheme
+as the on-chain factories.
+The v32 upgrade-prepare pipeline deploys only the bootstrap release used by `currentRelease`.
+Deploying production transition/core objects and their bound factories/executors is part of the
+v33 protocol-ops integration described above.
 
 ## Assumptions / invariants
 
@@ -243,15 +258,26 @@ pipeline (`CTMUpgrade_v32` for v32).
 - **Releases and transitions are pinned deployed contracts, write-once.** `initialize` reverts if
   already set; the committed `manifestHash` is what a proposal pins; the addresses referenced by
   governance are implementation addresses, never proxies.
-- **Pins are inline and mandatory.** Every address a release/transition/core-registry names
-  carries its expected `EXTCODEHASH` beside it, checked at initialization and by
-  `validate()` / `verifyAll()`.
+- **Factory provenance is mandatory.** CTM and ecosystem executors accept objects only from their
+  immutable transition/core factories; transitions accept both release edges only from the
+  release factory pinned in their manifest.
+- **Registry addresses are deterministic.** Factories use CREATE2 with the manifest hash as salt;
+  off-chain prediction must use the correct EVM/EraVM formula and exact creation code.
+- **Pins are inline and mandatory.** Every executable address a
+  release/transition/core-registry names carries its expected `EXTCODEHASH` beside it, checked at
+  initialization and by `validate()` / `verifyAll()`. Operational manifests must name deployed
+  code: pin validation currently compares hashes but does not separately require
+  `target.code.length != 0`.
 - **Validation reverts on execution paths.** `validate()` everywhere on-chain; `verifyAll()` is
   tooling-only.
-- **Releases carry explicit complete routing.** Empty selector lists are rejected; duplicate
-  selectors are rejected during derivation. Facet self-description
+- **Releases carry explicit complete routing.** Each declared facet row must have selectors;
+  duplicate selectors are rejected during transition derivation. Bootstrap generators must also
+  ensure the facet array is nonempty and duplicate-free because release initialization does not
+  independently enforce those whole-routing properties. Facet self-description
   (`ISelfDescribingFacet.selectors()`) is a BUILD-time tool for manifest generators, not a
   consumption-time code read.
+- **Zero hash means unchanged in an upgrade.** Release pairs must not require a nonzero → zero
+  base-system hash change; that state transition is not representable by `BaseZkSyncUpgrade`.
 - **VM identity has one source**: the pinned `DiamondInit.IS_ZKSYNC_OS` immutable, validated by
   the CTM against its own flavour when a release is pinned, and read by the composer for the L2
   tx type.
