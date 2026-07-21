@@ -174,9 +174,12 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         _claimRefundAndAssertRecovery();
     }
 
-    /// @notice A second `claimRefund` for the same leg must revert: `claimRefund` flips the leg to
-    /// `Reverted` (CEI) before its external recovery calls, so any replay/reentrant claim hits the
-    /// `Revertable` guard — the burned funds can be recovered exactly once.
+    /// @notice Sequential-replay coverage: after a completed `claimRefund`, a second independent claim for
+    /// the same leg reverts `ManagerLegNotRevertable` — the burned funds can be recovered at most once.
+    /// @dev This is the guard that also protects against reentrancy — `claimRefund` flips the leg to
+    /// `Reverted` (CEI) BEFORE its external recovery calls, so a nested claim would likewise hit the
+    /// `Revertable` check. This test only exercises the sequential (non-nested) case; a true reentrancy
+    /// scenario (a malicious recovery collaborator re-entering `claimRefund` mid-recovery) is not driven here.
     function test_atomicSend_RevertWhen_ClaimedTwice() public {
         _setUpAtomicStack();
         _sendAtomicLegWithInvalidRemotePeer();
@@ -188,6 +191,35 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
             abi.encodeWithSelector(ManagerLegNotRevertable.selector, ctx.flowId, ctx.bundleHash, LegState.Reverted)
         );
         manager.claimRefund(ctx.flowId, ctxBundleBytes);
+    }
+
+    /// @notice Regression guard for the preview-drain finding: `previewBundleHash` runs the SAME stateful
+    /// assembly as a real send — including the value-burning `initiateIndirectCall` (a real asset-router
+    /// `bridgeBurn`) — but ALWAYS reverts with `InteropPreviewHash`, so that burn must be rolled back.
+    /// Unlike the Solidity salt-suite preview test (value-less call) and the anvil eth_call preview (where
+    /// rollback is free regardless of logic), this drives a REAL burning indirect leg on the real stack and
+    /// asserts the caller's token balance is unchanged afterwards.
+    function test_previewBundleHash_rollsBackBurningIndirectLeg() public {
+        _setUpAtomicStack();
+        address l2Token = initializeTokenByDeposit();
+        InteropCallStarter[] memory calls = _tokenCallStarter(l2Token, TRANSFER_AMOUNT);
+        uint256 balanceBefore = IERC20(l2Token).balanceOf(address(this));
+
+        bytes[] memory attrs = new bytes[](1);
+        attrs[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (keccak256("preview burn rollback")));
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool ok, ) = address(l2InteropCenter).call(
+            abi.encodeCall(
+                l2InteropCenter.previewBundleHash,
+                (InteroperableAddress.formatEvmV1(destinationChainId), calls, attrs)
+            )
+        );
+        assertFalse(ok, "previewBundleHash must revert (quoter pattern)");
+        assertEq(
+            IERC20(l2Token).balanceOf(address(this)),
+            balanceBefore,
+            "the burning indirect leg run during preview must be rolled back by the revert"
+        );
     }
 
     /// @dev Phase 1+2: predict the local leg's hash, send the atomic bundle for real (asset-router

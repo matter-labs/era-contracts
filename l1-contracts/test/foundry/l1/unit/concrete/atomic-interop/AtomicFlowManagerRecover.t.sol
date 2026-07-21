@@ -84,9 +84,13 @@ contract AtomicFlowManagerRecoverTest is Test {
         });
     }
 
-    function test_recoverBundle_sameBaseToken_refundsViaAssetRouter() public {
-        // Destination shares this chain's base token -> the asset-router wrapper routes through NTV and
-        // BaseTokenHolder.recoverBaseToken with the correct caller.
+    /// @dev Dispatch-only: the asset router is mocked, so this asserts that `_recoverBundle` FORWARDS a
+    /// direct value leg's refund to `L2AssetRouter.bridgehubRecoverBaseToken` with the correct
+    /// (destChainId, source-base-token assetId, from, value). It does NOT exercise the downstream
+    /// disbursement — same-base routing to `BaseTokenHolder.recoverBaseToken` vs different-base NTV re-mint
+    /// happens inside {L2NativeTokenVault._disburseFailedTransfer}, which is covered separately
+    /// ({AtomicRecoveryForgery} for the router->NTV hop; the anvil atomic-swap spec end-to-end).
+    function test_recoverBundle_directValueLeg_forwardsSameBaseAssetIdToRouter() public {
         vm.mockCall(
             L2_ASSET_ROUTER_ADDR,
             abi.encodeWithSelector(IAssetRouterShared.bridgehubRecoverBaseToken.selector),
@@ -104,9 +108,11 @@ contract AtomicFlowManagerRecoverTest is Test {
         manager.exposedRecoverBundle(FLOW_ID, BUNDLE_HASH, _bundle(SOURCE_BASE_TOKEN_ASSET_ID, value));
     }
 
-    function test_recoverBundle_differentBaseToken_refundsViaAssetRouter() public {
-        // Destination base token differs -> refund reverses the asset-router base-token deposit,
-        // re-crediting the destination base-token asset to the depositor.
+    /// @dev Dispatch-only counterpart of {test_recoverBundle_directValueLeg_forwardsSameBaseAssetIdToRouter}
+    /// for a different destination base token: asserts the manager forwards the destination base-token
+    /// assetId (not this chain's) to `bridgehubRecoverBaseToken`. Downstream disbursement is not exercised
+    /// here (see that test's note).
+    function test_recoverBundle_directValueLeg_forwardsDifferentBaseAssetIdToRouter() public {
         vm.mockCall(
             L2_ASSET_ROUTER_ADDR,
             abi.encodeWithSelector(IAssetRouterShared.bridgehubRecoverBaseToken.selector),
