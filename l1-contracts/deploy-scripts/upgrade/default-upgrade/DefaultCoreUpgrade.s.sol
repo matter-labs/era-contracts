@@ -230,6 +230,12 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         );
 
         // Serialize bridges addresses
+        vm.serializeAddress(
+            "bridges",
+            "erc20_bridge_implementation_addr",
+            coreAddresses.bridges.implementations.erc20Bridge
+        );
+        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", coreAddresses.bridges.proxies.erc20Bridge);
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
         vm.serializeAddress(
             "bridges",

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::abi::{
     IDeployL2ContractsAbi, IDeployPaymasterAbi, IEnableEvmEmulatorAbi, IFinalizeChainInitAbi,
-    IRegisterOnAllChainsAbi, IRegisterZKChainAbi,
+    IRegisterOnAllChainsAbi, IRegisterZKChainAbi, ISetupLegacyBridgeAbi,
 };
 use crate::common::addresses::{ETH_ADDRESS, ZERO_ADDRESS};
 use crate::common::forge::scripts::{
@@ -199,8 +199,7 @@ pub async fn chain_init(
     runner: &mut ForgeRunner,
     deployer: &Wallet,
     owner: &Wallet,
-    // Retained for call-site compatibility; the legacy-bridge setup that used it has been removed.
-    _bridgehub_admin: &Wallet,
+    bridgehub_admin: &Wallet,
     input: &ChainInitInput,
 ) -> anyhow::Result<FullChainInitOutput> {
     // Register chain on CTM
@@ -310,6 +309,17 @@ pub async fn chain_init(
         full_output.consensus_registry_proxy = Some(l2_output.consensus_registry_proxy);
         full_output.multicall3 = Some(l2_output.multicall3);
         full_output.timestamp_asserter = Some(l2_output.timestamp_asserter);
+    }
+
+    // Setup legacy bridge (if requested)
+    if input.with_legacy_bridge {
+        logger::step("Setting up legacy bridge...");
+        setup_legacy_bridge_step(
+            runner,
+            bridgehub_admin,
+            input.bridgehub,
+            input.chain_params.chain_id.as_u64(),
+        )?;
     }
 
     Ok(full_output)
@@ -477,6 +487,23 @@ fn _register_on_all_chains_step(
 ) -> anyhow::Result<()> {
     let forge = runner
         .script_call(IRegisterOnAllChainsAbi::registerOnOtherChainsCall {
+            _bridgehub: bridgehub,
+            _chainId: U256::from(chain_id),
+        })
+        .with_wallet(auth);
+
+    runner.run(forge)?;
+    Ok(())
+}
+
+fn setup_legacy_bridge_step(
+    runner: &mut ForgeRunner,
+    auth: &Wallet,
+    bridgehub: Address,
+    chain_id: u64,
+) -> anyhow::Result<()> {
+    let forge = runner
+        .script_call(ISetupLegacyBridgeAbi::runCall {
             _bridgehub: bridgehub,
             _chainId: U256::from(chain_id),
         })

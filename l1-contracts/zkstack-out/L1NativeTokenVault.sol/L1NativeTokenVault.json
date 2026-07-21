@@ -897,6 +897,11 @@
   },
   {
     "type": "error",
+    "name": "EmptyDeposit",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "EmptyToken",
     "inputs": []
   },

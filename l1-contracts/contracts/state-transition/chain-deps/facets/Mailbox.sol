@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
+import {IMailboxLegacy} from "../../chain-interfaces/IMailboxLegacy.sol";
 import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 
@@ -33,6 +34,7 @@ import {
     PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET
 } from "../../../common/Config.sol";
 import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterShared} from "../../../bridge/asset-router/IAssetRouterShared.sol";
 import {
     AddressNotZero,
@@ -57,7 +59,7 @@ import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAs
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
+contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailboxLegacy {
     using UncheckedMath for uint256;
     using PriorityTree for PriorityTree.Tree;
 
@@ -567,16 +569,30 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ///////////////////////////////////////////////////////
     //////// Legacy Era functions
 
-    /// @inheritdoc IMailboxImpl
-    /// @dev Deprecated stub. The L2->L1 base-token withdrawal message is still tagged with the
-    /// `finalizeEthWithdrawal` selector, so the selector must remain part of the facet's ABI even though funds
-    /// are now finalized through the asset-router / L1Nullifier path. The entry point itself always reverts;
-    /// full removal is tracked separately (EVM-1216).
-    function finalizeEthWithdrawal(uint256, uint256, uint16, bytes calldata, bytes32[] calldata) external onlyL1 {
-        revert TransactionNotAllowed();
+    /// @inheritdoc IMailboxLegacy
+    function finalizeEthWithdrawal(
+        // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
+    ) external nonReentrant onlyL1 {
+        if (s.chainId != ERA_CHAIN_ID) {
+            revert OnlyEraSupported();
+        }
+        address sharedBridge = address(IBridgehubBase(s.bridgehub).assetRouter());
+        IL1AssetRouter(sharedBridge).finalizeWithdrawal({
+            _chainId: ERA_CHAIN_ID,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _message: _message,
+            _merkleProof: _merkleProof
+        });
     }
 
-    /// @inheritdoc IMailboxImpl
+    /// @inheritdoc IMailboxLegacy
     function requestL2Transaction(
         // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
         address _contractL2,

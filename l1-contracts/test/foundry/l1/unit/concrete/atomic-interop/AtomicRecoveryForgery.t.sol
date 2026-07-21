@@ -8,6 +8,7 @@ import {LegState} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {ManagerNoRecoverableCalls} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {RecoverToL1NotSupported} from "contracts/common/L1ContractErrors.sol";
 import {
@@ -205,6 +206,7 @@ contract AtomicRecoveryForgeryTest is Test {
             L1_CHAIN_ID,
             ERA_CHAIN_ID,
             IL1AssetRouter(makeAddr("l1 asset router")),
+            IL2SharedBridgeLegacy(address(0)),
             keccak256("base token asset id"),
             makeAddr("aliased owner")
         );

@@ -236,6 +236,28 @@ contract DataEncodingTest is Test {
         assertEq(keccak256(decodedDecimals), keccak256(decimals));
     }
 
+    function test_decodeTokenData_legacyEncodingVersion() public {
+        bytes memory name = abi.encode("LegacyToken");
+        bytes memory symbol = abi.encode("LT");
+        bytes memory decimals = abi.encode(uint8(6));
+
+        // Legacy encoding is just abi.encode of (name, symbol, decimals)
+        bytes memory legacyEncoded = abi.encode(name, symbol, decimals);
+
+        (
+            uint256 decodedChainId,
+            bytes memory decodedName,
+            bytes memory decodedSymbol,
+            bytes memory decodedDecimals
+        ) = this.externalDecodeTokenData(legacyEncoded);
+
+        // Legacy format doesn't include chainId, so it should be 0
+        assertEq(decodedChainId, 0);
+        assertEq(keccak256(decodedName), keccak256(name));
+        assertEq(keccak256(decodedSymbol), keccak256(symbol));
+        assertEq(keccak256(decodedDecimals), keccak256(decimals));
+    }
+
     function test_decodeTokenData_revertsOnUnsupportedVersion() public {
         // Create data with unsupported version (0x02)
         bytes memory unsupportedData = new bytes(100);

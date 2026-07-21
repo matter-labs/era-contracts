@@ -188,6 +188,59 @@
   },
   {
     "type": "function",
+    "name": "bridgeRecoverFailedTransfer",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_depositSender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_assetData",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_l2TxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_l2BatchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2MessageIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2TxNumberInBatch",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "_merkleProof",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "bridgehubConfirmL2Transaction",
     "inputs": [
       {
@@ -300,6 +353,108 @@
   },
   {
     "type": "function",
+    "name": "claimFailedDeposit",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_depositSender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_l1Token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2TxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_l2BatchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2MessageIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2TxNumberInBatch",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "_merkleProof",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "depositLegacyErc20Bridge",
+    "inputs": [
+      {
+        "name": "_originalCaller",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_l2Receiver",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_l1Token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2TxGasLimit",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2TxGasPerPubdataByte",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_refundRecipient",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "txHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
     "name": "finalizeDeposit",
     "inputs": [
       {
@@ -323,10 +478,48 @@
   },
   {
     "type": "function",
+    "name": "finalizeWithdrawal",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2BatchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2MessageIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2TxNumberInBatch",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "_message",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_merkleProof",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "getDepositCalldata",
     "inputs": [
       {
-        "name": "",
+        "name": "_sender",
         "type": "address",
         "internalType": "address"
       },
@@ -365,6 +558,35 @@
   },
   {
     "type": "function",
+    "name": "isWithdrawalFinalized",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2BatchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2MessageIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "l1InteropHandler",
     "inputs": [],
     "outputs": [
@@ -372,6 +594,38 @@
         "name": "",
         "type": "address",
         "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "l2BridgeAddress",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "legacyBridge",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IL1ERC20Bridge"
       }
     ],
     "stateMutability": "view"
@@ -509,6 +763,19 @@
   },
   {
     "type": "function",
+    "name": "setL1Erc20Bridge",
+    "inputs": [
+      {
+        "name": "_legacyBridge",
+        "type": "address",
+        "internalType": "contract IL1ERC20Bridge"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setL1InteropHandler",
     "inputs": [
       {
@@ -531,6 +798,35 @@
       }
     ],
     "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "transferFundsToNTV",
+    "inputs": [
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_originalCaller",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
     "stateMutability": "nonpayable"
   },
   {
@@ -730,6 +1026,49 @@
   },
   {
     "type": "event",
+    "name": "LegacyDepositInitiated",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "l2DepositTxHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "from",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "to",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "l1Token",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "OwnershipTransferStarted",
     "inputs": [
       {
@@ -843,6 +1182,22 @@
   },
   {
     "type": "error",
+    "name": "IncorrectTokenAddressFromNTV",
+    "inputs": [
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "tokenAddress",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InteropSenderChainIdMismatch",
     "inputs": [
       {
@@ -870,6 +1225,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidNTVBurnData",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidSelector",
     "inputs": [
       {
@@ -878,6 +1238,16 @@
         "internalType": "bytes4"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "LegacyBridgeUsesNonNativeToken",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "LegacyEncodingUsedForNonL1Token",
+    "inputs": []
   },
   {
     "type": "error",
@@ -907,6 +1277,22 @@
   {
     "type": "error",
     "name": "SlotOccupied",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TokenNotSupported",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "TokensWithFeesNotSupported",
     "inputs": []
   },
   {

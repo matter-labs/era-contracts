@@ -78,10 +78,20 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
         uint256 amount = 11;
 
-        // An unregistered foreign asset must be rejected by handleFinalizeBridgingOnL2.
         vm.expectRevert(abi.encodeWithSelector(AssetIdNotRegistered.selector, assetId));
         vm.prank(address(L2_NATIVE_TOKEN_VAULT_ADDR));
         L2_ASSET_TRACKER.handleFinalizeBridgingOnL2(L1_CHAIN_ID, assetId, amount, L1_CHAIN_ID, address(token));
+
+        stdstore.target(sharedBridgeLegacy).sig("l1TokenAddress(address)").with_key(address(token)).checked_write(
+            l1Token
+        );
+        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setLegacyTokenAssetId(address(token));
+
+        vm.prank(address(L2_NATIVE_TOKEN_VAULT_ADDR));
+        L2_ASSET_TRACKER.handleFinalizeBridgingOnL2(L1_CHAIN_ID, assetId, amount, L1_CHAIN_ID, address(token));
+
+        uint256 chainBalance = L2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, assetId);
+        assertEq(chainBalance, 0, "Foreign token chain balance should remain zero");
     }
 
     function test_handleFinalizeBaseTokenBridgingOnL2() public {
@@ -295,7 +305,15 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         // solhint-disable-next-line func-named-parameters
-        ntv.updateL2(liveL1ChainId, liveOwner, liveProxyBytecodeHash, liveWethToken, bridgingData, metadata);
+        ntv.updateL2(
+            liveL1ChainId,
+            liveOwner,
+            liveProxyBytecodeHash,
+            address(0),
+            liveWethToken,
+            bridgingData,
+            metadata
+        );
 
         vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
         vm.expectRevert(BaseTokenNativeToThisChain.selector);

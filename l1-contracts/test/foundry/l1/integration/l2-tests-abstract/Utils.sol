@@ -13,6 +13,7 @@ struct SystemContractsArgs {
     uint256 gatewayChainId;
     uint256 eraChainId;
     address l1AssetRouter;
+    address legacySharedBridge;
     address l2TokenBeacon;
     bytes32 l2TokenProxyBytecodeHash;
     address aliasedOwner;
