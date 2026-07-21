@@ -9,6 +9,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/CTMTransition.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/CTMUpgradeExecutor.sol";
+import {CTMReleaseFactory, CTMTransitionFactory} from "contracts/upgrades/registry/CTMRegistryFactory.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/CTMUpgradeComposer.sol";
 import {ICTMTransition, L2UpgradePlan} from "contracts/upgrades/registry/ICTMTransition.sol";
 import {GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
@@ -32,6 +33,9 @@ import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransit
 ///         exercised end-to-end by RegistryDrivenUpgrade.t.sol).
 contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
     CTMUpgradeExecutor internal ctmExecutor;
+    CTMReleaseFactory internal releaseFactory;
+    CTMTransitionFactory internal transitionFactory;
+    CTMRelease internal fromRelease;
     CTMRelease internal release;
     CTMTransition internal transition;
 
@@ -46,7 +50,14 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         _mockMigrationPausedFromBridgehub();
 
         breakGlass = makeAddr("breakGlass");
-        ctmExecutor = new CTMUpgradeExecutor(governor, breakGlass, IChainTypeManager(address(chainContractAddress)));
+        releaseFactory = new CTMReleaseFactory();
+        transitionFactory = new CTMTransitionFactory();
+        ctmExecutor = new CTMUpgradeExecutor(
+            governor,
+            breakGlass,
+            IChainTypeManager(address(chainContractAddress)),
+            transitionFactory
+        );
 
         // Handover through the fixed entrypoint — no break-glass involved.
         vm.prank(governor);
@@ -56,11 +67,29 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         assertEq(chainContractAddress.owner(), address(ctmExecutor));
 
         newVersion = SemVer.packSemVer(0, 1, 0);
-        release = _deployRelease();
+        // Transitions require factory-attested releases on BOTH edges, so the fixture CTM's
+        // mocked genesis release is replaced by a REAL factory-deployed one — through the
+        // break-glass raw-call surface, which is exactly the production escape hatch for
+        // out-of-band CTM state (the routine executor entrypoints cannot set currentRelease
+        // directly, by design).
+        fromRelease = _deployRelease(1);
+        Call[] memory repoint = new Call[](1);
+        repoint[0] = Call({
+            target: address(chainContractAddress),
+            value: 0,
+            data: abi.encodeCall(IChainTypeManager.setCurrentRelease, (address(fromRelease)))
+        });
+        vm.prank(breakGlass);
+        ctmExecutor.forward(repoint);
+        assertEq(chainContractAddress.currentRelease(), address(fromRelease));
+
+        release = _deployRelease(2);
         transition = _deployTransition(777);
     }
 
-    function _deployRelease() internal returns (CTMRelease result) {
+    /// @param _commitmentNonce Differentiates otherwise-identical release manifests (the factory
+    ///        is deployOrGet per manifest hash, so identical manifests resolve to ONE instance).
+    function _deployRelease(uint256 _commitmentNonce) internal returns (CTMRelease result) {
         // The release describes the complete chain state after the (facet-neutral) hop this
         // suite drives: the fixture's full facet routing (explicit selectors, inline pins) and
         // the carried base-system hashes — the transition derives an EMPTY delta from it.
@@ -73,9 +102,9 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                 codehash: facetCuts[i].facet.codehash
             });
         }
-        result = new CTMRelease();
-        result.initialize(
-            CTMRelease.ReleaseManifest({
+        result = CTMRelease(
+            releaseFactory.deployOrGetRelease(
+                CTMRelease.ReleaseManifest({
                 diamondInit: diamondInit,
                 diamondInitCodehash: diamondInit.codehash,
                 genesisFacets: genesisFacets,
@@ -86,9 +115,10 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                 genesisUpgrade: makeAddr("genesisUpgrade"),
                 genesisUpgradeCodehash: bytes32(0),
                 genesisBatchHash: bytes32(uint256(1)),
-                genesisBatchCommitment: bytes32(uint256(2)),
+                genesisBatchCommitment: bytes32(_commitmentNonce),
                 genesisIndexRepeatedStorageChanges: 54
-            })
+                })
+            )
         );
     }
 
@@ -111,9 +141,10 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         uint256[] memory factoryDeps = new uint256[](1);
         factoryDeps[0] = 1;
 
-        result = new CTMTransition();
-        result.initialize(
-            CTMTransition.TransitionManifest({
+        result = CTMTransition(
+            transitionFactory.deployOrGetTransition(
+                CTMTransition.TransitionManifest({
+                releaseFactory: address(releaseFactory),
                 oldProtocolVersion: _oldProtocolVersion,
                 newProtocolVersion: newVersion,
                 verifier: testnetVerifier,
@@ -132,7 +163,8 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                     delegateCalldata: hex"beef",
                     factoryDepHashes: factoryDeps
                 })
-            })
+                })
+            )
         );
     }
 
@@ -205,7 +237,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         // a fresh distinct release so it is not a patch) but a STALE version edge must trip the
         // executor's independent version assert.
         address appliedRelease = address(release);
-        release = _deployRelease();
+        release = _deployRelease(3);
         CTMTransition staleVersionTransition = _deployTransitionFrom(779, appliedRelease, 0);
 
         vm.expectRevert(abi.encodeWithSelector(OutdatedProtocolVersion.selector, newVersion, 0));

@@ -2,13 +2,11 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-/// @notice Canonical identifier for L1 ecosystem contracts shared by every CTM.
-///         Used as the lookup key of `ICoreRegistry` getters; the registry maps each
-///         entry to its proxy address (version-independent) and per-version
-///         implementation addresses.
+/// @notice Canonical identifier for L1 ecosystem contracts shared by every CTM. Used by
+///         deploy-script config/introspection plumbing; on-chain registry rows identify
+///         contracts by their proxy ADDRESS, not by this enum.
 /// @dev The enum is APPEND-ONLY: new variants must be added at the end and existing
-///      variants must never be reordered or removed, because the numeric values are
-///      compiled into registry implementations across protocol versions.
+///      variants must never be reordered or removed.
 enum L1EcosystemContract {
     L1Bridgehub,
     L1MessageRoot,
@@ -88,14 +86,4 @@ enum CTMContract {
 enum ZKsyncOSUpgradeType {
     SystemProxy,
     Unsafe
-}
-
-/// @notice A pinned expected codehash for a target address, verified by `verifyAll()`. Shared by
-///         both registry flavours (CTM + Core), so it lives here rather than being redeclared in
-///         each registry.
-/// @param target The address whose runtime code is pinned.
-/// @param expectedCodehash The `extcodehash` the audited bytecode must produce at `target`.
-struct CodehashPin {
-    address target;
-    bytes32 expectedCodehash;
 }

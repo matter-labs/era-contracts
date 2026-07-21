@@ -2,7 +2,6 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {L1EcosystemContract} from "./ContractIdentifiers.sol";
 
 /// @notice One ecosystem contract's upgrade row: a SOURCE-CHECKED edge, not just a target.
 /// @param key The contract's identifier (human/tooling orientation).
@@ -15,7 +14,6 @@ import {L1EcosystemContract} from "./ContractIdentifiers.sol";
 /// @param implNewCodehash The MANDATORY `EXTCODEHASH` pin of `implNew` (when `implNew` is set),
 ///        inline beside the address it protects.
 struct EcosystemContractRow {
-    L1EcosystemContract key;
     address proxy;
     address expectedOldImpl;
     address implNew;
@@ -35,6 +33,10 @@ struct EcosystemContractRow {
 interface ICoreRegistry {
     /// @notice Every ecosystem contract participating in this upgrade, as complete typed rows —
     ///         one call, no per-key rescans. Consumers iterate these directly.
+    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every pinned value,
+    ///         and the key under which the deploying factory attests this instance.
+    function manifestHash() external view returns (bytes32);
+
     function ecosystemRows() external view returns (EcosystemContractRow[] memory);
 
     /// @notice Walks every pinned implementation and compares its `EXTCODEHASH` against the hash

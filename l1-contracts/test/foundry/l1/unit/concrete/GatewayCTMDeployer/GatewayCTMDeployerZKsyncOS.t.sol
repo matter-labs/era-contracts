@@ -28,6 +28,7 @@ import {
     DirectCreate2Calldata
 } from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 import {
     AllDeployerResults,
@@ -210,6 +211,15 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
         (results.ctmResult, deployer) = tester.deployCTM(deployerCalldata.ctmCalldata);
         assertEq(deployer, expectedDeployers.ctmDeployer, "CTM deployer address mismatch");
 
+        // The bootstrap release the CTM deployer ACTUALLY deployed (CREATE2 through the
+        // directly-deployed factory, salt = genesis manifest hash) must land exactly where the
+        // helper predicted from build artifacts — the race-free, nonce-independent commitment.
+        assertEq(
+            IChainTypeManager(results.ctmResult.chainTypeManagerProxy).currentRelease(),
+            calculatedContracts.stateTransition.currentRelease,
+            "bootstrap release prediction mismatch"
+        );
+
         return results;
     }
 
@@ -260,13 +270,10 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
         deployed = tester.deployDirect(directCalldata.multicall3Calldata);
         assertEq(deployed, calculatedContracts.multicall3, "Multicall3 address mismatch");
 
-        // Bootstrap release FACTORY (deployed directly); the release itself is the factory's
-        // first CREATE, which is what the helper predicts as `currentRelease`.
+        // Bootstrap release FACTORY (deployed directly); the release itself is CREATE2-deployed
+        // through it inside the CTM deployer's transaction — its prediction is asserted against
+        // the LIVE deployment after `deployCTM` runs.
         deployed = tester.deployDirect(directCalldata.bootstrapReleaseFactoryCalldata);
-        assertEq(
-            vm.computeCreateAddress(deployed, 1),
-            calculatedContracts.stateTransition.currentRelease,
-            "bootstrap release prediction mismatch"
-        );
+        assertTrue(deployed.code.length != 0, "bootstrap release factory must be deployed");
     }
 }

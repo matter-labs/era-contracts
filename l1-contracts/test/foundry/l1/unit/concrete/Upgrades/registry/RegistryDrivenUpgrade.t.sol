@@ -6,6 +6,7 @@ import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_Cha
 import {ZKsyncOSChainTypeManagerSharedTest} from "../../state-transition/ChainTypeManager/_ZKsyncOSChainTypeManager_Shared.t.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/CTMUpgradeExecutor.sol";
+import {CTMReleaseFactory, CTMTransitionFactory} from "contracts/upgrades/registry/CTMRegistryFactory.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/CTMUpgradeComposer.sol";
 import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/CTMTransition.sol";
@@ -54,6 +55,8 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 ///      the real `DefaultUpgrade`, real verifier contracts.
 abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     CTMUpgradeExecutor internal ctmExecutor;
+    CTMReleaseFactory internal releaseFactory;
+    CTMTransitionFactory internal transitionFactory;
     CTMTransition internal transitionV32;
     CTMTransition internal transitionV33;
 
@@ -109,10 +112,13 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         _mockGetZKChainFromBridgehub(chainAddress);
         _mockMigrationPausedFromBridgehub();
 
+        releaseFactory = new CTMReleaseFactory();
+        transitionFactory = new CTMTransitionFactory();
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
             makeAddr("breakGlass"),
-            IChainTypeManager(address(chainContractAddress))
+            IChainTypeManager(address(chainContractAddress)),
+            transitionFactory
         );
 
         // Real v33 artifacts: a fresh AdminFacet implementation (same selectors, new address)
@@ -122,15 +128,27 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         verifierV32 = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
         verifierV33 = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
-        // Hand CTM ownership to the executor through its fixed entrypoint, then raise the
-        // chain's priority-tx gas limit through break-glass (a raw one-off admin action —
-        // exactly what the separately governed hatch exists for).
+        // Transitions require factory-attested releases on BOTH edges, so the fixture CTM's
+        // mocked genesis release is replaced by a REAL factory-deployed one describing the
+        // chain's current routing — hop 1 then departs from (and, being facet-neutral, also
+        // targets) exactly that release.
+        address genesisRelease = releaseFactory.deployOrGetRelease(_releaseManifest(address(0)));
+
+        // Hand CTM ownership to the executor through its fixed entrypoint, then perform two raw
+        // one-off admin actions through break-glass (exactly what the separately governed hatch
+        // exists for): re-point currentRelease at the real genesis release and raise the chain's
+        // priority-tx gas limit.
         vm.prank(governor);
         chainContractAddress.transferOwnership(address(ctmExecutor));
         vm.prank(governor);
         ctmExecutor.acceptCTMOwnership();
-        Call[] memory calls = new Call[](1);
+        Call[] memory calls = new Call[](2);
         calls[0] = Call({
+            target: address(chainContractAddress),
+            value: 0,
+            data: abi.encodeCall(IChainTypeManager.setCurrentRelease, (genesisRelease))
+        });
+        calls[1] = Call({
             target: address(chainContractAddress),
             value: 0,
             data: abi.encodeCall(IChainTypeManager.setPriorityTxMaxGasLimit, (chainId, PRIORITY_TX_MAX_GAS_LIMIT))
@@ -148,6 +166,31 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         // transitions from the V32 release the first hop pinned.
         transitionV32 = _makeTransition(0, V32, verifierV32, chainContractAddress.currentRelease(), address(0));
         transitionV33 = _makeTransition(V32, V33, verifierV33, transitionV32.newRelease(), newAdminFacet);
+    }
+
+    /// @dev One release's full manifest: the fixture's routing (AdminFacet swapped for
+    ///      `_adminFacet` when nonzero), carried base-system hashes, genesis params. Hop 1's
+    ///      target (facet-neutral) manifest is IDENTICAL to the genesis release's, so the
+    ///      deployOrGet factory resolves both to ONE instance — hop 1 is a same-release,
+    ///      verifier/schedule-only transition, exactly the intended patch shape.
+    function _releaseManifest(address _adminFacet) internal returns (CTMRelease.ReleaseManifest memory) {
+        return
+            CTMRelease.ReleaseManifest({
+                diamondInit: diamondInit,
+                diamondInitCodehash: diamondInit.codehash,
+                genesisFacets: _releaseFacets(_adminFacet),
+                // Carried unchanged through every hop: the release pins the complete values, so
+                // the derived hash changes are zero.
+                bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                fixedForceDeploymentsData: hex"f1f2",
+                genesisUpgrade: makeAddr("genesisUpgrade"),
+                genesisUpgradeCodehash: bytes32(0),
+                genesisBatchHash: bytes32(uint256(1)),
+                genesisBatchCommitment: _registryGenesisBatchCommitment(),
+                genesisIndexRepeatedStorageChanges: 54
+            });
     }
 
     /// @dev The complete facet routing of one release: the fixture's full facet set, with the
@@ -185,25 +228,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         address _fromRelease,
         address _newAdminFacet
     ) internal returns (CTMTransition transition) {
-        CTMRelease release = new CTMRelease();
-        release.initialize(
-            CTMRelease.ReleaseManifest({
-                diamondInit: diamondInit,
-                diamondInitCodehash: diamondInit.codehash,
-                genesisFacets: _releaseFacets(_newAdminFacet),
-                // Carried unchanged from the (mocked) genesis release through every hop: the
-                // release pins the complete values, so the derived hash changes are zero.
-                bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                fixedForceDeploymentsData: hex"f1f2",
-                genesisUpgrade: makeAddr("genesisUpgrade"),
-                genesisUpgradeCodehash: bytes32(0),
-                genesisBatchHash: bytes32(uint256(1)),
-                genesisBatchCommitment: _registryGenesisBatchCommitment(),
-                genesisIndexRepeatedStorageChanges: 54
-            })
-        );
+        address release = releaseFactory.deployOrGetRelease(_releaseManifest(_newAdminFacet));
 
         IComplexUpgrader.UniversalContractUpgradeInfo[]
             memory deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](
@@ -217,15 +242,16 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             });
         }
 
-        transition = new CTMTransition();
-        transition.initialize(
-            CTMTransition.TransitionManifest({
+        transition = CTMTransition(
+            transitionFactory.deployOrGetTransition(
+                CTMTransition.TransitionManifest({
+                releaseFactory: address(releaseFactory),
                 oldProtocolVersion: _oldVersion,
                 newProtocolVersion: _newVersion,
                 verifier: _verifier,
                 verifierCodehash: _verifier.codehash,
                 fromRelease: _fromRelease,
-                newRelease: address(release),
+                newRelease: release,
                 upgradeEngine: defaultUpgrade,
                 upgradeEngineCodehash: defaultUpgrade.codehash,
                 oldProtocolVersionDeadline: 1000,
@@ -236,7 +262,8 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
                     delegateCalldata: hex"",
                     factoryDepHashes: new uint256[](0)
                 })
-            })
+                })
+            )
         );
     }
 

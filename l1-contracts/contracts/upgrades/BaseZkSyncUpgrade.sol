@@ -7,14 +7,12 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol";
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
-import {ISelfDescribingFacet} from "../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {ICTMTransition} from "./registry/ICTMTransition.sol";
 import {CTMUpgradeComposer} from "./registry/CTMUpgradeComposer.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
-import {DiamondCutBuilder} from "../state-transition/libraries/DiamondCutBuilder.sol";
-import {ProposedUpgrade, UpgradeFacetSwap} from "../state-transition/libraries/ProposedUpgradeLib.sol";
+import {ProposedUpgrade} from "../state-transition/libraries/ProposedUpgradeLib.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {
@@ -115,52 +113,15 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         emit UpgradeComplete(_proposedUpgrade.newProtocolVersion, txHash, _proposedUpgrade);
     }
 
-    /// @notice Applies the registry-supplied facet-swap plan to the diamond this contract is
-    ///         delegatecalled into. An empty plan is a no-op.
-    /// @dev Selector lists are resolved here, at execution time: a pinned non-empty list wins
-    ///      (bootstrap override for facets predating `ISelfDescribingFacet`), otherwise the
-    ///      facet's own `selectors()` is read. Facet bytecode is immutable, so every execution of
-    ///      the same plan produces the same cut — which keeps the plan recomposable for the whole
-    ///      upgrade window without carting selector lists around.
-    function _upgradeFacets(UpgradeFacetSwap[] memory _facetSwaps) internal {
-        uint256 swapsLength = _facetSwaps.length;
-        if (swapsLength == 0) {
+    /// @notice Applies the transition's DERIVED, ready-to-execute diamond cuts to the diamond
+    ///         this contract is delegatecalled into, verbatim — the cuts were computed from the
+    ///         `(fromRelease, newRelease)` pair at transition initialization and stored, so there
+    ///         is nothing to resolve or re-diff at execution time. An empty list is a no-op.
+    function _applyDerivedFacetCuts(Diamond.FacetCut[] memory _facetCuts) internal {
+        if (_facetCuts.length == 0) {
             return;
         }
-
-        DiamondCutBuilder.FacetSwap[] memory swaps = new DiamondCutBuilder.FacetSwap[](swapsLength);
-        bytes4[][] memory oldSelectors = new bytes4[][](swapsLength);
-        bytes4[][] memory newSelectors = new bytes4[][](swapsLength);
-        for (uint256 i = 0; i < swapsLength; ++i) {
-            UpgradeFacetSwap memory swap = _facetSwaps[i];
-            swaps[i] = DiamondCutBuilder.FacetSwap({
-                oldFacet: swap.oldFacet,
-                newFacet: swap.newFacet,
-                isFreezable: swap.isFreezable
-            });
-            oldSelectors[i] = _resolveFacetSelectors(swap.oldFacet, swap.oldSelectors);
-            newSelectors[i] = _resolveFacetSelectors(swap.newFacet, swap.newSelectors);
-        }
-
-        Diamond.diamondCut(
-            Diamond.DiamondCutData({
-                facetCuts: DiamondCutBuilder.buildCuts(swaps, oldSelectors, newSelectors),
-                initAddress: address(0),
-                initCalldata: ""
-            })
-        );
-    }
-
-    /// @dev A zero facet has no selectors (pure addition/removal side); a pinned list overrides;
-    ///      otherwise the facet self-describes.
-    function _resolveFacetSelectors(
-        address _facet,
-        bytes4[] memory _pinnedSelectors
-    ) private view returns (bytes4[] memory) {
-        if (_facet == address(0) || _pinnedSelectors.length != 0) {
-            return _pinnedSelectors;
-        }
-        return ISelfDescribingFacet(_facet).selectors();
+        Diamond.diamondCut(Diamond.DiamondCutData({facetCuts: _facetCuts, initAddress: address(0), initCalldata: ""}));
     }
 
     /// @notice Change default account bytecode hash, that is used on L2
@@ -391,7 +352,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     function upgradeFromTransition(address _transition) external returns (bytes32) {
         ICTMTransition transition = ICTMTransition(_transition);
         transition.validate();
-        _upgradeFacets(transition.facetTransitions());
+        _applyDerivedFacetCuts(transition.facetCuts());
         return upgrade(CTMUpgradeComposer.buildProposedUpgrade(transition));
     }
 

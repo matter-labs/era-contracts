@@ -26,9 +26,13 @@ import {CoreRegistry} from "./CoreRegistry.sol";
 ///        verified, write-once) instance is returned instead of reverting — a front-runner using
 ///        the SAME manifest merely does the caller's work; a different manifest lands in a
 ///        different slot and cannot interfere.
-///      Deterministic addresses are deliberately NOT part of the model (CREATE2 address
-///      derivation differs between the EVM and EraVM, and nothing needs the address to be
-///      predictable — the CTM stores the pointer); idempotence comes from the hash registry.
+///      Instances are deployed via CREATE2 with `salt = keccak256(abi.encode(manifest))`, so the
+///      address itself is a commitment to the manifest and is predictable off-chain BEFORE the
+///      deployment transaction lands (VM-aware: EVM and EraVM derive CREATE2 addresses
+///      differently, and off-chain predictors must use the deploying chain's formula). This is
+///      what makes the Gateway bootstrap flow race-free: the predicted address depends only on
+///      (factory, manifest, creation code), never on the factory's nonce, so a front-runner
+///      cannot displace it. The `deployedFor` mapping is the cheap idempotence check on top.
 /// @dev One factory per registry type — NOT one combined factory: a factory's runtime code
 ///      embeds the creation bytecode of the contract it deploys, and all three together exceed
 ///      the EIP-170 runtime size limit on L1.
@@ -47,7 +51,7 @@ contract CTMReleaseFactory {
         if (existing != address(0)) {
             return existing;
         }
-        CTMRelease release = new CTMRelease();
+        CTMRelease release = new CTMRelease{salt: manifestHash}();
         release.initialize(_manifest);
         deployedFor[manifestHash] = address(release);
         emit ReleaseDeployed(address(release), manifestHash);
@@ -72,7 +76,7 @@ contract CTMTransitionFactory {
         if (existing != address(0)) {
             return existing;
         }
-        CTMTransition transition = new CTMTransition();
+        CTMTransition transition = new CTMTransition{salt: manifestHash}();
         transition.initialize(_manifest);
         deployedFor[manifestHash] = address(transition);
         emit TransitionDeployed(address(transition), manifestHash);
@@ -97,7 +101,7 @@ contract CoreRegistryFactory {
         if (existing != address(0)) {
             return existing;
         }
-        CoreRegistry coreRegistry = new CoreRegistry();
+        CoreRegistry coreRegistry = new CoreRegistry{salt: manifestHash}();
         coreRegistry.initialize(_manifest);
         deployedFor[manifestHash] = address(coreRegistry);
         emit CoreRegistryDeployed(address(coreRegistry), manifestHash);

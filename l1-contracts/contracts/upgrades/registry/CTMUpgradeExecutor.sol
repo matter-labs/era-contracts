@@ -5,12 +5,18 @@ pragma solidity 0.8.28;
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 import {ICTMTransition} from "./ICTMTransition.sol";
+import {CTMTransitionFactory} from "./CTMRegistryFactory.sol";
 import {CTMUpgradeComposer} from "./CTMUpgradeComposer.sol";
 import {UpgradeExecutorBase} from "../../governance/UpgradeExecutorBase.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {IDefaultUpgrade} from "../IDefaultUpgrade.sol";
-import {TransitionReleaseMismatch, UpgradeNotPermissionlessYet, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {
+    NotFactoryDeployed,
+    TransitionReleaseMismatch,
+    UpgradeNotPermissionlessYet,
+    ZeroAddress
+} from "../../common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "../../state-transition/L1StateTransitionErrors.sol";
 
 /// @title CTMUpgradeExecutor
@@ -29,6 +35,14 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
     ///         the binding is this immutable, so a transition cannot be aimed at a foreign CTM.
     IChainTypeManager public immutable CTM;
 
+    /// @notice The one trusted transition factory. Every transition this executor accepts must
+    ///         have been deployed (and therefore atomically initialized, write-once, with the
+    ///         audited `CTMTransition` code) by THIS factory — factory provenance turns
+    ///         "canonical write-once object" from an off-chain convention into an on-chain
+    ///         invariant: an arbitrary contract (or upgradeable proxy) merely implementing
+    ///         `ICTMTransition` is rejected.
+    CTMTransitionFactory public immutable TRANSITION_FACTORY;
+
     /// @notice Emitted after the bound CTM was moved to the transition's new protocol version.
     event CTMUpgradeApplied(address indexed transition, uint256 oldProtocolVersion, uint256 newProtocolVersion);
 
@@ -38,12 +52,22 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
     constructor(
         address _initialOwner,
         address _breakGlassGovernor,
-        IChainTypeManager _ctm
+        IChainTypeManager _ctm,
+        CTMTransitionFactory _transitionFactory
     ) UpgradeExecutorBase(_initialOwner, _breakGlassGovernor) {
-        if (address(_ctm) == address(0)) {
+        if (address(_ctm) == address(0) || address(_transitionFactory) == address(0)) {
             revert ZeroAddress();
         }
         CTM = _ctm;
+        TRANSITION_FACTORY = _transitionFactory;
+    }
+
+    /// @dev Factory provenance: the object at `_transition` must be one the bound factory
+    ///      deployed for that exact manifest hash.
+    function _requireFactoryDeployed(ICTMTransition _transition) private view {
+        if (TRANSITION_FACTORY.deployedFor(_transition.manifestHash()) != address(_transition)) {
+            revert NotFactoryDeployed(address(_transition));
+        }
     }
 
     /// @notice Completes the two-step ownership handover of the bound CTM to this executor.
@@ -60,6 +84,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
     ///        version schedule (also re-checked inside `setNewVersionUpgrade`).
     /// @param _transition The write-once transition approved by governance.
     function applyCTMUpgrade(ICTMTransition _transition) external onlyOwner {
+        _requireFactoryDeployed(_transition);
         _transition.validate();
 
         address currentRelease = CTM.currentRelease();
@@ -104,6 +129,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
                 revert UpgradeNotPermissionlessYet(deadline);
             }
         }
+        _requireFactoryDeployed(_transition);
         _transition.validate();
 
         CTM.upgradeChainFromVersion(_chainId, _transition.oldProtocolVersion(), _buildUpgradeCut(_transition));

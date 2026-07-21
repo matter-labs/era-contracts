@@ -7,11 +7,13 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {ICTMRelease} from "./ICTMRelease.sol";
 import {ICTMTransition, L2UpgradePlan} from "./ICTMTransition.sol";
 import {TransitionDeltaLib} from "./TransitionDeltaLib.sol";
-import {UpgradeFacetSwap} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
+import {CTMReleaseFactory} from "./CTMRegistryFactory.sol";
+import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {SemVer} from "../../common/libraries/SemVer.sol";
 import {ProtocolVersionTooSmall} from "../ZkSyncUpgradeErrors.sol";
 import {
     MalformedL2UpgradePlan,
+    NotFactoryDeployed,
     PatchMustReuseRelease,
     RegistryAlreadyInitialized,
     RegistryCodehashMismatch,
@@ -22,7 +24,7 @@ import {
 } from "../../common/L1ContractErrors.sol";
 
 /// @notice Storage-backed, write-once transition between two CTM releases.
-/// @dev The facet swaps and base-system hash changes are NOT part of the manifest: they are
+/// @dev The facet cuts and base-system hash changes are NOT part of the manifest: they are
 ///      DERIVED from the `(fromRelease, newRelease)` pair at initialization (see
 ///      {TransitionDeltaLib}) and stored. Transition and release state cannot diverge because
 ///      the delta is a pure function of the two pinned releases.
@@ -33,6 +35,11 @@ import {
 contract CTMTransition is ICTMTransition {
     // solhint-disable-next-line gas-struct-packing
     struct TransitionManifest {
+        /// @dev The canonical release factory that deployed BOTH `fromRelease` and `newRelease`.
+        ///      Factory provenance makes the releases genuine write-once `CTMRelease` instances —
+        ///      an arbitrary (possibly mutable) contract implementing `ICTMRelease` is rejected,
+        ///      so the derived delta and the genesis data served via `currentRelease` are frozen.
+        address releaseFactory;
         uint256 oldProtocolVersion;
         uint256 newProtocolVersion;
         address verifier;
@@ -61,8 +68,9 @@ contract CTMTransition is ICTMTransition {
     uint256 internal transitionUpgradeTimestamp;
     L2UpgradePlan internal plan;
 
-    // Derived at initialization from (fromRelease, newRelease) — never authored.
-    UpgradeFacetSwap[] internal derivedFacetSwaps;
+    // Derived at initialization from (fromRelease, newRelease) — never authored, and stored as
+    // ready-to-execute cuts the chain applies verbatim (no re-diffing at execution).
+    Diamond.FacetCut[] internal derivedFacetCuts;
     bytes32 internal derivedBootloaderChange;
     bytes32 internal derivedDefaultAccountChange;
     bytes32 internal derivedEvmEmulatorChange;
@@ -75,6 +83,7 @@ contract CTMTransition is ICTMTransition {
         // Pre-registry migration (v31 -> v32) is one-time migration code in the legacy upgrade
         // scripts — it installs `currentRelease` so that every later transition has a source.
         if (
+            _manifest.releaseFactory == address(0) ||
             _manifest.verifier == address(0) ||
             _manifest.fromRelease == address(0) ||
             _manifest.newRelease == address(0) ||
@@ -95,6 +104,9 @@ contract CTMTransition is ICTMTransition {
 
         _requirePin(_manifest.verifier, _manifest.verifierCodehash);
         _requirePin(_manifest.upgradeEngine, _manifest.upgradeEngineCodehash);
+        // Factory provenance for BOTH edges, then live validation.
+        _requireFactoryDeployedRelease(_manifest.releaseFactory, _manifest.newRelease);
+        _requireFactoryDeployedRelease(_manifest.releaseFactory, _manifest.fromRelease);
         ICTMRelease(_manifest.newRelease).validate();
         ICTMRelease(_manifest.fromRelease).validate();
 
@@ -144,14 +156,14 @@ contract CTMTransition is ICTMTransition {
         plan.delegateCalldata = _manifest.l2Plan.delegateCalldata;
         plan.factoryDepHashes = _manifest.l2Plan.factoryDepHashes;
 
-        // Derive the L1 delta from the release pair and freeze it.
-        UpgradeFacetSwap[] memory swaps = TransitionDeltaLib.deriveFacetSwaps(
+        // Derive the L1 delta from the release pair and freeze it as final diamond cuts.
+        Diamond.FacetCut[] memory facetCutsMemory = TransitionDeltaLib.deriveFacetCuts(
             ICTMRelease(_manifest.fromRelease),
             ICTMRelease(_manifest.newRelease)
         );
-        length = swaps.length;
+        length = facetCutsMemory.length;
         for (uint256 i = 0; i < length; ++i) {
-            derivedFacetSwaps.push(swaps[i]);
+            derivedFacetCuts.push(facetCutsMemory[i]);
         }
         (derivedBootloaderChange, derivedDefaultAccountChange, derivedEvmEmulatorChange) = TransitionDeltaLib
             .deriveHashChanges(ICTMRelease(_manifest.fromRelease), ICTMRelease(_manifest.newRelease));
@@ -189,8 +201,8 @@ contract CTMTransition is ICTMTransition {
         return transitionUpgradeTimestamp;
     }
 
-    function facetTransitions() external view returns (UpgradeFacetSwap[] memory) {
-        return derivedFacetSwaps;
+    function facetCuts() external view returns (Diamond.FacetCut[] memory) {
+        return derivedFacetCuts;
     }
 
     function baseSystemContractHashChanges() external view returns (bytes32, bytes32, bytes32) {
@@ -221,6 +233,14 @@ contract CTMTransition is ICTMTransition {
         return
             transitionVerifier.codehash == verifierCodehash &&
             transitionUpgradeEngine.codehash == upgradeEngineCodehash;
+    }
+
+    /// @dev The object at `_release` must be one `_releaseFactory` deployed for that exact
+    ///      manifest hash — genuine, write-once `CTMRelease` code.
+    function _requireFactoryDeployedRelease(address _releaseFactory, address _release) private view {
+        if (CTMReleaseFactory(_releaseFactory).deployedFor(ICTMRelease(_release).manifestHash()) != _release) {
+            revert NotFactoryDeployed(_release);
+        }
     }
 
     function _requirePin(address _target, bytes32 _expectedCodehash) private view {

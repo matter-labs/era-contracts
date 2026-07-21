@@ -6,12 +6,11 @@ import {Test} from "forge-std/Test.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {TestCoreRegistry} from "./TestRegistries.sol";
-
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/EcosystemUpgradeExecutor.sol";
-import {L1EcosystemContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
-import {ICoreRegistry} from "contracts/upgrades/registry/ICoreRegistry.sol";
-import {EcosystemImplMismatch} from "contracts/common/L1ContractErrors.sol";
+import {CoreRegistry} from "contracts/upgrades/registry/CoreRegistry.sol";
+import {CoreRegistryFactory} from "contracts/upgrades/registry/CTMRegistryFactory.sol";
+import {ICoreRegistry, EcosystemContractRow} from "contracts/upgrades/registry/ICoreRegistry.sol";
+import {EcosystemImplMismatch, NotFactoryDeployed} from "contracts/common/L1ContractErrors.sol";
 
 /// @dev Minimal implementation contracts for proxy-upgrade tests.
 contract DummyImplA {
@@ -30,13 +29,17 @@ contract DummyImplB {
 ///         governance address than the CTM-scoped executor in CTMUpgradeExecutor.t.sol: the two
 ///         authority domains are separable — each scope runs its own executor with its own owner,
 ///         and neither needs the other scope's registry.
+/// @dev Registries are REAL, factory-deployed `CoreRegistry` instances: the executor enforces
+///      factory provenance, so a mutable test double (or any hand-rolled `ICoreRegistry`
+///      implementation) is rejected by design — which this suite also asserts.
 contract EcosystemUpgradeExecutorTest is Test {
     bytes32 internal constant EIP1967_IMPL_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
     address internal ecosystemGovernor = makeAddr("ecosystemGovernor");
 
     EcosystemUpgradeExecutor internal ecosystemExecutor;
-    TestCoreRegistry internal coreRegistry;
+    CoreRegistryFactory internal coreRegistryFactory;
+    ICoreRegistry internal coreRegistry;
     ProxyAdmin internal proxyAdmin;
 
     DummyImplA internal implOld;
@@ -44,42 +47,61 @@ contract EcosystemUpgradeExecutorTest is Test {
     TransparentUpgradeableProxy internal bridgehubProxy;
     TransparentUpgradeableProxy internal messageRootProxy;
 
-    uint256 internal constant NEW_VERSION = uint256(1) << 32; // 0.1.0
-
     function setUp() public {
         implOld = new DummyImplA();
         implNew = new DummyImplB();
 
-        // The ecosystem executor is BOUND to (and owns) one immutable ecosystem ProxyAdmin,
-        // mirroring the production ownership chain (and nothing else — no CTM authority).
+        // The ecosystem executor is BOUND to (and owns) one immutable ecosystem ProxyAdmin and
+        // one immutable registry factory, mirroring the production ownership chain (and nothing
+        // else — no CTM authority).
         proxyAdmin = new ProxyAdmin();
-        ecosystemExecutor = new EcosystemUpgradeExecutor(ecosystemGovernor, makeAddr("breakGlass"), proxyAdmin);
+        coreRegistryFactory = new CoreRegistryFactory();
+        ecosystemExecutor = new EcosystemUpgradeExecutor(
+            ecosystemGovernor,
+            makeAddr("breakGlass"),
+            proxyAdmin,
+            coreRegistryFactory
+        );
         proxyAdmin.transferOwnership(address(ecosystemExecutor));
         bridgehubProxy = new TransparentUpgradeableProxy(address(implOld), address(proxyAdmin), hex"");
         messageRootProxy = new TransparentUpgradeableProxy(address(implOld), address(proxyAdmin), hex"");
 
-        coreRegistry = new TestCoreRegistry();
         // Bridgehub is a full source-checked edge (old -> new); MessageRoot pins its live
-        // implementation (the executor's live comparison must skip it); L1AssetRouter pins no
+        // implementation (the executor's live comparison must skip it); the third row pins no
         // new implementation at all (zero => skipped before any proxy interaction).
-        coreRegistry.addContract(
-            L1EcosystemContract.L1Bridgehub,
-            address(bridgehubProxy),
-            address(implOld),
-            address(implNew)
-        );
-        coreRegistry.addContract(
-            L1EcosystemContract.L1MessageRoot,
-            address(messageRootProxy),
-            address(implOld),
-            address(implOld)
-        );
-        coreRegistry.addContract(L1EcosystemContract.L1AssetRouter, address(0), address(0), address(0));
+        EcosystemContractRow[] memory rows = new EcosystemContractRow[](3);
+        rows[0] = _row(address(bridgehubProxy), address(implOld), address(implNew));
+        rows[1] = _row(address(messageRootProxy), address(implOld), address(implOld));
+        rows[2] = _row(address(0), address(0), address(0));
+        coreRegistry = _deployRegistry(rows);
+    }
+
+    function _row(
+        address _proxy,
+        address _expectedOldImpl,
+        address _implNew
+    ) internal view returns (EcosystemContractRow memory) {
+        return
+            EcosystemContractRow({
+                proxy: _proxy,
+                expectedOldImpl: _expectedOldImpl,
+                implNew: _implNew,
+                implNewCodehash: _implNew.codehash
+            });
+    }
+
+    /// @dev The production deployment surface: atomic deploy + initialize through the bound
+    ///      factory, which is what makes the instance acceptable to the executor.
+    function _deployRegistry(EcosystemContractRow[] memory _rows) internal returns (ICoreRegistry) {
+        return
+            ICoreRegistry(
+                coreRegistryFactory.deployOrGetCoreRegistry(CoreRegistry.CoreRegistryManifest({contractRows: _rows}))
+            );
     }
 
     function _applyL1Upgrade() internal {
         vm.prank(ecosystemGovernor);
-        ecosystemExecutor.applyL1Upgrade(ICoreRegistry(address(coreRegistry)));
+        ecosystemExecutor.applyL1Upgrade(coreRegistry);
     }
 
     function test_applyL1Upgrade_upgradesChangedProxiesOnly() public {
@@ -115,7 +137,34 @@ contract EcosystemUpgradeExecutorTest is Test {
         // are separate, and the entrypoint is owner-gated (no arbitrary-delegatecall surface).
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(makeAddr("ctmGovernor"));
-        ecosystemExecutor.applyL1Upgrade(ICoreRegistry(address(coreRegistry)));
+        ecosystemExecutor.applyL1Upgrade(coreRegistry);
+    }
+
+    function test_revertWhen_registryNotFactoryDeployed() public {
+        // A hand-deployed registry — genuine CoreRegistry code, correctly initialized, but NOT
+        // deployed through the bound factory — must be rejected: factory provenance is what
+        // turns "canonical write-once object" into an on-chain invariant.
+        EcosystemContractRow[] memory rows = new EcosystemContractRow[](1);
+        rows[0] = _row(address(bridgehubProxy), address(implOld), address(implNew));
+        CoreRegistry handDeployed = new CoreRegistry();
+        handDeployed.initialize(CoreRegistry.CoreRegistryManifest({contractRows: rows}));
+
+        vm.expectRevert(abi.encodeWithSelector(NotFactoryDeployed.selector, address(handDeployed)));
+        vm.prank(ecosystemGovernor);
+        ecosystemExecutor.applyL1Upgrade(ICoreRegistry(address(handDeployed)));
+    }
+
+    function test_factoryDeployOrGetIsIdempotentPerManifest() public {
+        // Same manifest -> the existing instance is returned (a same-manifest front-run merely
+        // does the caller's work); a different manifest lands in a different instance.
+        EcosystemContractRow[] memory rows = new EcosystemContractRow[](1);
+        rows[0] = _row(address(bridgehubProxy), address(implOld), address(implNew));
+        address first = address(_deployRegistry(rows));
+        address second = address(_deployRegistry(rows));
+        assertEq(first, second, "same manifest must resolve to the same instance");
+
+        rows[0] = _row(address(messageRootProxy), address(implOld), address(implNew));
+        assertTrue(address(_deployRegistry(rows)) != first, "a different manifest must land elsewhere");
     }
 
     function test_revertWhen_replayingStaleRegistryWouldDowngrade() public {
@@ -125,15 +174,11 @@ contract EcosystemUpgradeExecutorTest is Test {
         // replayed: the proxy is at neither that registry's source nor its target, so the replay
         // must revert instead of silently downgrading.
         DummyImplA implNewer = new DummyImplA();
-        TestCoreRegistry laterRegistry = new TestCoreRegistry();
-        laterRegistry.addContract(
-            L1EcosystemContract.L1Bridgehub,
-            address(bridgehubProxy),
-            address(implNew),
-            address(implNewer)
-        );
+        EcosystemContractRow[] memory rows = new EcosystemContractRow[](1);
+        rows[0] = _row(address(bridgehubProxy), address(implNew), address(implNewer));
+        ICoreRegistry laterRegistry = _deployRegistry(rows);
         vm.prank(ecosystemGovernor);
-        ecosystemExecutor.applyL1Upgrade(ICoreRegistry(address(laterRegistry)));
+        ecosystemExecutor.applyL1Upgrade(laterRegistry);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -144,6 +189,6 @@ contract EcosystemUpgradeExecutorTest is Test {
             )
         );
         vm.prank(ecosystemGovernor);
-        ecosystemExecutor.applyL1Upgrade(ICoreRegistry(address(coreRegistry)));
+        ecosystemExecutor.applyL1Upgrade(coreRegistry);
     }
 }

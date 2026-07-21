@@ -51,8 +51,9 @@ library GenesisManifestLib {
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](GENESIS_FACET_COUNT);
 
         // The canonical facet set of a new chain diamond, with explicit routing and inline pins
-        // captured from the just-deployed facets.
-        (address[GENESIS_FACET_COUNT] memory addrs, bool[GENESIS_FACET_COUNT] memory freezable) = _genesisFacets(
+        // captured from the just-deployed facets (live calls: this variant runs where the facets
+        // exist — in the deployers).
+        (address[GENESIS_FACET_COUNT] memory addrs, bool[GENESIS_FACET_COUNT] memory freezable) = genesisFacetSlots(
             _cfg.facets
         );
         for (uint256 i = 0; i < GENESIS_FACET_COUNT; ++i) {
@@ -64,23 +65,45 @@ library GenesisManifestLib {
             });
         }
 
+        return buildGenesisManifestFromRows(
+            _cfg,
+            genesisFacets,
+            _cfg.facets.diamondInit.codehash,
+            _cfg.genesisUpgrade.codehash
+        );
+    }
+
+    /// @notice Pure manifest assembly from precomputed facet rows and codehashes. Off-chain
+    ///         predictors (`GatewayCTMDeployerHelper`) use this with rows reconstructed from
+    ///         build artifacts — the facets do not exist yet at prediction time — and MUST
+    ///         reproduce byte-identical rows (same slot order via {genesisFacetSlots}, selectors
+    ///         from the facets' own ABI, VM-appropriate codehashes), since
+    ///         `keccak256(abi.encode(manifest))` is the release factory's CREATE2 salt.
+    function buildGenesisManifestFromRows(
+        GenesisConfig memory _cfg,
+        GenesisFacet[] memory _genesisFacets,
+        bytes32 _diamondInitCodehash,
+        bytes32 _genesisUpgradeCodehash
+    ) internal pure returns (CTMRelease.ReleaseManifest memory manifest) {
         manifest.diamondInit = _cfg.facets.diamondInit;
-        manifest.diamondInitCodehash = _cfg.facets.diamondInit.codehash;
-        manifest.genesisFacets = genesisFacets;
+        manifest.diamondInitCodehash = _diamondInitCodehash;
+        manifest.genesisFacets = _genesisFacets;
         manifest.bootloaderHash = _cfg.bootloaderHash;
         manifest.defaultAccountHash = _cfg.defaultAccountHash;
         manifest.evmEmulatorHash = _cfg.evmEmulatorHash;
         manifest.fixedForceDeploymentsData = _cfg.fixedForceDeploymentsData;
         manifest.genesisUpgrade = _cfg.genesisUpgrade;
-        manifest.genesisUpgradeCodehash = _cfg.genesisUpgrade.codehash;
+        manifest.genesisUpgradeCodehash = _genesisUpgradeCodehash;
         manifest.genesisBatchHash = _cfg.genesisBatchHash;
         manifest.genesisBatchCommitment = _cfg.genesisBatchCommitment;
         manifest.genesisIndexRepeatedStorageChanges = _cfg.genesisIndexRepeatedStorageChanges;
     }
 
-    function _genesisFacets(
+    /// @notice The canonical genesis facet slot order + freezability. Shared by the live builder
+    ///         and off-chain predictors so the two cannot disagree on row order.
+    function genesisFacetSlots(
         Facets memory _facets
-    ) private pure returns (address[GENESIS_FACET_COUNT] memory addrs, bool[GENESIS_FACET_COUNT] memory freezable) {
+    ) internal pure returns (address[GENESIS_FACET_COUNT] memory addrs, bool[GENESIS_FACET_COUNT] memory freezable) {
         addrs[0] = _facets.adminFacet;
         freezable[0] = false;
 

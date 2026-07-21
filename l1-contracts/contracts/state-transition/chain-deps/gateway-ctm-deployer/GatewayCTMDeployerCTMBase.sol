@@ -92,8 +92,10 @@ abstract contract GatewayCTMDeployerCTMBase {
         // installs the release's explicit facet routing and reads the base system contract
         // hashes from it. The release is deployed AND initialized ATOMICALLY here through the
         // directly-deployed `CTMReleaseFactory` — the same deployer flow governance approved,
-        // with no uninitialized window (the factory's first CREATE, so its address is still
-        // predictable off-chain).
+        // with no uninitialized window. Its address is a CREATE2 commitment to the genesis
+        // manifest (salt = manifest hash), so the off-chain prediction depends only on
+        // (factory, manifest, creation code) — a front-runner cannot displace it by bumping
+        // the factory's nonce.
         address currentRelease = _deployCurrentRelease({
             _releaseFactory: _config.bootstrapReleaseFactory,
             _genesisUpgrade: _config.genesisUpgrade,

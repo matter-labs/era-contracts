@@ -3,17 +3,17 @@
 pragma solidity 0.8.28;
 
 import {GenesisFacet, ICTMRelease} from "./ICTMRelease.sol";
-import {UpgradeFacetSwap} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
+import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {RegistryDuplicateSelector} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice DERIVES a transition's facet swaps and base-system hash changes from its
+/// @notice DERIVES a transition's final diamond cuts and base-system hash changes from its
 ///         `(fromRelease, newRelease)` pair. The delta is a pure function of the two releases —
-///         it is computed once at transition initialization and stored, never hand-authored, so
-///         the transition path (existing chains) cannot diverge from the release path (new
-///         chains) by construction. This replaces the previous model of authoring the delta and
-///         proving its convergence after the fact.
+///         it is computed once at transition initialization and stored as ready-to-execute
+///         `Diamond.FacetCut[]`, never hand-authored and never re-diffed at execution, so the
+///         transition path (existing chains) cannot diverge from the release path (new chains)
+///         by construction, and the chain applies the stored cuts verbatim.
 ///
 /// @dev Scope: L1 diamond routing + the three base-system hashes. The L2 payload
 ///      (`L2UpgradePlan`) is reviewed-and-pinned data, not derived — L1 cannot verify L2
@@ -26,17 +26,18 @@ library TransitionDeltaLib {
         bool isFreezable;
     }
 
-    /// @notice Derives the facet swaps whose execution transforms `_fromRelease`'s routing into
+    /// @notice Derives the diamond cuts whose execution transforms `_fromRelease`'s routing into
     ///         `_newRelease`'s routing exactly.
-    /// @dev Emitted as one pure-removal row per departing facet followed by one pure-addition
-    ///      row per arriving facet. `DiamondCutBuilder.buildCuts` groups all removals before all
-    ///      additions, so selectors moving between facets are freed before being re-added. A
-    ///      selector survives (contributes nothing) iff the target routes it to the SAME facet
-    ///      with the SAME freezability.
-    function deriveFacetSwaps(
+    /// @dev Emitted as one `Remove` cut per departing facet (facet address zero, per
+    ///      `Diamond._removeFunctions`) followed by one `Add` cut per arriving facet — all
+    ///      removals first, so selectors moving between facets are freed before being re-added.
+    ///      There is no `Replace` bucket: a re-routed selector is a removal from its old facet
+    ///      plus an addition to its new one. A selector survives (contributes nothing) iff the
+    ///      target routes it to the SAME facet with the SAME freezability.
+    function deriveFacetCuts(
         ICTMRelease _fromRelease,
         ICTMRelease _newRelease
-    ) internal view returns (UpgradeFacetSwap[] memory swaps) {
+    ) internal view returns (Diamond.FacetCut[] memory facetCuts) {
         GenesisFacet[] memory fromFacets = _fromRelease.genesisFacets();
         GenesisFacet[] memory newFacets = _newRelease.genesisFacets();
         Route[] memory fromRouting = _expand(fromFacets);
@@ -46,45 +47,43 @@ library TransitionDeltaLib {
         uint256 newFacetsLength = newFacets.length;
         // Per from-facet: the selectors NOT carried over unchanged (removed or re-routed).
         bytes4[][] memory removedPerFacet = new bytes4[][](fromFacetsLength);
-        uint256 removalRows = 0;
+        uint256 removalCuts = 0;
         for (uint256 i = 0; i < fromFacetsLength; ++i) {
             removedPerFacet[i] = _filterRoutes(fromFacets[i], newRouting);
             if (removedPerFacet[i].length != 0) {
-                ++removalRows;
+                ++removalCuts;
             }
         }
         // Per new-facet: the selectors NOT already routed identically in `fromRelease`.
         bytes4[][] memory addedPerFacet = new bytes4[][](newFacetsLength);
-        uint256 additionRows = 0;
+        uint256 additionCuts = 0;
         for (uint256 i = 0; i < newFacetsLength; ++i) {
             addedPerFacet[i] = _filterRoutes(newFacets[i], fromRouting);
             if (addedPerFacet[i].length != 0) {
-                ++additionRows;
+                ++additionCuts;
             }
         }
 
-        swaps = new UpgradeFacetSwap[](removalRows + additionRows);
+        facetCuts = new Diamond.FacetCut[](removalCuts + additionCuts);
         uint256 cursor = 0;
         for (uint256 i = 0; i < fromFacetsLength; ++i) {
             if (removedPerFacet[i].length != 0) {
-                swaps[cursor] = UpgradeFacetSwap({
-                    oldFacet: fromFacets[i].facet,
-                    newFacet: address(0),
+                facetCuts[cursor] = Diamond.FacetCut({
+                    facet: address(0),
+                    action: Diamond.Action.Remove,
                     isFreezable: false,
-                    oldSelectors: removedPerFacet[i],
-                    newSelectors: new bytes4[](0)
+                    selectors: removedPerFacet[i]
                 });
                 ++cursor;
             }
         }
         for (uint256 i = 0; i < newFacetsLength; ++i) {
             if (addedPerFacet[i].length != 0) {
-                swaps[cursor] = UpgradeFacetSwap({
-                    oldFacet: address(0),
-                    newFacet: newFacets[i].facet,
+                facetCuts[cursor] = Diamond.FacetCut({
+                    facet: newFacets[i].facet,
+                    action: Diamond.Action.Add,
                     isFreezable: newFacets[i].isFreezable,
-                    oldSelectors: new bytes4[](0),
-                    newSelectors: addedPerFacet[i]
+                    selectors: addedPerFacet[i]
                 });
                 ++cursor;
             }

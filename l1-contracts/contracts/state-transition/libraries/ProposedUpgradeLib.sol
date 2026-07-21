@@ -5,26 +5,6 @@ pragma solidity 0.8.28;
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
 
-/// @notice One planned facet swap. The committed diamond cut names a write-once transition;
-///         `BaseZkSyncUpgrade` reads this plan from that same transition and applies it in the
-///         diamond's context, so the outer cut needs no `facetCuts`.
-/// @param oldFacet The facet currently serving selectors, or zero for a pure addition.
-/// @param newFacet The facet serving them after the upgrade, or zero for a pure removal.
-/// @param isFreezable Whether the new facet's selectors can be frozen.
-/// @param oldSelectors Pinned selector-list override for `oldFacet`; empty means "read the
-///        facet's own `ISelfDescribingFacet.selectors()` at execution time" — the pinning exists
-///        only as the bootstrap override for facet versions predating that interface. Reading
-///        from the facet's immutable bytecode keeps the upgrade hash-stable across the whole
-///        upgrade window.
-/// @param newSelectors Same, for `newFacet`.
-struct UpgradeFacetSwap {
-    address oldFacet;
-    address newFacet;
-    bool isFreezable;
-    bytes4[] oldSelectors;
-    bytes4[] newSelectors;
-}
-
 /// @notice The struct that represents the upgrade proposal.
 /// @param l2ProtocolUpgradeTx The system upgrade transaction.
 /// @param bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.

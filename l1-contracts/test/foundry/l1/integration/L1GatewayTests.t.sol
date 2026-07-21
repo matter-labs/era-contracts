@@ -49,7 +49,7 @@ import {GatewayUtils} from "deploy-scripts/gateway/GatewayUtils.s.sol";
 import {Utils} from "../unit/concrete/Utils/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
-import {ProposedUpgrade, UpgradeFacetSwap} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
+import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";

@@ -34,7 +34,7 @@ import {SEMVER_MINOR_OFFSET} from "../../common/libraries/SemVer.sol";
 library CTMUpgradeComposer {
     /// @notice Builds the diamond cut that upgrades an existing chain: no `facetCuts` of its own.
     ///         The committed cut names the write-once transition; `BaseZkSyncUpgrade` reads the
-    ///         facet-swap plan (`transition.facetTransitions()`) straight from that same transition
+    ///         derived facet cuts (`transition.facetCuts()`) straight from that same transition
     ///         at execution time, so the swaps are never carried in the cut and both facet changes
     ///         and proposal composition share one source of truth.
     function buildUpgradeCutData(

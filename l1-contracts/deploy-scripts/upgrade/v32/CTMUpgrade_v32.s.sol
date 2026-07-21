@@ -31,11 +31,13 @@ import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.
 ///      - no new proxies — every proxy already exists on the v31 baseline and is discovered by
 ///        `AddressIntrospector`; only implementations are deployed (via CREATE2, so unchanged
 ///        contracts land on their existing implementation address and the swap is a no-op).
-/// @dev v32 is intended to be the first registry-driven upgrade: the addresses this script
-///      deploys are the manifest input of `scripts/gen-registry.ts`, and governance execution
-///      goes through `CTMUpgradeExecutor` (see
-///      contracts/upgrades/registry/) once protocol-ops adopts that flow. Until then this script
-///      also serializes the classic stage calls.
+/// @dev v32 EXECUTES through the legacy stage-calldata pipeline; what is registry-driven about
+///      it is GENESIS (this script deploys + pins the genesis `CTMRelease`, so every v33+
+///      transition has a real `fromRelease`). Production adoption of the on-chain execution
+///      path — deploying the canonical factories + bound executors and handing the CTM and the
+///      ecosystem ProxyAdmin over to them — is deliberately NOT part of this script: it is the
+///      v33 protocol-ops preparation work, tracked there. Today that wiring exists only in the
+///      test harnesses (foundry e2e + anvil runner).
 contract CTMUpgrade_v32 is Script, DefaultCTMUpgrade {
     /// @notice Single-call entry point invoked by the protocol-ops CLI's `ecosystem upgrade-prepare-all`.
     function noGovernancePrepare(CTMUpgradeParams memory _params) public {

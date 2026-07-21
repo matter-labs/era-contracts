@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
-import {UpgradeFacetSwap} from "../../state-transition/libraries/ProposedUpgradeLib.sol";
+import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 
 /// @notice The complete, typed L2 side of one transition: the force-deployments, the delegate
 ///         call the `L2ComplexUpgrader` performs after them, and the factory dependencies the
@@ -25,6 +25,10 @@ struct L2UpgradePlan {
 ///      is two releases and this transition's schedule/verifier/engine/L2 plan; the delta is a
 ///      pure function of the release pair, so transition and release state cannot diverge.
 interface ICTMTransition {
+    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every pinned value,
+    ///         and the key under which the deploying factory attests this instance.
+    function manifestHash() external view returns (bytes32);
+
     function oldProtocolVersion() external view returns (uint256);
 
     function newProtocolVersion() external view returns (uint256);
@@ -46,7 +50,10 @@ interface ICTMTransition {
     function upgradeTimestamp() external view returns (uint256);
 
     /// @notice The DERIVED facet swaps realizing `fromRelease -> newRelease` routing.
-    function facetTransitions() external view returns (UpgradeFacetSwap[] memory);
+    /// @notice The final, ready-to-execute diamond cuts — DERIVED from the release pair at
+    ///         initialization (all `Remove` cuts first, then `Add`), applied verbatim by the
+    ///         chain with no re-diffing.
+    function facetCuts() external view returns (Diamond.FacetCut[] memory);
 
     /// @notice The DERIVED base-system hash changes (zero = carried over unchanged).
     function baseSystemContractHashChanges() external view returns (bytes32, bytes32, bytes32);

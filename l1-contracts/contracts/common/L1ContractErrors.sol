@@ -383,6 +383,7 @@ error MalformedL2UpgradePlan();
 error TransitionDeadlineBeforeUpgrade(uint256 deadline, uint256 upgradeTimestamp);
 // @dev An ecosystem row's live implementation matches neither its source nor its target —
 //      rejects replaying a stale registry to downgrade a proxy.
+error NotFactoryDeployed(address instance);
 error EcosystemImplMismatch(address proxy, address expectedOldImpl, address actualImpl);
 // @dev The permissionless (post-deadline) execution window has not opened yet.
 error UpgradeNotPermissionlessYet(uint256 deadline);

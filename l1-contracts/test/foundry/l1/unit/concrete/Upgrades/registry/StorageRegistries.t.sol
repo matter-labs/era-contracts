@@ -8,6 +8,7 @@ import {L1EcosystemContract} from "contracts/upgrades/registry/ContractIdentifie
 import {CoreRegistry} from "contracts/upgrades/registry/CoreRegistry.sol";
 import {EcosystemContractRow} from "contracts/upgrades/registry/ICoreRegistry.sol";
 import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
+import {CTMReleaseFactory} from "contracts/upgrades/registry/CTMRegistryFactory.sol";
 import {CTMTransition} from "contracts/upgrades/registry/CTMTransition.sol";
 import {ICTMTransition, L2UpgradePlan} from "contracts/upgrades/registry/ICTMTransition.sol";
 import {ICTMRelease, GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
@@ -16,13 +17,14 @@ import {ReleaseFacetReader} from "contracts/upgrades/registry/ReleaseFacetReader
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {ProposedUpgrade, UpgradeFacetSwap} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
+import {ProposedUpgrade} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
     MalformedL2UpgradePlan,
+    NotFactoryDeployed,
     PatchMustReuseRelease,
     RegistryAlreadyInitialized,
     RegistryCodehashMismatch,
@@ -39,6 +41,7 @@ import {ProtocolVersionTooSmall} from "contracts/upgrades/ZkSyncUpgradeErrors.so
 ///         from the `(fromRelease, newRelease)` pair at initialization.
 contract StorageRegistriesTest is Test {
     CoreRegistry internal coreRegistry;
+    CTMReleaseFactory internal releaseFactory;
     CTMRelease internal fromRelease;
     CTMRelease internal newRelease;
     CTMTransition internal transition;
@@ -76,10 +79,11 @@ contract StorageRegistriesTest is Test {
 
         coreRegistry = new CoreRegistry();
         coreRegistry.initialize(_coreManifest());
-        fromRelease = new CTMRelease();
-        fromRelease.initialize(_fromReleaseManifest());
-        newRelease = new CTMRelease();
-        newRelease.initialize(_newReleaseManifest());
+        // Releases deploy through the canonical factory: transition initialization enforces
+        // factory provenance on BOTH edges.
+        releaseFactory = new CTMReleaseFactory();
+        fromRelease = CTMRelease(releaseFactory.deployOrGetRelease(_fromReleaseManifest()));
+        newRelease = CTMRelease(releaseFactory.deployOrGetRelease(_newReleaseManifest()));
         transition = new CTMTransition();
         transition.initialize(_transitionManifest());
     }
@@ -95,7 +99,6 @@ contract StorageRegistriesTest is Test {
         EcosystemContractRow[] memory rows = new EcosystemContractRow[](2);
         // A full source-checked edge...
         rows[0] = EcosystemContractRow({
-            key: L1EcosystemContract.L1Bridgehub,
             proxy: address(0xB001),
             expectedOldImpl: address(0xB101),
             implNew: coreImplNew,
@@ -103,7 +106,6 @@ contract StorageRegistriesTest is Test {
         });
         // ...and a no-op placeholder row (nothing to upgrade).
         rows[1] = EcosystemContractRow({
-            key: L1EcosystemContract.L1MessageRoot,
             proxy: address(0xB003),
             expectedOldImpl: address(0),
             implNew: address(0),
@@ -191,6 +193,7 @@ contract StorageRegistriesTest is Test {
     function _transitionManifest() internal view returns (CTMTransition.TransitionManifest memory manifest) {
         return
             CTMTransition.TransitionManifest({
+                releaseFactory: address(releaseFactory),
                 oldProtocolVersion: OLD_VERSION,
                 newProtocolVersion: NEW_VERSION,
                 verifier: verifier,
@@ -253,18 +256,19 @@ contract StorageRegistriesTest is Test {
         assertEq(transition.newRelease(), address(newRelease));
         assertEq(transition.upgradeEngine(), upgradeEngine);
 
-        // Derived, not authored: one removal row (the departing admin facet with its full
-        // routing) and one addition row (its replacement); carried-over facets contribute
-        // nothing.
-        UpgradeFacetSwap[] memory swaps = transition.facetTransitions();
-        assertEq(swaps.length, 2);
-        assertEq(swaps[0].oldFacet, facetOldAdmin);
-        assertEq(swaps[0].newFacet, address(0));
-        assertEq(swaps[0].oldSelectors.length, 2);
-        assertEq(swaps[1].oldFacet, address(0));
-        assertEq(swaps[1].newFacet, facetNewAdmin);
-        assertEq(swaps[1].newSelectors.length, 2);
-        assertFalse(swaps[1].isFreezable);
+        // Derived, not authored — and stored as final cuts: one Remove cut (the departing admin
+        // facet's full routing, facet address zero per Diamond semantics) followed by one Add
+        // cut (its replacement); carried-over facets contribute nothing, and there is no
+        // Replace bucket by construction.
+        Diamond.FacetCut[] memory derivedCuts = transition.facetCuts();
+        assertEq(derivedCuts.length, 2);
+        assertEq(derivedCuts[0].facet, address(0));
+        assertTrue(derivedCuts[0].action == Diamond.Action.Remove);
+        assertEq(derivedCuts[0].selectors.length, 2);
+        assertEq(derivedCuts[1].facet, facetNewAdmin);
+        assertTrue(derivedCuts[1].action == Diamond.Action.Add);
+        assertEq(derivedCuts[1].selectors.length, 2);
+        assertFalse(derivedCuts[1].isFreezable);
 
         // Hash changes derived the same way: only the bootloader differs between the releases.
         (bytes32 bootloaderChange, bytes32 defaultAccountChange, bytes32 evmEmulatorChange) = transition
@@ -338,7 +342,7 @@ contract StorageRegistriesTest is Test {
         patchTransition.initialize(_patchManifest());
         assertEq(patchTransition.fromRelease(), patchTransition.newRelease());
         // The derived delta of a same-release hop is empty by construction.
-        assertEq(patchTransition.facetTransitions().length, 0);
+        assertEq(patchTransition.facetCuts().length, 0);
         (bytes32 bootloaderChange, , ) = patchTransition.baseSystemContractHashChanges();
         assertEq(bootloaderChange, bytes32(0));
         // Both edges are live releases, so runtime validation holds.
@@ -441,18 +445,36 @@ contract StorageRegistriesTest is Test {
     }
 
     function test_revertWhen_releaseRoutesSelectorTwice() public {
-        // The duplicate is caught when a transition derives from the malformed release.
+        // The duplicate is caught when a transition derives from the malformed release (which
+        // must still be factory-deployed — provenance is checked before derivation).
         CTMRelease.ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.genesisFacets[1].selectors[0] = bytes4(uint32(0x20)); // collides with facetFrozen
 
-        CTMRelease malformed = new CTMRelease();
-        malformed.initialize(manifest);
+        address malformed = releaseFactory.deployOrGetRelease(manifest);
 
         CTMTransition.TransitionManifest memory transitionManifest = _transitionManifest();
-        transitionManifest.newRelease = address(malformed);
+        transitionManifest.newRelease = malformed;
         CTMTransition duplicated = new CTMTransition();
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateSelector.selector, bytes4(uint32(0x20))));
         duplicated.initialize(transitionManifest);
+    }
+
+    // ─────────────────────────── factory provenance ───────────────────────────
+
+    function test_revertWhen_transitionReleaseNotFactoryDeployed() public {
+        // Genuine CTMRelease code, correctly initialized — but hand-deployed, so the canonical
+        // factory never attested it. A transition must refuse both edges like that: otherwise an
+        // arbitrary (possibly mutable) `ICTMRelease` implementation could feed the derivation
+        // and later serve genesis data via `currentRelease`.
+        CTMRelease handDeployed = new CTMRelease();
+        handDeployed.initialize(_newReleaseManifest());
+
+        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(handDeployed);
+
+        CTMTransition unattested = new CTMTransition();
+        vm.expectRevert(abi.encodeWithSelector(NotFactoryDeployed.selector, address(handDeployed)));
+        unattested.initialize(manifest);
     }
 
     // ─────────────────────────── pins ───────────────────────────

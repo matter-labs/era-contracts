@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {ProposedUpgrade, UpgradeFacetSwap} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
+import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {
