@@ -88,8 +88,9 @@ contract AtomicFlowManagerRecoverTest is Test {
     /// direct value leg's refund to `L2AssetRouter.bridgehubRecoverBaseToken` with the correct
     /// (destChainId, source-base-token assetId, from, value). It does NOT exercise the downstream
     /// disbursement — same-base routing to `BaseTokenHolder.recoverBaseToken` vs different-base NTV re-mint
-    /// happens inside {L2NativeTokenVault._disburseFailedTransfer}, which is covered separately
-    /// ({AtomicRecoveryForgery} for the router->NTV hop; the anvil atomic-swap spec end-to-end).
+    /// happens inside {L2NativeTokenVault._disburseFailedTransfer}, which is covered on the real stack by
+    /// {L2AtomicInteropSendRefundTestAbstract}'s `test_atomicSend_directValueLeg_sameBase_*` /
+    /// `..._differentBase_*` tests (and {AtomicRecoveryForgery} for the router->NTV hop).
     function test_recoverBundle_directValueLeg_forwardsSameBaseAssetIdToRouter() public {
         vm.mockCall(
             L2_ASSET_ROUTER_ADDR,
