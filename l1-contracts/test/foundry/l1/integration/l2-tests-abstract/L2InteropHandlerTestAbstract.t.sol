@@ -215,6 +215,51 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         }
     }
 
+    /// @notice verify -> execute: once a bundle is `Verified`, `executeAtomicBundle` skips the
+    /// `requireFlowFinalized` gate (mirrors the L1 `test_VerifyThenExecuteBundle`). We prove the skip by
+    /// making the gate REVERT after verification — execute must still fully execute.
+    function test_verifyThenExecuteAtomicBundle_skipsFinalityGate() public {
+        InteropBundle memory interopBundle = getInteropBundle(1);
+        bytes memory bundle = abi.encode(interopBundle);
+        AtomicFinalityProof memory finality;
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
+
+        // Phase 1: verify with the finality gate mocked to succeed -> Verified.
+        _mockRequireFlowFinalized();
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(bundle, finality);
+        assertEq(
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            1,
+            "bundle should be Verified"
+        );
+
+        // Phase 2: make the finality gate REVERT, then execute. Because the bundle is already Verified,
+        // executeAtomicBundle must NOT re-invoke the gate, so it still fully executes.
+        vm.mockCallRevert(
+            L2_ATOMIC_FLOW_MANAGER_ADDR,
+            abi.encodeWithSelector(IAtomicFlowManager.requireFlowFinalized.selector),
+            "finality gate must be skipped once Verified"
+        );
+        vm.mockCall(
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
+            abi.encode(bytes(""))
+        );
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+            abi.encode(bytes32(0))
+        );
+
+        vm.prank(EXECUTION_ADDRESS);
+        L2_INTEROP_HANDLER.executeAtomicBundle(bundle, finality);
+        assertEq(
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            2,
+            "bundle should be FullyExecuted without re-running the finality gate"
+        );
+    }
+
     function test_unbundleBundle() public {
         InteropBundle memory interopBundle = getInteropBundle(3);
         bytes memory bundle = abi.encode(interopBundle);
@@ -520,29 +565,22 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
     }
 
-    /// @notice Regression test to ensure verifyBundle can access currentSettlementLayerChainId without
-    /// tripping access control, and emits BundleVerified / marks the bundle Verified.
-    /// @dev Atomic verification no longer gates on the settlement layer, but the chain may still be in
-    /// gateway mode; this exercises that path.
-    function test_regression_verifyBundleCanAccessCurrentSettlementLayerChainId() public {
+    /// @notice `verifyAtomicBundle` marks the bundle `Verified` and emits `BundleVerified`, and does so
+    /// even when the chain is in gateway mode.
+    /// @dev Atomic verification does NOT read `currentSettlementLayerChainId` (unlike the old public-interop
+    /// path), so this is a generic gateway-mode verification test rather than an accessor-access regression:
+    /// it only asserts that `verifyAtomicBundle` succeeds and records `Verified` regardless of settlement layer.
+    function test_verifyAtomicBundle_worksInGatewayMode() public {
         InteropBundle memory interopBundle = getInteropBundle(1);
         bytes memory bundle = abi.encode(interopBundle);
         AtomicFinalityProof memory finality;
         _mockRequireFlowFinalized();
 
-        // Simulate the chain settling on Gateway instead of L1.
-        uint256 gatewayChainId = GATEWAY_CHAIN_ID;
+        // Simulate the chain settling on Gateway instead of L1 to show verification is settlement-agnostic.
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
             abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
-            abi.encode(gatewayChainId)
-        );
-
-        // Mock sendToL1 for the event emission
-        vm.mockCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
-            abi.encode(bytes32(0))
+            abi.encode(GATEWAY_CHAIN_ID)
         );
 
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);

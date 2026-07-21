@@ -16,7 +16,8 @@ import {
     AttributeAlreadySet,
     AttributeViolatesRestriction,
     InteropBundleSaltAlreadyUsed,
-    InteropPreviewHash
+    InteropPreviewHash,
+    NonAtomicSendUnsupported
 } from "contracts/interop/InteropErrors.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
@@ -108,6 +109,23 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
     ///      The anvil-interop helpers rely on this equivalence to build atomic flows. The preview must run
     ///      from the same sender (its address feeds both the salt derivation and each call's `from`) and must
     ///      not consume the salt-uniqueness slot, so the real send below can reuse the same salt.
+    /// @notice The PR's headline invariant: an L2->L2 send WITHOUT the `atomicBundle` attribute has no
+    /// delivery path (public L1-published L2->L2 interop was removed) and must revert
+    /// `NonAtomicSendUnsupported`. This is the asymmetric counterpart to the atomic->L1 rejection
+    /// (`AtomicBundleToL1NotSupported`), which already has a negative test.
+    /// @dev The atomicity/destination check is the first thing `_sendBundle` does — before any value
+    /// collection or bundle assembly — so the revert precedes (and therefore rolls back) any burn.
+    function test_sendBundle_revertsWhen_noAtomicBundleAttribute() public {
+        _setupGatewayMode();
+        InteropCallStarter[] memory calls = _buildSimpleCall();
+        // Attributes with ONLY a salt — no `atomicBundle`.
+        bytes[] memory attrs = new bytes[](1);
+        attrs[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (keccak256("no-atomic-attr")));
+
+        vm.expectRevert(NonAtomicSendUnsupported.selector);
+        l2InteropCenter.sendBundle{value: 0}(InteroperableAddress.formatEvmV1(destinationChainId), calls, attrs);
+    }
+
     function test_previewBundleHash_matchesSentBundleHash() public {
         _setupGatewayMode();
         address sender = makeAddr("previewSender");

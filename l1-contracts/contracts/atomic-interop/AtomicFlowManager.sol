@@ -291,8 +291,10 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// when the destination shares this chain's base token, or deposited via the asset router otherwise.
     /// For direct calls, the refund routes through the asset router/NTV recovery path so the existing
     /// base-token recovery accounting is reused, returning `value` to the call's `from` (the depositor).
-    /// Router-produced calls do not take this branch: their value is part of the burn recovered by
-    /// {IAtomicRecoverable.recoverAtomicCall}. Every direct value leg counts as a recovery.
+    /// Router-produced calls (`from == asset router`) do not take this branch: they carry no base-token
+    /// `value` (indirect calls force `interopCallValue == 0`); what they move is a bridged asset, which
+    /// {IAtomicRecoverable.recoverAtomicCall} reverses directly (re-minting / unlocking that asset), not a
+    /// separate base-token value. Every direct value leg counts as a recovery.
     ///
     /// Recovery is best-effort by design. An atomic bundle may mix fund-moving calls with calls that move no
     /// funds and have nothing to reverse (e.g. flipping a flag). The latter contribute nothing. We only
