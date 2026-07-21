@@ -303,6 +303,14 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// must make any bespoke fund-moving leg that does not carry `value` recoverable; otherwise it would
     /// strand its funds. L1-destined atomic bundles remain blocked at send time because L2->L1 withdrawals
     /// are never revertable.
+    ///
+    /// Scope: this is the atomicity (TIMEOUT) refund — it fires only when the flow is proven unable to
+    /// finalize (a leg's commit value is still absent past the deadline, established via {authorizeRefund}).
+    /// It is NOT a refund for cancelled or undeliverable calls: once a flow HAS finalized, a call that
+    /// reverts on delivery (e.g. a non-{IERC7786Recipient} target) or that is cancelled during unbundle
+    /// forfeits its value — unchanged from prior interop, where a finalized call to a reverting recipient
+    /// was likewise un-executable and un-refundable. Extending refundability to those cases is possible
+    /// future work.
     function _recoverBundle(bytes32 _flowId, bytes32 _bundleHash, InteropBundle memory _bundle) internal {
         uint256 destChainId = _bundle.destinationChainId;
         // L2->L1 atomic bundles are rejected at send time ({InteropCenter.AtomicBundleToL1NotSupported}), so a
