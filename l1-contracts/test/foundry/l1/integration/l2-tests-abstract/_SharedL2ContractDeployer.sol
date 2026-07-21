@@ -330,12 +330,10 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     function finalizeDepositWithCustomCommitmentAndChainId(uint256 _chainId, bytes memory chainCommitment) public {
         bytes memory chainData = chainCommitment;
-        bytes memory ctmData = abi.encode(
-            baseTokenAssetId,
-            ownerWallet,
-            chainTypeManager.protocolVersion(),
-            config.contracts.diamondCutData
-        );
+        // The shape `forwardedBridgeBurn` produces and `forwardedBridgeMint` decodes: the new
+        // admin + protocol version only. The destination CTM rebuilds the genesis cut from its
+        // own release, and the base token asset id travels in `baseTokenBridgingData`.
+        bytes memory ctmData = abi.encode(ownerWallet, chainTypeManager.protocolVersion());
         BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
             chainId: _chainId,
             baseTokenBridgingData: TokenBridgingData({

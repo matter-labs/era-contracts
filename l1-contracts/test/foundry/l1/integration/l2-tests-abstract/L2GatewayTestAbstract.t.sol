@@ -142,7 +142,9 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         address newAdmin = makeAddr("newAdmin");
         BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
             chainId: mintChainId,
-            ctmData: abi.encode(newAdmin, config.contracts.diamondCutData),
+            // `forwardedBridgeBurn` decodes only the new settlement-layer admin — the destination
+            // CTM rebuilds the genesis cut from its own release, so no cut is forwarded.
+            ctmData: abi.encode(newAdmin),
             chainData: abi.encode(chainTypeManager.protocolVersion())
         });
 
