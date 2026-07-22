@@ -34,6 +34,8 @@ import {
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
@@ -115,6 +117,24 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     function setUp() public virtual {
         setUpInner(false);
+        // Interop is atomic-only: the InteropCenter calls `AtomicFlowManager.append` on send and the
+        // InteropHandler calls `AtomicFlowManager.requireFlowFinalized` on execute. The AtomicFlowManager is
+        // not deployed in these Foundry contexts, so mock both (void) calls to succeed. This mock is inert for
+        // non-interop suites (they never touch that address), so installing it unconditionally in the single
+        // shared `setUp` frees every concrete entrypoint from setUp/MRO boilerplate — the alternative
+        // (an overridable hook) still triggers a diamond-override on every interop concrete.
+        _mockAtomicFlowManager();
+    }
+
+    /// @notice Installs the void mocks for the AtomicFlowManager gates. Overridable so suites that deploy the
+    /// real AtomicFlowManager (e.g. the atomic send/refund tests) can opt out and exercise the real logic.
+    function _mockAtomicFlowManager() internal virtual {
+        vm.mockCall(L2_ATOMIC_FLOW_MANAGER_ADDR, abi.encodeWithSelector(IAtomicFlowManager.append.selector), "");
+        vm.mockCall(
+            L2_ATOMIC_FLOW_MANAGER_ADDR,
+            abi.encodeWithSelector(IAtomicFlowManager.requireFlowFinalized.selector),
+            ""
+        );
     }
 
     function setUpInner(bool _skip) public virtual {

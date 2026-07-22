@@ -106,7 +106,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: totalValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Verify that the mock received the correct indirectCallMessageValue as msg.value
@@ -159,7 +159,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: interopCallValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Test with only indirectCallMessageValue (missing interopCallValue)
@@ -168,7 +168,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: indirectCallMessageValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
     }
 
@@ -201,7 +201,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: indirectCallMessageValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Verify that the mock received the correct indirectCallMessageValue
@@ -242,7 +242,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: interopCallValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Verify that the mock received zero msg.value
@@ -303,7 +303,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: totalValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Verify first mock received correct values
@@ -373,7 +373,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: totalValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Verify indirect call mock received correct values
@@ -446,7 +446,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: indirectCallMessageValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Verify that the mock still received the correct indirectCallMessageValue
@@ -507,7 +507,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: indirectCallMessageValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Verify the indirect call was processed correctly
@@ -579,7 +579,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: totalIndirectValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Verify both indirect calls were processed
@@ -674,7 +674,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: totalIndirectValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Verify both calls were processed
