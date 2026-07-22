@@ -142,8 +142,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     }
 
     sourceTokenAddress = state.testTokens![sourceChainId];
-    // The pre-generated states carry no NTV registrations (the balance-migration setup
-    // that used to register test tokens was removed), so register on demand.
+    // The pre-generated chain states carry no NTV registrations, so register on demand.
     await registerL2NativeTokenIfNeeded(sourceProvider, sourceTokenAddress);
     sourceAssetId = await getAssetIdForToken(sourceProvider, sourceTokenAddress);
 
@@ -694,8 +693,8 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       name: "Live Interop Chain A Native Token",
       symbol: "LIA",
     });
-    // Interop eligibility no longer requires an on-chain balance migration;
-    // cross-chain asset correctness is guaranteed by ZK proofs.
+    // Interop requires no on-chain balance migration ({protocol-docs/bridging.md}),
+    // so the assetId is derived locally.
     const chainAAssetId = encodeNtvAssetId(sourceChainId, chainAToken);
 
     const chainBToken = await sendAndExecuteTokenInterop({
