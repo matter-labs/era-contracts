@@ -3,18 +3,25 @@ pragma solidity 0.8.28;
 
 import {IndexedMerkleTree, IMT, IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
 import {IL2InteropCommitmentTree} from "./IL2InteropCommitmentTree.sol";
-import {L2_ATOMIC_FLOW_MANAGER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ATOMIC_FLOW_MANAGER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    INTEROP_COMMITMENT_LEAF_HOOK
+} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {Unauthorized} from "../l2-system/zksync-os/errors/ZKOSContractErrors.sol";
-import {CommitmentTreeNotAppender} from "./AtomicInteropErrors.sol";
+import {CommitmentTreeNotAppender, InteropCommitmentLeafHookFailed} from "./AtomicInteropErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice See {IL2InteropCommitmentTree}. A thin shell over the shared dynamic-height Indexed Merkle
 /// Tree engine ({IndexedMerkleTree}).
 ///
-/// The tree publishes nothing itself. The ZKsync OS bootloader reads the root **directly from this
-/// contract's storage** at every batch boundary and commits both snapshots (batch begin and batch end)
-/// as dedicated leaves of the batch's chain batch root (see {ChainBatchRootTree}). Consuming chains
+/// The ZKsync OS bootloader reads the root **directly from this contract's storage** at every batch
+/// boundary and commits both snapshots (batch begin and batch end) as dedicated leaves of the batch's
+/// chain batch root (see {ChainBatchRootTree}). On each insert the contract additionally reports the
+/// inserted value to the interop commitment leaf system hook ({INTEROP_COMMITMENT_LEAF_HOOK}), which
+/// records it as an L2->L1 log; this keeps the full set of inserted values — and therefore the whole
+/// tree — reconstructible from L1 DA regardless of the chain's state-diff DA choice. Consuming chains
 /// authenticate a claimed root as that leaf against the interop root they import for the settling
 /// batch (see {AtomicInteropProof}); the deadline is checked against the batch's `l1Timestamp`, which
 /// the settlement layer assigns and which is re-derived from the same inclusion proof.
@@ -57,7 +64,23 @@ contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
         // Value / low-nullifier validation (non-zero, no duplicates, correct bracket) is enforced by
         // the engine and surfaces its own `IMT*` errors.
         (newIndex, newRoot) = _imt.insert(_value, _lowNullifierIndex);
+        // Record the inserted value as an L2->L1 log via the system hook, so the full set of inserted
+        // values — and therefore the whole tree — is always reconstructible from L1 DA, independently
+        // of the chain's state-diff DA choice. The values are logged in insertion order (one hook call
+        // per insert); the O(log n) `nextIndex`/`nextValue` links are re-derivable from the sorted set.
+        _reportLeaf(_value);
         emit RootUpdated(newIndex, newRoot);
+    }
+
+    /// @dev Reports a single inserted value to the interop commitment leaf system hook. The calldata is
+    /// exactly the 32-byte value, which the ZKsync OS hook records as the `value` of an L2->L1 log.
+    /// @dev The hook charges the ZKsync OS `native` resource for the log; no explicit EVM-gas burn is
+    /// performed here (unlike the public `L1Messenger.sendToL1` path) because `insert` is callable only
+    /// by the appender and is not a standalone user entrypoint.
+    function _reportLeaf(uint256 _value) private {
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool ok, ) = INTEROP_COMMITMENT_LEAF_HOOK.call(abi.encodePacked(_value));
+        require(ok, InteropCommitmentLeafHookFailed());
     }
 
     /// @inheritdoc IL2InteropCommitmentTree
