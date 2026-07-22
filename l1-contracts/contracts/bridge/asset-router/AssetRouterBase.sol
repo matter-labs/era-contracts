@@ -19,17 +19,22 @@ import {IBridgehubBase, IndirectCallRequest} from "../../core/bridgehub/IBridgeh
 import {
     AssetHandlerDoesNotExist,
     AssetIdNotSupported,
+    InteropSenderChainIdMismatch,
+    InvalidSelector,
+    PayloadTooShort,
     Unauthorized,
     UnsupportedEncodingVersion
 } from "../../common/L1ContractErrors.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
+import {IERC7786Recipient} from "../../interop/IERC7786Recipient.sol";
+import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Routes asset transfers for both L1 <-> ZK chain bridging and interop between ZK chains,
 /// supporting both ETH and ERC20 tokens.
 /// @dev Designed for use with a proxy for upgradability.
-abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, PausableUpgradeable {
+abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
     /// @dev Maps asset ID to address of corresponding asset handler.
@@ -163,6 +168,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         });
 
         request = _requestToBridge({
+            _chainId: _chainId,
             _originalCaller: _originalCaller,
             _assetId: assetId,
             _bridgeMintCalldata: bridgeMintCalldata,
@@ -190,18 +196,84 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice The interop handler on this chain that is allowed to deliver interop calls to this router.
+    /// @dev On L2 this is the `L2InteropHandler` system contract; on L1 the configured `L1InteropHandler`.
+    function _interopHandler() internal view virtual returns (address);
+
+    /// @notice Validates that the interop message sender is the asset-router counterpart on the source chain.
+    /// @dev On L2, only this same router (identical address on every ZK chain) may be the sender and the source
+    /// cannot be L1 (interop is only initiated on L2s). On L1, the sender must be the L2 asset router.
+    function _isValidInteropSender(uint256 _senderChainId, address _senderAddress) internal view virtual returns (bool);
+
+    /// @notice Executes a cross-chain asset-router call following the ERC-7786 standard.
+    /// @dev Called by this chain's interop handler while executing an interop bundle whose call targets this
+    /// router with a `finalizeDeposit` payload; the payload is re-invoked via a self-call. The sender and payload
+    /// validations prevent spoofed cross-chain messages and arbitrary function calls through the interop system.
+    /// @param sender ERC-7930 address of the message sender (the asset router on the source chain).
+    /// @param payload Encoded `finalizeDeposit` call data.
+    /// @return The `receiveMessage` selector per ERC-7786.
+    function receiveMessage(
+        bytes32 /* receiveId */,
+        bytes calldata sender,
+        bytes calldata payload
+    ) external payable override returns (bytes4) {
+        require(msg.sender == _interopHandler(), Unauthorized(msg.sender));
+
+        (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
+        require(_isValidInteropSender(senderChainId, senderAddress), Unauthorized(senderAddress));
+
+        // Only a `finalizeDeposit` call may be executed through the interop system. Its ABI layout is
+        // `finalizeDeposit(uint256 _sourceChainId, bytes32 _assetId, bytes _transferData)`, so the first word
+        // after the 4-byte selector is `_sourceChainId`.
+        require(payload.length >= 4 + 32, PayloadTooShort());
+        require(
+            bytes4(payload[0:4]) == AssetRouterBase.finalizeDeposit.selector,
+            InvalidSelector(bytes4(payload[0:4]))
+        );
+
+        // The chain id of the interop message sender (authenticated via the ERC-7930 `sender` and, on the
+        // receiving side, the message-inclusion proof) MUST equal the `_sourceChainId` the deposit will be
+        // finalized under. Under the honest-proof trust model these are always equal (both are the origin
+        // chain), but we enforce it explicitly so a payload can never finalize a deposit under a chain id
+        // other than the one whose message inclusion was proven — the security of asset accounting depends
+        // on this equality.
+        uint256 payloadSourceChainId = uint256(bytes32(payload[4:36]));
+        require(
+            senderChainId == payloadSourceChainId,
+            InteropSenderChainIdMismatch(senderChainId, payloadSourceChainId)
+        );
+
+        // slither-disable-next-line arbitrary-send-eth
+        (bool success, bytes memory returnData) = address(this).call{value: msg.value}(payload);
+        if (!success) {
+            // Bubble up the original revert reason (e.g. `InsufficientChainBalance`) instead of masking it, so
+            // callers can react to the specific error (the TBM flow retries withdrawals on `InsufficientChainBalance`).
+            assembly {
+                revert(add(returnData, 0x20), mload(returnData))
+            }
+        }
+        return IERC7786Recipient.receiveMessage.selector;
+    }
+
     /// @notice Finalize the withdrawal and release funds.
-    /// @param _chainId The chain ID of the transaction to check.
+    /// @param _sourceChainId The chain ID the deposit/withdrawal message originates from. Note that this is the
+    /// source chain of the message, not necessarily the origin chain of the bridged token.
     /// @param _assetId The bridged asset ID.
     /// @param _transferData The data used to finalize the withdrawal, it includes the data needed for the asset handler (e.g. NativeTokenVault).
     /// @dev Important note is that chains can be potentially malicious and provide arbitrary data here, so in case
-    /// a piece of data affects other chains than the `_chainId`, special care needs to be applied for validation.
-    /// @dev We have both the legacy finalizeWithdrawal and the new finalizeDeposit functions,
-    /// finalizeDeposit uses the new format. On the L2 we have finalizeDeposit with new and old formats both.
-    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) public payable virtual;
+    /// a piece of data affects other chains than the `_sourceChainId`, special care needs to be applied for validation.
+    /// @dev This is the single (new-format) finalization entry point — the legacy `finalizeWithdrawal` path and
+    /// old message format were removed. Cross-chain messages reach it only through the interop
+    /// `receiveMessage` self-call above; on L2 it is additionally callable by the aliased asset-router
+    /// counterpart for L1 -> L2 deposit finalization.
+    function finalizeDeposit(
+        uint256 _sourceChainId,
+        bytes32 _assetId,
+        bytes calldata _transferData
+    ) public payable virtual;
 
     function _finalizeDeposit(
-        uint256 _chainId,
+        uint256 _sourceChainId,
         bytes32 _assetId,
         bytes calldata _transferData,
         address _nativeTokenVault
@@ -209,13 +281,13 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         address assetHandler = assetHandlerAddress[_assetId];
 
         if (assetHandler != address(0)) {
-            IAssetHandler(assetHandler).bridgeMint{value: msg.value}(_chainId, _assetId, _transferData);
+            IAssetHandler(assetHandler).bridgeMint{value: msg.value}(_sourceChainId, _assetId, _transferData);
         } else {
             _setAssetHandler(_assetId, _nativeTokenVault);
             // Native token vault may not support non-zero `msg.value`, but we still provide it here to
             // prevent the passed ETH from being stuck in the asset router and also for consistency.
             // So the decision on whether to support non-zero `msg.value` is done at the asset handler layer.
-            IAssetHandler(_nativeTokenVault).bridgeMint{value: msg.value}(_chainId, _assetId, _transferData); // ToDo: Maybe it's better to receive amount and receiver here? transferData may have different encoding
+            IAssetHandler(_nativeTokenVault).bridgeMint{value: msg.value}(_sourceChainId, _assetId, _transferData); // ToDo: Maybe it's better to receive amount and receiver here? transferData may have different encoding
         }
     }
 
@@ -280,6 +352,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify bridge requests.
     /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
     function _requestToBridge(
+        uint256 _chainId,
         address _originalCaller,
         bytes32 _assetId,
         bytes memory _bridgeMintCalldata,
@@ -289,11 +362,17 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
         request = IndirectCallRequest({
             magicValue: INDIRECT_CALL_MAGIC_VALUE,
-            l2Contract: L2_ASSET_ROUTER_ADDR,
+            l2Contract: _l2AssetRouterAddress(_chainId),
             l2Calldata: l2TxCalldata,
             factoryDeps: new bytes[](0),
             txDataHash: _txDataHash
         });
+    }
+
+    /// @dev Returns the address of the L2 asset router on the destination chain.
+    /// Overridden by private interop to return the registered remote router address.
+    function _l2AssetRouterAddress(uint256 /* _destinationChainId */) internal view virtual returns (address) {
+        return L2_ASSET_ROUTER_ADDR;
     }
 
     function getDepositCalldata(

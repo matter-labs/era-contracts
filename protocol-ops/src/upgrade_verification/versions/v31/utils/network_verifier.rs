@@ -97,12 +97,6 @@ sol! {
     }
 
     #[sol(rpc)]
-    contract L1AssetTracker {
-        function BRIDGE_HUB() external view returns (address);
-        function chainAssetHandler() external view returns (address);
-    }
-
-    #[sol(rpc)]
     contract ChainRegistrationSender {
         function BRIDGE_HUB() external view returns (address);
     }

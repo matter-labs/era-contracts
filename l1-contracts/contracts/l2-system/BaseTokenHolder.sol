@@ -60,7 +60,7 @@ import {Unauthorized} from "../common/L1ContractErrors.sol";
  */
 // slither-disable-next-line locked-ether
 contract BaseTokenHolder is IBaseTokenHolder {
-    /// @notice Modifier that restricts access to the InteropHandler only.
+    /// @notice Modifier that restricts access to the L2InteropHandler only.
     modifier onlyInteropHandler() {
         if (msg.sender != L2_INTEROP_HANDLER_ADDR) {
             revert Unauthorized(msg.sender);
@@ -69,15 +69,18 @@ contract BaseTokenHolder is IBaseTokenHolder {
     }
 
     /// @notice Modifier that restricts access to callers that can bridge base tokens.
-    /// @dev InteropCenter: returns burned tokens during interop operations
-    /// @dev NativeTokenVault: returns tokens during bridged base token burns
-    /// @dev L2BaseToken: returns burned tokens during withdrawals
+    /// @dev InteropCenter: burns base-token value when sending an interop bundle
+    /// @dev NativeTokenVault: burns base-token value during bridged base-token burns
     modifier onlyBridgingCaller() {
-        if (
-            msg.sender != L2_INTEROP_CENTER_ADDR &&
-            msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR &&
-            msg.sender != L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
-        ) {
+        if (msg.sender != L2_INTEROP_CENTER_ADDR && msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    /// @notice Modifier that restricts access to the NativeTokenVault only (failed-transfer recovery).
+    modifier onlyNativeTokenVault() {
+        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -113,8 +116,26 @@ contract BaseTokenHolder is IBaseTokenHolder {
         emit BaseTokenMintedInterop(_to, _amount);
     }
 
+    /// @notice Returns base tokens escrowed by a failed/timed-out bridge-out to the original depositor.
+    /// @dev The inverse of `burnAndStartBridging`: notifies the asset tracker — which asserts the bridge-out
+    /// is recoverable (L2->L2 only; L2->L1 withdrawals are never revertable) — then returns the value.
+    /// Callable only by the NativeTokenVault (atomic-interop timeout recovery). Like `give`, this
+    /// pushes ETH and may revert if `_to` rejects it — recovery targets the original depositor by design.
+    /// @param _to The original depositor to refund.
+    /// @param _amount The amount of base tokens to return.
+    /// @param _toChainId The original bridge-out destination chain id (to reverse the matching accounting).
+    function recoverBaseToken(address _to, uint256 _amount, uint256 _toChainId) external override onlyNativeTokenVault {
+        if (_amount == 0) {
+            return;
+        }
+
+        L2_ASSET_TRACKER.handleRecoverBaseTokenBridgingOnL2(_toChainId, _amount);
+        Address.sendValue(payable(_to), _amount);
+        emit BaseTokenRecovered(_to, _amount);
+    }
+
     /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.
-    /// @dev Called by InteropCenter, NativeTokenVault, and L2BaseToken during bridging operations.
+    /// @dev Called by InteropCenter and NativeTokenVault during bridging operations.
     /// @dev This function notifies L2AssetTracker to track the bridging operation.
     /// @param _toChainId The chain ID which the funds are sent to.
     function burnAndStartBridging(uint256 _toChainId) external payable onlyBridgingCaller {

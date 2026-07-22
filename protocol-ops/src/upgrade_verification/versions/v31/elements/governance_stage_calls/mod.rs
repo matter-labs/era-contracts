@@ -56,7 +56,6 @@ sol! {
     function upgrade(address proxy, address implementation);
     function upgradeAndCall(address proxy, address implementation, bytes data);
     function initializeL1V31Upgrade();
-    function setAssetTracker(address _l1AssetTracker);
     function setAddresses();
     function updateSecurityCouncil(address _newSecurityCouncil);
     function updateGuardians(address _newGuardians);
@@ -67,7 +66,6 @@ sol! {
     // cross-check each priority tx targets the right contract on L2.
     function addChainTypeManager(address _chainTypeManager);
     function acceptOwnership();
-    function setGatewaySettlementFee(uint256 _newFee);
     function setAssetHandlerAddress(uint256 _originChainId, bytes32 _assetId, address _assetHandlerAddress);
     function setCTMAssetAddress(bytes32 _additionalData, address _assetAddress);
 

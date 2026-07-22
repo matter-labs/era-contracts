@@ -39,7 +39,6 @@ import {
 } from "../../common/L1ContractErrors.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
-import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -109,8 +108,6 @@ abstract contract NativeTokenVaultBase is
         require(msg.sender == address(_assetRouter()), Unauthorized(msg.sender));
         _;
     }
-
-    function _assetTracker() internal view virtual returns (IAssetTrackerBase);
 
     function originToken(bytes32 _assetId) public view virtual returns (address) {
         address token = tokenAddress[_assetId];
@@ -191,8 +188,8 @@ abstract contract NativeTokenVaultBase is
     /// - metadata not being verified is a known issue and will be addressed in the future releases. In the short term, we only expect
     /// chains with decently trusted chain type managers. This issue might affect the user experience, but never lead
     /// to loss of funds.
-    /// - To ensure no loss of funds, L1NativeTokenVault should track the balances using L1AssetTracker, while the L2NativeTokenVault trusts
-    /// the GWAssetTracker to track balances in case of interops and its L1 implementation to provide the valid data for `bridgeMint` in case of deposits.
+    /// - Correctness of the minted amounts is guaranteed by the ZK proofs of the sending chain
+    /// (plus 2FA on ZKsync OS chains); there is no on-chain per-chain balance enforcement.
     function bridgeMint(
         uint256 _chainId,
         bytes32 _assetId,
@@ -205,6 +202,34 @@ abstract contract NativeTokenVaultBase is
         (receiver, amount) = _bridgeMintToken(_chainId, _assetId, _data);
         // solhint-disable-next-line func-named-parameters
         emit BridgeMint(_chainId, _assetId, receiver, amount);
+    }
+
+    /// @inheritdoc INativeTokenVaultBase
+    /// @dev Refunds the original depositor (the burn data's `originalCaller`) by unlocking an
+    /// origin-native asset or re-minting a bridged one, reversing the `bridgeBurn` that locked/burned the
+    /// funds at `commitSend`. The bundle's mint data is forwarded verbatim, so the refund always targets
+    /// the depositor regardless of the data's `remoteReceiver`. `_chainId` must be the destination chain
+    /// used at burn time so `_handleBridgeFromChain` undoes the matching `_handleBridgeToChain`.
+    function bridgeRecoverFailedTransfer(
+        uint256 _chainId,
+        bytes32 _assetId,
+        bytes calldata _data
+    ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused {
+        // slither-disable-next-line unused-return
+        (address originalCaller, , address originTokenAddress, uint256 amount, bytes memory erc20Data) = DataEncoding
+            .decodeBridgeMintData(_data);
+        bool isNative = originChainId[_assetId] == block.chainid;
+        _disburseFailedTransfer({
+            _chainId: _chainId,
+            _assetId: _assetId,
+            _receiver: originalCaller,
+            _amount: amount,
+            _isNative: isNative,
+            _originToken: originTokenAddress,
+            _erc20Data: erc20Data
+        });
+        // solhint-disable-next-line func-named-parameters
+        emit BridgeRecoverFailedTransfer(_chainId, _assetId, originalCaller, amount);
     }
 
     /// @notice Mints/releases a bridged-in asset to the receiver and decreases the chain balance.
@@ -242,6 +267,46 @@ abstract contract NativeTokenVaultBase is
     }
 
     function _withdrawFunds(bytes32 _assetId, address _to, address _token, uint256 _amount) internal virtual;
+
+    /// @notice Disburses a failed/recovered transfer's funds to `_receiver`, reversing the source-side
+    /// `bridgeBurn` that locked/burned them.
+    /// @dev Shared by `bridgeRecoverFailedTransfer` (atomic-interop recovery) and the L1
+    /// `bridgeConfirmTransferResult` (failed-deposit claim). The chain balance is decreased before any
+    /// funds are released, mirroring the `_bridgeMint*` ordering, so a malicious token/ETH recipient cannot
+    /// overwrite the transient values from L1Nullifier.
+    /// @param _chainId The chain the funds are being recovered from (the burn-time destination chain).
+    /// @param _assetId The assetId of the asset being recovered.
+    /// @param _receiver The address that receives the recovered funds (always the original depositor).
+    /// @param _amount The amount to recover.
+    /// @param _isNative Whether `_assetId` is native to this chain (unlock) or bridged (re-mint).
+    /// @param _originToken The origin token address, used to deploy the bridged token if it is not yet known.
+    /// @param _erc20Data The ERC20 metadata, used to deploy the bridged token if it is not yet known.
+    /// @dev Virtual: on L2 the base token is escrowed off-vault (in `BaseTokenHolder`), so
+    /// {L2NativeTokenVault} overrides this to route the base token there. On L1 the ETH base token flows
+    /// through the normal native path below.
+    function _disburseFailedTransfer(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _receiver,
+        uint256 _amount,
+        bool _isNative,
+        address _originToken,
+        bytes memory _erc20Data
+    ) internal virtual {
+        // IMPORTANT: We must handle chain balance decrease before giving out funds to the user,
+        // because otherwise the latter operation (via a malicious token or ETH recipient)
+        // could've overwritten the transient values from L1Nullifier.
+        _handleBridgeFromChain({_chainId: _chainId, _assetId: _assetId, _amount: _amount});
+        if (_isNative) {
+            _withdrawFunds(_assetId, _receiver, tokenAddress[_assetId], _amount);
+        } else {
+            address token = tokenAddress[_assetId];
+            if (token == address(0)) {
+                token = _ensureAndSaveTokenDeployed(_assetId, _originToken, _erc20Data);
+            }
+            IBridgedStandardToken(token).bridgeMint(_receiver, _amount);
+        }
+    }
 
     /*//////////////////////////////////////////////////////////////
                             Start transaction Functions
@@ -459,8 +524,14 @@ abstract contract NativeTokenVaultBase is
         );
     }
 
+    /// @dev Chain-local bookkeeping hook invoked when funds are bridged out towards `_chainId`.
+    /// @dev On L2 this records outbound amounts in the L2AssetTracker; on L1 it increases the
+    /// net `bridgedOut` amount of L1-native tokens.
     function _handleBridgeToChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual;
 
+    /// @dev Chain-local bookkeeping hook invoked when funds bridged from `_chainId` are finalized here.
+    /// @dev On L2 this records inbound amounts in the L2AssetTracker; on L1 it decreases the
+    /// net `bridgedOut` amount of L1-native tokens.
     function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual;
 
     /*//////////////////////////////////////////////////////////////
@@ -524,10 +595,16 @@ abstract contract NativeTokenVaultBase is
         _addTokenToTokensList(_assetId);
         // Note, that it might be possible that the token is registered on the asset tracker, but not on the
         // native token vault. An example is when a token is automatically registered for a token that is native to L2
-        // and moves its balance to ZK Gateway in order to use it for interop (i.e. registration got triggered, but the native
-        // token vault was never called since there was no actual withdrawal of the asset).
-        _assetTracker().registerNewTokenIfNeeded(_assetId, _originChainId);
+        // (i.e. registration got triggered, but the native token vault was never called since there was no actual
+        // withdrawal of the asset).
+        _registerTokenInAssetTracker(_assetId, _originChainId);
     }
+
+    /// @dev Registers the token in the chain-local asset tracker, if one exists.
+    /// @dev On L2 this records the token in the L2AssetTracker (total-supply / outbound bookkeeping).
+    /// On L1 there is no asset tracker, so the default implementation is a no-op.
+    // solhint-disable-next-line no-empty-blocks
+    function _registerTokenInAssetTracker(bytes32 _assetId, uint256 _originChainId) internal virtual {}
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.
     /// @param _tokenOriginChainId The chain id of the origin token.
@@ -581,7 +658,6 @@ abstract contract NativeTokenVaultBase is
 
     /// @dev This pausability is inherited by both L1 and L2 vaults through the shared base.
     /// @dev On L1 it is part of the emergency controls for asset movement.
-    /// Interop-specific emergency handling is expected to happen at the Gateway layer in GWAssetTracker.
     /// On L2 it is kept only for legacy/shared-code reasons and should not be used as an emergency mechanism.
     /// Future L2 logic should rely on the L1/GW freeze flow instead of local pausability.
     /// @notice Pauses all functions marked with the `whenNotPaused` modifier.

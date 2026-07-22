@@ -16,7 +16,7 @@ import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 /// @title L2InteropHandlerReentrancyRegressionL1Test
-/// @notice Concrete test for InteropHandler reentrancy regression tests in L1 context
+/// @notice Concrete test for L2InteropHandler reentrancy regression tests in L1 context
 contract L2InteropHandlerReentrancyRegressionL1Test is
     Test,
     SharedL2ContractL1Deployer,

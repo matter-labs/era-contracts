@@ -11,9 +11,9 @@ runV31UpgradeScenario({
   targetRoles: ["gateway", "gwSettled"],
   clearGenesisUpgradeTxHash: true,
   seedBatchCounters: true,
-  // In v30, l1AssetTracker address is actually the old L1ChainAssetHandler.
+  // In v30 chain states, the recorded address is the old L1ChainAssetHandler proxy.
   // Governance needs ownership to call pauseMigration() in stage 0.
-  transferL1AssetTrackerOwnership: true,
+  transferL1ChainAssetHandlerOwnership: true,
 })
   .then(() => {
     process.exit(0);

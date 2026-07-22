@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use alloy::primitives::{Address, B256, U256};
+use alloy::primitives::{Address, B256};
 use serde::{Deserialize, Serialize};
 
 use crate::common::addresses::MAINNET_WETH_ADDRESS;
@@ -21,7 +21,6 @@ pub struct InitialDeploymentConfig {
     pub max_number_of_chains: u64,
     pub validator_timelock_execution_delay: u64,
     pub bridgehub_create_new_chain_salt: u64,
-    pub gateway_settlement_fee: U256,
 }
 
 impl Default for InitialDeploymentConfig {
@@ -34,7 +33,6 @@ impl Default for InitialDeploymentConfig {
             validator_timelock_execution_delay: 0,
             token_weth_address: Address::from_str(MAINNET_WETH_ADDRESS).unwrap(),
             bridgehub_create_new_chain_salt: 0,
-            gateway_settlement_fee: U256::from(1000000000u64),
         }
     }
 }
@@ -133,10 +131,13 @@ pub struct L1BridgehubOutput {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct L1BridgesOutput {
-    pub erc20_bridge_implementation_addr: Address,
-    pub erc20_bridge_proxy_addr: Address,
+    // The legacy L1ERC20Bridge was removed on the atomic/v32 branch, so the deploy script no longer
+    // emits `erc20_bridge_*`; it emits `l1_interop_handler_*` instead. Mirrors the script's
+    // [deployed_addresses.bridges] block exactly.
     pub shared_bridge_implementation_addr: Address,
     pub shared_bridge_proxy_addr: Address,
     pub l1_nullifier_implementation_addr: Address,
     pub l1_nullifier_proxy_addr: Address,
+    pub l1_interop_handler_implementation_addr: Address,
+    pub l1_interop_handler_proxy_addr: Address,
 }

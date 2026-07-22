@@ -14,9 +14,6 @@ import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
-import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
-import {IL1AssetTracker} from "../asset-tracker/IL1AssetTracker.sol";
-import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {IWETH9} from "../interfaces/IWETH9.sol";
 
@@ -27,13 +24,13 @@ import {TxStatus} from "../../common/Messaging.sol";
 
 import {
     AssetIdAlreadyRegistered,
-    BaseTokenTransferFailed,
     NoFundsTransferred,
     OriginChainIdNotFound,
     WithdrawFailed,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
 import {OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
+import {InsufficientChainBalance} from "../asset-tracker/AssetTrackerErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -57,16 +54,23 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev L1 nullifier contract that handles finalize withdrawal and confirm l2 tx mappings
     IL1Nullifier public immutable L1_NULLIFIER;
 
-    /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
-    ///      This mapping was deprecated in favor of AssetTracker component, now it will be responsible for tracking chain balances.
+    /// @dev Maps token balances for each chain. Deprecated: per-chain balance accounting was removed;
+    ///      correctness of transfers is guaranteed by ZK proofs (plus 2FA on ZKsync OS chains).
     ///      We have a `chainBalance` function now, which returns the values in this mapping, for backwards compatibility.
     // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) internal DEPRECATED_chainBalance;
 
-    /// @notice AssetTracker component address on L1. On L2 the address is L2_ASSET_TRACKER_ADDR.
-    ///         It adds one more layer of security on top of cross chain communication.
-    ///         Refer to its documentation for more details.
-    IL1AssetTracker public l1AssetTracker;
+    /// @dev Slot previously holding the removed L1AssetTracker address. Retained to preserve the
+    ///      storage layout of already-deployed vaults across the in-place upgrade.
+    // slither-disable-next-line unused-state
+    address private __DEPRECATED_l1AssetTracker;
+
+    /// @notice Net amount of each L1-native token currently bridged out of L1.
+    /// @dev Increases on outbound flows (deposits/interop sends) and decreases on inbound ones
+    /// (withdrawal finalizations and failed-deposit refunds), so unlike the vault's raw `balanceOf`
+    /// it cannot be skewed by direct transfers into the vault. It is bounded by the amount actually
+    /// escrowed in the vault, so it cannot overflow even for tokens with an astronomic total supply.
+    mapping(bytes32 assetId => uint256 amount) public bridgedOut;
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
@@ -100,11 +104,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return DEPRECATED_chainBalance[_chainId][_assetId];
     }
 
-    /// @dev Returns the AssetTracker component address on L1.
-    function _assetTracker() internal view override returns (IAssetTrackerBase) {
-        return IAssetTrackerBase(address(l1AssetTracker));
-    }
-
     /*//////////////////////////////////////////////////////////////
                             Initialization
     //////////////////////////////////////////////////////////////*/
@@ -136,13 +135,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     function registerEthToken() external {
         require(assetId[ETH_TOKEN_ADDRESS] == bytes32(0), AssetIdAlreadyRegistered());
         _unsafeRegisterNativeToken(ETH_TOKEN_ADDRESS);
-    }
-
-    /// @dev Function used to set AssetTracker component address.
-    ///      Only callable by owner.
-    /// @param _l1AssetTracker The address of the AssetTracker component.
-    function setAssetTracker(address _l1AssetTracker) external onlyOwner {
-        l1AssetTracker = IL1AssetTracker(_l1AssetTracker);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -197,33 +189,28 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         require(_txStatus == TxStatus.Failure, OnlyFailureStatusAllowed());
         // slither-disable-next-line unused-return
         (uint256 _amount, , ) = DataEncoding.decodeBridgeBurnData(_data);
-        address l1Token = tokenAddress[_assetId];
         require(_amount != 0, NoFundsTransferred());
 
-        // IMPORTANT: We must handle chain balance decrease before giving out funds to the user,
-        // because otherwise the latter operation (via a malicious token or ETH recipient)
-        // could've overwritten the transient values from L1Nullifier.
-        _handleBridgeFromChain({_chainId: _chainId, _assetId: _assetId, _amount: _amount});
-
-        if (l1Token == ETH_TOKEN_ADDRESS) {
-            bool callSuccess;
-            // Low-level assembly call, to avoid any memory copying (save gas)
-            assembly {
-                callSuccess := call(gas(), _depositSender, _amount, 0, 0, 0, 0)
-            }
-            require(callSuccess, BaseTokenTransferFailed());
-        } else {
-            uint256 originChainId = _getOriginChainId(_assetId);
-            if (originChainId == block.chainid) {
-                IERC20(l1Token).safeTransfer(_depositSender, _amount);
-            } else if (originChainId != 0) {
-                IBridgedStandardToken(l1Token).bridgeMint(_depositSender, _amount);
-            } else {
-                revert OriginChainIdNotFound();
-            }
-            // Note we don't allow weth deposits anymore, but there might be legacy weth deposits.
-            // until we add Weth bridging capabilities, we don't wrap/unwrap weth to ether.
+        uint256 originChain = _getOriginChainId(_assetId);
+        if (originChain == 0) {
+            revert OriginChainIdNotFound();
         }
+        // For a native asset (ETH or native ERC20) `_disburseFailedTransfer` unlocks via `_withdrawFunds`
+        // (assembly ETH send for the base token, `safeTransfer` otherwise); for a bridged asset it re-mints
+        // to `_depositSender`. The token is always already known here, so the deploy branch is never taken
+        // and the `_originToken`/`_erc20Data` arguments are unused.
+        // Note we don't allow weth deposits anymore, but there might be legacy weth deposits.
+        // until we add Weth bridging capabilities, we don't wrap/unwrap weth to ether.
+        bool isNative = originChain == block.chainid;
+        _disburseFailedTransfer({
+            _chainId: _chainId,
+            _assetId: _assetId,
+            _receiver: _depositSender,
+            _amount: _amount,
+            _isNative: isNative,
+            _originToken: address(0),
+            _erc20Data: ""
+        });
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -269,11 +256,23 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return BeaconProxy(payable(proxyAddress));
     }
 
-    function _handleBridgeToChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
-        l1AssetTracker.handleChainBalanceIncreaseOnL1(_chainId, _assetId, _amount, _getOriginChainId(_assetId));
+    /// @dev Records the outbound flow of L1-native tokens; see `bridgedOut`.
+    function _handleBridgeToChain(uint256, bytes32 _assetId, uint256 _amount) internal override {
+        if (originChainId[_assetId] == block.chainid) {
+            bridgedOut[_assetId] += _amount;
+        }
     }
 
+    /// @dev Records the inbound flow of L1-native tokens; see `bridgedOut`.
+    /// @dev An inbound amount exceeding the outstanding bridged-out amount is only possible if
+    /// bridged representations of the asset were forged somewhere upstream, so such a transfer
+    /// is blocked rather than recorded.
     function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
-        l1AssetTracker.handleChainBalanceDecreaseOnL1({_chainId: _chainId, _assetId: _assetId, _amount: _amount});
+        if (originChainId[_assetId] == block.chainid) {
+            if (bridgedOut[_assetId] < _amount) {
+                revert InsufficientChainBalance(_chainId, _assetId, _amount);
+            }
+            bridgedOut[_assetId] -= _amount;
+        }
     }
 }

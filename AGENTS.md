@@ -13,6 +13,8 @@ Instead, use the `cleanup.sh` script in the anvil-interop directory, which targe
 1. Avoid using magic numbers. Most constant numbers especially for system params / well known chain ids must be represented as a constant.
 2. All constants should be placed in the dedicated file (e.g. `common/Config.sol` in `l1-contracts`, `Constants.sol` in `system-contracts`, etc). if you do not know where to put the constant to, please closely analyze the corresponding project. If this file can not be found, please create one.
 3. Function parameters must be prefixed with `_` (e.g. `_value`, `_owner`). This convention applies to all functions across all contracts.
+4. Always use `{ }` for `if` blocks — never inline the body (`if (cond) revert X();` is forbidden; write `if (cond) { revert X(); }`). The same applies to `for`/`while` bodies.
+5. Never write doc comments (`///` natspec) for custom errors — error files contain only the `// 0x<selector>` lines maintained by the errors lint. Put any rationale at the revert site instead. When a new file with errors is added, it MUST be registered in the errors lint (`CONTRACTS_DIRECTORIES` in `l1-contracts/scripts/errors-lint.ts`) and `yarn errors-lint --fix` must be run.
 
 ## ⚠️ CRITICAL SOLIDITY CODE RULES ⚠️
 
@@ -104,56 +106,6 @@ const contract = new Contract(addr, someAbi, provider);
 - ONLY contracts deployed on L1 should have immutables. Contracts on L2 are deployed within zksync os environment and so and so DO NOT SUPPORT CONSTRUCTORS ALL (and so no immutable can be set). It is important that the `*Base` contracts that the L2 contracts inherit from dont have immutables or constructors too.
 - If you want to add an immutable for L1, always double check whether it is possible to deterministically obtain from other contracts.
 - If there is variable that can be an immutable on L1, but we need a similar field on L2, a common pattern is to create a method in the base contract that can be inherited by both. On L2 it can be either a constant (esp if it is an L2 built-in contract address) or a storage variable that must be initialized within during the genesis. For example, look how `initL2` functions are used.
-
-## Updating test_infra Git Dependencies (Bootloader Tests)
-
-### Problem
-
-The bootloader test infrastructure at `system-contracts/bootloader/test_infra/` uses `nightly-2025-05-23` and has git
-dependencies on `zksync-era`. When the git rev in `Cargo.toml` is updated, **do NOT run `cargo update` or regenerate
-the entire `Cargo.lock`**. A full re-resolve will pull in latest crates.io versions of transitive dependencies (e.g.,
-`crc-fast`, `zerocopy`) that use `stdarch_x86_avx512` intrinsics, which are not stabilized on this nightly toolchain.
-This causes CI build failures on x86_64 runners.
-
-### Correct Approach: Selective Lockfile Update
-
-When updating the zksync-era git rev in `Cargo.toml`, update the lockfile by targeting only the git dependencies:
-
-```bash
-cd system-contracts/bootloader/test_infra
-
-# Update only the git dependencies, keeping all crates.io deps pinned
-cargo update -p zksync_multivm -p zksync_types -p zksync_contracts \
-  -p zksync_utils -p zksync_state -p zksync_vlog
-```
-
-This swaps the git rev for the zksync-era crates while preserving all other dependency versions at their current
-(known-working) state.
-
-### If the Lockfile Is Already Broken
-
-If a full `cargo update` was already run and the lockfile has incompatible versions, restore from the last known-good
-commit and selectively update:
-
-```bash
-cd system-contracts/bootloader/test_infra
-
-# Restore the old working lockfile (find the last commit before the breakage)
-git show <last-good-commit>:system-contracts/bootloader/test_infra/Cargo.lock > Cargo.lock
-
-# Then selectively update only git deps
-cargo update -p zksync_multivm -p zksync_types -p zksync_contracts \
-  -p zksync_utils -p zksync_state -p zksync_vlog
-```
-
-### Known Incompatible Crate Versions (on nightly-2025-05-23)
-
-These versions require `stdarch_x86_avx512` (stabilized in Rust 1.89) and fail on `nightly-2025-05-23`:
-
-- `crc-fast >= 1.4` (all versions use AVX-512 intrinsics on x86_64)
-- `zerocopy >= 0.8.39`
-
-Known-good versions: `crc-fast 1.3.0`, `zerocopy 0.8.27`
 
 ## Testing Guidelines
 

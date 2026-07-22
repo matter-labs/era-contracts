@@ -352,12 +352,11 @@ library GatewayCTMDeployerHelper {
         );
 
         // ExecutorFacet
-        bytes memory executorFacetArgs = abi.encode(config.l1ChainId);
         (addresses.facets.executorFacet, data.executorFacetCalldata) = _calculateCreate2AddressAndCalldata(
             _create2Salt,
             "Executor.sol",
             "ExecutorFacet",
-            executorFacetArgs,
+            hex"",
             config.isZKsyncOS,
             true
         );

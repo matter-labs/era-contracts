@@ -133,11 +133,26 @@ address payable constant L2_INTEROP_HANDLER_ADDR = payable(address(BUILT_IN_CONT
 /// @dev the address of the L2 asset tracker
 address constant L2_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0f);
 
-/// @dev the address of the GW asset tracker
-address constant GW_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x10);
+/// @dev `BUILT_IN_CONTRACTS_OFFSET + 0x10` is intentionally unassigned: it belonged to the removed
+/// GWAssetTracker and is kept as a gap so the following addresses keep their positions.
 
 /// @dev The address of the base token holder contract that holds chain's base token reserves.
 address constant L2_BASE_TOKEN_HOLDER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x11);
+
+/// @dev The address of the per-chain atomic-interop commitment tree (Indexed Merkle Tree).
+address constant L2_INTEROP_COMMITMENT_TREE_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x12);
+
+/// @dev 0x13 is reserved: it formerly held the atomic-interop global-root importer, removed when atomic
+/// proofs were re-based on the interop-root / MessageRoot channel. Left unused to avoid address reuse.
+
+/// @dev The address of the atomic-interop flow manager (coordinator; not an escrow — it never
+/// custodies funds).
+address constant L2_ATOMIC_FLOW_MANAGER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x14);
+
+/// @dev The address of the stateless interop attribute parser. Its ERC-7786 attribute-parsing logic was split
+/// out of the InteropCenter to keep the latter under the EIP-170 runtime code-size limit; the InteropCenter
+/// calls it at this fixed address. Holds no state and has no initializer.
+address constant L2_INTEROP_ATTRIBUTE_PARSER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x15);
 
 ////////////////////////////////////////////////////////////
 // ZKsync OS genesis contracts

@@ -22,7 +22,7 @@ import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {GatewayDeployer} from "./_SharedGatewayDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {GW_ASSET_TRACKER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {
     L2CanonicalTransaction,
     L2Message,
@@ -30,12 +30,10 @@ import {
     ConfirmTransferResultData,
     TokenBridgingData
 } from "contracts/common/Messaging.sol";
-import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
-import {IGWAssetTracker} from "contracts/bridge/asset-tracker/IGWAssetTracker.sol";
 
 import {IGetters, IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -132,6 +130,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
                     batchLeafProofLen: 0,
                     batchSettlementRoot: 0,
                     chainIdLeaf: 0,
+                    l1BatchTimestamp: 0,
                     ptr: 0,
                     finalProofNode: false
                 })
@@ -434,16 +433,6 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             originChainId: currentChainId
         });
 
-        vm.expectCall(
-            GW_ASSET_TRACKER_ADDR,
-            abi.encodeCall(IGWAssetTracker.registerBaseTokenOnGateway, (baseTokenBridgingData))
-        );
-        vm.mockCall(
-            GW_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(IGWAssetTracker.registerBaseTokenOnGateway.selector),
-            abi.encode()
-        );
-
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(migratingChainId);
 
         bytes memory chainData = abi.encode(IMigrator(address(migratingChainContract)).prepareChainCommitment());
@@ -465,12 +454,9 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         });
 
         bytes memory bridgehubMintData = abi.encode(data);
-        bytes memory message = abi.encodePacked(
-            AssetRouterBase.finalizeDeposit.selector,
-            gatewayChainId,
-            assetId,
-            bridgehubMintData
-        );
+        // The CTM asset withdrawal from the gateway arrives as a single-call interop bundle emitted by
+        // the gateway's InteropCenter (see `GatewayPreparation.startMigrateChainFromGateway`).
+        bytes memory message = _encodeWithdrawalBundleMessage(gatewayChainId, assetId, bridgehubMintData);
 
         GatewayUtils userUtils = new GatewayUtils();
         userUtils.finishMigrateChainFromGateway(
@@ -819,14 +805,10 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     // Helper to verify migration events in correct order without stack-too-deep issues
     function _verifyMigrationEvents(TxStatus txStatus) internal {
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        uint256 transientSettlementLayerSetIndex = type(uint256).max;
         uint256 depositsUnpausedIndex = type(uint256).max;
         uint256 claimedFailedDepositIndex = type(uint256).max;
 
         for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == IL1Nullifier.TransientSettlementLayerSet.selector) {
-                transientSettlementLayerSetIndex = i;
-            }
             if (logs[i].topics[0] == IMigrator.DepositsUnpaused.selector) {
                 depositsUnpausedIndex = i;
             }
@@ -836,17 +818,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         }
 
         // Verify events are present
-        assertTrue(
-            transientSettlementLayerSetIndex != type(uint256).max,
-            "TransientSettlementLayerSet event not found"
-        );
         assertTrue(depositsUnpausedIndex != type(uint256).max, "DepositsUnpaused event not found");
-
-        // Verify order: TransientSettlementLayerSet must come before DepositsUnpaused
-        assertTrue(
-            transientSettlementLayerSetIndex < depositsUnpausedIndex,
-            "TransientSettlementLayerSet must be emitted before DepositsUnpaused"
-        );
 
         if (txStatus == TxStatus.Failure) {
             assertTrue(

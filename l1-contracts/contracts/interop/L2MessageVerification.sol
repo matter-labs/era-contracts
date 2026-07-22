@@ -27,8 +27,10 @@ contract L2MessageVerification is MessageVerification {
             _proof: _proof
         });
         if (proofData.finalProofNode) {
-            // For proof based interop this is the SL InteropRoot at block number _blockOrBatchNumber
-            bytes32 correctBatchRoot = L2_INTEROP_ROOT_STORAGE.interopRoots(_chainId, _blockOrBatchNumber);
+            // finalProofNode terminates on an L2 consumer: it anchors to the imported L1 aggregate interop
+            // root (`interopRoots`), since an L2 has no per-chain roots. (On L1 — the settlement layer of
+            // every chain in this release — `MessageRootBase` terminates at its own `chainBatchRoots`.)
+            bytes32 correctBatchRoot = L2_INTEROP_ROOT_STORAGE.interopRoots(_chainId, _blockOrBatchNumber).root;
             return correctBatchRoot == proofData.batchSettlementRoot && correctBatchRoot != bytes32(0);
         }
         if (_depth == 1) {

@@ -27,6 +27,8 @@ interface IL1AssetRouter is IAssetRouterBase, IL1CrossChainSender {
 
     function setNativeTokenVault(INativeTokenVaultBase _nativeTokenVault) external;
 
+    function setL1InteropHandler(address _l1InteropHandler) external;
+
     /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on L2.
     /// @param _chainId The ZK chain id to which the deposit was initiated.
     /// @param _depositSender The address of the entity that initiated the deposit.

@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {StoredInteropRoot} from "contracts/common/Messaging.sol";
 import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
@@ -20,11 +21,7 @@ import {
     TotalBatchesExecutedZero
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
-import {
-    GW_ASSET_TRACKER_ADDR,
-    L2_BRIDGEHUB_ADDR,
-    L2_COMPLEX_UPGRADER_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {ProofData} from "contracts/common/Messaging.sol";
 
@@ -305,7 +302,7 @@ contract MessageRoot_Extended_Test is Test {
 
         // Successfully add batch root
         vm.prank(chainSender);
-        messageRoot.addChainBatchRoot(chainId, 1, batchRoot);
+        messageRoot.addChainBatchRootV32(chainId, 1, batchRoot);
 
         // Verify batch root is stored
         assertEq(messageRoot.chainBatchRoots(chainId, 1), batchRoot);
@@ -336,11 +333,11 @@ contract MessageRoot_Extended_Test is Test {
 
         // Add first batch root
         vm.prank(chainSender);
-        messageRoot.addChainBatchRoot(chainId, 1, batchRoot1);
+        messageRoot.addChainBatchRootV32(chainId, 1, batchRoot1);
 
         // Add second batch root
         vm.prank(chainSender);
-        messageRoot.addChainBatchRoot(chainId, 2, batchRoot2);
+        messageRoot.addChainBatchRootV32(chainId, 2, batchRoot2);
 
         // Verify both batch roots are stored
         assertEq(messageRoot.chainBatchRoots(chainId, 1), batchRoot1);
@@ -376,9 +373,9 @@ contract MessageRoot_Extended_Test is Test {
         // Roll to a new block so the next emission increments the counter.
         vm.roll(block.number + 1);
 
-        // Add a batch root
-        vm.prank(GW_ASSET_TRACKER_ADDR);
-        l2MessageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
+        // Add a batch root (the chain itself appends its batch root on Gateway now)
+        vm.prank(chainSender);
+        l2MessageRoot.addChainBatchRootV32(chainId, 1, keccak256("batchRoot"));
 
         // Verify interopRootLogId incremented once for the new block
         assertEq(
@@ -387,9 +384,10 @@ contract MessageRoot_Extended_Test is Test {
             "interopRootLogId should increment by 1 when block advances"
         );
 
-        // Check that historical root is set
-        bytes32 historicalRoot = l2MessageRoot.historicalRoot(block.number);
-        assertTrue(historicalRoot != bytes32(0));
+        // Check that historical root is set (together with its creation timestamp)
+        StoredInteropRoot memory recordedRoot = l2MessageRoot.historicalRoot(block.number);
+        assertTrue(recordedRoot.root != bytes32(0));
+        assertEq(recordedRoot.timestamp, block.timestamp);
     }
 
     function test_L1_CHAIN_ID() public view {

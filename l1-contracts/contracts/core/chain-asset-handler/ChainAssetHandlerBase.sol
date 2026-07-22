@@ -19,6 +19,7 @@ import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
 
 import {
+    CHAIN_MIGRATIONS_ENABLED,
     L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS,
     MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
     MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1,
@@ -37,7 +38,12 @@ import {
     ZKChainNotRegistered,
     IteratedMigrationsNotSupported
 } from "../bridgehub/L1BridgehubErrors.sol";
-import {ChainIdNotRegistered, MigrationPaused, NotAssetRouter} from "../../common/L1ContractErrors.sol";
+import {
+    ChainIdNotRegistered,
+    ChainMigrationsDisabled,
+    MigrationPaused,
+    NotAssetRouter
+} from "../../common/L1ContractErrors.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetHandlerModifiers} from "../../bridge/interfaces/AssetHandlerModifiers.sol";
@@ -124,6 +130,33 @@ abstract contract ChainAssetHandlerBase is
         _;
     }
 
+    /// @notice Only when chain migrations are enabled in the current release.
+    /// @dev In the v32 release all chains settle on L1 and chain migrations are explicitly
+    /// disabled (see `CHAIN_MIGRATIONS_ENABLED` in `Config.sol`). This is a release-level ban:
+    /// unlike `migrationPaused`, it cannot be lifted at runtime and requires a protocol upgrade
+    /// that redeploys the chain asset handler with the constant set to `true`.
+    modifier whenMigrationsEnabled() {
+        if (!_chainMigrationsEnabled()) {
+            revert ChainMigrationsDisabled();
+        }
+        _;
+    }
+
+    /// @notice Whether chain migrations between settlement layers are enabled in the current release.
+    /// @dev Both this flag and `migrationPaused` must allow migrations for `bridgeBurn`/`bridgeMint`
+    /// to be callable. Recovery of a failed migration (`bridgeConfirmTransferResult`) is intentionally
+    /// NOT gated by this flag, since it only ever returns a chain back to settling on L1.
+    function migrationsEnabled() external view returns (bool) {
+        return _chainMigrationsEnabled();
+    }
+
+    /// @dev Virtual so that dev/test-only variants of the chain asset handler can re-enable
+    /// migrations and keep the migration machinery covered by tests while it is banned in
+    /// the production contracts. Production contracts MUST NOT override this.
+    function _chainMigrationsEnabled() internal view virtual returns (bool) {
+        return CHAIN_MIGRATIONS_ENABLED;
+    }
+
     modifier onlySystemContext() {
         if (msg.sender != L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR) {
             revert NotSystemContext(msg.sender);
@@ -168,6 +201,7 @@ abstract contract ChainAssetHandlerBase is
         onlyAssetRouter
         whenNotPaused
         whenMigrationsNotPaused
+        whenMigrationsEnabled
         returns (bytes memory bridgehubMintData)
     {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
@@ -294,8 +328,9 @@ abstract contract ChainAssetHandlerBase is
             originChainId: 0
         });
         if (block.chainid == _l1ChainId()) {
-            // We only need to define these values when migrating to GW
-            // This is so that the GW Asset Tracker can register the chain's base token
+            // We only need to define these values when migrating to GW.
+            // The destination chain's L2NativeTokenVault.updateL2 consumes originToken/originChainId
+            // to initialize its base token.
             IL1AssetRouter l1AssetRouter = IL1AssetRouter(address(_assetRouter()));
             INativeTokenVaultBase l1Ntv = l1AssetRouter.nativeTokenVault();
             baseTokenBridgingData.originToken = l1Ntv.originToken(assetId);
@@ -328,7 +363,16 @@ abstract contract ChainAssetHandlerBase is
         uint256, // unused originChainId: chain assets are identified by _assetId.
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
-    ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused whenMigrationsNotPaused {
+    )
+        external
+        payable
+        override
+        requireZeroValue(msg.value)
+        onlyAssetRouter
+        whenNotPaused
+        whenMigrationsNotPaused
+        whenMigrationsEnabled
+    {
         BridgehubMintCTMAssetData memory bridgehubMintData = abi.decode(
             _bridgehubMintData,
             (BridgehubMintCTMAssetData)
@@ -368,6 +412,14 @@ abstract contract ChainAssetHandlerBase is
             // We allow migrating chains that were not previously registered on this settlement layer,
             // so the chain is registered here during bridgeMint.
             IBridgehubBase(_bridgehub()).registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
+            // IMPORTANT: a chain registered here (settlement-layer migration, non-zero batch number) gets
+            // NO genesis batch leaf in this layer's message root — its tree stays empty until its
+            // first settlement here. This is fine under the current assumption that only the L1
+            // message root is used for atomic-interop timeout proofs (fresh chains are seeded on L1
+            // at creation, and `ChainRegistrationSender` refuses to enable interop towards a chain
+            // with an empty tree). If a non-L1 message root is ever used as the timeout-proof anchor,
+            // migrated chains need an equivalent guarantee here (e.g. carrying the chain's current
+            // IMT root in the migration data and seeding a leaf from it).
             _messageRoot().addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
         } else {
             // Note, that here we rely on the correctness of the provided data.

@@ -10,11 +10,14 @@ import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {BundleAttributes, InteropBundle, InteropCallStarter} from "contracts/common/Messaging.sol";
+import {AtomicFlowPreimage} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {
     AttributeAlreadySet,
     AttributeViolatesRestriction,
-    InteropBundleSaltAlreadyUsed
+    InteropBundleSaltAlreadyUsed,
+    InteropPreviewHash,
+    NonAtomicSendUnsupported
 } from "contracts/interop/InteropErrors.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
@@ -48,15 +51,33 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
         });
     }
 
-    /// @notice Builds bundle attributes containing only the salt attribute (when `_includeSalt` is true).
+    /// @notice Builds bundle attributes containing the salt attribute (when `_includeSalt` is true) plus the
+    ///         mandatory `atomicBundle` attribute (all interop is atomic).
+    /// @dev The salt is placed first so that restriction-violation tests, which parse this array under
+    ///      `OnlyCallAttributes`, still surface the salt selector as the first offending attribute. The
+    ///      atomicBundle flow metadata is a placeholder — the `AtomicFlowManager.append` gate is mocked in
+    ///      these unit tests (see {L2InteropTestUtils.setUp}).
     function _buildBundleAttributesWithSalt(
         bytes32 _salt,
         bool _includeSalt
     ) internal pure returns (bytes[] memory attrs) {
-        attrs = new bytes[](_includeSalt ? 1 : 0);
+        attrs = new bytes[](_includeSalt ? 2 : 1);
+        uint256 idx = 0;
         if (_includeSalt) {
-            attrs[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (_salt));
+            attrs[idx++] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (_salt));
         }
+        attrs[idx++] = abi.encodeCall(
+            IERC7786Attributes.atomicBundle,
+            (
+                AtomicFlowPreimage({
+                    deadline: type(uint64).max,
+                    settlementLayerChainId: 0,
+                    legBundleHashes: new bytes32[](0),
+                    legSourceChainIds: new uint256[](0)
+                }),
+                uint256(0)
+            )
+        );
     }
 
     /// @notice Sends a bundle and returns the `InteropBundle` decoded from the `InteropBundleSent` event.
@@ -79,6 +100,57 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
         require(data.length != 0, "InteropBundleSent event not found");
         // solhint-disable-next-line no-unused-vars
         (, , bundle) = abi.decode(data, (bytes32, bytes32, InteropBundle));
+    }
+
+    /// @notice `previewBundleHash` reports exactly the `bundleHash` the matching `sendBundle` emits, so the
+    ///         off-chain atomic `flowId` (which commits to `bundleHash`) can be derived before the real send.
+    /// @dev `previewBundleHash` follows the quoter pattern: it ALWAYS reverts with `InteropPreviewHash(hash)`
+    ///      (so its stateful assembly can never commit on-chain), and callers read the hash from the revert.
+    ///      The anvil-interop helpers rely on this equivalence to build atomic flows. The preview must run
+    ///      from the same sender (its address feeds both the salt derivation and each call's `from`) and must
+    ///      not consume the salt-uniqueness slot, so the real send below can reuse the same salt.
+    /// @notice The PR's headline invariant: an L2->L2 send WITHOUT the `atomicBundle` attribute has no
+    /// delivery path (public L1-published L2->L2 interop was removed) and must revert
+    /// `NonAtomicSendUnsupported`. This is the asymmetric counterpart to the atomic->L1 rejection
+    /// (`AtomicBundleToL1NotSupported`), which already has a negative test.
+    /// @dev The atomicity/destination check is the first thing `_sendBundle` does — before any value
+    /// collection or bundle assembly — so the revert precedes (and therefore rolls back) any burn.
+    function test_sendBundle_revertsWhen_noAtomicBundleAttribute() public {
+        _setupGatewayMode();
+        InteropCallStarter[] memory calls = _buildSimpleCall();
+        // Attributes with ONLY a salt — no `atomicBundle`.
+        bytes[] memory attrs = new bytes[](1);
+        attrs[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (keccak256("no-atomic-attr")));
+
+        vm.expectRevert(NonAtomicSendUnsupported.selector);
+        l2InteropCenter.sendBundle{value: 0}(InteroperableAddress.formatEvmV1(destinationChainId), calls, attrs);
+    }
+
+    function test_previewBundleHash_matchesSentBundleHash() public {
+        _setupGatewayMode();
+        address sender = makeAddr("previewSender");
+        bytes32 userSalt = keccak256("preview-salt-1");
+        bytes[] memory attrs = _buildBundleAttributesWithSalt(userSalt, true);
+        InteropCallStarter[] memory calls = _buildSimpleCall();
+        bytes memory destination = InteroperableAddress.formatEvmV1(destinationChainId);
+
+        vm.prank(sender);
+        // Low-level call so we can read the hash out of the quoter revert (see {previewBundleHash}).
+        (bool ok, bytes memory ret) = address(l2InteropCenter).call(
+            abi.encodeCall(l2InteropCenter.previewBundleHash, (destination, calls, attrs))
+        );
+        assertFalse(ok, "previewBundleHash must revert with InteropPreviewHash (quoter pattern)");
+        assertEq(ret.length, 36, "revert reason must be InteropPreviewHash(bytes32)");
+        assertEq(bytes4(ret), InteropPreviewHash.selector, "unexpected preview revert selector");
+        bytes32 predicted;
+        // ret layout: 4-byte selector followed by the abi-encoded bytes32 hash.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            predicted := mload(add(ret, 0x24))
+        }
+
+        (, bytes32 emitted) = _sendAndDecodeBundle(sender, attrs);
+        assertEq(predicted, emitted, "previewBundleHash must equal the emitted bundleHash");
     }
 
     /*//////////////////////////////////////////////////////////////

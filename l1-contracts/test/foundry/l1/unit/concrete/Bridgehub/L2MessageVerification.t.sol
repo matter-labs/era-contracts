@@ -21,6 +21,10 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 );
 
 contract MessageRootTest is Test {
+    uint256 internal constant TEST_L1_TIMESTAMP = 1_700_000_000;
+    bytes32 internal constant NON_ZERO_TIMESTAMP_INTEROP_ROOT =
+        0x55765aa3f08b5bec688734c70b62b130aeb4be787d6206ed626d7675742db67d;
+
     address bridgeHub;
     L2MessageVerification l2MessageVerification;
 
@@ -50,7 +54,7 @@ contract MessageRootTest is Test {
         vm.mockCall(
             address(L2_INTEROP_ROOT_STORAGE),
             abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
-            abi.encode(bytes32(0x46ab0a3240394cd4339c065011ad354c67d269d3c6e0f8ad7eb2eb4b8a3ffb49))
+            abi.encode(bytes32(0x46ab0a3240394cd4339c065011ad354c67d269d3c6e0f8ad7eb2eb4b8a3ffb49), uint256(0))
         );
         bool isIncluded = l2MessageVerification.proveL2LogInclusionShared(
             chainId,
@@ -62,7 +66,7 @@ contract MessageRootTest is Test {
         assertEq(isIncluded, true);
     }
 
-    function test_l2MessageVerification_with_double_proof() public {
+    function test_l2MessageVerification_bindsNonZeroL1Timestamp() public {
         uint256 chainId = 271;
         uint256 batchNumber = 66;
         uint256 l2ToL1LogIndex = 1;
@@ -76,7 +80,7 @@ contract MessageRootTest is Test {
             value: 0x182bf04331468886c27903ea0bdc761fde4a166e29814a178da2d3f56d205982
         });
         /// get this value from a real withdrawal by running integration tests.
-        bytes32[] memory proof = new bytes32[](27);
+        bytes32[] memory proof = new bytes32[](28);
         proof[0] = bytes32(0x010f060000000000000000000000000000000000000000000000000000000000);
         proof[1] = bytes32(0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba);
         proof[2] = bytes32(0xc3d03eebfd83049991ea3d3e358b6712e7aa2e2e63dc2d4b438987cec28ac8d0);
@@ -93,22 +97,25 @@ contract MessageRootTest is Test {
         proof[13] = bytes32(0xa707d1c62d8be699d34cb74804fdd7b4c568b6c1a821066f126c680d4b83e00b);
         proof[14] = bytes32(0xf6e093070e0389d2e529d60fadb855fdded54976ec50ac709e3a36ceaa64c291);
         proof[15] = bytes32(0xe4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf75944);
-        proof[16] = bytes32(0x0000000000000000000000000000000000000000000000000000000000000034);
-        proof[17] = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
-        proof[18] = bytes32(0xcc4c41edb0c2031348b292b768e9bac1ee8c92c09ef8a3277c2ece409c12d86a);
-        proof[19] = bytes32(0x665220c0a39a5c4886626c93dfe3f253324bd0fd48bf037156b977d2da1c2a80);
-        proof[20] = bytes32(0x4cd95f8962e2e3b5f525a0f4fdfbbf0667990c7159528a008057f3592bcb2c06);
-        proof[21] = bytes32(0x73374357c2721f1e18426e45490035daf9a01b4fd064b9fc6bf85acf888bbc42);
-        proof[22] = bytes32(0x9b63d72e0483741f19d143751f22f965461f0a98897b8ffffedd086935f6bc26);
-        proof[23] = bytes32(0x000000000000000000000000000000f300000000000000000000000000000001);
-        proof[24] = bytes32(0x00000000000000000000000000000000000000000000000000000000000001fa);
-        proof[25] = bytes32(0x0101000100000000000000000000000000000000000000000000000000000000);
-        proof[26] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
+        proof[16] = bytes32(TEST_L1_TIMESTAMP);
+        proof[17] = bytes32(0x0000000000000000000000000000000000000000000000000000000000000034);
+        proof[18] = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
+        proof[19] = bytes32(0xcc4c41edb0c2031348b292b768e9bac1ee8c92c09ef8a3277c2ece409c12d86a);
+        proof[20] = bytes32(0x665220c0a39a5c4886626c93dfe3f253324bd0fd48bf037156b977d2da1c2a80);
+        proof[21] = bytes32(0x4cd95f8962e2e3b5f525a0f4fdfbbf0667990c7159528a008057f3592bcb2c06);
+        proof[22] = bytes32(0x73374357c2721f1e18426e45490035daf9a01b4fd064b9fc6bf85acf888bbc42);
+        proof[23] = bytes32(0x9b63d72e0483741f19d143751f22f965461f0a98897b8ffffedd086935f6bc26);
+        proof[24] = bytes32(0x000000000000000000000000000000f300000000000000000000000000000001);
+        proof[25] = bytes32(0x00000000000000000000000000000000000000000000000000000000000001fa);
+        proof[26] = bytes32(0x0101000100000000000000000000000000000000000000000000000000000000);
+        proof[27] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
 
+        // Golden recursive root for this proof with the non-zero timestamp above. A verifier that drops
+        // the timestamp from the batch leaf no longer reconstructs this imported root.
         vm.mockCall(
             address(L2_INTEROP_ROOT_STORAGE),
             abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
-            abi.encode(bytes32(0x9df9ccdcc86232686d57ea501eadb14888fd7c9fe1fd72a74c91208f11e864d5))
+            abi.encode(NON_ZERO_TIMESTAMP_INTEROP_ROOT, uint256(0))
         );
         bool isIncluded = l2MessageVerification.proveL2LogInclusionShared(
             chainId,
@@ -117,7 +124,19 @@ contract MessageRootTest is Test {
             log,
             proof
         );
-        assertEq(isIncluded, true);
+        assertTrue(isIncluded, "non-zero settlement timestamp should verify");
+
+        // The timestamp is part of the authenticated batch leaf. Reusing every other proof field while
+        // changing only the timestamp must no longer resolve to the imported interop root.
+        proof[16] = bytes32(TEST_L1_TIMESTAMP + 1);
+        bool isIncludedAfterTimestampTampering = l2MessageVerification.proveL2LogInclusionShared(
+            chainId,
+            batchNumber,
+            l2ToL1LogIndex,
+            log,
+            proof
+        );
+        assertFalse(isIncludedAfterTimestampTampering, "tampered settlement timestamp should not verify");
     }
 
     /// @notice Test proving L2 message inclusion using data from integration tests
@@ -137,7 +156,7 @@ contract MessageRootTest is Test {
             data: hex"9c884fd1000000000000000000000000000000000000000000000000000000000000010f8e58414f1aa746a046df579572bd20b7a2caf396302d57c93c6e49dfdadc47f90000000000000000000000002e713618476e60a4ad8308a946c69de987242c820000000000000000000000002e713618476e60a4ad8308a946c69de987242c8200000000000000000000000058d9e3d9303750dc90bb2931ac1abbb99d203bc5000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000001c1010000000000000000000000000000000000000000000000000000000000000009000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000004574254430000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000457425443000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000"
         });
         // Merkle proof from context
-        bytes32[] memory proof = new bytes32[](26);
+        bytes32[] memory proof = new bytes32[](27);
         proof[0] = bytes32(0x010f040000000000000000000000000000000000000000000000000000000000);
         proof[1] = bytes32(0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba);
         proof[2] = bytes32(0xdd7bb18218689779cba04bc66a2ad1642e6089594b1357f09e7242990cab136e);
@@ -154,20 +173,22 @@ contract MessageRootTest is Test {
         proof[13] = bytes32(0xa707d1c62d8be699d34cb74804fdd7b4c568b6c1a821066f126c680d4b83e00b);
         proof[14] = bytes32(0xf6e093070e0389d2e529d60fadb855fdded54976ec50ac709e3a36ceaa64c291);
         proof[15] = bytes32(0xe4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf75944);
-        proof[16] = bytes32(0x000000000000000000000000000000000000000000000000000000000000000d);
-        proof[17] = bytes32(0x9f1e2c2b6905cf8b500791372e28c263d27c424a98d0ebf7d6ebc7447e2c3290);
-        proof[18] = bytes32(0x865aaa19e2efebb6065ca211221bcd7837a35d4a33b26706f8176241587488fa);
-        proof[19] = bytes32(0xc1d1deee8a8e4545df206889aa82d6a9861c9f3ef1b97d455d8cdd8972f12095);
-        proof[20] = bytes32(0x41fb5464a0875289c9b573d713cb4306f87d006347ba3f7ee628dc279519a07a);
-        proof[21] = bytes32(0x0000000000000000000000000000005700000000000000000000000000000001);
-        proof[22] = bytes32(0x00000000000000000000000000000000000000000000000000000000000001fa);
-        proof[23] = bytes32(0x0102000100000000000000000000000000000000000000000000000000000000);
-        proof[24] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
-        proof[25] = bytes32(0x666f22468f106684d5ba1fb17ff37ea4b72a05341328aa2f06a4e6361e1759bc);
+        proof[16] = bytes32(uint256(0)); // l1Timestamp bound into the batch leaf
+        proof[17] = bytes32(0x000000000000000000000000000000000000000000000000000000000000000d);
+        proof[18] = bytes32(0x9f1e2c2b6905cf8b500791372e28c263d27c424a98d0ebf7d6ebc7447e2c3290);
+        proof[19] = bytes32(0x865aaa19e2efebb6065ca211221bcd7837a35d4a33b26706f8176241587488fa);
+        proof[20] = bytes32(0xc1d1deee8a8e4545df206889aa82d6a9861c9f3ef1b97d455d8cdd8972f12095);
+        proof[21] = bytes32(0x41fb5464a0875289c9b573d713cb4306f87d006347ba3f7ee628dc279519a07a);
+        proof[22] = bytes32(0x0000000000000000000000000000005700000000000000000000000000000001);
+        proof[23] = bytes32(0x00000000000000000000000000000000000000000000000000000000000001fa);
+        proof[24] = bytes32(0x0102000100000000000000000000000000000000000000000000000000000000);
+        proof[25] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
+        proof[26] = bytes32(0x666f22468f106684d5ba1fb17ff37ea4b72a05341328aa2f06a4e6361e1759bc);
+        // Root the proof hashes to after the l1Timestamp is bound into the batch leaf.
         vm.mockCall(
             address(L2_INTEROP_ROOT_STORAGE),
             abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
-            abi.encode(bytes32(0x99fdc93ca122f259319be992fcd55b51c2bb5a100efb780ce2677b779ee7fec3))
+            abi.encode(bytes32(0xe63ec2d2ec32cbe198cf5fcafe5a375aab6b6ca4e3b66abd50c6648b539ef5ed), uint256(0))
         );
         // --- Execution ---
         // Call the function under test via the contract instance

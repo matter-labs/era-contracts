@@ -5,7 +5,6 @@ import {Test} from "forge-std/Test.sol";
 
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {AssetTrackerBase} from "contracts/bridge/asset-tracker/AssetTrackerBase.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {AssetIdAlreadyRegistered} from "contracts/common/L1ContractErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -29,7 +28,6 @@ contract L1NativeTokenVaultTest is Test {
 
     L1NativeTokenVault ntv;
     SomeToken token;
-    address assetTracker;
     address owner;
 
     uint256 constant CHAIN_ID = 123;
@@ -40,9 +38,6 @@ contract L1NativeTokenVaultTest is Test {
         owner = makeAddr("owner");
 
         ntv = new L1NativeTokenVault(makeAddr("wethToken"), assetRouter, IL1Nullifier(address(0)));
-        assetTracker = makeAddr("assetTracker");
-        vm.prank(address(0));
-        ntv.setAssetTracker(assetTracker);
 
         token = new SomeToken();
     }
@@ -56,10 +51,6 @@ contract L1NativeTokenVaultTest is Test {
             ),
             hex""
         );
-        bytes[] memory zeros = new bytes[](2);
-        zeros[0] = abi.encode(0);
-        zeros[1] = abi.encode(0);
-        vm.mockCalls(assetTracker, abi.encodeWithSelector(AssetTrackerBase.registerNewTokenIfNeeded.selector), zeros);
         ntv.registerToken(address(token));
 
         vm.expectRevert(AssetIdAlreadyRegistered.selector);
@@ -72,26 +63,6 @@ contract L1NativeTokenVaultTest is Test {
         assertEq(balance, 0);
     }
 
-    function test_SetAssetTracker_OnlyOwner() external {
-        address newAssetTracker = makeAddr("newAssetTracker");
-
-        // Non-owner should fail
-        vm.prank(makeAddr("randomUser"));
-        vm.expectRevert("Ownable: caller is not the owner");
-        ntv.setAssetTracker(newAssetTracker);
-    }
-
-    function test_SetAssetTracker_Success() external {
-        address newAssetTracker = makeAddr("newAssetTracker");
-
-        // Owner (address(0) in this test setup) should succeed
-        vm.prank(address(0));
-        ntv.setAssetTracker(newAssetTracker);
-
-        // Verify the asset tracker was updated
-        assertEq(address(ntv.l1AssetTracker()), newAssetTracker);
-    }
-
     function test_RegisterEthToken() external {
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
 
@@ -100,10 +71,6 @@ contract L1NativeTokenVaultTest is Test {
             abi.encodeCall(L1AssetRouter.setAssetHandlerAddressThisChain, (ethAssetId, address(ntv))),
             hex""
         );
-        bytes[] memory zeros = new bytes[](2);
-        zeros[0] = abi.encode(0);
-        zeros[1] = abi.encode(0);
-        vm.mockCalls(assetTracker, abi.encodeWithSelector(AssetTrackerBase.registerNewTokenIfNeeded.selector), zeros);
 
         ntv.registerEthToken();
     }
@@ -175,10 +142,6 @@ contract L1NativeTokenVaultTest is Test {
             ),
             hex""
         );
-        bytes[] memory zeros = new bytes[](2);
-        zeros[0] = abi.encode(0);
-        zeros[1] = abi.encode(0);
-        vm.mockCalls(assetTracker, abi.encodeWithSelector(AssetTrackerBase.registerNewTokenIfNeeded.selector), zeros);
         ntv.registerToken(address(token));
 
         // Get the asset id

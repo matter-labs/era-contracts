@@ -11,12 +11,10 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 import {IL2NativeTokenVault} from "./IL2NativeTokenVault.sol";
 import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 
-import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
-
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER,
-    L2_ASSET_TRACKER_ADDR,
+    L2_BASE_TOKEN_HOLDER,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR
@@ -28,6 +26,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {
     AddressMismatch,
+    AssetIdMismatch,
     AssetIdNotSupported,
     ChainIdMismatch,
     DeployFailed,
@@ -128,11 +127,11 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     }
 
     function registerBaseTokenIfNeeded() external onlyUpgrader {
-        if (_assetTracker().isAssetRegistered(BASE_TOKEN_ASSET_ID)) {
+        if (L2_ASSET_TRACKER.isAssetRegistered(BASE_TOKEN_ASSET_ID)) {
             // Base token is already registered, no need to register it again
             return;
         }
-        _assetTracker().registerNewTokenIfNeeded(BASE_TOKEN_ASSET_ID, originChainId[BASE_TOKEN_ASSET_ID]);
+        L2_ASSET_TRACKER.registerNewTokenIfNeeded(BASE_TOKEN_ASSET_ID, originChainId[BASE_TOKEN_ASSET_ID]);
     }
 
     /// @notice Updates the contract.
@@ -162,6 +161,13 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         // Prevent changing L1_CHAIN_ID if already set to a different value
         require(L1_CHAIN_ID == 0 || L1_CHAIN_ID == _l1ChainId, ChainIdMismatch());
 
+        // Freeze BASE_TOKEN_ASSET_ID once set (mirrors the WETH_TOKEN / L1_CHAIN_ID guards above): a change
+        // would strand in-flight bundles whose snapshotted destinationBaseTokenAssetId no longer matches.
+        require(
+            BASE_TOKEN_ASSET_ID == bytes32(0) || BASE_TOKEN_ASSET_ID == _baseTokenBridgingData.assetId,
+            AssetIdMismatch(BASE_TOKEN_ASSET_ID, _baseTokenBridgingData.assetId)
+        );
+
         WETH_TOKEN = _wethToken;
         BASE_TOKEN_ASSET_ID = _baseTokenBridgingData.assetId;
         L1_CHAIN_ID = _l1ChainId;
@@ -185,8 +191,9 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         }
     }
 
-    function _assetTracker() internal view override returns (IAssetTrackerBase) {
-        return IAssetTrackerBase(L2_ASSET_TRACKER_ADDR);
+    /// @dev Records the token in the L2AssetTracker (total-supply / outbound bookkeeping).
+    function _registerTokenInAssetTracker(bytes32 _assetId, uint256 _originChainId) internal override {
+        L2_ASSET_TRACKER.registerNewTokenIfNeeded(_assetId, _originChainId);
     }
 
     /// @notice Ensures that the token is deployed.
@@ -242,12 +249,39 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         IERC20(_token).safeTransfer(_to, _amount);
     }
 
+    /// @dev The base token is escrowed off-vault (in `BaseTokenHolder`) at burn time, so the native/bridged
+    /// disbursement branches cannot recover it; return the escrow instead — the inverse of
+    /// `burnAndStartBridging`. `_chainId` is the original bridge-out destination.
+    function _disburseFailedTransfer(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _receiver,
+        uint256 _amount,
+        bool _isNative,
+        address _originToken,
+        bytes memory _erc20Data
+    ) internal override {
+        if (_assetId == BASE_TOKEN_ASSET_ID) {
+            L2_BASE_TOKEN_HOLDER.recoverBaseToken(_receiver, _amount, _chainId);
+            return;
+        }
+        super._disburseFailedTransfer({
+            _chainId: _chainId,
+            _assetId: _assetId,
+            _receiver: _receiver,
+            _amount: _amount,
+            _isNative: _isNative,
+            _originToken: _originToken,
+            _erc20Data: _erc20Data
+        });
+    }
+
     /*//////////////////////////////////////////////////////////////
                             INTERNAL & HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Returns the L2 asset router for internal use.
-    function _assetRouter() internal view override returns (IAssetRouterBase) {
+    function _assetRouter() internal view virtual override returns (IAssetRouterBase) {
         return IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
     }
 
@@ -295,7 +329,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             : keccak256(abi.encode(_tokenOriginChainId, _l1Token));
     }
 
-    function _handleBridgeToChain(uint256 _chainid, bytes32 _assetId, uint256 _amount) internal override {
+    function _handleBridgeToChain(uint256 _chainid, bytes32 _assetId, uint256 _amount) internal virtual override {
         // on L2s we don't track the balance.
         // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
         // so L2NativeTokenVault doesn't have to handle balance changes on GW.
@@ -303,7 +337,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         L2_ASSET_TRACKER.handleInitiateBridgingOnL2(_chainid, _assetId, _amount, originChainId[_assetId]);
     }
 
-    function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
+    function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual override {
         // on L2s we don't track the balance.
         // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
         // so L2NativeTokenVault doesn't have to handle balance changes on GW.

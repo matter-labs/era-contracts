@@ -3,21 +3,27 @@
 pragma solidity ^0.8.21;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {
-    BalanceChange,
-    BundleAttributes,
-    CallAttributes,
-    InteropBundle,
-    InteropCallStarter
-} from "../common/Messaging.sol";
+import {BundleAttributes, CallAttributes, InteropBundle, InteropCallStarter} from "../common/Messaging.sol";
+import {AtomicFlowPreimage} from "../atomic-interop/IAtomicInterop.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IInteropCenter {
+    /// @notice Send-side metadata for an atomic bundle, parsed from the `atomicBundle` attribute. It is
+    /// deliberately NOT part of the cross-chain {InteropBundle}: keeping it out of `bundleHash` avoids a
+    /// circular dependency (the preimage's `legBundleHashes` include this very bundle's hash, so a
+    /// `bundleHash` that embedded the preimage could never be computed). Consumed by `_dispatchBundle`
+    /// to drive `AtomicFlowManager.append`, which recomputes `flowId` from the preimage and requires
+    /// the sent bundle's hash to be one of its legs.
+    struct AtomicSend {
+        AtomicFlowPreimage flowPreimage;
+        uint256 lowNullifierIndex;
+        bool isAtomic;
+    }
+
     event InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle interopBundle);
 
     event NewAssetRouter(address indexed oldAssetRouter, address indexed newAssetRouter);
-    event NewAssetTracker(address indexed oldAssetTracker, address indexed newAssetTracker);
 
     /// @notice Emitted when the interop protocol fee is updated.
     event InteropFeeUpdated(uint256 indexed oldFee, uint256 indexed newFee);
@@ -131,12 +137,10 @@ interface IInteropCenter {
     /// @param _chainId Target chain ID.
     /// @param _canonicalTxHash Canonical L1 transaction hash.
     /// @param _expirationTimestamp Deprecated, always 0.
-    /// @param _balanceChange Balance change for the transaction.
-    function forwardTransactionOnGatewayWithBalanceChange(
+    function forwardTransactionOnGateway(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp,
-        BalanceChange calldata _balanceChange
+        uint64 _expirationTimestamp
     ) external;
 
     /// @notice Sends an interop bundle.
@@ -151,6 +155,37 @@ interface IInteropCenter {
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
     ) external payable returns (bytes32 bundleHash);
+
+    /// @notice Simulates {sendBundle} and reports the `bundleHash` it would produce for the same caller and
+    ///         inputs, without collecting value or committing to the atomic interop IMT.
+    /// @dev Quoter pattern: this ALWAYS reverts with `InteropPreviewHash(bundleHash)` — it never returns and
+    ///      can never commit state. This is deliberate: to make the hash byte-exact it runs the same stateful
+    ///      assembly as {sendBundle}, including the value-burning `initiateIndirectCall` for indirect legs;
+    ///      reverting guarantees that burn is rolled back no matter who calls it or from what context (so it
+    ///      cannot be weaponised to move funds). Invoke it via a static `eth_call` / `callStatic` and read the
+    ///      hash out of the revert reason. Callers derive the atomic `flowId` (which commits to `bundleHash`)
+    ///      from this value before the real send. Requires no `msg.value` and no `atomicBundle` attribute, and
+    ///      does not consume the `interopBundleSalt` uniqueness slot.
+    /// @param _destinationChainId Same as {sendBundle}.
+    /// @param _callStarters Same as {sendBundle}.
+    /// @param _bundleAttributes Same as {sendBundle}.
+    function previewBundleHash(
+        bytes calldata _destinationChainId,
+        InteropCallStarter[] calldata _callStarters,
+        bytes[] calldata _bundleAttributes
+    ) external;
+
+    /// @notice Simulates {sendMessage} and reports the `bundleHash` of the single-call bundle it would produce
+    ///         for the same caller and inputs. Same quoter contract as {previewBundleHash}: it ALWAYS reverts
+    ///         with `InteropPreviewHash(bundleHash)` and must be invoked via a static `eth_call` / `callStatic`.
+    /// @param _recipient Same as {sendMessage}.
+    /// @param _payload Same as {sendMessage}.
+    /// @param _attributes Same as {sendMessage}.
+    function previewMessageHash(
+        bytes calldata _recipient,
+        bytes calldata _payload,
+        bytes[] calldata _attributes
+    ) external;
 
     /// @notice Parses the attributes of the call or bundle.
     /// @param _attributes ERC-7786 Attributes of the call or bundle.

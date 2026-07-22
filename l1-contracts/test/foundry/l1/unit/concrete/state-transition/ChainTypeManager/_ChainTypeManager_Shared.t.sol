@@ -146,7 +146,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new ExecutorFacet(block.chainid)),
+                facet: address(new ExecutorFacet()),
                 action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: Utils.getExecutorSelectors()

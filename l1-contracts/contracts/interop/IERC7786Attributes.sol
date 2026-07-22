@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.24;
 
+import {AtomicFlowPreimage} from "../atomic-interop/IAtomicInterop.sol";
+
 /// @title IERC7786Attributes
 /// @notice Interface for the ERC7786 gateway source
 /// @dev When adding/removing a function here the InteropCenter must be updated to reflect the changes.
@@ -22,6 +24,18 @@ interface IERC7786Attributes {
     /// @dev This attribute is optional and defaults to `false` (base token fees) when not provided.
     /// @dev Contracts should be able to toggle this flag for Stage1/Stage2 compatibility, this is due to the fact that operator-set base token amount is dependent on operator of the chain, while fixed ZK option is not.
     function useFixedFee(bool _useFixed) external pure;
+
+    /// @notice Marks a bundle as an **atomic interop** leg. When present, the InteropCenter does not
+    ///      publish the bundle to L1; instead it appends the bundle's commit value to the interop IMT
+    ///      via the AtomicFlowManager (the burn still flows through the normal `initiateIndirectCall`
+    ///      path). The destination executes it via `L2InteropHandler.executeAtomicBundle` once every leg
+    ///      of the flow is proven committed before the deadline. Bundle-level attribute.
+    /// @param _flowPreimage The full `flowId` preimage. The AtomicFlowManager recomputes `flowId` and
+    ///      requires this bundle's hash to be one of `legBundleHashes` with this chain as its declared
+    ///      source, so a preimage that does not contain the bundle — e.g. built from a stale off-chain
+    ///      bundle-hash preview — reverts the send instead of stranding the burned funds.
+    /// @param _lowNullifierIndex The low-nullifier slot for this leg's commit value in the IMT.
+    function atomicBundle(AtomicFlowPreimage calldata _flowPreimage, uint256 _lowNullifierIndex) external pure;
 
     /// @notice Specifies a user-provided salt for the interop bundle.
     /// @param _salt Arbitrary 32-byte salt chosen by the sender.

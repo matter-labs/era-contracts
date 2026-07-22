@@ -111,7 +111,7 @@
   },
   {
     "type": "function",
-    "name": "forwardTransactionOnGatewayWithBalanceChange",
+    "name": "forwardTransactionOnGateway",
     "inputs": [
       {
         "name": "_chainId",
@@ -127,48 +127,6 @@
         "name": "_expirationTimestamp",
         "type": "uint64",
         "internalType": "uint64"
-      },
-      {
-        "name": "_balanceChange",
-        "type": "tuple",
-        "internalType": "struct BalanceChange",
-        "components": [
-          {
-            "name": "version",
-            "type": "bytes1",
-            "internalType": "bytes1"
-          },
-          {
-            "name": "originToken",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "baseTokenAssetId",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "baseTokenAmount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "assetId",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "tokenOriginChainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
       }
     ],
     "outputs": [],
@@ -287,14 +245,14 @@
             "internalType": "uint256"
           },
           {
-            "name": "indirectCall",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
             "name": "indirectCallMessageValue",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "indirectCall",
+            "type": "bool",
+            "internalType": "bool"
           }
         ]
       },
@@ -360,6 +318,69 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "previewBundleHash",
+    "inputs": [
+      {
+        "name": "_destinationChainId",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_callStarters",
+        "type": "tuple[]",
+        "internalType": "struct InteropCallStarter[]",
+        "components": [
+          {
+            "name": "to",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "callAttributes",
+            "type": "bytes[]",
+            "internalType": "bytes[]"
+          }
+        ]
+      },
+      {
+        "name": "_bundleAttributes",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "previewMessageHash",
+    "inputs": [
+      {
+        "name": "_recipient",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_payload",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_attributes",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -745,25 +766,6 @@
   },
   {
     "type": "event",
-    "name": "NewAssetTracker",
-    "inputs": [
-      {
-        "name": "oldAssetTracker",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "newAssetTracker",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "OwnershipTransferStarted",
     "inputs": [
       {
@@ -897,42 +899,15 @@
   },
   {
     "type": "error",
-    "name": "AssetIdMismatch",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "supplied",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ]
+    "name": "AtomicBundleToL1NotSupported",
+    "inputs": []
   },
   {
     "type": "error",
-    "name": "AttributeAlreadySet",
+    "name": "CannotInitiateInteropOnL1",
     "inputs": [
       {
-        "name": "selector",
-        "type": "bytes4",
-        "internalType": "bytes4"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "AttributeViolatesRestriction",
-    "inputs": [
-      {
-        "name": "selector",
-        "type": "bytes4",
-        "internalType": "bytes4"
-      },
-      {
-        "name": "restriction",
+        "name": "destinationChainId",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -948,6 +923,11 @@
         "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "DirectCallToL1NotSupported",
+    "inputs": []
   },
   {
     "type": "error",
@@ -985,6 +965,33 @@
         "internalType": "bytes32"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "InteropCallToL1NotToAssetRouter",
+    "inputs": [
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InteropPreviewHash",
+    "inputs": [
+      {
+        "name": "bundleHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InteropToSelfNotSupported",
+    "inputs": []
   },
   {
     "type": "error",
@@ -1037,8 +1044,30 @@
   },
   {
     "type": "error",
-    "name": "NotInGatewayMode",
+    "name": "MultiCallToL1NotSupported",
+    "inputs": [
+      {
+        "name": "callCount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NonAtomicSendUnsupported",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NonZeroValueToL1NotSupported",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",

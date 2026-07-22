@@ -19,15 +19,11 @@ import {IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../IChainTypeManager.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
+import {ChainBatchRootTree} from "../../common/libraries/ChainBatchRootTree.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
 import {EmptyAssetId, EmptyBytes32, ZeroAddress} from "../../common/L1ContractErrors.sol";
-import {
-    L2_ASSET_TRACKER_ADDR,
-    L2_BRIDGEHUB_ADDR,
-    L2_NATIVE_TOKEN_VAULT_ADDR
-} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
-import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FeeParams} from "../../state-transition/chain-deps/ZKChainStorage.sol";
 
@@ -86,13 +82,10 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.chainTypeManager = _initializeData.chainTypeManager;
         if (_initializeData.bridgehub == L2_BRIDGEHUB_ADDR) {
             s.nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
-            s.assetTracker = L2_ASSET_TRACKER_ADDR;
         } else {
-            address nativeTokenVault = address(
+            s.nativeTokenVault = address(
                 IL1AssetRouter(address(IBridgehubBase(_initializeData.bridgehub).assetRouter())).nativeTokenVault()
             );
-            s.nativeTokenVault = nativeTokenVault;
-            s.assetTracker = address(IL1NativeTokenVault(nativeTokenVault).l1AssetTracker());
         }
         s.baseTokenAssetId = _initializeData.baseTokenAssetId;
         s.protocolVersion = _initializeData.protocolVersion;
@@ -127,6 +120,9 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.priorityTree.setup(s.__DEPRECATED_priorityQueue.getTotalPriorityTxs());
         s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
         s.zksyncOS = IS_ZKSYNC_OS;
+        if (IS_ZKSYNC_OS) {
+            s.l2LogsRootHashes[0] = ChainBatchRootTree.genesisChainBatchRoot();
+        }
 
         // All new chains (both ZKsync OS ones and not) have the totalSupply tracked for the base token of the chain.
         // The only exception are the legacy ZKsync OS chains.
