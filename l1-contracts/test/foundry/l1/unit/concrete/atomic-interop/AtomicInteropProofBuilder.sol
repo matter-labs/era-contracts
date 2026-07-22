@@ -213,6 +213,22 @@ abstract contract AtomicInteropProofBuilder is Test {
         uint256 _l1Timestamp,
         bytes32[] memory _batchLeafSiblings
     ) internal pure returns (bytes32[] memory proof) {
+        // Mask 0 = the batch leaf is the leftmost leaf of the chain's batch tree.
+        return _settlementProofWithMask(_slChainId, _slBlock, _l1Timestamp, 0, _batchLeafSiblings);
+    }
+
+    /// @dev Like {_settlementProof}, with a caller-chosen `batchLeafProofMask`. The mask encodes the
+    /// batch leaf's position in the chain's batch tree (bit `i` = 1 iff the node is a RIGHT child at
+    /// level `i`), which is what the timeout protocol's last-batch check inspects: on every
+    /// left-child level the right sibling must be the empty-subtree cascade, while right-child
+    /// levels may carry populated left siblings.
+    function _settlementProofWithMask(
+        uint256 _slChainId,
+        uint256 _slBlock,
+        uint256 _l1Timestamp,
+        uint256 _batchLeafProofMask,
+        bytes32[] memory _batchLeafSiblings
+    ) internal pure returns (bytes32[] memory proof) {
         uint256 topLen = ChainBatchRootTree.TREE_DEPTH;
         // Layout: [metadata, topSiblings(3), l1Timestamp, batchLeafProofMask, batchSiblings(n),
         //          slPackedInfo, slChainId]
@@ -226,7 +242,7 @@ abstract contract AtomicInteropProofBuilder is Test {
             proof[1 + i] = bytes32(uint256(0xdead)); // dummy top-tree sibling
         }
         proof[topLen + 1] = bytes32(_l1Timestamp);
-        proof[topLen + 2] = bytes32(uint256(0)); // batchLeafProofMask (leaf at index 0, left child)
+        proof[topLen + 2] = bytes32(_batchLeafProofMask);
         for (uint256 i = 0; i < _batchLeafSiblings.length; ++i) {
             proof[topLen + 3 + i] = _batchLeafSiblings[i];
         }

@@ -171,6 +171,22 @@ contract AtomicFlowManagerAppendTest is Test {
         _appendAsInteropCenter(localLeg, preimage);
     }
 
+    /// @notice The canonical order is STRICTLY ascending: equal adjacent leg hashes (a duplicated
+    /// leg) are rejected, not just descending ones. A duplicate would let one bundle occupy two leg
+    /// slots — its single commit value would "prove" both, so a flow could finalize with fewer real
+    /// commitments than legs.
+    function test_append_RevertWhen_DuplicateLegBundleHashes() public {
+        bytes32 localLeg = keccak256("local leg");
+        AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
+        // Duplicate the first leg hash into the second slot (equal adjacent hashes).
+        preimage.legBundleHashes[1] = preimage.legBundleHashes[0];
+        preimage.legSourceChainIds[0] = block.chainid;
+        preimage.legSourceChainIds[1] = block.chainid;
+
+        vm.expectRevert(ManagerBundleHashesNotSorted.selector);
+        _appendAsInteropCenter(preimage.legBundleHashes[0], preimage);
+    }
+
     /// @notice A preimage whose source-chain-id array is not aligned 1:1 with the leg hashes is rejected.
     function test_append_RevertWhen_SourceChainIdsLengthMismatch() public {
         bytes32 localLeg = keccak256("local leg");
@@ -208,6 +224,29 @@ contract AtomicFlowManagerAppendTest is Test {
                 preimage.legSourceChainIds[i] = unregisteredChainId;
             }
         }
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotRegistered.selector, unregisteredChainId));
+        _appendAsInteropCenter(localLeg, preimage);
+    }
+
+    /// @notice The registration gate scans EVERY leg, starting from the first: an unregistered
+    /// co-leg in slot 0 (ahead of the committing leg) is rejected just like one in a later slot.
+    /// Slot position is hash-order-dependent, so both arrangements must hold.
+    function test_append_RevertWhen_FirstSlotCoLegUnregistered() public {
+        // Force the (unregistered) co-leg into slot 0: its hash sorts strictly below the local leg's.
+        bytes32 coLeg = bytes32(uint256(1));
+        bytes32 localLeg = keccak256("local leg");
+        uint256 unregisteredChainId = 888;
+
+        AtomicFlowPreimage memory preimage;
+        preimage.deadline = DEADLINE;
+        preimage.settlementLayerChainId = L1_CHAIN_ID;
+        preimage.legBundleHashes = new bytes32[](2);
+        preimage.legBundleHashes[0] = coLeg;
+        preimage.legBundleHashes[1] = localLeg;
+        preimage.legSourceChainIds = new uint256[](2);
+        preimage.legSourceChainIds[0] = unregisteredChainId;
+        preimage.legSourceChainIds[1] = block.chainid;
 
         vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotRegistered.selector, unregisteredChainId));
         _appendAsInteropCenter(localLeg, preimage);

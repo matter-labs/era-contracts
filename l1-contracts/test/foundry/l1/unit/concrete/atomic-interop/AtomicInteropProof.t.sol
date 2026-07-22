@@ -277,6 +277,88 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
+    /// @dev A last batch that is a RIGHT child (non-zero batch-leaf mask) is accepted: the last-batch
+    /// check must skip right-child levels — their LEFT siblings are earlier, populated batches — and
+    /// only require the empty-subtree cascade on left-child levels. Modeled: a 3-batch chain tree
+    /// whose last leaf (index 2) sits at mask `0b10` — level 0 left child (right sibling = zeros[0]),
+    /// level 1 right child (left sibling = the populated subtree of batches 0..1).
+    function test_verifyTimeoutAbsence_inTimeLastBatch_acceptsRightChildLastLeaf() public {
+        bytes32[] memory siblings = new bytes32[](2);
+        siblings[0] = _emptySubtreeCascade(1)[0];
+        siblings[1] = keccak256("populated subtree of batches 0..1");
+
+        ImtProof memory absence = _nonInclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            absentValue,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            SL_BLOCK,
+            DEADLINE - 1
+        );
+        absence.settlementProof = _settlementProofWithMask(
+            SETTLEMENT_LAYER_CHAIN_ID,
+            SL_BLOCK,
+            DEADLINE - 1,
+            2, // 0b10: left child at level 0, right child at level 1
+            siblings
+        );
+        _expectRootAuthentication(absence, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
+        proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
+    }
+
+    /// @dev A non-last batch whose populated right sibling sits above a right-child level is still
+    /// rejected, and the revert pinpoints the offending LEVEL: mask `0b01` (right child at level 0 —
+    /// its left sibling, an earlier batch, is fine) with a populated right sibling at level 1 (a
+    /// LATER subtree — so later batches exist and the "last batch" claim is false).
+    function test_RevertWhen_timeout_inTimeBatchNotLastInRoot_atDeeperLevel() public {
+        bytes32 populatedLaterSubtree = keccak256("populated subtree of later batches");
+        bytes32[] memory siblings = new bytes32[](2);
+        siblings[0] = keccak256("earlier batch leaf");
+        siblings[1] = populatedLaterSubtree;
+
+        ImtProof memory absence = _nonInclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            absentValue,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            SL_BLOCK,
+            DEADLINE - 1
+        );
+        absence.settlementProof = _settlementProofWithMask(
+            SETTLEMENT_LAYER_CHAIN_ID,
+            SL_BLOCK,
+            DEADLINE - 1,
+            1, // 0b01: right child at level 0, left child at level 1
+            siblings
+        );
+        _expectRootAuthentication(absence, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
+        vm.expectRevert(abi.encodeWithSelector(ProofNotLastBatchInRoot.selector, 1, populatedLaterSubtree));
+        proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
+    }
+
+    /// @dev The empty-subtree cascade is LEVEL-SPECIFIC: `zeros[0]` presented at level 1 (where
+    /// `zeros[1] = keccak(zeros[0] || zeros[0])` is required) does not certify an empty right
+    /// subtree and is rejected. Guards the per-level cascade recomputation.
+    function test_RevertWhen_timeout_wrongCascadeLevelSibling() public {
+        bytes32 levelZeroHash = _emptySubtreeCascade(1)[0];
+        bytes32[] memory siblings = new bytes32[](2);
+        siblings[0] = levelZeroHash;
+        siblings[1] = levelZeroHash; // wrong: level 1 requires keccak(zeros[0] || zeros[0])
+
+        ImtProof memory absence = _nonInclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            absentValue,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            SL_BLOCK,
+            DEADLINE - 1
+        );
+        absence.settlementProof = _settlementProof(SETTLEMENT_LAYER_CHAIN_ID, SL_BLOCK, DEADLINE - 1, siblings);
+        _expectRootAuthentication(absence, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
+        vm.expectRevert(abi.encodeWithSelector(ProofNotLastBatchInRoot.selector, 1, levelZeroHash));
+        proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
+    }
+
     // ============ verifyTimeoutAbsence — reverts ============
 
     /// @dev Boundary: an settlement-layer interop root created exactly AT the deadline is not strictly after it — the
@@ -338,6 +420,26 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         absence.settlementProof = _settlementProof(SETTLEMENT_LAYER_CHAIN_ID, SL_BLOCK, DEADLINE - 1, siblings);
         _expectRootAuthentication(absence, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
         vm.expectRevert(abi.encodeWithSelector(ProofNotLastBatchInRoot.selector, 0, populatedSibling));
+        proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
+    }
+
+    /// @dev Boundary of the branch validation: a batch settled exactly AT the deadline is in time
+    /// (`t <= deadline`, matching {verifyInclusion}'s clock), so the begin branch — which requires a
+    /// strictly late batch — must reject it. Where the previous test pins `t < deadline`, this one
+    /// pins the `t == deadline` edge, where begin-branch absence would contradict a same-batch
+    /// finalization.
+    function test_RevertWhen_timeout_beginBranchWithBatchAtDeadline() public {
+        ImtProof memory absence = _nonInclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            absentValue,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            SL_BLOCK,
+            DEADLINE
+        );
+        absence.provesAgainstBeginRoot = true;
+        _expectRootAuthentication(absence, ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX);
+        vm.expectRevert(abi.encodeWithSelector(ProofTimeoutBranchMismatch.selector, true, uint256(DEADLINE), DEADLINE));
         proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
