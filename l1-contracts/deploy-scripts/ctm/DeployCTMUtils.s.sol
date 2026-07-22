@@ -126,10 +126,11 @@ abstract contract DeployCTMUtils is DeployUtils {
     /// set plus the base system contract hashes into it. The chain-creation params point at it
     /// (the CTM's `currentRelease`), and `DiamondInit` reads everything chain-independent
     /// from there — the committed genesis cut carries no facets and no init payload.
-    /// @dev Plain CREATE, not CREATE2: the registry has no constructor args, so a CREATE2 deploy
-    /// with the shared salt would land every run (Era CTM, ZKsyncOS CTM, later upgrades) on the
-    /// same, already-initialized address. A deterministic address buys nothing here — the CTM
-    /// stores the pointer.
+    /// @dev The factory itself deploys through the deterministic CREATE2 factory (deployOrGet:
+    /// an existing instance at the predicted address is reused). A plain CREATE would make the
+    /// canonical factory's address a function of the broadcaster's NONCE — un-replayable from
+    /// recorded governance bundles and impossible to predict for stage calldata; the CTM pins
+    /// this address as its release-provenance anchor, so it must be a commitment, not an accident.
     /// @dev Deploy + initialize happen atomically inside {CTMReleaseFactory.deployOrGetRelease} (one
     /// transaction), so the release is already initialized when its address is returned — there is
     /// no uninitialized, front-runnable window on the unauthenticated `initialize`.
@@ -158,8 +159,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             })
         );
 
-        vm.broadcast(getBroadcasterAddress());
-        CTMReleaseFactory factory = new CTMReleaseFactory();
+        CTMReleaseFactory factory = CTMReleaseFactory(deployViaCreate2(type(CTMReleaseFactory).creationCode));
         ctmAddresses.stateTransition.releaseFactory = address(factory);
 
         vm.broadcast(getBroadcasterAddress());

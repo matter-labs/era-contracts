@@ -238,6 +238,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             Utils.genesisConfigPath(isZKsyncOS)
         );
 
+        // Optional explicit target protocol version from the upgrade input. The genesis config
+        // (`configs/genesis/*/latest.json`) may still declare the PREVIOUS version while an
+        // upgrade to the next one is being prepared, so the upgrade-env preset can pin the
+        // packed version the emitted `setNewVersionUpgrade` must carry.
+        if (toml.keyExists("$.contracts.latest_protocol_version")) {
+            chainCreationParams.latestProtocolVersion = toml.readUint("$.contracts.latest_protocol_version");
+        }
+
         // Optional override for v29 introspection selection
         if (toml.keyExists("$.use_v29_introspection")) {
             newConfig.hasV29IntrospectionOverride = true;
