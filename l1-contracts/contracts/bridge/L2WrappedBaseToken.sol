@@ -13,7 +13,7 @@ import {BridgeMintNotImplemented, Unauthorized, WithdrawFailed, ZeroAddress} fro
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The canonical WETH-style wrapped-base-token implementation: unlike the legacy WETH9 it has no
-/// silent fallback and adds `receive`, `permit`, `depositTo` and `withdrawTo`. See {protocol-docs/bridging.md}.
+/// silent fallback and adds `receive`, `permit`, `depositTo` and `withdrawTo`. See {protocol-docs/bridging.md#base-token-handling}.
 /// @dev Still upgradeable for now; upgradeability will be removed later to make it trustless.
 contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBridgedStandardToken {
     /// @dev Address of the L2 WETH Bridge.

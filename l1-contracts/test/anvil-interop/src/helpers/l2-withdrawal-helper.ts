@@ -68,7 +68,7 @@ export interface InitiateErc20WithdrawalParams extends InitiateWithdrawalParams 
  * Initiate an ETH (base-token) withdrawal from L2 to L1 via the InteropCenter and return a
  * {@link PendingWithdrawal} handle that can be finalised later. Base-token withdrawals use the same
  * unified interop-bundle path as ERC20s (the dedicated `L2BaseToken.withdraw` entrypoint was
- * removed). See {protocol-docs/bridging.md}.
+ * removed). See {protocol-docs/bridging.md#deposit-initiation-source-side}.
  */
 export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): Promise<PendingWithdrawal> {
   const { l2RpcUrl, l1RpcUrl, chainId, l1Addresses, amount } = params;
@@ -123,7 +123,7 @@ export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): P
  * Initiate an ERC20 withdrawal from L2 to L1 via the InteropCenter: approve the L2 NTV, then send
  * an interop bundle whose single indirect call targets the L2 AssetRouter with destination L1 (the
  * legacy `L2AssetRouter.withdraw(assetId, data)` entrypoint was removed). See
- * {protocol-docs/bridging.md}.
+ * {protocol-docs/bridging.md#deposit-initiation-source-side}.
  */
 export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalParams): Promise<PendingWithdrawal> {
   const { l2RpcUrl, l1RpcUrl, l2TokenAddress, tokenOriginChainId, chainId, amount } = params;

@@ -101,11 +101,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         vm.prank(Ownable2StepUpgradeable(addresses.l1NativeTokenVault).pendingOwner());
         Ownable2StepUpgradeable(addresses.l1NativeTokenVault).acceptOwnership();
 
-        l2ChainAssetHandler = IL2ChainAssetHandler(
-            address(
-                new L2ChainAssetHandler()
-            )
-        );
+        l2ChainAssetHandler = IL2ChainAssetHandler(address(new L2ChainAssetHandler()));
         address owner = _owner();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         L2ChainAssetHandler(address(l2ChainAssetHandler)).initL2(block.chainid, owner);

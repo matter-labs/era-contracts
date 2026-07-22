@@ -232,7 +232,7 @@ contract IndexedMerkleTreeTest is Test {
 
     /// @notice Regression: the empty-leaf padding (`IMT_EMPTY_LEAF_HASH`) must stay distinct from
     /// `hashLeaf({0,0,0})` — otherwise a padded slot would verify as a `{0,0,0}` tail low leaf and could
-    /// prove a *present* value absent. See {protocol-docs/message-root.md}.
+    /// prove a *present* value absent. See {protocol-docs/message-root.md#indexed-merkle-tree-indexedmerkletree}.
     function test_emptyLeafPaddingIsNotAValidLeafHash() public view {
         assertTrue(IMT_EMPTY_LEAF_HASH != tree.hashLeaf(IMTLeaf({value: 0, nextIndex: 0, nextValue: 0})));
     }

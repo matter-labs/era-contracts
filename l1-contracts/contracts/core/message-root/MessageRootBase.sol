@@ -34,7 +34,7 @@ import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Stores the chain batch roots of registered chains and aggregates them into a single
 /// interop root. From v31 onwards it also verifies L2->L1 messages directly, bypassing the Mailbox
-/// of individual chains. See {protocol-docs/message-root.md}.
+/// of individual chains. See {protocol-docs/message-root.md#aggregation-structure}.
 abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initializable, MessageVerification {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
@@ -69,7 +69,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) internal chainTree;
 
     /// @notice The `(root, timestamp)` recorded per block on every shared-tree update — the tuple
-    /// chains import and the executor re-checks at batch execution. See {protocol-docs/message-root.md}.
+    /// chains import and the executor re-checks at batch execution. See {protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}.
     /// @dev Extending the value type from `bytes32` to `StoredInteropRoot` is layout-safe: mapping
     /// values live at hashed locations and `root` occupies the original slot.
     mapping(uint256 blockNumber => StoredInteropRoot) internal historicalRoots;
@@ -204,7 +204,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     }
 
     /// @dev Pushes an already-recorded chainBatchRoot into the chain tree and propagates the new chain
-    /// root into the shared tree (the interop half of the v32 flow). See {protocol-docs/message-root.md}.
+    /// root into the shared tree (the interop half of the v32 flow). See {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
     function _pushChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) internal {
         uint256 l1Timestamp = block.timestamp;
         chainBatchRootTimestamp[_chainId][_batchNumber] = l1Timestamp;
@@ -276,7 +276,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
 
     /// @dev Adds a single chain to the message root with an empty chain tree. Genesis seeding of
     /// freshly created ZKsync OS chains happens separately via {seedGenesisRoot}; see
-    /// {protocol-docs/chain-lifecycle.md}.
+    /// {protocol-docs/chain-lifecycle.md#genesis-batch-root-seeding-messagerootseedgenesisroot}.
     /// @param _chainId The ID of the chain that is being added to the message root.
     /// @param _startingBatchNumber The batch number the chain's numbering continues from on this layer.
     function _addNewChain(uint256 _chainId, uint256 _startingBatchNumber) internal {
@@ -352,7 +352,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         });
         if (proofData.finalProofNode) {
             // The proven root must equal the settling chain's recorded batch root (`chainBatchRoots`),
-            // never this layer's aggregate root. See {protocol-docs/message-root.md}.
+            // never this layer's aggregate root. See {protocol-docs/message-root.md#proof-paths}.
             bytes32 correctBatchRoot = _getChainBatchRoot(_chainId, _batchNumber);
             return correctBatchRoot == proofData.batchSettlementRoot && correctBatchRoot != bytes32(0);
         }
@@ -383,7 +383,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     }
 
     /// @dev Expected batch root for a batch number with no stored root: on L1, pre-v31 batches are
-    /// looked up on the chain itself; on L2 it always returns 0. See {protocol-docs/message-root.md}.
+    /// looked up on the chain itself; on L2 it always returns 0. See {protocol-docs/message-root.md#proof-paths}.
     function _noBatchFallback(uint256 _chainId, uint256 _batchNumber) internal view virtual returns (bytes32);
 
     /// @inheritdoc IMessageRootBase

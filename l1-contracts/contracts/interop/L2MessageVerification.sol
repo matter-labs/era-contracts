@@ -11,7 +11,7 @@ import {DepthMoreThanOneForRecursiveMerkleProof} from "../core/bridgehub/L1Bridg
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Proves L2->L1 message inclusion on an L2, anchoring the shared recursive proof logic to
-/// the imported interop roots. See {protocol-docs/interop.md} (message verification).
+/// the imported interop roots. See {protocol-docs/interop.md#message-verification-l2messageverification}.
 contract L2MessageVerification is MessageVerification {
     /// @dev Overrides the shared recursion with the L2 terminal step; recursion depth is limited to
     /// one hop.
@@ -42,7 +42,7 @@ contract L2MessageVerification is MessageVerification {
         }
 
         // Assumes all settlement layers the chain has ever settled on are trustworthy (see
-        // {protocol-docs/interop.md}, message verification).
+        // {protocol-docs/interop.md#message-verification-l2messageverification}).
         return
             this.proveL2LeafInclusionSharedRecursive({
                 _chainId: proofData.settlementLayerChainId,

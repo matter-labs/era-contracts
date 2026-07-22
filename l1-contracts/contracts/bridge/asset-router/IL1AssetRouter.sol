@@ -15,7 +15,7 @@ import {TxStatus} from "../../common/Messaging.sol";
 /// @title L1 Asset Router interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The L1 side of asset routing. See {protocol-docs/bridging.md}.
+/// @notice The L1 side of asset routing. See {protocol-docs/bridging.md#asset-routing-burn--mint}.
 interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy, IL1CrossChainSender {
     event ClaimedFailedDepositAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 

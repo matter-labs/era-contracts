@@ -114,7 +114,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             if (interopRoot.chainId == block.chainid) {
                 // In this release interop roots are imported only from the chain's own settlement
                 // layer, so the local MessageRoot record is the only case to cover.
-                // See {protocol-docs/message-root.md}.
+                // See {protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}.
                 StoredInteropRoot memory recordedRoot = messageRootContract.historicalRoot(
                     uint256(interopRoot.blockOrBatchNumber)
                 );
@@ -176,7 +176,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         // Cross-chain asset correctness is enforced by the ZK proof, so no per-batch log
-        // reconstruction / balance accounting happens here. See {protocol-docs/message-root.md}.
+        // reconstruction / balance accounting happens here. See {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
         for (uint256 i = 0; i < nBatches; ++i) {
             _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
         }

@@ -6,7 +6,7 @@ pragma solidity ^0.8.20;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The mint/burn interface implemented by bridged token contracts, called by the native token
-/// vault. See {protocol-docs/bridging.md}.
+/// vault. See {protocol-docs/bridging.md#bridged-token-contracts}.
 interface IBridgedStandardToken {
     event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
 

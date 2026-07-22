@@ -43,7 +43,7 @@ import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol"
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The L2 side of asset routing: routes L1 <-> L2 and L2 <-> L2 asset transfers to per-asset
-/// handlers. See {protocol-docs/bridging.md}.
+/// handlers. See {protocol-docs/bridging.md#asset-routing-burn--mint}.
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAtomicRecoverable {
     /// @dev Deprecated: previously stored the L2 Bridgehub. Now the address is resolved via
@@ -246,7 +246,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
 
     /// @inheritdoc AssetRouterBase
     /// @dev Interop is only initiated on L2s, so the source may not be L1; the sender must be this same
-    /// router (identical address on every ZK chain). See {protocol-docs/bridging.md}.
+    /// router (identical address on every ZK chain). See {protocol-docs/bridging.md#finalization-destination-side}.
     function _isValidInteropSender(
         uint256 _senderChainId,
         address _senderAddress
@@ -290,13 +290,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     /// @dev Timeout-refund hook of the atomic interop flow: recognizes only `finalizeDeposit` calls and
     /// reverses their burn via the NTV, refunding the original depositor. Returns `false` for any other
     /// call so the {AtomicFlowManager} can skip non-recoverable bundle calls without reverting.
-    /// See {protocol-docs/bridging.md}.
+    /// See {protocol-docs/bridging.md#atomic-recovery-hook}.
     function recoverAtomicCall(
         uint256 _destChainId,
         bytes calldata _callData
     ) external onlyAtomicFlowManager nonReentrant returns (bool recovered) {
         // L2->L1 withdrawals are never revertable: `totalWithdrawalsToL1` must stay append-only.
-        // See {protocol-docs/bridging.md}.
+        // See {protocol-docs/bridging.md#security-notes}.
         require(_destChainId != L1_CHAIN_ID, RecoverToL1NotSupported());
         if (_callData.length < 4 || bytes4(_callData[:4]) != AssetRouterBase.finalizeDeposit.selector) {
             return false;

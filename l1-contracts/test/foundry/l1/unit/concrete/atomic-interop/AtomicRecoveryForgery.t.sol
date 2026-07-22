@@ -69,7 +69,7 @@ contract MockRecoveringNativeTokenVault {
 
 /// @notice Regression tests for the atomic-recovery forgery: on timeout recovery only calls produced by
 /// the asset router's own burn path (`InteropCall.from == L2_ASSET_ROUTER_ADDR`) may be re-credited;
-/// forged direct calls are skipped. See {protocol-docs/bridging.md}.
+/// forged direct calls are skipped. See {protocol-docs/bridging.md#atomic-recovery-hook}.
 /// @dev The NTV is mocked to isolate the provenance gate from real vault accounting; `Revertable` state
 /// is forced via a harness (the full send + `authorizeRefund` proof path is covered by the anvil-interop
 /// suite) since the gate under test is at recovery.

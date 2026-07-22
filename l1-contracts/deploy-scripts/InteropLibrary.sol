@@ -123,7 +123,7 @@ library InteropLibrary {
     /// @param unbundlerAddress     Unbundler address on destination chain
     /// @param useFixedFee          Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
     /// @param salt                 User salt for `interopBundleSalt`: must be unique per sender, random recommended;
-    ///                             see {protocol-docs/interop.md}. `bytes32(0)` omits the attribute (usable at most
+    ///                             see {protocol-docs/interop.md#replay-protection-and-bundle-uniqueness}. `bytes32(0)` omits the attribute (usable at most
     ///                             once per sender). Deliberately no salt-less overload — callers must choose a salt.
     function buildBundleAttributes(
         address executionAddress,

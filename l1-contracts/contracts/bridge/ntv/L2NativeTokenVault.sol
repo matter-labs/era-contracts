@@ -49,7 +49,7 @@ import {TokenBridgingData, TokenMetadata} from "../../common/Messaging.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The L2 vault escrowing L2-native tokens and minting/burning bridged representations. Note,
 /// that it does not support any custom token logic, i.e. rebase tokens' functionality is not supported.
-/// See {protocol-docs/bridging.md}.
+/// See {protocol-docs/bridging.md#native-token-vault}.
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     using SafeERC20 for IERC20;

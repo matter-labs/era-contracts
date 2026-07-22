@@ -142,7 +142,7 @@ struct BridgehubL2TransactionRequest {
 /// For proof based interop it is block number. For commit based interop it is batch number.
 /// @param timestamp The block timestamp at which the imported root was created on the dependency
 /// chain. Double checked against `MessageRoot.historicalRoot` during batch execution.
-/// See {protocol-docs/message-root.md}.
+/// See {protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}.
 /// @param sides The sides of the dynamic incremental merkle tree emitted in the L2ToL1Messenger for precommit based interop
 /// For proof and commit based interop, the sides contain a single root.
 struct InteropRoot {
@@ -156,7 +156,7 @@ struct InteropRoot {
 
 /// @dev An aggregated (interop) root stored together with its creation timestamp. Shared by the
 /// settlement layer's `MessageRoot` (`historicalRoot`) and the L2 `L2InteropRootStorage`
-/// (`interopRoots`). See {protocol-docs/message-root.md}.
+/// (`interopRoots`). See {protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}.
 /// @param root The aggregated root.
 /// @param timestamp The block timestamp at which the root was created on its origin chain.
 struct StoredInteropRoot {
@@ -206,7 +206,7 @@ struct InteropCallStarterInternal {
 /// @param interopCallValue Base token value on destination chain to send for interop call.
 /// @param indirectCall If true, the call starter is first called on the source chain and returns
 /// the actual call starter (used e.g. for token transfers); a direct call uses the starter as-is.
-/// See {protocol-docs/interop.md}.
+/// See {protocol-docs/interop.md#direct-vs-indirect-calls}.
 /// @param indirectCallMessageValue Base token value on sending chain to send for indirect call.
 struct CallAttributes {
     uint256 interopCallValue;
@@ -218,7 +218,7 @@ struct CallAttributes {
 /// @param unbundlerAddress ERC-7930 Address allowed to unbundle the bundle on the destination chain. Note, that it is required to be nonempty, unlike `executionAddress`.
 /// @param useFixedFee If true, the user pays the fixed ZK fee (via ERC20 transfer) instead of the
 ///                    operator-controlled base-token fee. Bundle-level: all calls share the fee mode.
-///                    Fee model details: {protocol-docs/interop.md}.
+///                    Fee model details: {protocol-docs/interop.md#fee-model}.
 /// @param salt User-provided salt used to derive `interopBundleSalt` as
 ///             `keccak256(abi.encodePacked(msg.sender, salt))`. Must be unique per sender for every
 ///             bundle; a random salt also keeps the bundle hash unpredictable (privacy).

@@ -21,12 +21,12 @@ interface IERC7786Attributes {
 
     /// @notice Specifies the fee payment method for interop calls.
     /// @param _useFixed true = fixed ZK fee, false (default) = operator-set base-token fee.
-    /// @dev See {protocol-docs/interop.md} (fee model).
+    /// @dev See {protocol-docs/interop.md#fee-model}.
     function useFixedFee(bool _useFixed) external pure;
 
     /// @notice Marks a bundle as an atomic interop leg (bundle-level attribute): the InteropCenter
     ///      appends the bundle's commit value to the interop IMT instead of publishing it to L1.
-    ///      See {protocol-docs/interop.md} (atomic bundles) and {protocol-docs/atomic-interop.md}.
+    ///      See {protocol-docs/interop.md#atomic-bundles} and {protocol-docs/atomic-interop.md#flow}.
     /// @param _flowPreimage The full `flowId` preimage; the AtomicFlowManager recomputes `flowId` and
     ///      requires this bundle's hash to be one of its legs, else the send reverts.
     /// @param _lowNullifierIndex The low-nullifier slot for this leg's commit value in the IMT.
@@ -36,6 +36,6 @@ interface IERC7786Attributes {
     /// @param _salt Arbitrary 32-byte salt chosen by the sender.
     /// @dev Mixed with `msg.sender` into `interopBundleSalt`; each (sender, salt) pair may be used at
     ///      most once, and a random salt keeps the bundle hash unpredictable. Omitting it (salt 0) works
-    ///      at most once per sender. See {protocol-docs/interop.md} (replay protection).
+    ///      at most once per sender. See {protocol-docs/interop.md#replay-protection-and-bundle-uniqueness}.
     function interopBundleSalt(bytes32 _salt) external pure;
 }

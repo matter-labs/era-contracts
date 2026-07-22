@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 
 /// @notice Locks `ChainBatchRootTree` bit-for-bit against the zksync-os bootloader's
-/// `compute_chain_batch_root` (mirrors the Rust-side unit tests). See {protocol-docs/message-root.md}.
+/// `compute_chain_batch_root` (mirrors the Rust-side unit tests). See {protocol-docs/message-root.md#chain-batch-root-zksync-os}.
 contract ChainBatchRootTreeTest is Test {
     function _node(bytes32 _left, bytes32 _right) internal pure returns (bytes32) {
         return keccak256(bytes.concat(_left, _right));

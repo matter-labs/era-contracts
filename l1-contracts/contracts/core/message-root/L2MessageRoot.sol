@@ -20,7 +20,7 @@ import {InvalidCaller} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The MessageRoot deployment for settlement-layer L2s. See {protocol-docs/message-root.md}.
+/// @notice The MessageRoot deployment for settlement-layer L2s. See {protocol-docs/message-root.md#aggregation-structure}.
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2MessageRoot is MessageRootBase {
     using FullMerkleMemory for FullMerkleMemory.FullTree;

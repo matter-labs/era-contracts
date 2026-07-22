@@ -49,7 +49,7 @@ import {TxStatus} from "../../common/Messaging.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The L1 side of asset routing for L1 <-> ZK chain bridging, supporting both ETH and ERC20
-/// tokens. See {protocol-docs/bridging.md}.
+/// tokens. See {protocol-docs/bridging.md#asset-routing-burn--mint}.
 /// @dev Designed for use with a proxy for upgradability.
 contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     using SafeERC20 for IERC20;

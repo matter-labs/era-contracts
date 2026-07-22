@@ -17,7 +17,7 @@ struct SavedTotalSupply {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Chain-local token bookkeeping hooks called by the NTV, BaseTokenHolder and L2BaseToken.
-/// See {protocol-docs/bridging.md}.
+/// See {protocol-docs/bridging.md#l2-asset-tracker}.
 interface IL2AssetTracker {
     struct InteropL2Info {
         // Amount withdrawn to L1 while the chain settled on L1.

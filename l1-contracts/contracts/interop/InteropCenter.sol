@@ -70,7 +70,7 @@ import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol"
 import {IL2NativeTokenVault} from "../bridge/ntv/IL2NativeTokenVault.sol";
 
 /// @dev Default fixed ZK fee per interop call; intentionally above the intended dynamic fee to
-/// incentivize the dynamic path. See {protocol-docs/interop.md} (fee model).
+/// incentivize the dynamic path. See {protocol-docs/interop.md#fee-model}.
 uint256 constant DEFAULT_ZK_INTEROP_FEE = 10e18;
 
 /// @title InteropCenter
@@ -78,7 +78,7 @@ uint256 constant DEFAULT_ZK_INTEROP_FEE = 10e18;
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Primary entry point for interop between chains: forms interop bundles and dispatches them
 /// (L2->L1 message, or IMT commit for atomic bundles). Deployed on L2s only as of v31.
-/// See {protocol-docs/interop.md}.
+/// See {protocol-docs/interop.md#zksync-interop-protocol}.
 contract InteropCenter is
     IInteropCenter,
     IERC7786GatewaySource,
@@ -100,7 +100,7 @@ contract InteropCenter is
     uint256 public interopProtocolFee;
 
     /// @notice Fixed fee amount in ZK tokens per interop call (when useFixedFee=true). Provides Stage 1
-    ///      protection; see {protocol-docs/interop.md} (fee model).
+    ///      protection; see {protocol-docs/interop.md#fee-model}.
     /// @dev Not changeable at runtime; a storage variable (not a constant) only so a protocol upgrade
     ///      can change the value without redeploying.
     uint256 public ZK_INTEROP_FEE;
@@ -118,8 +118,8 @@ contract InteropCenter is
     mapping(address coinbase => uint256 amount) public accumulatedZKFees;
 
     /// @notice Tracks which salts a sender has already used; a (sender, salt) pair may be used at most
-    ///      once, which makes every emitted bundle hash unique. See {protocol-docs/interop.md}
-    ///      (replay protection).
+    ///      once, which makes every emitted bundle hash unique. See
+    ///      {protocol-docs/interop.md#replay-protection-and-bundle-uniqueness}.
     mapping(address user => mapping(bytes32 salt => bool hasBeenUsed)) public isInteropBundleSaltUsed;
 
     modifier onlySettlementLayerRelayedSender() {
@@ -208,7 +208,7 @@ contract InteropCenter is
 
         // Default the unbundler to the original sender pinned to this (source) chain — deliberately not
         // a chain wildcard, which would let a same-address clone on another chain unbundle. See
-        // {protocol-docs/interop.md} (bundle attributes).
+        // {protocol-docs/interop.md#bundle-attributes-bundleattributes}.
         if (bundleAttributes.unbundlerAddress.length == 0) {
             bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
         }
@@ -235,7 +235,7 @@ contract InteropCenter is
             _atomicSend: atomicSend
         });
 
-        // The sendId of the single call in the bundle (see {protocol-docs/interop.md}, identifiers).
+        // The sendId of the single call in the bundle (see {protocol-docs/interop.md#identifiers-and-hashes}).
         sendId = keccak256(abi.encodePacked(bundleHash, uint256(0)));
     }
 
@@ -398,7 +398,8 @@ contract InteropCenter is
 
     /// @notice Ensures `msg.value` matches the expected total for the bundle and burns/deposits the
     /// call value; charges the base-token protocol fee unless useFixedFee is set or the destination is
-    /// L1 (L2->L1 bundles are free). See {protocol-docs/interop.md} (fee model, send flow).
+    /// L1 (L2->L1 bundles are free). See {protocol-docs/interop.md#fee-model} and
+    /// {protocol-docs/interop.md#send-flow}.
     /// @param _destinationChainId Destination chain ID.
     /// @param _destinationBaseTokenAssetId The destination chain's base-token asset id (drives the
     /// same-vs-cross-base-token branch).
@@ -516,7 +517,7 @@ contract InteropCenter is
     }
 
     /// @notice Constructs, funds and dispatches an InteropBundle (both entry points funnel here).
-    /// See {protocol-docs/interop.md} (send flow).
+    /// See {protocol-docs/interop.md#send-flow}.
     /// @param _destinationChainId Chain ID to send to.
     /// @param _callStarters Array of InteropCallStarterInternal structs, corresponding to the calls in bundle.
     /// @param _bundleAttributes Attributes of the bundle.
@@ -549,7 +550,7 @@ contract InteropCenter is
         }
 
         // Deliberately no gateway-mode requirement on the send side; correctness is enforced by the
-        // receive-side proofs (see {protocol-docs/interop.md}, send flow).
+        // receive-side proofs (see {protocol-docs/interop.md#send-flow}).
 
         // A unique (sender, salt) pair guarantees a unique bundle hash.
         require(
@@ -627,7 +628,7 @@ contract InteropCenter is
             sourceChainId: block.chainid,
             destinationChainId: _destinationChainId,
             destinationBaseTokenAssetId: destinationBaseTokenAssetId,
-            // See {protocol-docs/interop.md} (replay protection) for the salt scheme.
+            // See {protocol-docs/interop.md#replay-protection-and-bundle-uniqueness} for the salt scheme.
             interopBundleSalt: keccak256(abi.encodePacked(msg.sender, _bundleAttributes.salt)),
             calls: new InteropCall[](_callStarters.length),
             bundleAttributes: _bundleAttributes
@@ -638,7 +639,7 @@ contract InteropCenter is
         for (uint256 i = 0; i < callStartersLength; ++i) {
             if (_destinationChainId == L1_CHAIN_ID) {
                 // Interop to L1 is restricted to a single indirect, zero-value asset-router call (a
-                // withdrawal) for this release. See {protocol-docs/interop.md} (restrictions).
+                // withdrawal) for this release. See {protocol-docs/interop.md#restrictions}.
                 require(_callStarters[i].callAttributes.indirectCall, DirectCallToL1NotSupported());
                 require(
                     _callStarters[i].to == L2_ASSET_ROUTER_ADDR,
@@ -735,7 +736,7 @@ contract InteropCenter is
     }
 
     /// @notice Turns a call starter into an `InteropCall` — as-is for direct calls, via the target's
-    /// `initiateIndirectCall` for indirect ones. See {protocol-docs/interop.md} (direct vs indirect).
+    /// `initiateIndirectCall` for indirect ones. See {protocol-docs/interop.md#direct-vs-indirect-calls}.
     function _processCallStarter(
         InteropCallStarterInternal memory _callStarter,
         uint256 _destinationChainId

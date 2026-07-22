@@ -30,7 +30,7 @@ bytes1 constant CHAIN_REGISTRATION_SENDER_ENCODING_VERSION = 0x01;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Registers chains on other chains' L2 Bridgehubs to enable interop between them.
-/// See {protocol-docs/chain-lifecycle.md}.
+/// See {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}.
 contract ChainRegistrationSender is
     IChainRegistrationSender,
     IL1CrossChainSender,
@@ -119,7 +119,7 @@ contract ChainRegistrationSender is
     /// @notice Used to get the L2 transaction calldata for the chain registration.
     /// @dev Also enforces the atomic-interop timeout precondition: the chain being registered must
     /// already have at least one batch inside this layer's message root. No backfill of
-    /// pre-existing chains is needed — see {protocol-docs/chain-lifecycle.md}.
+    /// pre-existing chains is needed — see {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}.
     /// @param chainToBeRegistered the chain to be registered
     /// @return the L2 transaction calldata
     function _getL2TxCalldata(uint256 chainToBeRegistered) internal view returns (bytes memory) {
@@ -134,7 +134,7 @@ contract ChainRegistrationSender is
     }
 
     /// @notice Checks that both chains are settling on the same settlement layer. As of v32 both
-    /// settling directly on L1 is permitted — see {protocol-docs/chain-lifecycle.md}.
+    /// settling directly on L1 is permitted — see {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}.
     /// @param chainToBeRegistered the chain to be registered
     /// @param chainRegisteredOn the chain to register on
     function _checkSettlementLayers(uint256 chainToBeRegistered, uint256 chainRegisteredOn) internal view {

@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The chain batch root of a ZKsync OS chain — a fixed height-3 (8-leaf) keccak256 Merkle
 /// tree over the batch's commitments. Mirrors `compute_chain_batch_root` in the zksync-os
-/// bootloader bit-for-bit. Leaf layout and rationale: {protocol-docs/message-root.md}.
+/// bootloader bit-for-bit. Leaf layout and rationale: {protocol-docs/message-root.md#chain-batch-root-zksync-os}.
 library ChainBatchRootTree {
     /// @dev Height of the chain batch root tree; every leaf sits exactly this many hops below the root.
     uint256 internal constant TREE_DEPTH = 3;
@@ -36,7 +36,7 @@ library ChainBatchRootTree {
 
     /// @notice The chain batch root of a chain's genesis batch (batch 0): zero logs and multichain
     /// roots, freshly seeded (empty) IMT at both batch boundaries. Seeded into the `MessageRoot` at
-    /// chain creation; see {protocol-docs/chain-lifecycle.md}.
+    /// chain creation; see {protocol-docs/chain-lifecycle.md#genesis-batch-root-seeding-messagerootseedgenesisroot}.
     function genesisChainBatchRoot() internal pure returns (bytes32) {
         return compute(bytes32(0), bytes32(0), EMPTY_IMT_ROOT, EMPTY_IMT_ROOT);
     }

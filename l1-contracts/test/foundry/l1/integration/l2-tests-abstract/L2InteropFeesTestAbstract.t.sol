@@ -33,7 +33,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 /// @title L2InteropFeesTestAbstract
 /// @notice Covers InteropCenter fee configuration and fee collection/claiming (base-token and fixed ZK fees)
-/// during sendBundle. See {protocol-docs/interop.md}.
+/// during sendBundle. See {protocol-docs/interop.md#fee-model}.
 abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
     using stdStorage for StdStorage;
 

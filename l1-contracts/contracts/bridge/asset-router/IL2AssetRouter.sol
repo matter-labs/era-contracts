@@ -9,7 +9,7 @@ import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 /// @title L2 Asset Router interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The L2 side of asset routing. See {protocol-docs/bridging.md}.
+/// @notice The L2 side of asset routing. See {protocol-docs/bridging.md#asset-routing-burn--mint}.
 interface IL2AssetRouter is IAssetRouterBase, IL2CrossChainSender {
     event WithdrawalInitiatedAssetRouter(
         uint256 chainId,

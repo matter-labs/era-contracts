@@ -39,7 +39,7 @@ import {IL1MessageRoot} from "../message-root/IL1MessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The L1 deployment of the chain asset handler. See {protocol-docs/chain-lifecycle.md}.
+/// @notice The L1 deployment of the chain asset handler. See {protocol-docs/chain-lifecycle.md#settlement-layer-migration-chainassethandler}.
 /// @dev L1 version – keeps the cheap immutables set in the constructor.
 contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1ChainAssetHandler {
     /// @dev The assetId of the ETH.

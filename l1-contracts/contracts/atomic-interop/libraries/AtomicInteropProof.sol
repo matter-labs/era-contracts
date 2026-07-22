@@ -28,7 +28,7 @@ import {
 /// @notice Cross-chain authentication for the atomic interop flow: verifies a leg's commit value
 /// present in (finality) or absent from (timeout) its source chain's IMT, with the claimed IMT root
 /// authenticated as a chain-batch-root leaf against an imported interop root (see {ImtProof} and
-/// {protocol-docs/atomic-interop.md} for the mechanics). This header is the canonical spec of the
+/// {protocol-docs/atomic-interop.md#flow} for the mechanics). This header is the canonical spec of the
 /// finality/timeout conditions and their soundness/completeness arguments.
 ///
 /// Two authenticated clocks are compared to the flow `deadline` (a settlement-layer timestamp):
@@ -52,7 +52,7 @@ import {
 ///     batch inside the aggregated root, and the value is absent from its batch-END IMT root (leaf 3)
 ///     — the final IMT state reachable in time (any later batch has `t' >= T > deadline`). This
 ///     branch restores refund liveness for a source chain that HALTS; the required "last batch"
-///     always exists (see {protocol-docs/atomic-interop.md}, timeout preconditions).
+///     always exists (see {protocol-docs/atomic-interop.md#timeout-protocol-preconditions}).
 ///
 /// SOUNDNESS — both timeout branches are mutually exclusive with finalization: a value committed in a
 /// batch `B` with `t_B <= deadline` is contained in `begin(L)` of every batch `L` with

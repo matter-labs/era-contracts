@@ -22,7 +22,7 @@ interface IInteropHandlerBase {
     event CallProcessed(bytes32 indexed bundleHash, uint256 indexed callIndex, CallStatus status);
 
     /// @notice Executes, cancels or skips a bundle's calls individually; may be invoked multiple times until
-    /// all calls are processed. See {protocol-docs/interop.md} (unbundling).
+    /// all calls are processed. See {protocol-docs/interop.md#unbundling-unbundlebundle}.
     /// @dev Does not verify the validity of the bundle itself: it requires the bundle to have been verified
     /// via `verifyBundle` first.
     /// @param _bundle ABI-encoded InteropBundle to unbundle.

@@ -81,7 +81,7 @@ export const TEST_TOKEN_MINT_AMOUNT_UNITS = "1000";
 
 // Mirrors the InteropBundle struct in contracts/common/Messaging.sol; the trailing tuple is
 // BundleAttributes (executionAddress, unbundlerAddress, useFixedFee, salt). Atomic-send params do
-// NOT live in the bundle (see {protocol-docs/atomic-interop.md}), so they never affect bundleHash.
+// NOT live in the bundle (see {protocol-docs/atomic-interop.md#key-values}), so they never affect bundleHash.
 export const INTEROP_BUNDLE_TUPLE_TYPE =
   "tuple(bytes1,uint256,uint256,bytes32,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes,bool,bytes32))";
 // Canonical signature of `InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle)`,

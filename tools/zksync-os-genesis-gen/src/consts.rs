@@ -73,7 +73,7 @@ pub const L2_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal:
 )));
 
 /// Reserved — formerly the GWAssetTracker; an empty stub is deployed here so new chains' genesis
-/// matches upgraded chains, which retain the old bytecode. See {protocol-docs/bridging.md}.
+/// matches upgraded chains, which retain the old bytecode. See {protocol-docs/bridging.md#l2-asset-tracker}.
 pub const GW_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000010010"
 )));
@@ -126,7 +126,7 @@ const L2_MESSAGE_VERIFICATION: Address = Address(FixedBytes::<20>(hex_literal::h
 const L2_INTEROP_COMMITMENT_TREE: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000010012"
 )));
-// 0x10013 is reserved (formerly L2GlobalInteropRootImporter). See {protocol-docs/atomic-interop.md}.
+// 0x10013 is reserved (formerly L2GlobalInteropRootImporter). See {protocol-docs/atomic-interop.md#contracts}.
 const L2_ATOMIC_FLOW_MANAGER: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000010014"
 )));
@@ -237,7 +237,7 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 24] = [
         L2_MESSAGE_VERIFICATION,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2MessageVerification")),
     ),
-    // Atomic interop built-ins. See {protocol-docs/atomic-interop.md}.
+    // Atomic interop built-ins. See {protocol-docs/atomic-interop.md#zksync-os-genesis}.
     (
         L2_INTEROP_COMMITMENT_TREE,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2InteropCommitmentTree")),

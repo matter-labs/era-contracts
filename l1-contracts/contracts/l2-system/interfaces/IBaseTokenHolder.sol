@@ -6,7 +6,7 @@ pragma solidity ^0.8.20;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface for the BaseTokenHolder contract that holds the chain's base-token reserve.
-/// See {protocol-docs/bridging.md}.
+/// See {protocol-docs/bridging.md#base-token-handling}.
 /// @dev On ZK OS the holder's initial 2^127 - 1 balance is minted by `L2BaseTokenZKOS.initL2()` via the
 /// MINT_BASE_TOKEN_HOOK — a raw call with the amount abi-encoded as uint256, which credits the caller and
 /// only accepts calls from the L2BaseToken address — and is then transferred here.
@@ -41,8 +41,8 @@ interface IBaseTokenHolder {
 
     /// @notice Returns base tokens escrowed by a failed/timed-out bridge-out to the original depositor.
     /// @dev Callable only by the NativeTokenVault (atomic-interop timeout recovery); see
-    /// {protocol-docs/bridging.md}. Like `give`, this pushes ETH and may revert if `_to` rejects it —
-    /// recovery targets the original depositor by design.
+    /// {protocol-docs/bridging.md#base-token-handling}. Like `give`, this pushes ETH and may revert if
+    /// `_to` rejects it — recovery targets the original depositor by design.
     /// @param _to The original depositor to refund.
     /// @param _amount The amount of base tokens to return.
     /// @param _toChainId The original bridge-out destination chain id (to reverse the matching accounting).

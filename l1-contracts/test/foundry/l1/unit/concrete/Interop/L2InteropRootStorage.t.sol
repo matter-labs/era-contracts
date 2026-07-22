@@ -16,7 +16,7 @@ import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddre
 
 /// @notice Covers the `L2InteropRootStorage` import gates: the `(root, timestamp)` tuple is stored and
 /// malformed imports are rejected, keeping the {IL2InteropRootStorage} zero-timestamp invariant
-/// structural. See {protocol-docs/message-root.md}.
+/// structural. See {protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}.
 contract L2InteropRootStorageTest is Test {
     uint256 internal constant CHAIN_ID = 320;
     uint256 internal constant BLOCK_NUMBER = 7;

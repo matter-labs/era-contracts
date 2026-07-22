@@ -41,7 +41,7 @@ import {RecoverToL1NotSupported} from "../common/L1ContractErrors.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice See {IAtomicFlowManager}. Coordinates atomic interop flows on this chain (send-side commit,
-/// finality gate, timeout refund); it never custodies funds. See {protocol-docs/atomic-interop.md};
+/// finality gate, timeout refund); it never custodies funds. See {protocol-docs/atomic-interop.md#flow};
 /// the exact finalization/timeout conditions live in the {AtomicInteropProof} library header.
 contract AtomicFlowManager is IAtomicFlowManager {
     /// @dev (flowId, bundleHash) => source-leg state on this chain.
@@ -116,7 +116,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
 
         // Every other leg must declare a Bridgehub-registered source chain: registration guarantees
         // MessageRoot presence, without which the leg could never be proven committed OR absent and the
-        // whole flow would be stranded. See {protocol-docs/atomic-interop.md} (timeout preconditions).
+        // whole flow would be stranded. See {protocol-docs/atomic-interop.md#timeout-protocol-preconditions}.
         for (uint256 i = 0; i < n; ++i) {
             uint256 legSourceChainId = _flowPreimage.legSourceChainIds[i];
             if (legSourceChainId == block.chainid) {
@@ -186,7 +186,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
 
         // Bind the absence proof to the missing leg's declared source chain: a commit value is trivially
         // absent from any OTHER chain's tree, so an unbound proof would allow a double-mint refund of a
-        // finalized flow. See {protocol-docs/atomic-interop.md}.
+        // finalized flow. See {protocol-docs/atomic-interop.md#flow}.
         AtomicFlowPreimage calldata preimage = _flow.preimage;
         uint256 missingLegChainId = preimage.legSourceChainIds[_missingLegIndex];
         if (_absence.sourceChainId != missingLegChainId) {
@@ -247,41 +247,19 @@ contract AtomicFlowManager is IAtomicFlowManager {
         return L2_INTEROP_HANDLER_ADDR;
     }
 
-    /// @dev Reverses every recoverable call embedded in `_bundle`, re-crediting the original depositor.
-    /// Each call's local sender (`InteropCall.from`) owns its own reversal via
-    /// {IAtomicRecoverable.recoverAtomicCall}: it is the contract that authorized (and burned for) the call
-    /// on this chain, while the call's target (`InteropCall.to`) lives on the destination chain and need
-    /// not even exist here. The manager is agnostic to the call/encoding format and simply forwards
-    /// `(destinationChainId, data)`, counting the calls that report a recovery. Senders must return `false`
-    /// (not revert) for calls they do not recognise.
-    ///
-    /// A second reversal applies to native base-token value. A call carrying `value` had that base token
-    /// collected at send time (see {InteropCenter._ensureCorrectTotalValue}) — held by the {BaseTokenHolder}
-    /// when the destination shares this chain's base token, or deposited via the asset router otherwise.
-    /// For direct calls, the refund routes through the asset router/NTV recovery path so the existing
-    /// base-token recovery accounting is reused, returning `value` to the call's `from` (the depositor).
-    /// Router-produced calls (`from == asset router`) do not take this branch: they carry no base-token
-    /// `value` (indirect calls force `interopCallValue == 0`); what they move is a bridged asset, which
-    /// {IAtomicRecoverable.recoverAtomicCall} reverses directly (re-minting / unlocking that asset), not a
-    /// separate base-token value. Every direct value leg counts as a recovery.
-    ///
-    /// Recovery is best-effort by design. An atomic bundle may mix fund-moving calls with calls that move no
-    /// funds and have nothing to reverse (e.g. flipping a flag). The latter contribute nothing. We only
-    /// require that *some* call recovered (`recovered != 0`): a bundle where nothing is recoverable has no
-    /// source funds to return, so a refund would be a no-op and we reject it.
-    ///
-    /// Consequence: the protocol does not guarantee full refundability of an arbitrary bundle. A flow author
-    /// must make any bespoke fund-moving leg that does not carry `value` recoverable; otherwise it would
-    /// strand its funds. L1-destined atomic bundles remain blocked at send time because L2->L1 withdrawals
-    /// are never revertable.
-    ///
-    /// Scope: this is the atomicity (TIMEOUT) refund — it fires only when the flow is proven unable to
-    /// finalize (a leg's commit value is still absent past the deadline, established via {authorizeRefund}).
-    /// It is NOT a refund for cancelled or undeliverable calls: once a flow HAS finalized, a call that
-    /// reverts on delivery (e.g. a non-{IERC7786Recipient} target) or that is cancelled during unbundle
-    /// forfeits its value — unchanged from prior interop, where a finalized call to a reverting recipient
-    /// was likewise un-executable and un-refundable. Extending refundability to those cases is possible
-    /// future work.
+    /// @dev Reverses every recoverable call embedded in `_bundle` (best-effort timeout refund — see
+    /// {protocol-docs/atomic-interop.md#flow}, step 4), re-crediting the original depositor.
+    /// @dev Each call's local sender (`InteropCall.from`) owns its own reversal via
+    /// {IAtomicRecoverable.recoverAtomicCall}: the manager is agnostic to the call/encoding format and
+    /// simply forwards `(destinationChainId, data)`, counting the calls that report a recovery. Senders
+    /// MUST return `false` (not revert) for calls they do not recognise.
+    /// @dev Native base-token `value` is reversed separately. Router-produced calls (`from == asset
+    /// router`) never carry it (indirect calls force `interopCallValue == 0`) and take only the
+    /// `recoverAtomicCall` branch. A direct call's `value` routes through the asset router/NTV base-token
+    /// recovery path (reusing the existing accounting) back to its `from`, and every such leg counts as a
+    /// recovery.
+    /// @dev `recovered != 0` is required: a bundle with nothing recoverable has no source funds to return,
+    /// so the refund would be a no-op and is rejected.
     function _recoverBundle(bytes32 _flowId, bytes32 _bundleHash, InteropBundle memory _bundle) internal {
         uint256 destChainId = _bundle.destinationChainId;
         // L2->L1 atomic bundles are rejected at send time ({InteropCenter.AtomicBundleToL1NotSupported}), so a
@@ -318,7 +296,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
         }
     }
 
-    /// @dev Atomic interop is L1-settling only in this release (see {protocol-docs/atomic-interop.md});
+    /// @dev Atomic interop is L1-settling only in this release (see {protocol-docs/atomic-interop.md#flow});
     /// checked wherever the settlement layer is consumed: `append`, finality and refund verification.
     function _checkSettlementLayerIsL1(uint256 _settlementLayerChainId) internal view {
         if (_settlementLayerChainId != L1_CHAIN_ID) {

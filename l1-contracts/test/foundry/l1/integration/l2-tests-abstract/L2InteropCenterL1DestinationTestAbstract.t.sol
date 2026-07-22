@@ -25,7 +25,7 @@ import {
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Covers `InteropCenter` send-time destination and recipient restrictions (L1-destined bundles,
-/// self-destination, zero addresses). See {protocol-docs/interop.md}.
+/// self-destination, zero addresses). See {protocol-docs/interop.md#restrictions}.
 /// @dev Kept in its own abstract (mixed into `L2InteropCenterTestAbstract`) rather than in
 /// `L2InteropLibraryBasicTestAbstract`: that abstract is also inherited by the zksync `L2InteropLibraryTest`, and
 /// the extra code would push it over EraVM's 65536-instruction bytecode limit. These checks are fully exercised
@@ -105,7 +105,7 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
     }
 
     /// @notice An L1-destined bundle carrying the `atomicBundle` attribute is rejected (see
-    /// {protocol-docs/atomic-interop.md}); the check fires in `_sendBundle` before any burn or state change.
+    /// {protocol-docs/atomic-interop.md#flow}); the check fires in `_sendBundle` before any burn or state change.
     function test_sendBundle_RevertWhen_AtomicBundleToL1() public {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = _l1CallStarter(L2_ASSET_ROUTER_ADDR, true, 0);

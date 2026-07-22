@@ -434,7 +434,8 @@ library L2GenesisForceDeploymentsHelper {
 
         // The atomic-interop built-ins are predeployed only in the ZKsync OS genesis; a pre-existing
         // chain upgraded to v31 has no code at these addresses and calling `initL2()` there would
-        // revert the whole upgrade. See {protocol-docs/chain-lifecycle.md}.
+        // revert the whole upgrade.
+        // See {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}.
         if (_isZKsyncOS && _isGenesisUpgrade) {
             L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
             IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);

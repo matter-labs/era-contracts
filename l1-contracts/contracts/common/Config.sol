@@ -283,7 +283,7 @@ uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 7;
 
 /// @dev Whether chain migrations between settlement layers are enabled in the current release.
 /// @dev Release-level switch (disabled in v32): lifting the ban requires a protocol upgrade, unlike
-/// the runtime `migrationPaused` flag. See {protocol-docs/chain-lifecycle.md}.
+/// the runtime `migrationPaused` flag. See {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}.
 bool constant CHAIN_MIGRATIONS_ENABLED = false;
 
 /// @dev Migration number used when a chain migrates from L1 to a settlement layer.

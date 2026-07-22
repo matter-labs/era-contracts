@@ -69,7 +69,7 @@ const ARTIFACTS = {
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
   TestnetERC20Token: "TestnetERC20Token.sol/TestnetERC20Token.json",
-  // Atomic interop (bundle model) — see {protocol-docs/atomic-interop.md}.
+  // Atomic interop (bundle model) — see {protocol-docs/atomic-interop.md#contracts}.
   L2InteropCommitmentTree: "L2InteropCommitmentTree.sol/L2InteropCommitmentTree.json",
   AtomicFlowManager: "AtomicFlowManager.sol/AtomicFlowManager.json",
   IAtomicFlowManager: "IAtomicFlowManager.sol/IAtomicFlowManager.json",

@@ -23,7 +23,7 @@ import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2C
 
 /// @title L2InteropBundleSaltTestAbstract
 /// @notice Covers the user-provided `interopBundleSalt` bundle attribute: salt derivation, per-sender replay
-/// protection, and attribute parsing. See {protocol-docs/interop.md}.
+/// protection, and attribute parsing. See {protocol-docs/interop.md#replay-protection-and-bundle-uniqueness}.
 abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
     /// @notice Mirrors the salt-derivation logic implemented in `InteropCenter._sendBundle`.
     function _expectedSalt(address _sender, bytes32 _userSalt) internal pure returns (bytes32) {

@@ -31,7 +31,7 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IL2AssetTracker, SavedTotalSupply, MAX_TOKEN_BALANCE} from "./IL2AssetTracker.sol";
 
 /// @notice Chain-local, write-mostly token bookkeeping; correctness of transfers is guaranteed by ZK
-/// proofs, not by these balances. See {protocol-docs/bridging.md}.
+/// proofs, not by these balances. See {protocol-docs/bridging.md#l2-asset-tracker}.
 /// @dev Inherits Ownable2StepUpgradeable and PausableUpgradeable (unused on L2) purely to preserve the
 /// storage layout of the already-deployed L2AssetTracker: they occupy slots 0-200 via the former shared
 /// AssetTrackerBase, so the tracker state below must stay at slots 201+.
@@ -58,9 +58,7 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
     mapping(bytes32 assetId => InteropL2Info info) public interopInfo;
 
     /// @notice Token total-supply snapshot captured before the token's first post-v31 bridge operation.
-    /// See {protocol-docs/bridging.md} (v31 migration accounting).
-    /// @dev For tokens that existed before the chain migrated to v31, this should equal
-    /// `totalSuccessfulDeposits - totalWithdrawalsToL1`.
+    /// See {protocol-docs/bridging.md#l2-asset-tracker}.
     /// @dev IMPORTANT: for the base token on ZKsync OS chains the value is a placeholder until backfilled;
     /// check `needBaseTokenTotalSupplyBackfill == false` before using it.
     mapping(bytes32 assetId => SavedTotalSupply snapshot) public totalPreV31TotalSupply;
@@ -223,14 +221,14 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
     }
 
     /// @inheritdoc IL2AssetTracker
-    /// @dev Only L2->L2 bridge-outs are recoverable and their forward accounting recorded nothing to
-    /// reverse; both invariants are asserted below. See {protocol-docs/bridging.md}.
+    /// @dev Asserts the two invariants that make recovery a no-op here. See
+    /// {protocol-docs/bridging.md#l2-asset-tracker}.
     function handleRecoverBaseTokenBridgingOnL2(
         uint256 _toChainId,
         uint256 /* _amount */
     ) external onlyBaseTokenHolder {
         // L2->L1 withdrawals are never revertable: `totalWithdrawalsToL1` must stay append-only.
-        // See {protocol-docs/bridging.md}.
+        // See {protocol-docs/bridging.md#l2-asset-tracker}.
         require(_toChainId != L1_CHAIN_ID, RecoverToL1NotSupported());
         // The base token never originates from this chain, so there is no chainBalance to re-credit.
         require(

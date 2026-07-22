@@ -12,7 +12,7 @@ import {ConfirmTransferResultData, FinalizeL1DepositParams} from "../../common/M
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Tracks initiated L1 -> L2 deposits so users can claim funds back if the L2 execution fails.
-/// See {protocol-docs/bridging.md}.
+/// See {protocol-docs/bridging.md#l1nullifier-and-failed-deposit-recovery}.
 interface IL1Nullifier {
     event BridgehubDepositFinalized(
         uint256 indexed chainId,

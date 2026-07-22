@@ -16,6 +16,7 @@ interface IL2InteropRootStorage {
     /// @notice Returns the imported message root and its creation timestamp (the
     /// `(blockOrBatchNumber, root, timestamp)` tuple) for a chain ID and block or batch number.
     /// @dev A zero timestamp only ever means "nothing imported at this key"; see
-    /// {protocol-docs/message-root.md} for the import invariants.
+    /// {protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check} for
+    /// the import invariants.
     function interopRoots(uint256 chainId, uint256 blockOrBatchNumber) external view returns (StoredInteropRoot memory);
 }

@@ -358,7 +358,7 @@ contract BaseTokenHolderTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Covers base-token bridge-out recovery via `recoverBaseToken`.
-    /// See {protocol-docs/bridging.md}.
+    /// See {protocol-docs/bridging.md#base-token-handling}.
     function test_recoverBaseToken_successFromNativeTokenVault() public {
         uint256 amount = 3 ether;
         uint256 recipientBalanceBefore = recipient.balance;

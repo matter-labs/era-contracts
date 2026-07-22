@@ -329,7 +329,7 @@ library DataEncoding {
     }
 
     /// @notice Builds the single indirect-call `InteropCallStarter` for an L2->L1 withdrawal of a registered,
-    /// NON-base-token asset (an ERC20 or the CTM/ZK asset). See {protocol-docs/interop.md}.
+    /// NON-base-token asset (an ERC20 or the CTM/ZK asset). See {protocol-docs/interop.md#direct-vs-indirect-calls}.
     /// @dev No base-token value rides the bundle (both value attributes are zero); the withdrawn amount is
     /// carried inside `_transferData`. For the chain's base token use
     /// `encodeInteropBaseTokenWithdrawalCallStarters` instead.
@@ -343,7 +343,7 @@ library DataEncoding {
     }
 
     /// @notice Builds the single indirect-call `InteropCallStarter` for an L2->L1 withdrawal of the chain's
-    /// BASE token. See {protocol-docs/interop.md}.
+    /// BASE token. See {protocol-docs/interop.md#direct-vs-indirect-calls}.
     /// @dev The withdrawn amount rides as the `indirectCall` message value, so the caller of
     /// `InteropCenter.sendBundle` MUST send `_amount` as the transaction value. `interopCallValue` stays zero
     /// (`NonZeroValueToL1NotSupported`).

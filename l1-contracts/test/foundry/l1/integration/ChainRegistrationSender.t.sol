@@ -198,7 +198,7 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
     }
 
     /// @notice A chain with an empty tree in the MessageRoot cannot be registered for interop (see
-    /// {protocol-docs/chain-lifecycle.md}). The happy path settles a batch first; here the empty tree is mocked.
+    /// {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}). The happy path settles a batch first; here the empty tree is mocked.
     function test_chainRegistrationSender_revertWhen_chainHasNoBatchesInMessageRoot() public {
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.proxies.messageRoot),

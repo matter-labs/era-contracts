@@ -46,7 +46,7 @@ import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Tracks initiated L1 -> L2 deposits and verifies/clears them when a failed deposit is claimed
-/// back on L1. See {protocol-docs/bridging.md}.
+/// back on L1. See {protocol-docs/bridging.md#l1nullifier-and-failed-deposit-recovery}.
 /// @dev Designed for use with a proxy for upgradability.
 contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;

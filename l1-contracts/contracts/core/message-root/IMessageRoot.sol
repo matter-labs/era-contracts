@@ -23,7 +23,7 @@ uint256 constant V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE = uint256(
 /**
  * @author Matter Labs
  * @notice MessageRoot contract is responsible for storing and aggregating the roots of the batches
- * from different chains into a single interop root. See {protocol-docs/message-root.md}.
+ * from different chains into a single interop root. See {protocol-docs/message-root.md#aggregation-structure}.
  * @custom:security-contact security@matterlabs.dev
  */
 interface IMessageRootBase is IMessageVerification {
@@ -59,7 +59,7 @@ interface IMessageRootBase is IMessageVerification {
     /// the same logId, so off-chain consumers can group them.
     /// @param timestamp The block timestamp at which the root was created.
     /// @param sides The "sides" of the interop root: with proof-based interop an array of length one
-    /// holding only the interop root itself. See {protocol-docs/message-root.md}.
+    /// holding only the interop root itself. See {protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}.
     event NewInteropRoot(
         uint256 indexed chainId,
         uint256 indexed blockNumber,
@@ -77,14 +77,14 @@ interface IMessageRootBase is IMessageVerification {
     function addNewChain(uint256 _chainId, uint256 _startingBatchNumber) external;
 
     /// @notice Records a chainBatchRoot WITHOUT pushing it into the interop trees — the v31,
-    /// record-only flow kept for pre-upgrade executor facets. See {protocol-docs/message-root.md}.
+    /// record-only flow kept for pre-upgrade executor facets. See {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
     /// @param _chainId The ID of the chain whose chainBatchRoot is being recorded.
     /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
     /// @param _chainBatchRoot The value of chainBatchRoot which is being recorded.
     function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external;
 
     /// @notice Records a chainBatchRoot AND pushes it into the chain tree and the aggregated shared
-    /// tree — the v32 flow, called by v32 executors while settling. See {protocol-docs/message-root.md}.
+    /// tree — the v32 flow, called by v32 executors while settling. See {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
     /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
     /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
     /// @param _chainBatchRoot The value of chainBatchRoot which is being added.
@@ -92,7 +92,7 @@ interface IMessageRootBase is IMessageVerification {
 
     /// @notice One-time, Bridgehub-only seeding of a freshly created chain's genesis (batch 0) chain
     /// batch root, pulled from the chain itself; a no-op for EraVM chains.
-    /// See {protocol-docs/chain-lifecycle.md}.
+    /// See {protocol-docs/chain-lifecycle.md#genesis-batch-root-seeding-messagerootseedgenesisroot}.
     /// @param _chainId The ID of the chain whose genesis root is seeded.
     function seedGenesisRoot(uint256 _chainId) external;
 

@@ -53,7 +53,7 @@ import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The asset handler that treats chains themselves as bridgeable assets of their CTM,
-/// used to migrate chains between settlement layers. See {protocol-docs/chain-lifecycle.md}.
+/// used to migrate chains between settlement layers. See {protocol-docs/chain-lifecycle.md#settlement-layer-migration-chainassethandler}.
 abstract contract ChainAssetHandlerBase is
     IChainAssetHandlerBase,
     IChainAssetHandlerShared,
@@ -131,7 +131,7 @@ abstract contract ChainAssetHandlerBase is
 
     /// @notice Only when chain migrations are enabled in the current release.
     /// @dev A release-level ban (unlike the runtime `migrationPaused` flag); disabled in v32.
-    /// See {protocol-docs/chain-lifecycle.md}.
+    /// See {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}.
     modifier whenMigrationsEnabled() {
         if (!_chainMigrationsEnabled()) {
             revert ChainMigrationsDisabled();
@@ -176,7 +176,7 @@ abstract contract ChainAssetHandlerBase is
 
     /// @notice `IAssetHandler` entry point that migrates (transfers) a chain to the settlement layer
     /// `_settlementChainId`: collects the chain's migration data and de-registers it locally.
-    /// See {protocol-docs/chain-lifecycle.md}.
+    /// See {protocol-docs/chain-lifecycle.md#role}.
     /// @param _settlementChainId The chainId of the settlement chain the migrating chain is sent to.
     /// @param _assetId The assetId of the migrating chain's CTM.
     /// @param _originalCaller The sender that initiated the calls leading to this bridge burn.
@@ -351,7 +351,7 @@ abstract contract ChainAssetHandlerBase is
     function _setMigrationInProgressOnL1(uint256 _chainId) internal virtual {}
 
     /// @notice `IAssetHandler` entry point that receives a chain on the settlement layer:
-    /// deploys/re-registers it there. See {protocol-docs/chain-lifecycle.md}.
+    /// deploys/re-registers it there. See {protocol-docs/chain-lifecycle.md#role}.
     /// @param _assetId The assetId of the chain's CTM.
     /// @param _bridgehubMintData The data for the mint.
     // slither-disable-next-line locked-ether
@@ -410,7 +410,7 @@ abstract contract ChainAssetHandlerBase is
             IBridgehubBase(_bridgehub()).registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
             // IMPORTANT: a chain registered here gets NO genesis batch leaf in this layer's message
             // root — safe only while L1 is the sole anchor for atomic-interop timeout proofs.
-            // See "Migrated chains and the message root" in {protocol-docs/chain-lifecycle.md}.
+            // See "Migrated chains and the message root" in {protocol-docs/chain-lifecycle.md#migrated-chains-and-the-message-root-important}.
             _messageRoot().addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
         } else {
             // Trusts the provided data; a malicious settlement layer could supply invalid values.

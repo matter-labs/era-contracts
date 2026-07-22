@@ -36,7 +36,7 @@ import {InsufficientChainBalance} from "../asset-tracker/AssetTrackerErrors.sol"
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The L1 vault holding native ETH and ERC20 tokens bridged into the ZK chains.
-/// See {protocol-docs/bridging.md}.
+/// See {protocol-docs/bridging.md#native-token-vault}.
 /// @dev Designed for use with a proxy for upgradability.
 contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeTokenVaultBase {
     using SafeERC20 for IERC20;
@@ -68,8 +68,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     address private __DEPRECATED_l1AssetTracker;
 
     /// @notice Net amount of each L1-native token currently bridged out of L1.
-    /// @dev Unlike the vault's raw `balanceOf` it cannot be skewed by direct transfers into the vault,
-    /// and it is bounded by the actually escrowed amount. See {protocol-docs/bridging.md}.
+    /// See {protocol-docs/bridging.md#native-token-vault}.
     mapping(bytes32 assetId => uint256 amount) public bridgedOut;
 
     /*//////////////////////////////////////////////////////////////

@@ -8,7 +8,7 @@ import {LegState, AtomicFlow, AtomicFlowPreimage, ImtProof, AtomicFinalityProof}
 /// @notice Per-chain coordinator for the atomic interop flow: `append` commits a source leg at send
 /// time, `requireFlowFinalized` gates atomic execution on the destination, and
 /// `authorizeRefund`/`claimRefund` implement the timeout path. Never custodies funds. Deployed as an
-/// L2 predeploy (no constructor). See {protocol-docs/atomic-interop.md}.
+/// L2 predeploy (no constructor). See {protocol-docs/atomic-interop.md#flow}.
 interface IAtomicFlowManager {
     /// @notice Emitted when a source leg is committed to this chain's IMT.
     event FlowCommitted(bytes32 indexed flowId, bytes32 indexed bundleHash, uint64 deadline, uint256 leafIndex);
@@ -23,7 +23,7 @@ interface IAtomicFlowManager {
     /// value into the interop IMT. State `Unset -> Committed`. Callable only by the {InteropCenter}.
     /// @dev Taking the full preimage (not an opaque `flowId`) is what couples the committed leg to its
     /// flow; a wrong or stale preimage reverts the whole send instead of stranding the burned funds.
-    /// See {protocol-docs/atomic-interop.md}.
+    /// See {protocol-docs/atomic-interop.md#flow}.
     /// @param _bundleHash `keccak256(abi.encode(sourceChainId, interopBundleBytes))` of this leg.
     /// @param _lowNullifierIndex The low-nullifier slot for the commit value (from the IMT engine).
     /// @param _flowPreimage The full `flowId` preimage ({AtomicFlowPreimage}).

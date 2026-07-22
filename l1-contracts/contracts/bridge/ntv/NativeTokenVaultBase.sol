@@ -44,7 +44,7 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The default asset handler for ETH and ERC20 tokens: escrows tokens native to this chain and
-/// mints/burns bridged representations. See {protocol-docs/bridging.md}.
+/// mints/burns bridged representations. See {protocol-docs/bridging.md#native-token-vault}.
 /// @dev Designed for use with a proxy for upgradability.
 abstract contract NativeTokenVaultBase is
     INativeTokenVaultBase,
@@ -129,8 +129,7 @@ abstract contract NativeTokenVaultBase is
     }
 
     function _registerToken(address _nativeToken) internal virtual returns (bytes32 newAssetId) {
-        // WETH may only be registered in the L1 NTV; all WETH-related operations are restricted to L1
-        // deposits to keep future logic upgrades easy. See {protocol-docs/bridging.md}.
+        // WETH may only be registered in the L1 NTV. See {protocol-docs/bridging.md#native-token-vault}.
         require(_nativeToken != _wethToken() || block.chainid == _l1ChainId(), TokenNotSupported(_wethToken()));
         require(_nativeToken.code.length > 0, EmptyToken());
         require(assetId[_nativeToken] == bytes32(0), AssetIdAlreadyRegistered());
@@ -173,9 +172,8 @@ abstract contract NativeTokenVaultBase is
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAssetHandler
-    /// @dev `_data` comes from a potentially malicious `_chainId`; mint-amount correctness is guaranteed
-    /// by the sending chain's ZK proofs, and token metadata is not verified (a UX-only known issue).
-    /// See {protocol-docs/bridging.md}.
+    /// @dev `_data` comes from a potentially malicious `_chainId`.
+    /// See {protocol-docs/bridging.md#native-token-vault}.
     function bridgeMint(
         uint256 _chainId,
         bytes32 _assetId,

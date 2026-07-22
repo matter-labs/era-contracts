@@ -36,7 +36,7 @@ import {DummyL2BaseTokenHolder} from "contracts/dev-contracts/test/DummyL2BaseTo
 
 /// @title L2BaseTokenZKOSTest
 /// @notice Unit tests for L2BaseTokenZKOS (init, pre-V31 total-supply backfill, totalSupply).
-/// See {protocol-docs/bridging.md}.
+/// See {protocol-docs/bridging.md#l2-asset-tracker}.
 contract L2BaseTokenZKOSTest is Test {
     L2BaseTokenZKOS internal l2BaseToken;
 

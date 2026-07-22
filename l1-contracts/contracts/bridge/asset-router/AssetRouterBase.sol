@@ -32,7 +32,7 @@ import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol"
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Routes asset transfers (L1 <-> ZK chain bridging and L2 <-> L2 interop) to per-asset
-/// handlers. See {protocol-docs/bridging.md}.
+/// handlers. See {protocol-docs/bridging.md#asset-routing-burn--mint}.
 /// @dev Designed for use with a proxy for upgradability.
 abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
@@ -54,7 +54,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
 
     /// @notice Sets the asset handler address for a specified asset ID on this chain.
     /// @dev The caller is encoded into the asset ID, so only the NTV or the asset's registered deployment
-    /// tracker may call it. See {protocol-docs/bridging.md} for the registration flows.
+    /// tracker may call it. See {protocol-docs/bridging.md#asset-ids-asset-handlers-deployment-trackers}.
     /// @param _assetRegistrationData The asset data which may include the asset address and any additional required data or encodings.
     /// @param _assetHandlerAddress The address of the asset handler to be set for the provided asset.
     function setAssetHandlerAddressThisChain(
@@ -82,7 +82,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
 
     /// @notice Allows the Bridgehub (L1) / InteropCenter (L2) to acquire the destination chain's `mintValue`.
     /// @dev Records nothing: if the L2 transaction fails, the base token is refunded to the L2
-    /// `refundRecipient` rather than being claimable on L1. See {protocol-docs/bridging.md}.
+    /// `refundRecipient` rather than being claimable on L1. See {protocol-docs/bridging.md#deposit-initiation-source-side}.
     /// @param _chainId The chain ID of the ZK chain to which to deposit.
     /// @param _assetId The base token asset ID of the destination chain.
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
@@ -234,7 +234,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
 
         // The proven message sender's chain id must equal the payload's `_sourceChainId`, so a payload can
         // never finalize a deposit under a chain id other than the one whose message inclusion was proven.
-        // Asset accounting depends on this equality; see {protocol-docs/bridging.md}.
+        // Asset accounting depends on this equality; see {protocol-docs/bridging.md#finalization-destination-side}.
         uint256 payloadSourceChainId = uint256(bytes32(payload[4:36]));
         require(
             senderChainId == payloadSourceChainId,
@@ -260,7 +260,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
     /// @param _transferData The data needed by the asset handler (e.g. NativeTokenVault) to finalize the transfer.
     /// @dev The single finalization entry point; cross-chain messages reach it only through the interop
     /// `receiveMessage` self-call above. Chains can be malicious, so data affecting chains other than
-    /// `_sourceChainId` needs special validation. See {protocol-docs/bridging.md}.
+    /// `_sourceChainId` needs special validation. See {protocol-docs/bridging.md#finalization-destination-side}.
     function finalizeDeposit(
         uint256 _sourceChainId,
         bytes32 _assetId,

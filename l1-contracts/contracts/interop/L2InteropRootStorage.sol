@@ -13,7 +13,7 @@ import {InteropRoot, StoredInteropRoot} from "contracts/common/Messaging.sol";
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
  * @notice Stores the message roots of other chains on the L2, imported by the bootloader.
- * See {protocol-docs/interop.md} (root import).
+ * See {protocol-docs/interop.md#root-import-l2interoprootstorage}.
  */
 contract L2InteropRootStorage is IL2InteropRootStorage {
     /// @dev Only allows calls from the bootloader.
@@ -24,9 +24,8 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
         _;
     }
 
-    /// @notice Imported `(root, timestamp)` per (chainId, blockOrBatchNumber); the tuple is double
-    /// checked on the settlement layer during batch execution, so time-sensitive proofs can rely on
-    /// the timestamp as much as on the root. See {protocol-docs/interop.md} (root import).
+    /// @notice Imported `(root, timestamp)` per (chainId, blockOrBatchNumber).
+    /// See {protocol-docs/interop.md#root-import-l2interoprootstorage}.
     /// @dev ZKsync OS only: the EraVM bootloader lacks the timestamp-carrying import entry points.
     /// @dev v31 storage compatibility: the mapping was empty at upgrade time (interop was inactive in
     /// v31) and the struct's first member occupies the old `bytes32` slot, so widening the value type
@@ -42,8 +41,8 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
     }
 
     /// @notice Imports a single interop root as a full `(blockOrBatchNumber, root, timestamp)` tuple.
-    /// See {protocol-docs/interop.md} (root import) for the `sides` and block-vs-batch-number
-    /// semantics.
+    /// See {protocol-docs/interop.md#root-import-l2interoprootstorage} for the `sides` and
+    /// block-vs-batch-number semantics.
     /// @param interopRoot The interop root to be added; see {InteropRoot}.
     function addSingleInteropRoot(InteropRoot calldata interopRoot) external onlyCallFromBootloader {
         _addInteropRoot(interopRoot.chainId, interopRoot.blockOrBatchNumber, interopRoot.timestamp, interopRoot.sides);
