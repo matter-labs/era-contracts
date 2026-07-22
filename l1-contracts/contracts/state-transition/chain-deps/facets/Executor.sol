@@ -6,10 +6,9 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {IMessageRootBase} from "../../../core/message-root/IMessageRoot.sol";
 import {EMPTY_STRING_KECCAK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
-import {IExecutor, ProcessLogsInput} from "../../chain-interfaces/IExecutor.sol";
+import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
-import {GW_ASSET_TRACKER} from "../../../common/l2-helpers/L2ContractInterfaces.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {
     CanOnlyProcessOneBatch,
@@ -161,6 +160,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _processTo,
         bytes calldata _executeData
     ) external nonReentrant onlyValidatorOrPriorityMode onlySettlementLayer {
+        // The trailing decoded value (settlementFeePayer) is intentionally omitted: the gateway
+        // interop settlement fees were removed together with the asset tracker.
+        // slither-disable-next-line unused-return
         (
             StoredBatchInfo[] memory batchesData,
             PriorityOpsBatchInfo[] memory priorityOpsData,
@@ -168,7 +170,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             L2Log[][] memory logs,
             bytes[][] memory messages,
             bytes32[] memory multichainBatchRoots,
-            address settlementFeePayer
+
         ) = BatchDecoder.decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
         uint256 nBatches = batchesData.length;
         if (batchesData.length != priorityOpsData.length) {
@@ -190,28 +192,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             );
         }
 
-        // Interop is only allowed on GW currently, so we go through the Asset Tracker when on Gateway.
-        // When on L1, we append directly to the Message Root, though interop is not allowed there, it is only used for
-        // message verification.
-        if (block.chainid != L1_CHAIN_ID) {
-            uint256 messagesLength = messages.length;
-            for (uint256 i = 0; i < messagesLength; ++i) {
-                ProcessLogsInput memory processLogsInput = ProcessLogsInput({
-                    logs: logs[i],
-                    messages: messages[i],
-                    chainId: s.chainId,
-                    batchNumber: batchesData[i].batchNumber,
-                    chainBatchRoot: batchesData[i].l2LogsTreeRoot,
-                    multichainBatchRoot: multichainBatchRoots[i],
-                    settlementFeePayer: settlementFeePayer
-                });
-                GW_ASSET_TRACKER.processLogsAndMessages(processLogsInput);
-            }
-        } else {
-            uint256 batchesDataLength = batchesData.length;
-            for (uint256 i = 0; i < batchesDataLength; ++i) {
-                _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
-            }
+        // Append each batch's proven `l2LogsTreeRoot` to the global message root. On Gateway the
+        // committed `l2LogsTreeRoot` is the chain batch root (it already commits to the empty
+        // multichain batch root), so the append is identical to the L1 path. Asset correctness across
+        // chains is guaranteed by ZK proofs (assuming proofs are correct),
+        // so no per-batch log reconstruction / balance accounting is performed.
+        for (uint256 i = 0; i < nBatches; ++i) {
+            _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
         }
 
         for (uint256 i = 0; i < nBatches; ++i) {

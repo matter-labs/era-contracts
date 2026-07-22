@@ -109,6 +109,13 @@ export class AnvilManager {
       "10000",
       "--gas-limit",
       "100000000", // Increase block gas limit to 100M to accommodate L2 genesis upgrade
+      // Pin the base fee to zero: EIP-1559's multiplicative update keeps zero at zero forever, so
+      // `eth_gasPrice` (and with it every broadcast tx's effective gas price) is a constant suggested
+      // tip. A live, block-height-dependent gas price leaks into governance operation calldata and
+      // into canonical priority-tx hashes (via `_deriveL2GasPrice(tx.gasprice, ..)`), which makes the
+      // generated chain state depend on wall-clock block timing and breaks state-generation determinism.
+      "--block-base-fee-per-gas",
+      "0",
       "--auto-impersonate", // Allow impersonating any address without signatures
     ];
 

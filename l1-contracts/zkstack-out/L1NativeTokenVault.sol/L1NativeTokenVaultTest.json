@@ -240,20 +240,6 @@
   },
   {
     "type": "function",
-    "name": "test_SetAssetTracker_OnlyOwner",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "test_SetAssetTracker_Success",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "test_WETH_TOKEN",
     "inputs": [],
     "outputs": [],

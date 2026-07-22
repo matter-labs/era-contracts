@@ -11,6 +11,12 @@ interface IL1ChainAssetHandler {
 
     function isReadyForMigration(uint256 _chainId) external view returns (bool);
 
+    /// @notice Requests that deposits be paused on the settlement layer for a migrating chain.
+    /// @dev Callable only by the chain's diamond. Forwards the request to the settlement layer's
+    /// `L2ChainAssetHandler` as a service transaction.
+    /// @param _chainId The chain whose deposits should be paused on the settlement layer.
+    function requestPauseDepositsForChainOnGateway(uint256 _chainId) external;
+
     /// @notice Returns the migration interval for a chain at a specific migration number.
     /// @param _chainId The ID of the chain.
     /// @param _migrationNumber The migration number (0 for legacy GW, 1+ for regular migrations).

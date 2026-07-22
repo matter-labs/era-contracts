@@ -294,8 +294,9 @@ abstract contract ChainAssetHandlerBase is
             originChainId: 0
         });
         if (block.chainid == _l1ChainId()) {
-            // We only need to define these values when migrating to GW
-            // This is so that the GW Asset Tracker can register the chain's base token
+            // We only need to define these values when migrating to GW.
+            // The destination chain's L2NativeTokenVault.updateL2 consumes originToken/originChainId
+            // to initialize its base token.
             IL1AssetRouter l1AssetRouter = IL1AssetRouter(address(_assetRouter()));
             INativeTokenVaultBase l1Ntv = l1AssetRouter.nativeTokenVault();
             baseTokenBridgingData.originToken = l1Ntv.originToken(assetId);

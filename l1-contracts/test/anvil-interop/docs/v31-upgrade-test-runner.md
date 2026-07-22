@@ -12,14 +12,14 @@ environment from working.
 In production, a v31 protocol upgrade proceeds as:
 
 1. **Deploy new L1 contracts**: `EcosystemUpgrade_v31` deploys new implementation contracts
-   (Bridgehub, MessageRoot, Nullifier, AssetRouter, NTV, AssetTracker, CTM, facets, etc.)
-   via Create2. Configures the new AssetTracker (calls `setAddresses()`, transfers ownership
+   (Bridgehub, MessageRoot, Nullifier, AssetRouter, NTV, CTM, facets, etc.)
+   via Create2. Configures the new ChainRegistrationSender (transfers ownership
    to governance).
 
 2. **Governance stage 0**: Pause gateway migrations (`pauseMigration()` on ChainAssetHandler).
 
 3. **Governance stage 1**: Upgrade all proxy implementations via the TransparentProxyAdmin,
-   accept AssetTracker ownership, set AssetTracker reference in NTV, set the new version
+   accept ChainRegistrationSender ownership, set the new version
    upgrade contract.
 
 4. **Governance stage 2**: Unpause gateway migrations, version-specific post-upgrade calls.
@@ -33,10 +33,10 @@ In production, a v31 protocol upgrade proceeds as:
    - Force-deploys new L2 system contract bytecodes (via ContractDeployer on Era, or the
      bytecode deployer on ZKsyncOS)
    - Delegatecalls to `L2V31Upgrade.upgrade()` which initializes new contracts (NTV, Bridgehub,
-     AssetRouter, AssetTracker, ChainAssetHandler, InteropCenter, BaseToken, etc.)
+     AssetRouter, L2AssetTracker, ChainAssetHandler, InteropCenter, BaseToken, etc.)
 
 7. **Stage 3**: Post-governance migration. Registers bridged tokens in NTV and migrates token
-   balances from NTV to AssetTracker (shared logic in `TokenMigrationUtils`).
+   legacy bridged tokens in the NTV (shared logic in `TokenMigrationUtils`).
 
 8. **Verification**: Protocol version on each chain is now `0x1f00000000` (v31).
 
@@ -141,7 +141,7 @@ The test calls the **real** `EcosystemUpgrade_v31` scripts via Forge.
 **Patch: Idempotent core upgrade** (`CoreUpgradeV31Idempotent`)
 
 - Production: `CoreUpgrade_v31.deployNewEcosystemContractsL1()` deploys contracts AND calls
-  `updateContractConnections()` (which runs `AssetTracker.setAddresses()` and
+  `updateContractConnections()` (which runs the ownership transfers and
   `transferOwnership(governance)`).
 - Test: step1 runs the full flow. step2 needs to re-populate `coreAddresses` (Create2 deploys
   are no-ops since contracts already exist) but must NOT re-run `updateContractConnections()`
@@ -246,7 +246,7 @@ ZKsync VM (bytecode hashing, validation, etc.) and do not work. The test patches
 ### 7. Stage 3: post-governance migration
 
 Runs the production `stage3()` Forge script which uses `TokenMigrationUtils` to register
-bridged tokens in NTV and migrate token balances from NTV to AssetTracker.
+legacy bridged tokens in the NTV bridged-tokens list.
 **No patches** -- this is pure L1 logic.
 
 ### 8. Verification
@@ -278,6 +278,6 @@ No patches. Reads on-chain state to assert:
 - Governance call generation and execution (stages 0-2)
 - Proxy upgrades for all L1 core contracts
 - L2 upgrade initialization logic (`L2V31Upgrade.upgrade()` delegatecall path)
-- New contract configuration (AssetTracker deployment, `setAddresses`, ownership transfer)
-- Token balance migration (stage 3 via `TokenMigrationUtils`)
+- New contract configuration (ownership transfers for newly deployed proxies)
+- Bridged-token registration in the NTV (stage 3 via `TokenMigrationUtils.registerBridgedTokensInNTV`)
 - Protocol version advancement on all target chains

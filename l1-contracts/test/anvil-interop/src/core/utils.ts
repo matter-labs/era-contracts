@@ -226,8 +226,7 @@ export function applyL1ToL2Alias(l1Address: string): string {
  * Build the merkle proof for withdrawal finalization.
  *
  * DummyL1MessageRoot bypasses verification, but getProofData() still parses the
- * proof structure to extract settlementLayerChainId (used by L1AssetTracker to
- * update the correct chainBalance).
+ * proof structure to extract settlementLayerChainId.
  *
  * For direct settlement (chain on L1): old format → settlementLayerChainId = 0
  * For gateway settlement: new format → settlementLayerChainId = GW chain ID
@@ -599,7 +598,7 @@ export async function extractAndRelayInteropBundles(
 
     // executeBundle can be called by any EOA — use the default Anvil account
     const wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, destProvider);
-    const interopHandler = new ethers.Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+    const interopHandler = new ethers.Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
     let result: { txHash: string; success: boolean };
     try {
       const tx = await interopHandler.executeBundle(bundleData, mockProof, { gasLimit: 5_000_000 });

@@ -22,7 +22,6 @@ import {ICreate2Factory} from "./interfaces/ICreate2Factory.sol";
 import {IEvmHashesStorage} from "./interfaces/IEvmHashesStorage.sol";
 import {IL2AssetRouter} from "./interfaces/IL2AssetRouter.sol";
 import {IL2AssetTracker} from "./interfaces/IL2AssetTracker.sol";
-import {IGWAssetTracker} from "./interfaces/IGWAssetTracker.sol";
 import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 import {IL2InteropRootStorage} from "./interfaces/IL2InteropRootStorage.sol";
 
@@ -34,8 +33,7 @@ import {
     USER_CONTRACTS_OFFSET,
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDRESS,
-    L2_ASSET_TRACKER_ADDRESS,
-    GW_ASSET_TRACKER_ADDRESS
+    L2_ASSET_TRACKER_ADDRESS
 } from "./Constants.sol";
 
 IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCodeStorage(
@@ -83,4 +81,3 @@ IL2InteropRootStorage constant L2_INTEROP_ROOT_STORAGE = IL2InteropRootStorage(a
 IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(address(USER_CONTRACTS_OFFSET + 0x09));
 IChainAssetHandler constant L2_CHAIN_ASSET_HANDLER = IChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDRESS);
 IL2AssetTracker constant L2_ASSET_TRACKER = IL2AssetTracker(address(L2_ASSET_TRACKER_ADDRESS));
-IGWAssetTracker constant GW_ASSET_TRACKER = IGWAssetTracker(address(GW_ASSET_TRACKER_ADDRESS));

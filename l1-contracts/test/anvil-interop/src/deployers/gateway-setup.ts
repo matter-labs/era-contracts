@@ -1,11 +1,10 @@
 import { Contract, ethers, providers } from "ethers";
 import * as path from "path";
-import type { CoreDeployedAddresses, CTMDeployedAddresses, TbmAccountingSnapshot } from "../core/types";
+import type { CoreDeployedAddresses, CTMDeployedAddresses } from "../core/types";
 import { GatewayDeployer } from "./gateway-deployer";
 import { getAbi } from "../core/contracts";
 import { L2_BRIDGEHUB_ADDR, ANVIL_DEFAULT_ACCOUNT_ADDR, SYSTEM_CONTEXT_ADDR } from "../core/const";
 import { applyL1ToL2Alias, impersonateAndRun, scanAndRelayPriorityRequests, timeIt } from "../core/utils";
-import { migrateTokenBalanceToGW } from "../helpers/token-balance-migration-helper";
 import { setSettlementLayerViaBootloader, transferOwnable2Step } from "../helpers/harness-shims";
 import {
   mergeGatewayVoteOutput,
@@ -58,7 +57,7 @@ export class GatewaySetup {
     gwRpcUrl?: string,
     gwSettledChainIds?: number[],
     l2ChainRpcUrls?: Map<number, string>
-  ): Promise<{ gatewayCTMAddr: string; tbmAccountingSnapshots: TbmAccountingSnapshot[] }> {
+  ): Promise<{ gatewayCTMAddr: string }> {
     console.log("🌐 Gateway setup for Anvil test environment...");
 
     const gatewayCTMAddr = this.ctmAddresses.chainTypeManager;
@@ -127,17 +126,15 @@ export class GatewaySetup {
       });
     }
 
-    let tbmAccountingSnapshots: TbmAccountingSnapshot[] = [];
-
     // Step 7: Migrate chains to gateway via Forge scripts
     if (gwSettledChainIds && gwSettledChainIds.length > 0) {
-      tbmAccountingSnapshots = await this.migrateChains(chainId, gwSettledChainIds, gatewayContext, l2ChainRpcUrls);
+      await this.migrateChains(chainId, gwSettledChainIds, gatewayContext, l2ChainRpcUrls);
     }
 
     console.log(`   Using existing CTM: ${gatewayCTMAddr}`);
     console.log("✅ Gateway setup complete");
 
-    return { gatewayCTMAddr, tbmAccountingSnapshots };
+    return { gatewayCTMAddr };
   }
 
   /**
@@ -234,17 +231,14 @@ export class GatewaySetup {
    * Phase 1 (L1, sequential): Forge scripts for pause+migrate and confirm for each chain
    * Phase 2 (GW, sequential): Relay L1→L2 priority requests to GW chain
    * Phase 3 (L2, parallel): Notify L2 chains about settlement layer change
-   * Phase 4 (mixed, sequential): base token TBM for each chain (L1 nonce shared)
    */
   private async migrateChains(
     gatewayChainId: number,
     gwSettledChainIds: number[],
     gatewayContext?: GatewayContext,
     l2ChainRpcUrls?: Map<number, string>
-  ): Promise<TbmAccountingSnapshot[]> {
-    const l1Bridgehub = this.getL1Bridgehub();
+  ): Promise<void> {
     const migrationPhaseStartBlock = await this.l1Provider.getBlockNumber();
-    const tbmAccountingSnapshots: TbmAccountingSnapshot[] = [];
 
     // Phase 1: All L1 forge scripts (sequential — shared L1 nonce)
     for (const chainId of gwSettledChainIds) {
@@ -291,21 +285,6 @@ export class GatewaySetup {
         );
       }
     );
-
-    // Phase 4: ETH TBM for each chain (sequential — L1 nonce + GW relay conflicts)
-    for (const chainId of gwSettledChainIds) {
-      if (l2ChainRpcUrls?.has(chainId) && gatewayContext) {
-        const snapshot = await this.runBaseTokenTbmForChain(
-          chainId,
-          l2ChainRpcUrls.get(chainId)!,
-          gatewayContext,
-          l1Bridgehub
-        );
-        tbmAccountingSnapshots.push(snapshot);
-      }
-    }
-
-    return tbmAccountingSnapshots;
   }
 
   /**
@@ -416,8 +395,7 @@ export class GatewaySetup {
    * On ZKsync OS, this is only emitted during actual migration between settlement layers
    * (and during genesis/v31 upgrades), NOT at every batch start.
    * This call propagates to L2ChainAssetHandler.setSettlementLayerChainId(), which increments
-   * migrationNumber[block.chainid] — required for TBM's initiateL1ToGatewayMigrationOnL2 to
-   * emit an L2→L1 message instead of early-returning.
+   * migrationNumber[block.chainid] so the chain's settlement-layer view stays consistent.
    */
   private async notifyL2SettlementLayerChange(
     l2Provider: providers.JsonRpcProvider,
@@ -453,32 +431,5 @@ export class GatewaySetup {
     const tx = await contract.connect(govSigner).acceptOwnership({ gasLimit: 500_000 });
     await tx.wait();
     console.log(`   ${contractName} ownership transferred to Governance`);
-  }
-
-  private async runBaseTokenTbmForChain(
-    chainId: number,
-    l2RpcUrl: string,
-    gatewayContext: GatewayContext,
-    l1Bridgehub: Contract
-  ): Promise<TbmAccountingSnapshot> {
-    const done = gwTimeIt(`base token TBM chain ${chainId}`);
-    const l2Provider = this.getProvider(l2RpcUrl);
-    const baseTokenAssetId: string = await l1Bridgehub.baseTokenAssetId(chainId);
-    const l2DiamondProxy: string = await l1Bridgehub.getZKChain(chainId);
-    console.log(`   Running base token TBM on chain ${chainId} (assetId: ${baseTokenAssetId})...`);
-    const result = await migrateTokenBalanceToGW({
-      l2Provider,
-      l1Provider: this.l1Provider,
-      gwProvider: gatewayContext.gwProvider,
-      chainId,
-      assetId: baseTokenAssetId,
-      l1AssetTrackerAddr: this.l1Addresses.l1AssetTracker,
-      gwDiamondProxyAddr: gatewayContext.gwDiamondProxy,
-      l2DiamondProxyAddr: l2DiamondProxy,
-      logger: (line) => console.log(line),
-    });
-    console.log(`   Base token TBM complete for chain ${chainId}`);
-    done();
-    return result.accounting;
   }
 }

@@ -111,7 +111,7 @@
   },
   {
     "type": "function",
-    "name": "forwardTransactionOnGatewayWithBalanceChange",
+    "name": "forwardTransactionOnGateway",
     "inputs": [
       {
         "name": "_chainId",
@@ -127,48 +127,6 @@
         "name": "_expirationTimestamp",
         "type": "uint64",
         "internalType": "uint64"
-      },
-      {
-        "name": "_balanceChange",
-        "type": "tuple",
-        "internalType": "struct BalanceChange",
-        "components": [
-          {
-            "name": "version",
-            "type": "bytes1",
-            "internalType": "bytes1"
-          },
-          {
-            "name": "originToken",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "baseTokenAssetId",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "baseTokenAmount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "assetId",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "tokenOriginChainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
       }
     ],
     "outputs": [],
@@ -745,25 +703,6 @@
   },
   {
     "type": "event",
-    "name": "NewAssetTracker",
-    "inputs": [
-      {
-        "name": "oldAssetTracker",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "newAssetTracker",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "OwnershipTransferStarted",
     "inputs": [
       {
@@ -897,22 +836,6 @@
   },
   {
     "type": "error",
-    "name": "AssetIdMismatch",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "supplied",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "AttributeAlreadySet",
     "inputs": [
       {
@@ -940,6 +863,17 @@
   },
   {
     "type": "error",
+    "name": "CannotInitiateInteropOnL1",
+    "inputs": [
+      {
+        "name": "destinationChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "DestinationChainNotRegistered",
     "inputs": [
       {
@@ -948,6 +882,11 @@
         "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "DirectCallToL1NotSupported",
+    "inputs": []
   },
   {
     "type": "error",
@@ -985,6 +924,22 @@
         "internalType": "bytes32"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "InteropCallToL1NotToAssetRouter",
+    "inputs": [
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InteropToSelfNotSupported",
+    "inputs": []
   },
   {
     "type": "error",
@@ -1037,8 +992,25 @@
   },
   {
     "type": "error",
-    "name": "NotInGatewayMode",
-    "inputs": []
+    "name": "MultiCallToL1NotSupported",
+    "inputs": [
+      {
+        "name": "callCount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NonZeroValueToL1NotSupported",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",

@@ -70,8 +70,6 @@ error NotOwnerViaRouter(address msgSender, address originalCaller);
 error NotRelayedSender(address msgSender, address settlementLayerRelaySender);
 // 0xb35a7373
 error NotSystemContext(address _sender);
-// 0x3db511f4
-error OnlyAssetTracker(address, address);
 // 0x527b87c7
 error OnlyInteropCenter(address msgSender, address bridgehub);
 // 0x2d396674

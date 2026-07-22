@@ -155,8 +155,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
                 _gatewayRollupDAManager: gatewayRollupDAManager,
                 _gatewayValidatorTimelock: gatewayValidatorTimelock,
                 _gatewayServerNotifier: gatewayServerNotifier,
-                _refundRecipient: msg.sender,
-                _gatewaySettlementFee: 0
+                _refundRecipient: msg.sender
             })
         );
         Utils.executeCalls(L1Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner(), bytes32(0), 0, calls);

@@ -9,7 +9,6 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {BridgehubBase} from "contracts/core/bridgehub/BridgehubBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IL1AssetTracker, L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
@@ -133,12 +132,12 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridges.implementations.l1NativeTokenVault,
             coreAddresses.bridges.proxies.l1NativeTokenVault
         ) = deployTuppWithContract("L1NativeTokenVault", false);
+        (
+            coreAddresses.bridges.implementations.l1InteropHandler,
+            coreAddresses.bridges.proxies.l1InteropHandler
+        ) = deployTuppWithContract("L1InteropHandler", false);
         setL1NativeTokenVaultParams();
 
-        (
-            coreAddresses.bridgehub.implementations.assetTracker,
-            coreAddresses.bridgehub.proxies.assetTracker
-        ) = deployTuppWithContract("L1AssetTracker", false);
         updateSharedBridge();
         (
             coreAddresses.bridgehub.implementations.ctmDeploymentTracker,
@@ -158,7 +157,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
 
     function setBridgehubParams() internal {
         IL1Bridgehub bridgehub = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
-        IL1AssetTracker assetTracker = L1AssetTracker(coreAddresses.bridgehub.proxies.assetTracker);
         L1ChainAssetHandler chainAssetHandler = L1ChainAssetHandler(coreAddresses.bridgehub.proxies.chainAssetHandler);
         vm.startBroadcast(getDeployerAddress());
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
@@ -170,18 +168,12 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridgehub.proxies.chainRegistrationSender
         );
         bridgehub.setInteropCenter(coreAddresses.bridgehub.proxies.interopCenter);
-        assetTracker.setAddresses();
         chainAssetHandler.setAddresses();
         vm.stopBroadcast();
         console.log("SharedBridge registered");
     }
 
     function updateSharedBridge() internal {
-        L1NativeTokenVault ntv = L1NativeTokenVault(payable(coreAddresses.bridges.proxies.l1NativeTokenVault));
-        vm.broadcast(getDeployerAddress());
-        ntv.setAssetTracker(coreAddresses.bridgehub.proxies.assetTracker);
-        console.log("L1NativeTokenVault updated with AssetTracker address");
-
         vm.broadcast(getDeployerAddress());
         IL1NativeTokenVault(coreAddresses.bridges.proxies.l1NativeTokenVault).registerEthToken();
     }
@@ -189,13 +181,18 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
     function setL1NativeTokenVaultParams() internal {
         IL1AssetRouter sharedBridge = IL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
         IL1Nullifier l1Nullifier = IL1Nullifier(coreAddresses.bridges.proxies.l1Nullifier);
-        // Ownable ownable = Ownable(coreAddresses.bridges.proxies.l1AssetRouter);
+        // Wire the shared bridge and nullifier to the native token vault, then point both the nullifier and the
+        // asset router at the L1 interop handler.
         vm.broadcast(getDeployerAddress());
         sharedBridge.setNativeTokenVault(INativeTokenVaultBase(coreAddresses.bridges.proxies.l1NativeTokenVault));
         vm.broadcast(getDeployerAddress());
         l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(coreAddresses.bridges.proxies.l1NativeTokenVault));
         vm.broadcast(getDeployerAddress());
         l1Nullifier.setL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
+        vm.broadcast(getDeployerAddress());
+        l1Nullifier.setL1InteropHandler(coreAddresses.bridges.proxies.l1InteropHandler);
+        vm.broadcast(getDeployerAddress());
+        sharedBridge.setL1InteropHandler(coreAddresses.bridges.proxies.l1InteropHandler);
     }
 
     function updateOwners() internal {
@@ -210,9 +207,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         IL1AssetRouter sharedBridge = IL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
         IOwnable(address(sharedBridge)).transferOwnership(coreAddresses.shared.governance);
 
-        IL1AssetTracker assetTracker = IL1AssetTracker(coreAddresses.bridgehub.proxies.assetTracker);
-        IOwnable(address(assetTracker)).transferOwnership(coreAddresses.shared.governance);
-
         L1NativeTokenVault l1NativeTokenVault = L1NativeTokenVault(
             payable(coreAddresses.bridges.proxies.l1NativeTokenVault)
         );
@@ -220,6 +214,9 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
 
         IL1Nullifier l1Nullifier = IL1Nullifier(coreAddresses.bridges.proxies.l1Nullifier);
         IOwnable(address(l1Nullifier)).transferOwnership(coreAddresses.shared.governance);
+
+        // The L1 interop handler's owner can pause/unpause withdrawal finalization.
+        IOwnable(coreAddresses.bridges.proxies.l1InteropHandler).transferOwnership(coreAddresses.shared.governance);
 
         ICTMDeploymentTracker ctmDeploymentTracker = ICTMDeploymentTracker(
             coreAddresses.bridgehub.proxies.ctmDeploymentTracker
@@ -275,12 +272,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             "ctm_deployment_tracker_implementation_addr",
             coreAddresses.bridgehub.implementations.ctmDeploymentTracker
         );
-        vm.serializeAddress(
-            "bridgehub",
-            "l1_asset_tracker_implementation_addr",
-            coreAddresses.bridgehub.implementations.assetTracker
-        );
-        vm.serializeAddress("bridgehub", "l1_asset_tracker_proxy_addr", coreAddresses.bridgehub.proxies.assetTracker);
         vm.serializeAddress("bridgehub", "message_root_proxy_addr", coreAddresses.bridgehub.proxies.messageRoot);
         string memory bridgehub = vm.serializeAddress(
             "bridgehub",
@@ -294,6 +285,12 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridges.implementations.l1Nullifier
         );
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
+        vm.serializeAddress(
+            "bridges",
+            "l1_interop_handler_implementation_addr",
+            coreAddresses.bridges.implementations.l1InteropHandler
+        );
+        vm.serializeAddress("bridges", "l1_interop_handler_proxy_addr", coreAddresses.bridges.proxies.l1InteropHandler);
         vm.serializeAddress(
             "bridges",
             "shared_bridge_implementation_addr",

@@ -67,7 +67,7 @@ contract L1NullifierTest is Test {
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(l1NullifierImpl),
             proxyAdmin,
-            abi.encodeWithSelector(L1Nullifier.initialize.selector, owner, 1, 1, 1, 0)
+            abi.encodeWithSelector(L1Nullifier.initialize.selector, owner)
         );
 
         l1Nullifier = L1Nullifier(payable(proxy));
@@ -91,7 +91,7 @@ contract L1NullifierTest is Test {
         new TransparentUpgradeableProxy(
             address(impl),
             proxyAdmin,
-            abi.encodeWithSelector(L1Nullifier.initialize.selector, address(0), 1, 1, 1, 0)
+            abi.encodeWithSelector(L1Nullifier.initialize.selector, address(0))
         );
     }
 
@@ -255,17 +255,6 @@ contract L1NullifierTest is Test {
         vm.prank(assetRouter);
         vm.expectRevert("Pausable: paused");
         l1Nullifier.confirmL2TransactionForwarded(1, bytes32(0), bytes32(uint256(1)));
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        TRANSIENT SETTLEMENT LAYER TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_GetTransientSettlementLayer() public view {
-        (uint256 settlementLayer, uint256 batchNumber) = l1Nullifier.getTransientSettlementLayer();
-        // Should return 0 initially since no transaction has set it
-        assertEq(settlementLayer, 0);
-        assertEq(batchNumber, 0);
     }
 
     /*//////////////////////////////////////////////////////////////

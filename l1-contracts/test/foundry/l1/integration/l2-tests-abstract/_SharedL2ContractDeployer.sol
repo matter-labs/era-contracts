@@ -206,11 +206,11 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             abi.encode(bytes(""))
         );
 
-        // Fund InteropHandler with ETH so it can send value with receiveMessage calls
+        // Fund L2InteropHandler with ETH so it can send value with receiveMessage calls
         // The mint mock doesn't actually give ETH, so we need to fund it manually
         vm.deal(L2_INTEROP_HANDLER_ADDR, 1000 ether);
 
-        // Mock currentSettlementLayerChainId for gateway mode check in InteropHandler
+        // Mock currentSettlementLayerChainId for gateway mode check in L2InteropHandler
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
             abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),

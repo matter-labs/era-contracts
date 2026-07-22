@@ -1808,7 +1808,56 @@
   },
   {
     "type": "function",
-    "name": "requestL2TransactionToGatewayMailboxWithBalanceChange",
+    "name": "requestL2Transaction",
+    "inputs": [
+      {
+        "name": "_contractL2",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_l2Value",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_calldata",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_l2GasLimit",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2GasPerPubdataByteLimit",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_factoryDeps",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
+      },
+      {
+        "name": "_refundRecipient",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "canonicalTxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "requestL2TransactionToGatewayMailbox",
     "inputs": [
       {
         "name": "_chainId",
@@ -1824,16 +1873,6 @@
         "name": "_expirationTimestamp",
         "type": "uint64",
         "internalType": "uint64"
-      },
-      {
-        "name": "_baseTokenAmount",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_getBalanceChange",
-        "type": "bool",
-        "internalType": "bool"
       }
     ],
     "outputs": [

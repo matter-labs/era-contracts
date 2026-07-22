@@ -41,6 +41,7 @@ import {
   deployRevertingContract,
   deployDummyInteropRecipient,
   getInteropExecutionData,
+  registerL2NativeTokenIfNeeded,
 } from "../../src/helpers/interop-helpers";
 import type { CallStarter, InteropSendResult } from "../../src/helpers/interop-helpers";
 import {
@@ -126,6 +127,9 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     }
 
     sourceTokenAddress = state.testTokens[sourceChainId];
+    // The pre-generated states carry no NTV registrations (the balance-migration setup
+    // that used to register test tokens was removed), so register on demand.
+    await registerL2NativeTokenIfNeeded(sourceProvider, sourceTokenAddress);
     sourceAssetId = await getAssetIdForToken(sourceProvider, sourceTokenAddress);
 
     if (getInteropSourceAddress().toLowerCase() === getInteropUnbundlerAddress().toLowerCase()) {
@@ -257,7 +261,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     await expectRevert(
       () => simulateUnbundleBundle(destProvider, bundleData, callStatuses, getInteropUnbundlerPrivateKey()),
       "unbundle non-verified bundle",
-      customError("InteropHandler", "CanNotUnbundle(bytes32)"),
+      customError("L2InteropHandler", "CanNotUnbundle(bytes32)"),
       destProvider
     );
   });
@@ -290,7 +294,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     await expectRevert(
       () => simulateUnbundleBundle(destProvider, bundleData, callStatuses),
       "unbundle from wrong address",
-      customError("InteropHandler", "UnbundlingNotAllowed(bytes32,bytes,bytes)"),
+      customError("L2InteropHandler", "UnbundlingNotAllowed(bytes32,bytes,bytes)"),
       destProvider
     );
   });
@@ -395,7 +399,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     await expectRevert(
       () => simulateUnbundleBundle(destProvider, bundleData, callStatuses, getInteropUnbundlerPrivateKey()),
       "re-execute processed calls",
-      customError("InteropHandler", "CallNotExecutable(bytes32,uint256)"),
+      customError("L2InteropHandler", "CallNotExecutable(bytes32,uint256)"),
       destProvider
     );
   });
@@ -426,7 +430,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     await expectRevert(
       () => simulateUnbundleBundle(destProvider, bundleData, callStatuses, getInteropUnbundlerPrivateKey()),
       "execute a cancelled call",
-      customError("InteropHandler", "CallNotExecutable(bytes32,uint256)"),
+      customError("L2InteropHandler", "CallNotExecutable(bytes32,uint256)"),
       destProvider
     );
   });
@@ -443,7 +447,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     const executionData = await getInteropExecutionData(destProvider, sendResult, sourceChainId);
 
     // Create a NEW bundle from the source chain that contains 2 calls to L2_INTEROP_HANDLER_ADDR
-    const interopHandlerIface = new ethers.utils.Interface(getAbi("InteropHandler"));
+    const interopHandlerIface = new ethers.utils.Interface(getAbi("L2InteropHandler"));
 
     // Call 1: verifyBundle(bundleData, proof)
     const verifyCalldata = interopHandlerIface.encodeFunctionData("verifyBundle", [
