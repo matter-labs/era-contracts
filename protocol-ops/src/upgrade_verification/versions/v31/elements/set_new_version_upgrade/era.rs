@@ -1,7 +1,7 @@
 //! Era-VM `forceDeployAndUpgrade` payload verification.
 //!
-//! Owns the expected `ForceDeployment[]` list (44 entries: 31 EraVM system
-//! contracts + 12 fixed-address core contracts + L2V31Upgrade), the per-entry
+//! Owns the expected `ForceDeployment[]` list (43 entries: 31 EraVM system
+//! contracts + 11 fixed-address core contracts + L2V31Upgrade), the per-entry
 //! shape walker, the special `L2ChainAssetHandler` constructor-input decoder,
 //! the Era factory-dep bytecode list, and the Era orchestrator wired from
 //! `ProposedUpgrade::verify_l2_protocol_upgrade_tx`.
@@ -20,14 +20,14 @@ use crate::upgrade_verification::{
         KECCAK256_SYSTEM_CONTRACT, L2_ACCOUNT_CODE_STORAGE_ADDR, L2_ASSET_ROUTER_ADDR,
         L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS,
         L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPRESSOR_ADDR,
-        L2_CREATE2_FACTORY_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_CENTER_ADDR,
-        L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE_ADDR,
-        L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR,
-        L2_MESSAGE_VERIFICATION_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_PUBDATA_CHUNK_PUBLISHER_ADDR,
-        L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_V31_UPGRADE_CONTRACT,
-        L2_VERSION_SPECIFIC_UPGRADER_ADDR, MODEXP_SYSTEM_CONTRACT, MSG_VALUE_SYSTEM_CONTRACT,
-        SHA256_SYSTEM_CONTRACT, SLOAD_CONTRACT_ADDR,
+        L2_CREATE2_FACTORY_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+        L2_INTEROP_ATTRIBUTE_PARSER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR,
+        L2_INTEROP_ROOT_STORAGE_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR,
+        L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR,
+        L2_PUBDATA_CHUNK_PUBLISHER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
+        L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+        L2_V31_UPGRADE_CONTRACT, L2_VERSION_SPECIFIC_UPGRADER_ADDR, MODEXP_SYSTEM_CONTRACT,
+        MSG_VALUE_SYSTEM_CONTRACT, SHA256_SYSTEM_CONTRACT, SLOAD_CONTRACT_ADDR,
     },
     verifiers::{VerificationResult, Verifiers},
 };
@@ -138,7 +138,7 @@ fn expected_v31_era_force_deployments() -> Vec<EraExpectedFd> {
             "l1-contracts/SystemContractProxyAdmin",
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
         ),
-        // ── Fixed-address core contracts (FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 10; L2WrappedBaseToken excluded) ──
+        // ── Fixed-address core contracts (FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 11; L2WrappedBaseToken excluded) ──
         simple!("l1-contracts/L2Bridgehub", L2_BRIDGEHUB_ADDR),
         simple!("l1-contracts/L2AssetRouter", L2_ASSET_ROUTER_ADDR),
         simple!(
@@ -164,6 +164,10 @@ fn expected_v31_era_force_deployments() -> Vec<EraExpectedFd> {
         ),
         simple!("l1-contracts/BaseTokenHolder", L2_BASE_TOKEN_HOLDER_ADDR),
         simple!("l1-contracts/InteropCenter", L2_INTEROP_CENTER_ADDR),
+        simple!(
+            "l1-contracts/InteropAttributeParser",
+            L2_INTEROP_ATTRIBUTE_PARSER_ADDR
+        ),
         simple!("l1-contracts/InteropHandler", L2_INTEROP_HANDLER_ADDR),
         // ── Additional: L2V31Upgrade (the delegate target for this upgrade) ──
         simple!(L2_V31_UPGRADE_CONTRACT, L2_VERSION_SPECIFIC_UPGRADER_ADDR),
@@ -354,6 +358,7 @@ pub(super) const EXPECTED_V31_ERA_BYTECODES: &[&str] = &[
     "l1-contracts/L2InteropRootStorage",
     "l1-contracts/BaseTokenHolder",
     "l1-contracts/InteropCenter",
+    "l1-contracts/InteropAttributeParser",
     "l1-contracts/InteropHandler",
     "l1-contracts/TransparentUpgradeableProxy",
     "l1-contracts/BeaconProxy",

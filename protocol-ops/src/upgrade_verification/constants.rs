@@ -70,6 +70,7 @@ pub const L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR: Address = l2_addr(0x0c);
 pub const L2_INTEROP_CENTER_ADDR: Address = l2_addr(0x0d);
 pub const L2_INTEROP_HANDLER_ADDR: Address = l2_addr(0x0e);
 pub const L2_BASE_TOKEN_HOLDER_ADDR: Address = l2_addr(0x11);
+pub const L2_INTEROP_ATTRIBUTE_PARSER_ADDR: Address = l2_addr(0x15);
 
 /// L2 system contract addresses (`SYSTEM_CONTRACTS_OFFSET + <offset>`).
 /// Sourced from `L2ContractAddresses.sol` where available; the rest live in
@@ -250,6 +251,10 @@ mod tests {
             ("L2_INTEROP_CENTER_ADDR", L2_INTEROP_CENTER_ADDR),
             ("L2_INTEROP_HANDLER_ADDR", L2_INTEROP_HANDLER_ADDR),
             ("L2_BASE_TOKEN_HOLDER_ADDR", L2_BASE_TOKEN_HOLDER_ADDR),
+            (
+                "L2_INTEROP_ATTRIBUTE_PARSER_ADDR",
+                L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
+            ),
             // SYSTEM_CONTRACTS_OFFSET range
             ("L2_BOOTLOADER_ADDRESS", L2_BOOTLOADER_ADDRESS),
             ("L2_ACCOUNT_CODE_STORAGE_ADDR", L2_ACCOUNT_CODE_STORAGE_ADDR),

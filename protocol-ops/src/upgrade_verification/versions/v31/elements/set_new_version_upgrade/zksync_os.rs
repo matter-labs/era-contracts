@@ -1,6 +1,6 @@
 //! ZKsync OS `forceDeployAndUpgradeUniversal` payload verification.
 //!
-//! Owns the expected `UniversalContractUpgradeInfo[]` list (15 fixed-address
+//! Owns the expected `UniversalContractUpgradeInfo[]` list (14 fixed-address
 //! entries, all proxy-upgrade shapes; the only unsafe force deployment is the
 //! L2V31Upgrade delegate target, validated separately), the
 //! deployed-bytecode-info decoder (96-byte triple or 320-byte impl/proxy
@@ -14,9 +14,9 @@ use std::collections::HashMap;
 use crate::upgrade_verification::{
     constants::{
         L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-        L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR,
-        L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE_ADDR, L2_MESSAGE_ROOT_ADDR,
-        L2_MESSAGE_VERIFICATION_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR,
+        L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
+        L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE_ADDR,
+        L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR,
         L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
         L2_V31_UPGRADE_CONTRACT,
     },
@@ -55,7 +55,7 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
     // ZKsyncOS force deployment except the L2V31Upgrade delegate target (validated separately);
     // verify_v31_zksync_os_force_deployments enforces that no other unsafe FD is present.
     vec![
-        // ── Fixed-address core contracts (getFixedAddressCoreContracts, 10 entries; L2WrappedBaseToken excluded) ──
+        // ── Fixed-address core contracts (getFixedAddressCoreContracts, 11 entries; L2WrappedBaseToken excluded) ──
         proxy!("l1-contracts/L2Bridgehub", L2_BRIDGEHUB_ADDR),
         proxy!("l1-contracts/L2AssetRouter", L2_ASSET_ROUTER_ADDR),
         proxy!(
@@ -78,6 +78,10 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
         ),
         proxy!("l1-contracts/BaseTokenHolder", L2_BASE_TOKEN_HOLDER_ADDR),
         proxy!("l1-contracts/InteropCenter", L2_INTEROP_CENTER_ADDR),
+        proxy!(
+            "l1-contracts/InteropAttributeParser",
+            L2_INTEROP_ATTRIBUTE_PARSER_ADDR
+        ),
         proxy!("l1-contracts/InteropHandler", L2_INTEROP_HANDLER_ADDR),
         // ── ZKsync-OS system contracts (getZKsyncOSExtraSystemContracts, 3 entries) ──
         proxy!(
@@ -329,6 +333,7 @@ pub(super) const EXPECTED_V31_ZKSYNC_OS_BYTECODES: &[&str] = &[
     "l1-contracts/L2InteropRootStorage",
     "l1-contracts/BaseTokenHolder",
     "l1-contracts/InteropCenter",
+    "l1-contracts/InteropAttributeParser",
     "l1-contracts/InteropHandler",
     "l1-contracts/UpgradeableBeaconDeployer",
     "l1-contracts/L2V31Upgrade",
