@@ -1,5 +1,5 @@
 /**
- * End-to-end test for the L1-free atomic-interop stack (bundle model).
+ * End-to-end test for the atomic-interop stack (bundle model).
  *
  * Topology (two GW-settled chains):
  *   Chain A: depositor (anvil acct #0) sends aAmount of testTokenA -> recipient on B.
@@ -10,45 +10,62 @@
  *           The bridge transfer burns via `initiateIndirectCall`; the `atomicBundle` attribute makes
  *           the InteropCenter append the leg's commit value to the L2InteropCommitmentTree instead of
  *           publishing to L1.
- *   RECEIVE `InteropHandler.executeAtomicBundle(bundleBytes, AtomicFinalityProof)`. Proves every leg
+ *   RECEIVE `L2InteropHandler.executeAtomicBundle(bundleBytes, AtomicFinalityProof)`. Proves every leg
  *           was committed in its source chain's IMT before the deadline (one inclusion proof per leg),
  *           then executes the bundle's calls (the destination mint). `bundleStatus` guards double-execute.
- *   TIMEOUT `AtomicFlowManager.authorizeRefund(...)` (proves the missing leg absent from the last batch
- *           with `t <= deadline`, pinned by a successor batch with `t > deadline`) then
- *           `claimRefund(flowId, bundleBytes)` recovers the burned source funds
- *           to the depositor via L2AssetRouter's recoverAtomicCall.
+ *   TIMEOUT `AtomicFlowManager.authorizeRefund(...)`: checked against a settlement interop root created
+ *           strictly after the deadline (the timestamp in `interopRoots[slChainId][slBlock]` is
+ *           `> deadline`, added on the harness via bootloader impersonation), proves the missing leg
+ *           absent from the batch-begin IMT root of a late batch (`t > deadline`) — or, for a halted source
+ *           chain, absent from the batch-end IMT root of the chain's LAST batch inside that settlement
+ *           interop root (`t <= deadline`) — then `claimRefund(flowId, bundleBytes)` recovers the burned
+ *           source funds to the depositor via L2AssetRouter's recoverAtomicCall. See the
+ *           AtomicInteropProof.sol library header for the canonical protocol description.
  *
  * Ids:
  *   - `bundleHash = keccak256(abi.encode(sourceChainId, abi.encode(InteropBundle)))`. The atomic send
- *     params (flowId, deadline, lowNullifierIndex) ride in the `atomicBundle` attribute and are not part
- *     of the InteropBundle, so `bundleHash` is independent of `flowId`. We predict each leg's bundleHash
- *     off-chain with a non-atomic `callStatic.sendBundle`, then cross-check it against the real send's
- *     `InteropBundleSent` event and fail loudly on mismatch.
- *   - `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`
- *     (bundle hashes ascending, source chain ids positionally aligned).
+ *     params (the full flowId preimage + lowNullifierIndex) ride in the `atomicBundle` attribute and are
+ *     not part of the InteropBundle, so `bundleHash` is independent of the preimage (whose leg hashes
+ *     include the bundle's own hash). We predict each leg's bundleHash off-chain with the static
+ *     `previewBundleHash` (which runs the real assembly but persists nothing), then cross-check it against
+ *     the real send's `InteropBundleSent` event and fail loudly on mismatch. On-chain, the AtomicFlowManager
+ *     additionally requires the sent bundle's hash to be one of the preimage's legs, so a stale prediction
+ *     reverts the send.
+ *   - `flowId = keccak256(abi.encode(preimage))`
+ *     (bundle hashes ascending, source chain ids positionally aligned), recomputed on-chain from the
+ *     attribute-supplied preimage rather than accepted from the sender.
  *   - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
  *
  * The deadline is a settlement-layer timestamp, compared on-chain against each batch's settlement
- * timestamp `t` from the real `MessageHashing._getProofData` parse of `messageProof`, so the off-chain
- * builders embed a chosen `t` in format-valid multi-hop proof bytes. Root-message authentication is mocked to `true` on the
- * anvil harness. The off-chain IMT engine reconstructs the root / Merkle paths from the live leaf set
- * and asserts it matches `tree.root()` before emitting a proof, so a passing test also confirms the
- * off-chain engine agrees with the on-chain one.
+ * timestamp `t` from the real `MessageHashing._getProofData` parse of `settlementProof`, so the
+ * off-chain builders embed a chosen `t` in format-valid multi-hop proof bytes (including the exact
+ * 3-hop chain-batch-root leaf path the verifier enforces). Chain-batch-root leaf authentication is
+ * mocked to `true` on the anvil harness. The off-chain IMT engine reconstructs the root / Merkle paths
+ * from the live leaf set and asserts it matches `tree.root()` before emitting a proof, so a passing
+ * test also confirms the off-chain engine agrees with the on-chain one.
  *
  * Verifies:
  *   - HAPPY PATH: atomic send (source burn + IMT insert) on both legs -> executeAtomicBundle (every-leg
- *     inclusion proof, `t <= deadline`) on each destination. Recipients receive the bridged token;
- *     source legs stay terminal at Committed; both destination bundles end FullyExecuted.
- *   - TIMEOUT PATH: one leg commits, the other never does -> after the deadline, an adjacency proof
- *     (missing leg absent from the last batch with `t <= deadline`, pinned by a successor with
- *     `t > deadline`) authorizes a refund -> claimRefund recovers the depositor's tokens; the
- *     source leg ends Reverted.
+ *     inclusion proof, `t <= deadline` — exercised exactly AT the boundary) on each destination.
+ *     Recipients receive the bridged token; source legs stay terminal at Committed; both destination
+ *     bundles end FullyExecuted.
+ *   - TIMEOUT PATH (late batch): one leg commits, the other never does -> a single absence proof
+ *     (missing leg absent from the batch-begin IMT root of a batch with `t > deadline`, checked against
+ *     a post-deadline settlement interop root) authorizes a refund -> claimRefund recovers the
+ *     depositor's tokens; the source leg ends Reverted.
+ *   - TIMEOUT PATH (halted chain): same setup, but the absence proof uses an in-time batch
+ *     (`t <= deadline`, exercised exactly AT the boundary) that is the chain's LAST batch inside a
+ *     post-deadline settlement interop root, checked against the batch-end IMT root.
+ *   - TIMEOUT NEGATIVES: a settlement interop root not created strictly after the deadline is rejected
+ *     (`ProofInteropRootNotAfterDeadline`, exercised exactly AT the boundary `T == deadline`), and an
+ *     in-time batch that is NOT the last batch in the settlement interop root is rejected
+ *     (`ProofNotLastBatchInRoot`).
  */
 
 import { expect } from "chai";
 import { BigNumber, Contract, Wallet, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { getChainIdsByRole, getL2Chain } from "../../src/core/utils";
+import { getChainIdsByRole, getL2Chain, impersonateAndRun } from "../../src/core/utils";
 import { getAbi } from "../../src/core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
@@ -56,14 +73,16 @@ import {
   INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
   L2_ATOMIC_FLOW_MANAGER_ADDR,
+  L2_BOOTLOADER_ADDR,
   L2_INTEROP_COMMITMENT_TREE_ADDR,
   L2_INTEROP_HANDLER_ADDR,
+  L2_INTEROP_ROOT_STORAGE_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
   ATOMIC_SEND_BUNDLE_GAS_LIMIT,
   DEFAULT_TX_GAS_LIMIT,
-  INTEROP_SEND_BUNDLE_GAS_LIMIT,
 } from "../../src/core/const";
 import { encodeEvmAddress, encodeEvmChain } from "../../src/core/data-encoding";
+import { customError, expectRevert } from "../../src/helpers/balance-helpers";
 import {
   atomicBundleAttr,
   interopBundleSaltAttr,
@@ -71,17 +90,19 @@ import {
   getTokenTransferData,
   indirectCallAttr,
   sendInteropBundle,
+  staticPreviewHash,
 } from "../../src/helpers/interop-helpers";
+import type { AtomicFlowPreimage } from "../../src/helpers/interop-helpers";
 import {
+  DEFAULT_SL_CHAIN_ID,
   atomicFinalityProofTuple,
   atomicFlowTuple,
-  atomicTimeoutProofTuple,
   buildInclusionProof,
   buildNonInclusionProof,
-  buildSuccessorProof,
   commitValue,
   computeFlowId,
   lowNullifierIndexFor,
+  proofTuple,
   reconstructChainImt,
 } from "../../src/helpers/imt-engine-lib";
 
@@ -98,7 +119,7 @@ enum LegState {
 /**
  * Handles to the atomic-interop built-ins on one L2 chain. These contracts are predeployed into the
  * ZKsync OS genesis (see `src/core/predeploys.ts`) and the {L2InteropCommitmentTree}'s IMT is seeded
- * by the harness's relayed v31 genesis upgrade (`_initializeV31Contracts` -> `tree.initialize()`), so
+ * by the harness's relayed v31 genesis upgrade (`_initializeV31Contracts` -> `tree.initL2()`), so
  * no install/seed step is needed here — we just bind contract objects to their canonical addresses.
  */
 type AtomicStack = {
@@ -185,6 +206,42 @@ async function chainNow(provider: ethers.providers.JsonRpcProvider): Promise<num
   return (await provider.getBlock("latest")).timestamp;
 }
 
+/**
+ * Ensures the settlement interop root for `settlementBlock` exists with the requested timestamp.
+ * If an entry already exists with that timestamp, the helper leaves it unchanged. A different
+ * timestamp is an error because settlement interop roots are write-once.
+ */
+async function ensureSettlementInteropRoot(
+  provider: ethers.providers.JsonRpcProvider,
+  settlementBlock: number,
+  timestamp: number
+): Promise<void> {
+  const storage = new Contract(L2_INTEROP_ROOT_STORAGE_ADDR, getAbi("L2InteropRootStorage"), provider);
+  const existing: { root: string; timestamp: BigNumber } = await storage.interopRoots(
+    DEFAULT_SL_CHAIN_ID,
+    settlementBlock
+  );
+  if (existing.root !== ethers.constants.HashZero) {
+    const storedTs: BigNumber = existing.timestamp;
+    if (!storedTs.eq(timestamp)) {
+      throw new Error(
+        `settlement interop root (${DEFAULT_SL_CHAIN_ID}, ${settlementBlock}) already has timestamp ${storedTs}, wanted ${timestamp}`
+      );
+    }
+    return;
+  }
+  await impersonateAndRun(provider, L2_BOOTLOADER_ADDR, async (signer) => {
+    await (
+      await storage.connect(signer).addSingleInteropRoot({
+        chainId: DEFAULT_SL_CHAIN_ID,
+        blockOrBatchNumber: settlementBlock,
+        timestamp,
+        sides: [ethers.utils.keccak256(ethers.utils.toUtf8Bytes(`settlement-interop-root-${settlementBlock}`))],
+      })
+    ).wait();
+  });
+}
+
 type ParsedManagerLog = { name: string; args: ethers.utils.Result } | undefined;
 
 /** Parse an AtomicFlowManager event log, returning {name, args} or undefined for non-manager logs. */
@@ -198,7 +255,7 @@ function parseManagerLog(manager: Contract, log: ethers.providers.Log): ParsedMa
   }
 }
 
-describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
+describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
   this.timeout(0);
 
   const runner = new DeploymentRunner();
@@ -250,7 +307,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
   });
 
   /**
-   * Predict a leg's bundleHash via a non-atomic callStatic on its source chain, targeting `dest`.
+   * Predict a leg's bundleHash via the static `previewBundleHash` on its source chain, targeting `dest`.
    * (Kept local so the `dest` chain id is explicit rather than threaded through a placeholder.)
    */
   async function predictLegBundleHash(
@@ -261,15 +318,16 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     salt: string
   ): Promise<string> {
     const interopCenter = source.stack.interopCenter.connect(source.user);
-    // The bundleHash now depends on the `interopBundleSalt` attribute (folded into the bundle), so the
-    // prediction MUST carry the exact same salt the real atomic send will use — otherwise the predicted
-    // hash (and the flowId derived from it) would not match the emitted one.
-    return interopCenter.callStatic.sendBundle(
+    // `sendBundle` now requires the mandatory `atomicBundle` attribute (interop is atomic-only), which needs
+    // the very flowId we are trying to derive — a circular dependency. `previewBundleHash` breaks it: it runs
+    // the identical bundle assembly (including the simulated, discarded indirect-call burn) without the atomic
+    // append, returning the exact bundleHash the real send will emit. The prediction MUST carry the same salt
+    // the real send uses, since the bundleHash commits to the `interopBundleSalt` attribute.
+    return staticPreviewHash(interopCenter, source.provider, source.user.address, "previewBundleHash", [
       encodeEvmChain(dest.chainId),
       [bridgeCallStarter(source, amount, recipient)],
       [interopBundleSaltAttr(salt)],
-      { gasLimit: INTEROP_SEND_BUNDLE_GAS_LIMIT, value: fee }
-    );
+    ]);
   }
 
   /** A fresh, deterministic-per-send bundle salt. Random keeps it unique per (sender, salt) — the
@@ -279,23 +337,39 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
   }
 
   /**
+   * Build the `atomicBundle` attribute's flowId preimage from the ascending leg hashes and their
+   * aligned source chain ids. The flowId itself is never sent: the AtomicFlowManager recomputes it
+   * on-chain from exactly these fields (see `computeFlowId` for the mirrored hash).
+   */
+  function flowPreimageOf(legHashesAsc: string[], chainIdsAsc: number[], deadline: number): AtomicFlowPreimage {
+    return {
+      deadline,
+      settlementLayerChainId: DEFAULT_SL_CHAIN_ID,
+      legBundleHashes: legHashesAsc,
+      legSourceChainIds: chainIdsAsc,
+    };
+  }
+
+  /**
    * Real atomic send of one leg: approve the source token, send the bundle with the `atomicBundle`
-   * attribute, and assert the emitted bundleHash matches the prediction used to build `flowId`.
+   * attribute (carrying the full flowId preimage), and assert the emitted bundleHash matches the
+   * prediction embedded in the preimage's leg hashes.
    */
   async function sendAtomicLeg(params: {
     source: ChainCtx;
     dest: ChainCtx;
     amount: BigNumber;
     recipient: string;
-    flowId: string;
-    deadline: number;
+    flowPreimage: AtomicFlowPreimage;
     predictedBundleHash: string;
     salt: string;
   }): Promise<{ bundleData: string; bundleHash: string }> {
-    const { source, dest, amount, recipient, flowId, deadline, predictedBundleHash, salt } = params;
+    const { source, dest, amount, recipient, flowPreimage, predictedBundleHash, salt } = params;
 
     await ensureNtvApproval(source, amount);
 
+    // Derived, not sent: mirrors the on-chain recomputation from the attribute-supplied preimage.
+    const flowId = computeFlowId(flowPreimage);
     const value = commitValue(flowId, predictedBundleHash);
     const lowNull = await lowNullifierIndexFor(source.stack.tree, value);
 
@@ -303,11 +377,11 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       sourceProvider: source.provider,
       destinationChainId: dest.chainId,
       callStarters: [bridgeCallStarter(source, amount, recipient)],
-      // Same salt used to predict `predictedBundleHash`, so the emitted bundleHash matches the flowId.
-      bundleAttributes: [atomicBundleAttr(flowId, deadline, lowNull), interopBundleSaltAttr(salt)],
+      // Same salt used to predict `predictedBundleHash`, so the emitted bundleHash matches the
+      // preimage's leg hash (the AtomicFlowManager rejects the send otherwise).
+      bundleAttributes: [atomicBundleAttr(flowPreimage, lowNull), interopBundleSaltAttr(salt)],
       value: fee,
-      // Atomic sends append to the IMT (~1.1M gas insert) on top of the burn; the plain-send default
-      // (INTEROP_SEND_BUNDLE_GAS_LIMIT) is too small.
+      // Atomic sends append to the IMT (~1.1M gas insert) on top of the burn, so they need the larger cap.
       gasLimit: ATOMIC_SEND_BUNDLE_GAS_LIMIT,
     });
 
@@ -318,11 +392,11 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     return { bundleData: sendResult.bundleData, bundleHash: sendResult.bundleHash };
   }
 
-  it("happy path: atomic send -> executeAtomicBundle mints both legs and leaves source Committed", async () => {
+  it("happy path: atomic send -> executeBundle mints both legs and leaves source Committed", async () => {
     const user = chainA.user.address; // anvil acct #0, the depositor + recipient on both chains
     const now = Math.max(await chainNow(chainA.provider), await chainNow(chainB.provider));
-    // The deadline is an SL timestamp; the harness sets each leg's batch `l1Timestamp == deadline`
-    // so every inclusion proof satisfies `l1Timestamp <= deadline`.
+    // The deadline is an SL timestamp; the harness sets each leg's batch `l1Timestamp == deadline`,
+    // pinning the inclusive `l1Timestamp <= deadline` finality bound exactly at the boundary.
     const deadline = now + 3600;
 
     // ── Predict each leg's bundleHash (no state change), then derive flowId ──────────────────
@@ -340,7 +414,8 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
     const legHashesAsc = legs.map((l) => l.hash);
     const chainIdsAsc = legs.map((l) => l.chainId);
-    const flowId = computeFlowId(legHashesAsc, chainIdsAsc, deadline);
+    const flowPreimage = flowPreimageOf(legHashesAsc, chainIdsAsc, deadline);
+    const flowId = computeFlowId(flowPreimage);
 
     // ── PHASE 1: atomic send on each source (burn + IMT insert) ──────────────────────────────
     const aBalanceBefore: BigNumber = await chainA.testToken.balanceOf(user);
@@ -351,8 +426,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       dest: chainB,
       amount: aAmount,
       recipient: user,
-      flowId,
-      deadline,
+      flowPreimage,
       predictedBundleHash: hAB,
       salt: saltAB,
     });
@@ -361,8 +435,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       dest: chainA,
       amount: bAmount,
       recipient: user,
-      flowId,
-      deadline,
+      flowPreimage,
       predictedBundleHash: hBA,
       salt: saltBA,
     });
@@ -390,7 +463,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     expect(imtB.root.toLowerCase()).to.equal((await chainB.stack.tree.root()).toLowerCase());
 
     // ── PHASE 2: build the per-flow inclusion proofs (one per leg, in ascending bundleHash order) ─
-    // executeAtomicBundle requires EVERY leg present in a root settled no later than the deadline,
+    // executeBundle requires EVERY leg present in a root settled no later than the deadline,
     // so even the executing chain's own leg needs an inclusion proof.
     const abProof = await buildInclusionProof({
       l2Tree: chainA.stack.tree,
@@ -408,13 +481,11 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     const proofsAsc = BigNumber.from(hAB).lt(BigNumber.from(hBA)) ? [abProof, baProof] : [baProof, abProof];
     const finality = atomicFinalityProofTuple({
       flowId,
-      deadline,
-      legBundleHashes: legHashesAsc,
-      chainIds: chainIdsAsc,
+      preimage: flowPreimage,
       proofs: proofsAsc,
     });
 
-    // ── PHASE 3: execute each destination leg via executeAtomicBundle ─────────────────────────
+    // ── PHASE 3: execute each destination leg via executeBundle ─────────────────────────
     // Snapshot the recipient shim balances BEFORE execute. The coverage harness runs every spec on
     // one shared chain set, so `user` may already hold these bridged shims from earlier specs — so we
     // assert the DELTA credited by this swap, not the absolute balance (the source-side checks above
@@ -465,12 +536,13 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     );
   });
 
-  it("timeout path: one leg commits, peer never does -> authorizeRefund + claimRefund recovers depositor", async () => {
+  it("timeout path (late batch): one leg commits, peer never does -> authorizeRefund + claimRefund recovers depositor", async () => {
     const user = chainA.user.address;
-    // The deadline is an SL timestamp. The timeout proof pins the missing leg absent from the last
-    // in-time batch (`t <= deadline`), using a consecutive successor batch with `t = deadline + 1`.
-    // Both `t`s are fabricated on the harness — only the deadline/adjacency checks are exercised.
     const deadline = 1_000;
+    // The settlement interop root used by the absence proof must have been created after the deadline.
+    // This fixed block is unique within the spec. The helper makes reruns against retained state idempotent.
+    const settlementInteropRootBlock = 201;
+    await ensureSettlementInteropRoot(chainA.provider, settlementInteropRootBlock, deadline + 5);
 
     const refundRecipient = chainB.user.address; // irrelevant for refund; distinct dest recipient
     const aTimeoutAmount = ethers.utils.parseUnits("3", TEST_TOKEN_DECIMALS);
@@ -491,7 +563,8 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
     const legHashesAsc = legs.map((l) => l.hash);
     const chainIdsAsc = legs.map((l) => l.chainId);
-    const flowId = computeFlowId(legHashesAsc, chainIdsAsc, deadline);
+    const flowPreimage = flowPreimageOf(legHashesAsc, chainIdsAsc, deadline);
+    const flowId = computeFlowId(flowPreimage);
 
     // ── Commit only the AB leg on A. B never commits BA. ─────────────────────────────────────
     const aBalanceBefore: BigNumber = await chainA.testToken.balanceOf(user);
@@ -500,8 +573,7 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       dest: chainB,
       amount: aTimeoutAmount,
       recipient: refundRecipient,
-      flowId,
-      deadline,
+      flowPreimage,
       predictedBundleHash: hAB,
       salt: saltAB,
     });
@@ -512,21 +584,19 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
       "AB depositor burned tokens at commit"
     );
 
-    // ── Build the timeout proof for the missing BA leg against B's IMT: absence at the last in-time
-    //    batch N (`t_N <= deadline`) pinned by the consecutive successor N+1 (`t_{N+1} > deadline`).
+    // ── Build the timeout proof for the missing BA leg against B's IMT: non-inclusion against the
+    //    batch-begin root of a late batch (`t > deadline`), checked against the post-deadline
+    //    settlement interop root added above. The live tree root stands in for the begin-root snapshot
+    //    (leaf 2 of the chain batch root) on the harness.
     const baValue = commitValue(flowId, hBA);
     const absence = await buildNonInclusionProof({
       l2Tree: chainB.stack.tree,
       chainId: chainB.chainId,
       value: baValue,
-      l1Timestamp: deadline, // t_N <= deadline
-      batchNumber: 1, // batch N
-    });
-    const successor = await buildSuccessorProof({
-      l2Tree: chainB.stack.tree,
-      chainId: chainB.chainId,
-      l1Timestamp: deadline + 1, // t_{N+1} > deadline
-      batchNumber: 2, // batch N+1 (consecutive)
+      l1Timestamp: deadline + 1, // t > deadline: the first late batch's begin root
+      provesAgainstBeginRoot: true,
+      batchNumber: 1,
+      slBlock: settlementInteropRootBlock,
     });
     const missingIdx = legHashesAsc[0] === hBA ? 0 : 1;
 
@@ -534,9 +604,9 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
     const managerA = chainA.stack.manager.connect(chainA.user);
     const refundAuth = await (
       await managerA.authorizeRefund(
-        atomicFlowTuple({ flowId, deadline, legBundleHashes: legHashesAsc, chainIds: chainIdsAsc }),
+        atomicFlowTuple({ flowId, preimage: flowPreimage }),
         missingIdx,
-        atomicTimeoutProofTuple(absence, successor),
+        proofTuple(absence),
         { gasLimit: DEFAULT_TX_GAS_LIMIT }
       )
     ).wait();
@@ -564,5 +634,247 @@ describe("13 - IMT atomic swap A <-> B (L1-free, bundle model)", function () {
         .some((p: ParsedManagerLog) => p?.name === "FlowRefunded" && p.args.bundleHash === hAB),
       "FlowRefunded(hAB) on A"
     ).to.be.true;
+  });
+
+  /** A fabricated (never-sent) two-leg flow for proof-validation tests: authorizeRefund verifies the
+   *  absence proof before touching any leg state, so no real sends are needed to exercise reverts. */
+  function fabricatedFlow(deadline: number) {
+    const legs = [
+      { hash: ethers.utils.id("fabricated-leg-1"), chainId: chainA.chainId },
+      { hash: ethers.utils.id("fabricated-leg-2"), chainId: chainB.chainId },
+    ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
+    const legHashesAsc = legs.map((l) => l.hash);
+    const chainIdsAsc = legs.map((l) => l.chainId);
+    const flowPreimage = flowPreimageOf(legHashesAsc, chainIdsAsc, deadline);
+    const flowId = computeFlowId(flowPreimage);
+    // The "missing" leg is the one sourced on chain B (proofs below are against B's IMT).
+    const missingIdx = chainIdsAsc.indexOf(chainB.chainId);
+    return { flowId, flowPreimage, legHashesAsc, chainIdsAsc, missingIdx };
+  }
+
+  it("timeout path (halted chain): in-time LAST batch + end-root absence authorizes the refund", async () => {
+    const user = chainA.user.address;
+    // Same shape as the late-batch timeout test, but the source chain "halted": its last batch inside
+    // the post-deadline settlement interop root is still in time (`t <= deadline`, pinned exactly AT
+    // the boundary). The proof then checks absence against the batch-END IMT root of that last batch
+    // (the zero-length batch-leaf path of the single-leaf chain tree trivially satisfies the
+    // last-batch check).
+    const deadline = 1_000;
+    const settlementInteropRootBlock = 202;
+    await ensureSettlementInteropRoot(chainA.provider, settlementInteropRootBlock, deadline + 5);
+
+    const refundRecipient = chainB.user.address;
+    const aTimeoutAmount = ethers.utils.parseUnits("2", TEST_TOKEN_DECIMALS);
+    const bTimeoutAmount = ethers.utils.parseUnits("4", TEST_TOKEN_DECIMALS);
+
+    const saltAB = freshBundleSalt();
+    const saltBA = freshBundleSalt();
+    const hAB = await predictLegBundleHash(chainA, chainB, aTimeoutAmount, refundRecipient, saltAB);
+    const hBA = await predictLegBundleHash(chainB, chainA, bTimeoutAmount, refundRecipient, saltBA);
+
+    const legs = [
+      { hash: hAB, chainId: chainA.chainId },
+      { hash: hBA, chainId: chainB.chainId },
+    ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
+    const legHashesAsc = legs.map((l) => l.hash);
+    const chainIdsAsc = legs.map((l) => l.chainId);
+    const flowPreimage = flowPreimageOf(legHashesAsc, chainIdsAsc, deadline);
+    const flowId = computeFlowId(flowPreimage);
+
+    const aBalanceBefore: BigNumber = await chainA.testToken.balanceOf(user);
+    const ab = await sendAtomicLeg({
+      source: chainA,
+      dest: chainB,
+      amount: aTimeoutAmount,
+      recipient: refundRecipient,
+      flowPreimage,
+      predictedBundleHash: hAB,
+      salt: saltAB,
+    });
+    expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Committed, "AB committed on A");
+
+    // Halted-source absence proof: `t <= deadline` selects the END-root branch (t == deadline pins
+    // the boundary), and the empty batch-leaf path marks the batch as the chain's last inside the
+    // settlement interop root.
+    const baValue = commitValue(flowId, hBA);
+    const absence = await buildNonInclusionProof({
+      l2Tree: chainB.stack.tree,
+      chainId: chainB.chainId,
+      value: baValue,
+      l1Timestamp: deadline,
+      provesAgainstBeginRoot: false,
+      batchNumber: 1,
+      slBlock: settlementInteropRootBlock,
+    });
+    const missingIdx = legHashesAsc[0] === hBA ? 0 : 1;
+
+    const managerA = chainA.stack.manager.connect(chainA.user);
+    await (
+      await managerA.authorizeRefund(
+        atomicFlowTuple({ flowId, preimage: flowPreimage }),
+        missingIdx,
+        proofTuple(absence),
+        { gasLimit: DEFAULT_TX_GAS_LIMIT }
+      )
+    ).wait();
+    expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Revertable, "AB revertable on A");
+
+    await (await managerA.claimRefund(flowId, ab.bundleData, { gasLimit: DEFAULT_TX_GAS_LIMIT })).wait();
+    expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Reverted, "AB reverted on A");
+    expect((await chainA.testToken.balanceOf(user)).toString()).to.equal(
+      aBalanceBefore.toString(),
+      "AB depositor fully recovered the burned tokens"
+    );
+  });
+
+  it("send-time coupling: an atomic send whose preimage does not contain the bundle is rejected", async () => {
+    // Regression for the flowId footgun: before the attribute carried the full preimage, a sender could
+    // commit a bundle under an arbitrary flowId whose preimage did not contain the bundle's hash (e.g.
+    // built from a stale off-chain prediction), stranding the burned funds forever. Now the whole send
+    // reverts before any burn: the AtomicFlowManager recomputes flowId from the preimage and requires
+    // the sent bundle to be one of its legs, declared with the sending chain as its source.
+    const user = chainA.user.address;
+    const deadline = (await chainNow(chainA.provider)) + 3600;
+    const amount = ethers.utils.parseUnits("1", TEST_TOKEN_DECIMALS);
+    const salt = freshBundleSalt();
+    const realHash = await predictLegBundleHash(chainA, chainB, amount, user, salt);
+    const strayLeg = ethers.utils.id("stale predicted bundle hash");
+    const interopCenter = chainA.stack.interopCenter.connect(chainA.user);
+
+    const sendWithPreimage = (preimage: AtomicFlowPreimage) => () =>
+      interopCenter.callStatic.sendBundle(
+        encodeEvmChain(chainB.chainId),
+        [bridgeCallStarter(chainA, amount, user)],
+        [atomicBundleAttr(preimage, 0), interopBundleSaltAttr(salt)],
+        { gasLimit: ATOMIC_SEND_BUNDLE_GAS_LIMIT, value: fee }
+      );
+
+    // 1. Preimage whose legs do NOT include the bundle actually being sent.
+    await expectRevert(
+      sendWithPreimage(flowPreimageOf([strayLeg], [chainA.chainId], deadline)),
+      "atomic send with preimage missing the bundle",
+      customError("AtomicFlowManager", "ManagerCommittedBundleNotInFlow(bytes32,bytes32)")
+    );
+
+    // 2. Preimage that contains the bundle, but declares the wrong source chain for it.
+    const misdeclaredLegs = [
+      { hash: realHash, chainId: chainB.chainId }, // wrong: this leg is sent from chain A
+      { hash: strayLeg, chainId: chainA.chainId },
+    ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
+    await expectRevert(
+      sendWithPreimage(
+        flowPreimageOf(
+          misdeclaredLegs.map((l) => l.hash),
+          misdeclaredLegs.map((l) => l.chainId),
+          deadline
+        )
+      ),
+      "atomic send with wrong declared source chain",
+      customError("AtomicFlowManager", "ManagerCommittedLegSourceChainMismatch(bytes32,uint256,uint256)")
+    );
+
+    // 3. Preimage whose co-leg declares a source chain the Bridgehub does not know. Such a phantom
+    //    leg could never be proven committed OR absent (no MessageRoot presence), so without this
+    //    send-time gate the local burned leg would be stranded with neither finalization nor refund.
+    const unregisteredChainId = 999_999;
+    const phantomLegs = [
+      { hash: realHash, chainId: chainA.chainId },
+      { hash: strayLeg, chainId: unregisteredChainId },
+    ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
+    await expectRevert(
+      sendWithPreimage(
+        flowPreimageOf(
+          phantomLegs.map((l) => l.hash),
+          phantomLegs.map((l) => l.chainId),
+          deadline
+        )
+      ),
+      "atomic send with unregistered co-leg source chain",
+      customError("AtomicFlowManager", "ManagerLegSourceChainNotRegistered(uint256)")
+    );
+
+    // 4. The exact same bundle with a well-formed preimage still sends fine (control for 1/2/3: proves
+    //    the reverts above came from the coupling/registration checks, not from the send setup).
+    const controlLegs = [
+      { hash: realHash, chainId: chainA.chainId },
+      { hash: strayLeg, chainId: chainB.chainId },
+    ].sort((a, b) => (BigNumber.from(a.hash).lt(BigNumber.from(b.hash)) ? -1 : 1));
+    const controlPreimage = flowPreimageOf(
+      controlLegs.map((l) => l.hash),
+      controlLegs.map((l) => l.chainId),
+      deadline
+    );
+    const controlFlowId = computeFlowId(controlPreimage);
+    const lowNull = await lowNullifierIndexFor(chainA.stack.tree, commitValue(controlFlowId, realHash));
+    const controlHash = await interopCenter.callStatic.sendBundle(
+      encodeEvmChain(chainB.chainId),
+      [bridgeCallStarter(chainA, amount, user)],
+      [atomicBundleAttr(controlPreimage, lowNull), interopBundleSaltAttr(salt)],
+      { gasLimit: ATOMIC_SEND_BUNDLE_GAS_LIMIT, value: fee }
+    );
+    expect(controlHash.toLowerCase()).to.equal(realHash.toLowerCase(), "well-formed preimage sends the same bundle");
+  });
+
+  it("timeout negatives: stale/missing settlement roots and non-last in-time batches are rejected", async () => {
+    const deadline = 1_000;
+    const { flowId, flowPreimage, legHashesAsc, missingIdx } = fabricatedFlow(deadline);
+    const missingValue = commitValue(flowId, legHashesAsc[missingIdx]);
+    const flow = atomicFlowTuple({ flowId, preimage: flowPreimage });
+    const managerA = chainA.stack.manager.connect(chainA.user);
+
+    // 1. Settlement interop root NOT created strictly after the deadline (added exactly AT
+    //    `T == deadline` to pin the strict bound): rejected even though the batch itself is in time
+    //    and the absence itself would hold (a stale snapshot proves nothing about the deadline moment).
+    const staleSettlementRootBlock = 203;
+    await ensureSettlementInteropRoot(chainA.provider, staleSettlementRootBlock, deadline);
+    const staleSettlementRootProof = await buildNonInclusionProof({
+      l2Tree: chainB.stack.tree,
+      chainId: chainB.chainId,
+      value: missingValue,
+      l1Timestamp: deadline - 1,
+      provesAgainstBeginRoot: false,
+      slBlock: staleSettlementRootBlock,
+    });
+    await expectRevert(
+      () => managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(staleSettlementRootProof)),
+      "stale settlement interop root",
+      customError("AtomicFlowManager", "ProofInteropRootNotAfterDeadline(uint256,uint64)")
+    );
+
+    // 2. Settlement interop root is missing, so its unset timestamp reads as 0: rejected.
+    const missingSettlementRootProof = await buildNonInclusionProof({
+      l2Tree: chainB.stack.tree,
+      chainId: chainB.chainId,
+      value: missingValue,
+      l1Timestamp: deadline + 1,
+      provesAgainstBeginRoot: true,
+      slBlock: 999_999,
+    });
+    await expectRevert(
+      () => managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(missingSettlementRootProof)),
+      "missing settlement interop root",
+      customError("AtomicFlowManager", "ProofSettlementLayerInteropRootNotImported(uint256,uint256)")
+    );
+
+    // 3. In-time batch that is NOT the chain's last inside the settlement interop root: the batch-leaf
+    //    path has a populated (non-empty-subtree) right sibling at level 0, so the last-batch check
+    //    rejects it.
+    const validSettlementRootBlock = 204;
+    await ensureSettlementInteropRoot(chainA.provider, validSettlementRootBlock, deadline + 5);
+    const notLastBatch = await buildNonInclusionProof({
+      l2Tree: chainB.stack.tree,
+      chainId: chainB.chainId,
+      value: missingValue,
+      l1Timestamp: deadline - 1,
+      provesAgainstBeginRoot: false,
+      slBlock: validSettlementRootBlock,
+      batchLeafSiblings: [ethers.utils.id("populated-right-subtree")],
+      batchLeafMask: 0, // left child at level 0 -> the sibling above must be the empty-subtree hash
+    });
+    await expectRevert(
+      () => managerA.callStatic.authorizeRefund(flow, missingIdx, proofTuple(notLastBatch)),
+      "in-time batch not last in root",
+      customError("AtomicFlowManager", "ProofNotLastBatchInRoot(uint256,bytes32)")
+    );
   });
 });

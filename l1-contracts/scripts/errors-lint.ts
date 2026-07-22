@@ -11,6 +11,7 @@ const CONTRACTS_DIRECTORIES: Record<string, string[]> = {
     "bridge/L1BridgeContractErrors.sol",
     "core/bridgehub/L1BridgehubErrors.sol",
     "interop/InteropErrors.sol",
+    "atomic-interop/AtomicInteropErrors.sol",
     "state-transition/L1StateTransitionErrors.sol",
     "upgrades/ZkSyncUpgradeErrors.sol",
   ],

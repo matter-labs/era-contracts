@@ -29,6 +29,7 @@ const ARTIFACTS = {
   IL2AssetRouter: "IL2AssetRouter.sol/IL2AssetRouter.json",
   IZKChain: "IZKChain.sol/IZKChain.json",
   InteropCenter: "InteropCenter.sol/InteropCenter.json",
+  InteropAttributeParser: "InteropAttributeParser.sol/InteropAttributeParser.json",
   L2InteropHandler: "L2InteropHandler.sol/L2InteropHandler.json",
   IComplexUpgraderZKsyncOSV29: "IComplexUpgraderZKsyncOSV29.sol/IComplexUpgraderZKsyncOSV29.json",
   ITransparentUpgradeableProxy: "TransparentUpgradeableProxy.sol/ITransparentUpgradeableProxy.json",
@@ -67,7 +68,7 @@ const ARTIFACTS = {
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
   TestnetERC20Token: "TestnetERC20Token.sol/TestnetERC20Token.json",
-  // L1-free atomic interop (bundle model). The global IMT + importer were removed on-chain; the
+  // Atomic interop (bundle model). The global IMT + importer were removed on-chain; the
   // per-chain commitment-tree root is carried by the standard interop-root channel, and the
   // (formerly escrow-direct) flow now runs through InteropCenter / InteropHandler with the
   // AtomicFlowManager coordinating the IMT commits and timeout recovery.

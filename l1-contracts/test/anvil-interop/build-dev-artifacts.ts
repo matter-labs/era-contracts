@@ -29,6 +29,10 @@ const ANVIL_INTEROP_DEV_ARTIFACTS: DevArtifact[] = [
     contractPath: "contracts/dev-contracts/TransparentUpgradeableProxyForHarness.sol",
     reason: "pulls TransparentUpgradeableProxy into forge out/ for the harness proxy-upgrade ABI",
   },
+  {
+    contractPath: "contracts/interop/L2InteropRootStorage.sol",
+    reason: "spec 13 and the live-interop helpers read the imported (root, timestamp) tuple via its ABI",
+  },
 ];
 
 function main(): void {

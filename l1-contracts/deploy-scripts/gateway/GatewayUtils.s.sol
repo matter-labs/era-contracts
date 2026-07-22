@@ -28,7 +28,7 @@ import {Utils} from "../utils/Utils.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
+import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
 import {ConfirmTransferResultData, TxStatus, MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
 import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
@@ -111,7 +111,7 @@ contract GatewayUtils is Script, IGatewayUtils {
         address l1InteropHandlerAddr = l1Nullifier.l1InteropHandler();
 
         vm.broadcast();
-        IInteropHandlerBase(l1InteropHandlerAddr).executeBundle(
+        L1InteropHandler(l1InteropHandlerAddr).executeBundle(
             UnsafeBytes.readRemainingBytes(message, 1),
             MessageInclusionProof({
                 chainId: gatewayChainId,

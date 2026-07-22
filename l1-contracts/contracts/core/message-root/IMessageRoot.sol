@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IMessageVerification} from "../../common/interfaces/IMessageVerification.sol";
-import {ProofData} from "../../common/Messaging.sol";
+import {ProofData, StoredInteropRoot} from "../../common/Messaging.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
@@ -52,12 +52,23 @@ interface IMessageRootBase is IMessageVerification {
     event NewChainRoot(uint256 indexed chainId, bytes32 chainRoot, bytes32 chainIdLeafHash);
 
     /// @notice Emitted whenever the sharedTree is updated, and the new InteropRoot (root of the sharedTree) is generated.
-    /// @param chainId The ID of the chain where the sharedTree was updated.
+    /// @param chainId The ID of the chain where the sharedTree was updated (the settlement layer's own chain id).
     /// @param blockNumber The block number of the block in which the sharedTree was updated.
-    /// @param logId The ID of the log emitted when a new InteropRoot.
-    /// @param sides The "sides" of the interop root. In this release which uses proof-based interop the sides is an array
-    /// of length one, which only include the interop root itself. More on that in `L2InteropRootStorage` contract.
-    event NewInteropRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
+    /// @param logId The per-block ID of the emission: all NewInteropRoot events within one block share
+    /// the same logId (it increments at most once per block), so off-chain consumers can group them.
+    /// @param timestamp The block timestamp at which the root was created — the third element of the
+    /// `(blockNumber, root, timestamp)` tuple chains import, so the event reports the full interop
+    /// root info.
+    /// @param sides The "sides" of the interop root. In this release, which uses proof-based interop, the
+    /// sides are an array of length one holding only the interop root itself. More on that in the
+    /// `L2InteropRootStorage` contract.
+    event NewInteropRoot(
+        uint256 indexed chainId,
+        uint256 indexed blockNumber,
+        uint256 indexed logId,
+        uint256 timestamp,
+        bytes32[] sides
+    );
 
     function BRIDGE_HUB() external view returns (address);
 
@@ -65,9 +76,16 @@ interface IMessageRootBase is IMessageVerification {
 
     function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external;
 
+    function addChainBatchRootV32(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external;
+
+    function seedGenesisRoot(uint256 _chainId) external;
+
     function chainBatchRoots(uint256 _chainId, uint256 _batchNumber) external view returns (bytes32);
 
-    function historicalRoot(uint256 _blockNumber) external view returns (bytes32);
+    /// @notice The global message root written at `_blockNumber` together with the block timestamp at
+    /// which it was written — the `(blockNumber, root, timestamp)` tuple that chains import; the
+    /// imported tuple is double checked against this record during batch execution.
+    function historicalRoot(uint256 _blockNumber) external view returns (StoredInteropRoot memory);
 
     /// @dev Used to parse the merkle proof data, this function calls a library function.
     function getProofData(
@@ -81,6 +99,10 @@ interface IMessageRootBase is IMessageVerification {
     function setMigratingChainBatchNumber(uint256 _chainId, uint256 _batchNumber) external;
 
     function currentChainBatchNumber(uint256 _chainId) external view returns (uint256);
+
+    /// @notice The number of batch leaves in a chain's tree on this settlement layer (non-zero means
+    /// the chain has at least one batch inside the aggregated shared root).
+    function chainTreeLeafCount(uint256 _chainId) external view returns (uint256);
 
     function getMerklePathForChain(uint256 _chainId) external view returns (bytes32[] memory);
 }

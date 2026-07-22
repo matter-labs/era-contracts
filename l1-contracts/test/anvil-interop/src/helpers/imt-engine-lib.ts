@@ -8,11 +8,13 @@
  *
  * Id derivations:
  *   - `bundleHash = keccak256(abi.encode(sourceChainId, abi.encode(InteropBundle)))`. The atomic send
- *     params (flowId, deadline, lowNullifierIndex) travel via the `atomicBundle` attribute, not the
- *     InteropBundle, so `bundleHash` does not depend on `flowId`.
- *   - `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`,
+ *     params (the full flowId preimage + lowNullifierIndex) travel via the `atomicBundle` attribute, not
+ *     the InteropBundle, so `bundleHash` does not depend on the preimage.
+ *   - `flowId = keccak256(abi.encode(preimage))`,
  *     bundle hashes strictly ascending with source chain ids positionally aligned. Since `bundleHash` is
- *     independent of `flowId`, `flowId` is computable off-chain before the send.
+ *     independent of the preimage, each leg's `bundleHash` (and thus the preimage) is computable off-chain
+ *     before the send; on-chain the AtomicFlowManager recomputes `flowId` from the attribute-supplied
+ *     preimage and requires the sent bundle to be one of its legs.
  *   - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
  *
  * Tree specifics (match IndexedMerkleTree.sol + FullMerkle.sol, the dynamic-height tree):
@@ -26,14 +28,18 @@
  *   - the tree seeds the {0,0,0} head at index 0, then appends each inserted leaf and repoints its
  *     low-nullifier, splicing the sorted linked list (forward search bounded by MAX_LOW_INDEX_SEARCH_ATTEMPTS).
  *
- * The `(root)` message authenticating a chain's IMT root is verified via
- * {L2_MESSAGE_VERIFICATION}.proveL2MessageInclusionShared. On the harness that address hosts
- * {MockL2MessageVerification}, which always returns true, so the root check is out of harness scope.
- * The deadline is a settlement-layer timestamp: {AtomicInteropProof} re-parses the same `messageProof`
- * bytes with the real {MessageHashing._getProofData} to derive the batch's `l1Timestamp` and the SL
- * chain id, so the harness builds format-valid multi-hop proof bytes carrying a chosen `l1Timestamp`
- * ({buildSlProofBytes}). The IMT membership / low-nullifier layer and the `l1Timestamp`-vs-deadline check
- * (inclusion `l1Timestamp <= deadline`; timeout adjacency) are the parts actually exercised.
+ * A chain's IMT root is authenticated as a **chain-batch-root leaf** (leaf 2 = batch begin, leaf 3 =
+ * batch end; see ChainBatchRootTree.sol) via {L2_MESSAGE_VERIFICATION}.proveL2LeafInclusionShared. On
+ * the harness that address hosts {MockL2MessageVerification}, which always returns true, so the root
+ * check is out of harness scope. {AtomicInteropProof} re-parses the same `settlementProof` bytes with
+ * the real {MessageHashing} accessors and REQUIRES the leaf-to-batch-root section of the proof to be
+ * exactly CHAIN_BATCH_ROOT_TREE_DEPTH (3) hops, so the harness builds format-valid multi-hop proof
+ * bytes carrying a chosen `l1Timestamp` and batch-leaf path ({buildSlProofBytes}). The parts actually
+ * exercised are the IMT membership / low-nullifier layer and the timeout-protocol clock checks; the
+ * protocol itself (finality/timeout conditions, branches, boundaries) is described ONCE in the
+ * AtomicInteropProof.sol library header — the settlement interop root timestamps it reads come from
+ * the REAL `L2InteropRootStorage.interopRoots[slChainId][slBlock]` tuples, which the harness adds via
+ * bootloader impersonation.
  */
 
 import type { providers, Wallet } from "ethers";
@@ -60,19 +66,22 @@ export interface IMTLeaf {
 
 /**
  * Mirror of `ImtProof` in IAtomicInterop.sol, used for both inclusion and non-inclusion. The IMT part
- * (chainImtRoot/leaf/imtLeafIndex/imtProof) is built from the engine; the message-inclusion part
- * (batchNumber/messageIndex/messageProof/messageTxNumberInBatch) authenticates the `(root)` L2->L1
- * message and, via {MessageHashing._getProofData}, carries the `l1Timestamp` used for the
- * deadline check. For inclusion `leaf` is the value's own leaf; for non-inclusion it is the
- * low-nullifier (predecessor) leaf.
+ * (chainImtRoot/leaf/imtLeafIndex/imtProof) is built from the engine; the settlement part
+ * (batchNumber/settlementProof) authenticates `chainImtRoot` as a chain-batch-root leaf (2 = batch
+ * begin for absence, 3 = batch end for inclusion — the mask is hardcoded on-chain per verify path)
+ * and, via {MessageHashing._getProofData}, carries the `l1Timestamp` used for the deadline check.
+ * For inclusion `leaf` is the value's own leaf; for non-inclusion it is the low-nullifier
+ * (predecessor) leaf.
  */
 export interface ImtProof {
   sourceChainId: string;
   batchNumber: string;
   chainImtRoot: string;
-  messageTxNumberInBatch: number;
-  messageIndex: string;
-  messageProof: string[];
+  /** Timeout-branch selector: true authenticates against the batch-BEGIN root (leaf 2), false the
+   * batch-END root (leaf 3). Validated on-chain against the authenticated batch `l1Timestamp`
+   * (begin => late batch, end => in-time last batch); ignored by the finality path. */
+  provesAgainstBeginRoot: boolean;
+  settlementProof: string[];
   leaf: IMTLeaf;
   imtLeafIndex: number;
   imtProof: string[];
@@ -95,22 +104,36 @@ export function indexedLeafHash(leaf: IMTLeaf): string {
 }
 
 /**
- * flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId)),
- * matching {AtomicFlowManager}'s preimage. `bundleHashes` must be strictly ascending, `chainIds` are
- * positionally aligned, and `settlementLayerChainId` binds all legs to a single settlement layer.
+ * The full `flowId` preimage (mirrors the Solidity `AtomicFlowPreimage` struct — the field set embedded
+ * in `AtomicFlow` and carried by the `atomicBundle` attribute). `legBundleHashes` must be strictly
+ * ascending with `legSourceChainIds` positionally aligned; `deadline` is a settlement-layer timestamp.
  */
-export function computeFlowId(
-  bundleHashes: string[],
-  chainIds: (BigNumber | number | string)[],
-  deadline: number,
-  settlementLayerChainId: BigNumber | number | string = DEFAULT_SL_CHAIN_ID
-): string {
-  return utils.keccak256(
-    utils.defaultAbiCoder.encode(
-      ["bytes32[]", "uint256[]", "uint64", "uint256"],
-      [bundleHashes, chainIds.map((c) => BigNumber.from(c)), deadline, BigNumber.from(settlementLayerChainId)]
-    )
-  );
+export interface AtomicFlowPreimage {
+  deadline: number;
+  settlementLayerChainId: BigNumber | number | string;
+  legBundleHashes: string[];
+  legSourceChainIds: (BigNumber | number | string)[];
+}
+
+/** The Solidity tuple type of `AtomicFlowPreimage`, in struct field order. */
+const FLOW_PREIMAGE_TUPLE_TYPE = "tuple(uint64,uint256,bytes32[],uint256[])";
+
+/**
+ * flowId = keccak256(abi.encode(preimage)) — the ABI encoding of the whole `AtomicFlowPreimage`
+ * struct, matching {AtomicFlowManager._validateAndComputeFlowId}.
+ */
+export function computeFlowId(preimage: AtomicFlowPreimage): string {
+  return utils.keccak256(utils.defaultAbiCoder.encode([FLOW_PREIMAGE_TUPLE_TYPE], [flowPreimageTuple(preimage)]));
+}
+
+/** Encode an {AtomicFlowPreimage} as its Solidity tuple: (deadline, settlementLayerChainId, legBundleHashes, legSourceChainIds). */
+export function flowPreimageTuple(preimage: AtomicFlowPreimage): unknown[] {
+  return [
+    preimage.deadline,
+    BigNumber.from(preimage.settlementLayerChainId),
+    preimage.legBundleHashes,
+    preimage.legSourceChainIds.map((c) => BigNumber.from(c)),
+  ];
 }
 
 // ── Dynamic-height FullMerkle port (leaf hashing / root / path) ───────────────────
@@ -328,68 +351,105 @@ export async function lowNullifierIndexFor(tree: Contract, value: string, blockT
 
 // ── Proof builders ────────────────────────────────────────────────────────────────────────
 
-/** Default settlement-layer chain id encoded into proof bytes. Arbitrary on the harness, since
- * {MockL2MessageVerification} accepts any message. */
-export const DEFAULT_SL_CHAIN_ID = 506;
+/** Default settlement-layer chain id encoded into proof bytes and bound into flow ids. Must equal
+ * the L1 chain id the AtomicFlowManager was initialized with (`initL2`): in this release interop
+ * legs settle on L1 only and the manager rejects flows declaring any other settlement layer. The
+ * harness L1 is the default anvil chain (31337). */
+export const DEFAULT_SL_CHAIN_ID = 31337;
+
+/** Depth of the chain batch root tree — mirrors ChainBatchRootTree.TREE_DEPTH; the on-chain
+ * verifier requires the leaf-to-batch-root proof section to be exactly this long. */
+export const CHAIN_BATCH_ROOT_TREE_DEPTH = 3;
 
 /**
- * Builds the minimal format-valid multi-hop L2-message inclusion proof bytes that
+ * Builds the minimal format-valid multi-hop leaf inclusion proof bytes that
  * {MessageHashing._getProofData} parses into a chosen `l1Timestamp` and settlement-layer
- * chain id (with `finalProofNode == false`). The deadline is compared against `t`; the SL snapshot block
- * is parsed but not used for acceptance, so it is an arbitrary placeholder.
+ * chain id (with `finalProofNode == false`). `slBlock` identifies the settlement interop root tuple
+ * that the timeout path reads from `interopRoots[slChainId][slBlock]`.
  *
- * Byte layout (logLeafProofLen=0, batchLeafProofLen=0 -> no path nodes, so the mask words are 0):
- *   [0] metadata header = version(0x01) << 248 | logLeafProofLen(0) | batchLeafProofLen(0) |
- *       finalProofNode(0); the low 28 bytes MUST be zero (new versioned format).
- *   [1] l1Timestamp = the settlement-layer timestamp bound into the batch leaf (read right after the
- *       log-leaf proof). Format-only on the harness (the mock accepts any message), so a chosen value.
- *   [2] batchLeafProofMask = 0.
- *   [3] settlementLayerPackedBatchInfo = (slBlock << 128) | mask(0).
- *   [4] settlementLayerChainId.
- * `messageIndex` (the leaf-proof mask) must be 0, since logLeafProofLen==0 requires index < 1.
+ * Byte layout (logLeafProofLen=3 — the chain-batch-root top-tree path {AtomicInteropProof} enforces):
+ *   [0]      metadata header = version(0x01) | logLeafProofLen(3) | batchLeafProofLen(n) |
+ *            finalProofNode(0); the low 28 bytes MUST be zero (new versioned format).
+ *   [1..3]   the 3 top-tree siblings hashing the IMT-root leaf up to the chain batch root. Placeholders
+ *            on the harness ({MockL2MessageVerification} accepts any leaf/root); in production these are
+ *            the real siblings (other IMT root, node(logsRoot, multichainRoot), reserved-subtree node).
+ *   [4]      l1Timestamp = the settlement-layer timestamp bound into the batch leaf (read right after
+ *            the leaf proof). Format-only on the harness, so a chosen value.
+ *   [5]      batchLeafProofMask (`batchLeafMask`).
+ *   [6..6+n) the batch-leaf path siblings (`batchLeafSiblings`; the chain's batch tree inside the SL
+ *            shared root). Empty by default — a single-leaf (genesis-only) chain tree has a
+ *            zero-length path — which also makes the timeout protocol's "last batch in root" check
+ *            trivially pass. Supply non-empty siblings to exercise that check.
+ *   [last-1] settlementLayerPackedBatchInfo = (slBlock << 128) | mask(0).
+ *   [last]   settlementLayerChainId.
+ * The leaf-proof mask is supplied on-chain by the verify path (2 = batch-begin leaf, 3 = batch-end
+ * leaf, selected by the verify function / timeout branch).
  */
 export function buildSlProofBytes(
   slBlock: number,
   slChainId: number = DEFAULT_SL_CHAIN_ID,
-  l1Timestamp: BigNumber | number | string = 0
+  l1Timestamp: BigNumber | number | string = 0,
+  batchLeafSiblings: string[] = [],
+  batchLeafMask: BigNumber | number | string = 0
 ): string[] {
-  const metadata = utils.hexZeroPad(BigNumber.from(0x01).shl(248).toHexString(), 32);
+  const metadata = utils.hexZeroPad(
+    BigNumber.from(0x01)
+      .shl(248)
+      .or(BigNumber.from(CHAIN_BATCH_ROOT_TREE_DEPTH).shl(240))
+      .or(BigNumber.from(batchLeafSiblings.length).shl(232))
+      .toHexString(),
+    32
+  );
+  const topTreeSiblings = new Array(CHAIN_BATCH_ROOT_TREE_DEPTH).fill(utils.hexZeroPad("0x00", 32));
   const l1TimestampWord = utils.hexZeroPad(BigNumber.from(l1Timestamp).toHexString(), 32);
-  const batchLeafProofMask = utils.hexZeroPad("0x00", 32);
+  const batchLeafProofMask = utils.hexZeroPad(BigNumber.from(batchLeafMask).toHexString(), 32);
   const packedBatchInfo = utils.hexZeroPad(BigNumber.from(slBlock).shl(128).toHexString(), 32);
   const settlementLayerChainId = utils.hexZeroPad(BigNumber.from(slChainId).toHexString(), 32);
-  return [metadata, l1TimestampWord, batchLeafProofMask, packedBatchInfo, settlementLayerChainId];
+  return [
+    metadata,
+    ...topTreeSiblings,
+    l1TimestampWord,
+    batchLeafProofMask,
+    ...batchLeafSiblings.map((s) => utils.hexZeroPad(s, 32)),
+    packedBatchInfo,
+    settlementLayerChainId,
+  ];
 }
 
 /**
- * Well-formed message-inclusion proof carrying a chosen `l1Timestamp` and batch number.
- * {MockL2MessageVerification} accepts any message, but {MessageHashing._getProofData} parses these bytes
- * to derive `t` and the SL chain id, which {AtomicInteropProof} compares against the deadline (inclusion:
- * `t <= deadline`; timeout adjacency: absence `t_N <= deadline`, successor `t_{N+1} > deadline`).
+ * Well-formed settlement proof carrying a chosen `l1Timestamp`, batch number and SL snapshot block.
+ * {MockL2MessageVerification} accepts any leaf, but {MessageHashing._getProofData} parses these bytes
+ * to derive `t`, the SL chain id and the SL snapshot block, which {AtomicInteropProof} uses for the
+ * clock checks (see the AtomicInteropProof.sol library header for the conditions).
  */
-function messageProofForBatch(params: {
+function settlementProofForBatch(params: {
   l1Timestamp: BigNumber | number | string;
   batchNumber?: number | string;
   slChainId?: number;
+  slBlock?: number;
+  batchLeafSiblings?: string[];
+  batchLeafMask?: BigNumber | number | string;
 }): {
   batchNumber: string;
-  messageIndex: string;
-  messageTxNumberInBatch: number;
-  messageProof: string[];
+  settlementProof: string[];
 } {
-  const { l1Timestamp, batchNumber = "1", slChainId = DEFAULT_SL_CHAIN_ID } = params;
+  const {
+    l1Timestamp,
+    batchNumber = "1",
+    slChainId = DEFAULT_SL_CHAIN_ID,
+    slBlock = 1,
+    batchLeafSiblings = [],
+    batchLeafMask = 0,
+  } = params;
   return {
     batchNumber: batchNumber.toString(),
-    messageIndex: "0",
-    messageTxNumberInBatch: 0,
-    // slBlock is an arbitrary placeholder (parsed but not used for acceptance on the harness).
-    messageProof: buildSlProofBytes(1, slChainId, l1Timestamp),
+    settlementProof: buildSlProofBytes(slBlock, slChainId, l1Timestamp, batchLeafSiblings, batchLeafMask),
   };
 }
 
 /**
  * Build an inclusion {ImtProof} for `value` against `chainId`'s live IMT (`leaf` is the value's own leaf),
- * carrying `l1Timestamp` (must be `<= deadline` for `requireFlowFinalized` to accept).
+ * carrying `l1Timestamp` (must satisfy the finality bound — see AtomicInteropProof.sol).
  */
 export async function buildInclusionProof(params: {
   l2Tree: Contract;
@@ -413,28 +473,51 @@ export async function buildInclusionProof(params: {
   return {
     sourceChainId: BigNumber.from(chainId).toString(),
     chainImtRoot: imt.root,
+    // The finality path always authenticates the end root; the branch selector is ignored.
+    provesAgainstBeginRoot: false,
     leaf: imt.leaves[idx],
     imtLeafIndex: idx,
     imtProof: imt.engine.merklePath(idx),
-    ...messageProofForBatch({ l1Timestamp, slChainId }),
+    ...settlementProofForBatch({ l1Timestamp, slChainId }),
   };
 }
 
 /**
- * Build the absence {ImtProof} of the timeout adjacency pair: proves `value` is absent from `chainId`'s
- * live IMT (`leaf` is the low-nullifier / predecessor leaf), in the last in-time batch `N` whose
- * `l1Timestamp` is `<= deadline`.
+ * Build the timeout absence {ImtProof}: proves `value` is absent from `chainId`'s live IMT (`leaf` is
+ * the low-nullifier / predecessor leaf). The live tree root stands in for the batch-begin (late
+ * batch) or batch-end (last in-time batch) IMT root snapshot on the harness; the timeout conditions
+ * the proof is checked against are described in the AtomicInteropProof.sol library header, and the
+ * settlement interop root it resolves is added via bootloader impersonation (see the spec's
+ * `ensureSettlementInteropRoot`).
  */
 export async function buildNonInclusionProof(params: {
   l2Tree: Contract;
   chainId: BigNumber | number | string;
   value: string;
   l1Timestamp: BigNumber | number | string;
+  /** The declared timeout branch (see {ImtProof.provesAgainstBeginRoot}); an honest prover uses
+   * `l1Timestamp > deadline`. */
+  provesAgainstBeginRoot: boolean;
   batchNumber?: number | string;
   slChainId?: number;
+  slBlock?: number;
+  batchLeafSiblings?: string[];
+  batchLeafMask?: BigNumber | number | string;
   l2BlockTag?: number;
 }): Promise<ImtProof> {
-  const { l2Tree, chainId, value, l1Timestamp, batchNumber = 1, slChainId, l2BlockTag } = params;
+  const {
+    l2Tree,
+    chainId,
+    value,
+    l1Timestamp,
+    provesAgainstBeginRoot,
+    batchNumber = 1,
+    slChainId,
+    slBlock,
+    batchLeafSiblings,
+    batchLeafMask,
+    l2BlockTag,
+  } = params;
   const imt = await reconstructChainImt(l2Tree, l2BlockTag);
   const lowIndex = findLowNullifierIndex(imt.leaves, value); // throws if value present
 
@@ -446,37 +529,11 @@ export async function buildNonInclusionProof(params: {
   return {
     sourceChainId: BigNumber.from(chainId).toString(),
     chainImtRoot: imt.root,
+    provesAgainstBeginRoot,
     leaf: imt.leaves[lowIndex],
     imtLeafIndex: lowIndex,
     imtProof: imt.engine.merklePath(lowIndex),
-    ...messageProofForBatch({ l1Timestamp, batchNumber, slChainId }),
-  };
-}
-
-/**
- * Build the successor {ImtProof} of the timeout adjacency pair: the consecutive batch `N+1`, same source
- * chain and settlement layer, with `l1Timestamp > deadline`. Its only job is to pin `N` as the
- * last in-time batch — {AtomicInteropProof.verifyTimeoutAdjacency} authenticates its root and reads
- * `t`/slChainId but does not check IMT membership, so the membership fields are placeholders (the current
- * head leaf and its path).
- */
-export async function buildSuccessorProof(params: {
-  l2Tree: Contract;
-  chainId: BigNumber | number | string;
-  l1Timestamp: BigNumber | number | string;
-  batchNumber: number | string;
-  slChainId?: number;
-  l2BlockTag?: number;
-}): Promise<ImtProof> {
-  const { l2Tree, chainId, l1Timestamp, batchNumber, slChainId, l2BlockTag } = params;
-  const imt = await reconstructChainImt(l2Tree, l2BlockTag);
-  return {
-    sourceChainId: BigNumber.from(chainId).toString(),
-    chainImtRoot: imt.root,
-    leaf: imt.leaves[0],
-    imtLeafIndex: 0,
-    imtProof: imt.engine.merklePath(0),
-    ...messageProofForBatch({ l1Timestamp, batchNumber, slChainId }),
+    ...settlementProofForBatch({ l1Timestamp, batchNumber, slChainId, slBlock, batchLeafSiblings, batchLeafMask }),
   };
 }
 
@@ -493,9 +550,8 @@ export function proofTuple(p: ImtProof): unknown[] {
     p.sourceChainId,
     p.batchNumber,
     p.chainImtRoot,
-    p.messageTxNumberInBatch,
-    p.messageIndex,
-    p.messageProof,
+    p.provesAgainstBeginRoot,
+    p.settlementProof,
     leafTuple(p.leaf),
     p.imtLeafIndex,
     p.imtProof,
@@ -504,46 +560,21 @@ export function proofTuple(p: ImtProof): unknown[] {
 
 /**
  * Build the `AtomicFlow` tuple {AtomicFlowManager} consumes (the flow definition). Tuple field order
- * matches the struct: (flowId, deadline, settlementLayerChainId, legBundleHashes, legSourceChainIds).
- * `legBundleHashes` is ascending; `chainIds` is positionally aligned; `settlementLayerChainId` defaults
- * to {DEFAULT_SL_CHAIN_ID}.
+ * matches the struct: (flowId, preimage).
  */
-export function atomicFlowTuple(params: {
-  flowId: string;
-  deadline: number;
-  settlementLayerChainId?: BigNumber | number | string;
-  legBundleHashes: string[];
-  chainIds: (BigNumber | number | string)[];
-}): unknown[] {
-  return [
-    params.flowId,
-    params.deadline,
-    BigNumber.from(params.settlementLayerChainId ?? DEFAULT_SL_CHAIN_ID),
-    params.legBundleHashes,
-    params.chainIds.map((c) => BigNumber.from(c)),
-  ];
+export function atomicFlowTuple(params: { flowId: string; preimage: AtomicFlowPreimage }): unknown[] {
+  return [params.flowId, flowPreimageTuple(params.preimage)];
 }
 
 /**
- * Build the `AtomicFinalityProof` tuple {InteropHandler.executeAtomicBundle} consumes: the flow
- * definition ({AtomicFlow}) plus one inclusion proof per leg, in `legBundleHashes` order. Tuple field
- * order matches the struct: (flow, proofs).
+ * Build the `AtomicFinalityProof` tuple {L2InteropHandler.executeAtomicBundle} consumes: the flow
+ * definition ({AtomicFlow}) plus one inclusion proof per leg, in `preimage.legBundleHashes` order.
+ * Tuple field order matches the struct: (flow, proofs).
  */
 export function atomicFinalityProofTuple(params: {
   flowId: string;
-  deadline: number;
-  settlementLayerChainId?: BigNumber | number | string;
-  legBundleHashes: string[];
-  chainIds: (BigNumber | number | string)[];
+  preimage: AtomicFlowPreimage;
   proofs: ImtProof[];
 }): unknown[] {
   return [atomicFlowTuple(params), params.proofs.map(proofTuple)];
-}
-
-/**
- * Build the `AtomicTimeoutProof` tuple {AtomicFlowManager.authorizeRefund} consumes — the adjacency pair
- * `(absence, successor)`, each an {ImtProof}. Tuple field order matches the struct: `(absence, successor)`.
- */
-export function atomicTimeoutProofTuple(absence: ImtProof, successor: ImtProof): unknown[] {
-  return [proofTuple(absence), proofTuple(successor)];
 }

@@ -21,6 +21,14 @@ interface IAssetRouterShared {
         uint256 _amount
     ) external payable;
 
+    /// @notice Refunds a timed-out atomic-interop base-token value leg funded via
+    /// {bridgehubDepositBaseToken}, re-crediting the destination base-token asset to the depositor.
+    /// @param _chainId The chain the asset was being bridged to at burn time.
+    /// @param _assetId The destination base-token asset id that was burned.
+    /// @param _receiver The original depositor to refund.
+    /// @param _amount The amount to recover.
+    function bridgehubRecoverBaseToken(uint256 _chainId, bytes32 _assetId, address _receiver, uint256 _amount) external;
+
     /// @notice Generates a calldata for calling the deposit finalization on the L2 native token contract.
     /// @param _sender The address of the deposit initiator.
     /// @param _assetId The deposited asset ID.

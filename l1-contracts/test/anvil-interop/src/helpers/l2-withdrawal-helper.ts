@@ -113,6 +113,8 @@ export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): P
     destinationChainId: l1ChainId,
     callStarters: [callStarter],
     value: amount,
+    // L2->L1 withdrawal: non-atomic, published to L1 (no atomic flow / bundleHash preview).
+    atomic: false,
   });
   console.log(`   L2 withdraw tx: cast run ${sendResult.txHash} -r ${l2RpcUrl}`);
 
@@ -185,6 +187,8 @@ export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalPar
     destinationChainId: l1ChainId,
     callStarters: [callStarter],
     value: ethers.constants.Zero,
+    // L2->L1 withdrawal: non-atomic, published to L1 (no atomic flow / bundleHash preview).
+    atomic: false,
   });
   console.log(`   L2 withdraw tx: cast run ${sendResult.txHash} -r ${l2RpcUrl}`);
 

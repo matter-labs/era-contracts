@@ -26,10 +26,11 @@ export const L2_CHAIN_ASSET_HANDLER_ADDR = "0x0000000000000000000000000000000000
 export const L2_NTV_BEACON_DEPLOYER_ADDR = "0x000000000000000000000000000000000001000b";
 export const L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR = "0x000000000000000000000000000000000001000c";
 export const INTEROP_CENTER_ADDR = "0x000000000000000000000000000000000001000d";
+export const INTEROP_ATTRIBUTE_PARSER_ADDR = "0x0000000000000000000000000000000000010015";
 export const L2_INTEROP_HANDLER_ADDR = "0x000000000000000000000000000000000001000e";
 export const L2_BASE_TOKEN_HOLDER_ADDR = "0x0000000000000000000000000000000000010011";
 
-// L1-free atomic interop (bundle model) canonical built-in addresses. Mirrors
+// Atomic interop (bundle model) canonical built-in addresses. Mirrors
 // L2_INTEROP_COMMITMENT_TREE_ADDR / L2_ATOMIC_FLOW_MANAGER_ADDR in
 // contracts/common/l2-helpers/L2ContractAddresses.sol. Slot 0x10013 is intentionally
 // skipped: it previously hosted the removed L2GlobalInteropRootImporter.
@@ -55,12 +56,10 @@ export const ANVIL_FUND_BALANCE = "0x56BC75E2D63100000";
 
 export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF";
 
-// Default gas limits for test transactions
-export const INTEROP_SEND_BUNDLE_GAS_LIMIT = 500_000;
-// Atomic sends additionally append the leg's commit value to the chain's {L2InteropCommitmentTree}
-// via {AtomicFlowManager.append}. The dynamic-height IndexedMerkleTree (#2235, FullMerkle-backed)
-// insert grows the tree and rehashes the populated path, so the atomic `sendBundle` needs a much
-// larger cap than the plain L1-publish path above.
+// Default gas limits for test transactions.
+// Every interop send is atomic: it appends the leg's commit value to the chain's {L2InteropCommitmentTree}
+// via {AtomicFlowManager.append}. The dynamic-height IndexedMerkleTree (#2235, FullMerkle-backed) insert
+// grows the tree and rehashes the populated path, so `sendBundle` needs a generous gas cap.
 export const ATOMIC_SEND_BUNDLE_GAS_LIMIT = 3_000_000;
 export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
 // 7 gwei, used by Anvil interop specs to exercise the non-zero dynamic fee path.
@@ -80,10 +79,10 @@ export const TEST_TOKEN_DECIMALS = 18;
 export const TEST_TOKEN_MINT_AMOUNT_UNITS = "1000";
 
 // Mirrors the InteropBundle struct in contracts/common/Messaging.sol. The trailing BundleAttributes
-// tuple is the original 3 fields (executionAddress, unbundlerAddress, useFixedFee). Atomic-send params
-// (flowId, deadline, lowNullifierIndex) do NOT live in the bundle — they travel via the `atomicBundle`
-// ERC-7786 attribute and are parsed by the InteropCenter into an internal AtomicSend struct, so they
-// never affect the bundle bytes / bundleHash.
+// tuple is the 4 fields (executionAddress, unbundlerAddress, useFixedFee, salt). Atomic-send params
+// (the full flowId preimage + lowNullifierIndex) do NOT live in the bundle — they travel via the
+// `atomicBundle` ERC-7786 attribute and are parsed by the InteropCenter into an internal AtomicSend
+// struct, so they never affect the bundle bytes / bundleHash.
 export const INTEROP_BUNDLE_TUPLE_TYPE =
   "tuple(bytes1,uint256,uint256,bytes32,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes,bool,bytes32))";
 // Canonical signature of `InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle)`,

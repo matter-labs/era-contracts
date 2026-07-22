@@ -3,61 +3,59 @@ pragma solidity ^0.8.21;
 
 import {LegState} from "./IAtomicInterop.sol";
 
-// ── L2InteropCommitmentTree errors ───────────────────────────────────────────────────
-// Value / low-nullifier validation now lives in {IndexedMerkleTree} and surfaces
-// its own `IMT*` errors; only the shell's appender ACL error remains here.
-/// @dev `insert` is restricted to the canonical {AtomicFlowManager}.
+// 0x742d1b5b
 error CommitmentTreeNotAppender(address sender);
-
-// ── AtomicFlowManager errors ─────────────────────────────────────────────────────────
-/// @dev `append` is restricted to the canonical {InteropCenter}.
-error ManagerNotInteropCenter(address sender);
-/// @dev `requireFlowFinalized` is restricted to the canonical {InteropHandler}.
-error ManagerNotInteropHandler(address sender);
-/// @dev A `(flowId, bundleHash)` source leg was already committed on this chain.
-error ManagerLegAlreadyCommitted(bytes32 flowId, bytes32 bundleHash);
-/// @dev `claimRefund` was called for a leg not in the `Revertable` state.
-error ManagerLegNotRevertable(bytes32 flowId, bytes32 bundleHash, LegState actual);
-/// @dev The recomputed `flowId` does not match the one supplied.
-error ManagerFlowIdMismatch(bytes32 expected, bytes32 computed);
-/// @dev The supplied per-leg bundle hashes are not strictly ascending.
+// 0x00bf0e3a
+error ManagerAlreadyInitialized();
+// 0xeff05b36
 error ManagerBundleHashesNotSorted();
-/// @dev The per-leg source chain id array length does not equal the number of legs.
-/// `legSourceChainIds` is aligned 1:1 with `legBundleHashes`; it may repeat and need not be ascending,
-/// so only its length is checked.
-error ManagerLegSourceChainIdsLengthMismatch(uint256 legs, uint256 chainIds);
-/// @dev The number of inclusion proofs does not equal the number of legs.
-error ManagerProofCountMismatch(uint256 legs, uint256 proofs);
-/// @dev The bundle being executed on the destination is not one of the flow's legs.
+// 0xca272942
+error ManagerCommittedBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
+// 0xbd57b2b9
+error ManagerCommittedLegSourceChainMismatch(bytes32 flowId, uint256 thisChainId, uint256 declaredSourceChainId);
+// 0x6a8bdfa0
 error ManagerExecutingBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
-/// @dev The reverted bundle has no recoverable calls, so there are no source funds to return.
+// 0xf8585117
+error ManagerFlowIdMismatch(bytes32 expected, bytes32 computed);
+// 0x3a62d7e3
+error ManagerLegAlreadyCommitted(bytes32 flowId, bytes32 bundleHash);
+// 0x83562707
+error ManagerLegNotRevertable(bytes32 flowId, bytes32 bundleHash, LegState actual);
+// 0xe1a77fd3
+error ManagerLegSourceChainIdsLengthMismatch(uint256 legs, uint256 chainIds);
+// 0x62c42f1d
+error ManagerLegSourceChainNotRegistered(uint256 legSourceChainId);
+// 0x1f1f5965
 error ManagerNoRecoverableCalls(bytes32 flowId, bytes32 bundleHash);
-
-// ── AtomicInteropProof library errors ────────────────────────────────────────────────
-/// @dev The commitment tree's `(root)` message could not be proven against the imported interop root
-/// for `(chainId, batchNumber)`.
-error ProofRootMessageInclusionFailed(uint256 chainId, uint256 batchNumber);
-/// @dev The proof is a single-level / commit-based (final-node) proof, which carries no settlement-layer
-/// block anchor. The atomic flow requires a multi-hop / SL-global proof so the deadline can be checked
-/// against `pd.settlementLayerBatchNumber`.
-error ProofMissingSettlementLayerAnchor(uint256 chainId, uint256 batchNumber);
-/// @dev The batch's `l1Timestamp` is newer than the deadline (inclusion / absence-batch path).
+// 0xd7522d7a
+error ManagerNotInteropCenter(address sender);
+// 0x07029ea6
+error ManagerNotInteropHandler(address sender);
+// 0x87fcf6d9
+error ManagerProofCountMismatch(uint256 legs, uint256 proofs);
+// 0xbf1e3a23
+error ManagerSettlementLayerNotL1(uint256 expectedL1ChainId, uint256 actual);
+// 0x2911a778
 error ProofDeadlineExceeded(uint256 batchTimestamp, uint64 deadline);
-/// @dev The batch's `l1Timestamp` is not strictly after the deadline (adjacency-successor path).
-error ProofDeadlineNotExceeded(uint256 batchTimestamp, uint64 deadline);
-/// @dev The commit value is not a member of the authenticated root.
+// 0x0aa51bc5
+error ProofImtRootInclusionFailed(uint256 chainId, uint256 batchNumber, bytes32 imtRoot);
+// 0x8839e86c
 error ProofInclusionFailed(bytes32 root, uint256 value);
-/// @dev The low-nullifier does not certify absence of the commit value in the authenticated root.
+// 0xc04eb5fb
+error ProofInteropRootNotAfterDeadline(uint256 rootTimestamp, uint64 deadline);
+// 0x10657590
+error ProofInvalidChainBatchRootDepth(uint256 expected, uint256 actual);
+// 0x06a2d6b0
+error ProofMissingSettlementLayerBatch(uint256 chainId, uint256 batchNumber);
+// 0x691e9240
 error ProofNonInclusionFailed(bytes32 root, uint256 value);
-/// @dev A proof's `sourceChainId` does not match the leg's declared source chain. Binding these prevents
-/// a non-inclusion proof against an unrelated chain (where the commit value is trivially absent) from
-/// force-refunding an on-time, finalized leg, which would double-mint.
-error ProofSourceChainMismatch(uint256 expectedSourceChainId, uint256 proofSourceChainId);
-/// @dev A proof's resolved settlement-layer chain id does not match the flow's `settlementLayerChainId`.
-/// Legs settling on different settlement layers have incomparable deadline/timestamp scales, so rejecting
-/// them keeps the single-`deadline` comparison well-defined.
+// 0x1ef4c1f6
+error ProofNotLastBatchInRoot(uint256 level, bytes32 sibling);
+// 0x9a462701
+error ProofSettlementLayerInteropRootNotImported(uint256 slChainId, uint256 slBlock);
+// 0x590cae72
 error ProofSettlementLayerMismatch(uint256 expectedSlChainId, uint256 proofSlChainId);
-/// @dev The timeout's adjacency witness is not the consecutive successor of the absence batch
-/// (`successorBatchNumber != absenceBatchNumber + 1`). The witness must be batch N+1 so it pins N as the
-/// last batch with `l1Timestamp <= deadline`.
-error ProofAdjacencyNotConsecutive(uint256 absenceBatchNumber, uint256 successorBatchNumber);
+// 0x75b23b57
+error ProofSourceChainMismatch(uint256 expectedSourceChainId, uint256 proofSourceChainId);
+// 0x81dbd1c1
+error ProofTimeoutBranchMismatch(bool provesAgainstBeginRoot, uint256 l1BatchTimestamp, uint256 deadline);

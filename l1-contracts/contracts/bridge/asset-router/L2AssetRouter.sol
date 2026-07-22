@@ -13,6 +13,7 @@ import {IL2Bridgehub} from "../../core/bridgehub/IL2Bridgehub.sol";
 import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {InteropCallStarter} from "../../common/Messaging.sol";
 import {IAtomicRecoverable} from "../../atomic-interop/IAtomicRecoverable.sol";
@@ -137,7 +138,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     }
 
     /// @notice Checks that the message sender is the canonical atomic-flow manager, which drives
-    /// `recoverAtomicCall` for the L1-free atomic interop flow's timeout path. On chains without the
+    /// `recoverAtomicCall` for the atomic interop flow's timeout path. On chains without the
     /// atomic-flow stack nothing is deployed at that address, so this gate naturally never passes.
     modifier onlyAtomicFlowManager() {
         require(msg.sender == _atomicFlowManagerAddr(), Unauthorized(msg.sender));
@@ -302,6 +303,31 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         (, bytes32 assetId, bytes memory mintData) = abi.decode(_callData[4:], (uint256, bytes32, bytes));
         IL2NativeTokenVault(_nativeTokenVaultAddr()).bridgeRecoverFailedTransfer(_destChainId, assetId, mintData);
         return true;
+    }
+
+    /// @notice Refunds a timed-out atomic-interop value leg, re-crediting the destination base-token asset
+    /// to the depositor.
+    /// @dev Manager-gated wrapper symmetric with {bridgehubDepositBaseToken} and the same-base
+    /// BaseTokenHolder path; forwards to the NTV, which dispatches through the existing failed-transfer
+    /// recovery logic.
+    /// @param _chainId The chain the asset was being bridged to at burn time.
+    /// @param _assetId The destination base-token asset id that was burned.
+    /// @param _receiver The original depositor to refund.
+    /// @param _amount The amount to recover.
+    function bridgehubRecoverBaseToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _receiver,
+        uint256 _amount
+    ) external onlyAtomicFlowManager nonReentrant {
+        require(_chainId != L1_CHAIN_ID, RecoverToL1NotSupported());
+        // Reuse the generic failed-transfer recovery. The base-token deposit (bridgehubDepositBaseToken)
+        // discarded its bridge-mint data, so reconstruct the minimal form: `bridgeRecoverFailedTransfer`
+        // refunds the mint data's `originalCaller` for `amount`, and the asset is already registered on
+        // this chain (it was burned from the depositor), so origin-token / erc20 metadata go unused.
+        // solhint-disable-next-line func-named-parameters
+        bytes memory mintData = DataEncoding.encodeBridgeMintData(_receiver, _receiver, address(0), _amount, "");
+        IL2NativeTokenVault(_nativeTokenVaultAddr()).bridgeRecoverFailedTransfer(_chainId, _assetId, mintData);
     }
 
     /// @inheritdoc IL2CrossChainSender

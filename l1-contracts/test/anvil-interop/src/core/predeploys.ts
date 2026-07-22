@@ -1,5 +1,6 @@
 import {
   INTEROP_CENTER_ADDR,
+  INTEROP_ATTRIBUTE_PARSER_ADDR,
   L1_MESSENGER_HOOK_ADDR,
   L2_ASSET_ROUTER_ADDR,
   L2_ATOMIC_FLOW_MANAGER_ADDR,
@@ -12,6 +13,7 @@ import {
   L2_GENESIS_UPGRADE_ADDR,
   L2_INTEROP_COMMITMENT_TREE_ADDR,
   L2_INTEROP_HANDLER_ADDR,
+  L2_INTEROP_ROOT_STORAGE_ADDR,
   L2_MESSAGE_ROOT_ADDR,
   L2_MESSAGE_VERIFICATION_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
@@ -44,16 +46,15 @@ export const PREDEPLOY_SYSTEM_CONTRACTS: readonly SystemContractPredeploy[] = [
   { address: L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, contractName: "L2WrappedBaseToken" },
   { address: L2_NTV_BEACON_DEPLOYER_ADDR, contractName: "UpgradeableBeaconDeployer" },
   { address: L2_MESSAGE_ROOT_ADDR, contractName: "L2MessageRoot" },
+  { address: L2_INTEROP_ROOT_STORAGE_ADDR, contractName: "L2InteropRootStorage" },
   { address: L2_BRIDGEHUB_ADDR, contractName: "L2Bridgehub" },
   { address: L2_ASSET_ROUTER_ADDR, contractName: "L2AssetRouter" },
   { address: L2_NATIVE_TOKEN_VAULT_ADDR, contractName: "L2NativeTokenVaultZKOS" },
   { address: L2_CHAIN_ASSET_HANDLER_ADDR, contractName: "L2ChainAssetHandler" },
   { address: L2_BASE_TOKEN_HOLDER_ADDR, contractName: "BaseTokenHolder" },
   { address: INTEROP_CENTER_ADDR, contractName: "InteropCenter" },
+  { address: INTEROP_ATTRIBUTE_PARSER_ADDR, contractName: "InteropAttributeParser" },
   { address: L2_INTEROP_HANDLER_ADDR, contractName: "L2InteropHandler" },
-  // L1-free atomic interop built-ins. On real ZKsync OS these are predeployed by the genesis-gen
-  // tool; the harness has no genesis-gen, so predeploy them here too — otherwise the genesis upgrade's
-  // _initializeV31Contracts reverts (empty) calling .initialize() on an address with no code.
   { address: L2_INTEROP_COMMITMENT_TREE_ADDR, contractName: "L2InteropCommitmentTree" },
   { address: L2_ATOMIC_FLOW_MANAGER_ADDR, contractName: "AtomicFlowManager" },
 ] as const;
