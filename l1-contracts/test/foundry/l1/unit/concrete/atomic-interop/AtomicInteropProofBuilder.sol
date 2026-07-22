@@ -109,10 +109,29 @@ abstract contract AtomicInteropProofBuilder is Test {
     }
 
     /// @dev Imports the settlement-layer interop root `(root, timestamp)` tuple into the REAL root storage through the
-    /// production bootloader entry point.
+    /// production bootloader entry point. The root value is a derived placeholder (the default verifier
+    /// mock does not read it); use {_seedSettlementLayerInteropRootWithValue} when the real verifier must
+    /// authenticate against a specific reconstructed root.
     function _seedSettlementLayerInteropRoot(uint256 _slChainId, uint256 _slBlock, uint256 _timestamp) internal {
+        _seedSettlementLayerInteropRootWithValue(
+            _slChainId,
+            _slBlock,
+            _timestamp,
+            keccak256(abi.encode("sl-interop-root", _slChainId, _slBlock))
+        );
+    }
+
+    /// @dev Like {_seedSettlementLayerInteropRoot}, but imports a caller-chosen `_root` — the value the
+    /// real `L2MessageVerification` terminates its recursion against (`interopRoots(...).root`, which
+    /// {L2InteropRootStorage} stores verbatim from `sides[0]`).
+    function _seedSettlementLayerInteropRootWithValue(
+        uint256 _slChainId,
+        uint256 _slBlock,
+        uint256 _timestamp,
+        bytes32 _root
+    ) internal {
         bytes32[] memory sides = new bytes32[](1);
-        sides[0] = keccak256(abi.encode("sl-interop-root", _slChainId, _slBlock));
+        sides[0] = _root;
         vm.prank(L2_BOOTLOADER_ADDRESS);
         rootStorage.addSingleInteropRoot(
             InteropRoot({chainId: _slChainId, blockOrBatchNumber: _slBlock, timestamp: _timestamp, sides: sides})

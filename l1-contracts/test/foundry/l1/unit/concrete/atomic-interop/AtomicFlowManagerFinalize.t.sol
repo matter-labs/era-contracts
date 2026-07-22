@@ -140,15 +140,28 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
         _requireFinalizedAsHandler(legFirst, finality);
     }
 
-    /// @notice Exactly one proof per leg: fewer proofs cannot cover every leg, and extra proofs would
-    /// silently ignore trailing entries (masking a caller bug).
-    function test_RevertWhen_ProofCountMismatch() public {
+    /// @notice Exactly one proof per leg: FEWER proofs cannot cover every leg.
+    function test_RevertWhen_ProofCountTooFew() public {
         AtomicFinalityProof memory finality = _validFinality();
         ImtProof[] memory oneProof = new ImtProof[](1);
         oneProof[0] = finality.proofs[0];
         finality.proofs = oneProof;
 
         vm.expectRevert(abi.encodeWithSelector(ManagerProofCountMismatch.selector, 2, 1));
+        _requireFinalizedAsHandler(legFirst, finality);
+    }
+
+    /// @notice ...and MORE proofs than legs is equally rejected (the check is `!= n`, not `< n`) — extra
+    /// entries must not be silently ignored, which would mask a caller bug.
+    function test_RevertWhen_ProofCountTooMany() public {
+        AtomicFinalityProof memory finality = _validFinality();
+        ImtProof[] memory threeProofs = new ImtProof[](3);
+        threeProofs[0] = finality.proofs[0];
+        threeProofs[1] = finality.proofs[1];
+        threeProofs[2] = finality.proofs[1]; // a spurious extra proof
+        finality.proofs = threeProofs;
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerProofCountMismatch.selector, 2, 3));
         _requireFinalizedAsHandler(legFirst, finality);
     }
 

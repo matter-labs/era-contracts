@@ -80,13 +80,18 @@ be refunded.
    otherwise) and is routed back to the call's `from` (the depositor) — every direct value leg counts
    as a recovery.
 
-   Recovery is **best-effort**: a direct call that moves no funds has nothing to reverse and simply
+   Recovery is **best-effort**: a call that moves no funds has nothing to reverse and simply
    contributes nothing; the refund succeeds as long as _some_ call recovered (`recovered != 0`).
-   Consequently the protocol does not guarantee full refundability of an arbitrary bundle — a bespoke
-   fund-moving leg that neither is an asset-router call nor carries `value` must be made recoverable by
-   the flow author. Atomic sends block only L1 destinations (an atomic bundle is never published to L1
-   and could only ever time out — but L2->L1 withdrawals must never be revertable, see
-   `L2AssetTracker`); native-`value` legs are **supported** and refunded as described above.
+   Only these two shapes are refundable — an asset-router call (`from == L2AssetRouter`) or a direct
+   call carrying native `value`. Recovery is **not** invoked generically on an arbitrary call's
+   sender: a bespoke contract that is the `from` of a zero-`value` call is skipped entirely (it is
+   never asked to implement `IAtomicRecoverable`), so a bundle whose only fund-moving leg is such a
+   call would strand those funds on timeout. A flow author who needs a custom fund-moving leg
+   refunded must therefore route it through the asset router (or carry the value as native
+   base-token `value`); there is no generic per-sender recovery hook. Atomic sends block only L1
+   destinations (an atomic bundle is never published to L1 and could only ever time out — but L2->L1
+   withdrawals must never be revertable, see `L2AssetTracker`); native-`value` legs are **supported**
+   and refunded as described above.
 
 Leg state machine (`LegState`): `Unset -> Committed` (send) `-> Revertable -> Reverted` (timeout path).
 
@@ -158,7 +163,10 @@ dependency roots; the genesis batch leaf is seeded by `MessageRoot.seedGenesisRo
   every collaborator is referenced by its canonical fixed address: the tree's appender and the manager's
   tree / interop center / interop handler are constant getters, and the AR recognises the manager via
   `_atomicFlowManagerAddr()`. The manager no longer holds an asset-router reference at all — it drives
-  recovery generically through `IAtomicRecoverable` on each bundle call's target.
+  recovery by asking the asset router (recognised by its canonical address) to reverse its own
+  burn-produced calls via `IAtomicRecoverable.recoverAtomicCall`, and by routing direct native-`value`
+  legs back through the router's base-token recovery (see the timeout/refund section above for the
+  exact, non-generic set of refundable calls).
 
 ## Off-chain tooling (`test/anvil-interop/`)
 

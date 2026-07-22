@@ -371,16 +371,31 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
     }
 
     /// @notice The finality proof must carry exactly one proof per leg — the handler forwards it to
-    /// the manager gate unchanged.
-    function test_executeAtomicBundle_RevertWhen_ProofCountMismatch() public {
+    /// the manager gate unchanged. Too FEW proofs is rejected.
+    function test_executeAtomicBundle_RevertWhen_ProofCountTooFew() public {
         _setUpAtomicStack();
-        _sendAtomicLegWithRemotePeer(keccak256("atomic execute proof-count salt"), bytes(""));
+        _sendAtomicLegWithRemotePeer(keccak256("atomic execute proof-count-few salt"), bytes(""));
         AtomicFinalityProof memory finality = _commitRemoteLegAndBuildFinality();
         ImtProof[] memory oneProof = new ImtProof[](1);
         oneProof[0] = finality.proofs[0];
         finality.proofs = oneProof;
 
         vm.expectRevert(abi.encodeWithSelector(ManagerProofCountMismatch.selector, 2, 1));
+        _executeOnDestination(finality);
+    }
+
+    /// @notice ...and too MANY proofs is equally rejected through the real handler path (`!= n`).
+    function test_executeAtomicBundle_RevertWhen_ProofCountTooMany() public {
+        _setUpAtomicStack();
+        _sendAtomicLegWithRemotePeer(keccak256("atomic execute proof-count-many salt"), bytes(""));
+        AtomicFinalityProof memory finality = _commitRemoteLegAndBuildFinality();
+        ImtProof[] memory threeProofs = new ImtProof[](3);
+        threeProofs[0] = finality.proofs[0];
+        threeProofs[1] = finality.proofs[1];
+        threeProofs[2] = finality.proofs[1];
+        finality.proofs = threeProofs;
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerProofCountMismatch.selector, 2, 3));
         _executeOnDestination(finality);
     }
 

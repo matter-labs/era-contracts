@@ -735,15 +735,11 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         );
     }
 
-    /// @notice A completed refund cannot be REOPENED: resubmitting the same (still-valid) timeout
-    /// proof after authorize -> claim is inert — no authorization event, the leg stays terminal
-    /// `Reverted` (not flipped back to `Revertable`), a further claim still reverts, and the balance
-    /// is unchanged. Without the Committed-only transition this would re-arm the leg for a second
-    /// payout of the same burn.
-    /// @notice Re-authorization while the leg is still `Revertable` (BEFORE any claim) is inert too:
+    /// @notice Re-authorization while the leg is still `Revertable` (BEFORE any claim) is inert:
     /// only `Committed` legs transition, so a second authorization with a fresh valid proof emits no
-    /// event and leaves the leg `Revertable`. Together with the post-claim case, this pins the full
-    /// "Committed-only" transition across both non-Committed terminal-ish states.
+    /// event and leaves the leg `Revertable`. Together with the post-claim case
+    /// ({test_authorizeRefund_ResubmittedProofAfterClaimIsInert}), this pins the full "Committed-only"
+    /// transition across both non-Committed states.
     function test_authorizeRefund_SecondAuthorizationBeforeClaimIsInert() public {
         _setUpAtomicStack();
         _sendAtomicLegWithInvalidRemotePeer();
@@ -775,6 +771,11 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         );
     }
 
+    /// @notice A completed refund cannot be REOPENED: resubmitting the same (still-valid) timeout
+    /// proof after authorize -> claim is inert — no authorization event, the leg stays terminal
+    /// `Reverted` (not flipped back to `Revertable`), a further claim still reverts, and the balance
+    /// is unchanged. Without the Committed-only transition this would re-arm the leg for a second
+    /// payout of the same burn.
     function test_authorizeRefund_ResubmittedProofAfterClaimIsInert() public {
         _setUpAtomicStack();
         _sendAtomicLegWithInvalidRemotePeer();

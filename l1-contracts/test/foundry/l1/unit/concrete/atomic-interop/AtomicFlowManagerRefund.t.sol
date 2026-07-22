@@ -371,6 +371,21 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         );
     }
 
+    /// @notice An out-of-range `_missingLegIndex` reverts rather than misbehaving. `authorizeRefund`
+    /// indexes the aligned `legSourceChainIds` / `legBundleHashes` arrays by `_missingLegIndex` before
+    /// any explicit bound check, so an index >= leg count reverts with the Solidity array
+    /// out-of-bounds panic (0x32). This documents the intended behaviour: a bad index is a safe revert
+    /// (no state change, no fund movement), not silent corruption — `authorizeRefund` is permissionless,
+    /// so a caller passing garbage simply fails.
+    function test_RevertWhen_MissingLegIndexOutOfRange() public {
+        ImtProof memory absence = _validAbsence();
+        uint256 outOfRangeIndex = preimage.legBundleHashes.length; // == 2, one past the last valid index
+
+        // Solidity array out-of-bounds panic (0x32).
+        vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x32));
+        manager.authorizeRefund(_flow(), outOfRangeIndex, absence);
+    }
+
     /// @notice The double-mint guard: the absence proof must be bound to the missing leg's DECLARED
     /// source chain. A proof against any other chain's tree is rejected before verification — a
     /// commit value exists only in its own chain's tree and is trivially absent elsewhere.
