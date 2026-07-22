@@ -61,7 +61,7 @@ struct ImtProof {
 }
 
 /// @notice The full `flowId` preimage — the single canonical field set the id is hashed over:
-/// `flowId = keccak256(abi.encode(preimage))`.
+/// `flowId = keccak256(abi.encode(ATOMIC_FLOW_ID_TAG, preimage))` (see {ATOMIC_FLOW_ID_TAG}).
 /// It is supplied by the sender in the `atomicBundle` ERC-7786 attribute and embedded (with the id)
 /// in {AtomicFlow}, so the send and finalize/refund paths hash one shape and cannot drift. At send
 /// time the {AtomicFlowManager} recomputes `flowId` from these fields and requires the committing
@@ -88,7 +88,7 @@ struct AtomicFlowPreimage {
 /// the finalize path ({AtomicFlowManager.requireFlowFinalized}) and the refund path
 /// ({AtomicFlowManager.authorizeRefund}); the supplied `flowId` is always recomputed from `preimage`
 /// and matched before use.
-/// @param flowId `keccak256(abi.encode(preimage))`.
+/// @param flowId `keccak256(abi.encode(ATOMIC_FLOW_ID_TAG, preimage))`.
 /// @param preimage The hashed field set (see {AtomicFlowPreimage}).
 struct AtomicFlow {
     bytes32 flowId;
@@ -109,3 +109,10 @@ struct AtomicFinalityProof {
 /// other hashes.
 /// `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
 bytes4 constant ATOMIC_COMMIT_LEAF_TAG = bytes4(keccak256("AtomicInterop.commit.v1"));
+
+/// @dev Versioned domain tag prepended to the {AtomicFlowPreimage} encoding when hashing a `flowId`,
+/// so flow ids cannot be confused with other hashes and ids of one preimage version can never collide
+/// with ids hashed over a future preimage shape. Bump the version suffix (`.v2`, ...) whenever the
+/// {AtomicFlowPreimage} field set or its canonicalization changes.
+/// `flowId = keccak256(abi.encode(ATOMIC_FLOW_ID_TAG, preimage))`.
+bytes4 constant ATOMIC_FLOW_ID_TAG = bytes4(keccak256("AtomicInterop.flowId.v1"));

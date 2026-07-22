@@ -10,7 +10,7 @@
  *   - `bundleHash = keccak256(abi.encode(sourceChainId, abi.encode(InteropBundle)))`. The atomic send
  *     params (the full flowId preimage + lowNullifierIndex) travel via the `atomicBundle` attribute, not
  *     the InteropBundle, so `bundleHash` does not depend on the preimage.
- *   - `flowId = keccak256(abi.encode(preimage))`,
+ *   - `flowId = keccak256(abi.encode(ATOMIC_FLOW_ID_TAG, preimage))` (versioned domain tag),
  *     bundle hashes strictly ascending with source chain ids positionally aligned. Since `bundleHash` is
  *     independent of the preimage, each leg's `bundleHash` (and thus the preimage) is computable off-chain
  *     before the send; on-chain the AtomicFlowManager recomputes `flowId` from the attribute-supplied
@@ -56,6 +56,9 @@ export const MAX_LOW_INDEX_SEARCH_ATTEMPTS = 5;
 export const ATOMIC_COMMIT_LEAF_TAG: string = utils
   .keccak256(utils.toUtf8Bytes("AtomicInterop.commit.v1"))
   .slice(0, 10);
+
+/** Versioned domain tag for flow ids: bytes4(keccak256("AtomicInterop.flowId.v1")). */
+export const ATOMIC_FLOW_ID_TAG: string = utils.keccak256(utils.toUtf8Bytes("AtomicInterop.flowId.v1")).slice(0, 10);
 
 /** Indexed-tree leaf, fields as uint256 decimal strings, in the on-chain field order. */
 export interface IMTLeaf {
@@ -119,11 +122,17 @@ export interface AtomicFlowPreimage {
 const FLOW_PREIMAGE_TUPLE_TYPE = "tuple(uint64,uint256,bytes32[],uint256[])";
 
 /**
- * flowId = keccak256(abi.encode(preimage)) — the ABI encoding of the whole `AtomicFlowPreimage`
- * struct, matching {AtomicFlowManager._validateAndComputeFlowId}.
+ * flowId = keccak256(abi.encode(ATOMIC_FLOW_ID_TAG, preimage)) — the versioned domain tag followed by
+ * the ABI encoding of the whole `AtomicFlowPreimage` struct, matching
+ * {AtomicFlowManager._validateAndComputeFlowId}.
  */
 export function computeFlowId(preimage: AtomicFlowPreimage): string {
-  return utils.keccak256(utils.defaultAbiCoder.encode([FLOW_PREIMAGE_TUPLE_TYPE], [flowPreimageTuple(preimage)]));
+  return utils.keccak256(
+    utils.defaultAbiCoder.encode(
+      ["bytes4", FLOW_PREIMAGE_TUPLE_TYPE],
+      [ATOMIC_FLOW_ID_TAG, flowPreimageTuple(preimage)]
+    )
+  );
 }
 
 /** Encode an {AtomicFlowPreimage} as its Solidity tuple: (deadline, settlementLayerChainId, legBundleHashes, legSourceChainIds). */

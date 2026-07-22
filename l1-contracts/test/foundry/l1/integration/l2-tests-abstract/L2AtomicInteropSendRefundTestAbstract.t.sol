@@ -12,7 +12,13 @@ import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
-import {AtomicFlow, AtomicFlowPreimage, ImtProof, LegState} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {
+    AtomicFlow,
+    AtomicFlowPreimage,
+    ImtProof,
+    LegState,
+    ATOMIC_FLOW_ID_TAG
+} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {ManagerCommittedBundleNotInFlow} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropBundle, InteropCallStarter} from "contracts/common/Messaging.sol";
@@ -112,7 +118,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     }
 
     function _flowIdOf(AtomicFlowPreimage memory _preimage) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_preimage));
+        return keccak256(abi.encode(ATOMIC_FLOW_ID_TAG, _preimage));
     }
 
     function _atomicAttributes(

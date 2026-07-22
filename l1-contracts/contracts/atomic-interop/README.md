@@ -13,10 +13,13 @@ message — finality is proven, not dispatched.
 ## Key values
 
 - `bundleHash = keccak256(abi.encode(sourceChainId, bundleBytes))` — a leg's bundle, chain-specific.
-- `flowId = keccak256(abi.encode(preimage))` —
-  binds all legs, each leg's source chain, the deadline, and the settlement layer. `legBundleHashes` is
-  strictly ascending (canonical order + dedup); `legSourceChainIds` is positional (aligned 1:1, may
-  repeat); `deadline` is a settlement-layer timestamp.
+- `flowId = keccak256(abi.encode(ATOMIC_FLOW_ID_TAG, preimage))` —
+  binds all legs, each leg's source chain, the deadline, and the settlement layer. `ATOMIC_FLOW_ID_TAG`
+  (`bytes4(keccak256("AtomicInterop.flowId.v1"))`) is a versioned domain tag: it keeps flow ids disjoint
+  from other hash domains and from ids hashed over any future preimage shape (bump the version suffix
+  whenever the preimage field set changes). `legBundleHashes` is strictly ascending (canonical order +
+  dedup); `legSourceChainIds` is positional (aligned 1:1, may repeat); `deadline` is a settlement-layer
+  timestamp.
 - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))` — the IMT
   leaf value for a leg. It bakes in `flowId` (hence all legs) and the chain-specific `bundleHash`, so a
   leg's commit value can only ever be inserted into its own source chain's IMT.

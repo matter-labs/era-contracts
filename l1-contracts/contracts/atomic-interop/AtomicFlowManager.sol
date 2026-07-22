@@ -5,7 +5,14 @@ import {IAtomicFlowManager} from "./IAtomicFlowManager.sol";
 import {IL2InteropCommitmentTree} from "./IL2InteropCommitmentTree.sol";
 import {IAtomicRecoverable} from "./IAtomicRecoverable.sol";
 import {AtomicInteropProof} from "./libraries/AtomicInteropProof.sol";
-import {LegState, AtomicFlow, AtomicFlowPreimage, ImtProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
+import {
+    LegState,
+    AtomicFlow,
+    AtomicFlowPreimage,
+    ImtProof,
+    AtomicFinalityProof,
+    ATOMIC_FLOW_ID_TAG
+} from "./IAtomicInterop.sol";
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
 import {InteropDataEncoding} from "../interop/InteropDataEncoding.sol";
 import {
@@ -339,7 +346,8 @@ contract AtomicFlowManager is IAtomicFlowManager {
     }
 
     /// @dev Canonicalizes and hashes a flowId preimage:
-    /// `flowId = keccak256(abi.encode(preimage))`.
+    /// `flowId = keccak256(abi.encode(ATOMIC_FLOW_ID_TAG, preimage))` — the versioned domain tag keeps
+    /// ids of this preimage version disjoint from other hash domains and from future preimage shapes.
     /// `legBundleHashes` must be strictly ascending (canonical order + dedup). `legSourceChainIds` is
     /// positional, aligned 1:1 with `legBundleHashes`; it may repeat and need not be ascending, so only its
     /// length is checked. Treating it as an ascending set instead would let a sibling chain in the set
@@ -356,6 +364,6 @@ contract AtomicFlowManager is IAtomicFlowManager {
         if (_preimage.legSourceChainIds.length != n) {
             revert ManagerLegSourceChainIdsLengthMismatch(n, _preimage.legSourceChainIds.length);
         }
-        return keccak256(abi.encode(_preimage));
+        return keccak256(abi.encode(ATOMIC_FLOW_ID_TAG, _preimage));
     }
 }
