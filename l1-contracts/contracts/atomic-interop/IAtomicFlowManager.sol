@@ -17,7 +17,7 @@ import {LegState, AtomicFlow, AtomicFlowPreimage, ImtProof, AtomicFinalityProof}
 ///      (with this chain as its declared source), inserts the leg's commit value
 ///      (`commitValue(flowId, bundleHash)`) into this chain's indexed interop IMT and records the
 ///      source leg as `Committed`. The burn already happened during `sendBundle`.
-///   2. `requireFlowFinalized` — called by the {InteropHandler} from `executeAtomicBundle` in place of
+///   2. `requireFlowFinalized` — called by the {L2InteropHandler} from `executeAtomicBundle` in place of
 ///      the L1-message inclusion proof: it verifies that *every* leg of the flow was committed before
 ///      the deadline. The handler then executes the bundle (and owns the double-execute guard).
 ///   3. `authorizeRefund` / `claimRefund` — the timeout path: prove (O(log n) non-inclusion) that a leg

@@ -28,7 +28,7 @@ interface IERC7786Attributes {
     /// @notice Marks a bundle as an **atomic interop** leg. When present, the InteropCenter does not
     ///      publish the bundle to L1; instead it appends the bundle's commit value to the interop IMT
     ///      via the AtomicFlowManager (the burn still flows through the normal `initiateIndirectCall`
-    ///      path). The destination executes it via `InteropHandler.executeAtomicBundle` once every leg
+    ///      path). The destination executes it via `L2InteropHandler.executeAtomicBundle` once every leg
     ///      of the flow is proven committed before the deadline. Bundle-level attribute.
     /// @param _flowPreimage The full `flowId` preimage. The AtomicFlowManager recomputes `flowId` and
     ///      requires this bundle's hash to be one of `legBundleHashes` with this chain as its declared

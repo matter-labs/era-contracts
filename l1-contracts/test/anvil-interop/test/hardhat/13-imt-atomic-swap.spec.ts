@@ -10,7 +10,7 @@
  *           The bridge transfer burns via `initiateIndirectCall`; the `atomicBundle` attribute makes
  *           the InteropCenter append the leg's commit value to the L2InteropCommitmentTree instead of
  *           publishing to L1.
- *   RECEIVE `InteropHandler.executeAtomicBundle(bundleBytes, AtomicFinalityProof)`. Proves every leg
+ *   RECEIVE `L2InteropHandler.executeAtomicBundle(bundleBytes, AtomicFinalityProof)`. Proves every leg
  *           was committed in its source chain's IMT before the deadline (one inclusion proof per leg),
  *           then executes the bundle's calls (the destination mint). `bundleStatus` guards double-execute.
  *   TIMEOUT `AtomicFlowManager.authorizeRefund(...)`: checked against a settlement interop root created
@@ -26,10 +26,11 @@
  *   - `bundleHash = keccak256(abi.encode(sourceChainId, abi.encode(InteropBundle)))`. The atomic send
  *     params (the full flowId preimage + lowNullifierIndex) ride in the `atomicBundle` attribute and are
  *     not part of the InteropBundle, so `bundleHash` is independent of the preimage (whose leg hashes
- *     include the bundle's own hash). We predict each leg's bundleHash off-chain with a non-atomic
- *     `callStatic.sendBundle`, then cross-check it against the real send's `InteropBundleSent` event and
- *     fail loudly on mismatch. On-chain, the AtomicFlowManager additionally requires the sent bundle's
- *     hash to be one of the preimage's legs, so a stale prediction reverts the send.
+ *     include the bundle's own hash). We predict each leg's bundleHash off-chain with the static
+ *     `previewBundleHash` (which runs the real assembly but persists nothing), then cross-check it against
+ *     the real send's `InteropBundleSent` event and fail loudly on mismatch. On-chain, the AtomicFlowManager
+ *     additionally requires the sent bundle's hash to be one of the preimage's legs, so a stale prediction
+ *     reverts the send.
  *   - `flowId = keccak256(abi.encode(preimage))` (`preimage.version` = ATOMIC_FLOW_PREIMAGE_VERSION)
  *     (bundle hashes ascending, source chain ids positionally aligned), recomputed on-chain from the
  *     attribute-supplied preimage rather than accepted from the sender.
@@ -79,7 +80,6 @@ import {
   L2_NATIVE_TOKEN_VAULT_ADDR,
   ATOMIC_SEND_BUNDLE_GAS_LIMIT,
   DEFAULT_TX_GAS_LIMIT,
-  INTEROP_SEND_BUNDLE_GAS_LIMIT,
 } from "../../src/core/const";
 import { encodeEvmAddress, encodeEvmChain } from "../../src/core/data-encoding";
 import { customError, expectRevert } from "../../src/helpers/balance-helpers";
@@ -90,6 +90,7 @@ import {
   getTokenTransferData,
   indirectCallAttr,
   sendInteropBundle,
+  staticPreviewHash,
 } from "../../src/helpers/interop-helpers";
 import type { AtomicFlowPreimage } from "../../src/helpers/interop-helpers";
 import {
@@ -307,7 +308,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
   });
 
   /**
-   * Predict a leg's bundleHash via a non-atomic callStatic on its source chain, targeting `dest`.
+   * Predict a leg's bundleHash via the static `previewBundleHash` on its source chain, targeting `dest`.
    * (Kept local so the `dest` chain id is explicit rather than threaded through a placeholder.)
    */
   async function predictLegBundleHash(
@@ -318,15 +319,16 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     salt: string
   ): Promise<string> {
     const interopCenter = source.stack.interopCenter.connect(source.user);
-    // The bundleHash now depends on the `interopBundleSalt` attribute (folded into the bundle), so the
-    // prediction MUST carry the exact same salt the real atomic send will use — otherwise the predicted
-    // hash (and the flowId derived from it) would not match the emitted one.
-    return interopCenter.callStatic.sendBundle(
+    // `sendBundle` now requires the mandatory `atomicBundle` attribute (interop is atomic-only), which needs
+    // the very flowId we are trying to derive — a circular dependency. `previewBundleHash` breaks it: it runs
+    // the identical bundle assembly (including the simulated, discarded indirect-call burn) without the atomic
+    // append, returning the exact bundleHash the real send will emit. The prediction MUST carry the same salt
+    // the real send uses, since the bundleHash commits to the `interopBundleSalt` attribute.
+    return staticPreviewHash(interopCenter, source.provider, source.user.address, "previewBundleHash", [
       encodeEvmChain(dest.chainId),
       [bridgeCallStarter(source, amount, recipient)],
       [interopBundleSaltAttr(salt)],
-      { gasLimit: INTEROP_SEND_BUNDLE_GAS_LIMIT, value: fee }
-    );
+    ]);
   }
 
   /** A fresh, deterministic-per-send bundle salt. Random keeps it unique per (sender, salt) — the
@@ -381,8 +383,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       // preimage's leg hash (the AtomicFlowManager rejects the send otherwise).
       bundleAttributes: [atomicBundleAttr(flowPreimage, lowNull), interopBundleSaltAttr(salt)],
       value: fee,
-      // Atomic sends append to the IMT (~1.1M gas insert) on top of the burn; the plain-send default
-      // (INTEROP_SEND_BUNDLE_GAS_LIMIT) is too small.
+      // Atomic sends append to the IMT (~1.1M gas insert) on top of the burn, so they need the larger cap.
       gasLimit: ATOMIC_SEND_BUNDLE_GAS_LIMIT,
     });
 
@@ -393,7 +394,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     return { bundleData: sendResult.bundleData, bundleHash: sendResult.bundleHash };
   }
 
-  it("happy path: atomic send -> executeAtomicBundle mints both legs and leaves source Committed", async () => {
+  it("happy path: atomic send -> executeBundle mints both legs and leaves source Committed", async () => {
     const user = chainA.user.address; // anvil acct #0, the depositor + recipient on both chains
     const now = Math.max(await chainNow(chainA.provider), await chainNow(chainB.provider));
     // The deadline is an SL timestamp; the harness sets each leg's batch `l1Timestamp == deadline`,
@@ -464,7 +465,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     expect(imtB.root.toLowerCase()).to.equal((await chainB.stack.tree.root()).toLowerCase());
 
     // ── PHASE 2: build the per-flow inclusion proofs (one per leg, in ascending bundleHash order) ─
-    // executeAtomicBundle requires EVERY leg present in a root settled no later than the deadline,
+    // executeBundle requires EVERY leg present in a root settled no later than the deadline,
     // so even the executing chain's own leg needs an inclusion proof.
     const abProof = await buildInclusionProof({
       l2Tree: chainA.stack.tree,
@@ -486,7 +487,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       proofs: proofsAsc,
     });
 
-    // ── PHASE 3: execute each destination leg via executeAtomicBundle ─────────────────────────
+    // ── PHASE 3: execute each destination leg via executeBundle ─────────────────────────
     // Snapshot the recipient shim balances BEFORE execute. The coverage harness runs every spec on
     // one shared chain set, so `user` may already hold these bridged shims from earlier specs — so we
     // assert the DELTA credited by this swap, not the absolute balance (the source-side checks above

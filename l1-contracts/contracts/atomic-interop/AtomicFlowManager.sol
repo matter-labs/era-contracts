@@ -15,6 +15,7 @@ import {
 } from "./IAtomicInterop.sol";
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
 import {InteropDataEncoding} from "../interop/InteropDataEncoding.sol";
+import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
@@ -43,6 +44,7 @@ import {
     ProofSourceChainMismatch
 } from "./AtomicInteropErrors.sol";
 import {Unauthorized} from "../l2-system/zksync-os/errors/ZKOSContractErrors.sol";
+import {RecoverToL1NotSupported} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -51,7 +53,7 @@ import {Unauthorized} from "../l2-system/zksync-os/errors/ZKOSContractErrors.sol
 /// Send: {InteropCenter.sendBundle} burns through the normal `initiateIndirectCall` path, then — when
 /// the bundle carries the `atomicBundle` attribute — calls {append} instead of publishing the bundle
 /// to L1; `append` records the leg's commit value in this chain's {L2InteropCommitmentTree}.
-/// Receive: {InteropHandler.executeAtomicBundle} calls {requireFlowFinalized} (the atomicity gate) in
+/// Receive: {L2InteropHandler.executeAtomicBundle} calls {requireFlowFinalized} (the atomicity gate) in
 /// place of the L1-message inclusion proof, then executes the bundle (and owns the replay guard).
 /// Timeout: {authorizeRefund} + {claimRefund} recover the burned source funds to the depositor by
 /// asking each burn-producing call's local sender to reverse itself via {IAtomicRecoverable.recoverAtomicCall}.
@@ -247,7 +249,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// @inheritdoc IAtomicFlowManager
     function claimRefund(bytes32 _flowId, bytes calldata _bundle) external {
         InteropBundle memory bundle = abi.decode(_bundle, (InteropBundle));
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle.sourceChainId, _bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(_bundle);
 
         LegState s = _state[_flowId][bundleHash];
         if (s != LegState.Revertable) {
@@ -292,32 +294,61 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// `(destinationChainId, data)`, counting the calls that report a recovery. Senders must return `false`
     /// (not revert) for calls they do not recognise.
     ///
-    /// Recovery is best-effort by design. An atomic bundle may mix fund-moving calls (e.g. asset-router
-    /// deposits, which re-mint to the depositor) with calls that move no funds and have nothing to reverse
-    /// (e.g. flipping a flag on some contract). The latter legitimately return `false` and are skipped —
-    /// they burned nothing at the source, so nothing is stranded. We only require that *some* call recovered
-    /// (`recovered != 0`): a bundle where nothing is recoverable has no source funds to return, so a refund
-    /// would be a no-op and we reject it.
+    /// A second reversal applies to native base-token value. A call carrying `value` had that base token
+    /// collected at send time (see {InteropCenter._ensureCorrectTotalValue}) — held by the {BaseTokenHolder}
+    /// when the destination shares this chain's base token, or deposited via the asset router otherwise.
+    /// For direct calls, the refund routes through the asset router/NTV recovery path so the existing
+    /// base-token recovery accounting is reused, returning `value` to the call's `from` (the depositor).
+    /// Router-produced calls (`from == asset router`) do not take this branch: they carry no base-token
+    /// `value` (indirect calls force `interopCallValue == 0`); what they move is a bridged asset, which
+    /// {IAtomicRecoverable.recoverAtomicCall} reverses directly (re-minting / unlocking that asset), not a
+    /// separate base-token value. Every direct value leg counts as a recovery.
+    ///
+    /// Recovery is best-effort by design. An atomic bundle may mix fund-moving calls with calls that move no
+    /// funds and have nothing to reverse (e.g. flipping a flag). The latter contribute nothing. We only
+    /// require that *some* call recovered (`recovered != 0`): a bundle where nothing is recoverable has no
+    /// source funds to return, so a refund would be a no-op and we reject it.
     ///
     /// Consequence: the protocol does not guarantee full refundability of an arbitrary bundle. A flow author
-    /// must make any fund-moving leg a recoverable (asset-router) call to have it returned on timeout; a
-    /// non-recoverable fund-moving call would strand its funds. Send-time ({InteropCenter}) only blocks
-    /// native-`value` legs (which no one can reverse) and L1-destined atomic bundles (L2->L1 withdrawals
-    /// are never revertable).
+    /// must make any bespoke fund-moving leg that does not carry `value` recoverable; otherwise it would
+    /// strand its funds. L1-destined atomic bundles remain blocked at send time because L2->L1 withdrawals
+    /// are never revertable.
+    ///
+    /// Scope: this is the atomicity (TIMEOUT) refund — it fires only when the flow is proven unable to
+    /// finalize (a leg's commit value is still absent past the deadline, established via {authorizeRefund}).
+    /// It is NOT a refund for cancelled or undeliverable calls: once a flow HAS finalized, a call that
+    /// reverts on delivery (e.g. a non-{IERC7786Recipient} target) or that is cancelled during unbundle
+    /// forfeits its value — unchanged from prior interop, where a finalized call to a reverting recipient
+    /// was likewise un-executable and un-refundable. Extending refundability to those cases is possible
+    /// future work.
     function _recoverBundle(bytes32 _flowId, bytes32 _bundleHash, InteropBundle memory _bundle) internal {
         uint256 destChainId = _bundle.destinationChainId;
+        // L2->L1 atomic bundles are rejected at send time ({InteropCenter.AtomicBundleToL1NotSupported}), so a
+        // recovered bundle never targets L1. Assert it explicitly: this keeps recovery from ever reaching the
+        // append-only L1 deposit/withdrawal counters in {L2AssetTracker}, whose settlement-layer-conditional
+        // updates are only correct when evaluated at send time, not at recovery time. Mirrors the same guard on
+        // the base-token recovery path ({L2AssetTracker.handleRecoverBaseTokenBridgingOnL2}).
+        require(destChainId != L1_CHAIN_ID, RecoverToL1NotSupported());
+        bytes32 destBaseTokenAssetId = _bundle.destinationBaseTokenAssetId;
         uint256 callsLen = _bundle.calls.length;
         uint256 recovered = 0;
         for (uint256 i = 0; i < callsLen; ++i) {
             InteropCall memory c = _bundle.calls[i];
-            // Only recover burn-produced calls (from == asset router, as set by `initiateIndirectCall`).
-            // A direct call never burned, so recovering it would mint funds with no matching burn — and its
-            // `from` (the original sender, possibly an EOA) need not implement {IAtomicRecoverable}, so
-            // calling it would brick the refund of the whole bundle. Skip instead.
-            if (c.from != L2_ASSET_ROUTER_ADDR) {
-                continue;
+            // Only ask burn-producing calls (from == asset router, as set by `initiateIndirectCall`) to
+            // reverse themselves. A direct call never burned through a recoverable sender, so its `from`
+            // (possibly an EOA) is skipped here; any base-token value it carried is handled below.
+            if (c.from == L2_ASSET_ROUTER_ADDR) {
+                if (IAtomicRecoverable(c.from).recoverAtomicCall(destChainId, c.data)) {
+                    ++recovered;
+                }
             }
-            if (IAtomicRecoverable(c.from).recoverAtomicCall(destChainId, c.data)) {
+            if (c.from != L2_ASSET_ROUTER_ADDR && c.value != 0) {
+                IAssetRouterShared(L2_ASSET_ROUTER_ADDR).bridgehubRecoverBaseToken(
+                    destChainId,
+                    destBaseTokenAssetId,
+                    c.from,
+                    c.value
+                );
                 ++recovered;
             }
         }

@@ -12,6 +12,7 @@ import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 import {IInteropCenter, InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
+import {AtomicFlowPreimage, ATOMIC_FLOW_PREIMAGE_VERSION} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {FeeWithdrawalFailed, ZKTokenNotAvailable} from "contracts/interop/InteropErrors.sol";
@@ -884,11 +885,26 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         address coinbaseAddr = makeAddr("coinbase");
         vm.coinbase(coinbaseAddr);
 
-        // Build bundle attributes WITHOUT useFixedFee (only unbundler)
-        bytes[] memory bundleAttributes = new bytes[](1);
+        // Build bundle attributes WITHOUT useFixedFee (only unbundler + the mandatory atomicBundle attribute).
+        // All interop is atomic, so the send must carry the atomicBundle attribute; useFixedFee is
+        // deliberately omitted to exercise its default (false).
+        bytes[] memory bundleAttributes = new bytes[](2);
         bundleAttributes[0] = abi.encodeCall(
             IERC7786Attributes.unbundlerAddress,
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
+        );
+        bundleAttributes[1] = abi.encodeCall(
+            IERC7786Attributes.atomicBundle,
+            (
+                AtomicFlowPreimage({
+                    version: ATOMIC_FLOW_PREIMAGE_VERSION,
+                    deadline: type(uint64).max,
+                    settlementLayerChainId: 0,
+                    legBundleHashes: new bytes32[](0),
+                    legSourceChainIds: new uint256[](0)
+                }),
+                uint256(0)
+            )
         );
 
         InteropCallStarter[] memory calls = _buildSimpleCall();
@@ -924,8 +940,22 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         bytes memory recipient = InteroperableAddress.formatEvmV1(destinationChainId, interopTargetContract);
         bytes memory payload = hex"";
 
-        // Build attributes WITHOUT useFixedFee (empty attributes)
-        bytes[] memory attributes = new bytes[](0);
+        // Build attributes WITHOUT useFixedFee (only the mandatory atomicBundle attribute — all interop is
+        // atomic — so useFixedFee still defaults to false).
+        bytes[] memory attributes = new bytes[](1);
+        attributes[0] = abi.encodeCall(
+            IERC7786Attributes.atomicBundle,
+            (
+                AtomicFlowPreimage({
+                    version: ATOMIC_FLOW_PREIMAGE_VERSION,
+                    deadline: type(uint64).max,
+                    settlementLayerChainId: 0,
+                    legBundleHashes: new bytes32[](0),
+                    legSourceChainIds: new uint256[](0)
+                }),
+                uint256(0)
+            )
+        );
 
         // Should succeed (useFixedFee defaults to false)
         vm.prank(sender);
