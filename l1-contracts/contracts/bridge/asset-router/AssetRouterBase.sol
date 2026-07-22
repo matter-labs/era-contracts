@@ -146,7 +146,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
     ) internal returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes1 encodingVersion = _data[0];
 
-        (bytes32 assetId, bytes memory transferData) = _getTransferData(encodingVersion, _data);
+        (bytes32 assetId, bytes memory transferData) = _getTransferData(encodingVersion, _originalCaller, _data);
         require(_bridgehub().baseTokenAssetId(_chainId) != assetId, AssetIdNotSupported(assetId));
 
         bytes memory bridgeMintCalldata = _burn({
@@ -160,6 +160,8 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         });
 
         bytes32 txDataHash = DataEncoding.encodeTxDataHash({
+            _nativeTokenVault: _nativeTokenVault,
+            _encodingVersion: encodingVersion,
             _originalCaller: _originalCaller,
             _assetId: assetId,
             _transferData: transferData
@@ -184,6 +186,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
 
     function _getTransferData(
         bytes1 /* _encodingVersion */,
+        address,
         bytes calldata _data
     ) internal virtual returns (bytes32 assetId, bytes memory transferData) {
         // slither-disable-next-line unused-return
@@ -369,6 +372,12 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
     ) public view virtual returns (bytes memory) {
         return abi.encodeCall(AssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
     }
+
+    /// @notice Ensures that token is registered with native token vault.
+    /// @dev Only used when deposit is made with legacy data encoding format.
+    /// @param _token The native token address which should be registered with native token vault.
+    /// @return assetId The asset ID of the token provided.
+    function _ensureTokenRegisteredWithNTV(address _token) internal virtual returns (bytes32 assetId);
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE

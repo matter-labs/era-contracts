@@ -38,8 +38,13 @@ contract BaseTokenHolder is IBaseTokenHolder {
     /// @notice Modifier that restricts access to callers that can bridge base tokens.
     /// @dev InteropCenter: burns base-token value when sending an interop bundle
     /// @dev NativeTokenVault: burns base-token value during bridged base-token burns
+    /// @dev L2BaseToken: burns the withdrawn value during legacy `withdraw`/`withdrawWithMessage`
     modifier onlyBridgingCaller() {
-        if (msg.sender != L2_INTEROP_CENTER_ADDR && msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
+        if (
+            msg.sender != L2_INTEROP_CENTER_ADDR &&
+            msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR &&
+            msg.sender != L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
+        ) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -88,7 +93,10 @@ contract BaseTokenHolder is IBaseTokenHolder {
         emit BaseTokenRecovered(_to, _amount);
     }
 
-    /// @inheritdoc IBaseTokenHolder
+    /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.
+    /// @dev Called by InteropCenter, NativeTokenVault, and L2BaseToken (its `withdraw` path) during bridging operations.
+    /// @dev This function notifies L2AssetTracker to track the bridging operation.
+    /// @param _toChainId The chain ID which the funds are sent to.
     function burnAndStartBridging(uint256 _toChainId) external payable onlyBridgingCaller {
         L2_ASSET_TRACKER.handleInitiateBaseTokenBridgingOnL2(_toChainId, msg.value);
         emit BaseTokenBurntInterop(msg.sender, _toChainId, msg.value);

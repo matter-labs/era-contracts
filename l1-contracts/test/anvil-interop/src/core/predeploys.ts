@@ -1,5 +1,6 @@
 import {
   INTEROP_CENTER_ADDR,
+  INTEROP_ATTRIBUTE_PARSER_ADDR,
   L1_MESSENGER_HOOK_ADDR,
   L2_ASSET_ROUTER_ADDR,
   L2_ASSET_TRACKER_ADDR,
@@ -54,6 +55,7 @@ export const PREDEPLOY_SYSTEM_CONTRACTS: readonly SystemContractPredeploy[] = [
   { address: L2_CHAIN_ASSET_HANDLER_ADDR, contractName: "L2ChainAssetHandler" },
   { address: L2_BASE_TOKEN_HOLDER_ADDR, contractName: "BaseTokenHolder" },
   { address: INTEROP_CENTER_ADDR, contractName: "InteropCenter" },
+  { address: INTEROP_ATTRIBUTE_PARSER_ADDR, contractName: "InteropAttributeParser" },
   { address: L2_INTEROP_HANDLER_ADDR, contractName: "L2InteropHandler" },
   { address: L2_INTEROP_COMMITMENT_TREE_ADDR, contractName: "L2InteropCommitmentTree" },
   { address: L2_ATOMIC_FLOW_MANAGER_ADDR, contractName: "AtomicFlowManager" },

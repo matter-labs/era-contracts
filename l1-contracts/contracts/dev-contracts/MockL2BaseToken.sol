@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IL2ToL1MessengerEra} from "../common/l2-helpers/IL2ToL1MessengerEra.sol";
-import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
+import {IMailboxLegacy} from "../state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @title MockL2BaseToken
@@ -25,7 +25,7 @@ contract MockL2BaseToken {
         uint256 amount = msg.value;
 
         // Message must match the format L1Nullifier expects when finalizing the withdrawal
-        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, _l1Receiver, amount);
+        bytes memory message = abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, _l1Receiver, amount);
         L1_MESSENGER.sendToL1(message);
 
         emit Withdrawal(msg.sender, _l1Receiver, amount);

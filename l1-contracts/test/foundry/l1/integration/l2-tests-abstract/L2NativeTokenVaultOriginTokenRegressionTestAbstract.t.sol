@@ -6,6 +6,8 @@ pragma solidity ^0.8.20;
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -15,6 +17,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
+import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
 
 abstract contract L2NativeTokenVaultOriginTokenRegressionTestAbstract is Test, SharedL2ContractDeployer {
@@ -144,19 +147,27 @@ abstract contract L2NativeTokenVaultOriginTokenRegressionTestAbstract is Test, S
         );
         bytes memory data = DataEncoding.encodeBridgeMintData(depositor, receiver, originToken, amount, erc20Metadata);
 
-        // Real bridge mint: first bridging of the asset, so the NTV deploys the bridged token via CREATE2 at
-        // `expectedL2TokenAddress`. Deliberately not mocked — a mock would inject code at the deploy target and
-        // collide with CREATE2; the legacy "adopt existing token" path has been removed.
+        // Mock legacy bridge to trigger the legacy token path
+        vm.mockCall(
+            sharedBridgeLegacy,
+            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (expectedL2TokenAddress)),
+            abi.encode(originToken)
+        );
+        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IBridgedStandardToken.bridgeMint, (receiver, amount)), "");
+        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20.totalSupply, ()), abi.encode(amount));
+
+        // Perform bridge mint
         vm.prank(L2_ASSET_ROUTER_ADDR);
         IAssetHandler(address(l2NativeTokenVault)).bridgeMint(originChainId, assetId, data);
 
-        assertEq(
-            l2NativeTokenVault.tokenAddress(assetId),
+        // Now mock the originToken call on the bridged token
+        vm.mockCall(
             expectedL2TokenAddress,
-            "bridged token should be deployed at the expected CREATE2 address"
+            abi.encodeCall(IBridgedStandardToken.originToken, ()),
+            abi.encode(originToken)
         );
 
-        // Call originToken and verify it returns the correct L1 origin token via the deployed bridged token.
+        // Call originToken and verify it returns the correct L1 origin token
         // Before the fix: would return address(0)
         // After the fix: should return originToken
         address returnedOriginToken = l2NativeTokenVault.originToken(assetId);

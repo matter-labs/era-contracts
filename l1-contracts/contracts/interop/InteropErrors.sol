@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
-// 0x74882034
-/// @notice A call in an atomic bundle carries non-zero native `value`.
-error AtomicBundleCallCarriesValue(uint256 callIndex, uint256 value);
-// 0xcd677e60
-/// @notice The `atomicBundle` attribute was passed to the single-call `sendMessage` entry point.
-error AtomicBundleNotAllowedInSendMessage();
 // 0x979e85dd
 /// @notice An atomic bundle declares L1 as its destination.
 error AtomicBundleToL1NotSupported();
@@ -49,6 +43,8 @@ error InteropCallToL1NotToAssetRouter(address target);
 error InteroperableAddressChainReferenceNotEmpty(bytes interoperableAddress);
 // 0x884f49ba
 error InteroperableAddressNotEmpty(bytes interoperableAddress);
+// 0x290dc1c0
+error InteropPreviewHash(bytes32 bundleHash);
 // 0x9b021130
 /// @notice The bundle's destination is the sending chain itself.
 error InteropToSelfNotSupported();
@@ -66,6 +62,8 @@ error MessageNotIncluded();
 // 0x6a430157
 /// @notice An L2->L1 bundle contains more than one call.
 error MultiCallToL1NotSupported(uint256 callCount);
+// 0x1db1b07e
+error NonAtomicSendUnsupported();
 // 0xd72e81d8
 /// @notice An L2->L1 call carries a non-zero interop call value.
 error NonZeroValueToL1NotSupported(uint256 value);

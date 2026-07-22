@@ -64,7 +64,7 @@ struct AtomicFlow {
 
 /// @notice The full atomicity proof a destination needs to execute an atomic bundle: the flow definition
 /// plus one IMT inclusion proof per leg. Passed as one calldata reference to
-/// `InteropHandler.executeAtomicBundle` / `AtomicFlowManager.requireFlowFinalized`.
+/// `L2InteropHandler.executeAtomicBundle` / `AtomicFlowManager.requireFlowFinalized`.
 /// @param flow The flow definition (see {AtomicFlow}).
 /// @param proofs One inclusion proof per leg, in `flow.preimage.legBundleHashes` order.
 struct AtomicFinalityProof {

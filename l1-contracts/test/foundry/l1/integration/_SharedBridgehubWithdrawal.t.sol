@@ -112,7 +112,7 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
             );
         }
 
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(currentChainId, bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
         assertTrue(
             addresses.l1InteropHandler.bundleStatus(bundleHash) == BundleStatus.FullyExecuted,
             "Bundle should be marked as fully executed"

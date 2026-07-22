@@ -292,7 +292,7 @@ enum BundleStatus {
 /// @param chainId Source chain identifier.
 /// @param l1BatchNumber Batch number on L1 where the message root was committed.
 /// @param l2MessageIndex Position in the L2 logs Merkle tree of this message.
-/// @param message The raw L2 message payload (including `BUNDLE_IDENTIFIER` prefix).
+/// @param message The raw L2 message payload.
 /// @param proof Merkle‐proof for verifying the message inclusion.
 struct MessageInclusionProof {
     uint256 chainId;

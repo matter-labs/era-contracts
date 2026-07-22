@@ -7,35 +7,29 @@ import {Test} from "forge-std/Test.sol";
 
 import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";
 import {
-    InteropCallStarter,
     InteropBundle,
     InteropCall,
     BundleAttributes,
     BundleStatus,
-    CallStatus,
-    MessageInclusionProof,
-    L2Message,
     INTEROP_BUNDLE_VERSION,
     INTEROP_CALL_VERSION
 } from "contracts/common/Messaging.sol";
+import {AtomicFinalityProof} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
-import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
-import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
-import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {EmptyBundle} from "contracts/interop/InteropErrors.sol";
+import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 
-import {
-    L2_INTEROP_CENTER_ADDR,
-    L2_INTEROP_HANDLER,
-    L2_INTEROP_HANDLER_ADDR,
-    L2_MESSAGE_VERIFICATION
-} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_INTEROP_HANDLER, L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 
 /// @title L2InteropHandlerReentrancyRegressionTestAbstract
-/// @notice Regression tests for the reentrancy fix in L2InteropHandler
+/// @notice Regression tests for the reentrancy fix in L2InteropHandler: a bundle call may legitimately
+///         re-enter the handler (via the `receiveMessage` self-call from `_executeCalls`) to execute/verify a
+///         nested bundle. Before the fix the nonReentrant guard blocked this; these tests assert the nested
+///         flow now runs to completion. The atomic finality gate is mocked in setUp, so a default
+///         `AtomicFinalityProof` suffices and the assertions exercise the reentrancy path, not proof checks.
 abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropTestUtils {
     address internal bundleExecutor;
 
@@ -44,27 +38,21 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         bundleExecutor = makeAddr("bundleExecutor");
     }
 
-    /// @notice A bundle can call receiveMessage on L2InteropHandler via _executeCalls; before the fix this
-    /// reverted with a ReentrancyGuard error.
+    /// @notice A bundle call may re-enter the handler via `receiveMessage` (self-call from `_executeCalls`).
+    /// @dev Before the fix, `executeBundle` (nonReentrant) -> `_executeCalls` -> `receiveMessage` (nonReentrant)
+    ///      reverted with the guard error before any inner logic ran. After the fix the nested dispatch is
+    ///      reached: here the inner `verifyBundle` decodes an EMPTY bundle and reverts deterministically with
+    ///      `EmptyBundle`. Asserting that exact error proves both that the guard is gone (a `Reentrancy` revert
+    ///      would fire first) and that the nested dispatch actually reached the inner handler.
     function test_regression_bundleCanCallReceiveMessageOnInteropHandler() public {
         uint256 sourceChainId = block.chainid;
 
-        // verifyBundle with empty data: fails inner validation deterministically, but only after the
-        // (formerly blocking) reentrancy guard has been passed.
-        bytes memory innerPayload = abi.encodeCall(
-            IInteropHandlerBase.verifyBundle,
-            (
-                new bytes(0),
-                MessageInclusionProof({
-                    chainId: sourceChainId,
-                    l1BatchNumber: 0,
-                    l2MessageIndex: 0,
-                    message: L2Message({txNumberInBatch: 0, sender: L2_INTEROP_CENTER_ADDR, data: new bytes(0)}),
-                    proof: new bytes32[](0)
-                })
-            )
-        );
+        // Inner payload: verifyBundle over an EMPTY bundle. The finality gate is mocked, so `_getBundleData`'s
+        // empty-bundle check — not the gate — is what reverts.
+        AtomicFinalityProof memory innerFinality;
+        bytes memory innerPayload = abi.encodeCall(L2InteropHandler.verifyAtomicBundle, (new bytes(0), innerFinality));
 
+        // Outer bundle whose single call targets L2InteropHandler.receiveMessage with that payload.
         InteropCall[] memory calls = new InteropCall[](1);
         calls[0] = InteropCall({
             version: INTEROP_CALL_VERSION,
@@ -82,33 +70,30 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             destinationBaseTokenAssetId: destinationBaseTokenAssetId,
             interopBundleSalt: bytes32(uint256(1)),
             calls: calls,
+            // Executed directly by `bundleExecutor` on the destination chain -> execution address on destChain.
             bundleAttributes: _createBundleAttributes(destinationChainId, bundleExecutor)
         });
 
         bytes memory encodedBundle = abi.encode(bundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
-
-        // Message inclusion verification is mocked to pass.
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
+        AtomicFinalityProof memory proof;
 
         vm.chainId(destinationChainId);
 
-        // Positive oracle: `EmptyBundle` proves the nested self-call got past the guard into the inner
-        // `verifyBundle`; before the fix this reverted with `Reentrancy` instead.
         vm.prank(bundleExecutor);
         vm.expectRevert(EmptyBundle.selector);
-        L2_INTEROP_HANDLER.executeBundle(encodedBundle, proof);
+        L2_INTEROP_HANDLER.executeAtomicBundle(encodedBundle, proof);
     }
 
-    /// @notice A nested this.executeBundle() reached through receiveMessage must not be blocked by a
-    /// nonReentrant modifier.
+    /// @notice `executeBundle` must not carry a nonReentrant guard: a bundle may re-enter it (via
+    ///         `receiveMessage`) to execute a nested bundle.
+    /// @dev Positive oracle: with the guard gone, the whole chain
+    ///      executeAtomicBundle(outer) -> receiveMessage -> this.executeAtomicBundle(inner) succeeds and BOTH bundles end up
+    ///      `FullyExecuted`. Before the fix the nested call reverted with `Reentrancy`.
     function test_regression_executeBundleNoReentrancyGuard() public {
         uint256 sourceChainId = block.chainid;
 
+        // Inner bundle executed via receiveMessage -> executeBundle. Its single call is a no-op to a mocked
+        // recipient.
         InteropCall[] memory innerCalls = new InteropCall[](1);
         innerCalls[0] = InteropCall({
             version: INTEROP_CALL_VERSION,
@@ -132,11 +117,14 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         });
 
         bytes memory encodedInnerBundle = abi.encode(innerBundle);
-        MessageInclusionProof memory innerProof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
+        AtomicFinalityProof memory innerProof;
 
-        bytes memory innerPayload = abi.encodeCall(IInteropHandlerBase.executeBundle, (encodedInnerBundle, innerProof));
+        bytes memory innerPayload = abi.encodeCall(
+            L2InteropHandler.executeAtomicBundle,
+            (encodedInnerBundle, innerProof)
+        );
 
-        // Call chain: executeBundle(outer) -> _executeCalls -> receiveMessage -> this.executeBundle(inner)
+        // Call chain: executeAtomicBundle(outer) -> _executeCalls -> receiveMessage -> this.executeAtomicBundle(inner)
         InteropCall[] memory outerCalls = new InteropCall[](1);
         outerCalls[0] = InteropCall({
             version: INTEROP_CALL_VERSION,
@@ -158,16 +146,9 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         });
 
         bytes memory encodedOuterBundle = abi.encode(outerBundle);
-        MessageInclusionProof memory outerProof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
+        AtomicFinalityProof memory outerProof;
 
-        // Message inclusion verification is mocked to pass.
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
-
-        // The inner recipient is mocked to accept the call (returns the receiveMessage selector).
+        // The inner bundle's no-op call forwards to the mocked recipient, which returns the ERC-7786 selector.
         vm.mockCall(
             makeAddr("innerRecipient"),
             abi.encodeWithSelector(IERC7786Recipient.receiveMessage.selector),
@@ -176,30 +157,30 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
 
         vm.chainId(destinationChainId);
 
-        // Positive oracle: the whole nested chain succeeds and BOTH bundles end up fully executed;
-        // before the fix this reverted with `Reentrancy` at the nested call.
         vm.prank(bundleExecutor);
-        L2_INTEROP_HANDLER.executeBundle(encodedOuterBundle, outerProof);
+        L2_INTEROP_HANDLER.executeAtomicBundle(encodedOuterBundle, outerProof);
 
         assertTrue(
-            L2_INTEROP_HANDLER.bundleStatus(
-                InteropDataEncoding.encodeInteropBundleHash(sourceChainId, encodedOuterBundle)
-            ) == BundleStatus.FullyExecuted,
+            L2_INTEROP_HANDLER.bundleStatus(InteropDataEncoding.encodeInteropBundleHash(encodedOuterBundle)) ==
+                BundleStatus.FullyExecuted,
             "outer bundle must be fully executed"
         );
         assertTrue(
-            L2_INTEROP_HANDLER.bundleStatus(
-                InteropDataEncoding.encodeInteropBundleHash(sourceChainId, encodedInnerBundle)
-            ) == BundleStatus.FullyExecuted,
+            L2_INTEROP_HANDLER.bundleStatus(InteropDataEncoding.encodeInteropBundleHash(encodedInnerBundle)) ==
+                BundleStatus.FullyExecuted,
             "nested bundle must be fully executed through the self-call"
         );
     }
 
-    /// @notice A nested this.verifyBundle() reached through receiveMessage must not be blocked by a
-    /// nonReentrant modifier.
+    /// @notice `verifyBundle` must not carry a nonReentrant guard: a bundle may re-enter to verify a nested one.
+    /// @dev Positive oracle: executeAtomicBundle(outer) -> receiveMessage -> this.verifyAtomicBundle(inner) succeeds, so the
+    ///      outer bundle ends up `FullyExecuted` and the nested bundle `Verified`. Before the fix the nested
+    ///      call reverted with `Reentrancy`.
     function test_regression_verifyBundleNoReentrancyGuard() public {
         uint256 sourceChainId = block.chainid;
 
+        // Inner bundle verified (not executed) via receiveMessage -> verifyBundle. `verifyBundle` is
+        // permissionless, so the inner execution address is not gated here.
         InteropCall[] memory innerCalls = new InteropCall[](1);
         innerCalls[0] = InteropCall({
             version: INTEROP_CALL_VERSION,
@@ -221,11 +202,14 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         });
 
         bytes memory encodedInnerBundle = abi.encode(innerBundle);
-        MessageInclusionProof memory innerProof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
+        AtomicFinalityProof memory innerProof;
 
-        bytes memory innerPayload = abi.encodeCall(IInteropHandlerBase.verifyBundle, (encodedInnerBundle, innerProof));
+        bytes memory innerPayload = abi.encodeCall(
+            L2InteropHandler.verifyAtomicBundle,
+            (encodedInnerBundle, innerProof)
+        );
 
-        // Call chain: executeBundle(outer) -> _executeCalls -> receiveMessage -> this.verifyBundle(inner)
+        // Call chain: executeAtomicBundle(outer) -> _executeCalls -> receiveMessage -> this.verifyAtomicBundle(inner)
         InteropCall[] memory outerCalls = new InteropCall[](1);
         outerCalls[0] = InteropCall({
             version: INTEROP_CALL_VERSION,
@@ -247,39 +231,29 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         });
 
         bytes memory encodedOuterBundle = abi.encode(outerBundle);
-        MessageInclusionProof memory outerProof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
-
-        // Message inclusion verification is mocked to pass.
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
+        AtomicFinalityProof memory outerProof;
 
         vm.chainId(destinationChainId);
 
-        // Positive oracle: the outer bundle ends up fully executed and the nested bundle verified;
-        // before the fix this reverted with `Reentrancy`.
         vm.prank(bundleExecutor);
-        L2_INTEROP_HANDLER.executeBundle(encodedOuterBundle, outerProof);
+        L2_INTEROP_HANDLER.executeAtomicBundle(encodedOuterBundle, outerProof);
 
         assertTrue(
-            L2_INTEROP_HANDLER.bundleStatus(
-                InteropDataEncoding.encodeInteropBundleHash(sourceChainId, encodedOuterBundle)
-            ) == BundleStatus.FullyExecuted,
+            L2_INTEROP_HANDLER.bundleStatus(InteropDataEncoding.encodeInteropBundleHash(encodedOuterBundle)) ==
+                BundleStatus.FullyExecuted,
             "outer bundle must be fully executed"
         );
         assertTrue(
-            L2_INTEROP_HANDLER.bundleStatus(
-                InteropDataEncoding.encodeInteropBundleHash(sourceChainId, encodedInnerBundle)
-            ) == BundleStatus.Verified,
+            L2_INTEROP_HANDLER.bundleStatus(InteropDataEncoding.encodeInteropBundleHash(encodedInnerBundle)) ==
+                BundleStatus.Verified,
             "nested bundle must be verified through the self-call"
         );
     }
-    /// @notice Helper to create bundle attributes with execution/unbundler address on the given chain.
-    /// @param chainId The ERC-7930 chain id of the execution/unbundler address (the destination chain for
-    /// directly executed bundles; the SOURCE chain for bundles executed through the interop-message self-call,
-    /// whose authorized sender carries the source chain id).
+
+    /// @notice Helper: bundle attributes with the execution/unbundler address bound to `chainId`.
+    /// @dev The execution-permission gate authorizes against the interop-message sender's ERC-7930 chain id —
+    /// the SOURCE chain for a nested (receiveMessage) execution, but `destinationChainId` for a direct top-level
+    /// execution — so callers pass the chain id matching how the bundle is executed.
     function _createBundleAttributes(
         uint256 chainId,
         address executor

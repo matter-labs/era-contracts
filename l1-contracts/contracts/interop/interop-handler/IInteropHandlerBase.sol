@@ -2,11 +2,12 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-import {BundleStatus, CallStatus, MessageInclusionProof} from "../../common/Messaging.sol";
+import {BundleStatus, CallStatus} from "../../common/Messaging.sol";
 
-/// @title IInteropHandlerBase
-/// @notice Interface for the interop handlers, the destination-side entry points for interop bundles.
-/// See {protocol-docs/interop.md} (destination-side processing).
+/// @notice Proof-agnostic surface of the interop handlers, shared by {InteropHandlerBase}.
+/// @dev `executeBundle`/`verifyBundle` are intentionally NOT declared here: the L2 handler takes an
+/// `AtomicFinalityProof` and the L1 handler a `MessageInclusionProof`, so each derived contract declares its
+/// own proof-typed entry point. Only the proof-agnostic parts (unbundle, status, events) live here.
 interface IInteropHandlerBase {
     /// @notice Emitted when a bundle is marked Verified.
     event BundleVerified(bytes32 indexed bundleHash);
@@ -19,18 +20,6 @@ interface IInteropHandlerBase {
 
     /// @notice Emitted for each call whose status changes during unbundling.
     event CallProcessed(bytes32 indexed bundleHash, uint256 indexed callIndex, CallStatus status);
-
-    /// @notice Executes a full bundle atomically. See {protocol-docs/interop.md} (execution).
-    /// @dev Reverts if any call fails, or if the bundle has been processed already.
-    /// @param _bundle ABI-encoded InteropBundle to execute.
-    /// @param _proof Inclusion proof for the bundle message.
-    function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) external;
-
-    /// @notice Verifies receipt of a bundle without executing calls, marking it Verified.
-    /// See {protocol-docs/interop.md} (verification).
-    /// @param _bundle ABI-encoded InteropBundle to verify.
-    /// @param _proof Inclusion proof for the bundle message.
-    function verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof) external;
 
     /// @notice Executes, cancels or skips a bundle's calls individually; may be invoked multiple times until
     /// all calls are processed. See {protocol-docs/interop.md} (unbundling).

@@ -20,7 +20,7 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
     address public override l2Bridge;
 
     /// @dev Address of the L1 base token. It can be deposited to mint this L2 token.
-    address public l1Address;
+    address public override l1Address;
 
     /// @dev Address of the native token vault.
     address public override nativeTokenVault;

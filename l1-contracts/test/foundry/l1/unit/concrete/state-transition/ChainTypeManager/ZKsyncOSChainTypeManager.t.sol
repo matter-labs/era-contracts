@@ -122,6 +122,12 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         vm.prank(governor);
         chainAssetHandler.setAddresses();
 
+        vm.mockCall(
+            address(sharedBridge),
+            abi.encodeCall(L1AssetRouter.l2BridgeAddress, (chainId)),
+            abi.encode(makeAddr("l2BridgeAddress"))
+        );
+
         vm.startPrank(address(bridgehub));
         chainTypeManager = new ZKsyncOSChainTypeManager(
             address(bridgehub),

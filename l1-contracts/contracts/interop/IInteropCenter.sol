@@ -155,6 +155,37 @@ interface IInteropCenter {
         bytes[] calldata _bundleAttributes
     ) external payable returns (bytes32 bundleHash);
 
+    /// @notice Simulates {sendBundle} and reports the `bundleHash` it would produce for the same caller and
+    ///         inputs, without collecting value or committing to the atomic interop IMT.
+    /// @dev Quoter pattern: this ALWAYS reverts with `InteropPreviewHash(bundleHash)` — it never returns and
+    ///      can never commit state. This is deliberate: to make the hash byte-exact it runs the same stateful
+    ///      assembly as {sendBundle}, including the value-burning `initiateIndirectCall` for indirect legs;
+    ///      reverting guarantees that burn is rolled back no matter who calls it or from what context (so it
+    ///      cannot be weaponised to move funds). Invoke it via a static `eth_call` / `callStatic` and read the
+    ///      hash out of the revert reason. Callers derive the atomic `flowId` (which commits to `bundleHash`)
+    ///      from this value before the real send. Requires no `msg.value` and no `atomicBundle` attribute, and
+    ///      does not consume the `interopBundleSalt` uniqueness slot.
+    /// @param _destinationChainId Same as {sendBundle}.
+    /// @param _callStarters Same as {sendBundle}.
+    /// @param _bundleAttributes Same as {sendBundle}.
+    function previewBundleHash(
+        bytes calldata _destinationChainId,
+        InteropCallStarter[] calldata _callStarters,
+        bytes[] calldata _bundleAttributes
+    ) external;
+
+    /// @notice Simulates {sendMessage} and reports the `bundleHash` of the single-call bundle it would produce
+    ///         for the same caller and inputs. Same quoter contract as {previewBundleHash}: it ALWAYS reverts
+    ///         with `InteropPreviewHash(bundleHash)` and must be invoked via a static `eth_call` / `callStatic`.
+    /// @param _recipient Same as {sendMessage}.
+    /// @param _payload Same as {sendMessage}.
+    /// @param _attributes Same as {sendMessage}.
+    function previewMessageHash(
+        bytes calldata _recipient,
+        bytes calldata _payload,
+        bytes[] calldata _attributes
+    ) external;
+
     /// @notice Parses the attributes of the call or bundle.
     /// @param _attributes ERC-7786 Attributes of the call or bundle.
     /// @param _restriction Restriction for parsing attributes.

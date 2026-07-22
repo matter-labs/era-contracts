@@ -20,9 +20,13 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 
-import {SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_INTEROP_ATTRIBUTES, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {SETTLEMENT_LAYER_RELAY_SENDER, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_ATOMIC_FLOW_MANAGER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BOOTLOADER_ADDRESS,
+    L2_ATOMIC_FLOW_MANAGER_ADDR,
+    L2_INTEROP_ATTRIBUTE_PARSER_ADDR
+} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {
     BUNDLE_IDENTIFIER,
     BundleAttributes,
@@ -37,11 +41,9 @@ import {
 import {MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 import {
-    AtomicBundleCallCarriesValue,
-    AtomicBundleNotAllowedInSendMessage,
+    NonAtomicSendUnsupported,
     AtomicBundleToL1NotSupported,
-    AttributeAlreadySet,
-    AttributeViolatesRestriction,
+    InteropPreviewHash,
     CannotInitiateInteropOnL1,
     DestinationChainNotRegistered,
     DirectCallToL1NotSupported,
@@ -58,8 +60,7 @@ import {
 } from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
-import {IERC7786Attributes} from "./IERC7786Attributes.sol";
-import {AttributesDecoder} from "./AttributesDecoder.sol";
+import {IInteropAttributeParser} from "./IInteropAttributeParser.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
 import {IAtomicFlowManager} from "../atomic-interop/IAtomicFlowManager.sol";
 import {ERC7930_V1_MIN_LENGTH} from "./InteropConstants.sol";
@@ -138,22 +139,12 @@ contract InteropCenter is
         _;
     }
 
-    /// @notice Returns the asset router address. Virtual to allow override in private interop.
-    function _assetRouterAddr() internal view virtual returns (address) {
-        return L2_ASSET_ROUTER_ADDR;
-    }
-
-    /// @notice Returns the native token vault. Virtual to allow override in private interop.
-    function _nativeTokenVault() internal view virtual returns (IL2NativeTokenVault) {
-        return IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT);
-    }
-
     /// @inheritdoc IInteropCenter
     function getZKTokenAddress() public view returns (address) {
         if (address(zkToken) != address(0)) {
             return address(zkToken);
         }
-        return _nativeTokenVault().tokenAddress(ZK_TOKEN_ASSET_ID);
+        return IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT).tokenAddress(ZK_TOKEN_ASSET_ID);
     }
 
     /// @notice Resolves the ZK token address from its asset ID (via the NTV), caching the result.
@@ -214,9 +205,6 @@ contract InteropCenter is
             attributes,
             AttributeParsingRestrictions.CallAndBundleAttributes
         );
-        // A single-call send is never atomic; reject a stray `atomicBundle` attribute rather than silently
-        // ignoring it (`sendBundle` is the atomic entry point).
-        require(!_parseAtomicSend(attributes).isAtomic, AtomicBundleNotAllowedInSendMessage());
 
         // Default the unbundler to the original sender pinned to this (source) chain — deliberately not
         // a chain wildcard, which would let a same-address clone on another chain unbundle. See
@@ -235,14 +223,16 @@ contract InteropCenter is
         bytes[][] memory originalCallAttributes = new bytes[][](1);
         originalCallAttributes[0] = attributes;
 
-        // This single-call send path is never atomic; pass an empty AtomicSend (publishes to L1 as usual).
-        AtomicSend memory emptyAtomicSend;
+        // Every send is atomic now (public interop was removed). A single-call send is a valid
+        // single-leg atomic flow: it must carry the `atomicBundle` attribute like any other send.
+        AtomicSend memory atomicSend = _parser().parseAtomicSend(attributes);
+
         bytes32 bundleHash = _sendBundle({
             _destinationChainId: recipientChainId,
             _callStarters: callStartersInternal,
             _bundleAttributes: bundleAttributes,
             _originalCallAttributes: originalCallAttributes,
-            _atomicSend: emptyAtomicSend
+            _atomicSend: atomicSend
         });
 
         // The sendId of the single call in the bundle (see {protocol-docs/interop.md}, identifiers).
@@ -260,53 +250,21 @@ contract InteropCenter is
         // slither-disable-next-line unused-return
         (uint256 destinationChainId, ) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
 
-        _ensureValidDestination(destinationChainId, _callStarters.length);
-        InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](
-            _callStarters.length
-        );
-        uint256 callStartersLength = _callStarters.length;
-
-        bytes[][] memory originalCallAttributes = new bytes[][](callStartersLength);
-
-        for (uint256 i = 0; i < callStartersLength; ++i) {
-            _ensureEmptyChainReference(_callStarters[i].to);
-
-            // slither-disable-next-line unused-return
-            (, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_callStarters[i].to);
-
-            // Same guard as `sendMessage`: an ERC-7930 encoding with an empty address field parses to
-            // address(0), which would collect value up-front for a call that can never execute and has
-            // no refund path.
-            require(recipientAddress != address(0), ZeroAddress());
-
-            // Store original attributes for MessageSent event emission
-            originalCallAttributes[i] = _callStarters[i].callAttributes;
-
-            // solhint-disable-next-line no-unused-vars
-            (CallAttributes memory callAttributes, ) = parseAttributes(
-                _callStarters[i].callAttributes,
-                AttributeParsingRestrictions.OnlyCallAttributes
-            );
-            callStartersInternal[i] = InteropCallStarterInternal({
-                to: recipientAddress,
-                data: _callStarters[i].data,
-                callAttributes: callAttributes
-            });
-        }
-        // solhint-disable-next-line no-unused-vars
-        (, BundleAttributes memory bundleAttributes) = parseAttributes(
-            _bundleAttributes,
-            AttributeParsingRestrictions.OnlyBundleAttributes
-        );
-
-        // Default the unbundler to the original sender pinned to this (source) chain — deliberately not
-        // a chain wildcard, which would let a same-address clone on another chain unbundle. See
-        // {protocol-docs/interop.md} (bundle attributes).
-        if (bundleAttributes.unbundlerAddress.length == 0) {
-            bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
+        // Ensure the destination is valid: bundles are initiated only on an L2, never target this chain
+        // itself, and an L2->L1 bundle (canonically a withdrawal) must be a single call.
+        require(L1_CHAIN_ID != block.chainid, CannotInitiateInteropOnL1(destinationChainId));
+        require(destinationChainId != block.chainid, InteropToSelfNotSupported());
+        if (destinationChainId == L1_CHAIN_ID) {
+            require(_callStarters.length == 1, MultiCallToL1NotSupported(_callStarters.length));
         }
 
-        AtomicSend memory atomicSend = _parseAtomicSend(_bundleAttributes);
+        (
+            InteropCallStarterInternal[] memory callStartersInternal,
+            BundleAttributes memory bundleAttributes,
+            bytes[][] memory originalCallAttributes
+        ) = _parseBundleInputs(_callStarters, _bundleAttributes);
+
+        AtomicSend memory atomicSend = _parser().parseAtomicSend(_bundleAttributes);
 
         bundleHash = _sendBundle({
             _destinationChainId: destinationChainId,
@@ -317,21 +275,96 @@ contract InteropCenter is
         });
     }
 
+    /// @inheritdoc IInteropCenter
+    function previewBundleHash(
+        bytes calldata _destinationChainId,
+        InteropCallStarter[] calldata _callStarters,
+        bytes[] calldata _bundleAttributes
+    ) external {
+        _ensureEmptyAddress(_destinationChainId);
+        // slither-disable-next-line unused-return
+        (uint256 destinationChainId, ) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
+        _ensureL2ToL2(destinationChainId);
+
+        // Shares the send path's input parsing so the previewed hash is byte-identical to sendBundle's.
+        // The original call attributes (event data) are irrelevant to the hash, so they are discarded here.
+        // slither-disable-next-line unused-return
+        (
+            InteropCallStarterInternal[] memory callStartersInternal,
+            BundleAttributes memory bundleAttributes,
+
+        ) = _parseBundleInputs(_callStarters, _bundleAttributes);
+
+        _previewBundleHashAndRevert(destinationChainId, callStartersInternal, bundleAttributes);
+    }
+
+    /// @inheritdoc IInteropCenter
+    function previewMessageHash(
+        bytes calldata _recipient,
+        bytes calldata _payload,
+        bytes[] calldata _attributes
+    ) external {
+        // slither-disable-next-line unused-return
+        (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_recipient);
+        _ensureL2ToL2(recipientChainId);
+        // Mirror `sendMessage`'s guard so the preview rejects a chain-only (address(0)) recipient exactly as
+        // the real send would, keeping the previewed hash faithful to what `sendMessage` accepts.
+        require(recipientAddress != address(0), ZeroAddress());
+
+        (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) = parseAttributes(
+            _attributes,
+            AttributeParsingRestrictions.CallAndBundleAttributes
+        );
+        if (bundleAttributes.unbundlerAddress.length == 0) {
+            bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
+        }
+
+        InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](1);
+        callStartersInternal[0] = InteropCallStarterInternal({
+            to: recipientAddress,
+            data: _payload,
+            callAttributes: callAttributes
+        });
+
+        _previewBundleHashAndRevert(recipientChainId, callStartersInternal, bundleAttributes);
+    }
+
+    /// @notice Shared tail of the preview quoters ({previewBundleHash}/{previewMessageHash}): assembles the
+    /// bundle from already-parsed inputs and reverts with its hash.
+    /// @dev Quoter pattern: this runs the same stateful assembly as `sendBundle` (including the value-burning
+    /// `initiateIndirectCall` for indirect legs), so it MUST NOT commit that burn on-chain. Reverting with the
+    /// hash — instead of returning it — rolls back every state change made while assembling, regardless of
+    /// caller/context; callers read the hash from the `InteropPreviewHash` revert via a static `eth_call`. It
+    /// intentionally stops BEFORE the atomic append (unlike the real dispatch): the flow's `flowId` commits to
+    /// this very bundle hash, so the hash must be predictable before any flow exists (a chicken-and-egg that a
+    /// `submitBundle`-then-revert form could not satisfy).
+    function _previewBundleHashAndRevert(
+        uint256 _destinationChainId,
+        InteropCallStarterInternal[] memory _callStarters,
+        BundleAttributes memory _bundleAttributes
+    ) private {
+        // slither-disable-next-line unused-return
+        (InteropBundle memory bundle, , ) = _buildInteropBundle(_destinationChainId, _callStarters, _bundleAttributes);
+        revert InteropPreviewHash(_hashBundle(bundle));
+    }
+
     /*//////////////////////////////////////////////////////////////
                             Internal functions
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Verifies that the ERC-7930 address has an empty ChainReference field.
-    /// @dev This function is used to ensure that CallStarters in sendBundle do not include ChainReference, as required
-    ///      by our implementation. The ChainReference length is stored at byte offset 0x04 in the ERC-7930 format.
+    /// @dev Ensures that CallStarters in `sendBundle` do not include a ChainReference, as required by our
+    ///      implementation. The ChainReference length is stored at byte offset 0x04 in the ERC-7930 format.
     /// @param _interoperableAddress The ERC-7930 address to verify.
     function _ensureEmptyChainReference(bytes calldata _interoperableAddress) internal pure {
         require(
             _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH,
             InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
         );
-        uint8 chainReferenceLength = uint8(_interoperableAddress[0x04]);
-        require(chainReferenceLength == 0, InteroperableAddressChainReferenceNotEmpty(_interoperableAddress));
+        require(
+            uint8(_interoperableAddress[0x04]) == 0,
+            InteroperableAddressChainReferenceNotEmpty(_interoperableAddress)
+        );
     }
 
     /// @notice Verifies that the ERC-7930 address has an empty address field.
@@ -352,21 +385,8 @@ contract InteropCenter is
         require(addressLength == 0, InteroperableAddressNotEmpty(_interoperableAddress));
     }
 
-    /// @notice Validates the bundle destination: another L2, or L1 for a single-call bundle only.
-    /// See {protocol-docs/interop.md} (restrictions) for the full destination rules; the ones that
-    /// need parsed call attributes are enforced later in `_sendBundle`.
-    /// @param _destinationChainId Destination chain ID.
-    /// @param _callCount Number of calls in the bundle.
-    function _ensureValidDestination(uint256 _destinationChainId, uint256 _callCount) internal view {
-        require(L1_CHAIN_ID != block.chainid, CannotInitiateInteropOnL1(_destinationChainId));
-        require(_destinationChainId != block.chainid, InteropToSelfNotSupported());
-        if (_destinationChainId == L1_CHAIN_ID) {
-            require(_callCount == 1, MultiCallToL1NotSupported(_callCount));
-        }
-    }
-
     /// @notice Strict L2->L2 destination check used by the generic single-message `sendMessage` entry point.
-    /// @dev Unlike `_ensureValidDestination`, this never allows an L1 destination; the L2->L1 path
+    /// @dev Unlike the `sendBundle` destination check, this never allows an L1 destination; the L2->L1 path
     /// goes through `sendBundle` (single-call bundle) instead.
     function _ensureL2ToL2(uint256 _destinationChainId) internal view {
         require(
@@ -394,7 +414,7 @@ contract InteropCenter is
         bool _useFixedFee,
         uint256 _callCount
     ) internal {
-        bytes32 thisChainBaseTokenAssetId = _nativeTokenVault().BASE_TOKEN_ASSET_ID();
+        bytes32 thisChainBaseTokenAssetId = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT).BASE_TOKEN_ASSET_ID();
 
         uint256 protocolFee = (_useFixedFee || _destinationChainId == L1_CHAIN_ID)
             ? 0
@@ -414,7 +434,7 @@ contract InteropCenter is
             require(msg.value == expectedValue, MsgValueMismatch(expectedValue, msg.value));
 
             if (_totalBurnedCallsValue > 0) {
-                IAssetRouterShared(_assetRouterAddr()).bridgehubDepositBaseToken(
+                IAssetRouterShared(L2_ASSET_ROUTER_ADDR).bridgehubDepositBaseToken(
                     _destinationChainId,
                     _destinationBaseTokenAssetId,
                     msg.sender,
@@ -427,6 +447,71 @@ contract InteropCenter is
         if (protocolFee > 0) {
             accumulatedProtocolFees[block.coinbase] += protocolFee;
             emit ProtocolFeesAccumulated(block.coinbase, protocolFee);
+        }
+    }
+
+    /// @notice Parses the raw `sendBundle`/`previewBundleHash` inputs into the internal representation shared
+    /// by the real send and the hash preview: resolves each call starter's recipient address and per-call
+    /// attributes, captures the original per-call attributes (for `MessageSent` events), parses the bundle
+    /// attributes and defaults the unbundler to the sender.
+    /// @dev Does NOT validate the destination — `sendBundle` allows L2->L1 withdrawals while the previews are
+    /// L2<->L2 only, so each caller runs its own destination check before calling this.
+    /// @param _callStarters Raw call starters (ERC-7930 recipient + calldata + ERC-7786 attributes).
+    /// @param _bundleAttributes Raw ERC-7786 bundle attributes.
+    /// @return callStartersInternal Resolved call starters ready for `_buildInteropBundle`.
+    /// @return bundleAttributes Parsed bundle attributes, with the unbundler defaulted to `msg.sender`.
+    /// @return originalCallAttributes Per-call original attributes, preserved for `MessageSent` emission.
+    function _parseBundleInputs(
+        InteropCallStarter[] calldata _callStarters,
+        bytes[] calldata _bundleAttributes
+    )
+        internal
+        view
+        returns (
+            InteropCallStarterInternal[] memory callStartersInternal,
+            BundleAttributes memory bundleAttributes,
+            bytes[][] memory originalCallAttributes
+        )
+    {
+        uint256 callStartersLength = _callStarters.length;
+        callStartersInternal = new InteropCallStarterInternal[](callStartersLength);
+        originalCallAttributes = new bytes[][](callStartersLength);
+
+        for (uint256 i = 0; i < callStartersLength; ++i) {
+            _ensureEmptyChainReference(_callStarters[i].to);
+
+            // slither-disable-next-line unused-return
+            (, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_callStarters[i].to);
+
+            // Same guard as `sendMessage`: an ERC-7930 encoding with an empty address field parses to
+            // address(0), which would collect value up-front for a call that can never execute and has no
+            // refund path. Reject it here (during parsing) so it surfaces before any later validation.
+            require(recipientAddress != address(0), ZeroAddress());
+
+            // Store original attributes for MessageSent event emission.
+            originalCallAttributes[i] = _callStarters[i].callAttributes;
+
+            // solhint-disable-next-line no-unused-vars
+            (CallAttributes memory callAttributes, ) = parseAttributes(
+                _callStarters[i].callAttributes,
+                AttributeParsingRestrictions.OnlyCallAttributes
+            );
+            callStartersInternal[i] = InteropCallStarterInternal({
+                to: recipientAddress,
+                data: _callStarters[i].data,
+                callAttributes: callAttributes
+            });
+        }
+
+        // solhint-disable-next-line no-unused-vars
+        (, bundleAttributes) = parseAttributes(_bundleAttributes, AttributeParsingRestrictions.OnlyBundleAttributes);
+
+        // If the unbundler was not set for a bundle, we set the unbundler to be equal to the original sender, so
+        // that it's still possible to unbundle the bundle. If the original sender is the contract, it'll still be
+        // able to unbundle the bundle either via direct call to `unbundleBundle`, or via `sendMessage` to
+        // `L2InteropHandler`, with specific payload. Refer to `L2InteropHandler` for details.
+        if (bundleAttributes.unbundlerAddress.length == 0) {
+            bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
         }
     }
 
@@ -445,10 +530,22 @@ contract InteropCenter is
         bytes[][] memory _originalCallAttributes,
         AtomicSend memory _atomicSend
     ) internal returns (bytes32 bundleHash) {
-        // An atomic bundle can never target L1 (no atomic execution there, and L2->L1 withdrawals must
-        // never be revertable — see {protocol-docs/interop.md}, restrictions). Checked before any burn.
+        // Reject invalid atomicity/destination combinations up front, before any stateful bundle assembly
+        // or value burn (both `sendMessage` and `sendBundle` funnel through here). Exactly one destination is
+        // valid per atomicity:
+        //  - Atomic  => an L2 destination. An atomic bundle can never target L1: it is not published as an
+        //    L2->L1 message (its commit value goes to the IMT instead) and L1 has no atomic execution, so
+        //    its only possible outcome would be a timeout refund — but L2->L1 withdrawals must never be
+        //    revertable (their `totalWithdrawalsToL1` accounting is consumed once during the L1->GW migration
+        //    and must stay append-only, see {L2AssetTracker}).
+        //  - Non-atomic => L1 (an L2->L1 withdrawal). Public (L1-published) L2->L2 interop was removed, so a
+        //    non-atomic L2->L2 send has no delivery path.
+        // The empty call-starter address (`ZeroAddress`) is already rejected earlier in `_parseBundleInputs`;
+        // `DestinationChainNotRegistered` for a bad L2 destination still surfaces from the assembly below.
         if (_atomicSend.isAtomic) {
             require(_destinationChainId != L1_CHAIN_ID, AtomicBundleToL1NotSupported());
+        } else {
+            require(_destinationChainId == L1_CHAIN_ID, NonAtomicSendUnsupported());
         }
 
         // Deliberately no gateway-mode requirement on the send side; correctness is enforced by the
@@ -461,56 +558,15 @@ contract InteropCenter is
         );
         isInteropBundleSaltUsed[msg.sender][_bundleAttributes.salt] = true;
 
-        // For an L2->L1 bundle the destination base token is the L1-native ETH asset id (L1 is not
-        // registered in the L2 Bridgehub, and its base token is not necessarily this L2's).
-        bytes32 destinationBaseTokenAssetId;
-        if (_destinationChainId == L1_CHAIN_ID) {
-            destinationBaseTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
-        } else {
-            destinationBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
-            require(destinationBaseTokenAssetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
-        }
-        InteropBundle memory bundle = InteropBundle({
-            version: INTEROP_BUNDLE_VERSION,
-            sourceChainId: block.chainid,
-            destinationChainId: _destinationChainId,
-            destinationBaseTokenAssetId: destinationBaseTokenAssetId,
-            // See {protocol-docs/interop.md} (replay protection) for the salt scheme.
-            interopBundleSalt: keccak256(abi.encodePacked(msg.sender, _bundleAttributes.salt)),
-            calls: new InteropCall[](_callStarters.length),
-            bundleAttributes: _bundleAttributes
-        });
+        // Form an InteropBundle (this also runs each call starter, burning value for indirect calls, and
+        // enforcing the L2->L1 withdrawal restrictions for an L1 destination).
+        (
+            InteropBundle memory bundle,
+            uint256 totalBurnedCallsValue,
+            uint256 totalIndirectCallsValue
+        ) = _buildInteropBundle(_destinationChainId, _callStarters, _bundleAttributes);
 
-        // This will calculate how much value does all of the calls use cumulatively.
-        uint256 totalBurnedCallsValue;
-        uint256 totalIndirectCallsValue;
-
-        // Fill the formed InteropBundle with calls.
         uint256 callStartersLength = _callStarters.length;
-        for (uint256 i = 0; i < callStartersLength; ++i) {
-            _validateCallStarterValue(_callStarters[i].callAttributes.interopCallValue);
-            if (_destinationChainId == L1_CHAIN_ID) {
-                // Interop to L1 is restricted to a single indirect, zero-value asset-router call (a
-                // withdrawal) for this release. See {protocol-docs/interop.md} (restrictions).
-                require(_callStarters[i].callAttributes.indirectCall, DirectCallToL1NotSupported());
-                require(
-                    _callStarters[i].to == L2_ASSET_ROUTER_ADDR,
-                    InteropCallToL1NotToAssetRouter(_callStarters[i].to)
-                );
-                require(
-                    _callStarters[i].callAttributes.interopCallValue == 0,
-                    NonZeroValueToL1NotSupported(_callStarters[i].callAttributes.interopCallValue)
-                );
-            }
-            InteropCall memory interopCall = _processCallStarter(_callStarters[i], _destinationChainId, msg.sender);
-            bundle.calls[i] = interopCall;
-            totalBurnedCallsValue += _callStarters[i].callAttributes.interopCallValue;
-            // For indirect calls, also account for the bridge message value that gets sent to the AssetRouter
-            if (_callStarters[i].callAttributes.indirectCall) {
-                totalIndirectCallsValue += _callStarters[i].callAttributes.indirectCallMessageValue;
-            }
-        }
-
         // Fixed ZK fees are accumulated per coinbase (not pushed) like the protocol fee above; L2->L1
         // bundles are free.
         if (_bundleAttributes.useFixedFee && _destinationChainId != L1_CHAIN_ID) {
@@ -521,7 +577,7 @@ contract InteropCenter is
         }
 
         // Ensure that tokens required for bundle execution were received.
-        _handleValueCollection({
+        _ensureCorrectTotalValue({
             _destinationChainId: bundle.destinationChainId,
             _destinationBaseTokenAssetId: bundle.destinationBaseTokenAssetId,
             _totalBurnedCallsValue: totalBurnedCallsValue,
@@ -530,6 +586,11 @@ contract InteropCenter is
             _callCount: callStartersLength
         });
 
+        // Hash the bundle and dispatch it. For an L2->L2 bundle this appends the commit value to the interop
+        // IMT via the AtomicFlowManager (atomic-only); for an L2->L1 withdrawal it publishes the bundle to L1.
+        // The atomic send metadata travels out-of-band (`_atomicSend`), not embedded in the bundle, so
+        // `bundleHash` does not depend on `flowId` (a circular dependency). `msgHash` is the L2->L1 message
+        // hash for a withdrawal, or `bytes32(0)` for an atomic L2->L2 bundle.
         bytes32 msgHash;
         (bundleHash, msgHash) = _dispatchBundle(bundle, _atomicSend);
 
@@ -544,6 +605,65 @@ contract InteropCenter is
         emit InteropBundleSent(msgHash, bundleHash, bundle);
     }
 
+    /// @notice Assembles the {InteropBundle} from resolved call starters: derives the sender-scoped salt,
+    /// resolves the destination base-token asset id, and processes each call starter (which, for indirect
+    /// calls, executes the value-burning `initiateIndirectCall`). Returns the bundle plus the aggregated
+    /// call values needed for source-chain value collection.
+    /// @dev Shared by {_sendBundle} (the real send) and the {previewBundleHash}/{previewMessageHash}
+    /// simulations, so a preview's `bundleHash` is byte-identical to the value the matching send emits.
+    function _buildInteropBundle(
+        uint256 _destinationChainId,
+        InteropCallStarterInternal[] memory _callStarters,
+        BundleAttributes memory _bundleAttributes
+    ) internal returns (InteropBundle memory bundle, uint256 totalBurnedCallsValue, uint256 totalIndirectCallsValue) {
+        // For an L2->L1 bundle the L1 chain is not registered as an interop destination in the L2 Bridgehub,
+        // so its base-token asset id is the L1-native ETH asset id (which is NOT necessarily this L2's base
+        // token — they only coincide on ETH-based chains). Otherwise resolve it from the Bridgehub registry.
+        bytes32 destinationBaseTokenAssetId = _destinationChainId == L1_CHAIN_ID
+            ? DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS)
+            : _getDestinationBaseTokenAssetId(_destinationChainId);
+        bundle = InteropBundle({
+            version: INTEROP_BUNDLE_VERSION,
+            sourceChainId: block.chainid,
+            destinationChainId: _destinationChainId,
+            destinationBaseTokenAssetId: destinationBaseTokenAssetId,
+            // See {protocol-docs/interop.md} (replay protection) for the salt scheme.
+            interopBundleSalt: keccak256(abi.encodePacked(msg.sender, _bundleAttributes.salt)),
+            calls: new InteropCall[](_callStarters.length),
+            bundleAttributes: _bundleAttributes
+        });
+
+        // Fill the formed InteropBundle with calls, aggregating the value each one consumes.
+        uint256 callStartersLength = _callStarters.length;
+        for (uint256 i = 0; i < callStartersLength; ++i) {
+            if (_destinationChainId == L1_CHAIN_ID) {
+                // Interop to L1 is restricted to a single indirect, zero-value asset-router call (a
+                // withdrawal) for this release. See {protocol-docs/interop.md} (restrictions).
+                require(_callStarters[i].callAttributes.indirectCall, DirectCallToL1NotSupported());
+                require(
+                    _callStarters[i].to == L2_ASSET_ROUTER_ADDR,
+                    InteropCallToL1NotToAssetRouter(_callStarters[i].to)
+                );
+                require(
+                    _callStarters[i].callAttributes.interopCallValue == 0,
+                    NonZeroValueToL1NotSupported(_callStarters[i].callAttributes.interopCallValue)
+                );
+            }
+            InteropCall memory interopCall = _processCallStarter(_callStarters[i], _destinationChainId);
+            bundle.calls[i] = interopCall;
+            totalBurnedCallsValue += _callStarters[i].callAttributes.interopCallValue;
+            // For indirect calls, also account for the bridge message value that gets sent to the AssetRouter
+            if (_callStarters[i].callAttributes.indirectCall) {
+                totalIndirectCallsValue += _callStarters[i].callAttributes.indirectCallMessageValue;
+            }
+        }
+    }
+
+    /// @notice Hashes an assembled {InteropBundle} into its canonical `bundleHash`.
+    function _hashBundle(InteropBundle memory _bundle) internal view returns (bytes32) {
+        return InteropDataEncoding.encodeInteropBundleHash(abi.encode(_bundle));
+    }
+
     /// @notice Returns the base token asset ID for the destination chain. Override for pre-v31 chains.
     function _getDestinationBaseTokenAssetId(uint256 _destinationChainId) internal view virtual returns (bytes32) {
         bytes32 assetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
@@ -551,75 +671,45 @@ contract InteropCenter is
         return assetId;
     }
 
-    /// @notice Validates a single call starter's interopCallValue. Any value is allowed.
-    function _validateCallStarterValue(uint256 /* _interopCallValue */) internal pure {
-        // No validation needed.
-    }
-
     /// @notice Handles base-token value collection for the bundle.
-    function _handleValueCollection(
-        uint256 _destinationChainId,
-        bytes32 _destinationBaseTokenAssetId,
-        uint256 _totalBurnedCallsValue,
-        uint256 _totalIndirectCallsValue,
-        bool _useFixedFee,
-        uint256 _callCount
-    ) internal {
-        // solhint-disable-next-line
-        _ensureCorrectTotalValue(
-            _destinationChainId,
-            _destinationBaseTokenAssetId,
-            _totalBurnedCallsValue,
-            _totalIndirectCallsValue,
-            _useFixedFee,
-            _callCount
-        );
-    }
-
-    /// @notice Sends the bundle message to L1. Override in private interop to send hash-only format.
-    /// @return msgHash The hash returned by the L2→L1 messenger.
-    function _sendBundleToL1(
-        bytes memory _interopBundleBytes,
-        uint256 /* _callCount */
-    ) internal virtual returns (bytes32 msgHash) {
-        msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(BUNDLE_IDENTIFIER, _interopBundleBytes));
-    }
-
-    /// @notice Hashes the bundle and dispatches it: a normal bundle is published to L1 via
-    /// {_sendBundleToL1}; an atomic bundle instead has its commit value appended to the interop IMT
-    /// via {IAtomicFlowManager.append} (see {protocol-docs/interop.md}, atomic bundles).
-    /// @dev `_atomicSend` travels out-of-band, never embedded in `_bundle`: `bundleHash` must stay
-    /// independent of the flowId preimage (see {AtomicSend}).
+    /// @notice Hashes the bundle and dispatches it along one of two paths, keyed on the destination:
+    /// - **L2->L2 interop (atomic):** the bundle's commit value is appended to the interop IMT via the
+    ///   {AtomicFlowManager} and is NOT published to L1 — the burn already happened through the normal
+    ///   `initiateIndirectCall` path, and the destination executes it via {L2InteropHandler.executeAtomicBundle}.
+    ///   Native-`value` legs are allowed: the base-token value collected at send time (via the base-token
+    ///   holder for the same base token, or the asset router for a different one) is refunded to the payer on
+    ///   timeout by {AtomicFlowManager._recoverBundle}. Atomicity/destination validity (atomic must be L2,
+    ///   non-atomic must be L1) is already enforced up front in {_sendBundle}.
+    /// - **L2->L1 withdrawal:** the `BUNDLE_IDENTIFIER`-prefixed bundle is published to L1 via the L2->L1
+    ///   messenger and finalized there by {L1InteropHandler}, which proves the message inclusion. Withdrawals
+    ///   are not atomic (they inherently target L1), so they carry no `atomicBundle` attribute.
+    /// @dev `_atomicSend` (flowId/deadline/lowNullifierIndex) is passed out-of-band and is intentionally
+    /// NOT embedded in `_bundle`, so `bundleHash` is independent of `flowId`. This is required:
+    /// `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`
+    /// must be computable off-chain before the send, which is impossible if a `bundleHash` (a flowId
+    /// input) embedded `flowId`.
+    /// @return bundleHash Canonical hash of the bundle.
+    /// @return msgHash The L2->L1 message hash for a withdrawal, or `bytes32(0)` for an atomic L2->L2 bundle.
     function _dispatchBundle(
         InteropBundle memory _bundle,
         AtomicSend memory _atomicSend
     ) internal returns (bytes32 bundleHash, bytes32 msgHash) {
-        bytes memory interopBundleBytes = abi.encode(_bundle);
-        bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
+        bundleHash = _hashBundle(_bundle);
 
-        if (_atomicSend.isAtomic) {
-            _validateAtomicBundle(_bundle);
-            IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
-                _bundleHash: bundleHash,
-                _lowNullifierIndex: _atomicSend.lowNullifierIndex,
-                _flowPreimage: _atomicSend.flowPreimage
-            });
-        } else {
-            msgHash = _sendBundleToL1(interopBundleBytes, _bundle.calls.length);
+        if (_bundle.destinationChainId == L1_CHAIN_ID) {
+            // L2->L1 withdrawal: publish the bundle to L1 for finalization by the L1InteropHandler.
+            msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(BUNDLE_IDENTIFIER, abi.encode(_bundle)));
+            return (bundleHash, msgHash);
         }
-    }
 
-    /// @notice Rejects atomic-bundle calls that carry native base-token `value` — the one thing timeout
-    /// recovery can never reverse. See {protocol-docs/interop.md} (restrictions).
-    /// @dev Every atomic send passes through {_dispatchBundle}, so this covers all atomic bundles.
-    function _validateAtomicBundle(InteropBundle memory _bundle) internal pure {
-        uint256 callsLength = _bundle.calls.length;
-        for (uint256 i = 0; i < callsLength; ++i) {
-            InteropCall memory currentCall = _bundle.calls[i];
-            if (currentCall.value != 0) {
-                revert AtomicBundleCallCarriesValue(i, currentCall.value);
-            }
-        }
+        // L2->L2 interop: atomic-only (`_sendBundle` already guaranteed `isAtomic` for a non-L1 destination
+        // and rejected atomic-to-L1). Append the leg's commit value to the interop IMT. The AtomicFlowManager
+        // recomputes `flowId` from the out-of-band preimage and requires `bundleHash` to be one of its legs.
+        IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).append({
+            _bundleHash: bundleHash,
+            _lowNullifierIndex: _atomicSend.lowNullifierIndex,
+            _flowPreimage: _atomicSend.flowPreimage
+        });
     }
 
     /// @notice Emits ERC-7786 MessageSent events for each call in a bundle.
@@ -648,8 +738,7 @@ contract InteropCenter is
     /// `initiateIndirectCall` for indirect ones. See {protocol-docs/interop.md} (direct vs indirect).
     function _processCallStarter(
         InteropCallStarterInternal memory _callStarter,
-        uint256 _destinationChainId,
-        address _sender
+        uint256 _destinationChainId
     ) internal returns (InteropCall memory interopCall) {
         address recipientAddress = _callStarter.to;
 
@@ -659,10 +748,10 @@ contract InteropCenter is
             // slither-disable-next-line arbitrary-send-eth
             InteropCallStarter memory actualCallStarter = IL2CrossChainSender(recipientAddress).initiateIndirectCall{
                 value: _callStarter.callAttributes.indirectCallMessageValue
-            }(_destinationChainId, _sender, _callStarter.callAttributes.interopCallValue, _callStarter.data);
+            }(_destinationChainId, msg.sender, _callStarter.callAttributes.interopCallValue, _callStarter.data);
             // solhint-disable-next-line no-unused-vars
             // slither-disable-next-line unused-return
-            (CallAttributes memory indirectCallAttributes, ) = this.parseAttributes(
+            (CallAttributes memory indirectCallAttributes, ) = _parser().parseAttributes(
                 actualCallStarter.callAttributes,
                 AttributeParsingRestrictions.OnlyInteropCallValue
             );
@@ -691,7 +780,7 @@ contract InteropCenter is
                 to: recipientAddress,
                 data: _callStarter.data,
                 value: _callStarter.callAttributes.interopCallValue,
-                from: _sender
+                from: msg.sender
             });
         }
     }
@@ -719,149 +808,26 @@ contract InteropCenter is
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IInteropCenter
+    /// @dev Thin forwarder to the stateless {InteropAttributeParser} built-in. The parsing logic was moved out
+    /// of this contract to keep it under the EIP-170 runtime code-size limit; kept here for ABI compatibility.
     function parseAttributes(
         bytes[] calldata _attributes,
         AttributeParsingRestrictions _restriction
     ) public pure returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) {
-        // Default value is direct call.
-        callAttributes.indirectCall = false;
-
-        bytes4[SUPPORTED_INTEROP_ATTRIBUTES] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
-        // We can only pass each attribute once.
-        bool[] memory attributeUsed = new bool[](ATTRIBUTE_SELECTORS.length);
-
-        uint256 attributesLength = _attributes.length;
-        for (uint256 i = 0; i < attributesLength; ++i) {
-            bytes4 selector = bytes4(_attributes[i]);
-
-            if (selector == IERC7786Attributes.interopCallValue.selector) {
-                require(!attributeUsed[0], AttributeAlreadySet(selector));
-                require(
-                    _restriction == AttributeParsingRestrictions.OnlyInteropCallValue ||
-                        _restriction == AttributeParsingRestrictions.OnlyCallAttributes ||
-                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                attributeUsed[0] = true;
-                callAttributes.interopCallValue = AttributesDecoder.decodeUint256(_attributes[i]);
-            } else if (selector == IERC7786Attributes.indirectCall.selector) {
-                require(!attributeUsed[1], AttributeAlreadySet(selector));
-                require(
-                    _restriction == AttributeParsingRestrictions.OnlyCallAttributes ||
-                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                attributeUsed[1] = true;
-                callAttributes.indirectCall = true;
-                callAttributes.indirectCallMessageValue = AttributesDecoder.decodeUint256(_attributes[i]);
-            } else if (selector == IERC7786Attributes.executionAddress.selector) {
-                require(!attributeUsed[2], AttributeAlreadySet(selector));
-                require(
-                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
-                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                attributeUsed[2] = true;
-                bundleAttributes.executionAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
-                _validateOptionalInteroperableAddress(bundleAttributes.executionAddress);
-            } else if (selector == IERC7786Attributes.unbundlerAddress.selector) {
-                require(!attributeUsed[3], AttributeAlreadySet(selector));
-                require(
-                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
-                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                attributeUsed[3] = true;
-                bundleAttributes.unbundlerAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
-                _validateOptionalInteroperableAddress(bundleAttributes.unbundlerAddress);
-            } else if (selector == IERC7786Attributes.useFixedFee.selector) {
-                require(!attributeUsed[4], AttributeAlreadySet(selector));
-                require(
-                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
-                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                attributeUsed[4] = true;
-
-                // Decode the boolean parameter using AttributesDecoder
-                bool useFixed = AttributesDecoder.decodeBool(_attributes[i]);
-                bundleAttributes.useFixedFee = useFixed;
-            } else if (selector == IERC7786Attributes.atomicBundle.selector) {
-                require(!attributeUsed[5], AttributeAlreadySet(selector));
-                require(
-                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
-                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                attributeUsed[5] = true;
-                // Only validated here (permitted, non-duplicate); the payload is parsed separately by
-                // `_parseAtomicSend` and never stored in `BundleAttributes` (see {AtomicSend}).
-            } else if (selector == IERC7786Attributes.interopBundleSalt.selector) {
-                require(!attributeUsed[6], AttributeAlreadySet(selector));
-                require(
-                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
-                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeViolatesRestriction(selector, uint256(_restriction))
-                );
-                attributeUsed[6] = true;
-                bundleAttributes.salt = AttributesDecoder.decodeBytes32(_attributes[i]);
-            } else {
-                revert IERC7786GatewaySource.UnsupportedAttribute(selector);
-            }
-        }
-    }
-
-    /// @notice Extracts the `atomicBundle` send metadata from the bundle attributes (already validated
-    /// by `parseAttributes`); `isAtomic = false` when the attribute is absent. Kept separate from
-    /// `BundleAttributes` so the metadata never enters the cross-chain bundle (see {AtomicSend}).
-    function _parseAtomicSend(bytes[] calldata _attributes) internal pure returns (AtomicSend memory atomicSend) {
-        uint256 attributesLength = _attributes.length;
-        for (uint256 i = 0; i < attributesLength; ++i) {
-            if (bytes4(_attributes[i]) == IERC7786Attributes.atomicBundle.selector) {
-                (atomicSend.flowPreimage, atomicSend.lowNullifierIndex) = AttributesDecoder.decodeAtomicBundle(
-                    _attributes[i]
-                );
-                atomicSend.isAtomic = true;
-            }
-        }
-    }
-
-    function _validateOptionalInteroperableAddress(bytes memory _interoperableAddress) internal pure {
-        if (_interoperableAddress.length == 0) {
-            return;
-        }
-
+        // The tuple IS returned to our caller; slither's unused-return misfires on `return extCall()`.
         // slither-disable-next-line unused-return
-        InteroperableAddress.parseEvmV1(_interoperableAddress);
+        return _parser().parseAttributes(_attributes, _restriction);
     }
 
-    /// @notice Checks if the attribute selector is supported by the InteropCenter.
-    /// @param _attributeSelector The attribute selector to check.
-    /// @return True if the attribute selector is supported, false otherwise.
+    /// @inheritdoc IERC7786GatewaySource
+    /// @dev Thin forwarder to the stateless {InteropAttributeParser} built-in (see {parseAttributes}).
     function supportsAttribute(bytes4 _attributeSelector) external pure override returns (bool) {
-        bytes4[SUPPORTED_INTEROP_ATTRIBUTES] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
-        uint256 attributeSelectorsLength = ATTRIBUTE_SELECTORS.length;
-        for (uint256 i = 0; i < attributeSelectorsLength; ++i) {
-            if (_attributeSelector == ATTRIBUTE_SELECTORS[i]) {
-                return true;
-            }
-        }
-        return false;
+        return _parser().supportsAttribute(_attributeSelector);
     }
 
-    /// @notice Returns the attribute selectors supported by the InteropCenter.
-    /// @return The attribute selectors supported by the InteropCenter.
-    function _getERC7786AttributeSelectors() internal pure returns (bytes4[SUPPORTED_INTEROP_ATTRIBUTES] memory) {
-        return
-            [
-                IERC7786Attributes.interopCallValue.selector,
-                IERC7786Attributes.indirectCall.selector,
-                IERC7786Attributes.executionAddress.selector,
-                IERC7786Attributes.unbundlerAddress.selector,
-                IERC7786Attributes.useFixedFee.selector,
-                IERC7786Attributes.atomicBundle.selector,
-                IERC7786Attributes.interopBundleSalt.selector
-            ];
+    /// @notice The stateless attribute parser deployed at its fixed built-in address.
+    function _parser() private pure returns (IInteropAttributeParser) {
+        return IInteropAttributeParser(L2_INTEROP_ATTRIBUTE_PARSER_ADDR);
     }
 
     /*//////////////////////////////////////////////////////////////

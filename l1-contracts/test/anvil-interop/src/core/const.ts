@@ -26,6 +26,7 @@ export const L2_CHAIN_ASSET_HANDLER_ADDR = "0x0000000000000000000000000000000000
 export const L2_NTV_BEACON_DEPLOYER_ADDR = "0x000000000000000000000000000000000001000b";
 export const L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR = "0x000000000000000000000000000000000001000c";
 export const INTEROP_CENTER_ADDR = "0x000000000000000000000000000000000001000d";
+export const INTEROP_ATTRIBUTE_PARSER_ADDR = "0x0000000000000000000000000000000000010015";
 export const L2_INTEROP_HANDLER_ADDR = "0x000000000000000000000000000000000001000e";
 export const L2_ASSET_TRACKER_ADDR = "0x000000000000000000000000000000000001000f";
 export const L2_BASE_TOKEN_HOLDER_ADDR = "0x0000000000000000000000000000000000010011";
@@ -56,10 +57,10 @@ export const ANVIL_FUND_BALANCE = "0x56BC75E2D63100000";
 
 export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF";
 
-// Default gas limits for test transactions
-export const INTEROP_SEND_BUNDLE_GAS_LIMIT = 500_000;
-// Atomic sends additionally perform an IMT insert (grows the tree and rehashes the populated
-// path), so they need a much larger cap than the plain-send limit above.
+// Default gas limits for test transactions.
+// Every interop send is atomic: it appends the leg's commit value to the chain's {L2InteropCommitmentTree}
+// via {AtomicFlowManager.append}. The dynamic-height IndexedMerkleTree (#2235, FullMerkle-backed) insert
+// grows the tree and rehashes the populated path, so `sendBundle` needs a generous gas cap.
 export const ATOMIC_SEND_BUNDLE_GAS_LIMIT = 3_000_000;
 export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
 // 7 gwei, used by Anvil interop specs to exercise the non-zero dynamic fee path.

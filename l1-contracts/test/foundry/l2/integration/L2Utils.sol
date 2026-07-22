@@ -16,6 +16,7 @@ import {
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_FORCE_DEPLOYER_ADDR,
     L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
     L2_INTEROP_HANDLER_ADDR,
     L2_ASSET_TRACKER_ADDR,
     L2_INTEROP_ROOT_STORAGE,
@@ -32,6 +33,7 @@ import {IContractDeployer, L2ContractHelper} from "contracts/common/l2-helpers/L
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
@@ -39,6 +41,7 @@ import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymen
 import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {InteropAttributeParser} from "contracts/interop/InteropAttributeParser.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 // import {InteropAccount} from "contracts/interop/InteropAccount.sol";
@@ -86,6 +89,7 @@ library L2Utils {
         forceDeployNativeTokenVault(_args);
         forceDeployL2MessageVerification(_args);
         forceDeployL2InteropRootStorage(_args);
+        forceDeployInteropAttributeParser(_args);
         forceDeployInteropCenter(_args);
         forceDeployInteropHandler(_args);
         forceDeployL2AssetTracker(_args);
@@ -169,6 +173,12 @@ library L2Utils {
         forceDeployWithoutConstructor("L2MessageVerification", address(L2_MESSAGE_VERIFICATION));
     }
 
+    function forceDeployInteropAttributeParser(SystemContractsArgs memory _args) internal {
+        new InteropAttributeParser();
+
+        forceDeployWithoutConstructor("InteropAttributeParser", L2_INTEROP_ATTRIBUTE_PARSER_ADDR);
+    }
+
     function forceDeployL2InteropRootStorage(SystemContractsArgs memory _args) internal {
         new DummyL2InteropRootStorage();
 
@@ -220,6 +230,7 @@ library L2Utils {
             _args.l1ChainId,
             _args.eraChainId,
             IL1AssetRouter(_args.l1AssetRouter),
+            IL2SharedBridgeLegacy(_args.legacySharedBridge),
             ethAssetId,
             _args.aliasedOwner
         );
@@ -239,6 +250,7 @@ library L2Utils {
             _args.l1ChainId,
             _args.aliasedOwner,
             _args.l2TokenProxyBytecodeHash,
+            _args.legacySharedBridge,
             _args.l2TokenBeacon,
             _args.wethToken,
             TokenBridgingData({assetId: ethAssetId, originChainId: _args.l1ChainId, originToken: ETH_TOKEN_ADDRESS}),

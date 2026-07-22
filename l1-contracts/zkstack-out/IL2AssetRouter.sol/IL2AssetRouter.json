@@ -46,6 +46,39 @@
   },
   {
     "type": "function",
+    "name": "finalizeDepositLegacyBridge",
+    "inputs": [
+      {
+        "name": "_l1Sender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_l2Receiver",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_l1Token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_data",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "initiateIndirectCall",
     "inputs": [
       {
@@ -111,6 +144,71 @@
       },
       {
         "name": "_assetHandlerAddress",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setLegacyTokenAssetHandler",
+    "inputs": [
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "withdraw",
+    "inputs": [
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_transferData",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "withdrawLegacyBridge",
+    "inputs": [
+      {
+        "name": "_l1Receiver",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_l2Token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_sender",
         "type": "address",
         "internalType": "address"
       }
@@ -239,6 +337,37 @@
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
+      },
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "assetData",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "WithdrawalInitiatedAssetRouter",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "l2Sender",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       },
       {
         "name": "assetId",

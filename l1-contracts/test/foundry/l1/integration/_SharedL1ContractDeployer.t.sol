@@ -167,6 +167,30 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         return keccak256(abi.encodePacked("test-withdrawal-bundle-salt", withdrawalBundleSaltNonce++));
     }
 
+    function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
+        stdstore
+            .target(address(addresses.l1Nullifier))
+            .sig(addresses.l1Nullifier.chainBalance.selector)
+            .with_key(_chainId)
+            .with_key(_token)
+            .checked_write(_value);
+    }
+
+    function _setSharedBridgeIsWithdrawalFinalized(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2ToL1MessageNumber,
+        bool _isFinalized
+    ) internal {
+        stdstore
+            .target(address(addresses.l1Nullifier))
+            .sig(addresses.l1Nullifier.isWithdrawalFinalized.selector)
+            .with_key(_chainId)
+            .with_key(_l2BatchNumber)
+            .with_key(_l2ToL1MessageNumber)
+            .checked_write(_isFinalized);
+    }
+
     // add this to be excluded from coverage report
     function test() internal virtual override {}
 }

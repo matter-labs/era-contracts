@@ -15,6 +15,7 @@ import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 // import {IInteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
+import {AtomicFlowPreimage} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {AmountMustBeGreaterThanZero, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -130,7 +131,7 @@ library InteropLibrary {
         bool useFixedFee,
         bytes32 salt
     ) internal pure returns (bytes[] memory) {
-        uint256 length = 1; // Always include useFixedFee
+        uint256 length = 2; // Always include useFixedFee and the atomicBundle attribute (all interop is atomic).
         if (executionAddress != address(0)) ++length;
         if (unbundlerAddress != address(0)) ++length;
         if (salt != bytes32(0)) ++length;
@@ -149,6 +150,28 @@ library InteropLibrary {
             );
         }
         attributes[attributesPointer++] = abi.encodeCall(IERC7786Attributes.useFixedFee, (useFixedFee));
+        // L2->L2 interop is atomic, so an `atomicBundle` attribute is mandatory or `InteropCenter` reverts
+        // `NonAtomicSendUnsupported`. The flow metadata below (flowId=1, deadline=max, lowNullifierIndex=0)
+        // is a PLACEHOLDER that is only valid when the `AtomicFlowManager.append`/`requireFlowFinalized`
+        // gate is mocked — which it is in the Foundry tests that use this helper. It is NOT usable for a real
+        // send: a real `flowId` commits to the `bundleHash`, which is not known until the bundle is assembled
+        // during the send, so a valid single-leg flow cannot be built on-chain ahead of time. Production
+        // atomic L2->L2 sends must therefore derive the flow off-chain (predict the hash via the static
+        // `previewBundleHash` quoter, compute `flowId`, and find the IMT `lowNullifierIndex`) — see the
+        // anvil-interop `buildSingleLegAtomicSend` helper. Callers that need a real flow should pass the
+        // resulting `atomicBundle` attribute themselves rather than relying on this placeholder.
+        attributes[attributesPointer++] = abi.encodeCall(
+            IERC7786Attributes.atomicBundle,
+            (
+                AtomicFlowPreimage({
+                    deadline: type(uint64).max,
+                    settlementLayerChainId: 0,
+                    legBundleHashes: new bytes32[](0),
+                    legSourceChainIds: new uint256[](0)
+                }),
+                uint256(0)
+            )
+        );
         if (salt != bytes32(0)) {
             attributes[attributesPointer++] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (salt));
         }
@@ -194,6 +217,11 @@ library InteropLibrary {
     /// @param  useFixedFee         Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
     /// @param  salt                User salt for `interopBundleSalt`; see {buildBundleAttributes}.
     /// @return bundleHash Hash of the sent bundle
+    /// @dev TEST/SIMULATION HELPER (deploy-scripts + Foundry only). It attaches the PLACEHOLDER `atomicBundle`
+    /// attribute from {buildBundleAttributes}, which only finalizes while the `AtomicFlowManager` gate is
+    /// mocked. It is NOT a production send path: a real atomic L2->L2 send must derive its flow off-chain
+    /// (predict the bundle hash via the `previewBundleHash` quoter, compute `flowId`, find the IMT
+    /// `lowNullifierIndex`) and attach its own `atomicBundle` attribute — see the anvil `buildSingleLegAtomicSend`.
     function sendToken(
         uint256 destinationChainId,
         address l2TokenAddress,
@@ -224,7 +252,13 @@ library InteropLibrary {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = buildSecondBridgeCall(secondBridgeCalldata, L2_ASSET_ROUTER_ADDR); // Using the default address as second bridge.
 
-        bytes[] memory bundleAttrs = buildBundleAttributes(address(0), unbundlerAddress, useFixedFee, salt);
+        // An L1 destination is an L2->L1 withdrawal: it must be NON-atomic (L1 has no atomic execution and
+        // withdrawals are never revertable), so it carries only the salt attribute — never the `atomicBundle`
+        // attribute, which `InteropCenter` rejects for L1 with `AtomicBundleToL1NotSupported`. Any other
+        // (L2) destination is atomic interop and carries the full attribute set.
+        bytes[] memory bundleAttrs = destinationChainId == L2_INTEROP_CENTER.L1_CHAIN_ID()
+            ? buildWithdrawalBundleAttributes(salt)
+            : buildBundleAttributes(address(0), unbundlerAddress, useFixedFee, salt);
 
         return L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(destinationChainId), calls, bundleAttrs);
     }
@@ -301,6 +335,9 @@ library InteropLibrary {
     /// @param useFixedFee          Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
     /// @param salt                 User salt for `interopBundleSalt`; see {buildBundleAttributes}.
     /// @return bundleHash Hash of the sent bundle
+    /// @dev TEST/SIMULATION HELPER (deploy-scripts + Foundry only): attaches the PLACEHOLDER `atomicBundle`
+    /// attribute from {buildBundleAttributes}, finalizable only while the `AtomicFlowManager` gate is mocked.
+    /// Not a production send path — see {sendToken} and {buildBundleAttributes} for the real-flow requirement.
     function sendDirectCallBundle(
         uint256 destination,
         address[] memory targets,
@@ -372,6 +409,9 @@ library InteropLibrary {
     /// @param  useFixedFee             Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
     /// @param  salt                    User salt for `interopBundleSalt`; see {buildBundleAttributes}.
     /// @return bundleHash Hash of the sent bundle
+    /// @dev TEST/SIMULATION HELPER (deploy-scripts + Foundry only): attaches the PLACEHOLDER `atomicBundle`
+    /// attribute from {buildBundleAttributes}, finalizable only while the `AtomicFlowManager` gate is mocked.
+    /// Not a production send path — see {sendToken} and {buildBundleAttributes} for the real-flow requirement.
     function sendNative(
         uint256 destinationChainId,
         address recipient,

@@ -8,8 +8,9 @@ import {LegState} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {ManagerNoRecoverableCalls} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
-import {RecoverToL1NotSupported} from "contracts/common/L1ContractErrors.sol";
+import {RecoverToL1NotSupported, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {
     BundleAttributes,
     INTEROP_BUNDLE_VERSION,
@@ -149,7 +150,7 @@ contract AtomicRecoveryForgeryTest is Test {
         InteropBundle memory _bundle
     ) internal returns (bytes32 flowId, bytes32 bundleHash, bytes memory encodedBundle) {
         encodedBundle = abi.encode(_bundle);
-        bundleHash = InteropDataEncoding.encodeInteropBundleHash(_bundle.sourceChainId, encodedBundle);
+        bundleHash = InteropDataEncoding.encodeInteropBundleHash(encodedBundle);
         flowId = keccak256(abi.encodePacked("flow", _bundle.interopBundleSalt));
         manager.forceRevertable(flowId, bundleHash);
     }
@@ -193,20 +194,39 @@ contract AtomicRecoveryForgeryTest is Test {
         assertEq(uint256(manager.legState(flowId, bundleHash)), uint256(LegState.Reverted));
     }
 
+    /// A timed-out value leg is recovered through the asset router wrapper: the wrapper reconstructs
+    /// bridge-mint data for the original depositor and forwards it to the NTV failed-transfer path.
+    function test_bridgehubRecoverBaseTokenForwardsRecoveryToNativeTokenVault() external {
+        vm.prank(address(manager));
+        router.bridgehubRecoverBaseToken(destinationChainId, assetId, attacker, amount);
+
+        assertEq(ntv.recoveries(), 1, "value-leg recovery must reach the NTV exactly once");
+        assertEq(ntv.recoveredDestinationChainId(), destinationChainId);
+        assertEq(ntv.recoveredAssetId(), assetId);
+        assertEq(ntv.recoveredOriginalCaller(), attacker);
+        assertEq(ntv.recoveredAmount(), amount);
+    }
+
+    function test_bridgehubRecoverBaseToken_revertsFromNonManager() external {
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, attacker));
+        vm.prank(attacker);
+        router.bridgehubRecoverBaseToken(destinationChainId, assetId, attacker, amount);
+    }
+
+    function test_bridgehubRecoverBaseToken_revertsForL1Destination() external {
+        _initializeRouterChainIds();
+
+        vm.expectRevert(RecoverToL1NotSupported.selector);
+        vm.prank(address(manager));
+        router.bridgehubRecoverBaseToken(L1_CHAIN_ID, assetId, attacker, amount);
+    }
+
     /// L2->L1 interop is never revertable (rejected at send), so recovery asserts the invariant: even a
     /// genuine router-backed burn reverts wholesale when destined to L1 — leaving the leg `Revertable`
     /// instead of unwinding the append-only `totalWithdrawalsToL1` accounting.
     function test_recoverToL1IsUnreachable() external {
         // Arm the router's L1 chain id through the real upgrade entry point.
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        // solhint-disable-next-line func-named-parameters
-        router.updateL2(
-            L1_CHAIN_ID,
-            ERA_CHAIN_ID,
-            IL1AssetRouter(makeAddr("l1 asset router")),
-            keccak256("base token asset id"),
-            makeAddr("aliased owner")
-        );
+        _initializeRouterChainIds();
 
         InteropBundle memory bundle = _buildBundle({_from: L2_ASSET_ROUTER_ADDR, _to: address(router)});
         bundle.destinationChainId = L1_CHAIN_ID;
@@ -220,6 +240,19 @@ contract AtomicRecoveryForgeryTest is Test {
             uint256(manager.legState(flowId, bundleHash)),
             uint256(LegState.Revertable),
             "leg must stay Revertable when the L1-destined claim reverts"
+        );
+    }
+
+    function _initializeRouterChainIds() internal {
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        // solhint-disable-next-line func-named-parameters
+        router.updateL2(
+            L1_CHAIN_ID,
+            ERA_CHAIN_ID,
+            IL1AssetRouter(makeAddr("l1 asset router")),
+            IL2SharedBridgeLegacy(address(0)),
+            keccak256("base token asset id"),
+            makeAddr("aliased owner")
         );
     }
 }

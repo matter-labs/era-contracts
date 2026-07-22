@@ -14,6 +14,7 @@ import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
+import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {IWETH9} from "../interfaces/IWETH9.sol";
 
@@ -52,7 +53,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev The chain ID of L1.
     uint256 public immutable L1_CHAIN_ID;
 
-    /// @dev L1 nullifier contract that handles finalize withdrawal and confirm l2 tx mappings
+    /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
     IL1Nullifier public immutable L1_NULLIFIER;
 
     /// @dev Maps token balances for each chain. Deprecated: per-chain balance accounting was removed;
@@ -176,6 +177,32 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
                             Start transaction Functions
     //////////////////////////////////////////////////////////////*/
 
+    function _bridgeBurnNativeToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _originalCaller,
+        // solhint-disable-next-line no-unused-vars
+        bool _depositChecked,
+        uint256 _depositAmount,
+        address _receiver,
+        address _nativeToken
+    ) internal override returns (bytes memory _bridgeMintData) {
+        bool depositChecked = IL1AssetRouter(address(ASSET_ROUTER)).transferFundsToNTV(
+            _assetId,
+            _depositAmount,
+            _originalCaller
+        );
+        _bridgeMintData = super._bridgeBurnNativeToken({
+            _chainId: _chainId,
+            _assetId: _assetId,
+            _originalCaller: _originalCaller,
+            _depositChecked: depositChecked,
+            _depositAmount: _depositAmount,
+            _receiver: _receiver,
+            _nativeToken: _nativeToken
+        });
+    }
+
     /*//////////////////////////////////////////////////////////////
                             L1 SPECIFIC FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -215,6 +242,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /*//////////////////////////////////////////////////////////////
                             INTERNAL & HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    function _registerTokenIfBridgedLegacy(address) internal pure override returns (bytes32) {
+        // There are no legacy tokens present on L1.
+        return bytes32(0);
+    }
 
     /// @inheritdoc NativeTokenVaultBase
     function calculateCreate2TokenAddress(
