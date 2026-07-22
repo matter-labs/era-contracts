@@ -551,7 +551,7 @@ export function buildMockInteropProof(sourceChainId: number, senderAddress?: str
 
 /**
  * Extract InteropBundleSent events from a receipt and execute each bundle on the
- * destination chain via L2InteropHandler.executeBundle().
+ * destination chain via L2InteropHandler.executeAtomicBundle().
  *
  * Used for real interop flows only. L1-originated deposits should stay on the
  * NewPriorityRequest relay path even when they pass through the gateway chain.
@@ -602,7 +602,7 @@ export async function extractAndRelayInteropBundles(
     const interopHandler = new ethers.Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
     let result: { txHash: string; success: boolean };
     try {
-      const tx = await interopHandler.executeBundle(bundleData, mockProof, { gasLimit: 5_000_000 });
+      const tx = await interopHandler.executeAtomicBundle(bundleData, mockProof, { gasLimit: 5_000_000 });
       const r = await tx.wait();
       result = { txHash: r.transactionHash, success: r.status === 1 };
     } catch (error) {

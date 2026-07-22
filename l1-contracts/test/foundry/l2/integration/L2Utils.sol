@@ -16,6 +16,7 @@ import {
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_FORCE_DEPLOYER_ADDR,
     L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
     L2_INTEROP_HANDLER_ADDR,
     L2_ASSET_TRACKER_ADDR,
     L2_INTEROP_ROOT_STORAGE,
@@ -39,6 +40,7 @@ import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymen
 import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {InteropAttributeParser} from "contracts/interop/InteropAttributeParser.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 // import {InteropAccount} from "contracts/interop/InteropAccount.sol";
@@ -86,6 +88,7 @@ library L2Utils {
         forceDeployNativeTokenVault(_args);
         forceDeployL2MessageVerification(_args);
         forceDeployL2InteropRootStorage(_args);
+        forceDeployInteropAttributeParser(_args);
         forceDeployInteropCenter(_args);
         forceDeployInteropHandler(_args);
         forceDeployL2AssetTracker(_args);
@@ -167,6 +170,12 @@ library L2Utils {
         new L2MessageVerification();
 
         forceDeployWithoutConstructor("L2MessageVerification", address(L2_MESSAGE_VERIFICATION));
+    }
+
+    function forceDeployInteropAttributeParser(SystemContractsArgs memory _args) internal {
+        new InteropAttributeParser();
+
+        forceDeployWithoutConstructor("InteropAttributeParser", L2_INTEROP_ATTRIBUTE_PARSER_ADDR);
     }
 
     function forceDeployL2InteropRootStorage(SystemContractsArgs memory _args) internal {
