@@ -75,6 +75,17 @@ contract SetDAValidatorPair is AdminTest {
         vm.stopPrank();
     }
 
+    function test_revertWhen_l2ToL1OnlyBlobsOnEraChain() public {
+        address admin = utilsFacet.util_getAdmin();
+
+        // L2_TO_L1_ONLY_BLOBS is likewise ZKsync-OS-only and must be rejected on an Era VM chain.
+        vm.startPrank(admin);
+        vm.expectRevert(NotZKsyncOS.selector);
+        adminFacet.setDAValidatorPair(address(1), L2DACommitmentScheme.L2_TO_L1_ONLY_BLOBS);
+
+        vm.stopPrank();
+    }
+
     function test_SuccessfulSet_zksyncOSOnlySchemeAllowedOnZKsyncOS() public {
         address admin = utilsFacet.util_getAdmin();
         // Mark the chain as ZKsync OS so a ZKsync-OS-only scheme is accepted.
@@ -85,5 +96,17 @@ contract SetDAValidatorPair is AdminTest {
         vm.stopPrank();
 
         assert(utilsFacet.util_getL2DACommimentScheme() == L2DACommitmentScheme.L2_TO_L1_ONLY);
+    }
+
+    function test_SuccessfulSet_l2ToL1OnlyBlobsAllowedOnZKsyncOS() public {
+        address admin = utilsFacet.util_getAdmin();
+        // Mark the chain as ZKsync OS so a ZKsync-OS-only scheme is accepted.
+        utilsFacet.util_setZksyncOS(true);
+
+        vm.startPrank(admin);
+        adminFacet.setDAValidatorPair(address(1), L2DACommitmentScheme.L2_TO_L1_ONLY_BLOBS);
+        vm.stopPrank();
+
+        assert(utilsFacet.util_getL2DACommimentScheme() == L2DACommitmentScheme.L2_TO_L1_ONLY_BLOBS);
     }
 }
