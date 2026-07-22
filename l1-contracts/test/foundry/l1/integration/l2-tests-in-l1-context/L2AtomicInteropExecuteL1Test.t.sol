@@ -47,4 +47,8 @@ contract L2AtomicInteropExecuteL1Test is Test, SharedL2ContractL1Deployer, L2Ato
     ) internal virtual override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
         return super.getInitializeCalldata(contractName, isZKBytecode);
     }
+
+    function _mockAtomicFlowManager() internal override(SharedL2ContractDeployer, L2AtomicInteropExecuteTestAbstract) {
+        L2AtomicInteropExecuteTestAbstract._mockAtomicFlowManager();
+    }
 }

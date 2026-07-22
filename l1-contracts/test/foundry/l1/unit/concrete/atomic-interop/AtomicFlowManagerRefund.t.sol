@@ -72,7 +72,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         // The committed leg must hash from real bundle bytes (claimRefund re-derives it); the missing
         // leg is a hash no chain ever commits.
         committedLegBundleBytes = abi.encode(_minimalBundle());
-        committedLeg = InteropDataEncoding.encodeInteropBundleHash(block.chainid, committedLegBundleBytes);
+        committedLeg = InteropDataEncoding.encodeInteropBundleHash(committedLegBundleBytes);
         missingLeg = keccak256("never committed leg");
 
         preimage.deadline = DEADLINE;

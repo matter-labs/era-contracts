@@ -567,7 +567,7 @@ export function atomicFlowTuple(params: { flowId: string; preimage: AtomicFlowPr
 }
 
 /**
- * Build the `AtomicFinalityProof` tuple {InteropHandler.executeAtomicBundle} consumes: the flow
+ * Build the `AtomicFinalityProof` tuple {L2InteropHandler.executeAtomicBundle} consumes: the flow
  * definition ({AtomicFlow}) plus one inclusion proof per leg, in `preimage.legBundleHashes` order.
  * Tuple field order matches the struct: (flow, proofs).
  */

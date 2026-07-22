@@ -5,9 +5,12 @@ pragma solidity ^0.8.20;
 
 import {Vm} from "forge-std/Vm.sol";
 
-import {L2AtomicInteropTestBase} from "./L2AtomicInteropTestBase.sol";
+import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
+import {AtomicInteropProofBuilder} from "../../unit/concrete/atomic-interop/AtomicInteropProofBuilder.sol";
+import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
+import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
 import {
@@ -31,16 +34,20 @@ import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {BundleStatus, CallStatus, InteropBundle, InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {
+    L2_ASSET_ROUTER_ADDR,
     L2_ATOMIC_FLOW_MANAGER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_INTEROP_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 /// @notice The DESTINATION side of an atomic flow, exercised through the REAL execution entry point:
 /// `L2InteropHandler.executeAtomicBundle` with a finality proof for every leg. The atomic bundle is
 /// produced by a real `InteropCenter.sendBundle` (asset-router burn + IMT commit) on the source
 /// chain; the test VM then switches its chain id to the destination (`vm.chainId`, the same pattern
-/// `L2InteropTestUtils.executeBundle` uses for non-atomic bundles) and executes: the atomicity gate
+/// `L2InteropTestUtils.executeBundle` uses) and executes: the atomicity gate
 /// (`AtomicFlowManager.requireFlowFinalized`) verifies every leg's IMT inclusion proof, the bundle's
 /// calls run (the destination NTV mint), and the replay guard closes behind it.
 ///
@@ -49,7 +56,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 /// IMT. The only logic mock is the separately-tested cross-chain leaf verifier inherited from
 /// {AtomicInteropProofBuilder}; the destination-context, executor-permission, replay, and atomicity
 /// checks under test all run for real.
-abstract contract L2AtomicInteropExecuteTestAbstract is L2AtomicInteropTestBase {
+abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, AtomicInteropProofBuilder {
     /// @dev The remote peer leg of every flow here: committed on the (Bridgehub-registered)
     /// destination chain in the happy paths, withheld in the missing-leg path.
     bytes32 internal constant REMOTE_LEG = keccak256("remote peer leg");
@@ -59,11 +66,79 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2AtomicInteropTestBase 
     uint256 internal constant REMOTE_BATCH_NUMBER = 9;
     uint256 internal constant TRANSFER_AMOUNT = 100;
 
+    /// @dev These tests exercise the REAL append/finalize logic, so the shared deployer's void mock of
+    /// `AtomicFlowManager.append`/`requireFlowFinalized` (installed in its `setUp`) is disabled here;
+    /// the real contracts are deployed by {_setUpAtomicStack}.
+    function _mockAtomicFlowManager() internal virtual override {}
+
+    /// @dev Deploys the atomic predeploys at their canonical addresses (the shared L2-in-L1 deployer
+    /// does not include them) and the proof fixtures. Called at the start of each test rather than in
+    /// `setUp` to stay independent of the deployer's own setUp chain.
+    function _setUpAtomicStack() internal {
+        deployCodeTo("AtomicFlowManager.sol:AtomicFlowManager", L2_ATOMIC_FLOW_MANAGER_ADDR);
+        deployCodeTo("L2InteropCommitmentTree.sol:L2InteropCommitmentTree", L2_INTEROP_COMMITMENT_TREE_ADDR);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(L1_CHAIN_ID);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
+        // Proof fixtures from the builder: `tree` acts as the REMOTE chain's IMT oracle, plus the
+        // real L2InteropRootStorage etched at its canonical address.
+        _setUpAtomicFixtures();
+    }
+
+    /// @dev The destination-side receiver of the transferred tokens (deterministic; recomputed in
+    /// asserts).
+    function _receiver() internal returns (address) {
+        return makeAddr("atomic recipient");
+    }
+
+    /// @dev The exact single-call token-transfer starter `InteropLibrary.sendToken` sends: an indirect
+    /// call through the L2 AssetRouter, which burns `_amount` of `_l2Token` from the sender and mints
+    /// to {_receiver} on the destination.
+    function _tokenCallStarter(address _l2Token, uint256 _amount) internal returns (InteropCallStarter[] memory calls) {
+        bytes memory secondBridgeCalldata = InteropLibrary.buildSecondBridgeCalldata(
+            L2_NATIVE_TOKEN_VAULT.assetId(_l2Token),
+            _amount,
+            _receiver(),
+            address(0)
+        );
+        calls = new InteropCallStarter[](1);
+        calls[0] = InteropLibrary.buildSecondBridgeCall(secondBridgeCalldata, L2_ASSET_ROUTER_ADDR);
+    }
+
+    /// @dev Predicts the bundle hash of a send with the given full (non-atomic) bundle-attribute set,
+    /// via the `previewBundleHash` quoter — it runs the real assembly but ALWAYS reverts with
+    /// `InteropPreviewHash(bytes32)`, unwinding any burn; the hash is read out of the revert data. The
+    /// prediction must carry the same BUNDLE attributes as the real send (they are part of the bundle,
+    /// hence of its hash) — everything except the out-of-band `atomicBundle`.
+    function _predictBundleHashWithAttrs(
+        InteropCallStarter[] memory _calls,
+        bytes[] memory _predictionAttrs
+    ) internal returns (bytes32 predicted) {
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool ok, bytes memory ret) = address(l2InteropCenter).call(
+            abi.encodeCall(
+                l2InteropCenter.previewBundleHash,
+                (InteroperableAddress.formatEvmV1(destinationChainId), _calls, _predictionAttrs)
+            )
+        );
+        require(!ok, "previewBundleHash must revert with InteropPreviewHash (quoter pattern)");
+        require(ret.length == 36, "unexpected preview revert reason");
+        // ret layout: 4-byte selector followed by the abi-encoded bytes32 hash.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            predicted := mload(add(ret, 0x24))
+        }
+    }
+
+    function _flowIdOf(AtomicFlowPreimage memory _preimage) internal pure returns (bytes32) {
+        return keccak256(abi.encode(_preimage));
+    }
+
     /// @dev Cross-phase context (storage rather than locals to stay under the stack limit; each test
     /// overwrites it fully).
     struct ExecCtx {
         address l2Token;
-        address receiver;
         bytes32 flowId;
         bytes32 bundleHash;
     }
@@ -78,11 +153,8 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2AtomicInteropTestBase 
     /// zero-length to skip.
     function _sendAtomicLegWithRemotePeer(bytes32 _salt, bytes memory _extraBundleAttribute) internal {
         ectx.l2Token = initializeTokenByDeposit();
-        ectx.receiver = makeAddr("atomic execute receiver");
-        InteropCallStarter[] memory calls = _tokenCallStarter(ectx.l2Token, TRANSFER_AMOUNT, ectx.receiver);
+        InteropCallStarter[] memory calls = _tokenCallStarter(ectx.l2Token, TRANSFER_AMOUNT);
 
-        // The prediction dry run must carry the same BUNDLE attributes as the real send (they are
-        // part of the bundle, hence of its hash) — everything except the out-of-band `atomicBundle`.
         bytes[] memory predictionAttrs;
         if (_extraBundleAttribute.length != 0) {
             predictionAttrs = new bytes[](2);
@@ -92,13 +164,8 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2AtomicInteropTestBase 
             predictionAttrs = new bytes[](1);
             predictionAttrs[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (_salt));
         }
-        uint256 snapshotId = vm.snapshotState();
-        bytes32 predicted = l2InteropCenter.sendBundle(
-            InteroperableAddress.formatEvmV1(destinationChainId),
-            calls,
-            predictionAttrs
-        );
-        vm.revertToState(snapshotId);
+        bytes32 predicted = _predictBundleHashWithAttrs(calls, predictionAttrs);
+
         AtomicFlowPreimage memory preimage;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = L1_CHAIN_ID;
@@ -112,15 +179,12 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2AtomicInteropTestBase 
         ectxPreimage = preimage;
         ectx.flowId = _flowIdOf(preimage);
 
-        bytes[] memory attrs = _atomicAttributes(preimage, _salt);
-        if (_extraBundleAttribute.length != 0) {
-            bytes[] memory extended = new bytes[](attrs.length + 1);
-            for (uint256 i = 0; i < attrs.length; ++i) {
-                extended[i] = attrs[i];
-            }
-            extended[attrs.length] = _extraBundleAttribute;
-            attrs = extended;
+        // The real send carries the atomic metadata out-of-band plus the same bundle attributes.
+        bytes[] memory attrs = new bytes[](predictionAttrs.length + 1);
+        for (uint256 i = 0; i < predictionAttrs.length; ++i) {
+            attrs[i] = predictionAttrs[i];
         }
+        attrs[predictionAttrs.length] = abi.encodeCall(IERC7786Attributes.atomicBundle, (preimage, 0));
 
         vm.recordLogs();
         ectx.bundleHash = l2InteropCenter.sendBundle(
@@ -128,7 +192,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2AtomicInteropTestBase 
             calls,
             attrs
         );
-        assertEq(ectx.bundleHash, predicted, "the atomic bundle hash must match the non-atomic prediction");
+        assertEq(ectx.bundleHash, predicted, "the atomic bundle hash must match the preview prediction");
 
         (, , InteropBundle memory sentBundle) = abi.decode(
             extractFirstBundleFromLogs(vm.getRecordedLogs()),
@@ -148,22 +212,38 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2AtomicInteropTestBase 
 
     /// @dev Assembles the finality proof from the canonical-tree local proof and `_remoteProof`.
     function _buildFinality(ImtProof memory _remoteProof) internal view returns (AtomicFinalityProof memory finality) {
-        // The real send inserted the local leg's commit value right after the genesis head leaf.
-        ImtProof memory localProof = _canonicalTreeInclusionProof(
-            block.chainid,
-            LOCAL_BATCH_NUMBER,
-            1,
-            SL_BLOCK,
-            DEADLINE - 1
-        );
-
         finality.flow = AtomicFlow({flowId: ectx.flowId, preimage: ectxPreimage});
         finality.proofs = new ImtProof[](2);
         (uint256 localIndex, uint256 remoteIndex) = ectxPreimage.legBundleHashes[0] == ectx.bundleHash
             ? (0, 1)
             : (1, 0);
-        finality.proofs[localIndex] = localProof;
+        finality.proofs[localIndex] = _canonicalTreeInclusionProof(block.chainid, LOCAL_BATCH_NUMBER, 1, DEADLINE - 1);
         finality.proofs[remoteIndex] = _remoteProof;
+    }
+
+    /// @dev Inclusion proof for a commit value inserted into the CANONICAL commitment tree (the one
+    /// the real atomic send populated) — the mirror of the builder's oracle-tree `_inclusionProof`,
+    /// used for the local leg whose commitment went through the production path. The real send
+    /// inserted the leg's commit value right after the genesis head leaf (index 1).
+    function _canonicalTreeInclusionProof(
+        uint256 _sourceChainId,
+        uint256 _batchNumber,
+        uint256 _leafIndex,
+        uint256 _l1Timestamp
+    ) internal view returns (ImtProof memory) {
+        L2InteropCommitmentTree canonicalTree = L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR);
+        return
+            ImtProof({
+                sourceChainId: _sourceChainId,
+                batchNumber: _batchNumber,
+                chainImtRoot: canonicalTree.root(),
+                // The finality path always authenticates the end root; the branch bool is ignored.
+                provesAgainstBeginRoot: false,
+                settlementProof: _settlementProof(L1_CHAIN_ID, SL_BLOCK, _l1Timestamp, new bytes32[](0)),
+                leaf: canonicalTree.leafAt(_leafIndex),
+                imtLeafIndex: _leafIndex,
+                imtProof: canonicalTree.merklePath(_leafIndex)
+            });
     }
 
     /// @dev Phase 3: become the destination chain and execute. The verifier mock (the one mocked
@@ -183,14 +263,14 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2AtomicInteropTestBase 
         _sendAtomicLegWithRemotePeer(keccak256("atomic execute happy salt"), bytes(""));
         AtomicFinalityProof memory finality = _commitRemoteLegAndBuildFinality();
 
-        uint256 receiverBalanceBefore = IERC20(ectx.l2Token).balanceOf(ectx.receiver);
+        uint256 receiverBalanceBefore = IERC20(ectx.l2Token).balanceOf(_receiver());
 
         vm.expectEmit(true, true, true, true, L2_INTEROP_HANDLER_ADDR);
         emit IInteropHandlerBase.BundleExecuted(ectx.bundleHash);
         _executeOnDestination(finality);
 
         assertEq(
-            IERC20(ectx.l2Token).balanceOf(ectx.receiver),
+            IERC20(ectx.l2Token).balanceOf(_receiver()),
             receiverBalanceBefore + TRANSFER_AMOUNT,
             "the destination mint must credit the receiver"
         );
@@ -218,8 +298,8 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2AtomicInteropTestBase 
         );
     }
 
-    /// @notice Replay protection: an executed atomic bundle cannot be executed again — atomic
-    /// bundles have no verify path, so the status flip at execution is the only replay guard.
+    /// @notice Replay protection: an executed atomic bundle cannot be executed again — the status
+    /// flip at execution is the replay guard.
     function test_executeAtomicBundle_RevertWhen_Replayed() public {
         _setUpAtomicStack();
         _sendAtomicLegWithRemotePeer(keccak256("atomic execute replay salt"), bytes(""));
@@ -251,7 +331,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2AtomicInteropTestBase 
         });
         AtomicFinalityProof memory finality = _buildFinality(bogusRemoteProof);
 
-        uint256 receiverBalanceBefore = IERC20(ectx.l2Token).balanceOf(ectx.receiver);
+        uint256 receiverBalanceBefore = IERC20(ectx.l2Token).balanceOf(_receiver());
         vm.expectRevert(
             abi.encodeWithSelector(IMTLeafValueMismatch.selector, _commitValue(ectx.flowId, REMOTE_LEG), 0)
         );
@@ -263,7 +343,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2AtomicInteropTestBase 
             "a failed atomicity gate must leave the bundle Unreceived"
         );
         assertEq(
-            IERC20(ectx.l2Token).balanceOf(ectx.receiver),
+            IERC20(ectx.l2Token).balanceOf(_receiver()),
             receiverBalanceBefore,
             "a failed atomicity gate must not mint"
         );

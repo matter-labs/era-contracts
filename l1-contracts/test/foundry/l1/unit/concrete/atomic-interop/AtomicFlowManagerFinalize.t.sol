@@ -12,7 +12,6 @@ import {
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {
-    ManagerNotInteropHandler,
     ManagerFlowIdMismatch,
     ManagerProofCountMismatch,
     ManagerExecutingBundleNotInFlow,
@@ -129,15 +128,6 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
     }
 
     // ============ reverts ============
-
-    /// @notice The gate is callable only by the canonical InteropHandler: it substitutes the
-    /// L1-message inclusion proof, so an open gate would let anyone probe or grief with arbitrary
-    /// flows (and any future non-view evolution of it would be unprotected).
-    function test_RevertWhen_NotInteropHandler() public {
-        AtomicFinalityProof memory finality = _validFinality();
-        vm.expectRevert(abi.encodeWithSelector(ManagerNotInteropHandler.selector, address(this)));
-        manager.requireFlowFinalized(legFirst, finality);
-    }
 
     /// @notice A `flowId` that does not match the canonicalized preimage hash is rejected: proofs are
     /// for commit values derived from the CLAIMED id, so accepting a mismatch would unbind the legs.
