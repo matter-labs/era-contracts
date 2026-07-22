@@ -22,7 +22,6 @@ import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 import {IndirectCallRequest} from "../core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol";
-import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
@@ -243,7 +242,7 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
             })
         );
 
-        IL1AssetRouter(_secondBridgeAddress).confirmL2Transaction(
+        IL1CrossChainSender(_secondBridgeAddress).confirmL2Transaction(
             _destinationChainId,
             outputRequest.txDataHash,
             canonicalTxHash

@@ -82,7 +82,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         _;
     }
 
-
     /// @notice Checks that the message sender is the legacy bridge.
     /// @notice Checks that the message sender is the native token vault.
     modifier onlyNativeTokenVault() {
