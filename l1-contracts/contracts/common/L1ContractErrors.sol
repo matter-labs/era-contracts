@@ -24,7 +24,6 @@ error AlreadyWhitelisted(address);
 // 0x5e85ae73
 error AmountMustBeGreaterThanZero();
 // 0x76fc80ad
-/// @notice No asset deployment tracker is registered for the asset id.
 error AssetDeploymentTrackerNotSet(bytes32 assetId);
 // 0xfde974f4
 error AssetHandlerDoesNotExist(bytes32 assetId);
@@ -89,7 +88,6 @@ error ChainIdNotRegistered(uint256 chainId);
 // 0x8f620a06
 error ChainIdTooBig();
 // 0x41888953
-/// @notice Chain migrations are disabled at the release level.
 error ChainMigrationsDisabled();
 // 0x5e361ef9
 error ChainRequiresValidatorsSignaturesForCommit();
@@ -164,28 +162,20 @@ error HashedLogIsDefault();
 // 0x0b08d5be
 error HashMismatch(bytes32 expected, bytes32 actual);
 // 0xf11438d9
-/// @notice `setup` called on an already-initialized indexed Merkle tree.
 error IMTAlreadyInitialized();
 // 0x62f8ffe2
-/// @notice The supplied leaf preimage's value does not match the value being proven.
 error IMTLeafValueMismatch(uint256 expectedValue, uint256 actualValue);
 // 0x037dc2ed
-/// @notice The supplied low-leaf index is beyond the current leaf count.
 error IMTLowLeafIndexOutOfBounds(uint256 lowLeafIndex, uint256 leafCount);
 // 0xd87e0e66
-/// @notice The low leaf's `nextValue` is not greater than the new value.
 error IMTLowLeafNextTooSmall(uint256 lowNextValue, uint256 newValue);
 // 0x74470b8f
-/// @notice The low leaf's value is not strictly less than the new value.
 error IMTLowLeafValueTooLarge(uint256 lowValue, uint256 newValue);
 // 0xae48798a
-/// @notice `insert` called on an uninitialized indexed Merkle tree.
 error IMTNotInitialized();
 // 0x68051076
-/// @notice The value is already present in the indexed Merkle tree.
 error IMTValueAlreadyExists(uint256 value);
 // 0xbd1de53d
-/// @notice The value is zero, which is reserved for the sentinel leaf.
 error IMTValueZero();
 // 0xd7d93e1f
 error IncorrectBatchBounds(
@@ -203,7 +193,6 @@ error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
 // 0x03eb8b54
 error InsufficientFunds(uint256 required, uint256 actual);
 // 0xd70c44f6
-/// @notice The proven interop sender's chain id does not match the payload's source chain id.
 error InteropSenderChainIdMismatch(uint256 senderChainId, uint256 payloadSourceChainId);
 // 0x9bf8b9aa
 error InvalidBatchNumber(uint256 provided, uint256 expected);
@@ -396,7 +385,6 @@ error PubdataGreaterThanLimit(uint256 limit, uint256 length);
 // 0x63c36549
 error QueueIsEmpty();
 // 0x881fba9f
-/// @notice A bridge-out recovery targets L1; L2->L1 withdrawals are never revertable.
 error RecoverToL1NotSupported();
 // 0xab143c06
 error Reentrancy();
