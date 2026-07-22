@@ -21,11 +21,6 @@
         "name": "_eraChainId",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "_eraDiamondProxy",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "stateMutability": "nonpayable"
@@ -52,19 +47,6 @@
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ERA_DIAMOND_PROXY",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IZKChain"
       }
     ],
     "stateMutability": "view"
@@ -188,90 +170,6 @@
   },
   {
     "type": "function",
-    "name": "bridgehubConfirmL2Transaction",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_txDataHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "_txHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "bridgehubDeposit",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_originalCaller",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_value",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_data",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "request",
-        "type": "tuple",
-        "internalType": "struct L2TransactionRequestTwoBridgesInner",
-        "components": [
-          {
-            "name": "magicValue",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "l2Contract",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "l2Calldata",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "factoryDeps",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
-          },
-          {
-            "name": "txDataHash",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "payable"
-  },
-  {
-    "type": "function",
     "name": "bridgehubDepositBaseToken",
     "inputs": [
       {
@@ -297,6 +195,29 @@
     ],
     "outputs": [],
     "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "confirmL2Transaction",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_txDataHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_txHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -362,6 +283,67 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "initiateIndirectCall",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_originalCaller",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_value",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_data",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "request",
+        "type": "tuple",
+        "internalType": "struct IndirectCallRequest",
+        "components": [
+          {
+            "name": "magicValue",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "l2Contract",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "l2Calldata",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "factoryDeps",
+            "type": "bytes[]",
+            "internalType": "bytes[]"
+          },
+          {
+            "name": "txDataHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "payable"
   },
   {
     "type": "function",
