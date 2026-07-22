@@ -15,9 +15,17 @@ import {
     ProofSourceChainMismatch,
     ProofImtRootInclusionFailed
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
-import {BundleAttributes, INTEROP_BUNDLE_VERSION, InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
+import {IAtomicRecoverable} from "contracts/atomic-interop/IAtomicRecoverable.sol";
+import {
+    BundleAttributes,
+    INTEROP_BUNDLE_VERSION,
+    INTEROP_CALL_VERSION,
+    InteropBundle,
+    InteropCall
+} from "contracts/common/Messaging.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {
+    L2_ASSET_ROUTER_ADDR,
     L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_CENTER_ADDR,
@@ -217,16 +225,32 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         vm.recordLogs();
         manager.authorizeRefund(AtomicFlow({flowId: multiFlowId, preimage: multiPreimage}), multiMissingIndex, absence);
 
-        // Exactly one FlowRefundAuthorized per committed leg — no more, no fewer.
+        // Each committed bundle hash must be authorized EXACTLY ONCE, emitted BY the manager, with the
+        // correct indexed (flowId, bundleHash) topics — and the missing leg must not be authorized at
+        // all. Counting per-hash (not just total) rejects a mutant that emits one leg twice.
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        uint256 authorizedEvents = 0;
-        for (uint256 i = 0; i < logs.length; ++i) {
-            if (logs[i].topics[0] == IAtomicFlowManager.FlowRefundAuthorized.selector) {
-                ++authorizedEvents;
-                assertEq(logs[i].topics[1], multiFlowId, "event must carry the flow id");
+        uint256 totalAuthorized = 0;
+        for (uint256 legIdx = 0; legIdx < 3; ++legIdx) {
+            bytes32 legHash = multiPreimage.legBundleHashes[legIdx];
+            uint256 perLeg = 0;
+            for (uint256 i = 0; i < logs.length; ++i) {
+                if (
+                    logs[i].emitter == address(manager) &&
+                    logs[i].topics[0] == IAtomicFlowManager.FlowRefundAuthorized.selector &&
+                    logs[i].topics[1] == multiFlowId &&
+                    logs[i].topics[2] == legHash
+                ) {
+                    ++perLeg;
+                }
             }
+            totalAuthorized += perLeg;
+            assertEq(
+                perLeg,
+                legIdx == multiMissingIndex ? 0 : 1,
+                "each committed leg authorized exactly once, missing leg never"
+            );
         }
-        assertEq(authorizedEvents, 2, "exactly the two committed legs must be authorized");
+        assertEq(totalAuthorized, 2, "no FlowRefundAuthorized beyond the two committed legs");
 
         for (uint256 i = 0; i < 3; ++i) {
             if (i == multiMissingIndex) {
@@ -243,6 +267,108 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
                 );
             }
         }
+    }
+
+    /// @notice A leg that commits LATE is still refundable through the SAME `_missingLegIndex` slot.
+    /// `append` has no deadline check, so a leg may commit in a post-deadline batch: its local state
+    /// is `Committed`, yet its absence is provable against that batch's begin root (it was not present
+    /// when the batch started). `authorizeRefund` deliberately transitions EVERY committed leg —
+    /// including the one at `_missingLegIndex` — so this late leg becomes `Revertable` and its own
+    /// sender can claim the refund. A mutant that skipped `_missingLegIndex` would strand exactly this
+    /// late sender, and no other test exercises `_missingLegIndex` pointing at a locally committed leg
+    /// (elsewhere it is always a remote, `Unset` leg).
+    /// @dev The recovery mechanics are isolated to a single mock (`recoverAtomicCall`), consistent
+    /// with this file's scope — the real recovery chain is covered by `AtomicRecoveryForgery.t.sol`
+    /// and the send/refund integration suite; here the point is the leg-state transition + claim
+    /// eligibility of the `_missingLegIndex` leg.
+    function test_authorizeRefund_LateCommittedLegAtMissingIndexIsRefundable() public {
+        // The late leg carries a recoverable (asset-router) call so `claimRefund` can complete.
+        InteropCall[] memory calls = new InteropCall[](1);
+        calls[0] = InteropCall({
+            version: INTEROP_CALL_VERSION,
+            shadowAccount: false,
+            to: makeAddr("late leg recipient"),
+            from: L2_ASSET_ROUTER_ADDR,
+            value: 0,
+            data: hex"c0ffee"
+        });
+        InteropBundle memory lateBundle = InteropBundle({
+            version: INTEROP_BUNDLE_VERSION,
+            sourceChainId: block.chainid,
+            destinationChainId: 777, // not L1: recovery rejects L1-destined bundles
+            destinationBaseTokenAssetId: bytes32(uint256(1)),
+            interopBundleSalt: keccak256("late leg salt"),
+            calls: calls,
+            bundleAttributes: BundleAttributes({
+                executionAddress: bytes(""),
+                unbundlerAddress: bytes(""),
+                useFixedFee: false,
+                salt: bytes32(0)
+            })
+        });
+        bytes memory lateBundleBytes = abi.encode(lateBundle);
+        bytes32 lateLeg = InteropDataEncoding.encodeInteropBundleHash(lateBundleBytes);
+        bytes32 peerLeg = keccak256("late-flow peer leg");
+
+        // Two-leg all-local flow; the LATE leg is the one whose absence gets proven (_missingLegIndex).
+        AtomicFlowPreimage memory latePreimage;
+        latePreimage.deadline = DEADLINE;
+        latePreimage.settlementLayerChainId = SETTLEMENT_LAYER_CHAIN_ID;
+        latePreimage.legBundleHashes = new bytes32[](2);
+        latePreimage.legSourceChainIds = new uint256[](2);
+        (uint256 lateIdx, uint256 peerIdx) = lateLeg < peerLeg ? (0, 1) : (1, 0);
+        latePreimage.legBundleHashes[lateIdx] = lateLeg;
+        latePreimage.legBundleHashes[peerIdx] = peerLeg;
+        latePreimage.legSourceChainIds[lateIdx] = block.chainid;
+        latePreimage.legSourceChainIds[peerIdx] = block.chainid;
+        bytes32 lateFlowId = keccak256(abi.encode(latePreimage));
+
+        // BOTH legs commit locally — the late one too (models a post-deadline commit).
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        manager.append(lateLeg, 0, latePreimage);
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        manager.append(peerLeg, 0, latePreimage);
+        assertEq(
+            uint256(manager.legState(lateFlowId, lateLeg)),
+            uint256(LegState.Committed),
+            "the late leg is locally Committed before the refund"
+        );
+
+        // Absence of the late leg against the oracle tree = the begin root of its late batch.
+        ImtProof memory absence = _nonInclusionProof(
+            block.chainid,
+            REMOTE_BATCH_NUMBER,
+            _commitValue(lateFlowId, lateLeg),
+            SETTLEMENT_LAYER_CHAIN_ID,
+            SL_BLOCK,
+            uint256(DEADLINE) + 1
+        );
+
+        vm.expectEmit(true, true, true, true, address(manager));
+        emit IAtomicFlowManager.FlowRefundAuthorized(lateFlowId, lateLeg);
+        manager.authorizeRefund(AtomicFlow({flowId: lateFlowId, preimage: latePreimage}), lateIdx, absence);
+
+        // The load-bearing assertion: the _missingLegIndex leg itself became Revertable.
+        assertEq(
+            uint256(manager.legState(lateFlowId, lateLeg)),
+            uint256(LegState.Revertable),
+            "the late leg at _missingLegIndex must become Revertable"
+        );
+
+        // ...and it can actually be claimed (recovery isolated to the one mock).
+        vm.mockCall(
+            L2_ASSET_ROUTER_ADDR,
+            abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector),
+            abi.encode(true)
+        );
+        vm.expectEmit(true, true, true, true, address(manager));
+        emit IAtomicFlowManager.FlowRefunded(lateFlowId, lateLeg);
+        manager.claimRefund(lateFlowId, lateBundleBytes);
+        assertEq(
+            uint256(manager.legState(lateFlowId, lateLeg)),
+            uint256(LegState.Reverted),
+            "the late leg must be claimable to Reverted"
+        );
     }
 
     /// @notice The double-mint guard: the absence proof must be bound to the missing leg's DECLARED

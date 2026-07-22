@@ -20,6 +20,8 @@ import {
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropBundle, InteropCallStarter} from "contracts/common/Messaging.sol";
+import {InteropPreviewHash} from "contracts/interop/InteropErrors.sol";
+import {IL2CrossChainSender} from "contracts/bridge/interfaces/IL2CrossChainSender.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
@@ -201,7 +203,10 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
             )
         );
         require(!ok, "previewBundleHash must revert with InteropPreviewHash (quoter pattern)");
-        require(ret.length == 36, "unexpected preview revert reason");
+        require(
+            ret.length == 36 && bytes4(ret) == InteropPreviewHash.selector,
+            "preview must revert with InteropPreviewHash"
+        );
         // ret layout: 4-byte selector followed by the abi-encoded bytes32 hash.
         // solhint-disable-next-line no-inline-assembly
         assembly {
@@ -299,14 +304,23 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
 
         bytes[] memory attrs = new bytes[](1);
         attrs[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (keccak256("preview burn rollback")));
+
+        // Prove the burn path was actually ENTERED: the preview assembly routes the token leg through
+        // the asset router's `initiateIndirectCall` (the burn). Without this, an early revert before
+        // the burn would pass the rollback assertion vacuously.
+        vm.expectCall(L2_ASSET_ROUTER_ADDR, abi.encodeWithSelector(IL2CrossChainSender.initiateIndirectCall.selector));
+
         // solhint-disable-next-line avoid-low-level-calls
-        (bool ok, ) = address(l2InteropCenter).call(
+        (bool ok, bytes memory ret) = address(l2InteropCenter).call(
             abi.encodeCall(
                 l2InteropCenter.previewBundleHash,
                 (InteroperableAddress.formatEvmV1(destinationChainId), calls, attrs)
             )
         );
         assertFalse(ok, "previewBundleHash must revert (quoter pattern)");
+        // ...and specifically with `InteropPreviewHash`, not some earlier unrelated revert.
+        assertEq(ret.length, 36, "unexpected preview revert reason");
+        assertEq(bytes4(ret), InteropPreviewHash.selector, "preview must revert with InteropPreviewHash");
         assertEq(
             IERC20(l2Token).balanceOf(address(this)),
             balanceBefore,
@@ -726,6 +740,41 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     /// `Reverted` (not flipped back to `Revertable`), a further claim still reverts, and the balance
     /// is unchanged. Without the Committed-only transition this would re-arm the leg for a second
     /// payout of the same burn.
+    /// @notice Re-authorization while the leg is still `Revertable` (BEFORE any claim) is inert too:
+    /// only `Committed` legs transition, so a second authorization with a fresh valid proof emits no
+    /// event and leaves the leg `Revertable`. Together with the post-claim case, this pins the full
+    /// "Committed-only" transition across both non-Committed terminal-ish states.
+    function test_authorizeRefund_SecondAuthorizationBeforeClaimIsInert() public {
+        _setUpAtomicStack();
+        _sendAtomicLegWithInvalidRemotePeer();
+        _authorizeRefundForInvalidRemoteLeg(); // leg -> Revertable, first event emitted
+
+        AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
+        ImtProof memory absence = _nonInclusionProof(
+            destinationChainId,
+            REMOTE_BATCH_NUMBER,
+            _commitValue(ctx.flowId, INVALID_REMOTE_LEG),
+            L1_CHAIN_ID,
+            SL_BLOCK,
+            uint256(DEADLINE) + 1
+        );
+
+        vm.recordLogs();
+        manager.authorizeRefund(AtomicFlow({flowId: ctx.flowId, preimage: ctxPreimage}), ctx.missingLegIndex, absence);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; ++i) {
+            assertTrue(
+                logs[i].topics[0] != IAtomicFlowManager.FlowRefundAuthorized.selector,
+                "re-authorizing an already-Revertable leg must not emit FlowRefundAuthorized"
+            );
+        }
+        assertEq(
+            uint256(manager.legState(ctx.flowId, ctx.bundleHash)),
+            uint256(LegState.Revertable),
+            "the leg must stay Revertable across a redundant authorization"
+        );
+    }
+
     function test_authorizeRefund_ResubmittedProofAfterClaimIsInert() public {
         _setUpAtomicStack();
         _sendAtomicLegWithInvalidRemotePeer();

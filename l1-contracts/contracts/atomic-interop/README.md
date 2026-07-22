@@ -68,18 +68,25 @@ be refunded.
    root**. The exact conditions, and why they are mutually exclusive with finalization yet always
    satisfiable for a genuinely timed-out leg, are described in the `AtomicInteropProof` library
    header.
-   The proof is bound to the missing leg's source chain and settlement layer. It
-   marks this chain's `Committed` legs `Revertable`; `claimRefund` then reverses each burn by asking the
-   call's local sender (`InteropCall.from`) to recover itself via `IAtomicRecoverable.recoverAtomicCall`
-   (implemented by `L2AssetRouter`, whose burn path produced the call), re-minting to the original
-   depositor. Recovery is **best-effort**: only burn-produced (asset-router) calls are recovered; direct
-   calls move no funds at send, have nothing to reverse, and are skipped (their `from` — possibly an
-   EOA — need not implement the interface); the refund succeeds as long as at least one call recovered.
-   Consequently the protocol does not guarantee full refundability of an arbitrary bundle — making a
-   fund-moving leg recoverable (an asset-router deposit) is the flow author's responsibility. Atomic
-   sends reject only native-`value` legs (which can never be reversed) and L1 destinations (an atomic
-   bundle is never published to L1 and could only ever time out — but L2->L1 withdrawals must never be
-   revertable, see `L2AssetTracker`).
+   The proof is bound to the missing leg's source chain and settlement layer. It marks this chain's
+   `Committed` legs `Revertable` (every committed leg, including one that committed late — `append`
+   has no deadline check, so a leg proven absent from a late batch's begin root may still be locally
+   `Committed`). `claimRefund` then reverses each burn, recovering two kinds of value (see
+   `AtomicFlowManager._recoverBundle`): (a) **burn-produced (asset-router) calls**, whose local sender
+   (`InteropCall.from == L2AssetRouter`, as set by `initiateIndirectCall`) recovers itself via
+   `IAtomicRecoverable.recoverAtomicCall`, re-minting/unlocking the bridged asset to the depositor; and
+   (b) **direct calls carrying native base-token `value`**, whose base token was collected at send
+   (escrowed in the `BaseTokenHolder` for a same-base destination, or bridged via the asset router
+   otherwise) and is routed back to the call's `from` (the depositor) — every direct value leg counts
+   as a recovery.
+
+   Recovery is **best-effort**: a direct call that moves no funds has nothing to reverse and simply
+   contributes nothing; the refund succeeds as long as _some_ call recovered (`recovered != 0`).
+   Consequently the protocol does not guarantee full refundability of an arbitrary bundle — a bespoke
+   fund-moving leg that neither is an asset-router call nor carries `value` must be made recoverable by
+   the flow author. Atomic sends block only L1 destinations (an atomic bundle is never published to L1
+   and could only ever time out — but L2->L1 withdrawals must never be revertable, see
+   `L2AssetTracker`); native-`value` legs are **supported** and refunded as described above.
 
 Leg state machine (`LegState`): `Unset -> Committed` (send) `-> Revertable -> Reverted` (timeout path).
 

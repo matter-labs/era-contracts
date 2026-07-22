@@ -287,66 +287,33 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
     /// `_innerAttributes`. Expects `ExecutingNotAllowed` from the nested gate, and both bundles left
     /// `Unreceived` with the inner recipient never called.
     function _assertNestedExecuteRejected(BundleAttributes memory _innerAttributes) internal {
-        uint256 sourceChainId = block.chainid;
         address innerRecipient = makeAddr("innerRecipient");
+        // Bundle assembly + expected-error construction are extracted to keep this frame small
+        // (stack-too-deep otherwise), and so the wrapped-sender chain id is captured BEFORE the
+        // `vm.chainId` switch below (it is the SOURCE chain, as `_executeCalls` forms the sender).
+        (
+            bytes memory encodedOuterBundle,
+            bytes memory encodedInnerBundle,
+            bytes memory expectedError
+        ) = _buildNestedRejectionCase(_innerAttributes, innerRecipient);
 
-        InteropCall[] memory innerCalls = new InteropCall[](1);
-        innerCalls[0] = InteropCall({
-            version: INTEROP_CALL_VERSION,
-            shadowAccount: false,
-            from: bundleExecutor,
-            to: innerRecipient,
-            value: 0,
-            data: hex""
-        });
-        InteropBundle memory innerBundle = InteropBundle({
-            version: INTEROP_BUNDLE_VERSION,
-            sourceChainId: sourceChainId,
-            destinationChainId: destinationChainId,
-            destinationBaseTokenAssetId: destinationBaseTokenAssetId,
-            interopBundleSalt: bytes32(uint256(1)),
-            calls: innerCalls,
-            bundleAttributes: _innerAttributes
-        });
-        bytes memory encodedInnerBundle = abi.encode(innerBundle);
-        AtomicFinalityProof memory innerProof;
-        bytes memory innerPayload = abi.encodeCall(
-            L2InteropHandler.executeAtomicBundle,
-            (encodedInnerBundle, innerProof)
-        );
-
-        InteropCall[] memory outerCalls = new InteropCall[](1);
-        outerCalls[0] = InteropCall({
-            version: INTEROP_CALL_VERSION,
-            shadowAccount: false,
-            from: bundleExecutor,
-            to: L2_INTEROP_HANDLER_ADDR,
-            value: 0,
-            data: innerPayload
-        });
-        InteropBundle memory outerBundle = InteropBundle({
-            version: INTEROP_BUNDLE_VERSION,
-            sourceChainId: sourceChainId,
-            destinationChainId: destinationChainId,
-            destinationBaseTokenAssetId: destinationBaseTokenAssetId,
-            interopBundleSalt: bytes32(uint256(2)),
-            calls: outerCalls,
-            bundleAttributes: _createBundleAttributes(destinationChainId, bundleExecutor)
-        });
-        bytes memory encodedOuterBundle = abi.encode(outerBundle);
-        AtomicFinalityProof memory outerProof;
-
-        // If the (never-authorized) inner call slipped through, this recipient would be hit.
+        // If the (never-authorized) inner call slipped through, this recipient would be hit — assert
+        // it is called ZERO times, proving the nested execution never ran its calls.
         vm.mockCall(
             innerRecipient,
             abi.encodeWithSelector(IERC7786Recipient.receiveMessage.selector),
             abi.encode(IERC7786Recipient.receiveMessage.selector)
         );
+        vm.expectCall(innerRecipient, abi.encodeWithSelector(IERC7786Recipient.receiveMessage.selector), 0);
 
         vm.chainId(destinationChainId);
 
+        // The revert must be the EXACT nested-gate error (inner bundle hash + wrapped source-chain
+        // sender + inner execution address), not just the shared `ExecutingNotAllowed` selector, so
+        // the revert is pinned to the nested rescue gate rather than the outer top-level gate.
+        AtomicFinalityProof memory outerProof;
         vm.prank(bundleExecutor);
-        vm.expectPartialRevert(ExecutingNotAllowed.selector);
+        vm.expectRevert(expectedError);
         L2_INTEROP_HANDLER.executeAtomicBundle(encodedOuterBundle, outerProof);
 
         // The revert unwinds the whole outer execution: both statuses roll back to Unreceived and
@@ -362,6 +329,72 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             "inner bundle must stay Unreceived"
         );
     }
+
+    /// @dev Builds the outer (rescue) and inner bundles for a nested-rejection case and the exact
+    /// `ExecutingNotAllowed` error the nested gate must raise. Kept separate from the assertion frame
+    /// to avoid stack-too-deep, and evaluated while `block.chainid` is still the SOURCE chain (the
+    /// wrapped sender's chain id, matching how `_executeCalls` forms `sender`).
+    function _buildNestedRejectionCase(
+        BundleAttributes memory _innerAttributes,
+        address _innerRecipient
+    )
+        internal
+        view
+        returns (bytes memory encodedOuterBundle, bytes memory encodedInnerBundle, bytes memory expectedError)
+    {
+        uint256 sourceChainId = block.chainid;
+
+        InteropCall[] memory innerCalls = new InteropCall[](1);
+        innerCalls[0] = InteropCall({
+            version: INTEROP_CALL_VERSION,
+            shadowAccount: false,
+            from: bundleExecutor,
+            to: _innerRecipient,
+            value: 0,
+            data: hex""
+        });
+        encodedInnerBundle = abi.encode(
+            InteropBundle({
+                version: INTEROP_BUNDLE_VERSION,
+                sourceChainId: sourceChainId,
+                destinationChainId: destinationChainId,
+                destinationBaseTokenAssetId: destinationBaseTokenAssetId,
+                interopBundleSalt: bytes32(uint256(1)),
+                calls: innerCalls,
+                bundleAttributes: _innerAttributes
+            })
+        );
+
+        InteropCall[] memory outerCalls = new InteropCall[](1);
+        outerCalls[0] = InteropCall({
+            version: INTEROP_CALL_VERSION,
+            shadowAccount: false,
+            from: bundleExecutor,
+            to: L2_INTEROP_HANDLER_ADDR,
+            value: 0,
+            data: abi.encodeCall(L2InteropHandler.executeAtomicBundle, (encodedInnerBundle, _emptyFinality()))
+        });
+        encodedOuterBundle = abi.encode(
+            InteropBundle({
+                version: INTEROP_BUNDLE_VERSION,
+                sourceChainId: sourceChainId,
+                destinationChainId: destinationChainId,
+                destinationBaseTokenAssetId: destinationBaseTokenAssetId,
+                interopBundleSalt: bytes32(uint256(2)),
+                calls: outerCalls,
+                bundleAttributes: _createBundleAttributes(destinationChainId, bundleExecutor)
+            })
+        );
+
+        expectedError = abi.encodeWithSelector(
+            ExecutingNotAllowed.selector,
+            InteropDataEncoding.encodeInteropBundleHash(encodedInnerBundle),
+            InteroperableAddress.formatEvmV1(sourceChainId, bundleExecutor),
+            _innerAttributes.executionAddress
+        );
+    }
+
+    function _emptyFinality() private pure returns (AtomicFinalityProof memory finality) {}
 
     /// @notice Helper: bundle attributes with the execution/unbundler address bound to `chainId`.
     /// @dev The execution-permission gate authorizes against the interop-message sender's ERC-7930 chain id —

@@ -30,22 +30,22 @@ contract L2AtomicInteropExecuteL1Test is Test, SharedL2ContractL1Deployer, L2Ato
     }
 
     function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
+        StateTransitionDeployedAddresses memory _stateTransition
     ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
-        return super.getChainCreationFacetCuts(stateTransition);
+        return super.getChainCreationFacetCuts(_stateTransition);
     }
 
     function getUpgradeAddedFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
+        StateTransitionDeployedAddresses memory _stateTransition
     ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
-        return super.getUpgradeAddedFacetCuts(stateTransition);
+        return super.getUpgradeAddedFacetCuts(_stateTransition);
     }
 
     function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
+        string memory _contractName,
+        bool _isZKBytecode
     ) internal virtual override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName, isZKBytecode);
+        return super.getInitializeCalldata(_contractName, _isZKBytecode);
     }
 
     function _registerInteropChains() internal override(SharedL2ContractDeployer, L2AtomicInteropExecuteTestAbstract) {

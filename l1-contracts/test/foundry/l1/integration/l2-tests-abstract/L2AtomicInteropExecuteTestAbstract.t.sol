@@ -27,6 +27,7 @@ import {
 import {
     BundleAlreadyProcessed,
     ExecutingNotAllowed,
+    InteropPreviewHash,
     WrongDestinationChainId
 } from "contracts/interop/InteropErrors.sol";
 import {IMTLeafValueMismatch} from "contracts/common/L1ContractErrors.sol";
@@ -137,7 +138,10 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
             )
         );
         require(!ok, "previewBundleHash must revert with InteropPreviewHash (quoter pattern)");
-        require(ret.length == 36, "unexpected preview revert reason");
+        require(
+            ret.length == 36 && bytes4(ret) == InteropPreviewHash.selector,
+            "preview must revert with InteropPreviewHash"
+        );
         // ret layout: 4-byte selector followed by the abi-encoded bytes32 hash.
         // solhint-disable-next-line no-inline-assembly
         assembly {
