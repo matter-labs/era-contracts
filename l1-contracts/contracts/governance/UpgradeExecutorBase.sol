@@ -45,7 +45,9 @@ abstract contract UpgradeExecutorBase is Ownable2Step {
     /// @param _initialOwner The governance executor that drives the fixed domain entrypoints.
     /// @param _breakGlassGovernor The separately governed break-glass authority.
     constructor(address _initialOwner, address _breakGlassGovernor) {
-        if (_breakGlassGovernor == address(0)) {
+        // A zero owner would permanently disable every fixed upgrade entrypoint (Ownable2Step
+        // cannot hand ownership out of address(0)), leaving break-glass as the only authority.
+        if (_initialOwner == address(0) || _breakGlassGovernor == address(0)) {
             revert ZeroAddress();
         }
         _transferOwnership(_initialOwner);

@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {UpgradeExecutorBase} from "contracts/governance/UpgradeExecutorBase.sol";
-import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 /// @dev A contract whose owner-gated function stands in for the owner-gated entrypoints
 ///      (CTM, ProxyAdmin, ...) whose ownership the executor holds in production.
@@ -60,6 +60,18 @@ contract UpgradeExecutorBaseTest is Test {
         assertEq(executor.owner(), governance);
         assertEq(executor.pendingOwner(), address(0));
         assertEq(executor.breakGlassGovernor(), breakGlass);
+    }
+
+    function test_revertWhen_constructorZeroOwner() public {
+        // A zero owner would permanently disable every fixed upgrade entrypoint and leave only
+        // break-glass authority.
+        vm.expectRevert(ZeroAddress.selector);
+        new TestUpgradeExecutor(address(0), breakGlass);
+    }
+
+    function test_revertWhen_constructorZeroBreakGlass() public {
+        vm.expectRevert(ZeroAddress.selector);
+        new TestUpgradeExecutor(governance, address(0));
     }
 
     /*//////////////////////////////////////////////////////////////
