@@ -741,12 +741,12 @@
   },
   {
     "contractName": "l1-contracts/AtomicFlowManager",
-    "zkBytecodeHash": "0x010005c554afc48622744d5f28b7281987baf1d2e55f44be5377e5d8d8f4a09e",
+    "zkBytecodeHash": "0x010005c5f957f59fcfa61dcd3a202c09390001ad4e4cc826d53ae9390387b25a",
     "zkBytecodePath": "/l1-contracts/zkout/AtomicFlowManager.sol/AtomicFlowManager.json",
-    "evmBytecodeHash": "0xa552e14bf40739ab51ac640757d4e6f06fd205235ce74cafa1469990f2401ebc",
+    "evmBytecodeHash": "0x445df4803263475e50e56345fce57064c301d4dbaa11c2ed029425702a3038a3",
     "evmBytecodePath": "/l1-contracts/out/AtomicFlowManager.sol/AtomicFlowManager.json",
-    "evmDeployedBytecodeHash": "0x47b03d1057e3d551cf0c85c61fc88cb801ee9b2aa11b21326a12c66848dac21e",
-    "evmDeployedBytecodeBlakeHash": "0x995383292d9c3590fa6dffa14fe2d091b06254a4a808c3ddbe2cbb08944a03ad",
+    "evmDeployedBytecodeHash": "0x9d9cda2524d4a334a6d380870192fd9a175fe588e11221c9c8be0023b3a47adf",
+    "evmDeployedBytecodeBlakeHash": "0x29e8fb5471e302041dae1b172c40c5333a4f12acb0b476dfc0312c6a917a78c1",
     "evmDeployedBytecodeLength": 12035
   },
   {
