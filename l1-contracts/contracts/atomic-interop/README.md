@@ -72,12 +72,14 @@ be refunded.
    marks this chain's `Committed` legs `Revertable`; `claimRefund` then reverses each burn by asking the
    call's local sender (`InteropCall.from`) to recover itself via `IAtomicRecoverable.recoverAtomicCall`
    (implemented by `L2AssetRouter`, whose burn path produced the call), re-minting to the original
-   depositor. Recovery is **best-effort**: only burn-produced (asset-router) calls are recovered; direct
-   calls move no funds at send, have nothing to reverse, and are skipped (their `from` — possibly an
-   EOA — need not implement the interface); the refund succeeds as long as at least one call recovered.
-   Consequently the protocol does not guarantee full refundability of an arbitrary bundle — making a
-   fund-moving leg recoverable (an asset-router deposit) is the flow author's responsibility. Atomic
-   sends reject only native-`value` legs (which can never be reversed) and L1 destinations (an atomic
+   depositor. Recovery is **best-effort**: burn-produced (asset-router) calls are recovered via
+   `recoverAtomicCall`, and a direct call's native `value` — collected at send through the base-token
+   holder (same-base destination) or an asset-router base-token burn (different-base destination) — is
+   returned to the call's sender via `L2AssetRouter.bridgehubRecoverBaseToken`. Direct calls that moved
+   no funds have nothing to reverse and are skipped (their `from` — possibly an EOA — need not implement
+   the interface); the refund succeeds as long as at least one call recovered. Consequently the protocol
+   does not guarantee full refundability of an arbitrary bundle — making any other fund-moving leg
+   recoverable is the flow author's responsibility. Atomic sends reject only L1 destinations (an atomic
    bundle is never published to L1 and could only ever time out — but L2->L1 withdrawals must never be
    revertable: their `totalWithdrawalsToL1` bookkeeping in `L2NativeTokenVault`/`BaseTokenHolder`
    must stay append-only).
