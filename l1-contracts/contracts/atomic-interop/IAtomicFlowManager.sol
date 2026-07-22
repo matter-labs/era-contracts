@@ -25,7 +25,7 @@ import {LegState, AtomicFlow, AtomicFlowPreimage, ImtProof, AtomicFinalityProof}
 ///      by asking each burn-producing call's local sender (`InteropCall.from`) to reverse itself via
 ///      {IAtomicRecoverable.recoverAtomicCall}.
 ///
-/// `flowId = keccak256(abi.encode(ATOMIC_FLOW_ID_TAG, preimage))` (versioned domain tag, see {ATOMIC_FLOW_ID_TAG}),
+/// `flowId = keccak256(abi.encode(preimage))` (`preimage.version` must equal {ATOMIC_FLOW_PREIMAGE_VERSION}),
 /// `bundleHash = keccak256(abi.encode(sourceChainId, interopBundleBytes))`. `legBundleHashes` is strictly
 /// ascending (canonical order + dedup); `legSourceChainIds` is positionally aligned with it (may repeat,
 /// need not be ascending). All legs settle on one `settlementLayerChainId`, so the deadline (a settlement-

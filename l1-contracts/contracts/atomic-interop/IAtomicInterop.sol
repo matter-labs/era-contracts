@@ -61,7 +61,7 @@ struct ImtProof {
 }
 
 /// @notice The full `flowId` preimage — the single canonical field set the id is hashed over:
-/// `flowId = keccak256(abi.encode(ATOMIC_FLOW_ID_TAG, preimage))` (see {ATOMIC_FLOW_ID_TAG}).
+/// `flowId = keccak256(abi.encode(preimage))`.
 /// It is supplied by the sender in the `atomicBundle` ERC-7786 attribute and embedded (with the id)
 /// in {AtomicFlow}, so the send and finalize/refund paths hash one shape and cannot drift. At send
 /// time the {AtomicFlowManager} recomputes `flowId` from these fields and requires the committing
@@ -69,6 +69,10 @@ struct ImtProof {
 /// can never be committed under a `flowId` that does not actually contain it — a wrong or stale
 /// preimage (e.g. an off-chain `bundleHash` prediction invalidated by an upgrade between preview and
 /// send) reverts the send instead of stranding the burned funds in an unfinalizable, unrefundable leg.
+/// @param version Version of the AtomicFlowPreimage (same convention as `InteropBundle.version` /
+/// `InteropCall.version`). Must equal {ATOMIC_FLOW_PREIMAGE_VERSION}; every path that hashes a
+/// preimage validates it first. Being the first hashed field, it also keeps ids of this preimage
+/// version distinct from ids hashed over any future preimage shape.
 /// @param deadline The flow deadline (a settlement-layer timestamp).
 /// @param settlementLayerChainId The single settlement layer every leg must settle on; committed in
 /// `flowId` and asserted equal to each proof's resolved `slChainId`.
@@ -78,6 +82,7 @@ struct ImtProof {
 /// interop chain — a chain with no MessageRoot presence could never prove its leg committed or absent,
 /// which would strand the whole flow, so `append` rejects it at send time.
 struct AtomicFlowPreimage {
+    bytes1 version;
     uint64 deadline;
     uint256 settlementLayerChainId;
     bytes32[] legBundleHashes;
@@ -88,7 +93,7 @@ struct AtomicFlowPreimage {
 /// the finalize path ({AtomicFlowManager.requireFlowFinalized}) and the refund path
 /// ({AtomicFlowManager.authorizeRefund}); the supplied `flowId` is always recomputed from `preimage`
 /// and matched before use.
-/// @param flowId `keccak256(abi.encode(ATOMIC_FLOW_ID_TAG, preimage))`.
+/// @param flowId `keccak256(abi.encode(preimage))`.
 /// @param preimage The hashed field set (see {AtomicFlowPreimage}).
 struct AtomicFlow {
     bytes32 flowId;
@@ -110,9 +115,8 @@ struct AtomicFinalityProof {
 /// `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
 bytes4 constant ATOMIC_COMMIT_LEAF_TAG = bytes4(keccak256("AtomicInterop.commit.v1"));
 
-/// @dev Versioned domain tag prepended to the {AtomicFlowPreimage} encoding when hashing a `flowId`,
-/// so flow ids cannot be confused with other hashes and ids of one preimage version can never collide
-/// with ids hashed over a future preimage shape. Bump the version suffix (`.v2`, ...) whenever the
-/// {AtomicFlowPreimage} field set or its canonicalization changes.
-/// `flowId = keccak256(abi.encode(ATOMIC_FLOW_ID_TAG, preimage))`.
-bytes4 constant ATOMIC_FLOW_ID_TAG = bytes4(keccak256("AtomicInterop.flowId.v1"));
+/// @dev The only supported {AtomicFlowPreimage.version} (same versioning convention as
+/// {INTEROP_BUNDLE_VERSION} / {INTEROP_CALL_VERSION}). Bumped whenever the {AtomicFlowPreimage}
+/// field set or its canonicalization changes, so a preimage of one version can never be accepted —
+/// or hash to the same `flowId` — under the rules of another.
+bytes1 constant ATOMIC_FLOW_PREIMAGE_VERSION = 0x01;

@@ -17,6 +17,8 @@ error ManagerCommittedLegSourceChainMismatch(bytes32 flowId, uint256 thisChainId
 error ManagerExecutingBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
 // 0xf8585117
 error ManagerFlowIdMismatch(bytes32 expected, bytes32 computed);
+// 0x1f6b4d47
+error ManagerFlowPreimageVersionMismatch(bytes1 expected, bytes1 actual);
 // 0x3a62d7e3
 error ManagerLegAlreadyCommitted(bytes32 flowId, bytes32 bundleHash);
 // 0x83562707

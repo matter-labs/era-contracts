@@ -11,7 +11,7 @@ import {
     AtomicFlowPreimage,
     ImtProof,
     AtomicFinalityProof,
-    ATOMIC_FLOW_ID_TAG
+    ATOMIC_FLOW_PREIMAGE_VERSION
 } from "./IAtomicInterop.sol";
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
 import {InteropDataEncoding} from "../interop/InteropDataEncoding.sol";
@@ -30,6 +30,7 @@ import {
     ManagerLegAlreadyCommitted,
     ManagerLegNotRevertable,
     ManagerFlowIdMismatch,
+    ManagerFlowPreimageVersionMismatch,
     ManagerBundleHashesNotSorted,
     ManagerCommittedBundleNotInFlow,
     ManagerCommittedLegSourceChainMismatch,
@@ -346,8 +347,10 @@ contract AtomicFlowManager is IAtomicFlowManager {
     }
 
     /// @dev Canonicalizes and hashes a flowId preimage:
-    /// `flowId = keccak256(abi.encode(ATOMIC_FLOW_ID_TAG, preimage))` — the versioned domain tag keeps
-    /// ids of this preimage version disjoint from other hash domains and from future preimage shapes.
+    /// `flowId = keccak256(abi.encode(preimage))`.
+    /// `version` must equal {ATOMIC_FLOW_PREIMAGE_VERSION} (the InteropBundle/InteropCall versioning
+    /// convention); as the first hashed field it also keeps ids of this preimage version distinct from
+    /// ids hashed over any future preimage shape.
     /// `legBundleHashes` must be strictly ascending (canonical order + dedup). `legSourceChainIds` is
     /// positional, aligned 1:1 with `legBundleHashes`; it may repeat and need not be ascending, so only its
     /// length is checked. Treating it as an ascending set instead would let a sibling chain in the set
@@ -355,6 +358,9 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// and the finalize/refund paths (`_checkFlowId`), so the preimage canonicalization cannot drift
     /// between them.
     function _validateAndComputeFlowId(AtomicFlowPreimage calldata _preimage) internal pure returns (bytes32) {
+        if (_preimage.version != ATOMIC_FLOW_PREIMAGE_VERSION) {
+            revert ManagerFlowPreimageVersionMismatch(ATOMIC_FLOW_PREIMAGE_VERSION, _preimage.version);
+        }
         uint256 n = _preimage.legBundleHashes.length;
         for (uint256 i = 1; i < n; ++i) {
             if (_preimage.legBundleHashes[i] <= _preimage.legBundleHashes[i - 1]) {
@@ -364,6 +370,6 @@ contract AtomicFlowManager is IAtomicFlowManager {
         if (_preimage.legSourceChainIds.length != n) {
             revert ManagerLegSourceChainIdsLengthMismatch(n, _preimage.legSourceChainIds.length);
         }
-        return keccak256(abi.encode(ATOMIC_FLOW_ID_TAG, _preimage));
+        return keccak256(abi.encode(_preimage));
     }
 }

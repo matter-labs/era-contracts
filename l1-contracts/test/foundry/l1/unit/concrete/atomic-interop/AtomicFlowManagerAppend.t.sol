@@ -10,12 +10,13 @@ import {
     AtomicFlowPreimage,
     LegState,
     ATOMIC_COMMIT_LEAF_TAG,
-    ATOMIC_FLOW_ID_TAG
+    ATOMIC_FLOW_PREIMAGE_VERSION
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
     ManagerBundleHashesNotSorted,
     ManagerCommittedBundleNotInFlow,
     ManagerCommittedLegSourceChainMismatch,
+    ManagerFlowPreimageVersionMismatch,
     ManagerLegAlreadyCommitted,
     ManagerLegSourceChainIdsLengthMismatch,
     ManagerLegSourceChainNotRegistered,
@@ -83,6 +84,7 @@ contract AtomicFlowManagerAppendTest is Test {
         bytes32 _localLeg,
         bytes32 _remoteLeg
     ) internal view returns (AtomicFlowPreimage memory preimage) {
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = L1_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](2);
@@ -96,7 +98,7 @@ contract AtomicFlowManagerAppendTest is Test {
 
     /// @dev Mirrors `AtomicFlowManager._validateAndComputeFlowId`'s hash (without the shape checks).
     function _flowId(AtomicFlowPreimage memory _preimage) internal pure returns (bytes32) {
-        return keccak256(abi.encode(ATOMIC_FLOW_ID_TAG, _preimage));
+        return keccak256(abi.encode(_preimage));
     }
 
     /// @dev Mirrors `AtomicInteropProof.commitValue`.
@@ -126,30 +128,35 @@ contract AtomicFlowManagerAppendTest is Test {
         assertEq(tree.leafAt(1).value, _commitValue(flowId, localLeg), "inserted leaf must hold the commit value");
     }
 
-    /// @notice Pins the `flowId` versioning: `ATOMIC_FLOW_ID_TAG` is the v1 domain-tag literal and the
-    /// manager commits legs under the tagged hash only. The bare (untagged, pre-versioning) hash of the
-    /// same preimage addresses a different — and untouched — leg state, so ids from other hash domains
-    /// or future preimage versions can never alias a committed leg.
-    function test_append_FlowIdIsVersionedWithDomainTag() public {
-        assertEq(ATOMIC_FLOW_ID_TAG, bytes4(keccak256("AtomicInterop.flowId.v1")), "v1 domain tag must be pinned");
+    /// @notice Pins the preimage versioning (the InteropBundle/InteropCall convention): the current
+    /// version literal is 0x01 and `append` rejects any other version outright, so a preimage of a
+    /// different (e.g. future) version can never commit a leg under this version's hashing rules.
+    /// Since `version` is the first hashed field, ids of different versions can never alias either.
+    function test_append_RevertWhen_FlowPreimageVersionMismatch() public {
+        assertEq(ATOMIC_FLOW_PREIMAGE_VERSION, bytes1(0x01), "v1 preimage version literal must be pinned");
 
         bytes32 localLeg = keccak256("local leg");
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
+        bytes1 unknownVersion = 0x02;
+        preimage.version = unknownVersion;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ManagerFlowPreimageVersionMismatch.selector,
+                ATOMIC_FLOW_PREIMAGE_VERSION,
+                unknownVersion
+            )
+        );
         _appendAsInteropCenter(localLeg, preimage);
 
-        bytes32 taggedFlowId = _flowId(preimage);
-        bytes32 untaggedHash = keccak256(abi.encode(preimage));
-        assertTrue(taggedFlowId != untaggedHash, "versioned flowId must differ from the untagged hash");
+        // Nothing committed under either version's hash.
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         assertEq(
-            uint256(manager.legState(taggedFlowId, localLeg)),
-            uint256(LegState.Committed),
-            "leg must be committed under the versioned flowId"
-        );
-        assertEq(
-            uint256(manager.legState(untaggedHash, localLeg)),
+            uint256(manager.legState(_flowId(preimage), localLeg)),
             uint256(LegState.Unset),
-            "no leg state may exist under the unversioned hash"
+            "no leg state may exist after the rejected append"
         );
+        assertEq(tree.leafCount(), 1, "nothing may be inserted into the commitment tree");
     }
 
     /// @notice The footgun regression: a preimage that does not contain the committing bundle's hash is
@@ -267,6 +274,7 @@ contract AtomicFlowManagerAppendTest is Test {
         bytes32 legA = keccak256("local leg A");
         bytes32 legB = keccak256("local leg B");
         AtomicFlowPreimage memory preimage;
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = L1_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](2);

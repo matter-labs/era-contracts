@@ -12,7 +12,7 @@
     "chainRegistrationSender": "0x440BfB8eF27d14bec4B758fcF878755DB56Cc861"
   },
   "ctmAddresses": {
-    "chainTypeManager": "0x674E37bDfFc38792Fcc06524A8eF42CBcb6da49E",
+    "chainTypeManager": "0x89Cb9c8106d13d0c8B1883d0787a1229935D4a02",
     "chainAdmin": "0x16b5d0b1A5c64195453315C58671A6f847CE1aC2",
     "verifier": "0x5422b0509a532dd24b0dD99AfaC766E66172af37",
     "rollupL1DAValidator": "0xeBAb99053A18eE485b5F0f960c7D9eFED9F9Dbd8"
@@ -20,23 +20,23 @@
   "chainAddresses": [
     {
       "chainId": 10,
-      "diamondProxy": "0x48E360e40C3BBB156A11279360f863F93138649D"
+      "diamondProxy": "0xd0baB531e51bEC25a0C63Fc6829FF7E2DebBC4Be"
     },
     {
       "chainId": 11,
-      "diamondProxy": "0x58DE56eB4bEB174a21608eb3CDc172A747bE1879"
+      "diamondProxy": "0x0Ef97A4bd4A6d8F78e1C75111EAB92d817cc32F6"
     },
     {
       "chainId": 12,
-      "diamondProxy": "0x1dD84086dDcDc7896D9228fec06BFCcfF8adf57a"
+      "diamondProxy": "0x5e1019669105f4237d6c38b49C39075439F599E9"
     },
     {
       "chainId": 13,
-      "diamondProxy": "0x4265B722AB4FA892908c1125a931CB6387E05c65"
+      "diamondProxy": "0xFF295A709d0F64869173206337AC87d38A46FD3A"
     },
     {
       "chainId": 14,
-      "diamondProxy": "0x26F3a3e1fe744c94b0711862A45e2D38FD24213b"
+      "diamondProxy": "0x97478D35fEE2C312aD45C5900D35dDbc7D65eFDa"
     }
   ],
   "testTokens": {

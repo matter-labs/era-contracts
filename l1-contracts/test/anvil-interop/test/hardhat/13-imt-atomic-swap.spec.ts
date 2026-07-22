@@ -30,7 +30,7 @@
  *     `callStatic.sendBundle`, then cross-check it against the real send's `InteropBundleSent` event and
  *     fail loudly on mismatch. On-chain, the AtomicFlowManager additionally requires the sent bundle's
  *     hash to be one of the preimage's legs, so a stale prediction reverts the send.
- *   - `flowId = keccak256(abi.encode(ATOMIC_FLOW_ID_TAG, preimage))` (versioned domain tag)
+ *   - `flowId = keccak256(abi.encode(preimage))` (`preimage.version` = ATOMIC_FLOW_PREIMAGE_VERSION)
  *     (bundle hashes ascending, source chain ids positionally aligned), recomputed on-chain from the
  *     attribute-supplied preimage rather than accepted from the sender.
  *   - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
@@ -95,6 +95,7 @@ import type { AtomicFlowPreimage } from "../../src/helpers/interop-helpers";
 import {
   DEFAULT_SL_CHAIN_ID,
   atomicFinalityProofTuple,
+  ATOMIC_FLOW_PREIMAGE_VERSION,
   atomicFlowTuple,
   buildInclusionProof,
   buildNonInclusionProof,
@@ -341,6 +342,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
    */
   function flowPreimageOf(legHashesAsc: string[], chainIdsAsc: number[], deadline: number): AtomicFlowPreimage {
     return {
+      version: ATOMIC_FLOW_PREIMAGE_VERSION,
       deadline,
       settlementLayerChainId: DEFAULT_SL_CHAIN_ID,
       legBundleHashes: legHashesAsc,
