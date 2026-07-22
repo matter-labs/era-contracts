@@ -131,7 +131,13 @@ contract DeployL1CoreUtils is DeployUtils {
                     coreAddresses.bridgehub.proxies.messageRoot
                 );
         } else if (compareStrings(contractName, "L1Nullifier")) {
-            return abi.encode(coreAddresses.bridgehub.proxies.bridgehub, coreAddresses.bridgehub.proxies.messageRoot);
+            return
+                abi.encode(
+                    coreAddresses.bridgehub.proxies.bridgehub,
+                    coreAddresses.bridgehub.proxies.messageRoot,
+                    config.eraChainId,
+                    config.eraDiamondProxyAddress
+                );
         } else if (compareStrings(contractName, "L1InteropHandler")) {
             return abi.encode(coreAddresses.bridgehub.proxies.messageRoot);
         } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
