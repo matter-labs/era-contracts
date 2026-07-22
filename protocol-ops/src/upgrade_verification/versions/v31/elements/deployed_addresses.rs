@@ -71,10 +71,6 @@ mod core_signatures {
         contract V31L1MessageRoot {
             constructor(address _bridgehub, uint256 _eraGatewayChainId, address _chainAssetHandler);
         }
-        contract V31L1AssetTracker {
-            constructor(address _bridgehub, address _nativeTokenVault, address _messageRoot);
-            function initialize(address _owner);
-        }
         contract V31L1ChainAssetHandler {
             constructor(address _owner, address _bridgehub);
         }
@@ -846,8 +842,6 @@ async fn verify_core_provenance(
         ],
     )?;
     let ctmdt_impl = in_bh("ctm_deployment_tracker_implementation_addr")?;
-    let tracker_impl = in_bh("l1_asset_tracker_implementation_addr")?;
-    let tracker_proxy = in_bh("l1_asset_tracker_proxy_addr")?;
     let asset_router_impl = in_bridges("l1_asset_router_implementation_addr")?;
     let nullifier_impl = in_bridges("l1_nullifier_implementation_addr")?;
     let bridgehub_impl = in_bh("bridgehub_implementation_addr")?;
@@ -871,14 +865,6 @@ async fn verify_core_provenance(
     } else {
         "l1-contracts/L1MessageRoot"
     };
-
-    // L1AssetTracker impl args are reused for the TUPP impl check below.
-    let tracker_ctor_args = V31L1AssetTracker::constructorCall::new((
-        context.bridgehub_addr,
-        context.ntv_proxy,
-        message_root_proxy,
-    ))
-    .abi_encode();
 
     // ChainRegistrationSender impl args are reused for the TUPP impl check below.
     let crs_ctor_args =
@@ -930,13 +916,6 @@ async fn verify_core_provenance(
             .abi_encode(),
             "l1-contracts/CTMDeploymentTracker",
         ),
-        // L1AssetTracker impl(bridgehub, ntv, messageRoot).
-        // Args reused below for the TUPP impl check.
-        (
-            tracker_impl,
-            tracker_ctor_args.clone(),
-            "l1-contracts/L1AssetTracker",
-        ),
         // L1AssetRouter impl(weth, bridgehub, nullifier, eraChainId, eraDiamondProxy).
         (
             asset_router_impl,
@@ -983,18 +962,6 @@ async fn verify_core_provenance(
     for (addr, args, file) in &checks {
         result.expect_create2_params(verifiers, addr, args.as_slice(), file);
     }
-
-    // L1AssetTracker TransparentUpgradeableProxy(impl, proxyAdmin, initialize(deployer)).
-    result
-        .expect_create2_params_proxy_with_bytecode(
-            verifiers,
-            &tracker_proxy,
-            V31L1AssetTracker::initializeCall::new((deployer,)).abi_encode(),
-            core_proxy_admin,
-            tracker_ctor_args,
-            "l1-contracts/L1AssetTracker",
-        )
-        .await;
 
     // ChainRegistrationSender TransparentUpgradeableProxy(impl, proxyAdmin, initialize(deployer)).
     result

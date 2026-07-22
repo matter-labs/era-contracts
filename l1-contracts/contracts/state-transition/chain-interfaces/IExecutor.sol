@@ -3,7 +3,6 @@
 pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "./IZKChainBase.sol";
-import {L2Log} from "../../common/Messaging.sol";
 // solhint-disable-next-line no-unused-import
 import {MAX_NUMBER_OF_BLOBS, SystemLogKey} from "system-contracts/contracts/Constants.sol";
 
@@ -23,37 +22,6 @@ struct LogProcessingOutput {
 
 /// @dev Maximal value that SystemLogKey variable can have.
 uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max);
-
-/// @notice The struct passed to the assetTracker for processing L2 logs and collecting settlement fees.
-/// @param logs The L2 logs from the batch.
-/// @param messages The L2 messages corresponding to the logs. Note: there can be fewer messages than logs,
-///        as not all logs have corresponding messages.
-/// @param chainId The chain ID of the settling chain.
-/// @param batchNumber The batch number being processed.
-/// @param chainBatchRoot The batch root hash for verification.
-/// @param multichainBatchRoot The multichain batch root for chain for verification.
-/// @param settlementFeePayer Address that pays gateway settlement fees for interop calls in this batch.
-///
-/// @dev Settlement Fee Payer Requirements:
-///      1. Must have called `setSettlementFeePayerAgreement(chainId, true)` on GWAssetTracker to opt-in for this specific chain
-///      2. Must have sufficient wrapped ZK token balance to cover: gatewaySettlementFee * chargeableInteropCount
-///      3. Must have approved GWAssetTracker to spend wrapped ZK tokens
-///      The opt-in mechanism prevents front-running attacks where a malicious operator could
-///      make another address pay for their chain's settlements by specifying it as settlementFeePayer.
-///
-/// @dev Failure Behavior:
-///      - If fee collection fails (payer not agreed, insufficient balance, or no approval), batch execution reverts
-///      - This ensures fees are always paid atomically with settlement
-///      - Operators must ensure their fee payer has agreed and maintains sufficient balance/approval
-struct ProcessLogsInput {
-    L2Log[] logs;
-    bytes[] messages;
-    uint256 chainId;
-    uint256 batchNumber;
-    bytes32 chainBatchRoot;
-    bytes32 multichainBatchRoot;
-    address settlementFeePayer;
-}
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch)
 uint256 constant L2_LOG_ADDRESS_OFFSET = 4;

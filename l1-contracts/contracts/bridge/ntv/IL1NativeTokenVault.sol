@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVaultBase} from "./INativeTokenVaultBase.sol";
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
-import {IL1AssetTracker} from "../asset-tracker/IL1AssetTracker.sol";
 
 /// @title L1 Native token vault contract interface
 /// @author Matter Labs
@@ -25,7 +24,8 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     /// ETH token is expected to have been already initialized in production.
     function registerEthToken() external;
 
-    function l1AssetTracker() external view returns (IL1AssetTracker);
+    /// @notice Net amount of the given L1-native asset currently bridged out of L1.
+    function bridgedOut(bytes32 _assetId) external view returns (uint256);
 
     event TokenBeaconUpdated(address indexed l2TokenBeacon);
 }

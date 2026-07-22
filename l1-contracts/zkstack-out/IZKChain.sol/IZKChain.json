@@ -1808,7 +1808,7 @@
   },
   {
     "type": "function",
-    "name": "requestL2TransactionToGatewayMailboxWithBalanceChange",
+    "name": "requestL2TransactionToGatewayMailbox",
     "inputs": [
       {
         "name": "_chainId",
@@ -1824,16 +1824,6 @@
         "name": "_expirationTimestamp",
         "type": "uint64",
         "internalType": "uint64"
-      },
-      {
-        "name": "_baseTokenAmount",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_getBalanceChange",
-        "type": "bool",
-        "internalType": "bool"
       }
     ],
     "outputs": [

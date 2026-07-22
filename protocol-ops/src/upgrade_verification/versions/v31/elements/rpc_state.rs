@@ -11,8 +11,7 @@ use crate::upgrade_verification::{
             fee_param_verifier::{FeeParamVerifier, FeeParams},
             network_verifier::{
                 Bridgehub as BridgehubContract, ChainRegistrationSender, ChainTypeManager,
-                L1AssetRouter, L1AssetTracker, Ownable, Ownable2Step, ValidatorTimelock,
-                ZKChainFeeParams,
+                L1AssetRouter, Ownable, Ownable2Step, ValidatorTimelock, ZKChainFeeParams,
             },
         },
         MAX_PRIORITY_TX_GAS_LIMIT, STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID,
@@ -44,7 +43,6 @@ const CORE_PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
     "message_root_proxy",
     "ctm_deployment_tracker_proxy",
     "chain_asset_handler_proxy",
-    "asset_tracker_proxy",
 ];
 
 fn expect_address_eq(
@@ -309,15 +307,6 @@ async fn verify_v31_core_wiring(
         "core",
         &["upgrade_addresses", "native_token_vault_addr"],
     )?;
-    let expected_tracker = required_address(
-        &artifact.core,
-        "core",
-        &[
-            "upgrade_addresses",
-            "bridgehub",
-            "l1_asset_tracker_proxy_addr",
-        ],
-    )?;
     let expected_chain_registration_sender = required_address(
         &artifact.core,
         "core",
@@ -417,31 +406,6 @@ async fn verify_v31_core_wiring(
         )),
     }
 
-    let asset_tracker = L1AssetTracker::new(expected_tracker, provider.clone());
-    match asset_tracker.BRIDGE_HUB().call().await {
-        Ok(actual) => expect_address_eq(
-            result,
-            "AssetTracker.BRIDGE_HUB()",
-            actual,
-            verifiers.bridgehub_address,
-        ),
-        Err(err) => result.report_error(&format!(
-            "Failed to call AssetTracker.BRIDGE_HUB() for core wiring checks: {err}"
-        )),
-    }
-    let tracker_ownership = Ownable2Step::new(expected_tracker, provider.clone());
-    match tracker_ownership.pendingOwner().call().await {
-        Ok(actual) => expect_address_eq(
-            result,
-            "AssetTracker.pendingOwner()",
-            actual,
-            bridgehub_owner,
-        ),
-        Err(err) => result.report_error(&format!(
-            "Failed to call AssetTracker.pendingOwner() for pre-upgrade ownership checks: {err}"
-        )),
-    }
-
     let chain_registration_sender =
         ChainRegistrationSender::new(expected_chain_registration_sender, provider.clone());
     match chain_registration_sender.BRIDGE_HUB().call().await {
@@ -477,17 +441,6 @@ async fn verify_v31_core_wiring(
                 actual_chain_asset_handler,
                 expected_chain_asset_handler,
             );
-            match asset_tracker.chainAssetHandler().call().await {
-                Ok(actual_tracker_chain_asset_handler) => expect_address_eq(
-                    result,
-                    "AssetTracker.chainAssetHandler()",
-                    actual_tracker_chain_asset_handler,
-                    actual_chain_asset_handler,
-                ),
-                Err(err) => result.report_error(&format!(
-                    "Failed to call AssetTracker.chainAssetHandler() for core wiring checks: {err}"
-                )),
-            }
         }
         Err(err) => result.report_error(&format!(
             "Failed to call Bridgehub.chainAssetHandler() for core wiring checks: {err}"

@@ -24,6 +24,8 @@ error ChainNotReadyForMigration(uint256 chainId);
 error ChainsSettlementLayerMismatch(uint256 chainToRegisterSL, uint256 chainRegisteredOnSL);
 // 0x1ed6c04f
 error ChainsSettlingOnL1();
+// 0xd7c176e8
+error CrossChainSenderAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 // 0x5d03f19d
 error CurrentBatchNumberAlreadySet();
 // 0x68d91b49
@@ -70,10 +72,6 @@ error NotOwnerViaRouter(address msgSender, address originalCaller);
 error NotRelayedSender(address msgSender, address settlementLayerRelaySender);
 // 0xb35a7373
 error NotSystemContext(address _sender);
-// 0x3db511f4
-error OnlyAssetTracker(address, address);
-// 0x527b87c7
-error OnlyInteropCenter(address msgSender, address bridgehub);
 // 0x2d396674
 error OnlyBridgehubOrChainAssetHandler(address sender, address bridgehub, address chainAssetHandler);
 // 0x73fe6c1b
@@ -82,12 +80,12 @@ error OnlyChain(address msgSender, address zkChainAddress);
 error OnlyChainAssetHandler(address sender, address chainAssetHandler);
 // 0xec76af13
 error OnlyGateway();
+// 0x2b5e524f
+error OnlyInteropCenter(address msgSender, address bridgehub);
 // 0x8d14ca84
 error OnlyL1();
 // 0x6b75db8c
 error OnlyOnSettlementLayer();
-// 0xb78dbaa7
-error CrossChainSenderAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 // 0xefb272e2
 error SettlementLayerMustNotBeL1();
 // 0x36917565

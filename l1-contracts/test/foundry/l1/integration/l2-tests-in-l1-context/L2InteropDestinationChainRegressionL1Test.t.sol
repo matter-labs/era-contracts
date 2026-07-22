@@ -17,8 +17,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 /// @title L2InteropDestinationChainRegressionL1Test
 /// @notice L1 context test for unregistered destination chain check regression (PR #1811)
-/// @dev Tests that InteropCenter properly rejects bundles sent to unregistered destination chains
-///      to prevent underflow in GWAssetTracker._increaseAndSaveChainBalance
+/// @dev Tests that InteropCenter properly rejects bundles sent to unregistered destination chains.
 contract L2InteropDestinationChainRegressionL1Test is
     Test,
     SharedL2ContractL1Deployer,

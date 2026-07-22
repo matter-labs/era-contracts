@@ -131,8 +131,6 @@ error EmptyPublicInputsLength();
 error EraBytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0x61733a89
 error EVMBytecodeAlreadyPublished(bytes32 bytecodeHash);
-// 0xf4072616
-error ExecuteMessageFailed();
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
 // 0x3fce21be
@@ -153,6 +151,22 @@ error GenesisUpgradeZero();
 error HashedLogIsDefault();
 // 0x0b08d5be
 error HashMismatch(bytes32 expected, bytes32 actual);
+// 0xf11438d9
+error IMTAlreadyInitialized();
+// 0x62f8ffe2
+error IMTLeafValueMismatch(uint256 expectedValue, uint256 actualValue);
+// 0x037dc2ed
+error IMTLowLeafIndexOutOfBounds(uint256 lowLeafIndex, uint256 leafCount);
+// 0xd87e0e66
+error IMTLowLeafNextTooSmall(uint256 lowNextValue, uint256 newValue);
+// 0x74470b8f
+error IMTLowLeafValueTooLarge(uint256 lowValue, uint256 newValue);
+// 0xae48798a
+error IMTNotInitialized();
+// 0x68051076
+error IMTValueAlreadyExists(uint256 value);
+// 0xbd1de53d
+error IMTValueZero();
 // 0xd7d93e1f
 error IncorrectBatchBounds(
     uint256 processFromExpected,
@@ -166,6 +180,8 @@ error IncorrectBatchChainId(uint256, uint256);
 error IncorrectBridgeHubAddress(address bridgehub);
 // 0x03eb8b54
 error InsufficientFunds(uint256 required, uint256 actual);
+// 0xd70c44f6
+error InteropSenderChainIdMismatch(uint256 senderChainId, uint256 payloadSourceChainId);
 // 0x9bf8b9aa
 error InvalidBatchNumber(uint256 provided, uint256 expected);
 // 0xd438e1fa
@@ -178,14 +194,10 @@ error InvalidChainId();
 error InvalidDAForPermanentRollup();
 // 0x4fbe5dba
 error InvalidDelay();
-// 0x075aaa80
-error InvalidInteropCalldata(bytes4);
 // 0x3f98a77e
 error InvalidL2DACommitmentScheme(L2DACommitmentScheme);
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
-// 0x6eca2e4b
-error InvalidMessage();
 // 0xa1ec1876
 error InvalidMessageRoot(bytes32 expectedMessageRoot, bytes32 providedMessageRoot);
 // 0xd08a97e6
@@ -216,26 +228,8 @@ error InvalidThreshold(uint256 max, uint256 got);
 error InvalidTxCountInPriorityMode(uint256 l2TxCount, uint256 l1TxCount);
 // 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
-// 0xf11438d9
-error IMTAlreadyInitialized();
-// 0x037dc2ed
-error IMTLowLeafIndexOutOfBounds(uint256 lowLeafIndex, uint256 leafCount);
-// 0xd87e0e66
-error IMTLowLeafNextTooSmall(uint256 lowNextValue, uint256 newValue);
-// 0x74470b8f
-error IMTLowLeafValueTooLarge(uint256 lowValue, uint256 newValue);
-// 0x62f8ffe2
-error IMTLeafValueMismatch(uint256 expectedValue, uint256 actualValue);
-// 0xae48798a
-error IMTNotInitialized();
-// 0x68051076
-error IMTValueAlreadyExists(uint256 value);
-// 0xbd1de53d
-error IMTValueZero();
 // 0xfb5c22e6
 error L2TimestampTooBig();
-// 0x97e1359e
-error L2WithdrawalMessageWrongLength(uint256 messageLen);
 // 0xe37d2c02
 error LengthIsNotDivisibleBy32(uint256 length);
 // 0x1b6825bb
@@ -364,8 +358,6 @@ error ProtocolIdNotGreater();
 error PubdataGreaterThanLimit(uint256 limit, uint256 length);
 // 0x63c36549
 error QueueIsEmpty();
-// 0x0a6c1a5c
-error ReconstructionMismatch(bytes32, bytes32);
 // 0xab143c06
 error Reentrancy();
 // 0x667d17de
@@ -464,8 +456,6 @@ error ValidateTxnNotEnoughGas();
 error ValueMismatch(uint256 expected, uint256 actual);
 // 0xe1022469
 error VerifiedBatchesExceedsCommittedBatches();
-// 0xae899454
-error WithdrawalAlreadyFinalized();
 // 0x750b219c
 error WithdrawFailed();
 // 0xf20c5c2a

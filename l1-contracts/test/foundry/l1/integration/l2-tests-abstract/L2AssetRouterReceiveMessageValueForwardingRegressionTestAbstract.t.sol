@@ -75,13 +75,13 @@ abstract contract L2AssetRouterReceiveMessageValueForwardingRegressionTestAbstra
         // Create sender bytes (ERC-7930 format) - L2AssetRouter on another L2 chain
         bytes memory sender = InteroperableAddress.formatEvmV1(sourceChainId, L2_ASSET_ROUTER_ADDR);
 
-        // Fund the InteropHandler so it can send value
+        // Fund the L2InteropHandler so it can send value
         vm.deal(L2_INTEROP_HANDLER_ADDR, valueToSend);
 
         // Reset the mock handler's recorded value
         mockAssetHandler.resetRecordedValue();
 
-        // InteropHandler calls receiveMessage with value
+        // L2InteropHandler calls receiveMessage with value
         vm.prank(L2_INTEROP_HANDLER_ADDR);
         IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage{value: valueToSend}(
             bytes32(0), // receiveId
@@ -113,7 +113,7 @@ abstract contract L2AssetRouterReceiveMessageValueForwardingRegressionTestAbstra
 
         mockAssetHandler.resetRecordedValue();
 
-        // InteropHandler calls receiveMessage without value
+        // L2InteropHandler calls receiveMessage without value
         vm.prank(L2_INTEROP_HANDLER_ADDR);
         IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage(bytes32(0), sender, payload);
 
