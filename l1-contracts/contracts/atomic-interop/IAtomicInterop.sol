@@ -70,9 +70,12 @@ struct ImtProof {
 /// preimage (e.g. an off-chain `bundleHash` prediction invalidated by an upgrade between preview and
 /// send) reverts the send instead of stranding the burned funds in an unfinalizable, unrefundable leg.
 /// @param version Version of the AtomicFlowPreimage (same convention as `InteropBundle.version` /
-/// `InteropCall.version`). Must equal {ATOMIC_FLOW_PREIMAGE_VERSION}; every path that hashes a
-/// preimage validates it first. Being the first hashed field, it also keeps ids of this preimage
-/// version distinct from ids hashed over any future preimage shape.
+/// `InteropCall.version`). Must be a version the {AtomicFlowManager} supports — currently only
+/// {ATOMIC_FLOW_PREIMAGE_VERSION} — validated identically on every path that hashes a preimage
+/// (`append`, finalize, refund). A new version is added alongside the old one rather than replacing it,
+/// so flows already in flight under an older version stay finalizable and refundable (no drain). Being
+/// the first hashed field, it also keeps ids of one preimage version distinct from — and non-aliasing
+/// with — ids hashed over any other version.
 /// @param deadline The flow deadline (a settlement-layer timestamp).
 /// @param settlementLayerChainId The single settlement layer every leg must settle on; committed in
 /// `flowId` and asserted equal to each proof's resolved `slChainId`.
@@ -115,8 +118,11 @@ struct AtomicFinalityProof {
 /// `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
 bytes4 constant ATOMIC_COMMIT_LEAF_TAG = bytes4(keccak256("AtomicInterop.commit.v1"));
 
-/// @dev The only supported {AtomicFlowPreimage.version} (same versioning convention as
-/// {INTEROP_BUNDLE_VERSION} / {INTEROP_CALL_VERSION}). Bumped whenever the {AtomicFlowPreimage}
-/// field set or its canonicalization changes, so a preimage of one version can never be accepted —
-/// or hash to the same `flowId` — under the rules of another.
+/// @dev The current {AtomicFlowPreimage.version} (same versioning convention as {INTEROP_BUNDLE_VERSION}
+/// / {INTEROP_CALL_VERSION}), and today the only accepted one. A new value is introduced whenever the
+/// {AtomicFlowPreimage} field set or its canonicalization changes; each version is validated under its
+/// own rules, so a preimage of one version can never be accepted — or hash to the same `flowId` — under
+/// the rules of another. Introducing a new version does not retire the old one: the {AtomicFlowManager}
+/// accepts both on every path (append/finalize/refund) so in-flight prior-version flows stay finalizable
+/// and refundable.
 bytes1 constant ATOMIC_FLOW_PREIMAGE_VERSION = 0x01;

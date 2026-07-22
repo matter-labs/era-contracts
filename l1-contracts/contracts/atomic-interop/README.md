@@ -15,10 +15,12 @@ message — finality is proven, not dispatched.
 - `bundleHash = keccak256(abi.encode(sourceChainId, bundleBytes))` — a leg's bundle, chain-specific.
 - `flowId = keccak256(abi.encode(preimage))` —
   binds all legs, each leg's source chain, the deadline, and the settlement layer. The preimage is
-  versioned like `InteropBundle`/`InteropCall`: its first field `version` must equal
-  `ATOMIC_FLOW_PREIMAGE_VERSION` (`0x01`, bumped whenever the preimage field set changes), so a
-  preimage of one version can never be accepted — or hash to the same `flowId` — under the rules of
-  another. `legBundleHashes` is strictly ascending (canonical order + dedup); `legSourceChainIds` is
+  versioned like `InteropBundle`/`InteropCall`: its first field `version` must be a version the manager
+  supports (currently only `ATOMIC_FLOW_PREIMAGE_VERSION` = `0x01`), checked identically on every path
+  (append/finalize/refund). Each version is validated under its own rules, so a preimage of one version
+  can never be accepted — or hash to the same `flowId` — under the rules of another; a new version is
+  added alongside the old one (not a drain), so flows in flight under a prior version stay finalizable
+  and refundable. `legBundleHashes` is strictly ascending (canonical order + dedup); `legSourceChainIds` is
   positional (aligned 1:1, may repeat); `deadline` is a settlement-layer timestamp.
 - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))` — the IMT
   leaf value for a leg. It bakes in `flowId` (hence all legs) and the chain-specific `bundleHash`, so a

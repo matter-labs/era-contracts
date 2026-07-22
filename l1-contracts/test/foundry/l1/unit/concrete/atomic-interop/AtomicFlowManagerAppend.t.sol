@@ -129,8 +129,9 @@ contract AtomicFlowManagerAppendTest is Test {
     }
 
     /// @notice Pins the preimage versioning (the InteropBundle/InteropCall convention): the current
-    /// version literal is 0x01 and `append` rejects any other version outright, so a preimage of a
-    /// different (e.g. future) version can never commit a leg under this version's hashing rules.
+    /// version literal is 0x01 and `append` rejects any version the manager does not (yet) support, so a
+    /// preimage of an unsupported version can never commit a leg under this version's hashing rules.
+    /// (When a new version is added it is accepted alongside 0x01; here 0x02 is not yet supported.)
     /// Since `version` is the first hashed field, ids of different versions can never alias either.
     function test_append_RevertWhen_FlowPreimageVersionMismatch() public {
         assertEq(ATOMIC_FLOW_PREIMAGE_VERSION, bytes1(0x01), "v1 preimage version literal must be pinned");

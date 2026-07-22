@@ -10,7 +10,8 @@
  *   - `bundleHash = keccak256(abi.encode(sourceChainId, abi.encode(InteropBundle)))`. The atomic send
  *     params (the full flowId preimage + lowNullifierIndex) travel via the `atomicBundle` attribute, not
  *     the InteropBundle, so `bundleHash` does not depend on the preimage.
- *   - `flowId = keccak256(abi.encode(preimage))` (`preimage.version` must be ATOMIC_FLOW_PREIMAGE_VERSION),
+ *   - `flowId = keccak256(abi.encode(preimage))` (`preimage.version` must be a manager-supported version,
+ *     currently ATOMIC_FLOW_PREIMAGE_VERSION),
  *     bundle hashes strictly ascending with source chain ids positionally aligned. Since `bundleHash` is
  *     independent of the preimage, each leg's `bundleHash` (and thus the preimage) is computable off-chain
  *     before the send; on-chain the AtomicFlowManager recomputes `flowId` from the attribute-supplied
@@ -57,7 +58,8 @@ export const ATOMIC_COMMIT_LEAF_TAG: string = utils
   .keccak256(utils.toUtf8Bytes("AtomicInterop.commit.v1"))
   .slice(0, 10);
 
-/** The only supported AtomicFlowPreimage.version — mirrors ATOMIC_FLOW_PREIMAGE_VERSION in IAtomicInterop.sol. */
+/** The current AtomicFlowPreimage.version — mirrors ATOMIC_FLOW_PREIMAGE_VERSION in IAtomicInterop.sol (the
+ *  only version accepted today; a bump adds the new version alongside the old on all manager paths). */
 export const ATOMIC_FLOW_PREIMAGE_VERSION = "0x01";
 
 /** Indexed-tree leaf, fields as uint256 decimal strings, in the on-chain field order. */
@@ -108,10 +110,10 @@ export function indexedLeafHash(leaf: IMTLeaf): string {
 
 /**
  * The full `flowId` preimage (mirrors the Solidity `AtomicFlowPreimage` struct — the field set embedded
- * in `AtomicFlow` and carried by the `atomicBundle` attribute). `version` must equal
- * ATOMIC_FLOW_PREIMAGE_VERSION (the InteropBundle/InteropCall versioning convention); `legBundleHashes`
- * must be strictly ascending with `legSourceChainIds` positionally aligned; `deadline` is a
- * settlement-layer timestamp.
+ * in `AtomicFlow` and carried by the `atomicBundle` attribute). `version` must be a manager-supported
+ * version (currently ATOMIC_FLOW_PREIMAGE_VERSION; the InteropBundle/InteropCall versioning convention);
+ * `legBundleHashes` must be strictly ascending with `legSourceChainIds` positionally aligned; `deadline`
+ * is a settlement-layer timestamp.
  */
 export interface AtomicFlowPreimage {
   version: string;
