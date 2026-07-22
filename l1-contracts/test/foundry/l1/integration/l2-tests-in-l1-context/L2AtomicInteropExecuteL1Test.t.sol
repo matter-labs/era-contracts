@@ -48,6 +48,10 @@ contract L2AtomicInteropExecuteL1Test is Test, SharedL2ContractL1Deployer, L2Ato
         return super.getInitializeCalldata(contractName, isZKBytecode);
     }
 
+    function _registerInteropChains() internal override(SharedL2ContractDeployer, L2AtomicInteropExecuteTestAbstract) {
+        L2AtomicInteropExecuteTestAbstract._registerInteropChains();
+    }
+
     function _mockAtomicFlowManager() internal override(SharedL2ContractDeployer, L2AtomicInteropExecuteTestAbstract) {
         L2AtomicInteropExecuteTestAbstract._mockAtomicFlowManager();
     }

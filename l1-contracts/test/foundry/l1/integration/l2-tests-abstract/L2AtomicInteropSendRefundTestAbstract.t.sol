@@ -15,7 +15,8 @@ import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitm
 import {AtomicFlow, AtomicFlowPreimage, ImtProof, LegState} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
     ManagerCommittedBundleNotInFlow,
-    ManagerLegNotRevertable
+    ManagerLegNotRevertable,
+    ManagerLegSourceChainNotRegistered
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropBundle, InteropCallStarter} from "contracts/common/Messaging.sol";
@@ -25,13 +26,12 @@ import {
     L2_ASSET_TRACKER_ADDR,
     L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
-    L2_BRIDGEHUB_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2_NATIVE_TOKEN_VAULT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_ASSET_ROUTER, L2_NATIVE_TOKEN_VAULT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 import {IBaseTokenHolder} from "contracts/l2-system/interfaces/IBaseTokenHolder.sol";
@@ -129,6 +129,19 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     /// void mock of `AtomicFlowManager.append`/`requireFlowFinalized` (installed in its `setUp`) is disabled
     /// here via the {_mockAtomicFlowManager} override; the real contracts are deployed below.
     function _mockAtomicFlowManager() internal virtual override {}
+
+    /// @dev Real registry instead of the harness's permissive selector-wide mock: this suite
+    /// exercises `AtomicFlowManager.append`'s registration gate, so unregistered chains must
+    /// actually read as unregistered (`bytes32(0)`). The chains the suite uses are registered
+    /// through the production `registerChainForInterop` entry point.
+    function _registerInteropChains() internal virtual override {
+        // Hoisted: an external call in the argument position would consume the prank.
+        bytes32 ownBaseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        l2Bridgehub.registerChainForInterop(block.chainid, ownBaseTokenAssetId);
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        l2Bridgehub.registerChainForInterop(destinationChainId, destinationBaseTokenAssetId);
+    }
 
     function _setUpAtomicStack() internal {
         deployCodeTo("AtomicFlowManager.sol:AtomicFlowManager", L2_ATOMIC_FLOW_MANAGER_ADDR);
@@ -613,14 +626,11 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         ctx.l2Token = initializeTokenByDeposit();
         IERC20(ctx.l2Token).transfer(_depositor, BRIDGED_VALUE_LEG_AMOUNT);
 
-        // Register the different-base destination in the Bridgehub registry. The shared harness already
-        // mocks `baseTokenAssetId` for every chain (the L2 Bridgehub chain registry is not part of the
-        // flows under test); this adds the one entry whose base token differs, the same way.
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeCall(IBridgehubBase.baseTokenAssetId, (DIFFERENT_BASE_DEST_CHAIN_ID)),
-            abi.encode(L2_NATIVE_TOKEN_VAULT.assetId(ctx.l2Token))
-        );
+        // Register the different-base destination through the REAL registry (see
+        // {_registerInteropChains}): the one entry whose base token differs.
+        bytes32 differentBaseAssetId = L2_NATIVE_TOKEN_VAULT.assetId(ctx.l2Token);
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        l2Bridgehub.registerChainForInterop(DIFFERENT_BASE_DEST_CHAIN_ID, differentBaseAssetId);
 
         // A direct value leg built by hand: `InteropLibrary.buildSendDestinationChainBaseTokenCall` routes
         // different-base transfers indirectly (bridging THIS chain's base token as an asset); here we
@@ -711,6 +721,56 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         );
     }
 
+    /// @notice A completed refund cannot be REOPENED: resubmitting the same (still-valid) timeout
+    /// proof after authorize -> claim is inert — no authorization event, the leg stays terminal
+    /// `Reverted` (not flipped back to `Revertable`), a further claim still reverts, and the balance
+    /// is unchanged. Without the Committed-only transition this would re-arm the leg for a second
+    /// payout of the same burn.
+    function test_authorizeRefund_ResubmittedProofAfterClaimIsInert() public {
+        _setUpAtomicStack();
+        _sendAtomicLegWithInvalidRemotePeer();
+        _authorizeRefundForInvalidRemoteLeg();
+        _claimRefundAndAssertRecovery();
+
+        AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
+        uint256 balanceAfterRefund = IERC20(ctx.l2Token).balanceOf(address(this));
+        // The same absence proof `_authorizeRefundForInvalidRemoteLeg` used: the invalid remote leg
+        // is still absent from its source chain's tree, so the proof itself still verifies.
+        ImtProof memory absence = _nonInclusionProof(
+            destinationChainId,
+            REMOTE_BATCH_NUMBER,
+            _commitValue(ctx.flowId, INVALID_REMOTE_LEG),
+            L1_CHAIN_ID,
+            SL_BLOCK,
+            uint256(DEADLINE) + 1
+        );
+
+        vm.recordLogs();
+        manager.authorizeRefund(AtomicFlow({flowId: ctx.flowId, preimage: ctxPreimage}), ctx.missingLegIndex, absence);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; ++i) {
+            assertTrue(
+                logs[i].topics[0] != IAtomicFlowManager.FlowRefundAuthorized.selector,
+                "re-authorization after a completed refund must not emit FlowRefundAuthorized"
+            );
+        }
+        assertEq(
+            uint256(manager.legState(ctx.flowId, ctx.bundleHash)),
+            uint256(LegState.Reverted),
+            "the refunded leg must stay terminal Reverted"
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ManagerLegNotRevertable.selector, ctx.flowId, ctx.bundleHash, LegState.Reverted)
+        );
+        manager.claimRefund(ctx.flowId, ctxBundleBytes);
+        assertEq(
+            IERC20(ctx.l2Token).balanceOf(address(this)),
+            balanceAfterRefund,
+            "a reopened claim attempt must not move funds"
+        );
+    }
+
     /// @notice The other end of the claim state machine (complementing
     /// {test_atomicSend_RevertWhen_ClaimedTwice}): a merely `Committed` leg — no timeout authorized —
     /// cannot be claimed. This gate is the only thing standing between a live, finalizable leg and a
@@ -723,6 +783,38 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
             abi.encodeWithSelector(ManagerLegNotRevertable.selector, ctx.flowId, ctx.bundleHash, LegState.Committed)
         );
         AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).claimRefund(ctx.flowId, ctxBundleBytes);
+    }
+
+    /// @notice The registration gate through the REAL registry: an atomic send whose preimage
+    /// declares a co-leg on an unregistered (phantom) chain reverts the whole send — such a leg could
+    /// neither be proven committed nor proven absent, stranding every other leg of the flow. Possible
+    /// to assert here because this suite registers chains for real (see {_registerInteropChains})
+    /// instead of inheriting the harness's permissive registry mock.
+    function test_atomicSend_RevertWhen_CoLegChainNotRegistered() public {
+        _setUpAtomicStack();
+        uint256 phantomChainId = 999_999;
+
+        address l2Token = initializeTokenByDeposit();
+        bytes32 salt = keccak256("atomic phantom co-leg salt");
+        InteropCallStarter[] memory calls = _tokenCallStarter(l2Token, TRANSFER_AMOUNT);
+
+        bytes32 predicted = _predictBundleHash(calls, salt);
+        (AtomicFlowPreimage memory preimage, uint256 remoteIndex) = _preimageWithInvalidRemoteLeg(predicted);
+        // Redeclare the co-leg's source as a chain id never registered in the (real) registry.
+        preimage.legSourceChainIds[remoteIndex] = phantomChainId;
+
+        uint256 balanceBefore = IERC20(l2Token).balanceOf(address(this));
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotRegistered.selector, phantomChainId));
+        l2InteropCenter.sendBundle(
+            InteroperableAddress.formatEvmV1(destinationChainId),
+            calls,
+            _atomicAttributes(preimage, salt)
+        );
+        assertEq(
+            IERC20(l2Token).balanceOf(address(this)),
+            balanceBefore,
+            "the burn must be unwound with the rejected send"
+        );
     }
 
     /// @notice The `atomicBundle` attribute is recognized in ANY position of the attributes array —

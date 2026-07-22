@@ -84,6 +84,24 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
+    /// @dev The timeout-branch flag is a NO-OP for inclusion: `verifyInclusion` always authenticates
+    /// the batch-END root (leaf 3), whatever the prover declares. A flag-sensitive implementation
+    /// could be steered to the begin root, where a same-batch commit is not yet present.
+    function test_verifyInclusion_ignoresBeginBranchFlag() public {
+        ImtProof memory proof = _inclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            committedIndex,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            SL_BLOCK,
+            DEADLINE - 1
+        );
+        proof.provesAgainstBeginRoot = true;
+        // Still the END leaf, and the proof still verifies.
+        _expectRootAuthentication(proof, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
+        proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
+    }
+
     /// @dev Boundary: `l1Timestamp == deadline` is in time (the check is strictly `>`).
     function test_verifyInclusion_allowsBatchSettledAtDeadline() public {
         ImtProof memory proof = _inclusionProof(

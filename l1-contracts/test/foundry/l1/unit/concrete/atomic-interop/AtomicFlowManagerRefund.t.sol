@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {Vm} from "forge-std/Vm.sol";
+
 import {AtomicInteropProofBuilder} from "./AtomicInteropProofBuilder.sol";
 
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
@@ -151,6 +153,96 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
             uint256(LegState.Unset),
             "never-committed leg must stay Unset"
         );
+    }
+
+    /// @notice The transition applies to EVERY locally committed leg, not just one: in a three-leg
+    /// flow with two legs committed on this chain and one missing, a single authorization flips both
+    /// committed legs to `Revertable` — with exactly one `FlowRefundAuthorized` event each — while
+    /// the missing leg stays `Unset`.
+    function test_authorizeRefund_MarksAllLocalCommittedLegs() public {
+        // A fresh all-local three-leg flow (independent of the setUp fixture): two committable legs
+        // plus one that is never committed anywhere.
+        bytes32[3] memory unsorted = [
+            keccak256("multi leg A"),
+            keccak256("multi leg B"),
+            keccak256("multi missing leg")
+        ];
+        bytes32 missingLegHash = unsorted[2];
+        // Canonical (strictly ascending) leg order, sources positionally all-local.
+        AtomicFlowPreimage memory multiPreimage;
+        multiPreimage.deadline = DEADLINE;
+        multiPreimage.settlementLayerChainId = SETTLEMENT_LAYER_CHAIN_ID;
+        multiPreimage.legBundleHashes = new bytes32[](3);
+        multiPreimage.legSourceChainIds = new uint256[](3);
+        for (uint256 i = 0; i < 3; ++i) {
+            multiPreimage.legBundleHashes[i] = unsorted[i];
+            multiPreimage.legSourceChainIds[i] = block.chainid;
+        }
+        for (uint256 i = 0; i < 3; ++i) {
+            for (uint256 j = i + 1; j < 3; ++j) {
+                if (multiPreimage.legBundleHashes[j] < multiPreimage.legBundleHashes[i]) {
+                    (multiPreimage.legBundleHashes[i], multiPreimage.legBundleHashes[j]) = (
+                        multiPreimage.legBundleHashes[j],
+                        multiPreimage.legBundleHashes[i]
+                    );
+                }
+            }
+        }
+        bytes32 multiFlowId = keccak256(abi.encode(multiPreimage));
+        uint256 multiMissingIndex;
+        for (uint256 i = 0; i < 3; ++i) {
+            if (multiPreimage.legBundleHashes[i] == missingLegHash) {
+                multiMissingIndex = i;
+            }
+        }
+
+        // Commit BOTH non-missing legs through the production send-side path.
+        for (uint256 i = 0; i < 3; ++i) {
+            if (i == multiMissingIndex) {
+                continue;
+            }
+            vm.prank(L2_INTEROP_CENTER_ADDR);
+            manager.append(multiPreimage.legBundleHashes[i], 0, multiPreimage);
+        }
+
+        ImtProof memory absence = _nonInclusionProof(
+            block.chainid,
+            REMOTE_BATCH_NUMBER,
+            _commitValue(multiFlowId, missingLegHash),
+            SETTLEMENT_LAYER_CHAIN_ID,
+            SL_BLOCK,
+            uint256(DEADLINE) + 1
+        );
+
+        vm.recordLogs();
+        manager.authorizeRefund(AtomicFlow({flowId: multiFlowId, preimage: multiPreimage}), multiMissingIndex, absence);
+
+        // Exactly one FlowRefundAuthorized per committed leg — no more, no fewer.
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        uint256 authorizedEvents = 0;
+        for (uint256 i = 0; i < logs.length; ++i) {
+            if (logs[i].topics[0] == IAtomicFlowManager.FlowRefundAuthorized.selector) {
+                ++authorizedEvents;
+                assertEq(logs[i].topics[1], multiFlowId, "event must carry the flow id");
+            }
+        }
+        assertEq(authorizedEvents, 2, "exactly the two committed legs must be authorized");
+
+        for (uint256 i = 0; i < 3; ++i) {
+            if (i == multiMissingIndex) {
+                assertEq(
+                    uint256(manager.legState(multiFlowId, multiPreimage.legBundleHashes[i])),
+                    uint256(LegState.Unset),
+                    "the missing leg must stay Unset"
+                );
+            } else {
+                assertEq(
+                    uint256(manager.legState(multiFlowId, multiPreimage.legBundleHashes[i])),
+                    uint256(LegState.Revertable),
+                    "every locally committed leg must become Revertable"
+                );
+            }
+        }
     }
 
     /// @notice The double-mint guard: the absence proof must be bound to the missing leg's DECLARED

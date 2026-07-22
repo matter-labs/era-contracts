@@ -40,7 +40,8 @@ import {
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_INTEROP_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2_NATIVE_TOKEN_VAULT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_ASSET_ROUTER, L2_NATIVE_TOKEN_VAULT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 /// @notice The DESTINATION side of an atomic flow, exercised through the REAL execution entry point:
@@ -55,7 +56,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 /// populated; the remote peer leg's from the builder's oracle tree, standing in for the peer chain's
 /// IMT. The only logic mock is the separately-tested cross-chain leaf verifier inherited from
 /// {AtomicInteropProofBuilder}; the destination-context, executor-permission, replay, and atomicity
-/// checks under test all run for real.
+/// checks under test all run for real, and the Bridgehub chain registry is the REAL one (chains registered via `registerChainForInterop`, see {_registerInteropChains}).
 abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, AtomicInteropProofBuilder {
     /// @dev The remote peer leg of every flow here: committed on the (Bridgehub-registered)
     /// destination chain in the happy paths, withheld in the missing-leg path.
@@ -70,6 +71,19 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
     /// `AtomicFlowManager.append`/`requireFlowFinalized` (installed in its `setUp`) is disabled here;
     /// the real contracts are deployed by {_setUpAtomicStack}.
     function _mockAtomicFlowManager() internal virtual override {}
+
+    /// @dev Real registry instead of the harness's permissive selector-wide mock: this suite
+    /// exercises the atomic send (whose `append` consults the registration gate), so unregistered
+    /// chains must actually read as unregistered (`bytes32(0)`). The chains the suite uses are
+    /// registered through the production `registerChainForInterop` entry point.
+    function _registerInteropChains() internal virtual override {
+        // Hoisted: an external call in the argument position would consume the prank.
+        bytes32 ownBaseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        l2Bridgehub.registerChainForInterop(block.chainid, ownBaseTokenAssetId);
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        l2Bridgehub.registerChainForInterop(destinationChainId, destinationBaseTokenAssetId);
+    }
 
     /// @dev Deploys the atomic predeploys at their canonical addresses (the shared L2-in-L1 deployer
     /// does not include them) and the proof fixtures. Called at the start of each test rather than in
@@ -291,10 +305,13 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
             uint256(CallStatus.Unprocessed),
             "no call status may be written past the bundle's calls"
         );
+        // Same-VM non-mutation check: `vm.chainId` does not fork storage, so this reads the SAME
+        // AtomicFlowManager the source phase populated. It asserts execution wrote nothing into the
+        // local manager — a genuine cross-chain source-state assertion lives in the multi-Anvil suite.
         assertEq(
             uint256(AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).legState(ectx.flowId, ectx.bundleHash)),
             uint256(LegState.Committed),
-            "execution must not touch the source leg state"
+            "execution must not mutate the (same-VM) flow-manager leg state"
         );
     }
 
@@ -485,5 +502,114 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         );
         vm.prank(executor);
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).executeAtomicBundle(ectxBundleBytes, finality);
+    }
+
+    // ------------------------------------------------------------------------------------------------
+    // verifyAtomicBundle — the same atomicity gate on the verify (no-execution) path
+    // ------------------------------------------------------------------------------------------------
+
+    /// @notice `verifyAtomicBundle` passes the SAME atomicity gate as execution: with every leg proven
+    /// committed in time, the bundle is marked `Verified` (exact event), and NOTHING executes — no
+    /// call status changes and no mint.
+    function test_verifyAtomicBundle_AllLegsProven_MarksVerifiedWithoutExecuting() public {
+        _setUpAtomicStack();
+        _sendAtomicLegWithRemotePeer(keccak256("atomic verify happy salt"), bytes(""));
+        AtomicFinalityProof memory finality = _commitRemoteLegAndBuildFinality();
+
+        uint256 receiverBalanceBefore = IERC20(ectx.l2Token).balanceOf(_receiver());
+        _mockVerifier(true);
+        vm.chainId(destinationChainId);
+
+        vm.expectEmit(true, true, true, true, L2_INTEROP_HANDLER_ADDR);
+        emit IInteropHandlerBase.BundleVerified(ectx.bundleHash);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(ectxBundleBytes, finality);
+
+        L2InteropHandler handler = L2InteropHandler(L2_INTEROP_HANDLER_ADDR);
+        assertEq(
+            uint256(handler.bundleStatus(ectx.bundleHash)),
+            uint256(BundleStatus.Verified),
+            "bundle must be Verified"
+        );
+        assertEq(
+            uint256(handler.callStatus(ectx.bundleHash, 0)),
+            uint256(CallStatus.Unprocessed),
+            "verification must not execute any call"
+        );
+        assertEq(IERC20(ectx.l2Token).balanceOf(_receiver()), receiverBalanceBefore, "verification must not mint");
+    }
+
+    /// @notice ATOMICITY on the verify path: a flow whose remote leg was never committed cannot be
+    /// verified — otherwise an arbitrary destination-valid bundle could become `Verified` (and later
+    /// unbundled) without its flow ever finalizing. The gate reverts, the bundle stays `Unreceived`,
+    /// no `BundleVerified` is emitted, and nothing executes.
+    function test_verifyAtomicBundle_RevertWhen_RemoteLegNotCommitted() public {
+        _setUpAtomicStack();
+        _sendAtomicLegWithRemotePeer(keccak256("atomic verify missing-leg salt"), bytes(""));
+
+        // The remote leg's commit value was never inserted; the best available "membership" data is
+        // the oracle tree's genesis head leaf, whose value (0) is not the leg's commit value.
+        ImtProof memory bogusRemoteProof = ImtProof({
+            sourceChainId: destinationChainId,
+            batchNumber: REMOTE_BATCH_NUMBER,
+            chainImtRoot: tree.root(),
+            provesAgainstBeginRoot: false,
+            settlementProof: _settlementProof(L1_CHAIN_ID, SL_BLOCK, DEADLINE - 1, new bytes32[](0)),
+            leaf: tree.leafAt(0),
+            imtLeafIndex: 0,
+            imtProof: tree.merklePath(0)
+        });
+        AtomicFinalityProof memory finality = _buildFinality(bogusRemoteProof);
+
+        uint256 receiverBalanceBefore = IERC20(ectx.l2Token).balanceOf(_receiver());
+        _mockVerifier(true);
+        vm.chainId(destinationChainId);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IMTLeafValueMismatch.selector, _commitValue(ectx.flowId, REMOTE_LEG), 0)
+        );
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(ectxBundleBytes, finality);
+
+        assertEq(
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(ectx.bundleHash)),
+            uint256(BundleStatus.Unreceived),
+            "a failed atomicity gate must leave the bundle Unreceived"
+        );
+        assertEq(
+            IERC20(ectx.l2Token).balanceOf(_receiver()),
+            receiverBalanceBefore,
+            "a failed verification must not mint"
+        );
+    }
+
+    /// @notice The verify -> execute flow: a `Verified` bundle executes WITHOUT re-proving the flow
+    /// (the gate is skipped for `Verified` status by design — verification already established
+    /// finality), mints, and is marked `FullyExecuted`. The empty finality proof passed at execution
+    /// documents that the skip is intentional, not accidental.
+    function test_verifyAtomicBundle_ThenExecuteSkipsGate() public {
+        _setUpAtomicStack();
+        _sendAtomicLegWithRemotePeer(keccak256("atomic verify-then-execute salt"), bytes(""));
+        AtomicFinalityProof memory finality = _commitRemoteLegAndBuildFinality();
+
+        uint256 receiverBalanceBefore = IERC20(ectx.l2Token).balanceOf(_receiver());
+        _mockVerifier(true);
+        vm.chainId(destinationChainId);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(ectxBundleBytes, finality);
+
+        // Execute the now-Verified bundle with an EMPTY finality proof: the gate must be skipped.
+        AtomicFinalityProof memory emptyFinality;
+        vm.expectEmit(true, true, true, true, L2_INTEROP_HANDLER_ADDR);
+        emit IInteropHandlerBase.BundleExecuted(ectx.bundleHash);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).executeAtomicBundle(ectxBundleBytes, emptyFinality);
+
+        assertEq(
+            IERC20(ectx.l2Token).balanceOf(_receiver()),
+            receiverBalanceBefore + TRANSFER_AMOUNT,
+            "the destination mint must credit the receiver"
+        );
+        assertEq(
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(ectx.bundleHash)),
+            uint256(BundleStatus.FullyExecuted),
+            "the verified bundle must execute to FullyExecuted"
+        );
     }
 }

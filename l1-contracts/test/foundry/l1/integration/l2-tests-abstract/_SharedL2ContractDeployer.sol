@@ -123,6 +123,27 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         _mockAtomicFlowManager();
     }
 
+    /// @notice Populates the L2 Bridgehub's chain registry view the interop flows read
+    /// (`baseTokenAssetId`). The default is a PERMISSIVE selector-wide mock — every chain id reads as
+    /// registered with the harness base token (plus the real asset id for this chain) — which is fine
+    /// for suites where registration is not part of the logic under test. Overridable so suites that
+    /// exercise the real registration gate (e.g. `AtomicFlowManager.append`'s phantom-co-leg check in
+    /// the atomic suites) can register their chains through the production
+    /// `L2Bridgehub.registerChainForInterop` path instead, leaving unregistered chains reading as 0.
+    function _registerInteropChains() internal virtual {
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
+            abi.encode(baseTokenAssetId)
+        );
+        bytes32 realBaseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeCall(IBridgehubBase.baseTokenAssetId, block.chainid),
+            abi.encode(realBaseTokenAssetId)
+        );
+    }
+
     /// @notice Installs the void mocks for the AtomicFlowManager gates. Overridable so suites that deploy the
     /// real AtomicFlowManager (e.g. the atomic send/refund tests) can opt out and exercise the real logic.
     function _mockAtomicFlowManager() internal virtual {
@@ -207,17 +228,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes32(uint256(1)))
         );
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
-            abi.encode(baseTokenAssetId)
-        );
-        bytes32 realBaseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeCall(IBridgehubBase.baseTokenAssetId, block.chainid),
-            abi.encode(realBaseTokenAssetId)
-        );
+        _registerInteropChains();
 
         vm.mockCall(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,

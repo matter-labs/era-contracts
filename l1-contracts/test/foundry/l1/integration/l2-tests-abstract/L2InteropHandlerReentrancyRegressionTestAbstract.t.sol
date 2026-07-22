@@ -17,7 +17,7 @@ import {
 import {AtomicFinalityProof} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
-import {EmptyBundle} from "contracts/interop/InteropErrors.sol";
+import {EmptyBundle, ExecutingNotAllowed} from "contracts/interop/InteropErrors.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 
 import {L2_INTEROP_HANDLER, L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
@@ -253,6 +253,113 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             L2_INTEROP_HANDLER.bundleStatus(InteropDataEncoding.encodeInteropBundleHash(encodedInnerBundle)) ==
                 BundleStatus.Verified,
             "nested bundle must be verified through the self-call"
+        );
+    }
+
+    /// @notice The rescue-path permission gate REJECTS a nested execution whose inner
+    /// `executionAddress` names a different address: the wrapped message's sender (the outer call's
+    /// `from`) is not the inner bundle's designated executor, so the nested dispatch reverts, the
+    /// whole outer execution unwinds, and BOTH bundles stay `Unreceived` with no recipient side
+    /// effects. Without this gate, any valid outer bundle could force-execute a finalized inner
+    /// bundle reserved for another executor.
+    /// @dev Same isolation as the rest of this suite: the atomic finality gate is mocked in setUp, so
+    /// the assertions exercise exactly the rescue permission check, not proof verification.
+    function test_nestedExecute_RevertWhen_InnerExecutorIsDifferentAddress() public {
+        _assertNestedExecuteRejected(
+            // Inner executor: correct (source) chain, WRONG address.
+            _createBundleAttributes(block.chainid, makeAddr("someone else"))
+        );
+    }
+
+    /// @notice ...and equally when the inner `executionAddress` names the right address bound to a
+    /// DIFFERENT chain: the rescue gate authorizes against the wrapped sender's (source) chain id, so
+    /// a destination-bound binding does not match (only a source-chain or chain-agnostic binding
+    /// does).
+    function test_nestedExecute_RevertWhen_InnerExecutorBoundToOtherChain() public {
+        _assertNestedExecuteRejected(
+            // Inner executor: right address, WRONG chain (destination instead of source).
+            _createBundleAttributes(destinationChainId, bundleExecutor)
+        );
+    }
+
+    /// @dev Shared driver for the rescue-gate rejection cases: outer bundle (executable by
+    /// `bundleExecutor`) whose single call re-enters the handler to execute an inner bundle carrying
+    /// `_innerAttributes`. Expects `ExecutingNotAllowed` from the nested gate, and both bundles left
+    /// `Unreceived` with the inner recipient never called.
+    function _assertNestedExecuteRejected(BundleAttributes memory _innerAttributes) internal {
+        uint256 sourceChainId = block.chainid;
+        address innerRecipient = makeAddr("innerRecipient");
+
+        InteropCall[] memory innerCalls = new InteropCall[](1);
+        innerCalls[0] = InteropCall({
+            version: INTEROP_CALL_VERSION,
+            shadowAccount: false,
+            from: bundleExecutor,
+            to: innerRecipient,
+            value: 0,
+            data: hex""
+        });
+        InteropBundle memory innerBundle = InteropBundle({
+            version: INTEROP_BUNDLE_VERSION,
+            sourceChainId: sourceChainId,
+            destinationChainId: destinationChainId,
+            destinationBaseTokenAssetId: destinationBaseTokenAssetId,
+            interopBundleSalt: bytes32(uint256(1)),
+            calls: innerCalls,
+            bundleAttributes: _innerAttributes
+        });
+        bytes memory encodedInnerBundle = abi.encode(innerBundle);
+        AtomicFinalityProof memory innerProof;
+        bytes memory innerPayload = abi.encodeCall(
+            L2InteropHandler.executeAtomicBundle,
+            (encodedInnerBundle, innerProof)
+        );
+
+        InteropCall[] memory outerCalls = new InteropCall[](1);
+        outerCalls[0] = InteropCall({
+            version: INTEROP_CALL_VERSION,
+            shadowAccount: false,
+            from: bundleExecutor,
+            to: L2_INTEROP_HANDLER_ADDR,
+            value: 0,
+            data: innerPayload
+        });
+        InteropBundle memory outerBundle = InteropBundle({
+            version: INTEROP_BUNDLE_VERSION,
+            sourceChainId: sourceChainId,
+            destinationChainId: destinationChainId,
+            destinationBaseTokenAssetId: destinationBaseTokenAssetId,
+            interopBundleSalt: bytes32(uint256(2)),
+            calls: outerCalls,
+            bundleAttributes: _createBundleAttributes(destinationChainId, bundleExecutor)
+        });
+        bytes memory encodedOuterBundle = abi.encode(outerBundle);
+        AtomicFinalityProof memory outerProof;
+
+        // If the (never-authorized) inner call slipped through, this recipient would be hit.
+        vm.mockCall(
+            innerRecipient,
+            abi.encodeWithSelector(IERC7786Recipient.receiveMessage.selector),
+            abi.encode(IERC7786Recipient.receiveMessage.selector)
+        );
+
+        vm.chainId(destinationChainId);
+
+        vm.prank(bundleExecutor);
+        vm.expectPartialRevert(ExecutingNotAllowed.selector);
+        L2_INTEROP_HANDLER.executeAtomicBundle(encodedOuterBundle, outerProof);
+
+        // The revert unwinds the whole outer execution: both statuses roll back to Unreceived and
+        // the inner recipient is never reached.
+        assertTrue(
+            L2_INTEROP_HANDLER.bundleStatus(InteropDataEncoding.encodeInteropBundleHash(encodedOuterBundle)) ==
+                BundleStatus.Unreceived,
+            "outer bundle must roll back to Unreceived"
+        );
+        assertTrue(
+            L2_INTEROP_HANDLER.bundleStatus(InteropDataEncoding.encodeInteropBundleHash(encodedInnerBundle)) ==
+                BundleStatus.Unreceived,
+            "inner bundle must stay Unreceived"
         );
     }
 
