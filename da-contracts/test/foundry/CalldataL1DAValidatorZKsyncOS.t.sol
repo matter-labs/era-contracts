@@ -20,7 +20,7 @@ contract CalldataL1DAValidatorZKsyncOSTest is Test {
     /// @dev The operator publishes the exact payload and its keccak matches the commitment: the call succeeds
     /// and returns a zero state-diff hash plus empty blob arrays.
     function testCheckDAVerifiesAndReturnsEmptyOutput() public {
-        bytes memory payload = abi.encodePacked("l2->l1 region: logs + message preimages");
+        bytes memory payload = abi.encodePacked("l2->l1 log region (logs + IMT leaves)");
         bytes32 daCommitment = keccak256(payload);
 
         // solhint-disable-next-line func-named-parameters

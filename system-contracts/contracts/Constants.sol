@@ -177,16 +177,22 @@ address constant SERVICE_CALL_PSEUDO_CALLER = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFfff
 /// @param PUBDATA_KECCAK256 Keccak of stateDiffHash and keccak(pubdata). Can be used by custom DA solutions.
 /// @param BLOBS_AND_PUBDATA_KECCAK256 This commitment includes EIP-4844 blobs data. Used by default RollupL1DAValidator.
 /// @param BLOBS_ZKSYNC_OS Keccak of blob versioned hashes filled with pubdata. This commitment scheme is used only for ZKsyncOS.
-/// @param L2_TO_L1_ONLY Forces publication of ONLY the L2->L1 region (logs + message preimages) on L1,
-/// independently of state-diff DA (state may be a Validium / live on another DA layer). Used by atomic-interop
-/// participants to keep their interop (IMT) data reconstructible from L1.
+/// @param L2_TO_L1_ONLY Forces publication, as L1 calldata, of ONLY the mandatory L2->L1 log region (the log
+/// records, which include user-message hashes and the interop-commitment (IMT) leaves), independently of
+/// state-diff DA (state may be a Validium / live on another DA layer). Message preimages and state diffs are
+/// left to the operator. The commitment is `keccak256(logRegion)`, validated by {CalldataL1DAValidatorZKsyncOS}.
+/// Used by atomic-interop participants to keep their interop (IMT) data reconstructible from L1. ZKsyncOS only.
+/// @param L2_TO_L1_ONLY_BLOBS Same mandatory L2->L1 log region as `L2_TO_L1_ONLY`, but published via EIP-4844
+/// blobs instead of calldata: the commitment is the keccak of the blob versioned hashes, validated by
+/// {BlobsL1DAValidatorZKsyncOS}. ZKsyncOS only.
 enum L2DACommitmentScheme {
     NONE,
     EMPTY_NO_DA,
     PUBDATA_KECCAK256,
     BLOBS_AND_PUBDATA_KECCAK256,
     BLOBS_ZKSYNC_OS,
-    L2_TO_L1_ONLY
+    L2_TO_L1_ONLY,
+    L2_TO_L1_ONLY_BLOBS
 }
 
 /// @dev The metadata version that is supported by the ZK Chains to prove that an L2->L1 log was included in a batch.

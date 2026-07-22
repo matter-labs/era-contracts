@@ -349,12 +349,14 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert InvalidL2DACommitmentScheme(_l2DACommitmentScheme);
         }
 
-        // `BLOBS_ZKSYNC_OS` and `L2_TO_L1_ONLY` are only supported on ZKsync OS, where the STF interprets the
-        // scheme. They have no commitment implementation on the Era VM (`L2DAValidator.makeDACommitment`
-        // reverts for them), so reject them here to avoid configuring an unusable DA pair.
+        // `BLOBS_ZKSYNC_OS`, `L2_TO_L1_ONLY` and `L2_TO_L1_ONLY_BLOBS` are only supported on ZKsync OS, where
+        // the STF interprets the scheme. They have no commitment implementation on the Era VM
+        // (`L2DAValidator.makeDACommitment` reverts for them), so reject them here to avoid configuring an
+        // unusable DA pair.
         if (
             (_l2DACommitmentScheme == L2DACommitmentScheme.BLOBS_ZKSYNC_OS ||
-                _l2DACommitmentScheme == L2DACommitmentScheme.L2_TO_L1_ONLY) && !s.zksyncOS
+                _l2DACommitmentScheme == L2DACommitmentScheme.L2_TO_L1_ONLY ||
+                _l2DACommitmentScheme == L2DACommitmentScheme.L2_TO_L1_ONLY_BLOBS) && !s.zksyncOS
         ) {
             revert NotZKsyncOS();
         }
