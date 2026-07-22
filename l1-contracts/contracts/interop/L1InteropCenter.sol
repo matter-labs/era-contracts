@@ -75,7 +75,7 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
     }
 
     /// @inheritdoc IL1InteropCenter
-    function initialize(address _owner) external reentrancyGuardInitializer {
+    function initialize(address _owner) external override reentrancyGuardInitializer {
         _transferOwnership(_owner);
     }
 
@@ -96,7 +96,7 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
         bytes calldata _recipient,
         bytes calldata _payload,
         bytes[] calldata _attributes
-    ) external payable whenNotPaused nonReentrant returns (bytes32 sendId) {
+    ) external payable override whenNotPaused nonReentrant returns (bytes32 sendId) {
         (uint256 destinationChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_recipient);
 
         L1MessageAttributes memory attributes = parseL1Attributes(_attributes);
@@ -104,15 +104,24 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
         address actualRecipient;
         if (attributes.indirectCall) {
             require(attributes.factoryDeps.length == 0, FactoryDepsNotAllowedForIndirectCall());
-            (sendId, actualRecipient) = _requestL2TransactionIndirect(
-                destinationChainId,
-                recipientAddress,
-                _payload,
-                attributes
-            );
+            IZKChain zkChain = _getZKChain(destinationChainId);
+            (sendId, actualRecipient) = _requestL2TransactionIndirect({
+                _destinationChainId: destinationChainId,
+                _zkChain: zkChain,
+                _secondBridgeAddress: recipientAddress,
+                _payload: _payload,
+                _attributes: attributes
+            });
         } else {
+            IZKChain zkChain = _getZKChain(destinationChainId);
             actualRecipient = recipientAddress;
-            sendId = _requestL2TransactionDirect(destinationChainId, recipientAddress, _payload, attributes);
+            sendId = _requestL2TransactionDirect({
+                _destinationChainId: destinationChainId,
+                _zkChain: zkChain,
+                _l2Contract: recipientAddress,
+                _payload: _payload,
+                _attributes: attributes
+            });
         }
 
         // For indirect calls the actual recipient is the destination-side contract constructed by the
@@ -132,10 +141,9 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Deposits the base token and requests the L1->L2 transaction directly.
-    /// @dev Note: If the ZK chain with the corresponding chain id is not yet created, the transaction
-    /// will revert with `ChainIdNotRegistered` in `_sendRequest`.
     function _requestL2TransactionDirect(
         uint256 _destinationChainId,
+        IZKChain _zkChain,
         address _l2Contract,
         bytes calldata _payload,
         L1MessageAttributes memory _attributes
@@ -162,7 +170,7 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
         }
 
         canonicalTxHash = _sendRequest(
-            _destinationChainId,
+            _zkChain,
             BridgehubL2TransactionRequest({
                 sender: msg.sender,
                 contractL2: _l2Contract,
@@ -183,6 +191,7 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
     /// @return l2Contract The destination-side contract of the L2 transaction constructed by the second bridge.
     function _requestL2TransactionIndirect(
         uint256 _destinationChainId,
+        IZKChain _zkChain,
         address _secondBridgeAddress,
         bytes calldata _payload,
         L1MessageAttributes memory _attributes
@@ -228,7 +237,7 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
         l2Contract = outputRequest.l2Contract;
 
         canonicalTxHash = _sendRequest(
-            _destinationChainId,
+            _zkChain,
             BridgehubL2TransactionRequest({
                 sender: _secondBridgeAddress,
                 contractL2: outputRequest.l2Contract,
@@ -261,31 +270,30 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
         uint256 _gasPrice,
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit
-    ) external view returns (uint256) {
-        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
-        if (zkChain == address(0)) {
-            revert ChainIdNotRegistered(_chainId);
-        }
-        return IZKChain(zkChain).l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
+    ) external view override returns (uint256) {
+        return _getZKChain(_chainId).l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
     }
 
     /// @notice Sends the request to the destination ZK chain's Mailbox.
-    /// @param _chainId the chainId of the destination chain
+    /// @param _zkChain the destination ZK chain
     /// @param _request the request
     /// @return canonicalTxHash the canonical transaction hash
     function _sendRequest(
-        uint256 _chainId,
+        IZKChain _zkChain,
         BridgehubL2TransactionRequest memory _request
     ) private returns (bytes32 canonicalTxHash) {
         // Although the aliasing might happen in the Mailbox, we still want to determine the refund recipient
         // here, as the Mailbox won't have the original caller.
         _request.refundRecipient = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);
-        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
-        if (zkChain == address(0)) {
+        canonicalTxHash = _zkChain.bridgehubRequestL2Transaction(_request);
+    }
+
+    /// @notice Resolves a registered ZK chain or reverts before any value-moving external calls are made.
+    function _getZKChain(uint256 _chainId) private view returns (IZKChain zkChain) {
+        zkChain = IZKChain(BRIDGE_HUB.getZKChain(_chainId));
+        if (address(zkChain) == address(0)) {
             revert ChainIdNotRegistered(_chainId);
         }
-
-        canonicalTxHash = IZKChain(zkChain).bridgehubRequestL2Transaction(_request);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -295,7 +303,7 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
     /// @inheritdoc IL1InteropCenter
     function parseL1Attributes(
         bytes[] calldata _attributes
-    ) public pure returns (L1MessageAttributes memory l1MessageAttributes) {
+    ) public pure override returns (L1MessageAttributes memory l1MessageAttributes) {
         bytes4[SUPPORTED_L1_INTEROP_ATTRIBUTES] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         // We can only pass each attribute once.
         bool[] memory attributeUsed = new bool[](ATTRIBUTE_SELECTORS.length);
@@ -370,12 +378,12 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IL1InteropCenter
-    function pause() external onlyOwner {
+    function pause() external override onlyOwner {
         _pause();
     }
 
     /// @inheritdoc IL1InteropCenter
-    function unpause() external onlyOwner {
+    function unpause() external override onlyOwner {
         _unpause();
     }
 }

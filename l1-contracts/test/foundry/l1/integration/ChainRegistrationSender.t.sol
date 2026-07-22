@@ -19,6 +19,7 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
@@ -239,6 +240,16 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
             abi.encodeWithSelector(ChainsSettlementLayerMismatch.selector, firstSettlementLayer, secondSettlementLayer)
         );
         addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
+    }
+
+    function test_confirmL2Transaction_onlyInteropCenter() public {
+        address unauthorizedCaller = makeAddr("unauthorizedCaller");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, unauthorizedCaller));
+        vm.prank(unauthorizedCaller);
+        addresses.chainRegistrationSender.confirmL2Transaction(zkChainIds[0], bytes32(0), bytes32(0));
+
+        vm.prank(address(addresses.l1InteropCenter));
+        addresses.chainRegistrationSender.confirmL2Transaction(zkChainIds[0], bytes32(0), bytes32(0));
     }
 
     // add this to be excluded from coverage report

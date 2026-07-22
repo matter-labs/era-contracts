@@ -18,7 +18,7 @@ import {
   L2_BRIDGEHUB_ADDRESS,
   computeL2Create2Address,
   DIAMOND_CUT_DATA_ABI_STRING,
-  encodeTwoBridgesInteropRequest,
+  encodeIndirectInteropRequest,
   l1InteropCenterInterface,
 } from "../src.ts/utils";
 
@@ -428,7 +428,7 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   const interopCenterAddress = await l1Bridgehub.interopCenter();
 
   // Setting the L2 bridgehub as the counterpart for the CTM asset
-  const ctmAssetMessage = encodeTwoBridgesInteropRequest({
+  const ctmAssetMessage = encodeIndirectInteropRequest({
     chainId,
     mintValue: value,
     l2Value: 0,
@@ -468,7 +468,7 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   console.log(`L2 CTM address ${l2CTMAddress} registered on gateway, txHash: ${receipt3.transactionHash}`);
 
   // Setting the corresponding CTM address on L2.
-  const ctmAddressMessage = encodeTwoBridgesInteropRequest({
+  const ctmAddressMessage = encodeIndirectInteropRequest({
     chainId,
     mintValue: value,
     l2Value: 0,

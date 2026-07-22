@@ -85,7 +85,7 @@ contract ChainRegistrationSender is
 
     /// @inheritdoc IL1CrossChainSender
     /// @notice Registers a chain on the L2 via a normal deposit.
-    /// @notice this is can be called by anyone (via the bridgehub), but baseTokens need to be provided.
+    /// @notice This is initiated by users through the L1InteropCenter, but base tokens need to be provided.
     // slither-disable-next-line locked-ether
     function initiateIndirectCall(
         uint256 chainRegisteredOn,
@@ -148,5 +148,9 @@ contract ChainRegistrationSender is
 
     /// @inheritdoc IL1CrossChainSender
     /// @notice This function is not used for ChainRegistrationSender, since we do not need to support failed L1->L2 transactions.
-    function confirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external override {}
+    function confirmL2Transaction(
+        uint256 _chainId,
+        bytes32 _txDataHash,
+        bytes32 _txHash
+    ) external override onlyInteropCenter {}
 }

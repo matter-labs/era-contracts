@@ -18,6 +18,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {IAssetRouterBase, NEW_ENCODING_VERSION} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IERC7786GatewaySource} from "../interop/IERC7786GatewaySource.sol";
+import {IERC7786Attributes} from "../interop/IERC7786Attributes.sol";
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 
 import {Call} from "./Common.sol";
@@ -306,7 +307,14 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
 
         // Assuming that correctly encoded calldata is provided, the following line must never fail,
         // since the correct selector was checked before.
-        (bytes memory recipient, bytes memory payload, ) = abi.decode(_call.data[4:], (bytes, bytes, bytes[]));
+        (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = abi.decode(
+            _call.data[4:],
+            (bytes, bytes, bytes[])
+        );
+
+        if (!_hasIndirectCallAttribute(attributes)) {
+            return (address(0), false);
+        }
 
         // A chain migration is an indirect call ("two bridges" flow) whose ERC-7930 recipient is the
         // shared bridge (the asset router), with the payload being the second bridge calldata.
@@ -357,5 +365,18 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
         (address l2Admin, ) = abi.decode(burnData.ctmData, (address, bytes));
 
         return (l2Admin, true);
+    }
+
+    /// @notice Checks whether the message uses the indirect L1->L2 call flow.
+    /// @dev Merely targeting the asset router is not enough to identify a migration: a direct message may
+    /// target the same address and carry the same payload, but it does not execute the asset-router flow on L1.
+    function _hasIndirectCallAttribute(bytes[] memory _attributes) private pure returns (bool) {
+        uint256 attributesLength = _attributes.length;
+        for (uint256 i = 0; i < attributesLength; ++i) {
+            if (bytes4(_attributes[i]) == IERC7786Attributes.indirectCall.selector) {
+                return true;
+            }
+        }
+        return false;
     }
 }

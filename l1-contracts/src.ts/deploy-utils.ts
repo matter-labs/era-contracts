@@ -275,6 +275,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       CTMDeploymentTrackerProxy: getAddressFromEnv("CONTRACTS_CTM_DEPLOYMENT_TRACKER_PROXY_ADDR"),
       MessageRootImplementation: getAddressFromEnv("CONTRACTS_MESSAGE_ROOT_IMPL_ADDR"),
       MessageRootProxy: getAddressFromEnv("CONTRACTS_MESSAGE_ROOT_PROXY_ADDR"),
+      InteropCenterImplementation: getAddressFromEnv("CONTRACTS_INTEROP_CENTER_IMPL_ADDR"),
+      InteropCenterProxy: getAddressFromEnv("CONTRACTS_INTEROP_CENTER_PROXY_ADDR"),
     },
     StateTransition: {
       StateTransitionProxy: getAddressFromEnv("CONTRACTS_STATE_TRANSITION_PROXY_ADDR"),

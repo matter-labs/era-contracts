@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {Vm} from "forge-std/Vm.sol";
 import {ExperimentalBridgeTestBase} from "../Bridgehub/_ExperimentalBridge_Shared.t.sol";
 import {
     L2TransactionRequestDirect,
@@ -27,7 +28,14 @@ import {
     INDIRECT_CALL_MAGIC_VALUE
 } from "contracts/common/Config.sol";
 import {CrossChainSenderAddressTooLow} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
-import {MsgValueMismatch, Unauthorized, WrongMagicValue} from "contracts/common/L1ContractErrors.sol";
+import {
+    ChainIdNotRegistered,
+    MsgValueMismatch,
+    Unauthorized,
+    WrongMagicValue
+} from "contracts/common/L1ContractErrors.sol";
+import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
+import {IAssetRouterShared} from "contracts/bridge/asset-router/IAssetRouterShared.sol";
 
 contract L1InteropCenterTest is ExperimentalBridgeTestBase {
     function test_requestL2TransactionDirect_RevertWhen_incorrectETHParams(
@@ -247,6 +255,151 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         L1InteropRequests.requestIndirect(l1InteropCenter, sentValue, l2TxnReq2BridgeOut);
     }
 
+    function test_requestL2TransactionIndirect_forwardsAndConfirmsExactRequest() public {
+        _useMockSharedBridge();
+        _initializeBridgehub();
+
+        address caller = makeAddr("INDIRECT_CALLER");
+        L2TransactionRequestIndirect memory request = L2TransactionRequestIndirect({
+            chainId: _setUpZKChainForChainId(501),
+            mintValue: 1 ether,
+            l2Value: 0.25 ether,
+            l2GasLimit: 1_000_000,
+            l2GasPerPubdataByteLimit: 800,
+            refundRecipient: makeAddr("REFUND_RECIPIENT"),
+            secondBridgeAddress: secondBridgeAddress,
+            secondBridgeValue: 0.1 ether,
+            secondBridgeCalldata: abi.encode("deposit data")
+        });
+        _setUpBaseTokenForChainId(request.chainId, true, address(0));
+
+        IndirectCallRequest memory outputRequest = IndirectCallRequest({
+            magicValue: INDIRECT_CALL_MAGIC_VALUE,
+            l2Contract: makeAddr("L2_CONTRACT"),
+            l2Calldata: abi.encodeCall(SimpleExecutor.execute, (makeAddr("TARGET"), 0, hex"1234")),
+            factoryDeps: _singleFactoryDependency(),
+            txDataHash: keccak256("TX_DATA")
+        });
+        bytes32 canonicalHash = keccak256("CANONICAL_TX_HASH");
+
+        // This unit test isolates L1InteropCenter routing from the downstream bridge and mailbox
+        // implementations; their exact calls are asserted below, including values and calldata.
+        vm.mockCall(
+            secondBridgeAddress,
+            abi.encodeWithSelector(IL1CrossChainSender.initiateIndirectCall.selector),
+            abi.encode(outputRequest)
+        );
+        vm.mockCall(
+            secondBridgeAddress,
+            abi.encodeWithSelector(IL1CrossChainSender.confirmL2Transaction.selector),
+            hex""
+        );
+        vm.mockCall(
+            address(mockChainContract),
+            abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
+            abi.encode(canonicalHash)
+        );
+
+        _expectIndirectCalls(request, caller, outputRequest, canonicalHash);
+
+        (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = L1InteropRequests.encodeIndirect(
+            request
+        );
+
+        uint256 msgValue = request.mintValue + request.secondBridgeValue;
+        vm.deal(caller, msgValue);
+        vm.recordLogs();
+        vm.prank(caller);
+        bytes32 sendId = l1InteropCenter.sendMessage{value: msgValue}(recipient, payload, attributes);
+
+        assertEq(sendId, canonicalHash);
+        _assertMessageSent(vm.getRecordedLogs(), request, outputRequest, caller, canonicalHash, attributes);
+    }
+
+    function _singleFactoryDependency() private pure returns (bytes[] memory factoryDeps) {
+        factoryDeps = new bytes[](1);
+        factoryDeps[0] = hex"010203";
+    }
+
+    function _assertMessageSent(
+        Vm.Log[] memory _logs,
+        L2TransactionRequestIndirect memory _request,
+        IndirectCallRequest memory _outputRequest,
+        address _caller,
+        bytes32 _canonicalHash,
+        bytes[] memory _attributes
+    ) private view {
+        uint256 logsLength = _logs.length;
+        for (uint256 i = 0; i < logsLength; ++i) {
+            if (
+                _logs[i].emitter == address(l1InteropCenter) &&
+                _logs[i].topics[0] == IERC7786GatewaySource.MessageSent.selector
+            ) {
+                assertEq(_logs[i].topics[1], _canonicalHash);
+                assertEq(
+                    _logs[i].data,
+                    abi.encode(
+                        InteroperableAddress.formatEvmV1(block.chainid, _caller),
+                        InteroperableAddress.formatEvmV1(_request.chainId, _outputRequest.l2Contract),
+                        _request.secondBridgeCalldata,
+                        _request.l2Value,
+                        _attributes
+                    )
+                );
+                return;
+            }
+        }
+        assertTrue(false, "MessageSent event was not emitted");
+    }
+
+    function _expectIndirectCalls(
+        L2TransactionRequestIndirect memory _request,
+        address _caller,
+        IndirectCallRequest memory _outputRequest,
+        bytes32 _canonicalHash
+    ) private {
+        vm.expectCall(
+            sharedBridgeAddress,
+            _request.mintValue,
+            abi.encodeCall(
+                IAssetRouterShared.bridgehubDepositBaseToken,
+                (_request.chainId, ETH_TOKEN_ASSET_ID, _caller, _request.mintValue)
+            )
+        );
+        vm.expectCall(
+            secondBridgeAddress,
+            _request.secondBridgeValue,
+            abi.encodeCall(
+                IL1CrossChainSender.initiateIndirectCall,
+                (_request.chainId, _caller, _request.l2Value, _request.secondBridgeCalldata)
+            )
+        );
+        vm.expectCall(
+            address(mockChainContract),
+            abi.encodeWithSelector(
+                mockChainContract.bridgehubRequestL2Transaction.selector,
+                BridgehubL2TransactionRequest({
+                    sender: secondBridgeAddress,
+                    contractL2: _outputRequest.l2Contract,
+                    mintValue: _request.mintValue,
+                    l2Value: _request.l2Value,
+                    l2Calldata: _outputRequest.l2Calldata,
+                    l2GasLimit: _request.l2GasLimit,
+                    l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
+                    factoryDeps: _outputRequest.factoryDeps,
+                    refundRecipient: _request.refundRecipient
+                })
+            )
+        );
+        vm.expectCall(
+            secondBridgeAddress,
+            abi.encodeCall(
+                IL1CrossChainSender.confirmL2Transaction,
+                (_request.chainId, _outputRequest.txDataHash, _canonicalHash)
+            )
+        );
+    }
+
     function test_requestL2TransactionIndirectWrongBridgeAddress(
         uint256 chainId,
         uint256 mintValue,
@@ -416,6 +569,38 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
             abi.encodeWithSelector(AttributeAlreadySet.selector, IERC7786Attributes.l1ToL2TransactionParams.selector)
         );
         l1InteropCenter.sendMessage(InteroperableAddress.formatEvmV1(eraChainId, mockL2Contract), hex"", attributes);
+    }
+
+    function test_sendMessage_RevertWhen_chainIsNotRegistered() public {
+        _useMockSharedBridge();
+        _initializeBridgehub();
+
+        uint256 unregisteredChainId = eraChainId + 1;
+        bytes[] memory attributes = new bytes[](1);
+        attributes[0] = abi.encodeCall(IERC7786Attributes.l1ToL2TransactionParams, (0, 0, 0, address(0)));
+
+        vm.expectRevert(abi.encodeWithSelector(ChainIdNotRegistered.selector, unregisteredChainId));
+        l1InteropCenter.sendMessage(
+            InteroperableAddress.formatEvmV1(unregisteredChainId, mockL2Contract),
+            hex"",
+            attributes
+        );
+    }
+
+    function test_pause_blocksSendMessageUntilOwnerUnpauses() public {
+        _useMockSharedBridge();
+        _initializeBridgehub();
+
+        vm.prank(bridgeOwner);
+        l1InteropCenter.pause();
+        assertTrue(l1InteropCenter.paused());
+
+        vm.expectRevert("Pausable: paused");
+        l1InteropCenter.sendMessage(hex"", hex"", new bytes[](0));
+
+        vm.prank(bridgeOwner);
+        l1InteropCenter.unpause();
+        assertFalse(l1InteropCenter.paused());
     }
 
     function test_sendMessage_direct_emitsMessageSent(
