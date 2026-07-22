@@ -34,6 +34,14 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @param _newPriorityTxMaxGasLimit The maximum number of L2 gas that a user can request for L1 -> L2 transactions
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
 
+    /// @notice Change the ZKsync OS single-transaction gas limit (EIP-7825).
+    /// @dev Only for ZKsync OS chains, callable on the active settlement layer instance. The limit is
+    /// part of the runtime chain config committed into each batch proof public input, so it can only
+    /// change when all committed batches are verified.
+    /// @param _newMaxTxGasLimit The new single-transaction gas limit; must not be below
+    /// `ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`
+    function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external;
+
     /// @notice Change the fee params for L1->L2 transactions
     /// @param _newFeeParams The new fee params
     function changeFeeParams(FeeParams calldata _newFeeParams) external;
@@ -136,6 +144,9 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice Priority transaction max L2 gas limit changed
     event NewPriorityTxMaxGasLimit(uint256 oldPriorityTxMaxGasLimit, uint256 newPriorityTxMaxGasLimit);
+
+    /// @notice ZKsync OS single-transaction gas limit (EIP-7825) changed
+    event NewZKsyncOSMaxTxGasLimit(uint64 oldMaxTxGasLimit, uint64 newMaxTxGasLimit);
 
     /// @notice Fee params for L1->L2 transactions changed
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
