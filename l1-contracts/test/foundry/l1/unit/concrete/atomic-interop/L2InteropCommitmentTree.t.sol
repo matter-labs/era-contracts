@@ -6,7 +6,7 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {IL2InteropCommitmentTree} from "contracts/atomic-interop/IL2InteropCommitmentTree.sol";
-import {IMTLeaf} from "contracts/common/libraries/IndexedMerkleTree.sol";
+import {IMTLeaf, IndexedMerkleTree} from "contracts/common/libraries/IndexedMerkleTree.sol";
 import {CommitmentTreeNotAppender} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {Unauthorized} from "contracts/l2-system/zksync-os/errors/ZKOSContractErrors.sol";
 import {
@@ -55,11 +55,8 @@ contract L2InteropCommitmentTreeTest is Test {
         assertEq(seed.nextIndex, 0, "seed nextIndex");
         assertEq(seed.nextValue, 0, "seed nextValue");
 
-        // Event: RootUpdated carries the exact seed root at index 0.
-        (uint256 leafIndex, bytes32 root, bool found) = _lastRootUpdated(vm.getRecordedLogs());
-        assertTrue(found, "RootUpdated emitted");
-        assertEq(leafIndex, 0, "seed leaf index");
-        assertEq(root, tree.root(), "emitted root matches tree root");
+        // Event: exactly one RootUpdated from the tree, carrying the seed root at index 0.
+        _assertSingleRootUpdated(vm.getRecordedLogs(), 0, tree.root());
     }
 
     /// @dev `initL2` is gated to the complex upgrader (the genesis-upgrade caller); no one else can seed.
@@ -99,11 +96,29 @@ contract L2InteropCommitmentTreeTest is Test {
         assertEq(seed.nextIndex, 1, "seed relinked nextIndex");
         assertEq(seed.nextValue, VALUE_A, "seed relinked nextValue");
 
-        // Event: RootUpdated carries the exact new index + root the insert produced.
-        (uint256 leafIndex, bytes32 root, bool found) = _lastRootUpdated(vm.getRecordedLogs());
-        assertTrue(found, "RootUpdated emitted");
-        assertEq(leafIndex, newIndex, "emitted leaf index");
-        assertEq(root, newRoot, "emitted root matches new root");
+        // Event: exactly one RootUpdated from the tree, carrying the exact new index + root the insert produced.
+        _assertSingleRootUpdated(vm.getRecordedLogs(), newIndex, newRoot);
+    }
+
+    /// @dev Regression guard for the emitted leaf index: a second insert must report index 2, not a
+    /// constant 1. This is the only test that asserts the event payload of a non-first mutation — without
+    /// it a shell that always emitted `RootUpdated(1, ...)` would stay green.
+    function test_insert_secondInsertEmitsRootUpdatedWithIncrementedIndex() public {
+        _initTree();
+
+        uint256 lowA = _lowNullifierIndex(VALUE_A);
+        vm.prank(L2_ATOMIC_FLOW_MANAGER_ADDR);
+        tree.insert(VALUE_A, lowA);
+
+        uint256 lowB = _lowNullifierIndex(VALUE_B);
+        vm.recordLogs();
+        vm.prank(L2_ATOMIC_FLOW_MANAGER_ADDR);
+        (uint256 newIndex, bytes32 newRoot) = tree.insert(VALUE_B, lowB);
+
+        // Second real leaf sits at index 2 (0 = sentinel, 1 = VALUE_A).
+        assertEq(newIndex, 2, "second insert leaf index");
+        assertEq(newRoot, tree.root(), "returned root matches tree root");
+        _assertSingleRootUpdated(vm.getRecordedLogs(), newIndex, newRoot);
     }
 
     function test_RevertWhen_insertNotAppender() public {
@@ -159,7 +174,13 @@ contract L2InteropCommitmentTreeTest is Test {
         assertEq(tree.leafAt(1).value, VALUE_A, "leaf 1 value");
         assertEq(tree.leafAt(2).value, VALUE_B, "leaf 2 value");
         assertTrue(tree.root() != rootAfterA, "root changes on each insert");
-        assertEq(tree.merklePath(2).length, tree.merklePath(1).length, "paths share the current tree height");
+
+        // `merklePath` must forward the index and return a real inclusion path (equal path lengths alone
+        // prove nothing — both share the current tree height): recompute the root from each path + the
+        // full `leafAt(index)` preimage + the index, and require it to match `root()`. A shell that
+        // ignored `_index` (e.g. always returned `merklePath(1)`) would fail for index 2.
+        _assertPathAuthenticatesLeaf(1);
+        _assertPathAuthenticatesLeaf(2);
     }
 
     function test_appender_isFlowManager() public view {
@@ -186,16 +207,41 @@ contract L2InteropCommitmentTreeTest is Test {
         revert("no low-nullifier (value present or tree empty)");
     }
 
-    /// @dev Returns the last `RootUpdated(uint256 indexed leafIndex, bytes32 root)` in `_logs`.
-    function _lastRootUpdated(
-        Vm.Log[] memory _logs
-    ) internal pure returns (uint256 leafIndex, bytes32 root, bool found) {
+    /// @dev Asserts `_logs` holds exactly one `RootUpdated(uint256 indexed leafIndex, bytes32 root)`
+    /// emitted BY THE TREE, carrying `_expectedIndex` and `_expectedRoot`. Enforcing the emitter and the
+    /// cardinality (rather than just picking the last matching log) means a stray, duplicate, or
+    /// foreign-emitter `RootUpdated` fails the assertion instead of being silently accepted.
+    function _assertSingleRootUpdated(
+        Vm.Log[] memory _logs,
+        uint256 _expectedIndex,
+        bytes32 _expectedRoot
+    ) internal view {
         bytes32 sig = IL2InteropCommitmentTree.RootUpdated.selector;
-        for (uint256 i = _logs.length; i > 0; --i) {
-            Vm.Log memory entry = _logs[i - 1];
-            if (entry.topics.length == 2 && entry.topics[0] == sig) {
-                return (uint256(entry.topics[1]), abi.decode(entry.data, (bytes32)), true);
+        uint256 count;
+        uint256 leafIndex;
+        bytes32 root;
+        for (uint256 i = 0; i < _logs.length; ++i) {
+            Vm.Log memory entry = _logs[i];
+            if (entry.emitter == address(tree) && entry.topics.length == 2 && entry.topics[0] == sig) {
+                ++count;
+                leafIndex = uint256(entry.topics[1]);
+                root = abi.decode(entry.data, (bytes32));
             }
         }
+        assertEq(count, 1, "exactly one RootUpdated emitted by the tree");
+        assertEq(leafIndex, _expectedIndex, "RootUpdated leaf index");
+        assertEq(root, _expectedRoot, "RootUpdated root");
+    }
+
+    /// @dev Asserts `merklePath(_index)` authenticates `leafAt(_index)` against the current root: recompute
+    /// the root from the returned path, the full leaf preimage, and the index (via the same engine the real
+    /// proofs use). This catches a getter that fails to forward `_index` or returns a non-authenticating path.
+    function _assertPathAuthenticatesLeaf(uint256 _index) internal view {
+        IMTLeaf memory leaf = tree.leafAt(_index);
+        bytes32[] memory path = tree.merklePath(_index);
+        assertTrue(
+            IndexedMerkleTree.verifyInclusion(tree.root(), leaf.value, leaf, _index, path),
+            "merklePath authenticates leafAt(index) against root"
+        );
     }
 }
