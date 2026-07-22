@@ -128,6 +128,10 @@ interface IGetters is IZKChainBase {
     /// @return The maximum number of L2 gas that a user can request for L1 -> L2 transactions
     function getPriorityTxMaxGasLimit() external view returns (uint256);
 
+    /// @return The effective ZKsync OS single-transaction gas limit (EIP-7825), with the default
+    /// substituted when the value was never set explicitly.
+    function getZKsyncOSMaxTxGasLimit() external view returns (uint64);
+
     /// @return Whether a withdrawal has been finalized.
     /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
     /// @param _l2MessageIndex The index of the L2->L1 message denoting the withdrawal.
