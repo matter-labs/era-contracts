@@ -3,10 +3,11 @@ pragma solidity 0.8.28;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
 
-import {ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT} from "contracts/common/Config.sol";
+import {ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT, ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT} from "contracts/common/Config.sol";
 import {
     Unauthorized,
     ZKsyncOSChainConfigUpdateWithUnverifiedBatches,
+    ZKsyncOSMaxTxGasLimitTooHigh,
     ZKsyncOSMaxTxGasLimitTooLow
 } from "contracts/common/L1ContractErrors.sol";
 import {NotSettlementLayer, NotZKsyncOS} from "contracts/state-transition/L1StateTransitionErrors.sol";
@@ -35,6 +36,19 @@ contract SetZKsyncOSChainConfigTest is AdminTest {
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectRevert(ZKsyncOSMaxTxGasLimitTooLow.selector);
         adminFacet.setZKsyncOSMaxTxGasLimit(ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT - 1);
+    }
+
+    function test_setZKsyncOSMaxTxGasLimit_revertWhen_aboveBlockGasLimit() public {
+        vm.startPrank(utilsFacet.util_getAdmin());
+        vm.expectRevert(ZKsyncOSMaxTxGasLimitTooHigh.selector);
+        adminFacet.setZKsyncOSMaxTxGasLimit(ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT + 1);
+    }
+
+    function test_setZKsyncOSMaxTxGasLimit_acceptsBlockGasLimitCeiling() public {
+        vm.startPrank(utilsFacet.util_getAdmin());
+        adminFacet.setZKsyncOSMaxTxGasLimit(ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT);
+
+        assertEq(utilsFacet.util_getZKsyncOSMaxTxGasLimit(), ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT);
     }
 
     function test_setZKsyncOSMaxTxGasLimit_revertWhen_notZKsyncOS() public {

@@ -6,7 +6,7 @@ import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 import {
-    L1_TX_CALLDATA_PRICE_L2_GAS_ZKSYNC_OS,
+    L1_TX_CALLDATA_FLOOR_PRICE_L2_GAS_ZKSYNC_OS,
     L1_TX_DELTA_544_ENCODING_BYTES,
     L1_TX_DELTA_FACTORY_DEPS_L2_GAS,
     L1_TX_DELTA_FACTORY_DEPS_PUBDATA,
@@ -140,8 +140,8 @@ library TransactionValidator {
 
             // 1. Intrinsic tx cost in gas
             uint256 intrinsicGasCost = L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS;
-            // we are always a bit overestimating for zero bytes
-            intrinsicGasCost += L1_TX_CALLDATA_PRICE_L2_GAS_ZKSYNC_OS * _calldataLength;
+            // we are overcharging using floor non-zero byte cost to cover the worst case
+            intrinsicGasCost += L1_TX_CALLDATA_FLOOR_PRICE_L2_GAS_ZKSYNC_OS * _calldataLength;
 
             // 2. Intrinsic tx cost in native resources
             // Since we are using huge `L1_TX_NATIVE_PER_GAS` ratio, it mostly consists of pubdata cost.

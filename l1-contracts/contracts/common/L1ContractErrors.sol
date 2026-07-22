@@ -492,6 +492,8 @@ error ZeroUpgradeTimestamp();
 error ZKChainLimitReached();
 // 0xb2cabab5
 error ZKsyncOSChainConfigUpdateWithUnverifiedBatches(uint256 batchesVerified, uint256 batchesCommitted);
+// 0x1df14b10
+error ZKsyncOSMaxTxGasLimitTooHigh();
 // 0x7e34baaf
 error ZKsyncOSMaxTxGasLimitTooLow();
 // 0x646ac57e
