@@ -53,35 +53,13 @@ contract SetDAValidatorPair is AdminTest {
         vm.stopPrank();
     }
 
-    function test_revertWhen_l2ToL1OnlyOnEraChain() public {
-        address admin = utilsFacet.util_getAdmin();
-
-        // The chain is an Era VM chain by default (zksyncOS == false); L2_TO_L1_ONLY is ZKsync-OS-only.
-        vm.startPrank(admin);
-        vm.expectRevert(NotZKsyncOS.selector);
-        adminFacet.setDAValidatorPair(address(1), L2DACommitmentScheme.L2_TO_L1_ONLY);
-
-        vm.stopPrank();
-    }
-
     function test_revertWhen_blobsZKsyncOSOnEraChain() public {
         address admin = utilsFacet.util_getAdmin();
 
-        // BLOBS_ZKSYNC_OS is likewise ZKsync-OS-only and must be rejected on an Era VM chain.
+        // BLOBS_ZKSYNC_OS is ZKsync-OS-only and must be rejected on an Era VM chain.
         vm.startPrank(admin);
         vm.expectRevert(NotZKsyncOS.selector);
         adminFacet.setDAValidatorPair(address(1), L2DACommitmentScheme.BLOBS_ZKSYNC_OS);
-
-        vm.stopPrank();
-    }
-
-    function test_revertWhen_l2ToL1OnlyBlobsOnEraChain() public {
-        address admin = utilsFacet.util_getAdmin();
-
-        // L2_TO_L1_ONLY_BLOBS is likewise ZKsync-OS-only and must be rejected on an Era VM chain.
-        vm.startPrank(admin);
-        vm.expectRevert(NotZKsyncOS.selector);
-        adminFacet.setDAValidatorPair(address(1), L2DACommitmentScheme.L2_TO_L1_ONLY_BLOBS);
 
         vm.stopPrank();
     }
@@ -92,21 +70,9 @@ contract SetDAValidatorPair is AdminTest {
         utilsFacet.util_setZksyncOS(true);
 
         vm.startPrank(admin);
-        adminFacet.setDAValidatorPair(address(1), L2DACommitmentScheme.L2_TO_L1_ONLY);
+        adminFacet.setDAValidatorPair(address(1), L2DACommitmentScheme.BLOBS_ZKSYNC_OS);
         vm.stopPrank();
 
-        assert(utilsFacet.util_getL2DACommimentScheme() == L2DACommitmentScheme.L2_TO_L1_ONLY);
-    }
-
-    function test_SuccessfulSet_l2ToL1OnlyBlobsAllowedOnZKsyncOS() public {
-        address admin = utilsFacet.util_getAdmin();
-        // Mark the chain as ZKsync OS so a ZKsync-OS-only scheme is accepted.
-        utilsFacet.util_setZksyncOS(true);
-
-        vm.startPrank(admin);
-        adminFacet.setDAValidatorPair(address(1), L2DACommitmentScheme.L2_TO_L1_ONLY_BLOBS);
-        vm.stopPrank();
-
-        assert(utilsFacet.util_getL2DACommimentScheme() == L2DACommitmentScheme.L2_TO_L1_ONLY_BLOBS);
+        assert(utilsFacet.util_getL2DACommimentScheme() == L2DACommitmentScheme.BLOBS_ZKSYNC_OS);
     }
 }

@@ -7,6 +7,7 @@ import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {
     L2DACommitmentScheme,
+    L2DAMode,
     MAX_GAS_PER_TRANSACTION,
     MAX_PRICE_CHANGE_DENOMINATOR,
     MAX_PRICE_CHANGE_NUMERATOR,
@@ -380,15 +381,10 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert InvalidL2DACommitmentScheme(_l2DACommitmentScheme);
         }
 
-        // `BLOBS_ZKSYNC_OS`, `L2_TO_L1_ONLY` and `L2_TO_L1_ONLY_BLOBS` are only supported on ZKsync OS, where
-        // the STF interprets the scheme. They have no commitment implementation on the Era VM
-        // (`L2DAValidator.makeDACommitment` reverts for them), so reject them here to avoid configuring an
-        // unusable DA pair.
-        if (
-            (_l2DACommitmentScheme == L2DACommitmentScheme.BLOBS_ZKSYNC_OS ||
-                _l2DACommitmentScheme == L2DACommitmentScheme.L2_TO_L1_ONLY ||
-                _l2DACommitmentScheme == L2DACommitmentScheme.L2_TO_L1_ONLY_BLOBS) && !s.zksyncOS
-        ) {
+        // `BLOBS_ZKSYNC_OS` is only supported on ZKsync OS, where the STF interprets the scheme. It has
+        // no commitment implementation on the Era VM (`L2DAValidator.makeDACommitment` reverts for it),
+        // so reject it here to avoid configuring an unusable DA pair.
+        if (_l2DACommitmentScheme == L2DACommitmentScheme.BLOBS_ZKSYNC_OS && !s.zksyncOS) {
             revert NotZKsyncOS();
         }
 
@@ -397,6 +393,12 @@ contract AdminFacet is ZKChainBase, IAdmin {
         }
 
         _setDAValidatorPair(_l1DAValidator, _l2DACommitmentScheme);
+    }
+
+    /// @inheritdoc IAdmin
+    function setL2DAMode(L2DAMode _l2DAMode) external onlyAdmin {
+        emit NewL2DAMode(s.l2DAMode, _l2DAMode);
+        s.l2DAMode = _l2DAMode;
     }
 
     /// @inheritdoc IAdmin

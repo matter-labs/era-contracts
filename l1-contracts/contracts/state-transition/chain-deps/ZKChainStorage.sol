@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../state-transition/libraries/PriorityTree.sol";
-import {L2DACommitmentScheme, PubdataPricingMode} from "../../common/Config.sol";
+import {L2DACommitmentScheme, L2DAMode, PubdataPricingMode} from "../../common/Config.sol";
 
 /// @notice Indicates whether an upgrade is initiated and if yes what type
 /// @param None Upgrade is NOT initiated
@@ -239,6 +239,11 @@ struct ZKChainStorage {
     /// The slot is retained (and kept packed) to preserve the storage layout of all following slots.
     /// @dev STORAGE SLOT: 60 (packed with zksyncOS + l2DACommitmentScheme)
     address __DEPRECATED_assetTracker;
+    /// @dev The DA mode: whether the batch commits the full pubdata (`ROLLUP`) or only the mandatory
+    /// L2->L1 log region (`VALIDIUM`). Orthogonal to `l2DACommitmentScheme` (the mechanism). Committed
+    /// into the ZKsync OS batch public input via the chain config hash (see `Executor`). ZKsync OS only.
+    /// @dev STORAGE SLOT: 60 (packed: 1-byte enum after zksyncOS + l2DACommitmentScheme + __DEPRECATED_assetTracker)
+    L2DAMode l2DAMode;
     /// @dev The address of the native token vault
     /// @dev STORAGE SLOT: 61
     address nativeTokenVault;
