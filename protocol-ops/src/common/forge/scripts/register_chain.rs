@@ -9,6 +9,8 @@ pub use super::REGISTER_CHAIN_INVOCATION as REGISTER_CHAIN_SCRIPT_PARAMS;
 
 pub use super::DEPLOY_PAYMASTER_INVOCATION as DEPLOY_PAYMASTER_SCRIPT_PARAMS;
 
+pub use super::SETUP_LEGACY_BRIDGE_INVOCATION as SETUP_LEGACY_BRIDGE;
+
 pub use super::ENABLE_EVM_EMULATOR_INVOCATION as ENABLE_EVM_EMULATOR_PARAMS;
 
 // ── Input types ──────────────────────────────────────────────────────────────
