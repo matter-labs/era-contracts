@@ -996,6 +996,19 @@
   },
   {
     "type": "function",
+    "name": "getZKsyncOSMaxTxGasLimit",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "isDiamondStorageFrozen",
     "inputs": [],
     "outputs": [
@@ -2036,6 +2049,19 @@
   },
   {
     "type": "function",
+    "name": "setZKsyncOSMaxTxGasLimit",
+    "inputs": [
+      {
+        "name": "_newMaxTxGasLimit",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setZKsyncOSPreV31TotalSupply",
     "inputs": [
       {
@@ -2807,6 +2833,25 @@
         "type": "address",
         "indexed": false,
         "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "NewZKsyncOSMaxTxGasLimit",
+    "inputs": [
+      {
+        "name": "oldMaxTxGasLimit",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      },
+      {
+        "name": "newMaxTxGasLimit",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
       }
     ],
     "anonymous": false

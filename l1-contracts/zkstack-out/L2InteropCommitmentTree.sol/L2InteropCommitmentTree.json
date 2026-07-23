@@ -235,6 +235,11 @@
   },
   {
     "type": "error",
+    "name": "InteropCommitmentLeafHookFailed",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "MerkleNothingToProve",
     "inputs": []
   },
