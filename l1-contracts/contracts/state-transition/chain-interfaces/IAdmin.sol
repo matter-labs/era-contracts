@@ -198,6 +198,7 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice New L2 DA mode set
     event NewL2DAMode(L2DAMode indexed oldL2DAMode, L2DAMode indexed newL2DAMode);
+
     event NewL1DAValidator(address indexed oldL1DAValidator, address indexed newL1DAValidator);
 
     event BridgeMint(address indexed _account, uint256 _amount);
