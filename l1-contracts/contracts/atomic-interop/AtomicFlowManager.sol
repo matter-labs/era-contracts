@@ -301,13 +301,10 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// require that *some* call recovered (`recovered != 0`): a bundle where nothing is recoverable has no
     /// source funds to return, so a refund would be a no-op and we reject it.
     ///
-    /// Consequence: the protocol does not guarantee full refundability of an arbitrary bundle. Only two call
-    /// shapes are refundable — an asset-router call (`from == L2_ASSET_ROUTER_ADDR`) or a direct call carrying
-    /// native `value`. There is NO generic per-sender recovery hook: a bespoke contract that is the `from` of a
-    /// zero-`value` call is skipped (never asked to implement {IAtomicRecoverable}), so its funds would strand.
-    /// A flow author who needs a custom fund-moving leg refunded must route it through the asset router (or
-    /// carry the value as native base-token `value`). L1-destined atomic bundles remain blocked at send time
-    /// because L2->L1 withdrawals are never revertable.
+    /// Consequence: the protocol does not guarantee full refundability of an arbitrary bundle. A flow author
+    /// must make any bespoke fund-moving leg that does not carry `value` recoverable; otherwise it would
+    /// strand its funds. L1-destined atomic bundles remain blocked at send time because L2->L1 withdrawals
+    /// are never revertable.
     ///
     /// Scope: this is the atomicity (TIMEOUT) refund — it fires only when the flow is proven unable to
     /// finalize (a leg's commit value is still absent past the deadline, established via {authorizeRefund}).

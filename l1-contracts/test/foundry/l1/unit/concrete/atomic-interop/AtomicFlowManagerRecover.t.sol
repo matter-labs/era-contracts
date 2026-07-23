@@ -232,7 +232,7 @@ contract AtomicFlowManagerRecoverTest is Test {
 
     // ------------------------------------------------------------------------------------------------
     // Multi-call bundles: _recoverBundle iterates EVERY call, so a regression that stopped after the
-    // first recovery (or mis-handled a false/reverting later call) would strand funds. These use a
+    // first recovery (or mishandled a false/reverting later call) would strand funds. These use a
     // stateful mock router at the canonical address so recovery side effects — and their rollback — are
     // observable.
     // ------------------------------------------------------------------------------------------------
