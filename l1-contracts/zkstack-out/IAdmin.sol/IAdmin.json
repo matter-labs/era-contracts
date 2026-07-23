@@ -225,6 +225,19 @@
   },
   {
     "type": "function",
+    "name": "setL2DAMode",
+    "inputs": [
+      {
+        "name": "_l2DAMode",
+        "type": "uint8",
+        "internalType": "enum L2DAMode"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setPendingAdmin",
     "inputs": [
       {
@@ -701,6 +714,25 @@
         "type": "uint8",
         "indexed": true,
         "internalType": "enum L2DACommitmentScheme"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "NewL2DAMode",
+    "inputs": [
+      {
+        "name": "oldL2DAMode",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "enum L2DAMode"
+      },
+      {
+        "name": "newL2DAMode",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "enum L2DAMode"
       }
     ],
     "anonymous": false
