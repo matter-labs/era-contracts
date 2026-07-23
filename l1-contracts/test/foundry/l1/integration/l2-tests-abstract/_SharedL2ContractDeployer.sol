@@ -37,6 +37,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {IL2AssetRouter} from "../../../../../contracts/bridge/asset-router/IL2AssetRouter.sol";
@@ -49,7 +50,7 @@ import {
     MessageInclusionProof,
     TokenBridgingData
 } from "../../../../../contracts/common/Messaging.sol";
-import {InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
+import {L2InteropCenter} from "../../../../../contracts/interop/interop-center/L2InteropCenter.sol";
 import {L2WrappedBaseToken} from "../../../../../contracts/bridge/L2WrappedBaseToken.sol";
 import {MailboxFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {AdminFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -79,7 +80,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     IL2AssetRouter l2AssetRouter = IL2AssetRouter(L2_ASSET_ROUTER_ADDR);
     IL2Bridgehub l2Bridgehub = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
-    InteropCenter l2InteropCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
+    L2InteropCenter l2InteropCenter = L2InteropCenter(L2_INTEROP_CENTER_ADDR);
     IL2NativeTokenVault l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
     uint256 internal constant L1_CHAIN_ID = 10; // it cannot be 9, the default block.chainid
@@ -282,6 +283,14 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         // Now, let's also append a priority transaction for a more representative example
         bytes[] memory deps = new bytes[](0);
 
+        // The Mailbox authorizes the L1InteropCenter by resolving `interopCenter()` on its bridgehub.
+        // This L2-in-L1-context setup drives the chain through the L2 Bridgehub (which has no interop
+        // center), so the resolution is mocked to authorize the L2 Bridgehub itself.
+        vm.mockCall(
+            address(l2Bridgehub),
+            abi.encodeWithSelector(IL1Bridgehub.interopCenter.selector),
+            abi.encode(address(l2Bridgehub))
+        );
         vm.prank(address(l2Bridgehub));
         MailboxFacet(chainAddress).bridgehubRequestL2Transaction(
             BridgehubL2TransactionRequest({

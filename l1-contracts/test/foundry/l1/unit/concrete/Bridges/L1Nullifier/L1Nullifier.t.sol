@@ -61,7 +61,9 @@ contract L1NullifierTest is Test {
 
         l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehub),
-            _messageRoot: IMessageRootBase(messageRoot)
+            _messageRoot: IMessageRootBase(messageRoot),
+            _eraChainId: ERA_CHAIN_ID,
+            _eraDiamondProxy: eraDiamondProxy
         });
 
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
@@ -84,7 +86,9 @@ contract L1NullifierTest is Test {
     function test_Initialize_RevertWhen_OwnerIsZeroAddress() public {
         L1NullifierDev impl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehub),
-            _messageRoot: IMessageRootBase(messageRoot)
+            _messageRoot: IMessageRootBase(messageRoot),
+            _eraChainId: ERA_CHAIN_ID,
+            _eraDiamondProxy: eraDiamondProxy
         });
 
         vm.expectRevert(ZeroAddress.selector);
@@ -171,7 +175,7 @@ contract L1NullifierTest is Test {
         address notRouter = makeAddr("notRouter");
         vm.prank(notRouter);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notRouter));
-        l1Nullifier.bridgehubConfirmL2TransactionForwarded(1, bytes32(0), bytes32(0));
+        l1Nullifier.confirmL2TransactionForwarded(1, bytes32(0), bytes32(0));
     }
 
     function test_BridgehubConfirmL2TransactionForwarded_RevertWhen_DepositExists() public {
@@ -184,12 +188,12 @@ contract L1NullifierTest is Test {
 
         // First call succeeds
         vm.prank(assetRouter);
-        l1Nullifier.bridgehubConfirmL2TransactionForwarded(chainId, txDataHash, txHash);
+        l1Nullifier.confirmL2TransactionForwarded(chainId, txDataHash, txHash);
 
         // Second call should fail
         vm.prank(assetRouter);
         vm.expectRevert(DepositExists.selector);
-        l1Nullifier.bridgehubConfirmL2TransactionForwarded(chainId, txDataHash, txHash);
+        l1Nullifier.confirmL2TransactionForwarded(chainId, txDataHash, txHash);
     }
 
     function test_BridgehubConfirmL2TransactionForwarded_Success() public {
@@ -203,7 +207,7 @@ contract L1NullifierTest is Test {
         assertEq(l1Nullifier.depositHappened(chainId, txHash), bytes32(0));
 
         vm.prank(assetRouter);
-        l1Nullifier.bridgehubConfirmL2TransactionForwarded(chainId, txDataHash, txHash);
+        l1Nullifier.confirmL2TransactionForwarded(chainId, txDataHash, txHash);
 
         assertEq(l1Nullifier.depositHappened(chainId, txHash), txDataHash);
     }
@@ -254,7 +258,7 @@ contract L1NullifierTest is Test {
 
         vm.prank(assetRouter);
         vm.expectRevert("Pausable: paused");
-        l1Nullifier.bridgehubConfirmL2TransactionForwarded(1, bytes32(0), bytes32(uint256(1)));
+        l1Nullifier.confirmL2TransactionForwarded(1, bytes32(0), bytes32(uint256(1)));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -288,7 +292,7 @@ contract L1NullifierTest is Test {
         l1Nullifier.setL1AssetRouter(assetRouter);
 
         vm.prank(assetRouter);
-        l1Nullifier.bridgehubConfirmL2TransactionForwarded(_chainId, _txDataHash, _txHash);
+        l1Nullifier.confirmL2TransactionForwarded(_chainId, _txDataHash, _txHash);
 
         assertEq(l1Nullifier.depositHappened(_chainId, _txHash), _txDataHash);
     }

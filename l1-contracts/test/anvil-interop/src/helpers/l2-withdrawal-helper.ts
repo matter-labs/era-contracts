@@ -32,7 +32,7 @@ export interface WithdrawETHResult {
 /**
  * A withdrawal that has been initiated on L2 but not yet finalised on L1.
  *
- * Carries the exact interop bundle the L2 InteropCenter emitted for this withdrawal (captured from the
+ * Carries the exact interop bundle the L2 L2InteropCenter emitted for this withdrawal (captured from the
  * `InteropBundleSent` event during initiation) plus the metadata needed to assert the finalisation outcome.
  * Reusing that real bundle — rather than reconstructing one — means the L1 finalisation runs on the same
  * bytes the L2 send produced; only the message-inclusion proof is mocked.
@@ -43,7 +43,7 @@ export interface PendingWithdrawal {
   amount: BigNumber;
   l1Recipient: string;
   tokenAddress: string;
-  /** ABI-encoded `InteropBundle` emitted by the L2 InteropCenter, reused verbatim for `executeBundle` on L1. */
+  /** ABI-encoded `InteropBundle` emitted by the L2 L2InteropCenter, reused verbatim for `executeBundle` on L1. */
   bundleData: string;
 }
 
@@ -68,7 +68,7 @@ export interface InitiateErc20WithdrawalParams extends InitiateWithdrawalParams 
 }
 
 /**
- * Initiate an ETH (base-token) withdrawal from L2 to L1 via the InteropCenter and
+ * Initiate an ETH (base-token) withdrawal from L2 to L1 via the L2InteropCenter and
  * return a {@link PendingWithdrawal} handle that can be finalised later.
  *
  * Base-token withdrawals use the same unified path as ERC20s: a single-call interop
@@ -105,7 +105,7 @@ export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): P
   const l1ChainId = (await l1Provider.getNetwork()).chainId;
 
   console.log(
-    `   Initiating ETH withdrawal from chain ${chainId} via InteropCenter.sendBundle (destination L1 chain ${l1ChainId})...`
+    `   Initiating ETH withdrawal from chain ${chainId} via L2InteropCenter.sendBundle (destination L1 chain ${l1ChainId})...`
   );
   // L2->L1 withdrawals are free (no interop protocol fee); only the withdrawn ETH rides as value.
   const sendResult = await sendInteropBundle({
@@ -127,18 +127,18 @@ export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): P
 }
 
 /**
- * Initiate an ERC20 withdrawal from L2 to L1 via the InteropCenter.
+ * Initiate an ERC20 withdrawal from L2 to L1 via the L2InteropCenter.
  *
  * Approves the L2 `NativeTokenVault` to transfer the tokens, then sends an
  * interop bundle whose single indirect call targets the L2 `AssetRouter` with a
- * destination of the L1 chain. The InteropCenter invokes
+ * destination of the L1 chain. The L2InteropCenter invokes
  * `L2AssetRouter.initiateIndirectCall`, which builds the bridgehub-deposit
  * request; because the destination is L1, it burns on L2 and produces the
  * single-call interop bundle finalized on L1 via `L1InteropHandler.executeBundle`
  * (which delivers `finalizeDeposit` to the L1 asset router).
  *
  * (The legacy `L2AssetRouter.withdraw(assetId, data)` entrypoint was removed; all
- * L2→L1 withdrawals now flow through the InteropCenter.)
+ * L2→L1 withdrawals now flow through the L2InteropCenter.)
  */
 export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalParams): Promise<PendingWithdrawal> {
   const { l2RpcUrl, l1RpcUrl, l2TokenAddress, tokenOriginChainId, chainId, amount } = params;
@@ -153,7 +153,7 @@ export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalPar
   // L2 NTV assigns the same value during `registerToken`.
   const assetId = encodeNtvAssetId(tokenOriginChainId, l2TokenAddress);
 
-  // Approve the L2 NTV to spend the caller's tokens. The InteropCenter routes
+  // Approve the L2 NTV to spend the caller's tokens. The L2InteropCenter routes
   // the burn through `L2AssetRouter.initiateIndirectCall` -> `_bridgehubDeposit`,
   // which pulls the tokens from the original caller (the `sendBundle` sender)
   // via the NTV.
@@ -177,7 +177,7 @@ export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalPar
   const l1ChainId = (await l1Provider.getNetwork()).chainId;
 
   console.log(
-    `   Initiating ERC20 withdrawal from chain ${chainId} via InteropCenter.sendBundle (destination L1 chain ${l1ChainId})...`
+    `   Initiating ERC20 withdrawal from chain ${chainId} via L2InteropCenter.sendBundle (destination L1 chain ${l1ChainId})...`
   );
   // L2->L1 withdrawals are free (no interop protocol fee), so no value rides along.
   const sendResult = await sendInteropBundle({
@@ -224,9 +224,9 @@ export async function finalizeWithdrawalOnL1(
   const interopHandlerAddress = await l1Nullifier.l1InteropHandler();
   const l1InteropHandler = new Contract(interopHandlerAddress, getAbi("L1InteropHandler"), l1Wallet);
 
-  // Reuse the exact bundle the L2 InteropCenter emitted for this withdrawal (captured from the
+  // Reuse the exact bundle the L2 L2InteropCenter emitted for this withdrawal (captured from the
   // `InteropBundleSent` event during initiation). It already carries the correct source/destination chain ids,
-  // the L1 ETH destination base-token assetId, the InteropCenter-assigned salt (so distinct withdrawals never
+  // the L1 ETH destination base-token assetId, the L2InteropCenter-assigned salt (so distinct withdrawals never
   // collide into the same bundle hash), and the single call targeting the L1 asset router's `finalizeDeposit`.
   // Only the message-inclusion proof below is mocked.
   const bundle = pending.bundleData;

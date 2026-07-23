@@ -146,12 +146,12 @@ contract DeployZKScript is Script {
         zkToken.approve(L2_NATIVE_TOKEN_VAULT_ADDR, someBigAmount);
         vm.stopBroadcast();
 
-        // The ZK-token L2->L1 withdrawal now goes through the InteropCenter as a single-call bundle to
+        // The ZK-token L2->L1 withdrawal now goes through the L2InteropCenter as a single-call bundle to
         // the L1 asset router (the unified path that replaced L2AssetRouter.withdraw). The deployer
         // approved the NTV above; the withdrawn amount rides in the bridge-burn transfer data.
         uint256 l1ChainId = l2AR.L1_CHAIN_ID();
         bytes memory zkTransferData = DataEncoding.encodeBridgeBurnData(someBigAmount, deployer, zkTokenAddress);
-        // Each (sender, salt) pair may be used only once by the InteropCenter; derive the salt from the
+        // Each (sender, salt) pair may be used only once by the L2InteropCenter; derive the salt from the
         // withdrawal content so distinct withdrawals get distinct salts deterministically.
         vm.broadcast();
         // slither-disable-next-line unused-return

@@ -184,20 +184,20 @@ contract L2BaseTokenZKOSTest is Test {
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: 1 ether}(0);
     }
 
-    /// @notice Verifies that BaseTokenHolder notifies L2AssetTracker when receiving ETH via burnAndStartBridging from InteropCenter
+    /// @notice Verifies that BaseTokenHolder notifies L2AssetTracker when receiving ETH via burnAndStartBridging from L2InteropCenter
     /// @dev This test ensures bridging operations are properly tracked
     function test_baseTokenHolder_notifiesAssetTrackerOnBridging() public {
         // Deploy real BaseTokenHolder for integration tests
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
         uint256 burnAmount = 1 ether;
 
-        // Expect the AssetTracker call when InteropCenter calls burnAndStartBridging
+        // Expect the AssetTracker call when L2InteropCenter calls burnAndStartBridging
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
             abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 0, burnAmount)
         );
 
-        // InteropCenter calls burnAndStartBridging (simulating a bridging burn)
+        // L2InteropCenter calls burnAndStartBridging (simulating a bridging burn)
         vm.deal(L2_INTEROP_CENTER_ADDR, burnAmount);
         vm.prank(L2_INTEROP_CENTER_ADDR);
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(0);
@@ -223,7 +223,7 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     /// @notice Verifies that L2BaseToken is NOT a bridging caller for burnAndStartBridging.
-    /// @dev Base-token withdrawals go through the InteropCenter (which burns the value via
+    /// @dev Base-token withdrawals go through the L2InteropCenter (which burns the value via
     /// burnAndStartBridging), so L2BaseToken calling it directly must revert.
     function test_baseTokenHolder_revertsFromL2BaseToken_burnAndStartBridging() public {
         // Deploy real BaseTokenHolder for integration tests

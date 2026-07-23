@@ -12,11 +12,8 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {IAccessControlDefaultAdminRules} from "@openzeppelin/contracts-v4/access/IAccessControlDefaultAdminRules.sol";
 
-import {
-    IL1Bridgehub,
-    L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestIndirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -38,6 +35,10 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
+import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
+import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
+import {IL1InteropCenter} from "contracts/interop/IL1InteropCenter.sol";
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 
 /// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the guardians.
 bytes32 constant EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH = keccak256(
@@ -507,7 +508,7 @@ library Utils {
         });
     }
 
-    function prepareL1L2TransactionTwoBridges(
+    function prepareL1L2TransactionIndirect(
         uint256 l1GasPrice,
         uint256 l2GasLimit,
         uint256 chainId,
@@ -516,11 +517,7 @@ library Utils {
         uint256 secondBridgeValue,
         bytes memory secondBridgeCalldata,
         address refundRecipient
-    )
-        internal
-        view
-        returns (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy)
-    {
+    ) internal view returns (L2TransactionRequestIndirect memory l2TransactionRequest, uint256 requiredValueToDeploy) {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddress);
 
         // 10x headroom — see `prepareL1L2Transaction` comment for rationale.
@@ -535,7 +532,7 @@ library Utils {
                 REQUIRED_L2_GAS_PRICE_PER_PUBDATA
             ) * 10;
 
-        l2TransactionRequest = L2TransactionRequestTwoBridgesOuter({
+        l2TransactionRequest = L2TransactionRequestIndirect({
             chainId: chainId,
             mintValue: requiredValueToDeploy,
             l2Value: 0,
@@ -546,6 +543,50 @@ library Utils {
             secondBridgeValue: secondBridgeValue,
             secondBridgeCalldata: secondBridgeCalldata
         });
+    }
+
+    /// @dev Builds the (target, calldata) pair that initiates the given direct L1->L2 transaction
+    /// request through the L1InteropCenter ERC-7786 `sendMessage` entry point.
+    function buildDirectSendMessageCall(
+        address bridgehubAddress,
+        L2TransactionRequestDirect memory request
+    ) internal view returns (address interopCenter, bytes memory data) {
+        interopCenter = IL1Bridgehub(bridgehubAddress).interopCenter();
+        bytes[] memory attributes = new bytes[](3);
+        attributes[0] = abi.encodeCall(
+            IERC7786Attributes.l1ToL2TransactionParams,
+            (request.mintValue, request.l2GasLimit, request.l2GasPerPubdataByteLimit, request.refundRecipient)
+        );
+        attributes[1] = abi.encodeCall(IERC7786Attributes.interopCallValue, (request.l2Value));
+        attributes[2] = abi.encodeCall(IERC7786Attributes.factoryDeps, (request.factoryDeps));
+        data = abi.encodeCall(
+            IERC7786GatewaySource.sendMessage,
+            (InteroperableAddress.formatEvmV1(request.chainId, request.l2Contract), request.l2Calldata, attributes)
+        );
+    }
+
+    /// @dev Builds the (target, calldata) pair that initiates the given two-bridges L1->L2 transaction
+    /// request through the L1InteropCenter ERC-7786 `sendMessage` entry point (indirect call).
+    function buildIndirectSendMessageCall(
+        address bridgehubAddress,
+        L2TransactionRequestIndirect memory request
+    ) internal view returns (address interopCenter, bytes memory data) {
+        interopCenter = IL1Bridgehub(bridgehubAddress).interopCenter();
+        bytes[] memory attributes = new bytes[](3);
+        attributes[0] = abi.encodeCall(
+            IERC7786Attributes.l1ToL2TransactionParams,
+            (request.mintValue, request.l2GasLimit, request.l2GasPerPubdataByteLimit, request.refundRecipient)
+        );
+        attributes[1] = abi.encodeCall(IERC7786Attributes.interopCallValue, (request.l2Value));
+        attributes[2] = abi.encodeCall(IERC7786Attributes.indirectCall, (request.secondBridgeValue));
+        data = abi.encodeCall(
+            IERC7786GatewaySource.sendMessage,
+            (
+                InteroperableAddress.formatEvmV1(request.chainId, request.secondBridgeAddress),
+                request.secondBridgeCalldata,
+                attributes
+            )
+        );
     }
 
     /**
@@ -590,10 +631,36 @@ library Utils {
             requiredValueToDeploy = 0;
         }
 
+        bytes[] memory sendMessageAttributes = new bytes[](3);
+        sendMessageAttributes[0] = abi.encodeCall(
+            IERC7786Attributes.l1ToL2TransactionParams,
+            (
+                l2TransactionRequestDirect.mintValue,
+                l2TransactionRequestDirect.l2GasLimit,
+                l2TransactionRequestDirect.l2GasPerPubdataByteLimit,
+                l2TransactionRequestDirect.refundRecipient
+            )
+        );
+        sendMessageAttributes[1] = abi.encodeCall(
+            IERC7786Attributes.interopCallValue,
+            (l2TransactionRequestDirect.l2Value)
+        );
+        sendMessageAttributes[2] = abi.encodeCall(
+            IERC7786Attributes.factoryDeps,
+            (l2TransactionRequestDirect.factoryDeps)
+        );
+
+        // The interop center must be resolved before arming the broadcast: no static calls are
+        // allowed between `vm.broadcast` and the broadcast transaction itself.
+        IL1InteropCenter interopCenter = IL1InteropCenter(bridgehub.interopCenter());
+
         vm.broadcast(getBroadcasterAddress());
         vm.recordLogs();
-        bytes32 canonicalTxHash = bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(
-            l2TransactionRequestDirect
+        // solhint-disable-next-line no-unused-vars
+        interopCenter.sendMessage{value: requiredValueToDeploy}(
+            InteroperableAddress.formatEvmV1(l2TransactionRequestDirect.chainId, l2TransactionRequestDirect.l2Contract),
+            l2TransactionRequestDirect.l2Calldata,
+            sendMessageAttributes
         );
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
@@ -668,18 +735,15 @@ library Utils {
 
         calls = mergeCalls(calls, newCalls);
 
-        bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            IL1Bridgehub.requestL2TransactionDirect,
-            (l2TransactionRequestDirect)
+        (address interopCenter, bytes memory sendMessageCalldata) = buildDirectSendMessageCall(
+            bridgehubAddress,
+            l2TransactionRequestDirect
         );
 
-        calls = appendCall(
-            calls,
-            Call({target: bridgehubAddress, value: ethAmountToPass, data: l2TransactionRequestDirectCalldata})
-        );
+        calls = appendCall(calls, Call({target: interopCenter, value: ethAmountToPass, data: sendMessageCalldata}));
     }
 
-    function prepareGovernanceL1L2TwoBridgesTransaction(
+    function prepareGovernanceL1L2IndirectTransaction(
         uint256 l1GasPrice,
         uint256 l2GasLimit,
         uint256 chainId,
@@ -691,9 +755,9 @@ library Utils {
         address refundRecipient
     ) internal view returns (Call[] memory calls) {
         (
-            L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
+            L2TransactionRequestIndirect memory l2TransactionRequest,
             uint256 requiredValueToDeploy
-        ) = prepareL1L2TransactionTwoBridges(
+        ) = prepareL1L2TransactionIndirect(
                 l1GasPrice,
                 l2GasLimit,
                 chainId,
@@ -713,15 +777,12 @@ library Utils {
 
         calls = mergeCalls(calls, newCalls);
 
-        bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            IL1Bridgehub.requestL2TransactionTwoBridges,
-            (l2TransactionRequest)
+        (address interopCenter, bytes memory sendMessageCalldata) = buildIndirectSendMessageCall(
+            bridgehubAddress,
+            l2TransactionRequest
         );
 
-        calls = appendCall(
-            calls,
-            Call({target: bridgehubAddress, value: ethAmountToPass, data: l2TransactionRequestCalldata})
-        );
+        calls = appendCall(calls, Call({target: interopCenter, value: ethAmountToPass, data: sendMessageCalldata}));
     }
 
     function prepareApproveBaseTokenGovernanceCalls(
@@ -789,21 +850,18 @@ library Utils {
         // 3) Start building up the final calls array
         calls = mergeCalls(calls, approvalCalls);
 
-        // 4) Add the actual requestL2TransactionDirect call to the Bridgehub
-        bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            IL1Bridgehub.requestL2TransactionDirect,
-            (l2TransactionRequestDirect)
+        // 4) Add the actual `sendMessage` call to the L1InteropCenter
+        (address interopCenter, bytes memory sendMessageCalldata) = buildDirectSendMessageCall(
+            bridgehubAddress,
+            l2TransactionRequestDirect
         );
 
-        calls = appendCall(
-            calls,
-            Call({target: bridgehubAddress, value: ethAmountToPass, data: l2TransactionRequestDirectCalldata})
-        );
+        calls = appendCall(calls, Call({target: interopCenter, value: ethAmountToPass, data: sendMessageCalldata}));
 
         return calls;
     }
 
-    function prepareAdminL1L2TwoBridgesTransaction(
+    function prepareAdminL1L2IndirectTransaction(
         uint256 l1GasPrice,
         uint256 l2GasLimit,
         uint256 chainId,
@@ -814,11 +872,11 @@ library Utils {
         bytes memory secondBridgeCalldata,
         address refundRecipient
     ) internal view returns (Call[] memory calls) {
-        // 1) Prepare the L2TransactionRequestTwoBridges (same logic as before)
+        // 1) Prepare the L2TransactionRequestIndirect (same logic as before)
         (
-            L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
+            L2TransactionRequestIndirect memory l2TransactionRequest,
             uint256 requiredValueToDeploy
-        ) = prepareL1L2TransactionTwoBridges(
+        ) = prepareL1L2TransactionIndirect(
                 l1GasPrice,
                 l2GasLimit,
                 chainId,
@@ -840,16 +898,13 @@ library Utils {
         // 3) Merge in the approval calls
         calls = mergeCalls(calls, approvalCalls);
 
-        // 4) Add the actual requestL2TransactionTwoBridges call to the Bridgehub
-        bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            IL1Bridgehub.requestL2TransactionTwoBridges,
-            (l2TransactionRequest)
+        // 4) Add the actual `sendMessage` call to the L1InteropCenter
+        (address interopCenter, bytes memory sendMessageCalldata) = buildIndirectSendMessageCall(
+            bridgehubAddress,
+            l2TransactionRequest
         );
 
-        calls = appendCall(
-            calls,
-            Call({target: bridgehubAddress, value: ethAmountToPass, data: l2TransactionRequestCalldata})
-        );
+        calls = appendCall(calls, Call({target: interopCenter, value: ethAmountToPass, data: sendMessageCalldata}));
 
         return calls;
     }
@@ -899,7 +954,7 @@ library Utils {
         console.logBytes32(txHash);
     }
 
-    function runAdminL1L2TwoBridgesTransaction(
+    function runAdminL1L2IndirectTransaction(
         uint256 l1GasPrice,
         address admin,
         address accessControlRestriction,
@@ -913,7 +968,7 @@ library Utils {
         address refundRecipient
     ) internal returns (bytes32 txHash) {
         // 1) Prepare the calls
-        Call[] memory calls = prepareAdminL1L2TwoBridgesTransaction(
+        Call[] memory calls = prepareAdminL1L2IndirectTransaction(
             l1GasPrice,
             l2GasLimit,
             chainId,
@@ -982,14 +1037,14 @@ library Utils {
             requiredValueToDeploy
         );
 
-        bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            IL1Bridgehub.requestL2TransactionDirect,
-            (l2TransactionRequestDirect)
+        (address interopCenter, bytes memory sendMessageCalldata) = buildDirectSendMessageCall(
+            bridgehubAddress,
+            l2TransactionRequestDirect
         );
 
         console.log("Executing transaction");
         vm.recordLogs();
-        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequestDirectCalldata, requiredValueToDeploy, 0);
+        executeUpgrade(governor, salt, interopCenter, sendMessageCalldata, requiredValueToDeploy, 0);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed successfully! Extracting logs...");
 
@@ -1001,7 +1056,7 @@ library Utils {
         console.logBytes32(txHash);
     }
 
-    function runGovernanceL1L2TwoBridgesTransaction(
+    function runGovernanceL1L2IndirectTransaction(
         uint256 l1GasPrice,
         address governor,
         bytes32 salt,
@@ -1014,9 +1069,9 @@ library Utils {
         bytes memory secondBridgeCalldata
     ) internal returns (bytes32 txHash) {
         (
-            L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
+            L2TransactionRequestIndirect memory l2TransactionRequest,
             uint256 requiredValueToDeploy
-        ) = prepareL1L2TransactionTwoBridges(
+        ) = prepareL1L2TransactionIndirect(
                 l1GasPrice,
                 l2GasLimit,
                 chainId,
@@ -1036,14 +1091,14 @@ library Utils {
             requiredValueToDeploy
         );
 
-        bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            IL1Bridgehub.requestL2TransactionTwoBridges,
-            (l2TransactionRequest)
+        (address interopCenter, bytes memory sendMessageCalldata) = buildIndirectSendMessageCall(
+            bridgehubAddress,
+            l2TransactionRequest
         );
 
         console.log("Executing transaction");
         vm.recordLogs();
-        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequestCalldata, requiredValueToDeploy, 0);
+        executeUpgrade(governor, salt, interopCenter, sendMessageCalldata, requiredValueToDeploy, 0);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed successfully! Extracting logs...");
 

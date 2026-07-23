@@ -967,7 +967,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             secondBridgeData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
         }
 
-        calls = Utils.prepareAdminL1L2TwoBridgesTransaction(
+        calls = Utils.prepareAdminL1L2IndirectTransaction(
             data.l1GasPrice,
             Utils.MAX_PRIORITY_TX_GAS,
             data.gatewayChainId,
@@ -1217,13 +1217,13 @@ contract AdminFunctions is Script, IAdminFunctions {
         );
 
         bytes32 ctmAssetId = IL1Bridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
-        // The CTM asset withdrawal from the gateway back to L1 is routed through the InteropCenter as a
+        // The CTM asset withdrawal from the gateway back to L1 is routed through the L2InteropCenter as a
         // single-call bundle to the L1 asset router (the unified path that replaced L2AssetRouter.withdraw).
-        // The admin L1->L2 transaction runs on the gateway and targets its InteropCenter; the bundle is
+        // The admin L1->L2 transaction runs on the gateway and targets its L2InteropCenter; the bundle is
         // destined for L1 (this script runs on L1, so `block.chainid` is the L1 chain id).
         bytes memory l2Calldata;
         {
-            // Each (sender, salt) pair may be used only once by the InteropCenter; derive the salt from the
+            // Each (sender, salt) pair may be used only once by the L2InteropCenter; derive the salt from the
             // migration content so distinct migrations get distinct salts deterministically.
             l2Calldata = InteropLibrary.encodeWithdrawalSendBundleCalldata(
                 block.chainid,

@@ -4,10 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-import {
-    L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestIndirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -26,6 +23,8 @@ import {
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
+
+import {L1InteropRequests} from "foundry-test/l1/utils/L1InteropRequests.sol";
 
 contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
     //@check Why is this file practically the same as BridgehubTests.t.sol???
@@ -231,7 +230,7 @@ contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
     }
 
     // deposits ERC20 token to the ZK chain where base token is ETH
-    // this function use requestL2TransactionTwoBridges function from shared bridge.
+    // this function use requestL2TransactionIndirect function from shared bridge.
     // tokenAddress should be any ERC20 token, excluding ETH
     function depositERC20ToEthChain(uint256 l2Value, address tokenAddress) private useGivenToken(tokenAddress) {
         uint256 gasPrice = 10000000;
@@ -252,7 +251,7 @@ contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
         currentToken.approve(address(addresses.sharedBridge), l2Value);
 
         bytes memory secondBridgeCallData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
-        L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
+        L2TransactionRequestIndirect memory requestTx = _createL2TransactionRequestIndirect({
             _chainId: currentChainId,
             _mintValue: mintValue,
             _secondBridgeValue: 0,
@@ -264,7 +263,7 @@ contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: mintValue}(requestTx);
+        bytes32 resultantHash = L1InteropRequests.requestIndirect(addresses.l1InteropCenter, mintValue, requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -302,7 +301,7 @@ contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
         currentToken.approve(address(addresses.sharedBridge), mintValue);
 
         bytes memory secondBridgeCallData = abi.encode(ETH_TOKEN_ADDRESS, uint256(0), chainContracts[currentChainId]);
-        L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
+        L2TransactionRequestIndirect memory requestTx = _createL2TransactionRequestIndirect({
             _chainId: currentChainId,
             _mintValue: mintValue,
             _secondBridgeValue: l2Value,
@@ -314,7 +313,7 @@ contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: l2Value}(requestTx);
+        bytes32 resultantHash = L1InteropRequests.requestIndirect(addresses.l1InteropCenter, l2Value, requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -357,7 +356,7 @@ contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
         currentToken.approve(address(addresses.sharedBridge), l2Value);
 
         bytes memory secondBridgeCallData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
-        L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
+        L2TransactionRequestIndirect memory requestTx = _createL2TransactionRequestIndirect({
             _chainId: currentChainId,
             _mintValue: mintValue,
             _secondBridgeValue: 0,
@@ -369,7 +368,7 @@ contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges(requestTx);
+        bytes32 resultantHash = L1InteropRequests.requestIndirect(addresses.l1InteropCenter, 0, requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -414,7 +413,7 @@ contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionDirect{value: mintValue}(txRequest);
+        bytes32 resultantHash = L1InteropRequests.requestDirect(addresses.l1InteropCenter, mintValue, txRequest);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
@@ -458,7 +457,7 @@ contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionDirect(txRequest);
+        bytes32 resultantHash = L1InteropRequests.requestDirect(addresses.l1InteropCenter, 0, txRequest);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);

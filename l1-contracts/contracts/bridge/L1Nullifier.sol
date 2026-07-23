@@ -34,6 +34,12 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IL1Bridgehub public immutable override BRIDGE_HUB;
 
+    /// @dev Era's chainID
+    uint256 internal immutable ERA_CHAIN_ID;
+
+    /// @dev The address of ZKsync Era diamond proxy contract.
+    address internal immutable ERA_DIAMOND_PROXY;
+
     /// @dev MessageRoot smart contract that is used to prove message inclusion.
     IMessageRootBase public immutable MESSAGE_ROOT;
 
@@ -109,10 +115,17 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IL1Bridgehub _bridgehub, IMessageRootBase _messageRoot) reentrancyGuardInitializer {
+    constructor(
+        IL1Bridgehub _bridgehub,
+        IMessageRootBase _messageRoot,
+        uint256 _eraChainId,
+        address _eraDiamondProxy
+    ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
         MESSAGE_ROOT = _messageRoot;
+        ERA_CHAIN_ID = _eraChainId;
+        ERA_DIAMOND_PROXY = _eraDiamondProxy;
     }
 
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy.
@@ -152,11 +165,11 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
-    /// This function is utilized by `requestL2TransactionTwoBridges` to validate the execution of a transaction.
+    /// This function is utilized by the L1InteropCenter indirect-call flow to validate the execution of a transaction.
     /// @param _chainId The chain ID of the ZK chain to which confirm the deposit.
     /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
     /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit.
-    function bridgehubConfirmL2TransactionForwarded(
+    function confirmL2TransactionForwarded(
         uint256 _chainId,
         bytes32 _txDataHash,
         bytes32 _txHash

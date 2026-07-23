@@ -41,7 +41,7 @@ import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymen
 import {L2MessageVerification} from "../../../../../contracts/interop/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 
-import {InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
+import {L2InteropCenter} from "../../../../../contracts/interop/interop-center/L2InteropCenter.sol";
 import {L2InteropHandler} from "../../../../../contracts/interop/interop-handler/L2InteropHandler.sol";
 import {DummyL2L1Messenger} from "../../../../../contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 
@@ -77,10 +77,10 @@ library L2UtilsBase {
         {
             address bridgehub = address(new L2Bridgehub());
             vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
-            address interopCenter = address(new InteropCenter());
+            address interopCenter = address(new L2InteropCenter());
             vm.etch(L2_INTEROP_CENTER_ADDR, interopCenter.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
+            L2InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
                 _args.l1ChainId,
                 _args.aliasedOwner,
                 DataEncoding.encodeNTVAssetId(_args.eraChainId, address(uint160(uint256(keccak256("zkToken")))))

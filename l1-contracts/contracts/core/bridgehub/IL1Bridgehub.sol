@@ -2,23 +2,25 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IBridgehubBase, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "./IBridgehubBase.sol";
+import {IBridgehubBase} from "./IBridgehubBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Interface for L1-specific Bridgehub functionality
 interface IL1Bridgehub is IBridgehubBase {
+    /// @notice Emitted when the L1InteropCenter address is set.
+    event InteropCenterSet(address indexed interopCenter);
+
     /// @notice Get L1 chain ID
     function L1_CHAIN_ID() external view returns (uint256);
-    /// @notice Request L2 transaction directly
-    function requestL2TransactionDirect(
-        L2TransactionRequestDirect calldata _request
-    ) external payable returns (bytes32 canonicalTxHash);
 
-    /// @notice Request L2 transaction through two bridges
-    function requestL2TransactionTwoBridges(
-        L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable returns (bytes32 canonicalTxHash);
+    /// @notice The L1InteropCenter contract, the single user-facing entry point for L1->L2 messaging.
+    /// Downstream contracts (the asset router, the cross-chain senders and the chains' Mailboxes)
+    /// authorize the L1InteropCenter by reading this field.
+    function interopCenter() external view returns (address);
+
+    /// @notice Set the L1InteropCenter contract
+    function setInteropCenter(address _interopCenter) external;
 
     /// @notice Create new chain
     function createNewChain(

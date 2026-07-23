@@ -21,13 +21,13 @@ import {
     NonZeroValueToL1NotSupported
 } from "contracts/interop/InteropErrors.sol";
 
-/// @notice `InteropCenter` send-time destination constraints: an L2->L1 bundle must be exactly one indirect,
+/// @notice `L2InteropCenter` send-time destination constraints: an L2->L1 bundle must be exactly one indirect,
 /// zero-value call to the L2 AssetRouter (a withdrawal), interop can never be initiated from L1 itself, and a
 /// bundle/message can never target the sending chain itself.
 /// @dev Kept in its own abstract (mixed into `L2InteropCenterTestAbstract`, i.e. the L1-context runner) rather than
 /// in `L2InteropLibraryBasicTestAbstract`, because that abstract is also inherited by the zksync `L2InteropLibraryTest`
 /// and the extra test code would push that contract over EraVM's 65536-instruction bytecode limit. These checks are
-/// L2 InteropCenter logic and are fully exercised in the L1 (EVM) context, so no zksync coverage is lost.
+/// L2 L2InteropCenter logic and are fully exercised in the L1 (EVM) context, so no zksync coverage is lost.
 abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils {
     /// @notice Happy path: a single-call token withdrawal to L1 sends successfully and emits `InteropBundleSent`.
     /// The L1 destination is not registered as an interop chain, so this also exercises the L1 base-token asset-ID
@@ -154,7 +154,7 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
     function test_sendBundle_RevertWhen_InitiatedOnL1() public {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = _l1CallStarter(L2_ASSET_ROUTER_ADDR, true, 0);
-        // Pretend the InteropCenter is running on L1.
+        // Pretend the L2InteropCenter is running on L1.
         vm.chainId(L1_CHAIN_ID);
         vm.expectRevert(abi.encodeWithSelector(CannotInitiateInteropOnL1.selector, L1_CHAIN_ID));
         l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, _l1BundleAttributes());

@@ -300,7 +300,7 @@ contract GatewayPreparation is Script {
             abi.encode(assetId, L2_BRIDGEHUB_ADDRESS)
         );
 
-        bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction(
+        bytes32 l2TxHash = Utils.runGovernanceL1L2IndirectTransaction(
             _getL1GasPrice(),
             config.governance,
             governanoceOperationSalt,
@@ -324,7 +324,7 @@ contract GatewayPreparation is Script {
             abi.encode(config.chainTypeManagerProxy, gatewayCTMAddress)
         );
 
-        bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction(
+        bytes32 l2TxHash = Utils.runGovernanceL1L2IndirectTransaction(
             _getL1GasPrice(),
             config.governance,
             governanoceOperationSalt,
@@ -413,7 +413,7 @@ contract GatewayPreparation is Script {
 
         bytes memory secondBridgeData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
 
-        bytes32 l2TxHash = Utils.runAdminL1L2TwoBridgesTransaction(
+        bytes32 l2TxHash = Utils.runAdminL1L2IndirectTransaction(
             _getL1GasPrice(),
             chainAdmin,
             accessControlRestriction,
@@ -460,10 +460,10 @@ contract GatewayPreparation is Script {
         bytes memory l2Calldata;
 
         {
-            // Route the CTM asset withdrawal from the gateway back to L1 through the InteropCenter as a
+            // Route the CTM asset withdrawal from the gateway back to L1 through the L2InteropCenter as a
             // single-call bundle to the L1 asset router (the unified path that replaced
-            // L2AssetRouter.withdraw). The gateway-side ChainAdmin multicall invokes the InteropCenter.
-            // Each (sender, salt) pair may be used only once by the InteropCenter; derive the salt from the
+            // L2AssetRouter.withdraw). The gateway-side ChainAdmin multicall invokes the L2InteropCenter.
+            // Each (sender, salt) pair may be used only once by the L2InteropCenter; derive the salt from the
             // migration content so distinct migrations get distinct salts deterministically.
             bytes memory data = InteropLibrary.encodeWithdrawalSendBundleCalldata(
                 l1ChainId,

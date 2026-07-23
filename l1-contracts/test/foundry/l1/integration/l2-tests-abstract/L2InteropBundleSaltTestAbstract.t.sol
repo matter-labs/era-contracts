@@ -24,7 +24,7 @@ import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2C
 ///      `InteropBundle` is derived as `keccak256(abi.encodePacked(msg.sender, userSalt))`, which keeps bundle hashes
 ///      unique across senders while letting a sender control uniqueness of their own bundles.
 abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
-    /// @notice Mirrors the salt-derivation logic implemented in `InteropCenter._sendBundle`.
+    /// @notice Mirrors the salt-derivation logic implemented in `L2InteropCenter._sendBundle`.
     function _expectedSalt(address _sender, bytes32 _userSalt) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(_sender, _userSalt));
     }

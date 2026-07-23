@@ -157,13 +157,13 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             abi.encode(bytes32(uint256(1)))
         );
 
-        // The CTM-asset chain-migration withdrawal now goes through the InteropCenter as an L2->L1
+        // The CTM-asset chain-migration withdrawal now goes through the L2InteropCenter as an L2->L1
         // withdrawal bundle: a single indirect call to the L2 AssetRouter destined for L1. The
         // indirect call runs L2AssetRouter.initiateIndirectCall, whose burn is routed to the CTM
         // asset handler (the chain-asset-handler), which starts the migration. The transferData for a
         // CTM asset is the ABI-encoded BridgehubBurnCTMAssetData. The bundle sender (ownerWallet) is
         // the chain admin whose authorization the migration burn checks.
-        // The bundle salt is user-provided via the `interopBundleSalt` bundle attribute; the InteropCenter
+        // The bundle salt is user-provided via the `interopBundleSalt` bundle attribute; the L2InteropCenter
         // commits to it together with the sender (keccak256(sender, salt)).
         bytes32 withdrawalBundleSalt = keccak256("ctm-migration-withdrawal-salt");
         bytes[] memory bundleAttributes = new bytes[](1);
@@ -177,7 +177,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         );
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // Verify the InteropCenter emitted the withdrawal bundle (the new L2->L1 withdrawal signal,
+        // Verify the L2InteropCenter emitted the withdrawal bundle (the new L2->L1 withdrawal signal,
         // replacing the removed WithdrawalInitiatedAssetRouter event) and verify its content — the
         // same checks the old event assertions performed (sender, assetId, destination chain, asset
         // data).

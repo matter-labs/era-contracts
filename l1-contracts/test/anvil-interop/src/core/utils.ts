@@ -564,7 +564,7 @@ export async function extractAndRelayInteropBundles(
   logger?: (line: string) => void
 ): Promise<string[]> {
   const log = logger || console.log;
-  const interopCenterIface = new ethers.utils.Interface(getAbi("InteropCenter"));
+  const interopCenterIface = new ethers.utils.Interface(getAbi("L2InteropCenter"));
   const abiCoder = ethers.utils.defaultAbiCoder;
 
   // Extract all InteropBundleSent events
@@ -579,7 +579,7 @@ export async function extractAndRelayInteropBundles(
         bundles.push(parsed.args["interopBundle"]);
       }
     } catch {
-      // Ignore non-InteropCenter logs
+      // Ignore non-L2InteropCenter logs
     }
   }
 
@@ -677,14 +677,14 @@ export async function scanAndRelayPriorityRequests(
 
 /**
  * Extract the InteropBundle struct from a transaction receipt.
- * Parses the InteropBundleSent event emitted by InteropCenter.
+ * Parses the InteropBundleSent event emitted by L2InteropCenter.
  *
  * @returns The interopBundle argument from the first InteropBundleSent event found.
  */
 export async function extractInteropBundle(rpcUrl: string, txHash: string): Promise<InteropBundle> {
   const provider = new providers.JsonRpcProvider(rpcUrl);
   const receipt = await provider.getTransactionReceipt(txHash);
-  const iface = new ethers.utils.Interface(getAbi("InteropCenter"));
+  const iface = new ethers.utils.Interface(getAbi("L2InteropCenter"));
 
   for (const logEntry of receipt.logs) {
     try {
@@ -693,7 +693,7 @@ export async function extractInteropBundle(rpcUrl: string, txHash: string): Prom
         return parsed.args["interopBundle"] as InteropBundle;
       }
     } catch {
-      // Not an InteropCenter log
+      // Not an L2InteropCenter log
     }
   }
   throw new Error(`InteropBundleSent event not found in tx ${txHash}`);

@@ -51,7 +51,7 @@ contract L1AssetRouterReceiveMessageTest is Test {
             makeAddr("bridgehub"),
             makeAddr("nullifier"),
             ERA_CHAIN_ID,
-            makeAddr("eraDiamond")
+            makeAddr("eraDiamondProxy")
         );
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(impl),

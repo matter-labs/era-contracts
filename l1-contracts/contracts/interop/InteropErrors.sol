@@ -23,6 +23,8 @@ error DirectCallToL1NotSupported();
 error EmptyBundle();
 // 0xe845be4c
 error ExecutingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes executionAddress);
+// 0x77eb8fcf
+error FactoryDepsNotAllowedForIndirectCall();
 // 0x16b0fa00
 error FeeWithdrawalFailed();
 // 0x62d214aa
@@ -43,6 +45,8 @@ error InteropRootAlreadyExists();
 error InvalidInteropBundleVersion();
 // 0xd5f13973
 error InvalidInteropCallVersion();
+// 0x9ccc7cc6
+error L1ToL2TransactionParamsMissing();
 // 0x32c2e156
 error MessageNotIncluded();
 // 0x6a430157
@@ -51,6 +55,8 @@ error MultiCallToL1NotSupported(uint256 callCount);
 error NonZeroValueToL1NotSupported(uint256 value);
 // 0x2f59bd0d
 error SidesLengthNotOne();
+// 0x96adc841
+error SingleCallBundleRequired(uint256 callCount);
 // 0x89fd2c76
 error UnauthorizedMessageSender(address expected, address actual);
 // 0x0345c281

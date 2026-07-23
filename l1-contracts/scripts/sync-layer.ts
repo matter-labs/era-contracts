@@ -18,6 +18,8 @@ import {
   L2_BRIDGEHUB_ADDRESS,
   computeL2Create2Address,
   DIAMOND_CUT_DATA_ABI_STRING,
+  encodeIndirectInteropRequest,
+  l1InteropCenterInterface,
 } from "../src.ts/utils";
 
 import { Wallet as ZkWallet, Provider as ZkProvider, utils as zkUtils } from "zksync-ethers";
@@ -421,24 +423,30 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   const assetRouter = deployer.defaultSharedBridge(deployer.deployWallet);
   const assetId = await l1Bridgehub.ctmAssetIdFromChainId(chainId);
 
+  // L1->L2 transactions are requested through the L1InteropCenter ERC-7786 `sendMessage`
+  // indirect flow (the former `L1Bridgehub.requestL2TransactionTwoBridges`).
+  const interopCenterAddress = await l1Bridgehub.interopCenter();
+
   // Setting the L2 bridgehub as the counterpart for the CTM asset
+  const ctmAssetMessage = encodeIndirectInteropRequest({
+    chainId,
+    mintValue: value,
+    l2Value: 0,
+    l2GasLimit: priorityTxMaxGasLimit,
+    l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
+    refundRecipient: deployer.deployWallet.address,
+    secondBridgeAddress: assetRouter.address,
+    secondBridgeValue: 0,
+    secondBridgeCalldata:
+      "0x02" + ethers.utils.defaultAbiCoder.encode(["bytes32", "address"], [assetId, L2_BRIDGEHUB_ADDRESS]).slice(2),
+  });
   const receipt2 = await deployer.executeUpgrade(
-    l1Bridgehub.address,
+    interopCenterAddress,
     ethIsBaseToken ? value : 0,
-    l1Bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
-      {
-        chainId,
-        mintValue: value,
-        l2Value: 0,
-        l2GasLimit: priorityTxMaxGasLimit,
-        l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
-        refundRecipient: deployer.deployWallet.address,
-        secondBridgeAddress: assetRouter.address,
-        secondBridgeValue: 0,
-        secondBridgeCalldata:
-          "0x02" +
-          ethers.utils.defaultAbiCoder.encode(["bytes32", "address"], [assetId, L2_BRIDGEHUB_ADDRESS]).slice(2),
-      },
+    l1InteropCenterInterface().encodeFunctionData("sendMessage", [
+      ctmAssetMessage.recipient,
+      ctmAssetMessage.payload,
+      ctmAssetMessage.attributes,
     ])
   );
   const l2TxHash = zkUtils.getL2HashFromPriorityOp(receipt2, gatewayAddress);
@@ -460,22 +468,25 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   console.log(`L2 CTM address ${l2CTMAddress} registered on gateway, txHash: ${receipt3.transactionHash}`);
 
   // Setting the corresponding CTM address on L2.
+  const ctmAddressMessage = encodeIndirectInteropRequest({
+    chainId,
+    mintValue: value,
+    l2Value: 0,
+    l2GasLimit: priorityTxMaxGasLimit,
+    l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
+    refundRecipient: deployer.deployWallet.address,
+    secondBridgeAddress: ctmDeploymentTracker.address,
+    secondBridgeValue: 0,
+    secondBridgeCalldata:
+      "0x01" + ethers.utils.defaultAbiCoder.encode(["address", "address"], [l1CTM.address, l2CTMAddress]).slice(2),
+  });
   const receipt4 = await deployer.executeUpgrade(
-    l1Bridgehub.address,
+    interopCenterAddress,
     value,
-    l1Bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
-      {
-        chainId,
-        mintValue: value,
-        l2Value: 0,
-        l2GasLimit: priorityTxMaxGasLimit,
-        l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
-        refundRecipient: deployer.deployWallet.address,
-        secondBridgeAddress: ctmDeploymentTracker.address,
-        secondBridgeValue: 0,
-        secondBridgeCalldata:
-          "0x01" + ethers.utils.defaultAbiCoder.encode(["address", "address"], [l1CTM.address, l2CTMAddress]).slice(2),
-      },
+    l1InteropCenterInterface().encodeFunctionData("sendMessage", [
+      ctmAddressMessage.recipient,
+      ctmAddressMessage.payload,
+      ctmAddressMessage.attributes,
     ])
   );
   const l2TxHash3 = zkUtils.getL2HashFromPriorityOp(receipt4, gatewayAddress);

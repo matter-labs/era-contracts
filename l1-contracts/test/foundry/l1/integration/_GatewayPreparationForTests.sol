@@ -15,16 +15,15 @@ import {AdminFunctions} from "deploy-scripts/AdminFunctions.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {
-    BridgehubBurnCTMAssetData,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {BridgehubBurnCTMAssetData, L2TransactionRequestIndirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {ConfirmTransferResultData, TxStatus} from "contracts/common/Messaging.sol";
+import {IL1InteropCenter} from "contracts/interop/IL1InteropCenter.sol";
+import {L1InteropRequests} from "foundry-test/l1/utils/L1InteropRequests.sol";
 
 contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
     using stdToml for string;
@@ -198,7 +197,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         );
         bytes memory secondBridgeData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
 
-        // Compute required value (baseCost * 2 as in Utils.prepareL1L2TransactionTwoBridges)
+        // Compute required value (baseCost * 2 as in Utils.prepareL1L2TransactionIndirect)
         uint256 l1GasPrice = _getL1GasPrice();
         uint256 requiredValue = bridgehub.l2TransactionBaseCost(
             _gatewayGovernanceConfig.gatewayChainId,
@@ -207,12 +206,17 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
             REQUIRED_L2_GAS_PRICE_PER_PUBDATA
         ) * 2;
 
-        // Call requestL2TransactionTwoBridges directly from chain admin.
+        // Resolve the interop center before the broadcast window (the view call must not consume it).
+        IL1InteropCenter interopCenter = IL1InteropCenter(bridgehub.interopCenter());
+
+        // Send the two-bridges request via the L1InteropCenter `sendMessage` directly from chain admin.
         // This sets isMigrationInProgress[chainId] = true and pausedDepositsTimestamp on the diamond proxy.
         // Capture the canonical L2 tx hash returned by the function.
         vm.startBroadcast(chainAdmin);
-        bytes32 canonicalTxHash = bridgehub.requestL2TransactionTwoBridges{value: requiredValue}(
-            L2TransactionRequestTwoBridgesOuter({
+        bytes32 canonicalTxHash = L1InteropRequests.requestIndirect(
+            interopCenter,
+            requiredValue,
+            L2TransactionRequestIndirect({
                 chainId: _gatewayGovernanceConfig.gatewayChainId,
                 mintValue: requiredValue,
                 l2Value: 0,

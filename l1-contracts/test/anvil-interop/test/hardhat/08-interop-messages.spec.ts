@@ -48,7 +48,7 @@ const ANVIL_INTEROP_PROTOCOL_FEE = ethers.BigNumber.from(ANVIL_INTEROP_PROTOCOL_
 /**
  * 08 - Interop Messages (sendMessage / executeBundle)
  *
- * Tests InteropCenter.sendMessage() for cross-chain value transfers
+ * Tests L2InteropCenter.sendMessage() for cross-chain value transfers
  * (base token and ERC20) and verifies that executeBundle on the destination
  * chain delivers the correct balances.
  *
@@ -141,7 +141,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
           "   The ZK token has not yet been bridged to the source chain; fixed ZK fee tests will be skipped."
         );
       } else {
-        expect(interopZkTokenAddress, "InteropCenter should resolve the seeded ZK token").to.equal(
+        expect(interopZkTokenAddress, "L2InteropCenter should resolve the seeded ZK token").to.equal(
           sourceZkTokenAddress
         );
         const zkBalance = await getTokenBalance(sourceProvider, sourceZkTokenAddress, getInteropSourceAddress());

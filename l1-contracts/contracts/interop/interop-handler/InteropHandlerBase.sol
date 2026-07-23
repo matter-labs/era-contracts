@@ -292,9 +292,9 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
     /// @param _bundle The abi-encoded InteropBundle struct corresponding to the bundle that is to be verified.
     /// @param _proof Proof for the message that corresponds to the bundle that is to be verified.
     /// @param _bundleHash Hash corresponding to the bundle that is to be verified.
-    /// That message gets sent to L1 by origin chain in InteropCenter contract, and is picked up and included in receiving chain by sequencer.
+    /// That message gets sent to L1 by origin chain in L2InteropCenter contract, and is picked up and included in receiving chain by sequencer.
     function _verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bytes32 _bundleHash) internal {
-        // Verify that the message came from the legitimate InteropCenter.
+        // Verify that the message came from the legitimate L2InteropCenter.
         // The bundle is authenticated solely by message inclusion plus the sender being the
         // canonical `L2_INTEROP_CENTER_ADDR`. Asset correctness across chains is guaranteed by ZK
         // proofs (assuming proofs are correct and chains are not malicious), so no on-chain

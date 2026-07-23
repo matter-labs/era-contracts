@@ -25,6 +25,11 @@
                     "internalType": "address"
                   },
                   {
+                    "name": "interopCenter",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
                     "name": "messageRoot",
                     "type": "address",
                     "internalType": "address"
@@ -53,6 +58,11 @@
                 "components": [
                   {
                     "name": "bridgehub",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "interopCenter",
                     "type": "address",
                     "internalType": "address"
                   },

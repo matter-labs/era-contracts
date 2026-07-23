@@ -59,6 +59,7 @@ import {IMessageRootBase, IMessageVerification} from "contracts/core/message-roo
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
+import {L1InteropRequests} from "foundry-test/l1/utils/L1InteropRequests.sol";
 
 import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
 
@@ -276,7 +277,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         uint256 senderBalanceBefore = address(this).balance;
 
         vm.recordLogs();
-        bytes32 canonicalTxHash = addresses.bridgehub.requestL2TransactionDirect{value: expectedValue}(request);
+        bytes32 canonicalTxHash = L1InteropRequests.requestDirect(addresses.l1InteropCenter, expectedValue, request);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Verify transaction was created
@@ -453,7 +454,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         bytes memory bridgehubMintData = abi.encode(data);
         // The CTM asset withdrawal from the gateway arrives as a single-call interop bundle emitted by
-        // the gateway's InteropCenter (see `GatewayPreparation.startMigrateChainFromGateway`).
+        // the gateway's L2InteropCenter (see `GatewayPreparation.startMigrateChainFromGateway`).
         bytes memory message = _encodeWithdrawalBundleMessage(gatewayChainId, assetId, bridgehubMintData);
 
         GatewayUtils userUtils = new GatewayUtils();
@@ -639,8 +640,9 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     }
 
     function _setDepositHappened(uint256 _chainId, bytes32 _txHash, bytes32 _txDataHash) internal {
-        vm.startBroadcast(address(addresses.bridgehub));
-        IL1AssetRouter(address(addresses.bridgehub.assetRouter())).bridgehubConfirmL2Transaction({
+        // `confirmL2Transaction` is gated to the L1InteropCenter.
+        vm.startBroadcast(address(addresses.l1InteropCenter));
+        IL1AssetRouter(address(addresses.bridgehub.assetRouter())).confirmL2Transaction({
             _chainId: _chainId,
             _txDataHash: _txDataHash,
             _txHash: _txHash

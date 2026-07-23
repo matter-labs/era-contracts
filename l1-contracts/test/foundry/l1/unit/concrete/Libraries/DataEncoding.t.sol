@@ -268,7 +268,7 @@ contract DataEncodingTest is Test {
     /// ZERO value (both the `indirectCall` message value and `interopCallValue` are 0). This is precisely why
     /// it cannot be used for base-token withdrawals: the base token can only be withdrawn by actually moving
     /// value, whereas this call moves the amount purely inside `_transferData` for the asset handler to release
-    /// on L1. Base-token withdrawals instead go through the InteropCenter's value-carrying path.
+    /// on L1. Base-token withdrawals instead go through the L2InteropCenter's value-carrying path.
     function test_encodeInteropWithdrawalCallStarters_isZeroValueIndirectCallToAssetRouter() public pure {
         bytes32 assetId = keccak256("some-erc20-asset");
         bytes memory transferData = hex"c0ffee";
@@ -307,7 +307,7 @@ contract DataEncodingTest is Test {
     /// @notice The base-token withdrawal encoder produces the same single indirect call to the L2 AssetRouter,
     /// but with the withdrawn amount riding as the `indirectCall` message value (burned from the `sendBundle`
     /// transaction value). `interopCallValue` must stay zero — destination-side call value is rejected for L1
-    /// destinations by the InteropCenter.
+    /// destinations by the L2InteropCenter.
     function test_encodeInteropBaseTokenWithdrawalCallStarters_carriesAmountAsIndirectCallValue() public pure {
         bytes32 assetId = keccak256("base-token-asset");
         bytes memory transferData = hex"c0ffee";

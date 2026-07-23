@@ -49,6 +49,9 @@ import {
   computeL2Create2Address,
   priorityTxMaxGasLimit,
   isCurrentNetworkLocal,
+  encodeDirectInteropRequest,
+  encodeIndirectInteropRequest,
+  l1InteropCenterInterface,
 } from "./utils";
 import {
   DIAMOND_CUT_DATA_ABI_STRING,
@@ -479,7 +482,7 @@ export class Deployer {
     ethTxOptions: ethers.providers.TransactionRequest
   ) {
     const contractAddress = await this.deployViaCreate2(
-      "InteropCenter",
+      "L2InteropCenter",
       [this.addresses.Bridgehub.BridgehubProxy, await this.getL1ChainId(), this.addresses.Governance],
       create2Salt,
       ethTxOptions
@@ -493,7 +496,7 @@ export class Deployer {
   }
 
   public async deployInteropCenterProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    const bridgehub = new Interface(hardhat.artifacts.readArtifactSync("InteropCenter").abi);
+    const bridgehub = new Interface(hardhat.artifacts.readArtifactSync("L2InteropCenter").abi);
 
     const initCalldata = bridgehub.encodeFunctionData("initialize", [this.addresses.Governance]);
 
@@ -819,21 +822,23 @@ export class Deployer {
         baseToken.interface.encodeFunctionData("approve", [this.addresses.Bridges.SharedBridgeProxy, value])
       );
     }
-    const l1Calldata = bridgehub.interface.encodeFunctionData("requestL2TransactionDirect", [
-      {
-        chainId,
-        l2Contract: targetAddress,
-        mintValue: value,
-        l2Value: 0,
-        l2Calldata: callData,
-        l2GasLimit: l2GasLimit,
-        l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
-        factoryDeps: [],
-        refundRecipient: this.deployWallet.address,
-      },
-    ]);
+    // L1->L2 transactions are requested through the L1InteropCenter ERC-7786 `sendMessage`
+    // entry point (the former `L1Bridgehub.requestL2TransactionDirect`).
+    const interopCenterAddress = await bridgehub.interopCenter();
+    const { recipient, payload, attributes } = encodeDirectInteropRequest({
+      chainId,
+      l2Contract: targetAddress,
+      mintValue: value,
+      l2Value: 0,
+      l2Calldata: callData,
+      l2GasLimit: l2GasLimit,
+      l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
+      factoryDeps: [],
+      refundRecipient: this.deployWallet.address,
+    });
+    const l1Calldata = l1InteropCenterInterface().encodeFunctionData("sendMessage", [recipient, payload, attributes]);
     const receipt = await this.executeUpgrade(
-      this.addresses.Bridgehub.BridgehubProxy,
+      interopCenterAddress,
       ethIsBaseToken ? value : 0,
       l1Calldata,
       {
@@ -1343,24 +1348,24 @@ export class Deployer {
     sharedBridgeData = "0x01" + sharedBridgeData.slice(2);
 
     // And now we 'transfer' the chain through the bridge (it behaves like a 'regular' asset, where we 'freeze' it in L1
-    // and then create on SyncLayer). You can see these methods in Admin.sol (part of DiamondProxy).
+    // and then create on SyncLayer). The request goes through the L1InteropCenter ERC-7786 `sendMessage`
+    // indirect flow (the former `L1Bridgehub.requestL2TransactionTwoBridges`).
+    const interopCenterAddress = await bridgehub.interopCenter();
+    const { recipient, payload, attributes } = encodeIndirectInteropRequest({
+      chainId: gatewayChainId,
+      mintValue: expectedCost,
+      l2Value: 0,
+      l2GasLimit: l2GasLimit,
+      l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      refundRecipient: await this.deployWallet.getAddress(),
+      secondBridgeAddress: this.addresses.Bridges.SharedBridgeProxy,
+      secondBridgeValue: 0,
+      secondBridgeCalldata: sharedBridgeData,
+    });
     const receipt = await this.executeChainAdminMulticall([
       {
-        target: bridgehub.address,
-        data: bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
-          // These arguments must match L2TransactionRequestTwoBridgesOuter struct.
-          {
-            chainId: gatewayChainId,
-            mintValue: expectedCost,
-            l2Value: 0,
-            l2GasLimit: l2GasLimit,
-            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            refundRecipient: await this.deployWallet.getAddress(),
-            secondBridgeAddress: this.addresses.Bridges.SharedBridgeProxy,
-            secondBridgeValue: 0,
-            secondBridgeCalldata: sharedBridgeData,
-          },
-        ]),
+        target: interopCenterAddress,
+        data: l1InteropCenterInterface().encodeFunctionData("sendMessage", [recipient, payload, attributes]),
         value: expectedCost,
       },
     ]);

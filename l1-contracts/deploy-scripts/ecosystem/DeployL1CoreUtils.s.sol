@@ -6,6 +6,7 @@ pragma solidity ^0.8.24;
 import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {L1InteropCenter} from "contracts/interop/interop-center/L1InteropCenter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
@@ -99,7 +100,7 @@ contract DeployL1CoreUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "ChainRegistrationSender")) {
             return abi.encode(coreAddresses.bridgehub.proxies.bridgehub);
-        } else if (compareStrings(contractName, "InteropCenter")) {
+        } else if (compareStrings(contractName, "L2InteropCenter")) {
             return abi.encode(coreAddresses.bridgehub.proxies.bridgehub, config.l1ChainId, config.ownerAddress);
         } else if (compareStrings(contractName, "BridgedStandardERC20")) {
             return abi.encode();
@@ -107,6 +108,8 @@ contract DeployL1CoreUtils is DeployUtils {
             return abi.encode(coreAddresses.bridges.bridgedStandardERC20Implementation);
         } else if (compareStrings(contractName, "L1Bridgehub")) {
             return abi.encode(config.ownerAddress, config.contracts.maxNumberOfChains);
+        } else if (compareStrings(contractName, "L1InteropCenter")) {
+            return abi.encode(coreAddresses.bridgehub.proxies.bridgehub, config.ownerAddress);
         } else if (
             compareStrings(contractName, "L1MessageRoot") ||
             compareStrings(contractName, "DummyL1MessageRoot") ||
@@ -130,7 +133,13 @@ contract DeployL1CoreUtils is DeployUtils {
                     coreAddresses.bridgehub.proxies.messageRoot
                 );
         } else if (compareStrings(contractName, "L1Nullifier")) {
-            return abi.encode(coreAddresses.bridgehub.proxies.bridgehub, coreAddresses.bridgehub.proxies.messageRoot);
+            return
+                abi.encode(
+                    coreAddresses.bridgehub.proxies.bridgehub,
+                    coreAddresses.bridgehub.proxies.messageRoot,
+                    config.eraChainId,
+                    config.eraDiamondProxyAddress
+                );
         } else if (compareStrings(contractName, "L1InteropHandler")) {
             return abi.encode(coreAddresses.bridgehub.proxies.messageRoot);
         } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
@@ -195,6 +204,8 @@ contract DeployL1CoreUtils is DeployUtils {
         if (!isZKBytecode) {
             if (compareStrings(contractName, "L1Bridgehub")) {
                 return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "L1InteropCenter")) {
+                return abi.encodeCall(L1InteropCenter.initialize, (config.deployerAddress));
             } else if (
                 compareStrings(contractName, "L1MessageRoot") || compareStrings(contractName, "DummyL1MessageRoot")
             ) {

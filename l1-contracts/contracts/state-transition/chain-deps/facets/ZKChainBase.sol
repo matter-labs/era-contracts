@@ -102,8 +102,12 @@ contract ZKChainBase is ReentrancyGuard {
         _;
     }
 
-    modifier onlyBridgehub() {
-        if (msg.sender != s.bridgehub) {
+    /// @dev Restricts the call to the L1InteropCenter, resolved dynamically through the Bridgehub so
+    /// that the chain does not need to store its address. Only used for L1-only entry points: on chains
+    /// whose `s.bridgehub` is the L2 Bridgehub (which has no `interopCenter()`), the resolution reverts,
+    /// making the gated function unreachable there by construction.
+    modifier onlyL1InteropCenter() {
+        if (msg.sender != IL1Bridgehub(s.bridgehub).interopCenter()) {
             revert Unauthorized(msg.sender);
         }
         _;

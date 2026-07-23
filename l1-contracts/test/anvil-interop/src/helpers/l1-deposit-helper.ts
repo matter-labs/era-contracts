@@ -12,6 +12,7 @@ import {
 } from "../core/const";
 import { runtimeConfig } from "../core/runtime-config";
 import { encodeAssetRouterBridgehubDepositData, encodeBridgeBurnData, encodeNtvAssetId } from "../core/data-encoding";
+import { encodeDirectInteropRequest, encodeIndirectInteropRequest } from "../core/interop-requests";
 
 export interface DepositETHParams {
   l1RpcUrl: string;
@@ -52,10 +53,11 @@ export interface DepositERC20Result {
 }
 
 /**
- * Deposit ETH from L1 to an L2 chain via Bridgehub.requestL2TransactionDirect.
+ * Deposit ETH from L1 to an L2 chain via L1InteropCenter.sendMessage
+ * (the direct flow that replaced Bridgehub.requestL2TransactionDirect).
  *
  * For ETH-base-token chains, the base token deposit goes through the direct path
- * (TwoBridges rejects base token deposits with AssetIdNotSupported).
+ * (the indirect / two-bridges flow rejects base token deposits with AssetIdNotSupported).
  * The settlement route is resolved from L1 Bridgehub:
  * direct-settled chains relay L1 -> L2, gateway-settled chains relay L1 -> GW -> L2
  * through nested NewPriorityRequest events.
@@ -89,10 +91,16 @@ export async function depositETHToL2(params: DepositETHParams): Promise<DepositE
     refundRecipient: recipient,
   };
 
-  console.log(`   Depositing ${ethers.utils.formatEther(amount)} ETH to chain ${chainId} via Direct...`);
+  console.log(
+    `   Depositing ${ethers.utils.formatEther(amount)} ETH to chain ${chainId} via L1InteropCenter.sendMessage (direct)...`
+  );
   console.log(`   baseCost: ${baseCost.toString()}, amount: ${amount.toString()}`);
 
-  const tx = await bridgehub.requestL2TransactionDirect(request, {
+  const interopCenterAddr: string = await bridgehub.interopCenter();
+  const interopCenter = new Contract(interopCenterAddr, getAbi("L1InteropCenter"), l1Wallet);
+  const { recipient: messageRecipient, payload, attributes } = encodeDirectInteropRequest(request);
+
+  const tx = await interopCenter.sendMessage(messageRecipient, payload, attributes, {
     value: mintValue,
     gasLimit: 5_000_000,
   });
@@ -122,7 +130,8 @@ export async function depositETHToL2(params: DepositETHParams): Promise<DepositE
 }
 
 /**
- * Deposit an L1 ERC20 token to an L2 chain via Bridgehub.requestL2TransactionTwoBridges.
+ * Deposit an L1 ERC20 token to an L2 chain via L1InteropCenter.sendMessage with the
+ * `indirectCall` attribute (the flow that replaced Bridgehub.requestL2TransactionTwoBridges).
  *
  * This uses L1AssetRouter as the second bridge and relays the emitted priority requests
  * to the target chain (or L1 -> GW -> L2 for GW-settled chains).
@@ -158,7 +167,7 @@ export async function depositERC20ToL2(params: DepositERC20Params): Promise<Depo
   }
 
   // The NativeTokenVault pulls the tokens directly via `safeTransferFrom` during
-  // `bridgehubDeposit` (see `NativeTokenVaultBase._depositFunds`), so the caller
+  // `initiateIndirectCall` (see `NativeTokenVaultBase._depositFunds`), so the caller
   // must approve the NTV — not the asset router. (Legacy removal deleted the
   // shared-bridge token-pull path that used to require an asset-router approval.)
   const currentAllowance = await token.allowance(l1Wallet.address, l1Addresses.l1NativeTokenVault);
@@ -177,26 +186,33 @@ export async function depositERC20ToL2(params: DepositERC20Params): Promise<Depo
     encodeBridgeBurnData(amount, recipient, tokenAddress)
   );
 
-  const tx = await bridgehub.requestL2TransactionTwoBridges(
-    {
-      chainId,
-      mintValue,
-      l2Value: 0,
-      l2GasLimit,
-      l2GasPerPubdataByteLimit,
-      refundRecipient: recipient,
-      secondBridgeAddress: assetRouter.address,
-      secondBridgeValue: 0,
-      secondBridgeCalldata,
-    },
-    {
-      value: mintValue,
-      gasLimit: 5_000_000,
-    }
-  );
+  const interopCenterAddr: string = await bridgehub.interopCenter();
+  const interopCenter = new Contract(interopCenterAddr, getAbi("L1InteropCenter"), l1Wallet);
+  const {
+    recipient: messageRecipient,
+    payload,
+    attributes,
+  } = encodeIndirectInteropRequest({
+    chainId,
+    mintValue,
+    l2Value: 0,
+    l2GasLimit,
+    l2GasPerPubdataByteLimit,
+    refundRecipient: recipient,
+    secondBridgeAddress: assetRouter.address,
+    secondBridgeValue: 0,
+    secondBridgeCalldata,
+  });
+
+  const tx = await interopCenter.sendMessage(messageRecipient, payload, attributes, {
+    value: mintValue,
+    gasLimit: 5_000_000,
+  });
   const l1Receipt = await tx.wait();
 
-  console.log(`   Depositing ${ethers.utils.formatUnits(amount, 18)} ERC20 to chain ${chainId} via TwoBridges...`);
+  console.log(
+    `   Depositing ${ethers.utils.formatUnits(amount, 18)} ERC20 to chain ${chainId} via L1InteropCenter.sendMessage (indirect)...`
+  );
   console.log(`   L1 tx: cast run ${tx.hash} -r ${l1RpcUrl}`);
 
   const txHashes = await extractAndRelayNewPriorityRequests(

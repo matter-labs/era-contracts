@@ -5,11 +5,8 @@ import {Test} from "forge-std/Test.sol";
 
 import {console2 as console} from "forge-std/console2.sol";
 
-import {
-    IL1Bridgehub,
-    L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestIndirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {BridgehubInvariantTests_1} from "test/foundry/l1/integration/BridgehubInvariantTests_1.t.sol";
 

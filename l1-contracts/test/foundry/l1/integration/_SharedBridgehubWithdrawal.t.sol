@@ -63,7 +63,7 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
     /// @notice Drives a real `L1InteropHandler.executeBundle` for the current chain's base-token withdrawal
     /// and asserts the balance outcomes.
     /// @dev Replaces the removed legacy `L1AssetRouter.finalizeWithdrawal` flow. The withdrawal is
-    /// reconstructed as the single-call interop bundle emitted by the L2 InteropCenter whose only call targets
+    /// reconstructed as the single-call interop bundle emitted by the L2 L2InteropCenter whose only call targets
     /// the L1 asset router's `finalizeDeposit` (the base-token assetId plus `encodeBridgeMintData` transfer
     /// data), and is finalized on L1 via `L1InteropHandler.executeBundle`.
     ///
@@ -76,7 +76,7 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
     /// @param _isEth Whether the chain's base token is native ETH (vs an ERC20).
     function _finalizeBaseTokenWithdrawal(uint256 _amountToWithdraw, bool _isEth) internal {
         // The withdrawal message carries the chain's base-token assetId. It is finalized via the
-        // interop-bundle path, so the L2 sender is the L2 InteropCenter (the only sender the
+        // interop-bundle path, so the L2 sender is the L2 L2InteropCenter (the only sender the
         // nullifier accepts).
         bytes32 assetId = addresses.bridgehub.baseTokenAssetId(currentChainId);
 
@@ -140,7 +140,7 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
 
     /// @notice Builds the withdrawal `bundle` and its `MessageInclusionProof` for a base-token withdrawal of
     /// `_amount` to `currentUser`, as consumed by `L1InteropHandler.executeBundle`.
-    /// @dev Reconstructs the single-call interop bundle emitted by the L2 InteropCenter. For a base-token
+    /// @dev Reconstructs the single-call interop bundle emitted by the L2 L2InteropCenter. For a base-token
     /// withdrawal, the original caller and origin token are empty and the metadata is empty (see
     /// `l2-withdrawal-helper.ts::finalizeWithdrawalOnL1`). The proof's message data is a placeholder because the
     /// handler substitutes it with the bundle while verifying inclusion (which is mocked here anyway).

@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 /// @title IERC7786Attributes
 /// @notice Interface for the ERC7786 gateway source
-/// @dev When adding/removing a function here the InteropCenter must be updated to reflect the changes.
+/// @dev When adding/removing a function here the L2InteropCenter must be updated to reflect the changes.
 /// https://github.com/ethereum/ERCs/blob/023a7d657666308568d3d1391c578d5972636093/ERCS/erc-7786.md
 interface IERC7786Attributes {
     function indirectCall(uint256 _indirectCallMessageValue) external pure;
@@ -32,4 +32,25 @@ interface IERC7786Attributes {
     /// @dev Omitting this attribute (or passing `bytes32(0)`) is allowed but discouraged: since each salt must be unique
     ///      per sender, a sender can send at most one bundle without a distinct, non-zero salt.
     function interopBundleSalt(bytes32 _salt) external pure;
+
+    /// @notice Parameters of the L1->L2 priority transaction that delivers a message sent from L1.
+    /// @param _mintValue The total amount of the destination chain's base token to be minted with the transaction.
+    /// It must cover both the transaction fee (base cost) and the value passed with the message (`interopCallValue`).
+    /// @param _l2GasLimit The gas limit of the L2 transaction.
+    /// @param _l2GasPerPubdataByteLimit The maximum amount of L2 gas that the operator may charge the user per pubdata byte.
+    /// @param _refundRecipient The address on the destination chain that receives the fee refund.
+    /// If zero, the refund is sent to the (possibly aliased) sender of the message.
+    /// @dev This attribute is required for every message sent through the L1InteropCenter and is not supported on L2s.
+    function l1ToL2TransactionParams(
+        uint256 _mintValue,
+        uint256 _l2GasLimit,
+        uint256 _l2GasPerPubdataByteLimit,
+        address _refundRecipient
+    ) external pure;
+
+    /// @notice Factory dependencies to be published with the L1->L2 priority transaction.
+    /// @dev This attribute is optional, only supported for direct calls sent through the L1InteropCenter
+    /// and is not supported on L2s. For indirect calls the factory dependencies are provided by the
+    /// cross-chain sender (e.g. the asset router) instead.
+    function factoryDeps(bytes[] calldata _factoryDeps) external pure;
 }

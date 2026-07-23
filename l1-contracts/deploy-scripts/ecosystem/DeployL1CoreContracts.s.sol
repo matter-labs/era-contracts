@@ -94,6 +94,10 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridgehub.proxies.bridgehub
         ) = deployTuppWithContract("L1Bridgehub", false);
         (
+            coreAddresses.bridgehub.implementations.interopCenter,
+            coreAddresses.bridgehub.proxies.interopCenter
+        ) = deployTuppWithContract("L1InteropCenter", false);
+        (
             coreAddresses.bridgehub.implementations.chainAssetHandler,
             coreAddresses.bridgehub.proxies.chainAssetHandler
         ) = deployTuppWithContract("L1ChainAssetHandler", false);
@@ -163,6 +167,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             coreAddresses.bridgehub.proxies.chainRegistrationSender
         );
+        bridgehub.setInteropCenter(coreAddresses.bridgehub.proxies.interopCenter);
         chainAssetHandler.setAddresses();
         vm.stopBroadcast();
         console.log("SharedBridge registered");
@@ -197,6 +202,8 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         IOwnable(address(bridgehub)).transferOwnership(coreAddresses.shared.governance);
         bridgehub.setPendingAdmin(coreAddresses.shared.bridgehubAdmin);
 
+        IOwnable(coreAddresses.bridgehub.proxies.interopCenter).transferOwnership(coreAddresses.shared.governance);
+
         IL1AssetRouter sharedBridge = IL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
         IOwnable(address(sharedBridge)).transferOwnership(coreAddresses.shared.governance);
 
@@ -228,6 +235,12 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             "bridgehub",
             "bridgehub_implementation_addr",
             coreAddresses.bridgehub.implementations.bridgehub
+        );
+        vm.serializeAddress("bridgehub", "interop_center_proxy_addr", coreAddresses.bridgehub.proxies.interopCenter);
+        vm.serializeAddress(
+            "bridgehub",
+            "interop_center_implementation_addr",
+            coreAddresses.bridgehub.implementations.interopCenter
         );
         vm.serializeAddress(
             "bridgehub",

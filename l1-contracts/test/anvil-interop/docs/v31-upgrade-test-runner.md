@@ -33,7 +33,7 @@ In production, a v31 protocol upgrade proceeds as:
    - Force-deploys new L2 system contract bytecodes (via ContractDeployer on Era, or the
      bytecode deployer on ZKsyncOS)
    - Delegatecalls to `L2V31Upgrade.upgrade()` which initializes new contracts (NTV, Bridgehub,
-     AssetRouter, L2AssetTracker, ChainAssetHandler, InteropCenter, BaseToken, etc.)
+     AssetRouter, L2AssetTracker, ChainAssetHandler, L2InteropCenter, BaseToken, etc.)
 
 7. **Stage 3**: Post-governance migration. Registers bridged tokens in NTV and migrates token
    legacy bridged tokens in the NTV (shared logic in `TokenMigrationUtils`).

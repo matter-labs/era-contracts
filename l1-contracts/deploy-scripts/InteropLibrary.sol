@@ -12,8 +12,7 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
-// import {IInteropCenter} from "contracts/interop/InteropCenter.sol";
-import {InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {IInteropCenterBase} from "contracts/interop/IInteropCenterBase.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {AmountMustBeGreaterThanZero, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
@@ -55,7 +54,7 @@ library InteropLibrary {
     /// @notice Build a single InteropCallStarter with provided attributes for sending a call.
     /// @param salt Salt mixed into the bundle's `interopBundleSalt`. Provide a random value: it keeps the bundle hash
     ///             unpredictable and thus preserves the bundle's privacy. `bytes32(0)` is allowed but discouraged —
-    ///             since each salt must be unique per sender (enforced by InteropCenter), a sender can use it at most once.
+    ///             since each salt must be unique per sender (enforced by L2InteropCenter), a sender can use it at most once.
     function buildCall(
         uint256 destinationChainId,
         address target,
@@ -127,7 +126,7 @@ library InteropLibrary {
     ///                             there is intentionally no salt-less overload — callers cannot create a bundle without
     ///                             consciously choosing a salt. Provide a random value: it keeps the bundle hash
     ///                             unpredictable and thus preserves the bundle's privacy. Each salt must be unique per
-    ///                             sender (enforced by InteropCenter): a sender must pass a distinct salt for every
+    ///                             sender (enforced by L2InteropCenter): a sender must pass a distinct salt for every
     ///                             bundle it sends, regardless of whether the bundle contents differ — reusing a salt
     ///                             reverts. `bytes32(0)` is allowed but discouraged: because used salts must be unique
     ///                             per sender, a sender can use `bytes32(0)` at most once (when passed, the salt
@@ -166,7 +165,7 @@ library InteropLibrary {
     /// @notice Appends an `interopBundleSalt` attribute to an existing bundle attributes array.
     /// @dev Prefer passing the salt directly to {buildBundleAttributes}/the senders. This helper remains useful when a
     ///      single base attributes array is reused to send several bundles, each needing a distinct salt so that every
-    ///      bundle hash is unique (enforced by InteropCenter).
+    ///      bundle hash is unique (enforced by L2InteropCenter).
     function withInteropBundleSalt(
         bytes[] memory _attributes,
         bytes32 _salt
@@ -203,7 +202,7 @@ library InteropLibrary {
     /// @param  useFixedFee         Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
     /// @param  salt                Salt mixed into the bundle's `interopBundleSalt`. Provide a random value to keep the
     ///                             bundle hash unpredictable and preserve the bundle's privacy. `bytes32(0)` is allowed
-    ///                             but discouraged — each salt must be unique per sender (enforced by InteropCenter), so
+    ///                             but discouraged — each salt must be unique per sender (enforced by L2InteropCenter), so
     ///                             a sender can use `bytes32(0)` at most once.
     /// @return bundleHash Hash of the sent bundle
     function sendToken(
@@ -247,7 +246,7 @@ library InteropLibrary {
 
     /// @notice Build the single-attribute (`interopBundleSalt`) bundle-attribute array used by L2->L1
     /// withdrawal bundles.
-    /// @dev Each (sender, salt) pair may be used only once by the InteropCenter, so callers derive the salt
+    /// @dev Each (sender, salt) pair may be used only once by the L2InteropCenter, so callers derive the salt
     /// deterministically from the withdrawal content.
     /// @param _salt Salt mixed into the bundle's `interopBundleSalt`.
     function buildWithdrawalBundleAttributes(bytes32 _salt) internal pure returns (bytes[] memory attributes) {
@@ -255,7 +254,7 @@ library InteropLibrary {
         attributes[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (_salt));
     }
 
-    /// @notice ABI-encode the `InteropCenter.sendBundle` calldata for an L2->L1 withdrawal of a single
+    /// @notice ABI-encode the `L2InteropCenter.sendBundle` calldata for an L2->L1 withdrawal of a single
     /// registered (non-base-token) asset. Used where the call is wrapped into an admin L1->L2 transaction /
     /// ChainAdmin multicall rather than sent directly.
     /// @param _l1ChainId Destination L1 chain id.
@@ -270,7 +269,7 @@ library InteropLibrary {
     ) internal pure returns (bytes memory) {
         return
             abi.encodeCall(
-                InteropCenter.sendBundle,
+                IInteropCenterBase.sendBundle,
                 (
                     InteroperableAddress.formatEvmV1(_l1ChainId),
                     DataEncoding.encodeInteropWithdrawalCallStarters(_assetId, _transferData),
@@ -280,7 +279,7 @@ library InteropLibrary {
     }
 
     /// @notice Send an L2->L1 withdrawal bundle for a single registered (non-base-token) asset directly through
-    /// the InteropCenter. Wrap in `vm.broadcast()` when broadcasting.
+    /// the L2InteropCenter. Wrap in `vm.broadcast()` when broadcasting.
     /// @param _l1ChainId Destination L1 chain id.
     /// @param _assetId The withdrawn asset id (an ERC20 or the CTM/ZK asset — NOT a base-token asset).
     /// @param _transferData Bridgehub-burn transfer data for the asset.
@@ -313,7 +312,7 @@ library InteropLibrary {
     /// @param useFixedFee          Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
     /// @param salt                 Salt mixed into the bundle's `interopBundleSalt`. Provide a random value to keep the
     ///                             bundle hash unpredictable and preserve the bundle's privacy. `bytes32(0)` is allowed
-    ///                             but discouraged — each salt must be unique per sender (enforced by InteropCenter), so
+    ///                             but discouraged — each salt must be unique per sender (enforced by L2InteropCenter), so
     ///                             a sender can use `bytes32(0)` at most once.
     /// @return bundleHash Hash of the sent bundle
     function sendDirectCallBundle(
@@ -350,7 +349,7 @@ library InteropLibrary {
     /// @param  data              Data which will be passed to the target
     /// @param  salt              Salt mixed into the bundle's `interopBundleSalt`. Provide a random value to keep the
     ///                           bundle hash unpredictable and preserve the bundle's privacy. `bytes32(0)` is allowed
-    ///                           but discouraged — each salt must be unique per sender (enforced by InteropCenter), so
+    ///                           but discouraged — each salt must be unique per sender (enforced by L2InteropCenter), so
     ///                           a sender can use `bytes32(0)` at most once.
     /// @return sendId Hash of the sent bundle containing a single call
     function sendDirectCall(
@@ -391,7 +390,7 @@ library InteropLibrary {
     /// @param  salt                    Salt mixed into the bundle's `interopBundleSalt`. Provide a random value to keep
     ///                                 the bundle hash unpredictable and preserve the bundle's privacy. `bytes32(0)` is
     ///                                 allowed but discouraged — each salt must be unique per sender (enforced by
-    ///                                 InteropCenter), so a sender can use `bytes32(0)` at most once.
+    ///                                 L2InteropCenter), so a sender can use `bytes32(0)` at most once.
     /// @return bundleHash Hash of the sent bundle
     function sendNative(
         uint256 destinationChainId,

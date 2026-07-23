@@ -5,11 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/console2.sol";
 
-import {
-    IL1Bridgehub,
-    L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestIndirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -33,6 +29,8 @@ import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {LogFinder} from "test-utils/LogFinder.sol";
 
 import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
+
+import {L1InteropRequests} from "foundry-test/l1/utils/L1InteropRequests.sol";
 
 contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     using LogFinder for Vm.Log[];
@@ -228,7 +226,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     }
 
     /// @notice Deposits an ERC20 token to a ZK chain that uses ETH as its base token,
-    /// using the TwoBridges path.
+    /// using the Indirect path.
     /// @dev ETH is sent as `msg.value` to cover the base token gas cost (`mintValue`).
     /// The ERC20 token is transferred via the second bridge by approving the shared bridge
     /// and encoding the token address and amount in `secondBridgeCalldata`.
@@ -255,7 +253,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         uint256 userTokenBefore = currentToken.balanceOf(currentUser);
 
         bytes memory secondBridgeCallData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
-        L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
+        L2TransactionRequestIndirect memory requestTx = _createL2TransactionRequestIndirect({
             _chainId: currentChainId,
             _mintValue: mintValue,
             _secondBridgeValue: 0,
@@ -267,7 +265,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: mintValue}(requestTx);
+        bytes32 resultantHash = L1InteropRequests.requestIndirect(addresses.l1InteropCenter, mintValue, requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -313,7 +311,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     }
 
     /// @notice Deposits ETH to a ZK chain that uses an ERC20 as its base token,
-    /// using the TwoBridges path.
+    /// using the Indirect path.
     /// @dev The ERC20 base token is minted and approved for `mintValue` (gas costs).
     /// ETH is sent as `secondBridgeValue` via `msg.value`. This is a dual-token flow:
     /// ERC20 pays for L2 gas, ETH is the actual deposit value.
@@ -338,7 +336,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         uint256 userTokenBefore = currentToken.balanceOf(currentUser);
 
         bytes memory secondBridgeCallData = abi.encode(ETH_TOKEN_ADDRESS, uint256(0), chainContracts[currentChainId]);
-        L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
+        L2TransactionRequestIndirect memory requestTx = _createL2TransactionRequestIndirect({
             _chainId: currentChainId,
             _mintValue: mintValue,
             _secondBridgeValue: l2Value,
@@ -350,7 +348,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: l2Value}(requestTx);
+        bytes32 resultantHash = L1InteropRequests.requestIndirect(addresses.l1InteropCenter, l2Value, requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -396,7 +394,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     }
 
     /// @notice Deposits an ERC20 token to a ZK chain that also uses an ERC20 as its base token,
-    /// using the TwoBridges path.
+    /// using the Indirect path.
     /// @dev Two separate ERC20 tokens are involved: the base token (for gas via `mintValue`)
     /// and the deposit token (for the L2 value via `secondBridgeCalldata`). Both are minted
     /// and approved independently. No ETH is sent with the call.
@@ -426,7 +424,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         uint256 userTokenBefore = currentToken.balanceOf(currentUser);
 
         bytes memory secondBridgeCallData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
-        L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
+        L2TransactionRequestIndirect memory requestTx = _createL2TransactionRequestIndirect({
             _chainId: currentChainId,
             _mintValue: mintValue,
             _secondBridgeValue: 0,
@@ -438,7 +436,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges(requestTx);
+        bytes32 resultantHash = L1InteropRequests.requestIndirect(addresses.l1InteropCenter, 0, requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -523,7 +521,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionDirect{value: mintValue}(txRequest);
+        bytes32 resultantHash = L1InteropRequests.requestDirect(addresses.l1InteropCenter, mintValue, txRequest);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
@@ -593,7 +591,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionDirect(txRequest);
+        bytes32 resultantHash = L1InteropRequests.requestDirect(addresses.l1InteropCenter, 0, txRequest);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
@@ -637,7 +635,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     /// @notice Routes an ETH deposit to the correct internal handler based on the selected
     /// chain's base token.
     /// @dev If the chain's base token is ETH, uses the Direct path (`depositEthBase`).
-    /// If the chain's base token is ERC20, uses the TwoBridges path (`depositEthToERC20Chain`).
+    /// If the chain's base token is ERC20, uses the Indirect path (`depositEthToERC20Chain`).
     function depositEthToBridgeSuccess(
         uint256 userIndexSeed,
         uint256 chainIndexSeed,
@@ -653,9 +651,9 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     /// @notice Routes an ERC20 deposit to the correct internal handler based on the selected
     /// chain's base token and the deposit token.
     /// @dev Three cases:
-    ///   - ETH-base chain: uses `depositERC20ToEthChain` (TwoBridges, ETH for gas + ERC20 deposit)
+    ///   - ETH-base chain: uses `depositERC20ToEthChain` (Indirect, ETH for gas + ERC20 deposit)
     ///   - ERC20-base chain, deposit token == base token: uses `depositERC20Base` (Direct)
-    ///   - ERC20-base chain, deposit token != base token: uses `depositERC20ToERC20Chain` (TwoBridges)
+    ///   - ERC20-base chain, deposit token != base token: uses `depositERC20ToERC20Chain` (Indirect)
     function depositERC20ToBridgeSuccess(
         uint256 userIndexSeed,
         uint256 chainIndexSeed,

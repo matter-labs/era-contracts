@@ -116,7 +116,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         // Verify asset ID is properly constructed
         assertTrue(assetId != bytes32(0), "Asset ID should be non-zero");
 
-        // L2->L1 withdrawals now go through the InteropCenter: a single indirect call to the
+        // L2->L1 withdrawals now go through the L2InteropCenter: a single indirect call to the
         // L2 AssetRouter, destined for L1. The indirect call runs L2AssetRouter.initiateIndirectCall,
         // which auto-registers the freshly-deployed native token and burns it via the NTV. No bundle
         // attributes are needed (the protocol fee defaults to 0, so msg.value stays 0).

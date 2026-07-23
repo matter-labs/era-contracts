@@ -57,10 +57,10 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
         utilsFacet.util_setChainId(eraChainId);
     }
 
-    function test_RevertWhen_NotEra(uint256 randomChainId) public {
-        vm.assume(eraChainId != randomChainId);
+    function test_RevertWhen_NotEra(uint256 _randomChainId) public {
+        vm.assume(eraChainId != _randomChainId);
 
-        utilsFacet.util_setChainId(randomChainId);
+        utilsFacet.util_setChainId(_randomChainId);
 
         vm.expectRevert(OnlyEraSupported.selector);
         mailboxFacet.requestL2Transaction({
@@ -122,54 +122,54 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
     }
 
     function _requestL2Transaction(
-        uint256 amount,
-        uint256 baseCost,
-        uint256 l2GasLimit
+        uint256 _amount,
+        uint256 _baseCost,
+        uint256 _l2GasLimit
     ) internal returns (bytes32 canonicalTxHash, uint256 mintValue) {
         bytes[] memory factoryDeps = new bytes[](1);
         factoryDeps[0] = "11111111111111111111111111111111";
 
-        mintValue = baseCost + amount;
+        mintValue = _baseCost + _amount;
 
         vm.deal(sender, mintValue);
         vm.prank(sender);
         canonicalTxHash = mailboxFacet.requestL2Transaction{value: mintValue}({
             _contractL2: tempAddress,
-            _l2Value: amount,
+            _l2Value: _amount,
             _calldata: tempBytes,
-            _l2GasLimit: l2GasLimit,
+            _l2GasLimit: _l2GasLimit,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             _factoryDeps: factoryDeps,
             _refundRecipient: tempAddress
         });
     }
 
-    function test_RevertWhen_bridgePaused(uint256 randomValue) public {
+    function test_RevertWhen_bridgePaused(uint256 _randomValue) public {
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
         utilsFacet.util_setPriorityTxMaxGasLimit(100000000);
 
         uint256 l2GasLimit = 1000000;
         uint256 baseCost = mailboxFacet.l2TransactionBaseCost(10000000, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
-        randomValue = bound(randomValue, 0, type(uint256).max - baseCost);
+        _randomValue = bound(_randomValue, 0, type(uint256).max - baseCost);
 
         l1SharedBridge.pause();
 
         vm.expectRevert("Pausable: paused");
-        _requestL2Transaction(randomValue, baseCost, l2GasLimit);
+        _requestL2Transaction(_randomValue, baseCost, l2GasLimit);
     }
 
-    function test_success_requestL2Transaction(uint256 randomValue) public {
+    function test_success_requestL2Transaction(uint256 _randomValue) public {
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
         utilsFacet.util_setPriorityTxMaxGasLimit(100000000);
 
         uint256 l2GasLimit = 1000000;
         uint256 baseCost = mailboxFacet.l2TransactionBaseCost(10000000, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
-        randomValue = bound(randomValue, 0, type(uint256).max - baseCost);
+        _randomValue = bound(_randomValue, 0, type(uint256).max - baseCost);
 
         bytes32 canonicalTxHash;
         uint256 mintValue;
 
-        (canonicalTxHash, mintValue) = _requestL2Transaction(randomValue, baseCost, l2GasLimit);
+        (canonicalTxHash, mintValue) = _requestL2Transaction(_randomValue, baseCost, l2GasLimit);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
         assertEq(baseTokenBridgeAddress.balance, mintValue);
         assertEq(l1SharedBridge.chainBalance(eraChainId, ETH_TOKEN_ADDRESS), mintValue);

@@ -97,7 +97,7 @@ LIVE_UNBUNDLER_PRIVATE_KEY=<unbundler-private-key> \
 yarn test:hardhat:interop
 ```
 
-Fixed-ZK-fee test coverage discovers the ZK token asset ID from `InteropCenter.ZK_TOKEN_ASSET_ID()` on the source
+Fixed-ZK-fee test coverage discovers the ZK token asset ID from `L2InteropCenter.ZK_TOKEN_ASSET_ID()` on the source
 chain. If the ZK token has not been bridged there yet, or if the sender's ZK balance is zero, fixed-ZK-fee cases are
 skipped with a warning.
 

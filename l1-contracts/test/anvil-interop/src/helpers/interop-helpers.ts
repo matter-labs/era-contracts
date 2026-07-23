@@ -1,7 +1,7 @@
 /**
  * Interop bundle and message helpers.
  *
- * Provides RPC wrappers for InteropCenter.sendBundle / sendMessage and
+ * Provides RPC wrappers for L2InteropCenter.sendBundle / sendMessage and
  * InteropHandler.executeBundle / verifyBundle / unbundleBundle, along with
  * ERC-7786 attribute encoding and contract deployment utilities.
  */
@@ -78,7 +78,7 @@ const INTEROP_BUNDLE_SALT_SELECTOR = erc7786Iface.getSighash("interopBundleSalt"
 /**
  * Ensure the bundle attributes carry an `interopBundleSalt` attribute.
  *
- * The InteropCenter derives the bundle hash from `keccak256(msg.sender, salt)` and rejects a (sender, salt)
+ * The L2InteropCenter derives the bundle hash from `keccak256(msg.sender, salt)` and rejects a (sender, salt)
  * pair that has already been used (`InteropBundleSaltAlreadyUsed`). Since the test harness sends many bundles
  * from the same source wallet, we attach a fresh salt whenever the caller did not provide one, so that each
  * bundle gets a unique hash (mirroring the previously auto-incremented interop nonce). If the caller already
@@ -174,7 +174,7 @@ export async function registerL2NativeTokenIfNeeded(
   }
 }
 
-// ── InteropCenter.sendBundle wrapper ───────────────────────────
+// ── L2InteropCenter.sendBundle wrapper ───────────────────────────
 
 export interface CallStarter {
   to: string; // ERC-7930 encoded destination address
@@ -205,12 +205,12 @@ export interface InteropSendResult {
 }
 
 /**
- * Send an interop bundle via InteropCenter.sendBundle on the source chain.
+ * Send an interop bundle via L2InteropCenter.sendBundle on the source chain.
  * Returns the tx receipt and the extracted InteropBundle struct.
  */
 export async function sendInteropBundle(options: SendBundleOptions): Promise<InteropSendResult> {
   const wallet = new Wallet(getInteropSourcePrivateKey(), options.sourceProvider);
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), wallet);
 
   const destinationChainIdBytes = encodeEvmChain(options.destinationChainId);
   const tx = await interopCenter.sendBundle(
@@ -236,7 +236,7 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
         break;
       }
     } catch {
-      // Not an InteropCenter log
+      // Not an L2InteropCenter log
     }
   }
   if (!interopBundle) {
@@ -260,11 +260,11 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
 }
 
 /**
- * Simulate InteropCenter.sendBundle via callStatic to capture revert data without sending a tx.
+ * Simulate L2InteropCenter.sendBundle via callStatic to capture revert data without sending a tx.
  */
 export async function simulateInteropBundle(options: SendBundleOptions): Promise<void> {
   const wallet = new Wallet(getInteropSourcePrivateKey(), options.sourceProvider);
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), wallet);
 
   const destinationChainIdBytes = encodeEvmChain(options.destinationChainId);
   await interopCenter.callStatic.sendBundle(
@@ -278,7 +278,7 @@ export async function simulateInteropBundle(options: SendBundleOptions): Promise
   );
 }
 
-// ── InteropCenter.sendMessage wrapper ──────────────────────────
+// ── L2InteropCenter.sendMessage wrapper ──────────────────────────
 
 export interface SendMessageOptions {
   sourceProvider: providers.JsonRpcProvider;
@@ -290,12 +290,12 @@ export interface SendMessageOptions {
 }
 
 /**
- * Send a single interop message via InteropCenter.sendMessage on the source chain.
+ * Send a single interop message via L2InteropCenter.sendMessage on the source chain.
  * Returns the tx receipt and the extracted InteropBundle struct (sendMessage wraps into a bundle).
  */
 export async function sendInteropMessage(options: SendMessageOptions): Promise<InteropSendResult> {
   const wallet = new Wallet(getInteropSourcePrivateKey(), options.sourceProvider);
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), wallet);
 
   const tx = await interopCenter.sendMessage(
     options.recipient,
@@ -320,7 +320,7 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
         break;
       }
     } catch {
-      // Not an InteropCenter log
+      // Not an L2InteropCenter log
     }
   }
   if (!interopBundle) {
@@ -508,10 +508,10 @@ export async function getCallStatus(
 }
 
 /**
- * Get the interop protocol fee from InteropCenter.
+ * Get the interop protocol fee from L2InteropCenter.
  */
 export async function getInteropProtocolFee(provider: providers.JsonRpcProvider): Promise<BigNumber> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), provider);
   return interopCenter.interopProtocolFee();
 }
 
@@ -523,14 +523,14 @@ export async function setInteropProtocolFee(provider: providers.JsonRpcProvider,
     throw new Error("setInteropProtocolFee uses Anvil bootloader impersonation and cannot run in live mode");
   }
 
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), provider);
   await impersonateAndRun(provider, L2_BOOTLOADER_ADDR, async (signer) => {
     const tx = await interopCenter.connect(signer).setInteropFee(fee, { gasLimit: 500_000 });
     await tx.wait();
   });
 
   const actualFee = await interopCenter.interopProtocolFee();
-  expect(actualFee.eq(fee), `InteropCenter fee should be ${fee.toString()}, got ${actualFee.toString()}`).to.be.true;
+  expect(actualFee.eq(fee), `L2InteropCenter fee should be ${fee.toString()}, got ${actualFee.toString()}`).to.be.true;
 }
 
 /**
@@ -540,7 +540,7 @@ export async function getAccumulatedProtocolFees(
   provider: providers.JsonRpcProvider,
   coinbase: string
 ): Promise<BigNumber> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), provider);
   return interopCenter.accumulatedProtocolFees(coinbase);
 }
 
@@ -578,26 +578,26 @@ export async function expectAccumulatedProtocolFeeDelta(
 }
 
 /**
- * Get the fixed ZK interop fee from InteropCenter.
+ * Get the fixed ZK interop fee from L2InteropCenter.
  */
 export async function getZkInteropFee(provider: providers.JsonRpcProvider): Promise<BigNumber> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), provider);
   return interopCenter.ZK_INTEROP_FEE();
 }
 
 /**
- * Get the configured ZK token asset ID from InteropCenter.
+ * Get the configured ZK token asset ID from L2InteropCenter.
  */
 export async function getZkTokenAssetId(provider: providers.JsonRpcProvider): Promise<string> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), provider);
   return interopCenter.ZK_TOKEN_ASSET_ID();
 }
 
 /**
- * Get the resolved ZK token address from InteropCenter.
+ * Get the resolved ZK token address from L2InteropCenter.
  */
 export async function getZkTokenAddress(provider: providers.JsonRpcProvider): Promise<string> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), provider);
   return interopCenter.getZKTokenAddress();
 }
 
@@ -605,7 +605,7 @@ export async function getZkTokenAddress(provider: providers.JsonRpcProvider): Pr
  * Get accumulated ZK fees for a coinbase address.
  */
 export async function getAccumulatedZkFees(provider: providers.JsonRpcProvider, coinbase: string): Promise<BigNumber> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), provider);
   return interopCenter.accumulatedZKFees(coinbase);
 }
 

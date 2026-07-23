@@ -19,7 +19,7 @@ struct L2TransactionRequestDirect {
     address refundRecipient;
 }
 
-struct L2TransactionRequestTwoBridgesOuter {
+struct L2TransactionRequestIndirect {
     uint256 chainId;
     uint256 mintValue;
     uint256 l2Value;
@@ -31,7 +31,7 @@ struct L2TransactionRequestTwoBridgesOuter {
     bytes secondBridgeCalldata;
 }
 
-struct L2TransactionRequestTwoBridgesInner {
+struct IndirectCallRequest {
     bytes32 magicValue;
     address l2Contract;
     bytes l2Calldata;

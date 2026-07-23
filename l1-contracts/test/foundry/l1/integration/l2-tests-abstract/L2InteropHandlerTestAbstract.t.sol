@@ -36,7 +36,7 @@ import {IBaseTokenHolder} from "contracts/l2-system/interfaces/IBaseTokenHolder.
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
-import {InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {L2InteropCenter} from "contracts/interop/interop-center/L2InteropCenter.sol";
 import {CallStatus, IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
 
 import {
@@ -124,7 +124,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         // Verify the proof is properly constructed
         assertTrue(proof.chainId > 0, "Chain ID should be positive");
         assertTrue(proof.proof.length > 0, "Proof should have elements");
-        assertEq(proof.message.sender, L2_INTEROP_CENTER_ADDR, "Message sender should be InteropCenter");
+        assertEq(proof.message.sender, L2_INTEROP_CENTER_ADDR, "Message sender should be L2InteropCenter");
 
         // Mock the verification call for L1 context tests
         vm.mockCall(
@@ -387,7 +387,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         return interopBundle;
     }
 
-    /// @notice Regression test to ensure bundles can only be verified from InteropCenter
+    /// @notice Regression test to ensure bundles can only be verified from L2InteropCenter
     /// @dev This test verifies that the fix for unauthorized bundle verification is working
     function test_verifyBundle_revertWhen_messageNotFromInteropCenter() public {
         address nonInteropCenter = makeAddr("nonInteropCenter");
@@ -499,56 +499,56 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
 
         IInteropHandlerBase(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
     }
-    /// @notice Test pause functionality in InteropCenter
+    /// @notice Test pause functionality in L2InteropCenter
     function test_interopCenter_pause() public {
-        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
+        address interopCenterOwner = L2InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
 
         vm.prank(interopCenterOwner);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
+        L2InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
 
-        assertTrue(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be paused");
+        assertTrue(L2InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "L2InteropCenter should be paused");
 
         bytes memory recipient = abi.encodePacked(uint256(271), address(0x123));
         bytes memory payload = abi.encode("test");
         bytes[] memory attributes = new bytes[](0);
 
         vm.expectRevert("Pausable: paused");
-        InteropCenter(L2_INTEROP_CENTER_ADDR).sendMessage(recipient, payload, attributes);
+        L2InteropCenter(L2_INTEROP_CENTER_ADDR).sendMessage(recipient, payload, attributes);
     }
 
-    /// @notice Test unpause functionality in InteropCenter
+    /// @notice Test unpause functionality in L2InteropCenter
     function test_interopCenter_unpause() public {
-        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
+        address interopCenterOwner = L2InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
 
         vm.prank(interopCenterOwner);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
-        assertTrue(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be paused");
+        L2InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
+        assertTrue(L2InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "L2InteropCenter should be paused");
 
         vm.prank(interopCenterOwner);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
+        L2InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
 
-        assertFalse(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be unpaused");
+        assertFalse(L2InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "L2InteropCenter should be unpaused");
     }
 
-    /// @notice Test that only owner can pause InteropCenter
+    /// @notice Test that only owner can pause L2InteropCenter
     function test_interopCenter_pause_onlyOwner() public {
         address nonOwner = makeAddr("nonOwner");
 
         vm.prank(nonOwner);
         vm.expectRevert("Ownable: caller is not the owner");
-        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
+        L2InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
     }
 
-    /// @notice Test that only owner can unpause InteropCenter
+    /// @notice Test that only owner can unpause L2InteropCenter
     function test_interopCenter_unpause_onlyOwner() public {
-        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
+        address interopCenterOwner = L2InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
         vm.prank(interopCenterOwner);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
+        L2InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
 
         address nonOwner = makeAddr("nonOwner");
         vm.prank(nonOwner);
         vm.expectRevert("Ownable: caller is not the owner");
-        InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
+        L2InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
     }
 
     function test_regression_verifyBundleCanAccessCurrentSettlementLayerChainId() public {

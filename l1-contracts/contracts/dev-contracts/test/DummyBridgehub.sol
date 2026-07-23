@@ -22,8 +22,20 @@ contract DummyBridgehub {
 
     address public chainAssetHandler;
 
+    /// @dev Optional override for `interopCenter()`; when unset, the dummy acts as its own interop center
+    /// so that its request-driving helpers pass the Mailbox's `onlyL1InteropCenter` gate.
+    address private interopCenterOverride;
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
+
+    function interopCenter() external view returns (address) {
+        return interopCenterOverride == address(0) ? address(this) : interopCenterOverride;
+    }
+
+    function setInteropCenter(address _interopCenter) external {
+        interopCenterOverride = _interopCenter;
+    }
 
     function baseTokenAssetId(uint256) public view returns (bytes32) {
         return

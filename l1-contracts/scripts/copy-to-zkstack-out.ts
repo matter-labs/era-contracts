@@ -47,7 +47,7 @@ const REQUIRED_CONTRACTS = [
   // Used by anvil-interop test suite (contracts.ts)
   "DummyInteropRecipient.sol",
   "L2Bridgehub.sol",
-  "InteropCenter.sol",
+  "L2InteropCenter.sol",
   "IL1Bridgehub.sol",
   "L2AssetRouter.sol",
   "L2NativeTokenVault.sol",
@@ -60,6 +60,7 @@ const REQUIRED_CONTRACTS = [
   "L1AssetRouter.sol",
   "L2InteropHandler.sol",
   "IERC7786Attributes.sol",
+  "L1InteropCenter.sol",
   "L2ComplexUpgrader.sol",
   "L2GenesisUpgrade.sol",
   "L2MessageRoot.sol",
@@ -90,7 +91,9 @@ async function copyContractAbi(src: string, dest: string): Promise<void> {
       const json = JSON.parse(content);
 
       if (json.abi) {
-        await fs.writeFile(destPath, JSON.stringify(json.abi, null, 2));
+        // Trailing newline to match the committed formatting convention
+        // (`zkstack-out` is excluded from prettier, so it must be added here).
+        await fs.writeFile(destPath, JSON.stringify(json.abi, null, 2) + "\n");
       } else {
         console.warn(`Warning: No ABI found in ${srcPath}`);
       }

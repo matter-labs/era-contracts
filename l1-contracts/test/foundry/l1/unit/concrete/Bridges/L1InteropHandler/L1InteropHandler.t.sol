@@ -289,7 +289,7 @@ contract L1InteropHandlerTest is Test {
         handler.executeBundle(bundle, proof);
     }
 
-    /// @notice Only messages emitted by the canonical L2 InteropCenter are accepted.
+    /// @notice Only messages emitted by the canonical L2 L2InteropCenter are accepted.
     function test_ExecuteBundle_RevertWhen_UnauthorizedMessageSender() public {
         (bytes memory bundle, MessageInclusionProof memory proof) = _buildBundle(
             address(recipient),

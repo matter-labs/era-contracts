@@ -290,7 +290,8 @@ export class GatewaySetup {
   /**
    * Confirm migration on L1 after the forge script has broadcasted the migration initiation.
    *
-   * The forge script's `runPauseAndMigrateChain` calls `requestL2TransactionTwoBridges` which
+   * The forge script's `runPauseAndMigrateChain` sends the migration request through the
+   * `L1InteropCenter.sendMessage` indirect flow (former `requestL2TransactionTwoBridges`) which
    * sets `isMigrationInProgress[chainId] = true`. We need to call `bridgeConfirmTransferResult`
    * to clear it. The canonical L2 tx hash changes between Forge simulation and broadcast, so
    * the confirmation must happen in a separate forge script invocation.

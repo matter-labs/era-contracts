@@ -5,7 +5,7 @@ import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {
     IBridgehubBase,
     L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
+    L2TransactionRequestIndirect
 } from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";

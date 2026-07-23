@@ -8,6 +8,7 @@ import {DeployCTMIntegrationScript} from "./deploy-scripts/DeployCTMIntegration.
 import {RegisterCTM} from "../../../../deploy-scripts/ecosystem/RegisterCTM.s.sol";
 import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+import {IL1InteropCenter} from "contracts/interop/IL1InteropCenter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
@@ -33,6 +34,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         address bridgehubOwnerAddress;
         L1Bridgehub bridgehub;
         IInteropCenter interopCenter;
+        IL1InteropCenter l1InteropCenter;
         CTMDeploymentTracker ctmDeploymentTracker;
         L1AssetRouter sharedBridge;
         L1Nullifier l1Nullifier;
@@ -93,6 +95,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
 
         // Get bridgehub from the CTM script's discovered addresses
         addresses.bridgehub = L1Bridgehub(ecosystemAddresses.bridgehub.proxies.bridgehub);
+        addresses.l1InteropCenter = IL1InteropCenter(ecosystemAddresses.bridgehub.proxies.interopCenter);
         addresses.chainTypeManager = IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager);
         addresses.ctmDeploymentTracker = CTMDeploymentTracker(address(addresses.bridgehub.l1CtmDeployer()));
 
@@ -114,6 +117,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         vm.startPrank(addresses.bridgehub.pendingOwner());
         addresses.bridgehub.acceptOwnership();
         addresses.sharedBridge.acceptOwnership();
+        IOwnable(ecosystemAddresses.bridgehub.proxies.interopCenter).acceptOwnership();
         IOwnable(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).acceptOwnership();
         addresses.ctmDeploymentTracker.acceptOwnership();
         vm.stopPrank();
@@ -141,12 +145,12 @@ contract L1ContractDeployer is UtilsCallMockerTest {
     }
 
     /// @dev Nonce making each reconstructed withdrawal bundle unique. On a real chain the salt is assigned by
-    /// the L2 InteropCenter (`keccak256(sender, nonce)`); under mocked proofs we only need per-bundle uniqueness
+    /// the L2 L2InteropCenter (`keccak256(sender, nonce)`); under mocked proofs we only need per-bundle uniqueness
     /// so that repeated withdrawals do not collide into the same bundle hash (`BundleAlreadyProcessed`).
     uint256 private withdrawalBundleSaltNonce;
 
     /// @notice Wraps an asset-router `finalizeDeposit` payload in the single-call InteropBundle message
-    /// form emitted by the L2 InteropCenter — the only withdrawal message form accepted on L1
+    /// form emitted by the L2 L2InteropCenter — the only withdrawal message form accepted on L1
     /// (see `InteropHandlerBase` / `L1AssetRouter.receiveMessage`).
     function _encodeWithdrawalBundleMessage(
         uint256 _sourceChainId,

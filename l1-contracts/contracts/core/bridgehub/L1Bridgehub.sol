@@ -5,39 +5,27 @@ pragma solidity 0.8.28;
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
-import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
+import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
 import {IL1Bridgehub} from "./IL1Bridgehub.sol";
-import {
-    L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter,
-    L2TransactionRequestTwoBridgesInner
-} from "./IBridgehubBase.sol";
 import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
-import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
-import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
-import {BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
-import {SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
 import {SettlementLayersMustSettleOnL1} from "../../common/L1ContractErrors.sol";
 import {
     ChainIdAlreadyExists,
     ChainIdMismatch,
     IncorrectBridgeHubAddress,
-    MsgValueMismatch,
-    WrongMagicValue,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
-import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev The Bridgehub contract serves as the primary entry point for L1->L2 communication,
-/// facilitating interactions between end user and bridges.
-/// It also manages state transition managers, base tokens, and chain registrations.
+/// @dev The Bridgehub is the registry of chains: it manages state transition managers, base tokens and
+/// chain registrations. L1->L2 communication happens through the L1InteropCenter (via ERC-7786 `sendMessage`),
+/// which uses this registry and is authorized by downstream contracts through the `interopCenter` field.
 contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
@@ -51,15 +39,18 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     /// This is a temporary security measure.
     uint256 public immutable MAX_NUMBER_OF_ZK_CHAINS;
 
+    /// @notice The L1InteropCenter contract, the single user-facing entry point for L1->L2 messaging.
+    /// @dev Downstream contracts (the asset router, the cross-chain senders and the chains' Mailboxes)
+    /// authorize the L1InteropCenter by reading this field.
+    address public interopCenter;
+
     /// @notice to avoid parity hack
     constructor(address _owner, uint256 _maxNumberOfZKChains) reentrancyGuardInitializer {
         L1_CHAIN_ID = block.chainid;
         _disableInitializers();
         MAX_NUMBER_OF_ZK_CHAINS = _maxNumberOfZKChains;
 
-        // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
-        // This is indeed true, since the only methods where this immutable is used are the ones on L1Bridgehub.
-        // We will change this with interop.
+        // The asset id of ETH, registered as a supported base token asset id during initialization.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
         _initializeInner();
@@ -144,130 +135,14 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         return _chainId;
     }
 
-    /// @notice The mailbox is called directly after the assetRouter received the deposit
-    /// this assumes that either ether is the base token or
-    /// the msg.sender has approved mintValue allowance for the nativeTokenVault.
-    /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token.
-    /// In case allowance is provided to the Asset Router, then it will be transferred to NTV.
-    function requestL2TransactionDirect(
-        L2TransactionRequestDirect calldata _request
-    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
-        // Note: If the ZK chain with corresponding `chainId` is not yet created,
-        // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
-        {
-            bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
-            if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
-                if (msg.value != _request.mintValue) {
-                    revert MsgValueMismatch(_request.mintValue, msg.value);
-                }
-            } else {
-                if (msg.value != 0) {
-                    revert MsgValueMismatch(0, msg.value);
-                }
-            }
-
-            // slither-disable-next-line arbitrary-send-eth
-            IAssetRouterShared(address(assetRouter)).bridgehubDepositBaseToken{value: msg.value}(
-                _request.chainId,
-                tokenAssetId,
-                msg.sender,
-                _request.mintValue
-            );
+    /// @notice Sets the L1InteropCenter contract, the single entry point for L1->L2 transaction requests.
+    /// @param _interopCenter the address of the L1InteropCenter
+    function setInteropCenter(address _interopCenter) external onlyOwnerOrUpgrader {
+        if (_interopCenter == address(0)) {
+            revert ZeroAddress();
         }
-
-        canonicalTxHash = _sendRequest(
-            _request.chainId,
-            _request.refundRecipient,
-            BridgehubL2TransactionRequest({
-                sender: msg.sender,
-                contractL2: _request.l2Contract,
-                mintValue: _request.mintValue,
-                l2Value: _request.l2Value,
-                l2Calldata: _request.l2Calldata,
-                l2GasLimit: _request.l2GasLimit,
-                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                factoryDeps: _request.factoryDeps,
-                refundRecipient: address(0)
-            })
-        );
-    }
-
-    /// @notice After depositing funds to the assetRouter, the secondBridge is called
-    ///  to return the actual L2 message which is sent to the Mailbox.
-    ///  This assumes that either ether is the base token or
-    ///  the msg.sender has approved the nativeTokenVault with the mintValue,
-    ///  and also the necessary approvals are given for the second bridge.
-    ///  In case allowance is provided to the Shared Bridge, then it will be transferred to NTV.
-    /// @notice The logic of this bridge is to allow easy depositing for bridges.
-    /// Each contract that handles the users ERC20 tokens needs approvals from the user, this contract allows
-    /// the user to approve for each token only its respective bridge
-    /// @notice This function is great for contract calls to L2, the secondBridge can be any contract.
-    /// @param _request the request for the L2 transaction
-    function requestL2TransactionTwoBridges(
-        L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
-        if (_request.secondBridgeAddress <= BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS) {
-            revert SecondBridgeAddressTooLow(_request.secondBridgeAddress, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS);
-        }
-
-        {
-            bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
-            uint256 baseTokenMsgValue;
-            if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
-                if (msg.value != _request.mintValue + _request.secondBridgeValue) {
-                    revert MsgValueMismatch(_request.mintValue + _request.secondBridgeValue, msg.value);
-                }
-                baseTokenMsgValue = _request.mintValue;
-            } else {
-                if (msg.value != _request.secondBridgeValue) {
-                    revert MsgValueMismatch(_request.secondBridgeValue, msg.value);
-                }
-                baseTokenMsgValue = 0;
-            }
-
-            // slither-disable-next-line arbitrary-send-eth
-            IAssetRouterShared(address(assetRouter)).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
-                _request.chainId,
-                tokenAssetId,
-                msg.sender,
-                _request.mintValue
-            );
-        }
-
-        // slither-disable-next-line arbitrary-send-eth
-        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1CrossChainSender(_request.secondBridgeAddress)
-            .bridgehubDeposit{value: _request.secondBridgeValue}(
-            _request.chainId,
-            msg.sender,
-            _request.l2Value,
-            _request.secondBridgeCalldata
-        );
-
-        if (outputRequest.magicValue != TWO_BRIDGES_MAGIC_VALUE) {
-            revert WrongMagicValue(uint256(TWO_BRIDGES_MAGIC_VALUE), uint256(outputRequest.magicValue));
-        }
-
-        canonicalTxHash = _sendRequest(
-            _request.chainId,
-            _request.refundRecipient,
-            BridgehubL2TransactionRequest({
-                sender: _request.secondBridgeAddress,
-                contractL2: outputRequest.l2Contract,
-                mintValue: _request.mintValue,
-                l2Value: _request.l2Value,
-                l2Calldata: outputRequest.l2Calldata,
-                l2GasLimit: _request.l2GasLimit,
-                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                factoryDeps: outputRequest.factoryDeps,
-                refundRecipient: address(0)
-            })
-        );
-
-        IL1AssetRouter(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
-            _request.chainId,
-            outputRequest.txDataHash,
-            canonicalTxHash
-        );
+        interopCenter = _interopCenter;
+        emit InteropCenterSet(_interopCenter);
     }
 
     /// @notice Sets contract addresses
