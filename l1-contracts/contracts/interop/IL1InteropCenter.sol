@@ -51,5 +51,4 @@ interface IL1InteropCenter is IInteropCenterBase {
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256);
-
 }

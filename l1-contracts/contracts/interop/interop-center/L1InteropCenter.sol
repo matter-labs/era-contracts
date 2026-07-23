@@ -97,15 +97,21 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
     /// @param _attributes The ERC-7786 attributes of the message. The `l1ToL2TransactionParams` attribute is
     /// required; `interopCallValue`, `indirectCall` and `factoryDeps` (direct calls only) are optional.
     /// @return sendId The canonical hash of the L1->L2 priority transaction that delivers the message.
-    function _sendMessage(bytes calldata _recipient, bytes calldata _payload, bytes[] calldata _attributes)
-        internal
-        override
-        returns (bytes32 sendId)
-    {
+    function _sendMessage(
+        bytes calldata _recipient,
+        bytes calldata _payload,
+        bytes[] calldata _attributes
+    ) internal override returns (bytes32 sendId) {
         (uint256 destinationChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_recipient);
 
         L1MessageAttributes memory attributes = parseL1Attributes(_attributes);
-        sendId = _sendSingleCall(destinationChainId, recipientAddress, _payload, attributes, _attributes);
+        sendId = _sendSingleCall({
+            _destinationChainId: destinationChainId,
+            _recipientAddress: recipientAddress,
+            _payload: _payload,
+            _attributes: attributes,
+            _eventAttributes: _attributes
+        });
     }
 
     /// @dev L1 accepts the shared bundle interface but delivers exactly one call as one priority transaction.
@@ -119,24 +125,32 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
 
         _ensureEmptyAddress(_destinationChainId);
         // slither-disable-next-line unused-return
-        (uint256 destinationChainId,) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
+        (uint256 destinationChainId, ) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
 
         InteropCallStarter calldata callStarter = _callStarters[0];
         _ensureEmptyChainReference(callStarter.to);
         // slither-disable-next-line unused-return
         (, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(callStarter.to);
 
-        L1MessageAttributes memory attributes =
-            _parseL1Attributes(_bundleAttributes, L1AttributeParsingRestrictions.OnlyBundleAttributes);
-        L1MessageAttributes memory callAttributes =
-            _parseL1Attributes(callStarter.callAttributes, L1AttributeParsingRestrictions.OnlyCallAttributes);
+        L1MessageAttributes memory attributes = _parseL1Attributes(
+            _bundleAttributes,
+            L1AttributeParsingRestrictions.OnlyBundleAttributes
+        );
+        L1MessageAttributes memory callAttributes = _parseL1Attributes(
+            callStarter.callAttributes,
+            L1AttributeParsingRestrictions.OnlyCallAttributes
+        );
         attributes.interopCallValue = callAttributes.interopCallValue;
         attributes.indirectCall = callAttributes.indirectCall;
         attributes.indirectCallMessageValue = callAttributes.indirectCallMessageValue;
 
-        sendId = _sendSingleCall(
-            destinationChainId, recipientAddress, callStarter.data, attributes, callStarter.callAttributes
-        );
+        sendId = _sendSingleCall({
+            _destinationChainId: destinationChainId,
+            _recipientAddress: recipientAddress,
+            _payload: callStarter.data,
+            _attributes: attributes,
+            _eventAttributes: callStarter.callAttributes
+        });
     }
 
     function _sendSingleCall(
@@ -209,7 +223,10 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
 
             // slither-disable-next-line arbitrary-send-eth
             IAssetRouterShared(address(BRIDGE_HUB.assetRouter())).bridgehubDepositBaseToken{value: msg.value}(
-                _destinationChainId, tokenAssetId, msg.sender, _attributes.mintValue
+                _destinationChainId,
+                tokenAssetId,
+                msg.sender,
+                _attributes.mintValue
             );
         }
 
@@ -262,15 +279,17 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
 
             // slither-disable-next-line arbitrary-send-eth
             IAssetRouterShared(address(BRIDGE_HUB.assetRouter())).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
-                _destinationChainId, tokenAssetId, msg.sender, _attributes.mintValue
+                _destinationChainId,
+                tokenAssetId,
+                msg.sender,
+                _attributes.mintValue
             );
         }
 
         // slither-disable-next-line arbitrary-send-eth
-        IndirectCallRequest memory outputRequest = IL1CrossChainSender(_secondBridgeAddress)
-        .initiateIndirectCall{value: _attributes.indirectCallMessageValue}(
-            _destinationChainId, msg.sender, _attributes.interopCallValue, _payload
-        );
+        IndirectCallRequest memory outputRequest = IL1CrossChainSender(_secondBridgeAddress).initiateIndirectCall{
+            value: _attributes.indirectCallMessageValue
+        }(_destinationChainId, msg.sender, _attributes.interopCallValue, _payload);
 
         if (outputRequest.magicValue != INDIRECT_CALL_MAGIC_VALUE) {
             revert WrongMagicValue(uint256(INDIRECT_CALL_MAGIC_VALUE), uint256(outputRequest.magicValue));
@@ -293,8 +312,11 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
             })
         );
 
-        IL1CrossChainSender(_secondBridgeAddress)
-            .confirmL2Transaction(_destinationChainId, outputRequest.txDataHash, canonicalTxHash);
+        IL1CrossChainSender(_secondBridgeAddress).confirmL2Transaction(
+            _destinationChainId,
+            outputRequest.txDataHash,
+            canonicalTxHash
+        );
     }
 
     /// @notice Estimates the base cost (in the destination chain's base token) of an L1->L2 transaction.
@@ -317,10 +339,10 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
     /// @param _zkChain the destination ZK chain
     /// @param _request the request
     /// @return canonicalTxHash the canonical transaction hash
-    function _sendRequest(IZKChain _zkChain, BridgehubL2TransactionRequest memory _request)
-        private
-        returns (bytes32 canonicalTxHash)
-    {
+    function _sendRequest(
+        IZKChain _zkChain,
+        BridgehubL2TransactionRequest memory _request
+    ) private returns (bytes32 canonicalTxHash) {
         // Although the aliasing might happen in the Mailbox, we still want to determine the refund recipient
         // here, as the Mailbox won't have the original caller.
         _request.refundRecipient = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);
@@ -340,20 +362,16 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IL1InteropCenter
-    function parseL1Attributes(bytes[] calldata _attributes)
-        public
-        pure
-        override
-        returns (L1MessageAttributes memory l1MessageAttributes)
-    {
+    function parseL1Attributes(
+        bytes[] calldata _attributes
+    ) public pure override returns (L1MessageAttributes memory l1MessageAttributes) {
         l1MessageAttributes = _parseL1Attributes(_attributes, L1AttributeParsingRestrictions.CallAndBundleAttributes);
     }
 
-    function _parseL1Attributes(bytes[] calldata _attributes, L1AttributeParsingRestrictions _restriction)
-        private
-        pure
-        returns (L1MessageAttributes memory l1MessageAttributes)
-    {
+    function _parseL1Attributes(
+        bytes[] calldata _attributes,
+        L1AttributeParsingRestrictions _restriction
+    ) private pure returns (L1MessageAttributes memory l1MessageAttributes) {
         bytes4[SUPPORTED_L1_INTEROP_ATTRIBUTES] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         // We can only pass each attribute once.
         bool[] memory attributeUsed = new bool[](ATTRIBUTE_SELECTORS.length);
@@ -433,11 +451,12 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
     /// @notice Returns the attribute selectors supported by the L1InteropCenter.
     /// @return The attribute selectors supported by the L1InteropCenter.
     function _getERC7786AttributeSelectors() internal pure returns (bytes4[SUPPORTED_L1_INTEROP_ATTRIBUTES] memory) {
-        return [
-            IERC7786Attributes.interopCallValue.selector,
-            IERC7786Attributes.indirectCall.selector,
-            IERC7786Attributes.l1ToL2TransactionParams.selector,
-            IERC7786Attributes.factoryDeps.selector
-        ];
+        return
+            [
+                IERC7786Attributes.interopCallValue.selector,
+                IERC7786Attributes.indirectCall.selector,
+                IERC7786Attributes.l1ToL2TransactionParams.selector,
+                IERC7786Attributes.factoryDeps.selector
+            ];
     }
 }

@@ -17,12 +17,12 @@ interface IInteropCenterBase is IERC7786GatewaySource {
     /// @param _destinationChainId ERC-7930 destination with an empty address field.
     /// @param _callStarters Calls to send. Each `to` address must have an empty chain-reference field.
     /// @param _bundleAttributes Attributes applying to the transport or the complete collection of calls.
-    /// @return sendId L2 returns the interop bundle hash; L1 returns the canonical priority-transaction hash.
+    /// @return bundleHash L2 returns the interop bundle hash; L1 returns the canonical priority-transaction hash.
     function sendBundle(
         bytes calldata _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
-    ) external payable returns (bytes32 sendId);
+    ) external payable returns (bytes32 bundleHash);
 
     /// @notice Pauses the message-sending entry points.
     function pause() external;

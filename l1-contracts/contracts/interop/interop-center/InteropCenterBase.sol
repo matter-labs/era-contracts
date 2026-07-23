@@ -25,15 +25,12 @@ abstract contract InteropCenterBase is
     PausableUpgradeable
 {
     /// @notice Sends a single ERC-7786 message using the layer-specific transport.
-    function sendMessage(bytes calldata _recipient, bytes calldata _payload, bytes[] calldata _attributes)
-        external
-        payable
-        override
-        whenNotPaused
-        nonReentrant
-        returns (bytes32 sendId)
-    {
-        sendId = _sendMessage(_recipient, _payload, _attributes);
+    function sendMessage(
+        bytes calldata recipient,
+        bytes calldata payload,
+        bytes[] calldata attributes
+    ) external payable override whenNotPaused nonReentrant returns (bytes32 sendId) {
+        sendId = _sendMessage(recipient, payload, attributes);
     }
 
     /// @inheritdoc IInteropCenterBase
@@ -41,14 +38,15 @@ abstract contract InteropCenterBase is
         bytes calldata _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
-    ) external payable override whenNotPaused nonReentrant returns (bytes32 sendId) {
-        sendId = _sendBundle(_destinationChainId, _callStarters, _bundleAttributes);
+    ) external payable override whenNotPaused nonReentrant returns (bytes32 bundleHash) {
+        bundleHash = _sendBundle(_destinationChainId, _callStarters, _bundleAttributes);
     }
 
-    function _sendMessage(bytes calldata _recipient, bytes calldata _payload, bytes[] calldata _attributes)
-        internal
-        virtual
-        returns (bytes32 sendId);
+    function _sendMessage(
+        bytes calldata _recipient,
+        bytes calldata _payload,
+        bytes[] calldata _attributes
+    ) internal virtual returns (bytes32 sendId);
 
     function _sendBundle(
         bytes calldata _destinationChainId,

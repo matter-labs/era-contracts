@@ -680,15 +680,9 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
 
         InteropCallStarter[] memory calls = _emptyBundleCall();
         calls[0].callAttributes = new bytes[](1);
-        calls[0].callAttributes[0] = abi.encodeCall(
-            IERC7786Attributes.l1ToL2TransactionParams,
-            (0, 0, 0, address(0))
-        );
+        calls[0].callAttributes[0] = abi.encodeCall(IERC7786Attributes.l1ToL2TransactionParams, (0, 0, 0, address(0)));
         bytes[] memory bundleAttributes = new bytes[](1);
-        bundleAttributes[0] = abi.encodeCall(
-            IERC7786Attributes.l1ToL2TransactionParams,
-            (0, 0, 0, address(0))
-        );
+        bundleAttributes[0] = abi.encodeCall(IERC7786Attributes.l1ToL2TransactionParams, (0, 0, 0, address(0)));
 
         vm.expectRevert(
             abi.encodeWithSelector(

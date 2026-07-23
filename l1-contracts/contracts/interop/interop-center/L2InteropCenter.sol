@@ -160,11 +160,11 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
     }
 
     /// @inheritdoc IInteropCenter
-    function initL2(uint256 _l1ChainId, address _owner, bytes32 _zkTokenAssetId)
-        public
-        reentrancyGuardInitializer
-        onlyUpgrader
-    {
+    function initL2(
+        uint256 _l1ChainId,
+        address _owner,
+        bytes32 _zkTokenAssetId
+    ) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
 
         // Note, that it is used to query and cache the ZK token address,
@@ -188,17 +188,19 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
     /// @param _recipient ERC-7930 address corresponding to the destination of a message. It must be corresponding to an EIP-155 chain.
     /// @param _payload Payload to send.
     /// @param _attributes ERC-7786 call and bundle attributes.
-    function _sendMessage(bytes calldata _recipient, bytes calldata _payload, bytes[] calldata _attributes)
-        internal
-        override
-        returns (bytes32 sendId)
-    {
+    function _sendMessage(
+        bytes calldata _recipient,
+        bytes calldata _payload,
+        bytes[] calldata _attributes
+    ) internal override returns (bytes32 sendId) {
         (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_recipient);
 
         _ensureL2ToL2(recipientChainId);
 
-        (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) =
-            parseAttributes(_attributes, AttributeParsingRestrictions.CallAndBundleAttributes);
+        (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) = parseAttributes(
+            _attributes,
+            AttributeParsingRestrictions.CallAndBundleAttributes
+        );
 
         // If the unbundler was not set for a call, we set the unbundler to be equal to the original sender, so that it's
         // still possible to unbundle the bundle containing the call. If the original sender is the contract, it'll still
@@ -209,15 +211,22 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
         }
 
         InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](1);
-        callStartersInternal[0] =
-            InteropCallStarterInternal({to: recipientAddress, data: _payload, callAttributes: callAttributes});
+        callStartersInternal[0] = InteropCallStarterInternal({
+            to: recipientAddress,
+            data: _payload,
+            callAttributes: callAttributes
+        });
 
         // Prepare original attributes array for the single call
         bytes[][] memory originalCallAttributes = new bytes[][](1);
         originalCallAttributes[0] = _attributes;
 
-        bytes32 bundleHash =
-            _sendBundle(recipientChainId, callStartersInternal, bundleAttributes, originalCallAttributes);
+        bytes32 bundleHash = _sendBundle(
+            recipientChainId,
+            callStartersInternal,
+            bundleAttributes,
+            originalCallAttributes
+        );
 
         // We return the sendId of the only message that was sent in the bundle above. We always send messages in bundles, even if there's only one message being sent.
         // Note, that bundleHash is unique for every bundle. Each sendId is determined as keccak256 of bundleHash where the message (call) is contained,
@@ -236,12 +245,13 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
 
         // Extract the actual chain ID from the ERC-7930 address
         // slither-disable-next-line unused-return
-        (uint256 destinationChainId,) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
+        (uint256 destinationChainId, ) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
 
         // Ensure the destination is valid: L2->L2, or an L2->L1 bundle expressed as a single call (canonically a withdrawal).
         _ensureValidDestination(destinationChainId, _callStarters.length);
-        InteropCallStarterInternal[] memory callStartersInternal =
-            new InteropCallStarterInternal[](_callStarters.length);
+        InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](
+            _callStarters.length
+        );
         uint256 callStartersLength = _callStarters.length;
 
         // Prepare original attributes array for all calls
@@ -257,15 +267,21 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
             originalCallAttributes[i] = _callStarters[i].callAttributes;
 
             // solhint-disable-next-line no-unused-vars
-            (CallAttributes memory callAttributes,) =
-                parseAttributes(_callStarters[i].callAttributes, AttributeParsingRestrictions.OnlyCallAttributes);
+            (CallAttributes memory callAttributes, ) = parseAttributes(
+                _callStarters[i].callAttributes,
+                AttributeParsingRestrictions.OnlyCallAttributes
+            );
             callStartersInternal[i] = InteropCallStarterInternal({
-                to: recipientAddress, data: _callStarters[i].data, callAttributes: callAttributes
+                to: recipientAddress,
+                data: _callStarters[i].data,
+                callAttributes: callAttributes
             });
         }
         // solhint-disable-next-line no-unused-vars
-        (, BundleAttributes memory bundleAttributes) =
-            parseAttributes(_bundleAttributes, AttributeParsingRestrictions.OnlyBundleAttributes);
+        (, BundleAttributes memory bundleAttributes) = parseAttributes(
+            _bundleAttributes,
+            AttributeParsingRestrictions.OnlyBundleAttributes
+        );
 
         // If the unbundler was not set for a bundle, we set the unbundler to be equal to the original sender, so
         // that it's still possible to unbundle the bundle. If the original sender is the contract, it'll still be
@@ -342,7 +358,9 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
 
         // Calculate protocol fee - only charge base token fee if not using fixed ZK fees.
         // Fee is charged per-call. L2->L1 withdrawals are free (they are not interop).
-        uint256 protocolFee = (_useFixedFee || _destinationChainId == L1_CHAIN_ID) ? 0 : interopProtocolFee * _callCount;
+        uint256 protocolFee = (_useFixedFee || _destinationChainId == L1_CHAIN_ID)
+            ? 0
+            : interopProtocolFee * _callCount;
 
         // We burn the value that is passed along the bundle here, on source chain.
         if (_destinationBaseTokenAssetId == thisChainBaseTokenAssetId) {
@@ -362,10 +380,12 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
 
             // Handle cross-chain token deposit for different base tokens
             if (_totalBurnedCallsValue > 0) {
-                IAssetRouterShared(L2_ASSET_ROUTER_ADDR)
-                    .bridgehubDepositBaseToken(
-                        _destinationChainId, _destinationBaseTokenAssetId, msg.sender, _totalBurnedCallsValue
-                    );
+                IAssetRouterShared(L2_ASSET_ROUTER_ADDR).bridgehubDepositBaseToken(
+                    _destinationChainId,
+                    _destinationBaseTokenAssetId,
+                    msg.sender,
+                    _totalBurnedCallsValue
+                );
             }
         }
         // Accumulate the fee for later withdrawal via claimProtocolFees().
@@ -447,7 +467,8 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
                 // message value, and a value-bearing call could otherwise end up in an unfinalizable bundle.
                 require(_callStarters[i].callAttributes.indirectCall, DirectCallToL1NotSupported());
                 require(
-                    _callStarters[i].to == L2_ASSET_ROUTER_ADDR, InteropCallToL1NotToAssetRouter(_callStarters[i].to)
+                    _callStarters[i].to == L2_ASSET_ROUTER_ADDR,
+                    InteropCallToL1NotToAssetRouter(_callStarters[i].to)
                 );
                 require(
                     _callStarters[i].callAttributes.interopCallValue == 0,
@@ -542,19 +563,20 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
             // interopCallValue. Whether a particular indirect path supports non-zero interopCallValue is defined by
             // the concrete IL2CrossChainSender implementation (e.g. the current L2AssetRouter/NTV path does not).
             // slither-disable-next-line arbitrary-send-eth
-            InteropCallStarter memory actualCallStarter = IL2CrossChainSender(recipientAddress)
-            .initiateIndirectCall{value: _callStarter.callAttributes.indirectCallMessageValue}(
-                _destinationChainId, _sender, _callStarter.callAttributes.interopCallValue, _callStarter.data
-            );
+            InteropCallStarter memory actualCallStarter = IL2CrossChainSender(recipientAddress).initiateIndirectCall{
+                value: _callStarter.callAttributes.indirectCallMessageValue
+            }(_destinationChainId, _sender, _callStarter.callAttributes.interopCallValue, _callStarter.data);
             // solhint-disable-next-line no-unused-vars
             // slither-disable-next-line unused-return
-            (CallAttributes memory indirectCallAttributes,) = this.parseAttributes(
-                actualCallStarter.callAttributes, AttributeParsingRestrictions.OnlyInteropCallValue
+            (CallAttributes memory indirectCallAttributes, ) = this.parseAttributes(
+                actualCallStarter.callAttributes,
+                AttributeParsingRestrictions.OnlyInteropCallValue
             );
             require(
                 _callStarter.callAttributes.interopCallValue == indirectCallAttributes.interopCallValue,
                 IndirectCallValueMismatch(
-                    _callStarter.callAttributes.interopCallValue, indirectCallAttributes.interopCallValue
+                    _callStarter.callAttributes.interopCallValue,
+                    indirectCallAttributes.interopCallValue
                 )
             );
             // Parse the returned 7930 address from actualCallStarter.to
@@ -585,11 +607,11 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IInteropCenter
-    function forwardTransactionOnGateway(uint256 _chainId, bytes32 _canonicalTxHash, uint64 _expirationTimestamp)
-        external
-        override
-        onlySettlementLayerRelayedSender
-    {
+    function forwardTransactionOnGateway(
+        uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external override onlySettlementLayerRelayedSender {
         address zkChain = L2_BRIDGEHUB.getZKChain(_chainId);
         if (zkChain == address(0)) {
             revert DestinationChainNotRegistered(_chainId);
@@ -603,11 +625,10 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IInteropCenter
-    function parseAttributes(bytes[] calldata _attributes, AttributeParsingRestrictions _restriction)
-        public
-        pure
-        returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes)
-    {
+    function parseAttributes(
+        bytes[] calldata _attributes,
+        AttributeParsingRestrictions _restriction
+    ) public pure returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) {
         // Default value is direct call.
         callAttributes.indirectCall = false;
 
@@ -622,9 +643,9 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
             if (selector == IERC7786Attributes.interopCallValue.selector) {
                 require(!attributeUsed[0], AttributeAlreadySet(selector));
                 require(
-                    _restriction == AttributeParsingRestrictions.OnlyInteropCallValue
-                        || _restriction == AttributeParsingRestrictions.OnlyCallAttributes
-                        || _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
+                    _restriction == AttributeParsingRestrictions.OnlyInteropCallValue ||
+                        _restriction == AttributeParsingRestrictions.OnlyCallAttributes ||
+                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
                     AttributeViolatesRestriction(selector, uint256(_restriction))
                 );
                 attributeUsed[0] = true;
@@ -632,8 +653,8 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
             } else if (selector == IERC7786Attributes.indirectCall.selector) {
                 require(!attributeUsed[1], AttributeAlreadySet(selector));
                 require(
-                    _restriction == AttributeParsingRestrictions.OnlyCallAttributes
-                        || _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
+                    _restriction == AttributeParsingRestrictions.OnlyCallAttributes ||
+                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
                     AttributeViolatesRestriction(selector, uint256(_restriction))
                 );
                 attributeUsed[1] = true;
@@ -642,8 +663,8 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
             } else if (selector == IERC7786Attributes.executionAddress.selector) {
                 require(!attributeUsed[2], AttributeAlreadySet(selector));
                 require(
-                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes
-                        || _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
+                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
+                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
                     AttributeViolatesRestriction(selector, uint256(_restriction))
                 );
                 attributeUsed[2] = true;
@@ -652,8 +673,8 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
             } else if (selector == IERC7786Attributes.unbundlerAddress.selector) {
                 require(!attributeUsed[3], AttributeAlreadySet(selector));
                 require(
-                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes
-                        || _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
+                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
+                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
                     AttributeViolatesRestriction(selector, uint256(_restriction))
                 );
                 attributeUsed[3] = true;
@@ -662,8 +683,8 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
             } else if (selector == IERC7786Attributes.useFixedFee.selector) {
                 require(!attributeUsed[4], AttributeAlreadySet(selector));
                 require(
-                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes
-                        || _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
+                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
+                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
                     AttributeViolatesRestriction(selector, uint256(_restriction))
                 );
                 attributeUsed[4] = true;
@@ -674,8 +695,8 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
             } else if (selector == IERC7786Attributes.interopBundleSalt.selector) {
                 require(!attributeUsed[5], AttributeAlreadySet(selector));
                 require(
-                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes
-                        || _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
+                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
+                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
                     AttributeViolatesRestriction(selector, uint256(_restriction))
                 );
                 attributeUsed[5] = true;
@@ -712,14 +733,15 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
     /// @notice Returns the attribute selectors supported by the L2InteropCenter.
     /// @return The attribute selectors supported by the L2InteropCenter.
     function _getERC7786AttributeSelectors() internal pure returns (bytes4[SUPPORTED_INTEROP_ATTRIBUTES] memory) {
-        return [
-            IERC7786Attributes.interopCallValue.selector,
-            IERC7786Attributes.indirectCall.selector,
-            IERC7786Attributes.executionAddress.selector,
-            IERC7786Attributes.unbundlerAddress.selector,
-            IERC7786Attributes.useFixedFee.selector,
-            IERC7786Attributes.interopBundleSalt.selector
-        ];
+        return
+            [
+                IERC7786Attributes.interopCallValue.selector,
+                IERC7786Attributes.indirectCall.selector,
+                IERC7786Attributes.executionAddress.selector,
+                IERC7786Attributes.unbundlerAddress.selector,
+                IERC7786Attributes.useFixedFee.selector,
+                IERC7786Attributes.interopBundleSalt.selector
+            ];
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -743,7 +765,7 @@ contract L2InteropCenter is IInteropCenter, InteropCenterBase {
         accumulatedProtocolFees[msg.sender] = 0;
 
         // slither-disable-next-line arbitrary-send-eth
-        (bool success,) = _receiver.call{value: amount}("");
+        (bool success, ) = _receiver.call{value: amount}("");
         require(success, FeeWithdrawalFailed());
 
         emit ProtocolFeesClaimed(msg.sender, _receiver, amount);
