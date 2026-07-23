@@ -8,18 +8,18 @@ import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {L2DACommitmentScheme, L2DAMode} from "contracts/common/Config.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
-import {AlreadyPermanentRollup, InvalidDAForPermanentRollup, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {AlreadyPermanentRollup, InvalidDAForPermanentRollup, Unauthorized, DAModeLockedForPermanentRollup, NonRollupDAModeForPermanentRollup} from "contracts/common/L1ContractErrors.sol";
 
 contract MakePermanentRollupTest is AdminTest {
     RollupDAManager internal rollupDAManager;
     address internal l1DAValidator;
 
     function getExtendedAdminSelectors() internal pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](16);
+        bytes4[] memory selectors = new bytes4[](17);
         uint256 i = 0;
         selectors[i++] = IAdmin.setPendingAdmin.selector;
         selectors[i++] = IAdmin.acceptAdmin.selector;
@@ -38,6 +38,7 @@ contract MakePermanentRollupTest is AdminTest {
         // New selectors for permanent rollup tests
         selectors[i++] = IAdmin.getRollupDAManager.selector;
         selectors[i++] = IAdmin.makePermanentRollup.selector;
+        selectors[i++] = IAdmin.setL2DAMode.selector;
         return selectors;
     }
 
@@ -161,5 +162,71 @@ contract MakePermanentRollupTest is AdminTest {
         // Setting to another allowed pair should succeed
         vm.prank(admin);
         adminFacet.setDAValidatorPair(anotherValidator, L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256);
+    }
+
+    function test_RevertWhen_MakePermanentRollupWithNonRollupDAMode() public {
+        address admin = utilsFacet.util_getAdmin();
+
+        // Set a valid DA pair, but switch the chain to VALIDIUM mode.
+        vm.prank(admin);
+        adminFacet.setDAValidatorPair(l1DAValidator, L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256);
+
+        vm.prank(admin);
+        adminFacet.setL2DAMode(L2DAMode.VALIDIUM);
+
+        // A permanent rollup must publish full pubdata, so this must revert while in VALIDIUM mode.
+        vm.prank(admin);
+        vm.expectRevert(NonRollupDAModeForPermanentRollup.selector);
+        adminFacet.makePermanentRollup();
+    }
+
+    function test_MakePermanentRollupAfterRevertingToRollupDAMode() public {
+        address admin = utilsFacet.util_getAdmin();
+
+        vm.prank(admin);
+        adminFacet.setDAValidatorPair(l1DAValidator, L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256);
+
+        // Move to VALIDIUM and back to ROLLUP; the one-way lock only applies once permanent.
+        vm.prank(admin);
+        adminFacet.setL2DAMode(L2DAMode.VALIDIUM);
+        vm.prank(admin);
+        adminFacet.setL2DAMode(L2DAMode.ROLLUP);
+
+        vm.prank(admin);
+        adminFacet.makePermanentRollup();
+
+        vm.prank(admin);
+        vm.expectRevert(AlreadyPermanentRollup.selector);
+        adminFacet.makePermanentRollup();
+    }
+
+    function test_RevertWhen_SetL2DAModeOnPermanentRollup() public {
+        address admin = utilsFacet.util_getAdmin();
+
+        // Set a valid DA pair and make the chain a permanent rollup.
+        vm.prank(admin);
+        adminFacet.setDAValidatorPair(l1DAValidator, L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256);
+
+        vm.prank(admin);
+        adminFacet.makePermanentRollup();
+
+        // The DA mode is now locked; even setting it back to ROLLUP must revert.
+        vm.prank(admin);
+        vm.expectRevert(DAModeLockedForPermanentRollup.selector);
+        adminFacet.setL2DAMode(L2DAMode.VALIDIUM);
+
+        vm.prank(admin);
+        vm.expectRevert(DAModeLockedForPermanentRollup.selector);
+        adminFacet.setL2DAMode(L2DAMode.ROLLUP);
+    }
+
+    function test_SetL2DAModeSuccessWhenNotPermanentRollup() public {
+        address admin = utilsFacet.util_getAdmin();
+
+        vm.prank(admin);
+        adminFacet.setL2DAMode(L2DAMode.VALIDIUM);
+
+        vm.prank(admin);
+        adminFacet.setL2DAMode(L2DAMode.ROLLUP);
     }
 }
