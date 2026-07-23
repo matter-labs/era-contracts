@@ -30,9 +30,9 @@ contract ExecutorZKsyncOSPublicInputHarness is ExecutorFacet {
 /// ZKsync OS implementation (`public_input.rs` / `chain_config.rs` in the zksync-os repository):
 /// changing the encoding on either side must update both.
 /// @dev The public input is `keccak256(state_before, state_after, chain_config_hash, batch_output)`,
-/// where `chain_config_hash = keccak256(chain_id, fri_proof_verification_enabled, max_tx_gas_limit)`
-/// as three 32-byte big-endian words. FRI proof verification is always disabled from the settlement
-/// layer, so its word is always zero.
+/// where `chain_config_hash = keccak256(chain_id, fri_proof_verification_enabled, max_tx_gas_limit,
+/// l2_da_mode)` as four 32-byte big-endian words. FRI proof verification is always disabled from the
+/// settlement layer, so its word is always zero; `l2_da_mode` is `ROLLUP` (0) / `VALIDIUM` (1).
 contract ZKsyncOSPublicInputTest is Test {
     ExecutorZKsyncOSPublicInputHarness internal executor;
 
@@ -41,10 +41,12 @@ contract ZKsyncOSPublicInputTest is Test {
         0x1c24f398aa0701f9348912ecca748ba93bfb84bfe4f283c16514311419f4f658;
 
     /// @dev `BatchPublicInput::hash()` for zero state commitments, `chain_config_hash` of chain id 37
-    /// with FRI proof verification disabled and the default max tx gas limit (matching zksync-os
-    /// `ChainConfig::new(37, false, DEFAULT_MAX_TX_GAS_LIMIT).hash()`), and `BATCH_OUTPUT_HASH_GOLDEN`.
+    /// with FRI proof verification disabled, the default max tx gas limit and DA mode `ROLLUP` (matching
+    /// zksync-os `ChainConfig::new(37, false, DEFAULT_MAX_TX_GAS_LIMIT).hash()`, which defaults to
+    /// `DAMode::Rollup`), and `BATCH_OUTPUT_HASH_GOLDEN`. Shared with zksync-os
+    /// `batch_public_input_hash_golden_vector`.
     bytes32 internal constant PUBLIC_INPUT_HASH_GOLDEN =
-        0xa6ed40b112cb51e6d0d0defe86e29ae9b7b8df601160de98e5e6ff29036ff440;
+        0x0a5143e28ed3fc1728ef4d96319f2306bb5a81bfccd908154e44029988ef9e7c;
 
     uint256 internal constant GOLDEN_CHAIN_ID = 37;
 
