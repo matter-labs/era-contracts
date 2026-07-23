@@ -12,7 +12,13 @@ import {L2DACommitmentScheme, L2DAMode} from "contracts/common/Config.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
-import {AlreadyPermanentRollup, InvalidDAForPermanentRollup, Unauthorized, DAModeLockedForPermanentRollup, NonRollupDAModeForPermanentRollup} from "contracts/common/L1ContractErrors.sol";
+import {
+    AlreadyPermanentRollup,
+    InvalidDAForPermanentRollup,
+    Unauthorized,
+    DAModeLockedForPermanentRollup,
+    NonRollupDAModeForPermanentRollup
+} from "contracts/common/L1ContractErrors.sol";
 
 contract MakePermanentRollupTest is AdminTest {
     RollupDAManager internal rollupDAManager;
