@@ -47,6 +47,7 @@ import {
     WithdrawalAlreadyFinalized,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
+import {InsufficientChainBalance} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {
@@ -266,6 +267,9 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             data: message
         });
 
+        _setAssetTrackerChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
+        _setAssetTrackerChainBalance(block.chainid, ETH_TOKEN_ADDRESS, amount);
+
         vm.mockCall(
             messageRootAddress,
             abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector, chainId),
@@ -303,6 +307,9 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
+
+        _setAssetTrackerChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
+        _setAssetTrackerChainBalance(block.chainid, ETH_TOKEN_ADDRESS, amount);
 
         vm.mockCall(
             messageRootAddress,
@@ -391,7 +398,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         console.log("txDataHash", uint256(txDataHash));
 
         bytes32 ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
-        vm.deal(address(nativeTokenVault), amount);
+        _setAssetTrackerChainBalance(eraChainId, ETH_TOKEN_ADDRESS, 1);
 
         vm.mockCall(
             messageRootAddress,
@@ -409,6 +416,10 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
+        // asset tracker is a separate contract.
+        vm.expectRevert(
+            abi.encodeWithSelector(InsufficientChainBalance.selector, eraChainId, ETH_TOKEN_ASSET_ID, amount)
+        );
         vm.mockCall(
             messageRootAddress,
             abi.encodeWithSelector(IMessageVerification.proveL1ToL2TransactionStatusShared.selector),
@@ -508,6 +519,43 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             DataEncoding.encodeBridgeBurnData(amount, address(0), address(0))
         );
         vm.expectRevert(abi.encodeWithSelector(DepositDoesNotExist.selector, 0, txDataHash));
+        l1Nullifier.claimFailedDeposit({
+            _chainId: chainId,
+            _depositSender: alice,
+            _l1Token: ETH_TOKEN_ADDRESS,
+            _amount: amount,
+            _l2TxHash: txHash,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _merkleProof: merkleProof
+        });
+    }
+
+    function test_claimFailedDeposit_chainBalanceLow() public {
+        _setAssetTrackerChainBalance(chainId, ETH_TOKEN_ADDRESS, 0);
+
+        bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
+        _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
+        require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
+
+        vm.mockCall(
+            messageRootAddress,
+            // solhint-disable-next-line func-named-parameters
+            abi.encodeWithSelector(
+                IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
+                chainId,
+                txHash,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2TxNumberInBatch,
+                merkleProof,
+                TxStatus.Failure
+            ),
+            abi.encode(true)
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(InsufficientChainBalance.selector, chainId, ETH_TOKEN_ASSET_ID, amount));
         l1Nullifier.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
@@ -633,6 +681,40 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         );
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: message,
+            _merkleProof: merkleProof
+        });
+    }
+
+    function test_finalizeWithdrawal_chainBalance() public {
+        bytes memory message = abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, alice, amount);
+        L2Message memory l2ToL1Message = L2Message({
+            txNumberInBatch: l2TxNumberInBatch,
+            sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            data: message
+        });
+
+        vm.mockCall(
+            messageRootAddress,
+            // solhint-disable-next-line func-named-parameters
+            abi.encodeWithSelector(
+                IMessageVerification.proveL2MessageInclusionShared.selector,
+                chainId,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2ToL1Message,
+                merkleProof
+            ),
+            abi.encode(true)
+        );
+        _setAssetTrackerChainBalance(chainId, ETH_TOKEN_ADDRESS, 1);
+
+        vm.expectRevert(abi.encodeWithSelector(InsufficientChainBalance.selector, chainId, ETH_TOKEN_ASSET_ID, 100));
+        sharedBridge.finalizeWithdrawal({
+            _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
             _l2TxNumberInBatch: l2TxNumberInBatch,

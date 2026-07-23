@@ -240,8 +240,18 @@ contract L1AssetRouterTest is Test {
             abi.encodeWithSelector(IL1Bridgehub.requestL2TransactionDirect.selector),
             abi.encode(txHash)
         );
+        _setAssetTrackerChainBalance(eraChainId, ETH_TOKEN_ADDRESS, 100);
+        _setAssetTrackerChainBalance(chainId, address(token), 100);
+
         token.mint(address(nativeTokenVault), amount);
 
+        /// storing chainBalance
+        _setAssetTrackerChainBalance(chainId, address(token), 1000 * amount);
+        _setAssetTrackerChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
+        // Also set balance for block.chainid to handle _getWithdrawalChain scenarios
+        _setAssetTrackerChainBalance(block.chainid, address(token), 1000 * amount);
+        _setAssetTrackerChainBalance(block.chainid, ETH_TOKEN_ADDRESS, amount);
+        // console.log("chainBalance %s, %s", address(token), nativeTokenVault.chainBalance(chainId, address(token)));
         _setSharedBridgeChainBalance(chainId, address(token), amount);
         _setSharedBridgeChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
 
@@ -262,6 +272,7 @@ contract L1AssetRouterTest is Test {
         token.approve(address(l1Nullifier), amount);
 
         _setBaseTokenAssetId(ETH_TOKEN_ASSET_ID);
+        _setAssetTrackerChainBalance(chainId, address(token), amount);
 
         vm.mockCall(
             address(nativeTokenVault),
@@ -310,6 +321,19 @@ contract L1AssetRouterTest is Test {
             .with_key(_chainId)
             .with_key(_txHash)
             .checked_write(_txDataHash);
+    }
+
+    /// @dev Per-chain balance enforcement was removed together with the L1 asset tracker; the
+    /// equivalent accounting is the NTV's per-asset `bridgedOut` net outflow. The `_chainId`
+    /// parameter is kept so historical call sites read unchanged.
+    // solhint-disable-next-line no-unused-vars
+    function _setAssetTrackerChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
+        stdstore
+            .target(address(nativeTokenVault))
+            .sig(nativeTokenVault.bridgedOut.selector)
+            .with_key(assetId)
+            .checked_write(_value);
     }
 
     function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {

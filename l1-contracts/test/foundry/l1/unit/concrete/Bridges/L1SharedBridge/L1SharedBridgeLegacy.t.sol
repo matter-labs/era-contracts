@@ -57,6 +57,8 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
     function test_finalizeWithdrawalLegacyErc20Bridge_EthOnEth() public {
         vm.deal(address(sharedBridge), amount);
 
+        /// storing chainBalance
+        _setAssetTrackerChainBalance(eraChainId, ETH_TOKEN_ADDRESS, amount);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehubBase.baseToken.selector),
@@ -101,6 +103,9 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
     }
 
     function test_finalizeWithdrawalLegacyErc20Bridge_ErcOnEth() public {
+        /// storing chainBalance
+        _setAssetTrackerChainBalance(eraChainId, address(token), amount);
+
         // solhint-disable-next-line func-named-parameters
         bytes memory message = abi.encodePacked(
             IL1ERC20Bridge.finalizeWithdrawal.selector,

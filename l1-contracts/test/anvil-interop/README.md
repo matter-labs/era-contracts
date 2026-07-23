@@ -122,7 +122,7 @@ Live environment variables:
 | Spec                         | What it tests                                                                                                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `01-deployment-verification` | L1 contracts deployed, CTM registered, all 4 L2 chains have diamond proxies, L2 system contracts present, test tokens deployed, initial chainBalance is zero |
-| `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 10 (direct L1 settlement), balance assertions                                                            |
+| `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 10 (direct L1 settlement), net flow assertions                                                           |
 | `03-interop-transfer`        | Unsupported interop routes revert; only GW-settled L2<->GW-settled L2 interop is intentionally registered                                                    |
 | `04-gateway-setup`           | GW chain contracts deployed, interop chains registered on GW L2Bridgehub, GW designated as settlement layer on L1                                            |
 | `05-gateway-bridge`          | L1->L2A ETH deposit + L2A->L1 ETH withdrawal on chain 12 (via GW)                                                                                            |
@@ -199,6 +199,7 @@ test/anvil-interop/
 │       ├── l1-deposit-helper.ts   # L1->L2 ETH/ERC20 deposits
 │       ├── l2-withdrawal-helper.ts          # L2->L1 ETH/ERC20 withdrawals
 │       ├── token-transfer.ts                # L2<->L2 interop token transfers
+│       ├── bridged-out-helper.ts            # Read L1NativeTokenVault.bridgedOut in bridge tests
 │       └── deploy-test-token.ts             # Deploy ERC20 test tokens to L2 chains
 ├── test/hardhat/
 │   ├── 01-deployment-verification.spec.ts

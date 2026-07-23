@@ -3,6 +3,7 @@ import { ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { depositETHToL2 } from "../../src/helpers/l1-deposit-helper";
 import { withdrawETHFromL2 } from "../../src/helpers/l2-withdrawal-helper";
+import { getL1BridgedOut, getL1BaseTokenAssetId } from "../../src/helpers/bridged-out-helper";
 import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_RECIPIENT_ADDR } from "../../src/core/const";
 import { getL1RpcUrl, getL2RpcUrl, getChainIdByRole, getChainIdsByRole } from "../../src/core/utils";
 
@@ -31,6 +32,13 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
 
       const senderL1Before = await l1Provider.getBalance(senderAddr);
 
+      // ETH escrows in the L1NativeTokenVault regardless of settlement layer, so bridgedOut[ETH]
+      // moves the same way as for a direct-settled chain (this replaces the removed
+      // L1AssetTracker.chainBalance[gwChainId] check, which relied on per-chain attribution).
+      const l1Ntv = state.l1Addresses!.l1NativeTokenVault;
+      const ethAssetId = await getL1BaseTokenAssetId(getL1RpcUrl(state), l1Ntv);
+      const bridgedOutBefore = await getL1BridgedOut(getL1RpcUrl(state), l1Ntv, ethAssetId);
+
       const result = await depositETHToL2({
         l1RpcUrl: getL1RpcUrl(state),
         l2RpcUrl: getL2RpcUrl(state, gwSettledChainId),
@@ -50,6 +58,14 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
         senderL1Delta.lte(result.mintValue.mul(-1)),
         `Sender L1 ETH should decrease by at least ${result.mintValue.toString()}, got delta ${senderL1Delta.toString()}`
       ).to.equal(true);
+
+      // L1NativeTokenVault.bridgedOut[ETH] should increase by exactly the bridged amount (mintValue).
+      const bridgedOutAfter = await getL1BridgedOut(getL1RpcUrl(state), l1Ntv, ethAssetId);
+      const bridgedOutDelta = bridgedOutAfter.sub(bridgedOutBefore);
+      expect(
+        bridgedOutDelta.eq(result.mintValue),
+        `bridgedOut[ETH] should increase by ${result.mintValue.toString()}, got ${bridgedOutDelta.toString()}`
+      ).to.equal(true);
     });
   });
 
@@ -60,6 +76,11 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
       const recipientAddr = ANVIL_RECIPIENT_ADDR;
 
       const recipientL1Before = await l1Provider.getBalance(recipientAddr);
+
+      // Snapshot L1NativeTokenVault.bridgedOut[ETH] before finalizing the withdrawal on L1.
+      const l1Ntv = state.l1Addresses!.l1NativeTokenVault;
+      const ethAssetId = await getL1BaseTokenAssetId(getL1RpcUrl(state), l1Ntv);
+      const bridgedOutBefore = await getL1BridgedOut(getL1RpcUrl(state), l1Ntv, ethAssetId);
 
       const result = await withdrawETHFromL2({
         l1RpcUrl: getL1RpcUrl(state),
@@ -73,6 +94,14 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
       expect(result.l2TxHash).to.not.be.null;
 
       const recipientL1After = await l1Provider.getBalance(recipientAddr);
+
+      // L1NativeTokenVault.bridgedOut[ETH] should decrease by exactly the withdrawn amount.
+      const bridgedOutAfter = await getL1BridgedOut(getL1RpcUrl(state), l1Ntv, ethAssetId);
+      const bridgedOutDelta = bridgedOutBefore.sub(bridgedOutAfter);
+      expect(
+        bridgedOutDelta.eq(amount),
+        `bridgedOut[ETH] should decrease by ${amount.toString()}, got ${bridgedOutDelta.toString()}`
+      ).to.equal(true);
 
       // Recipient's L1 ETH balance should increase by exactly the withdrawal amount
       const recipientL1Delta = recipientL1After.sub(recipientL1Before);
