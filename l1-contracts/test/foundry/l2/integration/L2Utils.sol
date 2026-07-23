@@ -38,7 +38,7 @@ import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymen
 
 import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
-import {InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {L2InteropCenter} from "contracts/interop/interop-center/L2InteropCenter.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 // import {InteropAccount} from "contracts/interop/InteropAccount.sol";
@@ -172,12 +172,12 @@ library L2Utils {
     }
 
     function forceDeployInteropCenter(SystemContractsArgs memory _args) internal {
-        new InteropCenter();
+        new L2InteropCenter();
 
-        forceDeployWithoutConstructor("InteropCenter", L2_INTEROP_CENTER_ADDR);
-        InteropCenter interopCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
+        forceDeployWithoutConstructor("L2InteropCenter", L2_INTEROP_CENTER_ADDR);
+        L2InteropCenter interopCenter = L2InteropCenter(L2_INTEROP_CENTER_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
+        L2InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
             _args.l1ChainId,
             _args.aliasedOwner,
             DataEncoding.encodeNTVAssetId(_args.eraChainId, address(uint160(uint256(keccak256("zkToken")))))

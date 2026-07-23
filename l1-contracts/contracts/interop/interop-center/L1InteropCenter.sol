@@ -2,43 +2,42 @@
 
 pragma solidity 0.8.28;
 
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
-
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {
     MIN_CROSS_CHAIN_SENDER_ADDRESS,
     ETH_TOKEN_ADDRESS,
     SUPPORTED_L1_INTEROP_ATTRIBUTES,
     INDIRECT_CALL_MAGIC_VALUE
-} from "../common/Config.sol";
-import {ChainIdNotRegistered, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
-import {CrossChainSenderAddressTooLow} from "../core/bridgehub/L1BridgehubErrors.sol";
-import {BridgehubL2TransactionRequest} from "../common/Messaging.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
+} from "../../common/Config.sol";
+import {ChainIdNotRegistered, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {CrossChainSenderAddressTooLow} from "../../core/bridgehub/L1BridgehubErrors.sol";
+import {BridgehubL2TransactionRequest, InteropCallStarter} from "../../common/Messaging.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
+import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
+import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 
-import {IndirectCallRequest} from "../core/bridgehub/IBridgehubBase.sol";
-import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
-import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol";
-import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol";
-import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
+import {IndirectCallRequest} from "../../core/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
+import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
+import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.sol";
+import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 
-import {AttributesDecoder} from "./AttributesDecoder.sol";
-import {IERC7786Attributes} from "./IERC7786Attributes.sol";
-import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
-import {IL1InteropCenter, L1MessageAttributes} from "./IL1InteropCenter.sol";
+import {AttributesDecoder} from "../AttributesDecoder.sol";
+import {IERC7786Attributes} from "../IERC7786Attributes.sol";
+import {IERC7786GatewaySource} from "../IERC7786GatewaySource.sol";
+import {IL1InteropCenter, L1MessageAttributes} from "../IL1InteropCenter.sol";
+import {InteropCenterBase} from "./InteropCenterBase.sol";
 import {
     AttributeAlreadySet,
+    AttributeViolatesRestriction,
     FactoryDepsNotAllowedForIndirectCall,
-    L1ToL2TransactionParamsMissing
-} from "./InteropErrors.sol";
+    L1ToL2TransactionParamsMissing,
+    SingleCallBundleRequired
+} from "../InteropErrors.sol";
 
 /// @title L1InteropCenter
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev This contract is the L1 counterpart of the L2 `InteropCenter`: the single user-facing entry point for
+/// @dev This contract is the L1 counterpart of the L2 `L2InteropCenter`: the single user-facing entry point for
 /// sending messages from L1 to the ZK chains, exposed through the ERC-7786 `sendMessage` interface.
 /// @dev Unlike on L2s, where messages are delivered as interop bundles verified against interop roots,
 /// messages sent from L1 are delivered through the priority queue: every `sendMessage` call results in an
@@ -56,7 +55,13 @@ import {
 /// @dev The contract relies on the L1 Bridgehub as the registry of chains and base tokens; the downstream
 /// contracts (asset router, cross-chain senders and the chains' Mailboxes) authorize this contract by
 /// resolving `interopCenter()` on the Bridgehub.
-contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
+contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
+    enum L1AttributeParsingRestrictions {
+        OnlyCallAttributes,
+        OnlyBundleAttributes,
+        CallAndBundleAttributes
+    }
+
     /// @notice The L1 Bridgehub, used as the registry of chains, base tokens and ZK chain addresses.
     IL1Bridgehub public immutable override BRIDGE_HUB;
 
@@ -92,47 +97,89 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
     /// @param _attributes The ERC-7786 attributes of the message. The `l1ToL2TransactionParams` attribute is
     /// required; `interopCallValue`, `indirectCall` and `factoryDeps` (direct calls only) are optional.
     /// @return sendId The canonical hash of the L1->L2 priority transaction that delivers the message.
-    function sendMessage(
-        bytes calldata _recipient,
-        bytes calldata _payload,
-        bytes[] calldata _attributes
-    ) external payable override whenNotPaused nonReentrant returns (bytes32 sendId) {
+    function _sendMessage(bytes calldata _recipient, bytes calldata _payload, bytes[] calldata _attributes)
+        internal
+        override
+        returns (bytes32 sendId)
+    {
         (uint256 destinationChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_recipient);
 
         L1MessageAttributes memory attributes = parseL1Attributes(_attributes);
+        sendId = _sendSingleCall(destinationChainId, recipientAddress, _payload, attributes, _attributes);
+    }
 
+    /// @dev L1 accepts the shared bundle interface but delivers exactly one call as one priority transaction.
+    function _sendBundle(
+        bytes calldata _destinationChainId,
+        InteropCallStarter[] calldata _callStarters,
+        bytes[] calldata _bundleAttributes
+    ) internal override returns (bytes32 sendId) {
+        uint256 callCount = _callStarters.length;
+        require(callCount == 1, SingleCallBundleRequired(callCount));
+
+        _ensureEmptyAddress(_destinationChainId);
+        // slither-disable-next-line unused-return
+        (uint256 destinationChainId,) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
+
+        InteropCallStarter calldata callStarter = _callStarters[0];
+        _ensureEmptyChainReference(callStarter.to);
+        // slither-disable-next-line unused-return
+        (, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(callStarter.to);
+
+        L1MessageAttributes memory attributes =
+            _parseL1Attributes(_bundleAttributes, L1AttributeParsingRestrictions.OnlyBundleAttributes);
+        L1MessageAttributes memory callAttributes =
+            _parseL1Attributes(callStarter.callAttributes, L1AttributeParsingRestrictions.OnlyCallAttributes);
+        attributes.interopCallValue = callAttributes.interopCallValue;
+        attributes.indirectCall = callAttributes.indirectCall;
+        attributes.indirectCallMessageValue = callAttributes.indirectCallMessageValue;
+
+        sendId = _sendSingleCall(
+            destinationChainId, recipientAddress, callStarter.data, attributes, callStarter.callAttributes
+        );
+    }
+
+    function _sendSingleCall(
+        uint256 _destinationChainId,
+        address _recipientAddress,
+        bytes calldata _payload,
+        L1MessageAttributes memory _attributes,
+        bytes[] calldata _eventAttributes
+    ) private returns (bytes32 sendId) {
         address actualRecipient;
-        if (attributes.indirectCall) {
-            require(attributes.factoryDeps.length == 0, FactoryDepsNotAllowedForIndirectCall());
-            IZKChain zkChain = _getZKChain(destinationChainId);
+        if (_attributes.indirectCall) {
+            require(_attributes.factoryDeps.length == 0, FactoryDepsNotAllowedForIndirectCall());
+        }
+
+        IZKChain zkChain = _getZKChain(_destinationChainId);
+        if (_attributes.indirectCall) {
             (sendId, actualRecipient) = _requestL2TransactionIndirect({
-                _destinationChainId: destinationChainId,
+                _destinationChainId: _destinationChainId,
                 _zkChain: zkChain,
-                _secondBridgeAddress: recipientAddress,
+                _secondBridgeAddress: _recipientAddress,
                 _payload: _payload,
-                _attributes: attributes
+                _attributes: _attributes
             });
         } else {
-            IZKChain zkChain = _getZKChain(destinationChainId);
-            actualRecipient = recipientAddress;
+            actualRecipient = _recipientAddress;
             sendId = _requestL2TransactionDirect({
-                _destinationChainId: destinationChainId,
+                _destinationChainId: _destinationChainId,
                 _zkChain: zkChain,
-                _l2Contract: recipientAddress,
+                _l2Contract: _recipientAddress,
                 _payload: _payload,
-                _attributes: attributes
+                _attributes: _attributes
             });
         }
 
         // For indirect calls the actual recipient is the destination-side contract constructed by the
-        // cross-chain sender, consistent with the `MessageSent` semantics of the L2 InteropCenter.
+        // cross-chain sender, consistent with the `MessageSent` semantics of the L2InteropCenter.
         emit MessageSent({
             sendId: sendId,
             sender: InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
-            recipient: InteroperableAddress.formatEvmV1(destinationChainId, actualRecipient),
+            recipient: InteroperableAddress.formatEvmV1(_destinationChainId, actualRecipient),
             payload: _payload,
-            value: attributes.interopCallValue,
-            attributes: _attributes
+            value: _attributes.interopCallValue,
+            attributes: _eventAttributes
         });
     }
 
@@ -162,10 +209,7 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
 
             // slither-disable-next-line arbitrary-send-eth
             IAssetRouterShared(address(BRIDGE_HUB.assetRouter())).bridgehubDepositBaseToken{value: msg.value}(
-                _destinationChainId,
-                tokenAssetId,
-                msg.sender,
-                _attributes.mintValue
+                _destinationChainId, tokenAssetId, msg.sender, _attributes.mintValue
             );
         }
 
@@ -218,17 +262,15 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
 
             // slither-disable-next-line arbitrary-send-eth
             IAssetRouterShared(address(BRIDGE_HUB.assetRouter())).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
-                _destinationChainId,
-                tokenAssetId,
-                msg.sender,
-                _attributes.mintValue
+                _destinationChainId, tokenAssetId, msg.sender, _attributes.mintValue
             );
         }
 
         // slither-disable-next-line arbitrary-send-eth
-        IndirectCallRequest memory outputRequest = IL1CrossChainSender(_secondBridgeAddress).initiateIndirectCall{
-            value: _attributes.indirectCallMessageValue
-        }(_destinationChainId, msg.sender, _attributes.interopCallValue, _payload);
+        IndirectCallRequest memory outputRequest = IL1CrossChainSender(_secondBridgeAddress)
+        .initiateIndirectCall{value: _attributes.indirectCallMessageValue}(
+            _destinationChainId, msg.sender, _attributes.interopCallValue, _payload
+        );
 
         if (outputRequest.magicValue != INDIRECT_CALL_MAGIC_VALUE) {
             revert WrongMagicValue(uint256(INDIRECT_CALL_MAGIC_VALUE), uint256(outputRequest.magicValue));
@@ -251,11 +293,8 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
             })
         );
 
-        IL1CrossChainSender(_secondBridgeAddress).confirmL2Transaction(
-            _destinationChainId,
-            outputRequest.txDataHash,
-            canonicalTxHash
-        );
+        IL1CrossChainSender(_secondBridgeAddress)
+            .confirmL2Transaction(_destinationChainId, outputRequest.txDataHash, canonicalTxHash);
     }
 
     /// @notice Estimates the base cost (in the destination chain's base token) of an L1->L2 transaction.
@@ -278,10 +317,10 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
     /// @param _zkChain the destination ZK chain
     /// @param _request the request
     /// @return canonicalTxHash the canonical transaction hash
-    function _sendRequest(
-        IZKChain _zkChain,
-        BridgehubL2TransactionRequest memory _request
-    ) private returns (bytes32 canonicalTxHash) {
+    function _sendRequest(IZKChain _zkChain, BridgehubL2TransactionRequest memory _request)
+        private
+        returns (bytes32 canonicalTxHash)
+    {
         // Although the aliasing might happen in the Mailbox, we still want to determine the refund recipient
         // here, as the Mailbox won't have the original caller.
         _request.refundRecipient = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);
@@ -301,9 +340,20 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IL1InteropCenter
-    function parseL1Attributes(
-        bytes[] calldata _attributes
-    ) public pure override returns (L1MessageAttributes memory l1MessageAttributes) {
+    function parseL1Attributes(bytes[] calldata _attributes)
+        public
+        pure
+        override
+        returns (L1MessageAttributes memory l1MessageAttributes)
+    {
+        l1MessageAttributes = _parseL1Attributes(_attributes, L1AttributeParsingRestrictions.CallAndBundleAttributes);
+    }
+
+    function _parseL1Attributes(bytes[] calldata _attributes, L1AttributeParsingRestrictions _restriction)
+        private
+        pure
+        returns (L1MessageAttributes memory l1MessageAttributes)
+    {
         bytes4[SUPPORTED_L1_INTEROP_ATTRIBUTES] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         // We can only pass each attribute once.
         bool[] memory attributeUsed = new bool[](ATTRIBUTE_SELECTORS.length);
@@ -317,15 +367,27 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
             bytes4 selector = bytes4(_attributes[i]);
 
             if (selector == IERC7786Attributes.interopCallValue.selector) {
+                require(
+                    _restriction != L1AttributeParsingRestrictions.OnlyBundleAttributes,
+                    AttributeViolatesRestriction(selector, uint256(_restriction))
+                );
                 require(!attributeUsed[0], AttributeAlreadySet(selector));
                 attributeUsed[0] = true;
                 l1MessageAttributes.interopCallValue = AttributesDecoder.decodeUint256(_attributes[i]);
             } else if (selector == IERC7786Attributes.indirectCall.selector) {
+                require(
+                    _restriction != L1AttributeParsingRestrictions.OnlyBundleAttributes,
+                    AttributeViolatesRestriction(selector, uint256(_restriction))
+                );
                 require(!attributeUsed[1], AttributeAlreadySet(selector));
                 attributeUsed[1] = true;
                 l1MessageAttributes.indirectCall = true;
                 l1MessageAttributes.indirectCallMessageValue = AttributesDecoder.decodeUint256(_attributes[i]);
             } else if (selector == IERC7786Attributes.l1ToL2TransactionParams.selector) {
+                require(
+                    _restriction != L1AttributeParsingRestrictions.OnlyCallAttributes,
+                    AttributeViolatesRestriction(selector, uint256(_restriction))
+                );
                 require(!attributeUsed[2], AttributeAlreadySet(selector));
                 attributeUsed[2] = true;
                 hasL1ToL2TransactionParams = true;
@@ -336,6 +398,10 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
                     l1MessageAttributes.refundRecipient
                 ) = AttributesDecoder.decodeL1ToL2TransactionParams(_attributes[i]);
             } else if (selector == IERC7786Attributes.factoryDeps.selector) {
+                require(
+                    _restriction != L1AttributeParsingRestrictions.OnlyCallAttributes,
+                    AttributeViolatesRestriction(selector, uint256(_restriction))
+                );
                 require(!attributeUsed[3], AttributeAlreadySet(selector));
                 attributeUsed[3] = true;
                 l1MessageAttributes.factoryDeps = AttributesDecoder.decodeBytesArray(_attributes[i]);
@@ -344,7 +410,10 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
             }
         }
 
-        require(hasL1ToL2TransactionParams, L1ToL2TransactionParamsMissing());
+        require(
+            _restriction == L1AttributeParsingRestrictions.OnlyCallAttributes || hasL1ToL2TransactionParams,
+            L1ToL2TransactionParamsMissing()
+        );
     }
 
     /// @notice Checks if the attribute selector is supported by the L1InteropCenter.
@@ -364,26 +433,11 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
     /// @notice Returns the attribute selectors supported by the L1InteropCenter.
     /// @return The attribute selectors supported by the L1InteropCenter.
     function _getERC7786AttributeSelectors() internal pure returns (bytes4[SUPPORTED_L1_INTEROP_ATTRIBUTES] memory) {
-        return
-            [
-                IERC7786Attributes.interopCallValue.selector,
-                IERC7786Attributes.indirectCall.selector,
-                IERC7786Attributes.l1ToL2TransactionParams.selector,
-                IERC7786Attributes.factoryDeps.selector
-            ];
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            PAUSE
-    //////////////////////////////////////////////////////////////*/
-
-    /// @inheritdoc IL1InteropCenter
-    function pause() external override onlyOwner {
-        _pause();
-    }
-
-    /// @inheritdoc IL1InteropCenter
-    function unpause() external override onlyOwner {
-        _unpause();
+        return [
+            IERC7786Attributes.interopCallValue.selector,
+            IERC7786Attributes.indirectCall.selector,
+            IERC7786Attributes.l1ToL2TransactionParams.selector,
+            IERC7786Attributes.factoryDeps.selector
+        ];
     }
 }

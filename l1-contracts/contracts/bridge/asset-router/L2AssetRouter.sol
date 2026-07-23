@@ -190,15 +190,15 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     }
 
     /// @inheritdoc AssetRouterBase
-    /// @dev Validates cross-chain bridge operations initiated through the InteropCenter system:
+    /// @dev Validates cross-chain bridge operations initiated through the L2InteropCenter system:
     /// - L1->L2 calls: Currently Interop can only be initiated on L2, so this case shouldn't be covered.
     /// - L2->L2 calls: Only this contract (L2AssetRouter) can send messages from other L2 chains
     /// This dual validation prevents attackers from spoofing cross-chain messages by requiring
     /// both correct source chain ID and authorized sender address.
     ///
     /// INDIRECT CALL PATTERN (L2->L2 interop flow):
-    /// 1. User calls InteropCenter on source L2
-    /// 2. InteropCenter calls initiateIndirectCall() on source chain's L2AssetRouter
+    /// 1. User calls L2InteropCenter on source L2
+    /// 2. L2InteropCenter calls initiateIndirectCall() on source chain's L2AssetRouter
     /// 3. Source L2AssetRouter becomes the "sender" for the destination L2 call
     /// 4. Destination L2 validates senderAddress == address(this) for non-L1 sources
     ///    (L2AssetRouter address is equal for all ZKsync chains)
@@ -250,16 +250,16 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         uint256 _value,
         bytes calldata _data
     ) external payable onlyL2InteropCenter returns (InteropCallStarter memory interopCallStarter) {
-        // This function is called by the InteropCenter when processing indirect interop calls.
+        // This function is called by the L2InteropCenter when processing indirect interop calls.
         // It prepares the bridge operation for cross-chain execution through these steps:
         // 1. Processing the bridge request through the standard bridgehub flow
         // 2. Encoding the call for interop execution with proper attributes
-        // 3. Returning an InteropCallStarter struct for the InteropCenter to process
+        // 3. Returning an InteropCallStarter struct for the L2InteropCenter to process
         // COMPLETE L2->L2 BRIDGE FLOW:
         // - User wants to bridge from L2A to L2B
-        // - L2A InteropCenter calls this function on L2A AssetRouter
+        // - L2A L2InteropCenter calls this function on L2A AssetRouter
         // - This creates an InteropCallStarter targeting L2B AssetRouter
-        // - InteropCenter sends the call to L2B via the interop messaging system
+        // - L2InteropCenter sends the call to L2B via the interop messaging system
         // - L2B AssetRouter receives via executeMessage() with sender=address(this)
         //   (L2AssetRouter address is equal on all ZKsync chains)
 

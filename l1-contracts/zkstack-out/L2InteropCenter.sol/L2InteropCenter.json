@@ -365,7 +365,7 @@
     ],
     "outputs": [
       {
-        "name": "bundleHash",
+        "name": "sendId",
         "type": "bytes32",
         "internalType": "bytes32"
       }
@@ -377,17 +377,17 @@
     "name": "sendMessage",
     "inputs": [
       {
-        "name": "recipient",
+        "name": "_recipient",
         "type": "bytes",
         "internalType": "bytes"
       },
       {
-        "name": "payload",
+        "name": "_payload",
         "type": "bytes",
         "internalType": "bytes"
       },
       {
-        "name": "attributes",
+        "name": "_attributes",
         "type": "bytes[]",
         "internalType": "bytes[]"
       }

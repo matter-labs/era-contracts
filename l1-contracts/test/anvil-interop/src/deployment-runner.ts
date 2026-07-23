@@ -152,7 +152,7 @@ export class DeploymentRunner {
     sourceAddress: string
   ): Promise<{ l1Address: string; assetId: string } | undefined> {
     const provider = new providers.JsonRpcProvider(sourceRpcUrl);
-    const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+    const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("L2InteropCenter"), provider);
     const assetId: string = await interopCenter.ZK_TOKEN_ASSET_ID();
 
     if (assetId === ethers.constants.HashZero) {

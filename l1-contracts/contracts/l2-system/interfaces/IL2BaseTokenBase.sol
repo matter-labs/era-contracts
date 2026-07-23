@@ -6,7 +6,7 @@ pragma solidity ^0.8.20;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Base interface for L2 Base Token contracts (shared between Era and ZK OS).
-/// @dev Base-token L2->L1 withdrawals are initiated through the InteropCenter (`sendBundle`), the same
+/// @dev Base-token L2->L1 withdrawals are initiated through the L2InteropCenter (`sendBundle`), the same
 /// unified path as ERC20 withdrawals; there is no dedicated `withdraw` entrypoint on the base token.
 interface IL2BaseTokenBase {
     /// @notice Returns the total circulating supply of base tokens.

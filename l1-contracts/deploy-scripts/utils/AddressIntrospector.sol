@@ -108,7 +108,7 @@ library AddressIntrospector {
 
         BridgehubContracts memory proxies = BridgehubContracts({
             bridgehub: L2_BRIDGEHUB_ADDR,
-            // The L2 InteropCenter is a system contract with a fixed address, not tracked here.
+            // The L2 L2InteropCenter is a system contract with a fixed address, not tracked here.
             interopCenter: address(0),
             messageRoot: L2_MESSAGE_ROOT_ADDR,
             ctmDeploymentTracker: ctmDeploymentTrackerProxy,

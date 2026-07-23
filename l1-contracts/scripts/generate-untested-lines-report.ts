@@ -87,7 +87,7 @@ function generateReport(parsed: ParsedLcov, outputPath: string): void {
       !f.path.includes("L2ChainAssetHandler") &&
       !f.path.includes("L2MessageRoot") &&
       !f.path.includes("L2WrappedBaseToken") &&
-      !f.path.includes("InteropCenter") &&
+      !f.path.includes("L2InteropCenter") &&
       !f.path.includes("InteropHandler") &&
       !f.path.includes("/l2-upgrades/") &&
       !f.path.includes("/l2-system/")

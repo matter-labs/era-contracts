@@ -105,7 +105,7 @@ contract BaseTokenHolderTest is Test {
     }
 
     function test_give_revertWhenCalledByInteropCenter() public {
-        // InteropCenter can call burnAndStartBridging() but cannot call give()
+        // L2InteropCenter can call burnAndStartBridging() but cannot call give()
         vm.prank(L2_INTEROP_CENTER_ADDR);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, L2_INTEROP_CENTER_ADDR));
         baseTokenHolder.give(recipient, 1 ether, ERA_CHAIN_ID);
@@ -158,14 +158,14 @@ contract BaseTokenHolderTest is Test {
     }
 
     function test_receive_rejectFromInteropCenter() public {
-        // InteropCenter should use burnAndStartBridging() not receive()
+        // L2InteropCenter should use burnAndStartBridging() not receive()
         uint256 amount = 1 ether;
         vm.deal(L2_INTEROP_CENTER_ADDR, amount);
 
         vm.prank(L2_INTEROP_CENTER_ADDR);
         (bool success, ) = address(baseTokenHolder).call{value: amount}("");
 
-        assertFalse(success, "Transfer should fail - InteropCenter should use burnAndStartBridging()");
+        assertFalse(success, "Transfer should fail - L2InteropCenter should use burnAndStartBridging()");
     }
 
     function test_receive_rejectFromNativeTokenVault() public {
@@ -244,7 +244,7 @@ contract BaseTokenHolderTest is Test {
         _burnAndStartBridging_success(L2_NATIVE_TOKEN_VAULT_ADDR, ERA_CHAIN_ID);
     }
 
-    /// @dev L2BaseToken is no longer a bridging caller: base-token withdrawals go through the InteropCenter,
+    /// @dev L2BaseToken is no longer a bridging caller: base-token withdrawals go through the L2InteropCenter,
     /// which is the contract that burns the value via `burnAndStartBridging`.
     function test_burnAndStartBridging_revertFromL2BaseToken() public {
         vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, 1 ether);

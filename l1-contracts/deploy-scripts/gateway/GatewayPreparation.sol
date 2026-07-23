@@ -460,10 +460,10 @@ contract GatewayPreparation is Script {
         bytes memory l2Calldata;
 
         {
-            // Route the CTM asset withdrawal from the gateway back to L1 through the InteropCenter as a
+            // Route the CTM asset withdrawal from the gateway back to L1 through the L2InteropCenter as a
             // single-call bundle to the L1 asset router (the unified path that replaced
-            // L2AssetRouter.withdraw). The gateway-side ChainAdmin multicall invokes the InteropCenter.
-            // Each (sender, salt) pair may be used only once by the InteropCenter; derive the salt from the
+            // L2AssetRouter.withdraw). The gateway-side ChainAdmin multicall invokes the L2InteropCenter.
+            // Each (sender, salt) pair may be used only once by the L2InteropCenter; derive the salt from the
             // migration content so distinct migrations get distinct salts deterministically.
             bytes memory data = InteropLibrary.encodeWithdrawalSendBundleCalldata(
                 l1ChainId,

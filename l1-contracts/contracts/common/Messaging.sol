@@ -204,8 +204,8 @@ struct CallAttributes {
 ///                    This is a bundle-level attribute - all calls within a bundle share the same fee mode.
 ///                    Users are free to choose which fee mode to use when creating their bundle.
 ///                    In more details, any user of interop functionality is able to choose between two fee options:
-///                    - Fixed fee in ZK (ZK_INTEROP_FEE constant in InteropCenter). User pays this fee directly in ZK tokens via ERC20 transfer.
-///                    - Dynamic fee in base token of source chain where the interop is initiated. This value is fully under control of chain operator via interopProtocolFee in InteropCenter.
+///                    - Fixed fee in ZK (ZK_INTEROP_FEE constant in L2InteropCenter). User pays this fee directly in ZK tokens via ERC20 transfer.
+///                    - Dynamic fee in base token of source chain where the interop is initiated. This value is fully under control of chain operator via interopProtocolFee in L2InteropCenter.
 ///                    Note on ZK-as-base-token chains: On chains where ZK is the base token, useFixedFee=true still requires wrapped ZK tokens
 ///                    (paid via ERC20 transfer), while useFixedFee=false accepts native ZK via msg.value. This is intentional behavior.
 ///                    IMPORTANT: useFixedFee=true requires ZK token to be bridged to the source chain. If ZK token is not yet available

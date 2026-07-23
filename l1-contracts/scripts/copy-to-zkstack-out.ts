@@ -47,7 +47,7 @@ const REQUIRED_CONTRACTS = [
   // Used by anvil-interop test suite (contracts.ts)
   "DummyInteropRecipient.sol",
   "L2Bridgehub.sol",
-  "InteropCenter.sol",
+  "L2InteropCenter.sol",
   "IL1Bridgehub.sol",
   "L2AssetRouter.sol",
   "L2NativeTokenVault.sol",

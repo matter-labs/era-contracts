@@ -6,7 +6,7 @@ pragma solidity ^0.8.24;
 import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
-import {L1InteropCenter} from "contracts/interop/L1InteropCenter.sol";
+import {L1InteropCenter} from "contracts/interop/interop-center/L1InteropCenter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
@@ -100,7 +100,7 @@ contract DeployL1CoreUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "ChainRegistrationSender")) {
             return abi.encode(coreAddresses.bridgehub.proxies.bridgehub);
-        } else if (compareStrings(contractName, "InteropCenter")) {
+        } else if (compareStrings(contractName, "L2InteropCenter")) {
             return abi.encode(coreAddresses.bridgehub.proxies.bridgehub, config.l1ChainId, config.ownerAddress);
         } else if (compareStrings(contractName, "BridgedStandardERC20")) {
             return abi.encode();
@@ -133,7 +133,13 @@ contract DeployL1CoreUtils is DeployUtils {
                     coreAddresses.bridgehub.proxies.messageRoot
                 );
         } else if (compareStrings(contractName, "L1Nullifier")) {
-            return abi.encode(coreAddresses.bridgehub.proxies.bridgehub, coreAddresses.bridgehub.proxies.messageRoot);
+            return
+                abi.encode(
+                    coreAddresses.bridgehub.proxies.bridgehub,
+                    coreAddresses.bridgehub.proxies.messageRoot,
+                    config.eraChainId,
+                    config.eraDiamondProxyAddress
+                );
         } else if (compareStrings(contractName, "L1InteropHandler")) {
             return abi.encode(coreAddresses.bridgehub.proxies.messageRoot);
         } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
@@ -144,7 +150,8 @@ contract DeployL1CoreUtils is DeployUtils {
                     config.tokens.tokenWethAddress,
                     coreAddresses.bridgehub.proxies.bridgehub,
                     coreAddresses.bridges.proxies.l1Nullifier,
-                    config.eraChainId
+                    config.eraChainId,
+                    config.eraDiamondProxyAddress
                 );
         } else if (compareStrings(contractName, "L1NativeTokenVault")) {
             return

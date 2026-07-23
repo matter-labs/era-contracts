@@ -16,7 +16,7 @@ import {
 
 /// @title InteropWithdrawalBundleEncoder
 /// @notice Test-only helper that reconstructs the single-call L2->L1 withdrawal `InteropBundle` the L2
-/// InteropCenter emits, for finalizing withdrawals via `L1InteropHandler.executeBundle` under a mocked
+/// L2InteropCenter emits, for finalizing withdrawals via `L1InteropHandler.executeBundle` under a mocked
 /// inclusion proof. Production flows never reconstruct bundles — they pass the actual emitted bundle bytes.
 library InteropWithdrawalBundleEncoder {
     /// @notice Builds the `BUNDLE_IDENTIFIER`-prefixed L2->L1 withdrawal message form.
@@ -41,13 +41,13 @@ library InteropWithdrawalBundleEncoder {
 
     /// @notice Builds the ABI-encoded single-call `InteropBundle` for an interop-routed withdrawal, without the
     /// `BUNDLE_IDENTIFIER` prefix. This is the form consumed by `IInteropHandlerBase.executeBundle`.
-    /// @dev The `destinationBaseTokenAssetId` matches what the L2 InteropCenter sets for an L1-destined bundle
+    /// @dev The `destinationBaseTokenAssetId` matches what the L2 L2InteropCenter sets for an L1-destined bundle
     /// (L1's ETH asset ID), which `InteropHandlerBase._validateBundleDestinationContext` checks on execution.
     /// @param _chainId The source ZK chain ID (encoded both in the bundle and the inner call).
     /// @param _l1AssetRouter The L1 asset router that the bundle's single call targets.
     /// @param _assetId The asset being withdrawn.
     /// @param _transferData The bridge-mint/transfer data for the asset.
-    /// @param _interopBundleSalt The bundle salt. Real bundles carry the salt assigned by the L2 InteropCenter
+    /// @param _interopBundleSalt The bundle salt. Real bundles carry the salt assigned by the L2 L2InteropCenter
     /// (`keccak256(abi.encodePacked(sender, userSalt))`, where `userSalt` comes from the `interopBundleSalt`
     /// bundle attribute) — a reconstruction can only be finalized against a real inclusion proof if it supplies
     /// that same salt, since the bundle bytes must hash-match the emitted message. Tests running under mocked

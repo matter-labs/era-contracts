@@ -85,6 +85,7 @@ library DeployCTML1OrGateway {
         } else if (_contractName == CTMContract.MailboxFacet) {
             return
                 abi.encode(
+                    _config.eraChainId,
                     _config.l1ChainId,
                     _config.chainAssetHandler,
                     _config.eip7702Checker,

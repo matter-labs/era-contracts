@@ -250,7 +250,7 @@ library DataEncoding {
     /// NON-base-token asset (an ERC20 or the CTM/ZK asset).
     /// @dev An L2->L1 withdrawal is a single-call interop bundle whose one call is an indirect call to the
     /// L2 AssetRouter carrying the bridgehub-deposit payload for the withdrawn asset; on L1 it is executed
-    /// by `L1InteropHandler.executeBundle`. Callers pass the resulting array to `InteropCenter.sendBundle`
+    /// by `L1InteropHandler.executeBundle`. Callers pass the resulting array to `L2InteropCenter.sendBundle`
     /// (directly, or ABI-encoded for an admin L1->L2 transaction). Both the `indirectCall` message value and
     /// `interopCallValue` are zero, so NO base-token value rides the bundle; the withdrawn amount is carried
     /// inside `_transferData` and released by the asset handler on L1. For withdrawing the chain's base token
@@ -267,9 +267,9 @@ library DataEncoding {
     /// @notice Builds the single indirect-call `InteropCallStarter` for an L2->L1 withdrawal of the chain's
     /// BASE token.
     /// @dev Same single-call shape as `encodeInteropWithdrawalCallStarters`, but the withdrawn amount rides as
-    /// the `indirectCall` message value: the InteropCenter burns it from the `msg.value` provided to
+    /// the `indirectCall` message value: the L2InteropCenter burns it from the `msg.value` provided to
     /// `sendBundle` (via the BaseTokenHolder), and the L1 asset handler releases it to the recipient when the
-    /// bundle is finalized. The caller of `InteropCenter.sendBundle` MUST therefore send `_amount` as the
+    /// bundle is finalized. The caller of `L2InteropCenter.sendBundle` MUST therefore send `_amount` as the
     /// transaction value. `interopCallValue` stays zero — destination-side call value is not supported for L1
     /// destinations (`NonZeroValueToL1NotSupported`).
     /// @param _assetId The base-token assetId of the withdrawn token.

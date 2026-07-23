@@ -454,7 +454,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         bytes memory bridgehubMintData = abi.encode(data);
         // The CTM asset withdrawal from the gateway arrives as a single-call interop bundle emitted by
-        // the gateway's InteropCenter (see `GatewayPreparation.startMigrateChainFromGateway`).
+        // the gateway's L2InteropCenter (see `GatewayPreparation.startMigrateChainFromGateway`).
         bytes memory message = _encodeWithdrawalBundleMessage(gatewayChainId, assetId, bridgehubMintData);
 
         GatewayUtils userUtils = new GatewayUtils();

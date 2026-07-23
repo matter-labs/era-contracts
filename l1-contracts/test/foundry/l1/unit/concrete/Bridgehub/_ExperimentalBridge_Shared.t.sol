@@ -10,7 +10,8 @@ import "forge-std/console.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
-import {IInteropCenter, InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+import {L2InteropCenter} from "contracts/interop/interop-center/L2InteropCenter.sol";
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
 import {
     L2TransactionRequestDirect,
@@ -26,7 +27,7 @@ import {IL1CrossChainSender} from "contracts/bridge/interfaces/IL1CrossChainSend
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
-import {L1InteropCenter} from "contracts/interop/L1InteropCenter.sol";
+import {L1InteropCenter} from "contracts/interop/interop-center/L1InteropCenter.sol";
 import {
     AttributeAlreadySet,
     FactoryDepsNotAllowedForIndirectCall,
@@ -157,7 +158,7 @@ abstract contract ExperimentalBridgeTestBase is Test {
         bridgeOwner = makeAddr("BRIDGE_OWNER");
         dummyBridgehub = new DummyBridgehubSetter(bridgeOwner, type(uint256).max);
         bridgehub = L1Bridgehub(address(dummyBridgehub));
-        interopCenter = new InteropCenter();
+        interopCenter = new L2InteropCenter();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         interopCenter.initL2(l1ChainId, bridgeOwner, DataEncoding.encodeNTVAssetId(eraChainId, makeAddr("zkToken")));
         messageRoot = L1MessageRoot(
@@ -179,7 +180,7 @@ abstract contract ExperimentalBridgeTestBase is Test {
         address mockL1WethAddress = makeAddr("Weth");
         address eraDiamondProxy = makeAddr("eraDiamondProxy");
 
-        l1Nullifier = new L1Nullifier(bridgehub, messageRoot);
+        l1Nullifier = new L1Nullifier(bridgehub, messageRoot, eraChainId, eraDiamondProxy);
         l1NullifierAddress = address(l1Nullifier);
 
         mockSharedBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
@@ -253,7 +254,13 @@ abstract contract ExperimentalBridgeTestBase is Test {
         address _l1WethAddress,
         address _eraDiamondProxy
     ) internal returns (L1AssetRouter assetRouter) {
-        assetRouter = new L1AssetRouter(_l1WethAddress, address(bridgehub), l1NullifierAddress, eraChainId);
+        assetRouter = new L1AssetRouter(
+            _l1WethAddress,
+            address(bridgehub),
+            l1NullifierAddress,
+            eraChainId,
+            _eraDiamondProxy
+        );
         address defaultOwner = assetRouter.owner();
         vm.prank(defaultOwner);
         assetRouter.transferOwnership(bridgeOwner);

@@ -33,11 +33,14 @@ import {
     PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET
 } from "../../../common/Config.sol";
 import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {IAssetRouterShared} from "../../../bridge/asset-router/IAssetRouterShared.sol";
 import {
     AddressNotZero,
     GasPerPubdataMismatch,
     InvalidChainId,
     MsgValueTooLow,
+    NotAssetRouter,
+    OnlyEraSupported,
     TooManyFactoryDeps,
     TransactionNotAllowed,
     ValueMismatch,
@@ -70,6 +73,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     uint256 internal immutable L1_CHAIN_ID;
 
     /// @dev Era's chainID
+    uint256 internal immutable ERA_CHAIN_ID; // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
 
     /// @dev The address of the L1ChainAssetHandler system contract. Only used on L1.
     address internal immutable CHAIN_ASSET_HANDLER;
@@ -90,12 +94,19 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         _;
     }
 
-    constructor(uint256 _l1ChainId, address _chainAssetHandler, IEIP7702Checker _eip7702Checker, bool _isTestnet) {
+    constructor(
+        uint256 _eraChainId,
+        uint256 _l1ChainId,
+        address _chainAssetHandler,
+        IEIP7702Checker _eip7702Checker,
+        bool _isTestnet
+    ) {
         if (address(_eip7702Checker) == address(0) && block.chainid == _l1ChainId) {
             revert ZeroAddress();
         } else if (address(_eip7702Checker) != address(0) && block.chainid != _l1ChainId) {
             revert AddressNotZero();
         }
+        ERA_CHAIN_ID = _eraChainId; // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
         L1_CHAIN_ID = _l1ChainId;
         CHAIN_ASSET_HANDLER = _chainAssetHandler;
         EIP_7702_CHECKER = _eip7702Checker;
@@ -563,5 +574,43 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     /// full removal is tracked separately (EVM-1216).
     function finalizeEthWithdrawal(uint256, uint256, uint16, bytes calldata, bytes32[] calldata) external onlyL1 {
         revert TransactionNotAllowed();
+    }
+
+    /// @inheritdoc IMailboxImpl
+    function requestL2Transaction(
+        // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
+        address _contractL2,
+        uint256 _l2Value,
+        bytes calldata _calldata,
+        uint256 _l2GasLimit,
+        uint256 _l2GasPerPubdataByteLimit,
+        bytes[] calldata _factoryDeps,
+        address _refundRecipient
+    ) external payable onlyL1 returns (bytes32 canonicalTxHash) {
+        if (s.chainId != ERA_CHAIN_ID) {
+            revert OnlyEraSupported();
+        }
+        address assetRouter = address(IBridgehubBase(s.bridgehub).assetRouter());
+        require(msg.sender != assetRouter, NotAssetRouter(msg.sender, assetRouter));
+        canonicalTxHash = _requestL2TransactionSender(
+            BridgehubL2TransactionRequest({
+                sender: msg.sender,
+                contractL2: _contractL2,
+                mintValue: msg.value,
+                l2Value: _l2Value,
+                l2GasLimit: _l2GasLimit,
+                l2Calldata: _calldata,
+                l2GasPerPubdataByteLimit: _l2GasPerPubdataByteLimit,
+                factoryDeps: _factoryDeps,
+                refundRecipient: _refundRecipient
+            })
+        );
+        address sharedBridge = address(IBridgehubBase(s.bridgehub).assetRouter());
+        IAssetRouterShared(sharedBridge).bridgehubDepositBaseToken{value: msg.value}(
+            s.chainId,
+            s.baseTokenAssetId,
+            msg.sender,
+            msg.value
+        );
     }
 }

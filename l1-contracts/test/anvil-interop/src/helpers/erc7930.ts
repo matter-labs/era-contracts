@@ -21,7 +21,7 @@ function encodeChainRef(chainId: number): { len: string; bytes: string } {
 
 /**
  * Encode a chain ID as an ERC-7930 InteroperableAddress (no address component).
- * Used as the `destinationChain` argument in InteropCenter.sendBundle.
+ * Used as the `destinationChain` argument in L2InteropCenter.sendBundle.
  */
 export function encodeEvmChain(chainId: number): string {
   const ref = encodeChainRef(chainId);

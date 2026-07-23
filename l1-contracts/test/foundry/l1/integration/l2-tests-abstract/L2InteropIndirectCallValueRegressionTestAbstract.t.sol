@@ -23,7 +23,7 @@ import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {IL2CrossChainSender} from "contracts/bridge/interfaces/IL2CrossChainSender.sol";
 
 /// @title MockL2CrossChainSender
-/// @notice Mock contract for testing indirect call value handling in InteropCenter
+/// @notice Mock contract for testing indirect call value handling in L2InteropCenter
 contract MockL2CrossChainSender is IL2CrossChainSender {
     uint256 public lastReceivedMsgValue;
     uint256 public lastInteropCallValue;
@@ -62,7 +62,7 @@ contract MockL2CrossChainSender is IL2CrossChainSender {
 }
 
 /// @title L2InteropIndirectCallValueRegressionTestAbstract
-/// @notice Regression tests for the indirect call value handling fix in InteropCenter
+/// @notice Regression tests for the indirect call value handling fix in L2InteropCenter
 abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropTestUtils {
     MockL2CrossChainSender internal mockCrossChainSender;
     address internal finalRecipient;

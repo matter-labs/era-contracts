@@ -106,7 +106,7 @@ library ContractsBytecodesLib {
             "DefaultUpgrade",
             "EraSettlementLayerV31Upgrade",
             "ZKsyncOSSettlementLayerV31Upgrade",
-            "InteropCenter",
+            "L2InteropCenter",
             "L2InteropHandler",
             "EraDualVerifier",
             "ZKsyncOSDualVerifier",

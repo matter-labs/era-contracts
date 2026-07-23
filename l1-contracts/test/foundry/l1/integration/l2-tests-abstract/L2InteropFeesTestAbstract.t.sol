@@ -9,7 +9,8 @@ import "forge-std/console.sol";
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
-import {IInteropCenter, InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+import {L2InteropCenter} from "contracts/interop/interop-center/L2InteropCenter.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
@@ -31,7 +32,7 @@ import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 /// @title L2InteropFeesTestAbstract
-/// @notice Tests for InteropCenter fee configuration and fee collection functionality
+/// @notice Tests for L2InteropCenter fee configuration and fee collection functionality
 /// @dev Tests both fee configuration and actual fee collection during sendBundle operations.
 abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
     using stdStorage for StdStorage;
@@ -363,7 +364,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         // Deploy ZK token
         zkToken = new TestnetERC20Token("ZK Token", "ZK", 18);
 
-        // Set up ZK token in InteropCenter via storage
+        // Set up ZK token in L2InteropCenter via storage
         bytes32 zkTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, address(zkToken));
 
         // Mock NTV to return the zkToken address for the asset ID
@@ -373,7 +374,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
             abi.encode(address(zkToken))
         );
 
-        // Set ZK_TOKEN_ASSET_ID in InteropCenter storage (slot varies, use stdStorage)
+        // Set ZK_TOKEN_ASSET_ID in L2InteropCenter storage (slot varies, use stdStorage)
         stdstore.target(L2_INTEROP_CENTER_ADDR).sig("ZK_TOKEN_ASSET_ID()").checked_write(zkTokenAssetId);
 
         // Prepare sender with ZK tokens
@@ -381,7 +382,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         uint256 zkFeePerCall = l2InteropCenter.ZK_INTEROP_FEE(); // 1e18
         zkToken.mint(sender, zkFeePerCall * 10);
 
-        // Approve InteropCenter to spend ZK tokens
+        // Approve L2InteropCenter to spend ZK tokens
         vm.prank(sender);
         zkToken.approve(L2_INTEROP_CENTER_ADDR, type(uint256).max);
 
@@ -770,11 +771,11 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         // Verify fees were accumulated
         assertEq(l2InteropCenter.accumulatedZKFees(coinbaseAddr), zkFeePerCall, "ZK fees should be accumulated");
 
-        // Verify InteropCenter holds the tokens
+        // Verify L2InteropCenter holds the tokens
         assertEq(
             zkToken.balanceOf(L2_INTEROP_CENTER_ADDR),
             zkFeePerCall,
-            "InteropCenter should hold accumulated ZK tokens"
+            "L2InteropCenter should hold accumulated ZK tokens"
         );
     }
 
@@ -1243,7 +1244,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         assertEq(
             zkToken.balanceOf(L2_INTEROP_CENTER_ADDR),
             totalExpectedZKFee,
-            "InteropCenter should hold exact fee amount"
+            "L2InteropCenter should hold exact fee amount"
         );
     }
 
@@ -1264,7 +1265,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
         // Send multiple bundles to accumulate fees. Each bundle carries a distinct salt so that its hash is unique,
-        // as InteropCenter rejects re-sending a bundle with an already-used hash.
+        // as L2InteropCenter rejects re-sending a bundle with an already-used hash.
         for (uint256 i = 0; i < 3; i++) {
             bytes[] memory bundleAttributes = InteropLibrary.withInteropBundleSalt(
                 InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false, bytes32(0)),

@@ -482,7 +482,7 @@ export class Deployer {
     ethTxOptions: ethers.providers.TransactionRequest
   ) {
     const contractAddress = await this.deployViaCreate2(
-      "InteropCenter",
+      "L2InteropCenter",
       [this.addresses.Bridgehub.BridgehubProxy, await this.getL1ChainId(), this.addresses.Governance],
       create2Salt,
       ethTxOptions
@@ -496,7 +496,7 @@ export class Deployer {
   }
 
   public async deployInteropCenterProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    const bridgehub = new Interface(hardhat.artifacts.readArtifactSync("InteropCenter").abi);
+    const bridgehub = new Interface(hardhat.artifacts.readArtifactSync("L2InteropCenter").abi);
 
     const initCalldata = bridgehub.encodeFunctionData("initialize", [this.addresses.Governance]);
 

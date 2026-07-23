@@ -23,6 +23,7 @@ import {AddressAlreadySet, NonEmptyMsgValue, Unauthorized, ZeroAddress} from "..
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
+import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IBridgehubBase, IndirectCallRequest} from "../../core/bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
@@ -39,8 +40,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @dev Bridgehub smart contract used for asynchronous cross-chain requests, including deposits and interop-related routing.
     IL1Bridgehub public immutable BRIDGE_HUB;
 
-    /// @dev Chain ID of Era. Not used in the contract logic; kept as an introspectable registry value
-    /// for deployment tooling (see `AddressIntrospector.getEraChainId`).
+    /// @dev Chain ID of Era, retained for the legacy Mailbox request path until EVM-1216.
     uint256 public immutable ERA_CHAIN_ID;
 
     /// @dev The address of the WETH token on L1.
@@ -48,6 +48,9 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
     /// @dev The assetId of the ETH.
     bytes32 public immutable ETH_TOKEN_ASSET_ID;
+
+    /// @dev The address of ZKsync Era diamond proxy contract.
+    IZKChain public immutable ERA_DIAMOND_PROXY;
 
     /// @dev Address of nullifier.
     IL1Nullifier public immutable L1_NULLIFIER;
@@ -73,6 +76,18 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @dev `finalizeDeposit` is reached only via `receiveMessage`'s self-call, mirroring the L2 asset router.
     modifier onlySelf() {
         require(msg.sender == address(this), Unauthorized(msg.sender));
+        _;
+    }
+
+    /// @notice Checks that the message sender is the L1InteropCenter or ZKsync Era Diamond Proxy.
+    /// @dev The L1InteropCenter is resolved dynamically through the Bridgehub, matching ChainAssetHandler
+    /// authorization and keeping one source of truth for upgrade rotations.
+    modifier onlyInteropCenterOrEra(uint256 _chainId) {
+        require(
+            msg.sender == BRIDGE_HUB.interopCenter() ||
+                (_chainId == ERA_CHAIN_ID && msg.sender == address(ERA_DIAMOND_PROXY)),
+            Unauthorized(msg.sender)
+        );
         _;
     }
 
@@ -103,12 +118,14 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         address _l1WethToken,
         address _bridgehub,
         address _l1Nullifier,
-        uint256 _eraChainId
+        uint256 _eraChainId,
+        address _eraDiamondProxy
     ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = IL1Bridgehub(_bridgehub);
         ERA_CHAIN_ID = _eraChainId;
         L1_WETH_TOKEN = _l1WethToken;
+        ERA_DIAMOND_PROXY = IZKChain(_eraDiamondProxy);
         L1_NULLIFIER = IL1Nullifier(_l1Nullifier);
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
     }
@@ -202,7 +219,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes32 _assetId,
         address _originalCaller,
         uint256 _amount
-    ) public payable virtual override onlyInteropCenter whenNotPaused {
+    ) public payable virtual override onlyInteropCenterOrEra(_chainId) whenNotPaused {
         _bridgehubDepositBaseToken(_chainId, _assetId, _originalCaller, _amount);
     }
 

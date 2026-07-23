@@ -19,7 +19,7 @@ import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice L1-side interop handler. It executes L2 -> L1 interop bundles through the shared
 /// `InteropHandlerBase.executeBundle` interface (symmetric to the L2 `L2InteropHandler`). For this release an
-/// L1-destined bundle is restricted to a single asset WITHDRAWAL: the L2 InteropCenter only accepts an indirect,
+/// L1-destined bundle is restricted to a single asset WITHDRAWAL: the L2 L2InteropCenter only accepts an indirect,
 /// zero-value call to the L2 AssetRouter, which resolves to a call targeting the L1 asset router's
 /// `finalizeDeposit`, delivered here via ERC-7786 `receiveMessage`. Arbitrary/direct L2 -> L1 calls are not
 /// allowed, keeping the L1-side surface to the asset router.
@@ -80,7 +80,7 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
     /// @dev L1-destined calls carry no base-token call value; any transferred amount rides inside the call
     /// payload (e.g. a withdrawal's `finalizeDeposit` transfer data).
     /// @dev Deliberate double-defense: the same invariant is already enforced at SEND time by the L2
-    /// InteropCenter (`NonZeroValueToL1NotSupported`); this receive-side check re-verifies it with its own
+    /// L2InteropCenter (`NonZeroValueToL1NotSupported`); this receive-side check re-verifies it with its own
     /// error (`InteropWithdrawalNonZeroValue`) in case a malformed bundle ever reaches L1.
     function _handleCallValue(uint256 _value, uint256 /* _sourceChainId */) internal pure override {
         require(_value == 0, InteropWithdrawalNonZeroValue(_value));

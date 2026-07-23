@@ -55,6 +55,8 @@ error MultiCallToL1NotSupported(uint256 callCount);
 error NonZeroValueToL1NotSupported(uint256 value);
 // 0x2f59bd0d
 error SidesLengthNotOne();
+// 0x96adc841
+error SingleCallBundleRequired(uint256 callCount);
 // 0x89fd2c76
 error UnauthorizedMessageSender(address expected, address actual);
 // 0x0345c281

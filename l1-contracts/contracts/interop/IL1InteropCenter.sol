@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.24;
 
-import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
+import {IInteropCenterBase} from "./IInteropCenterBase.sol";
 
 /// @dev The parsed representation of the ERC-7786 attributes supported by the L1InteropCenter.
 /// @param interopCallValue The value (in the destination chain's base token) passed with the call on the destination chain.
@@ -29,7 +29,7 @@ struct L1MessageAttributes {
 /// @title L1 Interop Center interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL1InteropCenter is IERC7786GatewaySource {
+interface IL1InteropCenter is IInteropCenterBase {
     /// @notice The L1 Bridgehub, used as the registry of chains, base tokens and ZK chain addresses.
     function BRIDGE_HUB() external view returns (IL1Bridgehub);
 
@@ -52,9 +52,4 @@ interface IL1InteropCenter is IERC7786GatewaySource {
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256);
 
-    /// @notice Pauses `sendMessage`. Used for incident response.
-    function pause() external;
-
-    /// @notice Unpauses `sendMessage`.
-    function unpause() external;
 }

@@ -34,7 +34,7 @@ interface IBaseTokenHolder {
     /// @notice Emitted when base tokens are received and outbound bridging is initiated.
     /// @dev Emitted for outbound base-token bridging through BaseTokenHolder.burnAndStartBridging(), which is now
     /// the unified path on both Era and ZK OS: base-token L2->L1 withdrawals and cross-chain sends flow through
-    /// the InteropCenter, and bridged base-token burns through the NativeTokenVault — both call
+    /// the L2InteropCenter, and bridged base-token burns through the NativeTokenVault — both call
     /// burnAndStartBridging. (The dedicated L2BaseToken withdraw entrypoint that used to bypass this contract on
     /// Era was removed, so Era withdrawals now route through here too.)
     /// @param from The address that sent the base tokens.
@@ -49,7 +49,7 @@ interface IBaseTokenHolder {
     function give(address _to, uint256 _amount, uint256 _fromChainId) external;
 
     /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.
-    /// @dev Called by InteropCenter and NativeTokenVault during bridging operations.
+    /// @dev Called by L2InteropCenter and NativeTokenVault during bridging operations.
     /// @param _toChainId The chain ID which the funds are sent to.
     function burnAndStartBridging(uint256 _toChainId) external payable;
 }
