@@ -639,7 +639,6 @@ contract CommittingTest is ExecutorTest {
         return
             keccak256(
                 abi.encodePacked(
-                    _batch.chainId,
                     _batch.firstBlockTimestamp,
                     _batch.lastBlockTimestamp,
                     uint256(_batch.daCommitmentScheme),
