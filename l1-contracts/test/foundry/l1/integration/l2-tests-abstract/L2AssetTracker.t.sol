@@ -28,7 +28,6 @@ import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.so
 import {AssetAlreadyRegistered, AssetIdNotRegistered} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {L2BaseTokenZKOS} from "contracts/l2-system/zksync-os/L2BaseTokenZKOS.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
-import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
@@ -69,20 +68,10 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
         uint256 amount = 11;
 
+        // An unregistered foreign asset must be rejected by handleFinalizeBridgingOnL2.
         vm.expectRevert(abi.encodeWithSelector(AssetIdNotRegistered.selector, assetId));
         vm.prank(address(L2_NATIVE_TOKEN_VAULT_ADDR));
         L2_ASSET_TRACKER.handleFinalizeBridgingOnL2(L1_CHAIN_ID, assetId, amount, L1_CHAIN_ID, address(token));
-
-        stdstore.target(sharedBridgeLegacy).sig("l1TokenAddress(address)").with_key(address(token)).checked_write(
-            l1Token
-        );
-        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setLegacyTokenAssetId(address(token));
-
-        vm.prank(address(L2_NATIVE_TOKEN_VAULT_ADDR));
-        L2_ASSET_TRACKER.handleFinalizeBridgingOnL2(L1_CHAIN_ID, assetId, amount, L1_CHAIN_ID, address(token));
-
-        uint256 chainBalance = L2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, assetId);
-        assertEq(chainBalance, 0, "Foreign token chain balance should remain zero");
     }
 
     function test_handleFinalizeBaseTokenBridgingOnL2() public {

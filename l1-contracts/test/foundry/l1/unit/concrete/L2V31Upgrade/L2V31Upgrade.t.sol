@@ -48,7 +48,6 @@ contract MockV31UpgradeNativeTokenVault {
     bytes32 public immutable L2_TOKEN_PROXY_BYTECODE_HASH;
     address public immutable WETH_TOKEN;
 
-    address public L2_LEGACY_SHARED_BRIDGE;
     address public BASE_TOKEN_ORIGIN_TOKEN;
     string public BASE_TOKEN_NAME;
     string public BASE_TOKEN_SYMBOL;
@@ -88,7 +87,6 @@ contract MockV31UpgradeNativeTokenVault {
         uint256 _l1ChainId,
         address /* _aliasedOwner */,
         bytes32 _l2TokenProxyBytecodeHash,
-        address _legacySharedBridge,
         address _wethToken,
         TokenBridgingData calldata _baseTokenBridgingData,
         TokenMetadata calldata _baseTokenMetadata
@@ -102,7 +100,6 @@ contract MockV31UpgradeNativeTokenVault {
         require(_wethToken == WETH_TOKEN, "unexpected weth token");
         require(_baseTokenBridgingData.assetId == BASE_TOKEN_ASSET_ID, "unexpected base token asset id");
 
-        L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
         BASE_TOKEN_ORIGIN_TOKEN = _baseTokenBridgingData.originToken;
         BASE_TOKEN_NAME = _baseTokenMetadata.name;
         BASE_TOKEN_SYMBOL = _baseTokenMetadata.symbol;

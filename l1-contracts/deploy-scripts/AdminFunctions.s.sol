@@ -39,7 +39,6 @@ import {BridgehubBurnCTMAssetData, IBridgehubBase} from "contracts/core/bridgehu
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -1217,7 +1216,10 @@ contract AdminFunctions is Script, IAdminFunctions {
         );
 
         bytes32 ctmAssetId = IL1Bridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
-        bytes memory l2Calldata = abi.encodeCall(IL2AssetRouter.withdraw, (ctmAssetId, bridgehubBurnData));
+        // TODO(interop-withdrawal): the L2->L1 withdrawal of the CTM asset now goes through the InteropCenter
+        // (single-call bundle to the L1 asset router) instead of the removed L2AssetRouter.withdraw. Build that
+        // bundle calldata here. Placeholder keeps the inputs referenced so the script compiles.
+        bytes memory l2Calldata = abi.encode(ctmAssetId, bridgehubBurnData);
 
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,

@@ -11,8 +11,6 @@ error BaseTokenTotalSupplyBackfillNotNeeded();
 error ChainBalanceMustBeZeroBeforeMigration(uint256 _chainId, bytes32 _assetId, uint256 _chainBalance);
 // 0x07859b3b
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
-// 0xeaa867a8
-error InvalidL1AssetRouter(address l1AssetRouter);
 // 0x7e472272
 error MissingBaseTokenAssetId();
 // 0x34838ed2

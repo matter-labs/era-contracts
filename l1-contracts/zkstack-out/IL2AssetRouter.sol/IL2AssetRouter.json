@@ -46,39 +46,6 @@
   },
   {
     "type": "function",
-    "name": "finalizeDepositLegacyBridge",
-    "inputs": [
-      {
-        "name": "_l1Sender",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_l2Receiver",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_l1Token",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_data",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "initiateIndirectCall",
     "inputs": [
       {
@@ -153,19 +120,6 @@
   },
   {
     "type": "function",
-    "name": "setLegacyTokenAssetHandler",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "withdraw",
     "inputs": [
       {
@@ -186,34 +140,6 @@
         "internalType": "bytes32"
       }
     ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "withdrawLegacyBridge",
-    "inputs": [
-      {
-        "name": "_l1Receiver",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_l2Token",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_sender",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
     "stateMutability": "nonpayable"
   },
   {

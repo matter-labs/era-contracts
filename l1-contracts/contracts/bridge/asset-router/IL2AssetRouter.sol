@@ -22,22 +22,7 @@ interface IL2AssetRouter is IAssetRouterBase, IL2CrossChainSender {
 
     function BASE_TOKEN_ASSET_ID() external view returns (bytes32);
 
-    function withdrawLegacyBridge(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) external;
-
-    function finalizeDepositLegacyBridge(
-        address _l1Sender,
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        bytes calldata _data
-    ) external;
-
     /// @dev Used to set the assetHandlerAddress for a given assetId.
     /// @dev Will be used by ZK Gateway
     function setAssetHandlerAddress(uint256 _originChainId, bytes32 _assetId, address _assetHandlerAddress) external;
-
-    /// @notice Function that allows native token vault to register itself as the asset handler for
-    /// a legacy asset.
-    /// @param _assetId The assetId of the legacy token.
-    function setLegacyTokenAssetHandler(bytes32 _assetId) external;
 }

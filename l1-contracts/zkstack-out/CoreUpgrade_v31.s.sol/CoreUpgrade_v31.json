@@ -311,11 +311,6 @@
                 "internalType": "struct BridgeContracts",
                 "components": [
                   {
-                    "name": "erc20Bridge",
-                    "type": "address",
-                    "internalType": "address"
-                  },
-                  {
                     "name": "l1AssetRouter",
                     "type": "address",
                     "internalType": "address"
@@ -337,11 +332,6 @@
                 "type": "tuple",
                 "internalType": "struct BridgeContracts",
                 "components": [
-                  {
-                    "name": "erc20Bridge",
-                    "type": "address",
-                    "internalType": "address"
-                  },
                   {
                     "name": "l1AssetRouter",
                     "type": "address",

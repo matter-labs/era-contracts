@@ -12,7 +12,6 @@ import {Governance} from "contracts/governance/Governance.sol";
 import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
-import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {DummyL1MessageRoot} from "contracts/dev-contracts/test/DummyL1MessageRoot.sol";
@@ -148,14 +147,6 @@ contract DeployL1CoreUtils is DeployUtils {
                     config.eraChainId,
                     config.eraDiamondProxyAddress
                 );
-        } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-            return
-                abi.encode(
-                    coreAddresses.bridges.proxies.l1Nullifier,
-                    coreAddresses.bridges.proxies.l1AssetRouter,
-                    coreAddresses.bridges.proxies.l1NativeTokenVault,
-                    config.eraChainId
-                );
         } else if (compareStrings(contractName, "L1NativeTokenVault")) {
             return
                 abi.encode(
@@ -218,11 +209,9 @@ contract DeployL1CoreUtils is DeployUtils {
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
                 return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1Nullifier")) {
-                return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1, 1, 1, 0));
+                return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1));
             } else if (compareStrings(contractName, "L1AssetRouter")) {
                 return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-                return abi.encodeCall(L1ERC20Bridge.initialize, ());
             } else if (compareStrings(contractName, "L1NativeTokenVault")) {
                 return
                     abi.encodeCall(

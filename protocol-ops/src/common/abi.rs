@@ -271,15 +271,6 @@ pub mod il2_asset_tracker {
 }
 pub use il2_asset_tracker::IL2AssetTrackerAbi;
 
-pub mod i_setup_legacy_bridge {
-    alloy::sol!(
-        #[sol(rpc)]
-        ISetupLegacyBridgeAbi,
-        "../l1-contracts/zkstack-out/ISetupLegacyBridge.sol/ISetupLegacyBridge.json"
-    );
-}
-pub use i_setup_legacy_bridge::ISetupLegacyBridgeAbi;
-
 pub mod ctm_ext {
     alloy::sol!(
         #[sol(rpc)]
