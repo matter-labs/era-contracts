@@ -108,6 +108,11 @@ contract ReentrantRefundClaimer {
 ///      failed-transfer branch of `L2NativeTokenVault._disburseFailedTransfer`.
 ///   5. Reentrancy: a malicious depositor re-entering `claimRefund` from the recovery ETH push is rejected
 ///      by the CEI leg-state machine (no `nonReentrant` guard exists by design).
+///
+/// EraVM coverage: L1-context wrapper only, by construction — the atomic predeploys and interop-root
+/// storage are installed via `deployCodeTo` / `vm.etch` (EVM-only; zkFoundry rejects `EXTCODECOPY`).
+/// The atomic send + timeout-refund flow is exercised on real EraVM nodes by the anvil-interop
+/// `13-imt-atomic-swap` spec. See {L2AtomicInteropExecuteTestAbstract} for the full rationale.
 abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, AtomicInteropProofBuilder {
     /// @dev The remote leg the reviewer's flow prescribes: a bundle hash no chain will ever commit.
     bytes32 internal constant INVALID_REMOTE_LEG = keccak256("invalid");
@@ -499,8 +504,9 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     function _sendDirectValueLegWithInvalidRemotePeer(address _depositor) internal {
         AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
         bytes32 salt = keccak256("atomic direct value leg salt");
-        // The destination shares this chain's base token (the harness registers every chain with the same
-        // base-token asset id), so the library builds the DIRECT value-carrying starter.
+        // The destination (`destinationChainId`) is registered in {_registerInteropChains} with this
+        // chain's base-token asset id, i.e. it shares this chain's base token, so the library builds the
+        // DIRECT value-carrying starter.
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = InteropLibrary.buildSendDestinationChainBaseTokenCall(
             destinationChainId,
@@ -865,6 +871,89 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
             balanceBefore,
             "the burn must be unwound with the rejected send"
         );
+    }
+
+    /// @dev previewMessageHash quoter: predicts the bundle hash `sendMessage` will produce for a single
+    /// message (atomic metadata is out-of-band, so the preview carries only the salt). Extracted to keep
+    /// the caller's stack shallow.
+    function _predictMessageHash(
+        bytes memory _recipient7930,
+        bytes memory _payload,
+        bytes32 _salt
+    ) internal returns (bytes32 predicted) {
+        bytes[] memory previewAttrs = new bytes[](1);
+        previewAttrs[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (_salt));
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool ok, bytes memory ret) = address(l2InteropCenter).call(
+            abi.encodeCall(l2InteropCenter.previewMessageHash, (_recipient7930, _payload, previewAttrs))
+        );
+        require(
+            !ok && ret.length == 36 && bytes4(ret) == InteropPreviewHash.selector,
+            "preview must revert with InteropPreviewHash"
+        );
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            predicted := mload(add(ret, 0x24))
+        }
+    }
+
+    /// @notice The single-message atomic entry point `sendMessage` (distinct from `sendBundle`): it
+    /// independently parses attributes, defaults the unbundler, builds the one-call bundle, parses the
+    /// `atomicBundle` attribute and commits the leg. Exercised for REAL end to end — predicted hash via
+    /// `previewMessageHash`, then `sendMessage` — asserting the returned send id, the `FlowCommitted`
+    /// event, the committed leg state, the canonical IMT leaf, and the emitted bundle payload.
+    function test_atomicSendMessage_singleLeg_commitsLeg() public {
+        _setUpAtomicStack();
+        AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
+
+        address recipient = makeAddr("single-message recipient");
+        bytes memory payload = hex"c0ffee";
+        bytes32 salt = keccak256("atomic sendMessage salt");
+        bytes memory recipient7930 = InteroperableAddress.formatEvmV1(destinationChainId, recipient);
+
+        // Predict the bundle hash the message send will produce (atomic metadata is out-of-band, so the
+        // preview carries only the salt) via the previewMessageHash quoter.
+        bytes32 predicted = _predictMessageHash(recipient7930, payload, salt);
+
+        // Single all-local leg flow whose only leg is this predicted message bundle.
+        AtomicFlowPreimage memory preimage;
+        preimage.deadline = DEADLINE;
+        preimage.settlementLayerChainId = L1_CHAIN_ID;
+        preimage.legBundleHashes = new bytes32[](1);
+        preimage.legBundleHashes[0] = predicted;
+        preimage.legSourceChainIds = new uint256[](1);
+        preimage.legSourceChainIds[0] = block.chainid;
+        bytes32 flowId = _flowIdOf(preimage);
+
+        bytes[] memory attrs = new bytes[](2);
+        attrs[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (salt));
+        attrs[1] = abi.encodeCall(IERC7786Attributes.atomicBundle, (preimage, 0));
+
+        vm.recordLogs();
+        vm.expectEmit(true, true, true, true, address(manager));
+        emit IAtomicFlowManager.FlowCommitted(flowId, predicted, DEADLINE, 1);
+        bytes32 sendId = l2InteropCenter.sendMessage(recipient7930, payload, attrs);
+
+        assertEq(sendId, keccak256(abi.encodePacked(predicted, uint256(0))), "sendId must be keccak(bundleHash, 0)");
+        assertEq(
+            uint256(manager.legState(flowId, predicted)),
+            uint256(LegState.Committed),
+            "the single message leg must be Committed"
+        );
+        assertEq(
+            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafAt(1).value,
+            _commitValue(flowId, predicted),
+            "the leg's commit value must land in the canonical IMT"
+        );
+
+        // The emitted bundle carries the single call verbatim (recipient + payload).
+        (, , InteropBundle memory sentBundle) = abi.decode(
+            extractFirstBundleFromLogs(vm.getRecordedLogs()),
+            (bytes32, bytes32, InteropBundle)
+        );
+        assertEq(sentBundle.calls.length, 1, "single-message bundle has exactly one call");
+        assertEq(sentBundle.calls[0].to, recipient, "the call targets the message recipient");
+        assertEq(sentBundle.calls[0].data, payload, "the call carries the message payload");
     }
 
     /// @notice The `atomicBundle` attribute is recognized in ANY position of the attributes array —

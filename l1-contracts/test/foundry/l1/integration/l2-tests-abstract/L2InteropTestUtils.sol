@@ -38,7 +38,8 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
     /// @dev The AtomicFlowManager `append`/`requireFlowFinalized` gates are mocked to succeed in
     /// {SharedL2ContractDeployer.setUp} (installed unconditionally there, inert for non-interop suites), so
     /// interop concretes need no setUp/MRO boilerplate. The IMT proof machinery itself is exercised
-    /// end-to-end in the anvil-interop atomic-swap spec.
+    /// against the real contracts by the atomic foundry suites (send/refund, execute/finalize, and the
+    /// real-verifier proof composition), and end-to-end on a real node by the anvil-interop atomic-swap spec.
 
     /// @notice Returns a copy of `_attrs` with the mandatory ERC-7786 `atomicBundle` attribute appended.
     /// @dev Every interop send must be atomic (see {InteropCenter}); without this attribute the send

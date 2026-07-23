@@ -58,6 +58,14 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 /// IMT. The only logic mock is the separately-tested cross-chain leaf verifier inherited from
 /// {AtomicInteropProofBuilder}; the destination-context, executor-permission, replay, and atomicity
 /// checks under test all run for real, and the Bridgehub chain registry is the REAL one (chains registered via `registerChainForInterop`, see {_registerInteropChains}).
+///
+/// EraVM coverage: this abstract has an L1-context wrapper only, by construction. Installing the atomic
+/// predeploys and the interop-root storage at their canonical addresses relies on `deployCodeTo` /
+/// `vm.etch` (via {AtomicInteropProofBuilder} and {_setUpAtomicStack}), which are EVM-only — zkFoundry
+/// rejects them (`EXTCODECOPY` is unsupported on EraVM). Running this on EraVM would require adding
+/// AtomicFlowManager + L2InteropCommitmentTree to the L2 genesis force-deployment set (a production
+/// change, out of scope for a test PR). The atomic execute/finalize flow is exercised on real EraVM
+/// nodes by the anvil-interop `13-imt-atomic-swap` spec.
 abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, AtomicInteropProofBuilder {
     /// @dev The remote peer leg of every flow here: committed on the (Bridgehub-registered)
     /// destination chain in the happy paths, withheld in the missing-leg path.
@@ -630,5 +638,24 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
             uint256(BundleStatus.FullyExecuted),
             "the verified bundle must execute to FullyExecuted"
         );
+    }
+
+    /// @notice A bundle cannot be VERIFIED twice: `_validateVerifiable` requires `Unreceived`, so the
+    /// second verify is rejected by the status check BEFORE the finality gate re-runs. Proven by
+    /// passing an otherwise-invalid (empty) finality proof on the second call and still getting
+    /// `BundleAlreadyProcessed` — if the status check did not gate first, the empty proof would fail
+    /// the gate with a different error instead.
+    function test_verifyAtomicBundle_RevertWhen_VerifiedTwice() public {
+        _setUpAtomicStack();
+        _sendAtomicLegWithRemotePeer(keccak256("atomic verify-twice salt"), bytes(""));
+        AtomicFinalityProof memory finality = _commitRemoteLegAndBuildFinality();
+
+        _mockVerifier(true);
+        vm.chainId(destinationChainId);
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(ectxBundleBytes, finality);
+
+        AtomicFinalityProof memory emptyFinality;
+        vm.expectRevert(abi.encodeWithSelector(BundleAlreadyProcessed.selector, ectx.bundleHash));
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(ectxBundleBytes, emptyFinality);
     }
 }

@@ -53,7 +53,8 @@ contract MockRecoveryRouter {
         reverts[keccak256(_data)] = true;
     }
 
-    function recoverAtomicCall(uint256, bytes calldata _data) external returns (bool) {
+    function recoverAtomicCall(uint256 _destChainId, bytes calldata _data) external returns (bool) {
+        _destChainId; // unused; recovery routing is not exercised by this stateful stand-in
         ++recoverAttempts;
         if (reverts[keccak256(_data)]) {
             revert("recovery boom");
@@ -65,7 +66,8 @@ contract MockRecoveryRouter {
         return true;
     }
 
-    function bridgehubRecoverBaseToken(uint256, bytes32, address, uint256) external {
+    function bridgehubRecoverBaseToken(uint256 _destChainId, bytes32 _assetId, address _from, uint256 _value) external {
+        (_destChainId, _assetId, _from, _value); // unused; only the tally matters here
         ++baseTokenRecoveries;
     }
 }
@@ -307,6 +309,38 @@ contract AtomicFlowManagerRecoverTest is Test {
         assertEq(router.recoverSuccesses(), 1, "only the second call actually recovers");
     }
 
+    /// @notice If EVERY router-backed recovery returns `false`, nothing was recovered: `claimRefund`
+    /// reverts `ManagerNoRecoverableCalls`, the leg stays `Revertable`, no `FlowRefunded` is emitted, and
+    /// no payout occurs. This is the case a mutant that increments `recovered` regardless of the return
+    /// value would slip past (the false-then-true test alone does not catch it, since one call succeeds).
+    function test_claimRefund_multiCall_allRouterFalseRevertsAndKeepsRevertable() public {
+        MockRecoveryRouter router = _deployMockRouter();
+        router.scriptReturnsFalse(hex"1111");
+        router.scriptReturnsFalse(hex"2222");
+
+        InteropCall[] memory calls = new InteropCall[](2);
+        calls[0] = _call(L2_ASSET_ROUTER_ADDR, 0, hex"1111"); // recoverAtomicCall -> false
+        calls[1] = _call(L2_ASSET_ROUTER_ADDR, 0, hex"2222"); // recoverAtomicCall -> false
+
+        InteropBundle memory bundle = _multiCallBundle(calls);
+        bytes memory bundleBytes = abi.encode(bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundleBytes);
+        manager.forceRevertable(FLOW_ID, bundleHash);
+
+        // The revert discards any FlowRefunded event and all state — so the expectRevert alone proves
+        // "no FlowRefunded, no payout"; the post-revert reads below confirm the rollback.
+        vm.expectRevert(abi.encodeWithSelector(ManagerNoRecoverableCalls.selector, FLOW_ID, bundleHash));
+        manager.claimRefund(FLOW_ID, bundleBytes);
+
+        assertEq(router.recoverAttempts(), 0, "the reverted claim rolls back the attempt tally too");
+        assertEq(router.baseTokenRecoveries(), 0, "no base-token payout occurred");
+        assertEq(
+            uint256(manager.legState(FLOW_ID, bundleHash)),
+            uint256(LegState.Revertable),
+            "the leg must stay Revertable when nothing was recoverable"
+        );
+    }
+
     /// @notice A later call reverting during recovery rolls the WHOLE `claimRefund` back: the earlier
     /// call's payout is undone (the mock's counters are real storage and revert with the tx), the leg
     /// stays `Revertable` (not stuck `Reverted`), so the refund remains retryable once the failing call
@@ -324,6 +358,19 @@ contract AtomicFlowManagerRecoverTest is Test {
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundleBytes);
         manager.forceRevertable(FLOW_ID, bundleHash);
 
+        // Prove BOTH recovery calls are actually reached (so the earlier one genuinely paid out before
+        // the later one reverted) — otherwise `recoverSuccesses() == 0` afterwards could be vacuously
+        // true because the first call was never made.
+        vm.expectCall(
+            L2_ASSET_ROUTER_ADDR,
+            abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector, DEST_CHAIN_ID, hex"600d"),
+            1
+        );
+        vm.expectCall(
+            L2_ASSET_ROUTER_ADDR,
+            abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector, DEST_CHAIN_ID, hex"baad"),
+            1
+        );
         vm.expectRevert("recovery boom");
         manager.claimRefund(FLOW_ID, bundleBytes);
 
