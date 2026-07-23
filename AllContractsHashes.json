@@ -2390,16 +2390,6 @@
     "zkBytecodePath": null
   },
   {
-    "contractName": "da-contracts/CalldataL1DAValidatorZKsyncOS",
-    "evmBytecodeHash": "0xbb38749e1ee4eefad1d542e3569ac6bc3e026ff37c62df779cc8825187f5e95b",
-    "evmBytecodePath": "/da-contracts/out/CalldataL1DAValidatorZKsyncOS.sol/CalldataL1DAValidatorZKsyncOS.json",
-    "evmDeployedBytecodeHash": "0xde248d2bb506745c093107d750ce408a6ce9cca315dfe7af6a3a0ea7fc47cfab",
-    "evmDeployedBytecodeBlakeHash": "0x49c6427aeeef0411c4bd1e7389842ef9cdee79f5aa10f7a991e04c492fc6b272",
-    "evmDeployedBytecodeLength": 1286,
-    "zkBytecodeHash": null,
-    "zkBytecodePath": null
-  },
-  {
     "contractName": "da-contracts/DummyAvailBridge",
     "evmBytecodeHash": "0x999d4ab8230e7242bec5927ad7d30f915b64cc8918d2987dfc7acfa381a918be",
     "evmBytecodePath": "/da-contracts/out/DummyAvailBridge.sol/DummyAvailBridge.json",
