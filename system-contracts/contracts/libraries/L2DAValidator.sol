@@ -80,7 +80,7 @@ library L2DAValidator {
         } else {
             // will revert if `_l2DACommitmentScheme` is:
             // - `NONE`(invalid option)
-            // - `BLOBS_ZKSYNC_OS`, `L2_TO_L1_ONLY`, `L2_TO_L1_ONLY_BLOBS`(not supported with Era VM)
+            // - `BLOBS_ZKSYNC_OS`(not supported with Era VM)
             revert InvalidDACommitmentScheme(uint256(_l2DACommitmentScheme));
         }
     }

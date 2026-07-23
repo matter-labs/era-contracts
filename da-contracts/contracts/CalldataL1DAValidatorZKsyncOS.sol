@@ -12,12 +12,12 @@ import {InvalidL2DAOutputHash} from "./DAContractsErrors.sol";
 /// {BlobsL1DAValidatorZKsyncOS}. The operator publishes the batch's DA payload directly as L1 calldata and
 /// this validator forces it to match the proven `daCommitment` by checking
 /// `keccak256(operatorDAInput) == daCommitment`.
-/// @dev It is content-blind: whether the calldata carries the full pubdata or only a subset — e.g. just the
+/// @dev It is content-blind: whether the calldata carries the full pubdata (Rollup mode) or only the
 /// mandatory L2->L1 log region (the log records, which include user-message hashes and the interop-commitment
-/// (IMT) leaves; message preimages and state diffs are optional) under the `L2_TO_L1_ONLY` scheme, which
-/// atomic-interop chains use to keep their interop (IMT) data reconstructible from L1 — is decided by the STF
-/// when it builds the commitment, not here. Publishing as calldata keeps the data permanently available,
-/// unlike EIP-4844 blobs, which expire after a few weeks.
+/// (IMT) leaves; message preimages and state diffs left to the operator) in Validium mode — is decided by the
+/// STF when it builds the commitment, not here. Atomic-interop chains use Validium mode to keep their interop
+/// (IMT) data reconstructible from L1. Publishing as calldata keeps the data permanently available, unlike
+/// EIP-4844 blobs, which expire after a few weeks.
 /// @dev Like {BlobsL1DAValidatorZKsyncOS}, the returned output is unused on ZKsync OS (state diffs and blob
 /// content are bound by the batch proof), so it returns a zero state-diff hash and empty blob arrays.
 contract CalldataL1DAValidatorZKsyncOS is IL1DAValidator {
