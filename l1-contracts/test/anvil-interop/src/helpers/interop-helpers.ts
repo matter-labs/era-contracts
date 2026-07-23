@@ -80,16 +80,25 @@ const INTEROP_BUNDLE_SALT_SELECTOR = erc7786Iface.getSighash("interopBundleSalt"
  *
  * The InteropCenter derives the bundle hash from `keccak256(msg.sender, salt)` and rejects a (sender, salt)
  * pair that has already been used (`InteropBundleSaltAlreadyUsed`). Since the test harness sends many bundles
- * from the same source wallet, we attach a fresh random salt whenever the caller did not provide one, so that
- * each bundle gets a unique hash (mirroring the previously auto-incremented interop nonce). If the caller already
+ * from the same source wallet, we attach a fresh salt whenever the caller did not provide one, so that each
+ * bundle gets a unique hash (mirroring the previously auto-incremented interop nonce). If the caller already
  * supplied a salt attribute, it is left untouched.
+ *
+ * The salt is derived deterministically from `(sender, account nonce)` rather than random bytes: the nonce is
+ * consumed by the send so every bundle still gets a fresh salt, but re-runs of the harness reproduce identical
+ * salts. That keeps the pre-generated chain-state snapshots byte-deterministic (random salts change both the
+ * salt-keyed storage slots and the calldata gas cost run-to-run), and later test runs against a loaded snapshot
+ * cannot collide with salts already used during state generation because the account nonce has advanced.
  */
-function ensureUniqueBundleSalt(attributes: string[]): string[] {
+async function ensureUniqueBundleSalt(attributes: string[], wallet: Wallet): Promise<string[]> {
   const hasSalt = attributes.some((attr) => attr.slice(0, 10).toLowerCase() === INTEROP_BUNDLE_SALT_SELECTOR);
   if (hasSalt) {
     return attributes;
   }
-  const salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+  const nonce = await wallet.getTransactionCount();
+  const salt = ethers.utils.keccak256(
+    ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [wallet.address, nonce])
+  );
   return [...attributes, interopBundleSaltAttr(salt)];
 }
 
@@ -207,7 +216,7 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
   const tx = await interopCenter.sendBundle(
     destinationChainIdBytes,
     options.callStarters,
-    ensureUniqueBundleSalt(options.bundleAttributes || []),
+    await ensureUniqueBundleSalt(options.bundleAttributes || [], wallet),
     {
       gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
       value: options.value || 0,
@@ -261,7 +270,7 @@ export async function simulateInteropBundle(options: SendBundleOptions): Promise
   await interopCenter.callStatic.sendBundle(
     destinationChainIdBytes,
     options.callStarters,
-    ensureUniqueBundleSalt(options.bundleAttributes || []),
+    await ensureUniqueBundleSalt(options.bundleAttributes || [], wallet),
     {
       gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
       value: options.value || 0,
@@ -291,7 +300,7 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
   const tx = await interopCenter.sendMessage(
     options.recipient,
     options.payload,
-    ensureUniqueBundleSalt(options.attributes),
+    await ensureUniqueBundleSalt(options.attributes, wallet),
     {
       gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
       value: options.value || 0,
@@ -383,7 +392,7 @@ export async function executeBundle(
   gasLimit?: number
 ): Promise<ethers.providers.TransactionReceipt> {
   const wallet = new Wallet(getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
   const tx = await interopHandler.executeBundle(bundleData, proof, {
@@ -402,7 +411,7 @@ export async function simulateExecuteBundle(
   gasLimit?: number
 ): Promise<void> {
   const wallet = new Wallet(getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
   await interopHandler.callStatic.executeBundle(bundleData, proof, {
@@ -421,7 +430,7 @@ export async function verifyBundle(
   signerKey?: string
 ): Promise<ethers.providers.TransactionReceipt> {
   const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
   const tx = await interopHandler.verifyBundle(bundleData, proof, { gasLimit: DEFAULT_TX_GAS_LIMIT });
@@ -455,7 +464,7 @@ export async function unbundleBundle(
   signerKey?: string
 ): Promise<ethers.providers.TransactionReceipt> {
   const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
 
   const tx = await interopHandler.unbundleBundle(bundleData, callStatuses, { gasLimit: DEFAULT_TX_GAS_LIMIT });
   return tx.wait();
@@ -471,7 +480,7 @@ export async function simulateUnbundleBundle(
   signerKey?: string
 ): Promise<void> {
   const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), destProvider);
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
 
   await interopHandler.callStatic.unbundleBundle(bundleData, callStatuses, { gasLimit: DEFAULT_TX_GAS_LIMIT });
 }
@@ -480,7 +489,7 @@ export async function simulateUnbundleBundle(
  * Query bundle status from InteropHandler.
  */
 export async function getBundleStatus(provider: providers.JsonRpcProvider, bundleHash: string): Promise<number> {
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), provider);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), provider);
   const result = await interopHandler.bundleStatus(bundleHash);
   return typeof result === "number" ? result : result.toNumber();
 }
@@ -493,7 +502,7 @@ export async function getCallStatus(
   bundleHash: string,
   callIndex: number
 ): Promise<number> {
-  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), provider);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), provider);
   const result = await interopHandler.callStatus(bundleHash, callIndex);
   return typeof result === "number" ? result : result.toNumber();
 }

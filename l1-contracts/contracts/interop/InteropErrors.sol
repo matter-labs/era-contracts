@@ -11,12 +11,16 @@ error BundleAlreadyProcessed(bytes32 bundleHash);
 error CallAlreadyExecuted(bytes32 bundleHash, uint256 callIndex);
 // 0xc087b727
 error CallNotExecutable(bytes32 bundleHash, uint256 callIndex);
-// 0xf36a88e5
-error CannotClaimInteropOnL1Settlement();
+// 0xa8ab28c8
+error CannotInitiateInteropOnL1(uint256 destinationChainId);
 // 0xf729f26d
 error CanNotUnbundle(bytes32 bundleHash);
 // 0x2d159f39
 error DestinationChainNotRegistered(uint256 destinationChainId);
+// 0x43f0659c
+error DirectCallToL1NotSupported();
+// 0x558c44fc
+error EmptyBundle();
 // 0xe845be4c
 error ExecutingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes executionAddress);
 // 0x16b0fa00
@@ -25,10 +29,14 @@ error FeeWithdrawalFailed();
 error IndirectCallValueMismatch(uint256 expected, uint256 actual);
 // 0xbfa9bcca
 error InteropBundleSaltAlreadyUsed(address user, bytes32 salt);
+// 0xd9b009c7
+error InteropCallToL1NotToAssetRouter(address target);
 // 0xfe8b1b16
 error InteroperableAddressChainReferenceNotEmpty(bytes interoperableAddress);
 // 0x884f49ba
 error InteroperableAddressNotEmpty(bytes interoperableAddress);
+// 0x9b021130
+error InteropToSelfNotSupported();
 // 0x2d48e8cf
 error InteropRootAlreadyExists();
 // 0xeae192ef
@@ -37,6 +45,10 @@ error InvalidInteropBundleVersion();
 error InvalidInteropCallVersion();
 // 0x32c2e156
 error MessageNotIncluded();
+// 0x6a430157
+error MultiCallToL1NotSupported(uint256 callCount);
+// 0xd72e81d8
+error NonZeroValueToL1NotSupported(uint256 value);
 // 0x2f59bd0d
 error SidesLengthNotOne();
 // 0x89fd2c76

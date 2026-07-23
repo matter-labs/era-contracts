@@ -129,7 +129,7 @@
     "name": "finalizeDeposit",
     "inputs": [
       {
-        "name": "_originChainId",
+        "name": "_sourceChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -347,7 +347,7 @@
     "name": "setAssetHandlerAddress",
     "inputs": [
       {
-        "name": "_originChainId",
+        "name": "_sourceChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -434,30 +434,6 @@
       }
     ],
     "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "withdraw",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "_assetData",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
     "stateMutability": "nonpayable"
   },
   {
@@ -577,7 +553,7 @@
     "name": "DepositFinalizedAssetRouter",
     "inputs": [
       {
-        "name": "chainId",
+        "name": "sourceChainId",
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
@@ -675,37 +651,6 @@
     "anonymous": false
   },
   {
-    "type": "event",
-    "name": "WithdrawalInitiatedAssetRouter",
-    "inputs": [
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "l2Sender",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "assetData",
-        "type": "bytes",
-        "indexed": false,
-        "internalType": "bytes"
-      }
-    ],
-    "anonymous": false
-  },
-  {
     "type": "error",
     "name": "AssetHandlerDoesNotExist",
     "inputs": [
@@ -739,8 +684,19 @@
   },
   {
     "type": "error",
-    "name": "ExecuteMessageFailed",
-    "inputs": []
+    "name": "InteropSenderChainIdMismatch",
+    "inputs": [
+      {
+        "name": "senderChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "payloadSourceChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",

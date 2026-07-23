@@ -167,7 +167,7 @@ contract ExperimentalBridgeTest is Test {
         address mockL1WethAddress = makeAddr("Weth");
         address eraDiamondProxy = makeAddr("eraDiamondProxy");
 
-        l1Nullifier = new L1Nullifier(bridgehub, messageRoot, eraChainId, eraDiamondProxy);
+        l1Nullifier = new L1Nullifier(bridgehub, messageRoot);
         l1NullifierAddress = address(l1Nullifier);
 
         mockSharedBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);

@@ -128,6 +128,10 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridges.implementations.l1NativeTokenVault,
             coreAddresses.bridges.proxies.l1NativeTokenVault
         ) = deployTuppWithContract("L1NativeTokenVault", false);
+        (
+            coreAddresses.bridges.implementations.l1InteropHandler,
+            coreAddresses.bridges.proxies.l1InteropHandler
+        ) = deployTuppWithContract("L1InteropHandler", false);
         setL1NativeTokenVaultParams();
 
         updateSharedBridge();
@@ -172,13 +176,18 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
     function setL1NativeTokenVaultParams() internal {
         IL1AssetRouter sharedBridge = IL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
         IL1Nullifier l1Nullifier = IL1Nullifier(coreAddresses.bridges.proxies.l1Nullifier);
-        // Ownable ownable = Ownable(coreAddresses.bridges.proxies.l1AssetRouter);
+        // Wire the shared bridge and nullifier to the native token vault, then point both the nullifier and the
+        // asset router at the L1 interop handler.
         vm.broadcast(getDeployerAddress());
         sharedBridge.setNativeTokenVault(INativeTokenVaultBase(coreAddresses.bridges.proxies.l1NativeTokenVault));
         vm.broadcast(getDeployerAddress());
         l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(coreAddresses.bridges.proxies.l1NativeTokenVault));
         vm.broadcast(getDeployerAddress());
         l1Nullifier.setL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
+        vm.broadcast(getDeployerAddress());
+        l1Nullifier.setL1InteropHandler(coreAddresses.bridges.proxies.l1InteropHandler);
+        vm.broadcast(getDeployerAddress());
+        sharedBridge.setL1InteropHandler(coreAddresses.bridges.proxies.l1InteropHandler);
     }
 
     function updateOwners() internal {
@@ -198,6 +207,9 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
 
         IL1Nullifier l1Nullifier = IL1Nullifier(coreAddresses.bridges.proxies.l1Nullifier);
         IOwnable(address(l1Nullifier)).transferOwnership(coreAddresses.shared.governance);
+
+        // The L1 interop handler's owner can pause/unpause withdrawal finalization.
+        IOwnable(coreAddresses.bridges.proxies.l1InteropHandler).transferOwnership(coreAddresses.shared.governance);
 
         ICTMDeploymentTracker ctmDeploymentTracker = ICTMDeploymentTracker(
             coreAddresses.bridgehub.proxies.ctmDeploymentTracker
@@ -260,6 +272,12 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridges.implementations.l1Nullifier
         );
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
+        vm.serializeAddress(
+            "bridges",
+            "l1_interop_handler_implementation_addr",
+            coreAddresses.bridges.implementations.l1InteropHandler
+        );
+        vm.serializeAddress("bridges", "l1_interop_handler_proxy_addr", coreAddresses.bridges.proxies.l1InteropHandler);
         vm.serializeAddress(
             "bridges",
             "shared_bridge_implementation_addr",
