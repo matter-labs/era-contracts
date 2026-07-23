@@ -280,12 +280,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // The final word is the DA mode (`ROLLUP=0`/`VALIDIUM=1`), mirroring `ChainConfig::hash`
         // on ZKsync OS, which appends `da_mode` after `max_tx_gas_limit`.
         bytes32 chainConfigHash = keccak256(
-            abi.encodePacked(
-                s.chainId,
-                uint256(0),
-                uint256(_getZKsyncOSMaxTxGasLimit()),
-                uint256(s.l2DAMode)
-            )
+            abi.encodePacked(s.chainId, uint256(0), uint256(_getZKsyncOSMaxTxGasLimit()), uint256(s.l2DAMode))
         );
         return
             uint256(
