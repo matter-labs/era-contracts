@@ -69,13 +69,7 @@ struct ImtProof {
 /// can never be committed under a `flowId` that does not actually contain it — a wrong or stale
 /// preimage (e.g. an off-chain `bundleHash` prediction invalidated by an upgrade between preview and
 /// send) reverts the send instead of stranding the burned funds in an unfinalizable, unrefundable leg.
-/// @param version Version of the AtomicFlowPreimage (same convention as `InteropBundle.version` /
-/// `InteropCall.version`). Must be a version the {AtomicFlowManager} supports — currently only
-/// {ATOMIC_FLOW_PREIMAGE_VERSION} — validated identically on every path that hashes a preimage
-/// (`append`, finalize, refund). A new version is added alongside the old one rather than replacing it,
-/// so flows already in flight under an older version stay finalizable and refundable (no drain). Being
-/// the first hashed field, it also keeps ids of one preimage version distinct from — and non-aliasing
-/// with — ids hashed over any other version.
+/// @param version Preimage format version (see {ATOMIC_FLOW_PREIMAGE_VERSION}).
 /// @param deadline The flow deadline (a settlement-layer timestamp).
 /// @param settlementLayerChainId The single settlement layer every leg must settle on; committed in
 /// `flowId` and asserted equal to each proof's resolved `slChainId`.

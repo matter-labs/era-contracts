@@ -379,12 +379,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
 
     /// @dev Canonicalizes and hashes a flowId preimage:
     /// `flowId = keccak256(abi.encode(preimage))`.
-    /// `version` must be a supported version — currently only {ATOMIC_FLOW_PREIMAGE_VERSION} (the
-    /// InteropBundle/InteropCall versioning convention). The same check runs on every path that reaches
-    /// here (send via `append`, finalize/refund via `_checkFlowId`), so when a new version is added the
-    /// manager accepts it alongside the old one and in-flight prior-version flows stay finalizable and
-    /// refundable — no drain. As the first hashed field, `version` also keeps ids of one preimage version
-    /// distinct from ids hashed over any other version.
+    /// `version` must be a manager-supported version (see {ATOMIC_FLOW_PREIMAGE_VERSION}).
     /// `legBundleHashes` must be strictly ascending (canonical order + dedup). `legSourceChainIds` is
     /// positional, aligned 1:1 with `legBundleHashes`; it may repeat and need not be ascending, so only its
     /// length is checked. Treating it as an ascending set instead would let a sibling chain in the set

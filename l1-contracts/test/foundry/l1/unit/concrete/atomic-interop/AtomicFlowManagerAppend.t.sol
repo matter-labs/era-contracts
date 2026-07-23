@@ -128,11 +128,8 @@ contract AtomicFlowManagerAppendTest is Test {
         assertEq(tree.leafAt(1).value, _commitValue(flowId, localLeg), "inserted leaf must hold the commit value");
     }
 
-    /// @notice Pins the preimage versioning (the InteropBundle/InteropCall convention): the current
-    /// version literal is 0x01 and `append` rejects any version the manager does not (yet) support, so a
-    /// preimage of an unsupported version can never commit a leg under this version's hashing rules.
-    /// (When a new version is added it is accepted alongside 0x01; here 0x02 is not yet supported.)
-    /// Since `version` is the first hashed field, ids of different versions can never alias either.
+    /// @notice `append` rejects a preimage whose `version` the manager does not support (0x02 here),
+    /// so it can never commit a leg. See {ATOMIC_FLOW_PREIMAGE_VERSION}.
     function test_append_RevertWhen_FlowPreimageVersionMismatch() public {
         assertEq(ATOMIC_FLOW_PREIMAGE_VERSION, bytes1(0x01), "v1 preimage version literal must be pinned");
 
