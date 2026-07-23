@@ -8,7 +8,8 @@ import {
     L2_COMPLEX_UPGRADER_ADDR,
     INTEROP_COMMITMENT_LEAF_HOOK
 } from "../common/l2-helpers/L2ContractAddresses.sol";
-import {Unauthorized} from "../l2-system/zksync-os/errors/ZKOSContractErrors.sol";
+import {L1MessageGasLib} from "../l2-system/zksync-os/L1MessageGasLib.sol";
+import {Unauthorized, NotSelfCall, NotEnoughGasSupplied} from "../l2-system/zksync-os/errors/ZKOSContractErrors.sol";
 import {CommitmentTreeNotAppender, InteropCommitmentLeafHookFailed} from "./AtomicInteropErrors.sol";
 
 /// @author Matter Labs
@@ -74,13 +75,29 @@ contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
 
     /// @dev Reports a single inserted value to the interop commitment leaf system hook. The calldata is
     /// exactly the 32-byte value, which the ZKsync OS hook records as the `value` of an L2->L1 log.
-    /// @dev The hook charges the ZKsync OS `native` resource for the log; no explicit EVM-gas burn is
-    /// performed here (unlike the public `L1Messenger.sendToL1` path) because `insert` is callable only
-    /// by the appender and is not a standalone user entrypoint.
+    /// @dev First burns the gas equivalent of recording that log ({L1MessageGasLib.estimateLogGas}):
+    /// the hook charges the ZKsync OS `native` resource for the log, and the burn is the caller-side
+    /// EVM-gas accounting, mirroring `L1Messenger.sendToL1`.
     function _reportLeaf(uint256 _value) private {
+        _burnLogGas();
         // solhint-disable-next-line avoid-low-level-calls
         (bool ok, ) = INTEROP_COMMITMENT_LEAF_HOOK.call(abi.encodePacked(_value));
         require(ok, InteropCommitmentLeafHookFailed());
+    }
+
+    /// @dev Burns the gas equivalent of recording one L2->L1 log by forwarding it to the self-only
+    /// reverting `fallback`, mirroring `L1Messenger.burnGas`.
+    function _burnLogGas() private {
+        uint256 gasToBurn = L1MessageGasLib.estimateLogGas();
+
+        // If there isn't enough gas to burn the desired amount, revert.
+        if ((gasleft() * 63) / 64 < gasToBurn) {
+            revert NotEnoughGasSupplied();
+        }
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, ) = address(this).call{gas: gasToBurn}("");
+        success; // ignored
     }
 
     /// @inheritdoc IL2InteropCommitmentTree
@@ -106,5 +123,15 @@ contract L2InteropCommitmentTree is IL2InteropCommitmentTree {
     /// @inheritdoc IL2InteropCommitmentTree
     function appender() public view virtual returns (address) {
         return L2_ATOMIC_FLOW_MANAGER_ADDR;
+    }
+
+    /// @dev Self-call target that consumes the gas forwarded by `_burnLogGas`. Only callable by this
+    /// contract; `invalid()` reverts the self-call. Non-payable so it does not affect `address ->
+    /// L2InteropCommitmentTree` conversions elsewhere.
+    fallback() external {
+        require(msg.sender == address(this), NotSelfCall());
+        assembly {
+            invalid()
+        }
     }
 }
