@@ -25,12 +25,18 @@ import {IMTLeafValueMismatch, IMTLowLeafNextTooSmall} from "contracts/common/L1C
 /// Atomicity is deployed only on L1-settled ecosystems, so every fixture uses a single L1 settlement
 /// layer (`SETTLEMENT_LAYER_CHAIN_ID`).
 ///
-/// The IMT membership half is driven against a REAL {L2InteropCommitmentTree} (the oracle) and the
-/// timeout settlement-layer interop root tuples against a REAL {L2InteropRootStorage} seeded through the production
-/// bootloader entry point; the cross-chain leaf verifier is mocked (isolating the separately-tested
-/// leaf-inclusion layer) while the real `settlementProof` blob is still parsed by {MessageHashing},
-/// so the settlement-layer / clock / last-batch / inclusion branches all run for real. See
-/// {AtomicInteropProofBuilder}.
+/// The happy paths run END-TO-END with nothing mocked: the commit value is aggregated into a REAL
+/// {L1MessageRoot}, imported into the REAL {L2InteropRootStorage}, and authenticated through the REAL
+/// {L2MessageVerification} (see {AtomicInteropProofBuilder}'s `_real*` helpers).
+///
+/// The negative and branch-shape cases isolate a SINGLE library branch (chain-batch-root depth, the
+/// last-batch empty-subtree cascade at a chosen level/mask, a final-node proof, a forced verifier
+/// failure) by crafting a synthetic `settlementProof` blob that real aggregation cannot produce — a
+/// grown chain-batch tree with a specific mask, a wrong-level cascade sibling, etc. Those cases (and
+/// only those) keep a documented `_mockVerifier` stub over the separately-tested leaf verifier; the
+/// real `settlementProof` blob is still parsed by {MessageHashing}, so the settlement-layer / clock /
+/// last-batch / inclusion branches all run for real. The real end-to-end verifier path for every
+/// happy shape is additionally covered by {AtomicInteropProofRealVerification} and the pipeline test.
 contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     uint256 internal constant SOURCE_CHAIN_ID = 271;
     uint256 internal constant SETTLEMENT_LAYER_CHAIN_ID = 1; // L1
@@ -45,10 +51,10 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     function setUp() public {
         _setUpAtomicFixtures();
-        // The leaf verifier is authenticated-true by default; individual reverts re-mock it to false.
-        _mockVerifier(true);
-        // The default settlement-layer interop root every timeout test resolves against: created strictly after the
-        // deadline, seeded through the real storage's production entry point.
+        // No global verifier mock: happy paths authenticate through the real verifier. Branch-isolation
+        // cases below re-establish a local `_mockVerifier(true/false)` over their synthetic blobs.
+        // The default settlement-layer interop root the crafted-blob timeout cases resolve against:
+        // created strictly after the deadline, seeded through the real storage's production entry point.
         _seedSettlementLayerInteropRoot(SETTLEMENT_LAYER_CHAIN_ID, SL_BLOCK, uint256(DEADLINE) + 1);
 
         committedValue = _commitValue(keccak256("flowA"), keccak256("bundleA"));
@@ -67,17 +73,10 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         );
     }
 
-    // ============ verifyInclusion — happy / boundary ============
+    // ============ verifyInclusion — happy / boundary (real end-to-end) ============
 
     function test_verifyInclusion_happy() public {
-        ImtProof memory proof = _inclusionProof(
-            SOURCE_CHAIN_ID,
-            BATCH_N,
-            committedIndex,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            SL_BLOCK,
-            DEADLINE - 1 // settled before the deadline
-        );
+        ImtProof memory proof = _realInclusionProof(SOURCE_CHAIN_ID, committedIndex, DEADLINE - 1);
         // Outcome under test: an in-time inclusion proof does NOT revert, and the claimed IMT root is
         // authenticated as exactly the batch-END chain-batch-root leaf (leaf 3).
         _expectRootAuthentication(proof, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
@@ -88,14 +87,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// the batch-END root (leaf 3), whatever the prover declares. A flag-sensitive implementation
     /// could be steered to the begin root, where a same-batch commit is not yet present.
     function test_verifyInclusion_ignoresBeginBranchFlag() public {
-        ImtProof memory proof = _inclusionProof(
-            SOURCE_CHAIN_ID,
-            BATCH_N,
-            committedIndex,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            SL_BLOCK,
-            DEADLINE - 1
-        );
+        ImtProof memory proof = _realInclusionProof(SOURCE_CHAIN_ID, committedIndex, DEADLINE - 1);
         proof.provesAgainstBeginRoot = true;
         // Still the END leaf, and the proof still verifies.
         _expectRootAuthentication(proof, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
@@ -104,14 +96,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     /// @dev Boundary: `l1Timestamp == deadline` is in time (the check is strictly `>`).
     function test_verifyInclusion_allowsBatchSettledAtDeadline() public {
-        ImtProof memory proof = _inclusionProof(
-            SOURCE_CHAIN_ID,
-            BATCH_N,
-            committedIndex,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            SL_BLOCK,
-            DEADLINE
-        );
+        ImtProof memory proof = _realInclusionProof(SOURCE_CHAIN_ID, committedIndex, DEADLINE);
         _expectRootAuthentication(proof, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
@@ -136,7 +121,8 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     }
 
     /// @dev The leaf-to-chain-batch-root section must be exactly {ChainBatchRootTree.TREE_DEPTH} hops;
-    /// a longer path could descend INTO the IMT and pass off an internal node as "the root".
+    /// a longer path could descend INTO the IMT and pass off an internal node as "the root". The depth
+    /// check runs before the verifier, so no stub is needed.
     function test_RevertWhen_inclusion_invalidChainBatchRootDepth() public {
         ImtProof memory proof = _inclusionProof(
             SOURCE_CHAIN_ID,
@@ -161,6 +147,9 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     }
 
     function test_RevertWhen_inclusion_missingSettlementLayerBatch() public {
+        // Branch isolation: a final-node blob cannot be produced by real aggregation, so the leaf
+        // verifier is stubbed to reach the `finalProofNode` check.
+        _mockVerifier(true);
         ImtProof memory proof = _inclusionProof(
             SOURCE_CHAIN_ID,
             BATCH_N,
@@ -177,6 +166,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     }
 
     function test_RevertWhen_inclusion_settlementLayerMismatch() public {
+        _mockVerifier(true);
         uint256 proofSl = SETTLEMENT_LAYER_CHAIN_ID + 1;
         ImtProof memory proof = _inclusionProof(
             SOURCE_CHAIN_ID,
@@ -193,90 +183,65 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
+    /// @dev Real end-to-end negative: a genuinely aggregated + imported batch whose inclusion time is
+    /// past the deadline is rejected by the clock check (no stub — the verifier authenticates the real
+    /// root, then the deadline comparison fires).
     function test_RevertWhen_inclusion_deadlineExceeded() public {
         uint256 lateTimestamp = uint256(DEADLINE) + 1;
-        ImtProof memory proof = _inclusionProof(
-            SOURCE_CHAIN_ID,
-            BATCH_N,
-            committedIndex,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            SL_BLOCK,
-            lateTimestamp
-        );
+        ImtProof memory proof = _realInclusionProof(SOURCE_CHAIN_ID, committedIndex, lateTimestamp);
         _expectRootAuthentication(proof, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
         vm.expectRevert(abi.encodeWithSelector(ProofDeadlineExceeded.selector, lateTimestamp, DEADLINE));
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
-    /// @dev Correct commit value + correct settlement/deadline, but the membership proof does not hash to
-    /// the claimed root: the IMT check fails (distinct from a value/leaf mismatch, which the engine catches
-    /// earlier). We keep the real leaf (so `leaf.value == commitValue`) and only corrupt `chainImtRoot`.
+    /// @dev Real end-to-end negative: correct commit value + correct settlement/deadline, but the
+    /// membership path is corrupted so it no longer hashes to the (genuinely authenticated) root. The
+    /// verifier still authenticates `chainImtRoot`; only the IMT membership check fails (distinct from a
+    /// value/leaf mismatch, which the engine catches earlier).
     function test_RevertWhen_inclusion_inclusionFailed() public {
-        ImtProof memory proof = _inclusionProof(
-            SOURCE_CHAIN_ID,
-            BATCH_N,
-            committedIndex,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            SL_BLOCK,
-            DEADLINE - 1
-        );
-        proof.chainImtRoot = WRONG_ROOT;
+        ImtProof memory proof = _realInclusionProof(SOURCE_CHAIN_ID, committedIndex, DEADLINE - 1);
+        proof.imtProof[0] = WRONG_ROOT; // corrupt the membership path, keep the real (authenticated) root
         _expectRootAuthentication(proof, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
-        vm.expectRevert(abi.encodeWithSelector(ProofInclusionFailed.selector, WRONG_ROOT, committedValue));
+        vm.expectRevert(abi.encodeWithSelector(ProofInclusionFailed.selector, proof.chainImtRoot, committedValue));
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
+    /// @dev Real end-to-end negative: the leaf genuinely present at `committedIndex` holds
+    /// `committedValue`, so verifying against a DIFFERENT expected value is caught by the IMT engine.
     function test_RevertWhen_inclusion_commitValueMismatch() public {
-        ImtProof memory proof = _inclusionProof(
-            SOURCE_CHAIN_ID,
-            BATCH_N,
-            committedIndex,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            SL_BLOCK,
-            DEADLINE - 1
-        );
+        ImtProof memory proof = _realInclusionProof(SOURCE_CHAIN_ID, committedIndex, DEADLINE - 1);
         uint256 wrongCommitValue = absentValue;
         _expectRootAuthentication(proof, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
         vm.expectRevert(abi.encodeWithSelector(IMTLeafValueMismatch.selector, wrongCommitValue, committedValue));
         proofLib.verifyInclusion(proof, wrongCommitValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
-    // ============ verifyTimeoutAbsence — happy / boundary ============
+    // ============ verifyTimeoutAbsence — happy / boundary (real end-to-end) ============
 
     /// @dev Late-batch branch: `t > deadline` selects the batch-BEGIN root (leaf 2); absence there
     /// means the value was never committed in time.
     function test_verifyTimeoutAbsence_lateBatch_happy() public {
-        ImtProof memory absence = _nonInclusionProof(
-            SOURCE_CHAIN_ID,
-            BATCH_N,
-            absentValue,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            SL_BLOCK,
-            uint256(DEADLINE) + 1
-        );
+        ImtProof memory absence = _realTimeoutBeginProof(SOURCE_CHAIN_ID, absentValue, uint256(DEADLINE) + 1);
         _expectRootAuthentication(absence, ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX);
         proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
     /// @dev Halted-chain branch: `t <= deadline` (pinned exactly AT the boundary) selects the
-    /// batch-END root (leaf 3) and requires the batch to be the chain's LAST inside the settlement-layer interop root —
-    /// trivially true for the empty batch-leaf path of a single-leaf chain tree.
+    /// batch-END root (leaf 3) and requires the batch to be the chain's LAST inside the settlement-layer
+    /// interop root — the source chain's single in-time batch is its last, and a later (peer-chain)
+    /// aggregation pushes the imported root's creation time past the deadline.
     function test_verifyTimeoutAbsence_inTimeLastBatch_happy() public {
-        ImtProof memory absence = _nonInclusionProof(
-            SOURCE_CHAIN_ID,
-            BATCH_N,
-            absentValue,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            SL_BLOCK,
-            DEADLINE
-        );
+        ImtProof memory absence = _realTimeoutEndProof(SOURCE_CHAIN_ID, absentValue, DEADLINE);
         _expectRootAuthentication(absence, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
         proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
     /// @dev The last-batch check accepts a deeper batch-leaf path whose right siblings are the
-    /// `DynamicIncrementalMerkle` empty-subtree cascade (a real last leaf in a grown chain tree).
+    /// `DynamicIncrementalMerkle` empty-subtree cascade (a real last leaf in a grown chain tree). A
+    /// grown chain-batch tree with this shape cannot be produced by the single-batch aggregation
+    /// helpers, so the leaf verifier is stubbed over the synthetic path.
     function test_verifyTimeoutAbsence_inTimeLastBatch_acceptsEmptySubtreeCascade() public {
+        _mockVerifier(true);
         ImtProof memory absence = _nonInclusionProof(
             SOURCE_CHAIN_ID,
             BATCH_N,
@@ -299,8 +264,11 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// check must skip right-child levels — their LEFT siblings are earlier, populated batches — and
     /// only require the empty-subtree cascade on left-child levels. Modeled: a 3-batch chain tree
     /// whose last leaf (index 2) sits at mask `0b10` — level 0 left child (right sibling = zeros[0]),
-    /// level 1 right child (left sibling = the populated subtree of batches 0..1).
+    /// level 1 right child (left sibling = the populated subtree of batches 0..1). Synthetic shape ->
+    /// stubbed verifier; the real right-child last-leaf path is covered by
+    /// {AtomicInteropProofRealVerification}.
     function test_verifyTimeoutAbsence_inTimeLastBatch_acceptsRightChildLastLeaf() public {
+        _mockVerifier(true);
         bytes32[] memory siblings = new bytes32[](2);
         siblings[0] = _emptySubtreeCascade(1)[0];
         siblings[1] = keccak256("populated subtree of batches 0..1");
@@ -329,6 +297,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// its left sibling, an earlier batch, is fine) with a populated right sibling at level 1 (a
     /// LATER subtree — so later batches exist and the "last batch" claim is false).
     function test_RevertWhen_timeout_inTimeBatchNotLastInRoot_atDeeperLevel() public {
+        _mockVerifier(true);
         bytes32 populatedLaterSubtree = keccak256("populated subtree of later batches");
         bytes32[] memory siblings = new bytes32[](2);
         siblings[0] = keccak256("earlier batch leaf");
@@ -358,6 +327,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// `zeros[1] = keccak(zeros[0] || zeros[0])` is required) does not certify an empty right
     /// subtree and is rejected. Guards the per-level cascade recomputation.
     function test_RevertWhen_timeout_wrongCascadeLevelSibling() public {
+        _mockVerifier(true);
         bytes32 levelZeroHash = _emptySubtreeCascade(1)[0];
         bytes32[] memory siblings = new bytes32[](2);
         siblings[0] = levelZeroHash;
@@ -382,6 +352,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// @dev Boundary: an settlement-layer interop root created exactly AT the deadline is not strictly after it — the
     /// stale/genesis-root guard (an in-time snapshot proves nothing about the deadline moment).
     function test_RevertWhen_timeout_interopRootAtDeadline() public {
+        _mockVerifier(true);
         uint256 staleBlock = SL_BLOCK + 1;
         _seedSettlementLayerInteropRoot(SETTLEMENT_LAYER_CHAIN_ID, staleBlock, DEADLINE);
         ImtProof memory absence = _nonInclusionProof(
@@ -399,6 +370,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     /// @dev A missing settlement interop root has an unset timestamp that reads as 0 and is rejected.
     function test_RevertWhen_timeout_missingSettlementInteropRoot() public {
+        _mockVerifier(true);
         uint256 unseededBlock = SL_BLOCK + 2;
         ImtProof memory absence = _nonInclusionProof(
             SOURCE_CHAIN_ID,
@@ -423,6 +395,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// batch-leaf path carries a populated (non-empty-subtree) right sibling, so a later batch —
     /// which may contain the commit — exists and the proof is rejected.
     function test_RevertWhen_timeout_inTimeBatchNotLastInRoot() public {
+        _mockVerifier(true);
         bytes32 populatedSibling = keccak256("populated-right-subtree");
         bytes32[] memory siblings = new bytes32[](1);
         siblings[0] = populatedSibling;
@@ -447,6 +420,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// pins the `t == deadline` edge, where begin-branch absence would contradict a same-batch
     /// finalization.
     function test_RevertWhen_timeout_beginBranchWithBatchAtDeadline() public {
+        _mockVerifier(true);
         ImtProof memory absence = _nonInclusionProof(
             SOURCE_CHAIN_ID,
             BATCH_N,
@@ -464,6 +438,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// @dev The declared branch must match the authenticated inclusion time: the begin root proves
     /// nothing for an in-time batch (its begin state predates the deadline moment).
     function test_RevertWhen_timeout_beginBranchWithInTimeBatch() public {
+        _mockVerifier(true);
         ImtProof memory absence = _nonInclusionProof(
             SOURCE_CHAIN_ID,
             BATCH_N,
@@ -483,6 +458,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// @dev ...and the end root is paired exclusively with the in-time last-batch branch: a late
     /// batch must use its begin root (which needs no last-batch property).
     function test_RevertWhen_timeout_endBranchWithLateBatch() public {
+        _mockVerifier(true);
         ImtProof memory absence = _nonInclusionProof(
             SOURCE_CHAIN_ID,
             BATCH_N,
@@ -500,8 +476,10 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     }
 
     /// @dev A LATE batch does not need the last-batch property: the same populated batch-leaf path
-    /// that fails the in-time branch is accepted when `t > deadline` (begin-root branch).
+    /// that fails the in-time branch is accepted when `t > deadline` (begin-root branch). Synthetic
+    /// batch-leaf path -> stubbed verifier.
     function test_verifyTimeoutAbsence_lateBatchNeedsNoLastBatchProperty() public {
+        _mockVerifier(true);
         bytes32[] memory siblings = new bytes32[](1);
         siblings[0] = keccak256("populated-right-subtree");
 
@@ -524,6 +502,8 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     }
 
     function test_RevertWhen_timeout_missingSettlementLayerBatch() public {
+        // Branch isolation: a final-node blob cannot be produced by real aggregation.
+        _mockVerifier(true);
         ImtProof memory absence = _nonInclusionProof(
             SOURCE_CHAIN_ID,
             BATCH_N,
@@ -538,6 +518,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     }
 
     function test_RevertWhen_timeout_settlementLayerMismatch() public {
+        _mockVerifier(true);
         uint256 proofSl = SETTLEMENT_LAYER_CHAIN_ID + 1;
         ImtProof memory absence = _nonInclusionProof(
             SOURCE_CHAIN_ID,
@@ -571,20 +552,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
+    /// @dev Real end-to-end negative: a genuine begin-branch absence proof whose membership path is
+    /// then corrupted so it no longer hashes to the (authenticated) root — non-inclusion is not
+    /// certified.
     function test_RevertWhen_timeout_nonInclusionFailed() public {
-        ImtProof memory absence = _nonInclusionProof(
-            SOURCE_CHAIN_ID,
-            BATCH_N,
-            absentValue,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            SL_BLOCK,
-            uint256(DEADLINE) + 1
-        );
-        // The low-nullifier leaf brackets `absentValue`, but the membership path no longer hashes to the
-        // claimed root, so absence is not certified.
-        absence.chainImtRoot = WRONG_ROOT;
+        ImtProof memory absence = _realTimeoutBeginProof(SOURCE_CHAIN_ID, absentValue, uint256(DEADLINE) + 1);
+        absence.imtProof[0] = WRONG_ROOT; // corrupt the low-nullifier path, keep the real root
         _expectRootAuthentication(absence, ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX);
-        vm.expectRevert(abi.encodeWithSelector(ProofNonInclusionFailed.selector, WRONG_ROOT, absentValue));
+        vm.expectRevert(abi.encodeWithSelector(ProofNonInclusionFailed.selector, absence.chainImtRoot, absentValue));
         proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
@@ -596,21 +571,17 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// refundable (proven absent). Note: this library does not check that an absence proof targets the
     /// leg's own source chain; that binding (which blocks a cross-chain force-refund) is enforced by the
     /// caller, `AtomicFlowManager.authorizeRefund`, so it is out of scope for this library-level test.
+    /// The inclusion half runs end-to-end (real aggregation); the illegitimate absence half crafts a
+    /// begin-root proof from the real tree's predecessor leaf, so its verifier is stubbed.
     function test_includedValueCannotBeProvenAbsent() public {
-        // Sanity: the committed value verifies as included in time.
-        ImtProof memory inclusion = _inclusionProof(
-            SOURCE_CHAIN_ID,
-            BATCH_N,
-            committedIndex,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            SL_BLOCK,
-            DEADLINE - 1
-        );
+        // Sanity: the committed value verifies as included in time (real, unmocked).
+        ImtProof memory inclusion = _realInclusionProof(SOURCE_CHAIN_ID, committedIndex, DEADLINE - 1);
         _expectRootAuthentication(inclusion, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
         proofLib.verifyInclusion(inclusion, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
 
         // Build an (illegitimate) absence proof using the committed value's true predecessor leaf,
         // against a late batch inside the post-deadline settlement-layer interop root.
+        _mockVerifier(true);
         uint256 predIndex = _predecessorIndexOf(committedValue);
         ImtProof memory absence = ImtProof({
             sourceChainId: SOURCE_CHAIN_ID,
@@ -636,8 +607,11 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     // ============ fuzz ============
 
-    /// @dev Across the deadline boundary, an inclusion proof passes iff `l1Timestamp <= deadline`.
+    /// @dev Across the deadline boundary, an inclusion proof passes iff `l1Timestamp <= deadline`. The
+    /// batch-leaf clock is exercised over a fixed real proof (built once) with the timestamp word
+    /// re-stamped per run; the verifier is stubbed so the fuzz does not re-aggregate each iteration.
     function testFuzz_verifyInclusion_deadlineBoundary(uint64 _l1Timestamp, uint64 _deadline) public {
+        _mockVerifier(true);
         ImtProof memory proof = _inclusionProof(
             SOURCE_CHAIN_ID,
             BATCH_N,
@@ -662,6 +636,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         uint64 _interopRootTimestamp,
         uint64 _deadline
     ) public {
+        _mockVerifier(true);
         vm.assume(_interopRootTimestamp != 0); // 0 == "never seeded"; covered by its own test
         uint256 slBlock = SL_BLOCK + 10; // fresh key per run; fuzz runs revert state after each run
         _seedSettlementLayerInteropRoot(SETTLEMENT_LAYER_CHAIN_ID, slBlock, _interopRootTimestamp);

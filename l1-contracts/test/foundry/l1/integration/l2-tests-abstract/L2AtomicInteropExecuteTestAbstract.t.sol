@@ -59,6 +59,18 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 /// {AtomicInteropProofBuilder}; the destination-context, executor-permission, replay, and atomicity
 /// checks under test all run for real, and the Bridgehub chain registry is the REAL one (chains registered via `registerChainForInterop`, see {_registerInteropChains}).
 ///
+/// Why the leaf verifier stays mocked HERE while the unit tests authenticate through the real
+/// {L2MessageVerification}: a real inclusion proof requires the leg's source chain to be aggregated as
+/// a REMOTE chain in the settlement-layer {L1MessageRoot}, but that oracle treats `block.chainid` as
+/// its own local chain (`chainRegistered` is unconditionally true for it and `addChainBatchRootV32`
+/// refuses it). This is a two-leg CROSS-chain flow that switches `block.chainid` (source -> destination
+/// via `vm.chainId`), so at every instant one of the two legs' source equals the current chain id and
+/// cannot be aggregated; a single VM cannot hold both legs' sources as remote at once. The real
+/// aggregate -> import -> L1-verify -> membership pipeline is instead covered exhaustively by the
+/// atomic unit suite ({AtomicInteropProof}, {AtomicFlowManagerFinalize}, {AtomicFlowManagerRefund},
+/// {AtomicInteropProofRealVerification}, {AtomicInteropProofPipeline}), and on real EraVM by the
+/// anvil-interop spec below.
+///
 /// EraVM coverage: this abstract has an L1-context wrapper only, by construction. Installing the atomic
 /// predeploys and the interop-root storage at their canonical addresses relies on `deployCodeTo` /
 /// `vm.etch` (via {AtomicInteropProofBuilder} and {_setUpAtomicStack}), which are EVM-only — zkFoundry

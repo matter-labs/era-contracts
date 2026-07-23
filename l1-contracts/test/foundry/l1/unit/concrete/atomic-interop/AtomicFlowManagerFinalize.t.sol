@@ -42,8 +42,6 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
     uint256 internal constant SETTLEMENT_LAYER_CHAIN_ID = 1; // L1
     uint256 internal constant CHAIN_A = 271;
     uint256 internal constant CHAIN_B = 272;
-    uint256 internal constant BATCH_N = 100;
-    uint256 internal constant SL_BLOCK = 555;
 
     AtomicFlowManager internal manager;
 
@@ -62,7 +60,6 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
         manager.initL2(SETTLEMENT_LAYER_CHAIN_ID);
 
         _setUpAtomicFixtures();
-        _mockVerifier(true);
 
         // A canonical two-leg flow: both legs committed in their source chains' IMTs (one shared
         // oracle tree plays both chains — each proof's chain binding is its `sourceChainId` field,
@@ -85,26 +82,27 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
         legSecondIndex = _insertCommit(_commitValue(flowId, legSecond));
     }
 
-    /// @dev A finality proof whose per-leg inclusion proofs are all genuine and in time.
-    function _validFinality() internal view returns (AtomicFinalityProof memory finality) {
+    /// @dev A finality proof whose per-leg inclusion proofs are all genuine and in time — each leg's
+    /// commit value is aggregated into the real MessageRoot as its source chain's END chain-batch-root
+    /// leaf, imported into the real interop-root storage, and later re-verified through the real
+    /// {L2MessageVerification}. Nothing on the inclusion path is mocked. `_tsFirst`/`_tsSecond` are the
+    /// settlement-layer inclusion timestamps stamped into each leg's batch.
+    /// @dev NOT `view`: real aggregation + import mutate MessageRoot / interop-root storage. Each source
+    /// chain must be aggregated exactly once per call so its single batch stays the right child of a
+    /// two-leaf chain tree (matching `_realSettlementProof`); do not invoke twice for the same chains.
+    function _finalityProofs(
+        uint256 _tsFirst,
+        uint256 _tsSecond
+    ) internal returns (AtomicFinalityProof memory finality) {
         finality.flow = AtomicFlow({flowId: flowId, preimage: preimage});
         finality.proofs = new ImtProof[](2);
-        finality.proofs[0] = _inclusionProof(
-            CHAIN_A,
-            BATCH_N,
-            legFirstIndex,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            SL_BLOCK,
-            DEADLINE - 1
-        );
-        finality.proofs[1] = _inclusionProof(
-            CHAIN_B,
-            BATCH_N,
-            legSecondIndex,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            SL_BLOCK,
-            DEADLINE - 1
-        );
+        finality.proofs[0] = _realInclusionProof(CHAIN_A, legFirstIndex, _tsFirst);
+        finality.proofs[1] = _realInclusionProof(CHAIN_B, legSecondIndex, _tsSecond);
+    }
+
+    /// @dev A finality proof whose per-leg inclusion proofs are all genuine and in time.
+    function _validFinality() internal returns (AtomicFinalityProof memory) {
+        return _finalityProofs(DEADLINE - 1, DEADLINE - 1);
     }
 
     function _requireFinalizedAsHandler(bytes32 _executingBundleHash, AtomicFinalityProof memory _finality) internal {
@@ -123,8 +121,8 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
         _expectRootAuthentication(finality.proofs[1], ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
         _requireFinalizedAsHandler(legFirst, finality);
 
-        // The second leg is an equally valid executing bundle for the same flow.
-        _requireFinalizedAsHandler(legSecond, _validFinality());
+        // The second leg is an equally valid executing bundle for the same flow (same genuine proofs).
+        _requireFinalizedAsHandler(legSecond, finality);
     }
 
     // ============ reverts ============
@@ -226,16 +224,9 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
     /// @notice A leg whose batch settled after the deadline does not finalize the flow, even when
     /// every other leg is in time: the per-leg deadline check flows through the manager path.
     function test_RevertWhen_LegSettledAfterDeadline() public {
-        AtomicFinalityProof memory finality = _validFinality();
         uint256 lateTimestamp = uint256(DEADLINE) + 1;
-        finality.proofs[1] = _inclusionProof(
-            CHAIN_B,
-            BATCH_N,
-            legSecondIndex,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            SL_BLOCK,
-            lateTimestamp
-        );
+        // The second leg's batch is genuinely aggregated with a post-deadline inclusion timestamp.
+        AtomicFinalityProof memory finality = _finalityProofs(DEADLINE - 1, lateTimestamp);
 
         vm.expectRevert(abi.encodeWithSelector(ProofDeadlineExceeded.selector, lateTimestamp, DEADLINE));
         _requireFinalizedAsHandler(legFirst, finality);

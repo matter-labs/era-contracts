@@ -88,9 +88,11 @@ contract ReentrantRefundClaimer {
 /// `AtomicFlowManager.append` -> `L2InteropCommitmentTree.insert`, and the timeout path recovers the
 /// burn through the real `authorizeRefund` -> `claimRefund` -> `L2AssetRouter.recoverAtomicCall` ->
 /// NTV re-mint chain. Everything runs on the shared L2-in-L1-context deployment (real InteropCenter,
-/// AssetRouter, NTV, Bridgehub registry and bridged token); the only logic mock is the
-/// separately-tested cross-chain leaf verifier inherited from {AtomicInteropProofBuilder}
-/// (`L2_MESSAGE_VERIFICATION.proveL2LeafInclusionShared`), which absence proofs resolve against.
+/// AssetRouter, NTV, Bridgehub registry and bridged token). Nothing on the proof path is mocked: the
+/// timeout absence proofs are aggregated into a real {L1MessageRoot}, imported into the real
+/// {L2InteropRootStorage}, and authenticated through the real {L2MessageVerification} (the invalid
+/// remote leg's source is a genuinely-remote chain, so — unlike the chain-id-switching execute
+/// abstract — it can be aggregated end-to-end; see {AtomicInteropProofBuilder._realTimeoutBeginProof}).
 ///
 /// Covered flows (complementing the send-time edge cases unit-tested in `AtomicFlowManagerAppend.t.sol`):
 ///   1. A user sends an atomic leg whose preimage pairs it with an INVALID remote leg
@@ -124,10 +126,11 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     /// @dev Destination chain whose base token differs from this chain's. Chain ids 10 (L1), 270 (era),
     /// 271 (default destination), 300 (mint) and 506 (gateway) are taken by the shared harness.
     uint256 internal constant DIFFERENT_BASE_DEST_CHAIN_ID = 373;
-    /// @dev Settlement-layer block the post-deadline interop root is imported at (arbitrary).
-    uint256 internal constant SL_BLOCK = 201;
-    /// @dev Claimed source-batch number for the absence proof (arbitrary; authentication is mocked).
-    uint256 internal constant REMOTE_BATCH_NUMBER = 1;
+    /// @dev The invalid remote leg's real begin-branch absence proof, built once by
+    /// {_authorizeRefundForInvalidRemoteLeg} and reused by the idempotency tests so the remote source
+    /// chain is aggregated into the MessageRoot exactly once (a second aggregation would grow its chain
+    /// tree past the two-leaf shape {_realSettlementProof} assumes).
+    ImtProof internal _invalidRemoteAbsence;
 
     /// @dev Deploys the atomic predeploys at their canonical addresses (the shared L2-in-L1 deployer
     /// does not include them) and the proof fixtures. Called at the start of each test rather than in
@@ -159,8 +162,11 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
         // Proof fixtures from the builder: `tree` below acts as the REMOTE chain's IMT oracle (only
         // its genesis head leaf — the invalid leg is never committed there), plus the real
-        // L2InteropRootStorage etched at its canonical address for the timeout clock.
+        // L2InteropRootStorage etched at its canonical address for the timeout clock, and a real
+        // {L1MessageRoot} aggregation oracle. Align the oracle's settlement layer with this harness's
+        // `L1_CHAIN_ID` so real proofs bake / import under the same SL the flows declare.
         _setUpAtomicFixtures();
+        builderSlChainId = L1_CHAIN_ID;
     }
 
     /// @dev The exact single-call token-transfer starter `InteropLibrary.sendToken` sends: an indirect
@@ -388,16 +394,17 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     /// post-deadline settlement interop root.
     function _authorizeRefundForInvalidRemoteLeg() internal {
         AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
-        _seedSettlementLayerInteropRoot(L1_CHAIN_ID, SL_BLOCK, uint256(DEADLINE) + 5);
-        _mockVerifier(true);
-        ImtProof memory absence = _nonInclusionProof(
+        // Real begin-branch absence: the invalid remote leg's source chain is aggregated as a LATE
+        // batch into the real {L1MessageRoot}, imported post-deadline into the real interop-root
+        // storage, and authenticated through the real {L2MessageVerification} — nothing mocked. Built
+        // before `expectEmit` because aggregation + import emit their own events. Stored for reuse by
+        // the idempotency tests (re-aggregating the same chain would break the two-leaf proof shape).
+        ImtProof memory absence = _realTimeoutBeginProof(
             destinationChainId,
-            REMOTE_BATCH_NUMBER,
             _commitValue(ctx.flowId, INVALID_REMOTE_LEG),
-            L1_CHAIN_ID,
-            SL_BLOCK,
             uint256(DEADLINE) + 1
         );
+        _invalidRemoteAbsence = absence;
 
         vm.expectEmit(true, true, true, true, address(manager));
         emit IAtomicFlowManager.FlowRefundAuthorized(ctx.flowId, ctx.bundleHash);
@@ -752,14 +759,9 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         _authorizeRefundForInvalidRemoteLeg(); // leg -> Revertable, first event emitted
 
         AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
-        ImtProof memory absence = _nonInclusionProof(
-            destinationChainId,
-            REMOTE_BATCH_NUMBER,
-            _commitValue(ctx.flowId, INVALID_REMOTE_LEG),
-            L1_CHAIN_ID,
-            SL_BLOCK,
-            uint256(DEADLINE) + 1
-        );
+        // The same genuine absence proof the first authorization used (still valid; reused to avoid a
+        // second real aggregation of the remote chain).
+        ImtProof memory absence = _invalidRemoteAbsence;
 
         vm.recordLogs();
         manager.authorizeRefund(AtomicFlow({flowId: ctx.flowId, preimage: ctxPreimage}), ctx.missingLegIndex, absence);
@@ -792,14 +794,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         uint256 balanceAfterRefund = IERC20(ctx.l2Token).balanceOf(address(this));
         // The same absence proof `_authorizeRefundForInvalidRemoteLeg` used: the invalid remote leg
         // is still absent from its source chain's tree, so the proof itself still verifies.
-        ImtProof memory absence = _nonInclusionProof(
-            destinationChainId,
-            REMOTE_BATCH_NUMBER,
-            _commitValue(ctx.flowId, INVALID_REMOTE_LEG),
-            L1_CHAIN_ID,
-            SL_BLOCK,
-            uint256(DEADLINE) + 1
-        );
+        ImtProof memory absence = _invalidRemoteAbsence;
 
         vm.recordLogs();
         manager.authorizeRefund(AtomicFlow({flowId: ctx.flowId, preimage: ctxPreimage}), ctx.missingLegIndex, absence);
