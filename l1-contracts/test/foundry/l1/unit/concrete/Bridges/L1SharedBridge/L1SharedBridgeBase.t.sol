@@ -284,7 +284,6 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     }
 
     function test_finalizeWithdrawal_ErcOnEth() public {
-        _setAssetTrackerChainBalance(chainId, address(token), amount);
         bytes memory message = abi.encodePacked(
             AssetRouterBase.finalizeDeposit.selector,
             chainId,
@@ -323,7 +322,6 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     function test_finalizeWithdrawal_EthOnErc() public {
         // vm.deal(address(sharedBridge), amount);
 
-        // _setAssetTrackerChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
         _setBaseTokenAssetId(tokenAssetId);
         // vm.prank(bridgehubAddress);
 

@@ -101,8 +101,6 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
-        _setAssetTrackerChainBalance(chainId, address(token), amount);
-
         vm.mockCall(
             messageRootAddress,
             // solhint-disable-next-line func-named-parameters

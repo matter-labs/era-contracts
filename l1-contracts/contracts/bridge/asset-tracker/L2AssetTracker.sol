@@ -30,15 +30,18 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IL2AssetTracker, SavedTotalSupply, MAX_TOKEN_BALANCE} from "./IL2AssetTracker.sol";
 
 /// @dev Inherits Ownable2StepUpgradeable and PausableUpgradeable to preserve the storage layout of the
-/// already-deployed L2AssetTracker (they occupy slots 0-200 via the former shared AssetTrackerBase, so the
-/// tracker state below must stay at slots 201+). The owner/pause features are unused on L2 — access control
-/// is enforced by the address-based modifiers below — but the slots are retained for upgrade compatibility.
+/// already-deployed L2AssetTracker (their storage, including the OZ `__gap`s, precedes the tracker state
+/// below exactly as it did via the former shared AssetTrackerBase, so the tracker state keeps its slots).
+/// The owner/pause features are unused on L2 — access control is enforced by the address-based modifiers
+/// below — but the slots are retained for upgrade compatibility.
 contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpgradeable, ReentrancyGuard {
     /// @notice Maps token balances for each chain.
     /// NOTE: this mapping may be removed in the future, don't rely on it!
-    /// @dev This is write-only bookkeeping kept for future use; it is not consulted by any
-    /// bridging decision. Correctness of transfers is guaranteed by ZK proofs (plus 2FA on
-    /// ZKsync OS chains) rather than by on-chain balance enforcement.
+    /// @dev For tokens native to this chain (including the base token) the balance IS enforced:
+    /// outbound bridging reverts with `InsufficientChainBalance` if it would drive the balance
+    /// negative (see `_decreaseChainBalance`). For bridged (non-native) tokens it is not consulted
+    /// by any bridging decision — correctness of their transfers is guaranteed by ZK proofs (plus
+    /// 2FA on ZKsync OS chains) rather than by on-chain balance enforcement.
     /// @dev The `chainBalance` is only used to track the balance of native tokens on the L2.
     /// For all the other tokens it is expected to be 0.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public override chainBalance;
@@ -59,7 +62,9 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
 
     bytes32 public BASE_TOKEN_ASSET_ID;
 
-    /// @dev L2-side accounting used to compute the amount to keep on L1 during L1 -> Gateway migration.
+    /// @dev L2-side accounting of L1<->L2 flows. Currently write-only bookkeeping kept for future
+    /// use (its former consumer, the L1 -> Gateway token balance migration, was removed); it is not
+    /// consulted by any bridging decision.
     mapping(bytes32 assetId => InteropL2Info info) public interopInfo;
 
     /// @dev Token total supply snapshot captured before the first post-v31 bridge operation for each token.

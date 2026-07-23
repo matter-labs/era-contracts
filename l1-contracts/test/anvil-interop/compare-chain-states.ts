@@ -67,10 +67,6 @@ const BALANCE_TOLERANCE_WEI = BigInt("10000000000000000"); // 10^16
 //     collectSkipStorageAccounts): the L1 messageRoot and every chain diamond
 //     proxy (per-batch `storedBatchHashes`/`l2LogsRootHashes` + batch counters).
 //
-// The L1NativeTokenVault is NOT skipped wholesale (most of its storage is
-// deterministic); its single gas-dependent `bridgedOut[ETH]` slot is handled by
-// GAS_DEPENDENT_VALUE_SLOTS below instead.
-//
 // Everything NOT in this set is still storage-compared exactly, so real drift in
 // the bridgehub, CTM, bridges, NTV, tokens, etc. is still caught.
 const BLOCK_INDEXED_STORAGE_ACCOUNTS = new Set(["0x0000000000000000000000000000000000010005"]);
@@ -109,13 +105,9 @@ const BLOCK_NUMBER_STORAGE_SLOTS = new Set([
 // run-to-run by the same tiny margin as a native balance (the harness bridges a
 // gas-dependent mintValue on L1->L2 deposits). They are compared with the same
 // BALANCE_TOLERANCE_WEI slack as native balances rather than skipped outright, so
-// large (real) drift is still caught. Before the asset trackers were removed this
-// drift lived in the L1AssetTracker, whose storage was skipped wholesale; it now
-// lives in the L1NativeTokenVault's `bridgedOut[ETH]` entry.
-//   slot = keccak256(abi.encode(ethAssetId, 253)), where 253 is the `bridgedOut`
-//   mapping's storage index. Recompute with `cast index bytes32 <ethAssetId> 253`
-//   if the L1NativeTokenVault layout changes.
-const GAS_DEPENDENT_VALUE_SLOTS = new Set(["0xa779570f23bf75d0370baade00c3f15fe23265e729cfb55c61a10ccf98dc7093"]);
+// large (real) drift is still caught. Currently empty: the per-asset accounting
+// that lived here was removed together with the asset trackers.
+const GAS_DEPENDENT_VALUE_SLOTS = new Set<string>([]);
 
 // True when two raw storage words differ by no more than the native-balance
 // tolerance (used only for slots known to hold a gas-dependent ETH amount).

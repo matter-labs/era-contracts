@@ -47,6 +47,7 @@ export enum L2DACommitmentScheme {
   PUBDATA_KECCAK256,
   BLOBS_AND_PUBDATA_KECCAK256,
   BLOBS_ZKSYNC_OS,
+  L2_TO_L1_ONLY,
 }
 
 // Default L2 DA commitment scheme for tests
@@ -583,28 +584,14 @@ export function encodeExecuteBatchesData(
   settlementFeePayer: string = ethers.constants.AddressZero
 ): [BigNumberish, BigNumberish, string] {
   const emptyInteropRoots = batchesData.map(() => []);
-  const emptyLogs = batchesData.map(() => []);
-  const emptyMessages = batchesData.map(() => []);
-  const emptyMultichainBatchRoots = batchesData.map(() => ethers.constants.HashZero);
   const encodedExecuteDataWithoutVersion = defaultAbiCoder.encode(
     [
       `${STORED_BATCH_INFO_ABI_STRING}[]`,
       `${PRIORITY_OPS_BATCH_INFO_ABI_STRING}[]`,
       "tuple(uint256 chainId, uint256 blockOrBatchNumber, bytes32[] sides)[][]",
-      "tuple(uint8 l2ShardId, bool isService, uint16 txNumberInBatch, address sender, bytes32 key, bytes32 value)[][]",
-      "bytes[][]",
-      "bytes32[]",
       "address",
     ],
-    [
-      batchesData,
-      priorityOpsBatchInfo,
-      emptyInteropRoots,
-      emptyLogs,
-      emptyMessages,
-      emptyMultichainBatchRoots,
-      settlementFeePayer,
-    ]
+    [batchesData, priorityOpsBatchInfo, emptyInteropRoots, settlementFeePayer]
   );
   const executeData = hexConcat(["0x01", encodedExecuteDataWithoutVersion]);
   return [batchesData[0].batchNumber, batchesData[batchesData.length - 1].batchNumber, executeData];

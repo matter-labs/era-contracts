@@ -186,11 +186,10 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(NonSequentialBatch.selector);
-        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils
-            .encodeExecuteBatchesDataZeroLogs(
-                storedBatchInfoArray,
-                Utils.generatePriorityOps(storedBatchInfoArray.length)
-            );
+        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
+            storedBatchInfoArray,
+            Utils.generatePriorityOps(storedBatchInfoArray.length)
+        );
         vm.mockCall(
             address(messageRoot),
             abi.encodeWithSelector(IMessageRootBase.addChainBatchRoot.selector, 9, 10, bytes32(0)),
@@ -218,11 +217,10 @@ contract ExecutingTest is ExecutorTest {
                 keccak256(abi.encode(wrongNewStoredBatchInfo))
             )
         );
-        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils
-            .encodeExecuteBatchesDataZeroLogs(
-                storedBatchInfoArray,
-                Utils.generatePriorityOps(storedBatchInfoArray.length)
-            );
+        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
+            storedBatchInfoArray,
+            Utils.generatePriorityOps(storedBatchInfoArray.length)
+        );
         executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData);
     }
 
@@ -237,11 +235,10 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(CantExecuteUnprovenBatches.selector);
-        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils
-            .encodeExecuteBatchesDataZeroLogs(
-                storedBatchInfoArray,
-                Utils.generatePriorityOps(storedBatchInfoArray.length)
-            );
+        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
+            storedBatchInfoArray,
+            Utils.generatePriorityOps(storedBatchInfoArray.length)
+        );
         executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData);
     }
 
@@ -313,7 +310,7 @@ contract ExecutingTest is ExecutorTest {
         vm.prank(validator);
         // vm.expectRevert(QueueIsEmpty.selector);
         {
-            (processBatchFrom, processBatchTo, processData) = Utils.encodeExecuteBatchesDataZeroLogs(
+            (processBatchFrom, processBatchTo, processData) = Utils.encodeExecuteBatchesData(
                 correctNewStoredBatchInfoArray,
                 Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length, 1)
             );
@@ -420,7 +417,7 @@ contract ExecutingTest is ExecutorTest {
         vm.expectRevert(PriorityOperationsRollingHashMismatch.selector);
 
         {
-            (processBatchFrom, processBatchTo, processData) = Utils.encodeExecuteBatchesDataZeroLogs(
+            (processBatchFrom, processBatchTo, processData) = Utils.encodeExecuteBatchesData(
                 correctNewStoredBatchInfoArray,
                 Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length, 2)
             );
@@ -471,11 +468,10 @@ contract ExecutingTest is ExecutorTest {
         storedBatchInfoArray[0] = newStoredBatchInfo;
 
         vm.prank(validator);
-        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils
-            .encodeExecuteBatchesDataZeroLogs(
-                storedBatchInfoArray,
-                Utils.generatePriorityOps(storedBatchInfoArray.length)
-            );
+        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
+            storedBatchInfoArray,
+            Utils.generatePriorityOps(storedBatchInfoArray.length)
+        );
         executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData);
 
         uint256 totalBlocksExecuted = getters.getTotalBlocksExecuted();
@@ -497,11 +493,10 @@ contract ExecutingTest is ExecutorTest {
         storedBatchInfoArray[0] = newStoredBatchInfo;
 
         vm.prank(validator);
-        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils
-            .encodeExecuteBatchesDataZeroLogs(
-                storedBatchInfoArray,
-                Utils.generatePriorityOps(storedBatchInfoArray.length)
-            );
+        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
+            storedBatchInfoArray,
+            Utils.generatePriorityOps(storedBatchInfoArray.length)
+        );
         validatorTimelock.executeBatchesSharedBridge(address(executor), executeBatchFrom, executeBatchTo, executeData);
         vm.snapshotGasLastCall("Executor", "execute");
     }
@@ -742,9 +737,6 @@ contract ExecutingTest is ExecutorTest {
             IExecutor.StoredBatchInfo[] memory storedBatchInfos,
             PriorityOpsBatchInfo[] memory priorityOpsBatchInfos,
             InteropRoot[][] memory dependencyRoots,
-            ,
-            ,
-            ,
 
         ) = BatchDecoder.decodeAndCheckExecuteData(data, from, from);
         return (storedBatchInfos, priorityOpsBatchInfos, dependencyRoots);

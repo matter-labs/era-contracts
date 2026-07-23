@@ -3,7 +3,6 @@ import { ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { depositETHToL2 } from "../../src/helpers/l1-deposit-helper";
 import { withdrawETHFromL2 } from "../../src/helpers/l2-withdrawal-helper";
-import { getL1BridgedOut, getL1BaseTokenAssetId } from "../../src/helpers/bridged-out-helper";
 import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_RECIPIENT_ADDR } from "../../src/core/const";
 import { getL2Chain, getChainIdByRole } from "../../src/core/utils";
 
@@ -35,11 +34,6 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
       const senderL1Before = await l1Provider.getBalance(senderAddr);
       const recipientL2Before = await l2Provider.getBalance(recipientAddr);
 
-      // Snapshot L1NativeTokenVault.bridgedOut[ETH] (replaces the removed L1AssetTracker.chainBalance check).
-      const l1Ntv = state.l1Addresses!.l1NativeTokenVault;
-      const ethAssetId = await getL1BaseTokenAssetId(state.chains!.l1!.rpcUrl, l1Ntv);
-      const bridgedOutBefore = await getL1BridgedOut(state.chains!.l1!.rpcUrl, l1Ntv, ethAssetId);
-
       const result = await depositETHToL2({
         l1RpcUrl: state.chains!.l1!.rpcUrl,
         l2RpcUrl: l2Chain.rpcUrl,
@@ -53,14 +47,6 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
 
       const senderL1After = await l1Provider.getBalance(senderAddr);
       const recipientL2After = await l2Provider.getBalance(recipientAddr);
-
-      // L1NativeTokenVault.bridgedOut[ETH] should increase by exactly the bridged amount (mintValue).
-      const bridgedOutAfter = await getL1BridgedOut(state.chains!.l1!.rpcUrl, l1Ntv, ethAssetId);
-      const bridgedOutDelta = bridgedOutAfter.sub(bridgedOutBefore);
-      expect(
-        bridgedOutDelta.eq(result.mintValue),
-        `bridgedOut[ETH] should increase by ${result.mintValue.toString()}, got ${bridgedOutDelta.toString()}`
-      ).to.equal(true);
 
       // Sender's L1 ETH balance should decrease (by at least mintValue; gas costs add to the decrease)
       const senderL1Delta = senderL1After.sub(senderL1Before);
@@ -90,11 +76,6 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
       // Snapshot recipient's L1 balance
       const recipientL1Before = await l1Provider.getBalance(recipientAddr);
 
-      // Snapshot L1NativeTokenVault.bridgedOut[ETH] before finalizing the withdrawal on L1.
-      const l1Ntv = state.l1Addresses!.l1NativeTokenVault;
-      const ethAssetId = await getL1BaseTokenAssetId(state.chains!.l1!.rpcUrl, l1Ntv);
-      const bridgedOutBefore = await getL1BridgedOut(state.chains!.l1!.rpcUrl, l1Ntv, ethAssetId);
-
       const result = await withdrawETHFromL2({
         l1RpcUrl: state.chains!.l1!.rpcUrl,
         l2RpcUrl: l2Chain.rpcUrl,
@@ -107,14 +88,6 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
       expect(result.l2TxHash).to.not.be.null;
 
       const recipientL1After = await l1Provider.getBalance(recipientAddr);
-
-      // L1NativeTokenVault.bridgedOut[ETH] should decrease by exactly the withdrawn amount.
-      const bridgedOutAfter = await getL1BridgedOut(state.chains!.l1!.rpcUrl, l1Ntv, ethAssetId);
-      const bridgedOutDelta = bridgedOutBefore.sub(bridgedOutAfter);
-      expect(
-        bridgedOutDelta.eq(amount),
-        `bridgedOut[ETH] should decrease by ${amount.toString()}, got ${bridgedOutDelta.toString()}`
-      ).to.equal(true);
 
       // Recipient's L1 ETH balance should increase by exactly the withdrawal amount
       const recipientL1Delta = recipientL1After.sub(recipientL1Before);

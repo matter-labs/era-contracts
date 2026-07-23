@@ -104,7 +104,9 @@ async function main(): Promise<void> {
       await timedAsync("load chain states (coverage mode)", () => runner.loadChainStates(anvilManager, stateDir));
     } else {
       console.log("\nNo pre-generated chain states found, running full deployment...");
-      await timedAsync("full deployment + test tokens + TBM", () => runner.deployAndSetupWithTBM(anvilManager));
+      await timedAsync("full deployment + test tokens + wrapped-ZK seeding", () =>
+        runner.deployAndSetupWithWrappedZk(anvilManager)
+      );
     }
 
     // Step 3: Run tests (coverage-invisible — we collect traces afterward)

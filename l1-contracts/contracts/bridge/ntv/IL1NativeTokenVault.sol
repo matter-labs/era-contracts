@@ -24,8 +24,5 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     /// ETH token is expected to have been already initialized in production.
     function registerEthToken() external;
 
-    /// @notice Net amount of the given L1-native asset currently bridged out of L1.
-    function bridgedOut(bytes32 _assetId) external view returns (uint256);
-
     event TokenBeaconUpdated(address indexed l2TokenBeacon);
 }

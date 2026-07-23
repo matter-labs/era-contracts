@@ -178,7 +178,8 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     }
 
     /// @notice Returns whether a chain can be migrated from L1 to a settlement layer.
-    /// @dev A chain is ready only when its legacy base-token balance in L1NativeTokenVault has been migrated.
+    /// @dev A chain is ready only when it is post-v31, its base token is registered in the
+    /// L1NativeTokenVault and the base token supports `totalSupply()`.
     /// @param _chainId The chain id to check.
     /// @return True if migration preconditions are met.
     function isReadyForMigration(uint256 _chainId) public view returns (bool) {

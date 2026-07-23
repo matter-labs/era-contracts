@@ -24,12 +24,12 @@ async function main(): Promise<void> {
     const stateDir = path.join(__dirname, "chain-states", version);
     const dumpStatePaths = runner.buildDumpStatePaths(stateDir);
 
-    // Run full deployment + test tokens + TBM in deterministic mode:
+    // Run full deployment + test tokens + wrapped-ZK seeding in deterministic mode:
     // - blockTime 1 = match the fresh-deploy harness's known-good mining cadence
     // - timestamp 1 = fixed genesis timestamp
     // - dumpStatePaths = Anvil will dump state to these files on exit
     // This ensures state is fully deterministic regardless of wall clock.
-    const { l1Addresses, ctmAddresses, chainAddresses } = await runner.deployAndSetupWithTBM(anvilManager, {
+    const { l1Addresses, ctmAddresses, chainAddresses } = await runner.deployAndSetupWithWrappedZk(anvilManager, {
       startChainOptions: { blockTime: 1, timestamp: 1, dumpStatePaths },
     });
 

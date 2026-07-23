@@ -35,8 +35,8 @@ In production, a v31 protocol upgrade proceeds as:
    - Delegatecalls to `L2V31Upgrade.upgrade()` which initializes new contracts (NTV, Bridgehub,
      AssetRouter, L2AssetTracker, ChainAssetHandler, InteropCenter, BaseToken, etc.)
 
-7. **Stage 3**: Post-governance migration. Registers bridged tokens in NTV and migrates token
-   legacy bridged tokens in the NTV (shared logic in `TokenMigrationUtils`).
+7. **Stage 3**: Post-governance token registration. Registers legacy bridged tokens in the NTV
+   (shared logic in `TokenMigrationUtils`).
 
 8. **Verification**: Protocol version on each chain is now `0x1f00000000` (v31).
 

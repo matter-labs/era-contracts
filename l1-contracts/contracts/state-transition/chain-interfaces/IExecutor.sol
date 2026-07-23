@@ -100,7 +100,9 @@ interface IExecutor is IZKChainBase {
     /// `ValidatorTimelock` and `Executor` for easier and cheaper implementation of the timelock.
     /// @param _processFrom The batch number from which the execution starts.
     /// @param _processTo The batch number at which the execution ends.
-    /// @param _executeData The encoded data of the new batches to be executed. Contains settlement fee payer address.
+    /// @param _executeData The encoded data of the new batches to be executed. The trailing settlement
+    /// fee payer address is decoded but unused: gateway settlement fees were removed together with the
+    /// asset tracker.
     function executeBatchesSharedBridge(
         address _chainAddress,
         uint256 _processFrom,

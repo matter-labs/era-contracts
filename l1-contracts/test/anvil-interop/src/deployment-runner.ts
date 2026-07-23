@@ -969,7 +969,7 @@ export class DeploymentRunner {
    * balances on ETH-base-token L2 chains. Cross-chain asset correctness is
    * guaranteed by ZK proofs, so no on-chain balance migration step is needed.
    */
-  async deployAndSetupWithTBM(
+  async deployAndSetupWithWrappedZk(
     anvilManager: AnvilManager,
     options?: DeployAndSetupOptions
   ): Promise<FullDeploymentResult> {

@@ -30,7 +30,7 @@ import {
     TOTAL_BLOBS_IN_COMMITMENT
 } from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
-import {InteropRoot, L2CanonicalTransaction, L2Log} from "contracts/common/Messaging.sol";
+import {InteropRoot, L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundry/L1TestsErrors.sol";
@@ -292,38 +292,10 @@ library Utils {
         address _settlementFeePayer
     ) internal pure returns (uint256, uint256, bytes memory) {
         uint256 len = _batchesData.length;
-        return _encodeExecuteBatchesDataInner(_batchesData, _priorityOpsData, _settlementFeePayer, len);
-    }
-
-    function encodeExecuteBatchesDataZeroLogs(
-        IExecutor.StoredBatchInfo[] memory _batchesData,
-        PriorityOpsBatchInfo[] memory _priorityOpsData
-    ) internal pure returns (uint256, uint256, bytes memory) {
-        return encodeExecuteBatchesDataZeroLogs(_batchesData, _priorityOpsData, address(0));
-    }
-
-    function encodeExecuteBatchesDataZeroLogs(
-        IExecutor.StoredBatchInfo[] memory _batchesData,
-        PriorityOpsBatchInfo[] memory _priorityOpsData,
-        address _settlementFeePayer
-    ) internal pure returns (uint256, uint256, bytes memory) {
-        return _encodeExecuteBatchesDataInner(_batchesData, _priorityOpsData, _settlementFeePayer, 0);
-    }
-
-    function _encodeExecuteBatchesDataInner(
-        IExecutor.StoredBatchInfo[] memory _batchesData,
-        PriorityOpsBatchInfo[] memory _priorityOpsData,
-        address _settlementFeePayer,
-        uint256 _logsLen
-    ) private pure returns (uint256, uint256, bytes memory) {
-        uint256 len = _batchesData.length;
         bytes memory encoded = abi.encode(
             _batchesData,
             _priorityOpsData,
             new InteropRoot[][](len),
-            new L2Log[](_logsLen),
-            new bytes[](_logsLen),
-            new bytes32[](_logsLen),
             _settlementFeePayer
         );
         return (

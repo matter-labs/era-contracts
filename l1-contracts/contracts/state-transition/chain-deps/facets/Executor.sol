@@ -29,7 +29,7 @@ import {
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
-import {InteropRoot, L2Log} from "../../../common/Messaging.sol";
+import {InteropRoot} from "../../../common/Messaging.sol";
 
 /// @title ZK chain Executor contract capable of processing events emitted in the ZK chain protocol.
 /// @author Matter Labs
@@ -167,29 +167,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             StoredBatchInfo[] memory batchesData,
             PriorityOpsBatchInfo[] memory priorityOpsData,
             InteropRoot[][] memory dependencyRoots,
-            L2Log[][] memory logs,
-            bytes[][] memory messages,
-            bytes32[] memory multichainBatchRoots,
 
         ) = BatchDecoder.decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
         uint256 nBatches = batchesData.length;
         if (batchesData.length != priorityOpsData.length) {
             revert InvalidBatchesDataLength(batchesData.length, priorityOpsData.length);
-        }
-        if (block.chainid == L1_CHAIN_ID) {
-            require(logs.length == 0, InvalidBatchesDataLength(0, logs.length));
-            require(messages.length == 0, InvalidBatchesDataLength(0, messages.length));
-            require(multichainBatchRoots.length == 0, InvalidBatchesDataLength(0, multichainBatchRoots.length));
-        } else {
-            require(batchesData.length == logs.length, InvalidBatchesDataLength(batchesData.length, logs.length));
-            require(
-                batchesData.length == messages.length,
-                InvalidBatchesDataLength(batchesData.length, messages.length)
-            );
-            require(
-                batchesData.length == multichainBatchRoots.length,
-                InvalidBatchesDataLength(batchesData.length, multichainBatchRoots.length)
-            );
         }
 
         // Append each batch's proven `l2LogsTreeRoot` to the global message root. On Gateway the

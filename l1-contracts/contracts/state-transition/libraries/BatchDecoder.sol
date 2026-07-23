@@ -12,7 +12,7 @@ import {
     UnsupportedExecuteBatchEncoding,
     UnsupportedProofBatchEncoding
 } from "../../common/L1ContractErrors.sol";
-import {InteropRoot, L2Log} from "../../common/Messaging.sol";
+import {InteropRoot} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -241,9 +241,6 @@ library BatchDecoder {
     /// @return executeData An array containing the stored batch information for execution.
     /// @return priorityOpsData Merkle proofs of the priority operations for each batch.
     /// @return dependencyRoots Interop dependency roots for each batch.
-    /// @return logs L2 logs for each batch.
-    /// @return messages L2 messages for each batch.
-    /// @return multichainBatchRoots Multichain batch roots for chain for each batch.
     /// @return settlementFeePayer Address that pays gateway settlement fees.
     function _decodeExecuteData(
         bytes calldata _executeData
@@ -254,9 +251,6 @@ library BatchDecoder {
             IExecutor.StoredBatchInfo[] memory executeData,
             PriorityOpsBatchInfo[] memory priorityOpsData,
             InteropRoot[][] memory dependencyRoots,
-            L2Log[][] memory logs,
-            bytes[][] memory messages,
-            bytes32[] memory multichainBatchRoots,
             address settlementFeePayer
         )
     {
@@ -266,26 +260,10 @@ library BatchDecoder {
 
         uint8 encodingVersion = uint8(_executeData[0]);
         if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
-            (
-                executeData,
-                priorityOpsData,
-                dependencyRoots,
-                logs,
-                messages,
-                multichainBatchRoots,
-                settlementFeePayer
-            ) = abi.decode(
-                    _executeData[1:],
-                    (
-                        IExecutor.StoredBatchInfo[],
-                        PriorityOpsBatchInfo[],
-                        InteropRoot[][],
-                        L2Log[][],
-                        bytes[][],
-                        bytes32[],
-                        address
-                    )
-                );
+            (executeData, priorityOpsData, dependencyRoots, settlementFeePayer) = abi.decode(
+                _executeData[1:],
+                (IExecutor.StoredBatchInfo[], PriorityOpsBatchInfo[], InteropRoot[][], address)
+            );
         } else {
             revert UnsupportedExecuteBatchEncoding(encodingVersion);
         }
@@ -300,9 +278,6 @@ library BatchDecoder {
     /// @return executeData An array containing the stored batch information for execution.
     /// @return priorityOpsData Merkle proofs of the priority operations for each batch.
     /// @return dependencyRoots Interop dependency roots for each batch.
-    /// @return logs L2 logs for each batch.
-    /// @return messages L2 messages for each batch.
-    /// @return multichainBatchRoots Multichain batch roots for chain for each batch.
     /// @return settlementFeePayer Address that pays gateway settlement fees.
     function decodeAndCheckExecuteData(
         bytes calldata _executeData,
@@ -315,21 +290,10 @@ library BatchDecoder {
             IExecutor.StoredBatchInfo[] memory executeData,
             PriorityOpsBatchInfo[] memory priorityOpsData,
             InteropRoot[][] memory dependencyRoots,
-            L2Log[][] memory logs,
-            bytes[][] memory messages,
-            bytes32[] memory multichainBatchRoots,
             address settlementFeePayer
         )
     {
-        (
-            executeData,
-            priorityOpsData,
-            dependencyRoots,
-            logs,
-            messages,
-            multichainBatchRoots,
-            settlementFeePayer
-        ) = _decodeExecuteData(_executeData);
+        (executeData, priorityOpsData, dependencyRoots, settlementFeePayer) = _decodeExecuteData(_executeData);
 
         if (executeData.length == 0) {
             revert EmptyData();
