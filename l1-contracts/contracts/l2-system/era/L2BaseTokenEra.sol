@@ -10,7 +10,7 @@ import {
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     MSG_VALUE_SYSTEM_CONTRACT
 } from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {L2_ASSET_TRACKER} from "../../common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_BASE_TOKEN_HOLDER} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "../../common/Config.sol";
 import {BaseTokenHolderAlreadyInitialized, InsufficientFunds, Unauthorized} from "../../common/L1ContractErrors.sol";
 
@@ -87,9 +87,9 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
     /// @param _account The address which to mint the funds to.
     /// @param _amount The amount of ETH in wei to be minted.
     function mint(address _account, uint256 _amount) external override onlyBootloader {
-        // Notify the asset tracker BEFORE changing balances/totalSupply, so that
-        // _needToForceSetAssetMigrationOnL2 can use totalSupply() == 0 consistently.
-        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(L1_CHAIN_ID, _amount);
+        // Record the inbound flow BEFORE changing balances/totalSupply, so the bookkeeping
+        // observes the pre-mint state.
+        L2_BASE_TOKEN_HOLDER.recordBaseTokenDeposit(L1_CHAIN_ID, _amount);
 
         // Transfer from BaseTokenHolder to the recipient
         // This decreases holder balance, which increases totalSupply() automatically

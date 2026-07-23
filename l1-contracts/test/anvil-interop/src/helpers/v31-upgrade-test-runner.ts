@@ -12,7 +12,6 @@ import {
   INITIAL_BASE_TOKEN_HOLDER_BALANCE,
   INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
-  L2_ASSET_TRACKER_ADDR,
   L2_BASE_TOKEN_ADDR,
   L2_BASE_TOKEN_HOLDER_ADDR,
   L2_BRIDGEHUB_ADDR,
@@ -1196,17 +1195,18 @@ function extractTxInput(transaction: Record<string, unknown>): string | undefine
 // ── Verification ─────────────────────────────────────────────────────
 
 async function verifyL2UpgradeResult(l2Provider: ethers.providers.JsonRpcProvider, chainId: number): Promise<void> {
-  const assetTracker = new ethers.Contract(L2_ASSET_TRACKER_ADDR, getAbi("L2AssetTracker"), l2Provider);
+  const nativeTokenVault = new ethers.Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), l2Provider);
 
-  const l1ChainId = await assetTracker.L1_CHAIN_ID();
+  const l1ChainId = await nativeTokenVault.L1_CHAIN_ID();
   if (!l1ChainId.eq(runtimeConfig.l1ChainId)) {
-    throw new Error(`Chain ${chainId}: L2AssetTracker.L1_CHAIN_ID = ${l1ChainId}, expected ${runtimeConfig.l1ChainId}`);
+    throw new Error(
+      `Chain ${chainId}: L2NativeTokenVault.L1_CHAIN_ID = ${l1ChainId}, expected ${runtimeConfig.l1ChainId}`
+    );
   }
 
-  const baseTokenAssetId = await assetTracker.BASE_TOKEN_ASSET_ID();
-  const registered = await assetTracker.isAssetRegistered(baseTokenAssetId);
-  if (!registered) {
-    throw new Error(`Chain ${chainId}: base token not registered after L2 upgrade`);
+  const baseTokenAssetId = await nativeTokenVault.BASE_TOKEN_ASSET_ID();
+  if (baseTokenAssetId === ethers.constants.HashZero) {
+    throw new Error(`Chain ${chainId}: base token asset id not initialized after L2 upgrade`);
   }
 }
 
@@ -1416,7 +1416,6 @@ function buildAddressToContract(isZKsyncOS: boolean): ReadonlyMap<string, Contra
     [L2_ASSET_ROUTER_ADDR.toLowerCase(), "L2AssetRouter"],
     [L2_NATIVE_TOKEN_VAULT_ADDR.toLowerCase(), isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault"],
     [L2_CHAIN_ASSET_HANDLER_ADDR.toLowerCase(), "L2ChainAssetHandler"],
-    [L2_ASSET_TRACKER_ADDR.toLowerCase(), "L2AssetTracker"],
     [INTEROP_CENTER_ADDR.toLowerCase(), "InteropCenter"],
     [L2_INTEROP_HANDLER_ADDR.toLowerCase(), "InteropHandler"],
     [L2_BASE_TOKEN_HOLDER_ADDR.toLowerCase(), "BaseTokenHolder"],

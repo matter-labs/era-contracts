@@ -6,18 +6,25 @@ import {Test} from "forge-std/Test.sol";
 
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 import {IBaseTokenHolder} from "contracts/l2-system/interfaces/IBaseTokenHolder.sol";
-import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
+import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
+import {SavedTotalSupply} from "contracts/common/L2AssetBookkeeping.sol";
+import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 import {
-    L2_ASSET_TRACKER_ADDR,
     L2_BOOTLOADER_ADDRESS,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_HANDLER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR,
-    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {DummyL2AssetTracker} from "contracts/dev-contracts/test/DummyL2AssetTracker.sol";
+import {
+    BaseTokenBookkeepingAlreadyInitialized,
+    BaseTokenBookkeepingNotInitialized,
+    BaseTokenTotalSupplyBackfillNotNeeded,
+    L1ChainIdNotSet,
+    Unauthorized
+} from "contracts/common/L1ContractErrors.sol";
 
 /// @title BaseTokenHolderTest
 /// @notice Unit tests for BaseTokenHolder contract
@@ -26,6 +33,7 @@ contract BaseTokenHolderTest is Test {
 
     address internal recipient;
     uint256 internal constant INITIAL_BALANCE = 100 ether;
+    uint256 internal constant L1_CHAIN_ID = 9;
     uint256 internal constant ERA_CHAIN_ID = 271;
     uint256 internal constant GATEWAY_CHAIN_ID = 505;
 
@@ -33,10 +41,15 @@ contract BaseTokenHolderTest is Test {
         baseTokenHolder = new BaseTokenHolder();
         recipient = makeAddr("recipient");
 
-        // Deploy dummy L2AssetTracker at system address (replaces per-test vm.mockCall)
-        vm.etch(
-            L2_ASSET_TRACKER_ADDR,
-            address(new DummyL2AssetTracker(address(0), DummyL2AssetTracker.RecordMode.None)).code
+        vm.mockCall(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            abi.encodeWithSelector(IL2NativeTokenVault.L1_CHAIN_ID.selector),
+            abi.encode(L1_CHAIN_ID)
+        );
+        vm.mockCall(
+            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(ISystemContext.currentSettlementLayerChainId.selector),
+            abi.encode(L1_CHAIN_ID)
         );
 
         // Fund the BaseTokenHolder contract
@@ -73,16 +86,28 @@ contract BaseTokenHolderTest is Test {
         assertEq(address(baseTokenHolder).balance, holderBalanceBefore, "Holder balance should not change");
     }
 
-    function test_give_notifiesAssetTracker() public {
+    function test_give_fromL1_recordsSuccessfulDeposit() public {
         uint256 amount = 1 ether;
 
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(IL2AssetTracker.handleFinalizeBaseTokenBridgingOnL2.selector, ERA_CHAIN_ID, amount)
+        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        baseTokenHolder.give(recipient, amount, L1_CHAIN_ID);
+
+        (, uint256 deposits) = baseTokenHolder.baseTokenInteropInfo();
+        assertEq(deposits, amount, "L1 deposit should be recorded");
+    }
+
+    function test_give_fromL1WhileSettlingOnGateway_doesNotRecordDeposit() public {
+        vm.mockCall(
+            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(ISystemContext.currentSettlementLayerChainId.selector),
+            abi.encode(GATEWAY_CHAIN_ID)
         );
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
-        baseTokenHolder.give(recipient, amount, ERA_CHAIN_ID);
+        baseTokenHolder.give(recipient, 1 ether, L1_CHAIN_ID);
+
+        (, uint256 deposits) = baseTokenHolder.baseTokenInteropInfo();
+        assertEq(deposits, 0, "gateway-settled deposit must not be attributed to L1");
     }
 
     function test_give_revertWhenRecipientRejectsETH() public {
@@ -93,7 +118,10 @@ contract BaseTokenHolderTest is Test {
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
         vm.expectRevert("Address: unable to send value, recipient may have reverted");
-        baseTokenHolder.give(address(rejecting), amount, ERA_CHAIN_ID);
+        baseTokenHolder.give(address(rejecting), amount, L1_CHAIN_ID);
+
+        (, uint256 deposits) = baseTokenHolder.baseTokenInteropInfo();
+        assertEq(deposits, 0, "reverted transfer must revert bookkeeping");
     }
 
     function test_give_revertWhenCalledByNonInteropHandler() public {
@@ -218,11 +246,6 @@ contract BaseTokenHolderTest is Test {
 
         uint256 holderBalanceBefore = address(baseTokenHolder).balance;
 
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2.selector, _toChainId, amount)
-        );
-
         vm.expectEmit(true, false, false, true, address(baseTokenHolder));
         emit IBaseTokenHolder.BaseTokenBurntInterop(_caller, _toChainId, amount);
 
@@ -283,55 +306,123 @@ contract BaseTokenHolderTest is Test {
         baseTokenHolder.burnAndStartBridging{value: 1 ether}(ERA_CHAIN_ID);
     }
 
-    function test_burnAndStartBridging_callsAssetTrackerWithCorrectParams() public {
+    function test_burnAndStartBridging_toL1_recordsWithdrawal() public {
         uint256 amount = 2 ether;
 
         vm.deal(L2_INTEROP_CENTER_ADDR, amount);
 
-        // Verify exact parameters passed to asset tracker
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(
-                IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2.selector,
-                GATEWAY_CHAIN_ID,
-                amount
-            )
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        baseTokenHolder.burnAndStartBridging{value: amount}(L1_CHAIN_ID);
+
+        (uint256 withdrawals, ) = baseTokenHolder.baseTokenInteropInfo();
+        assertEq(withdrawals, amount, "L1 withdrawal should be recorded");
+    }
+
+    function test_burnAndStartBridging_toL1WhileSettlingOnGateway_doesNotRecordWithdrawal() public {
+        vm.mockCall(
+            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(ISystemContext.currentSettlementLayerChainId.selector),
+            abi.encode(GATEWAY_CHAIN_ID)
         );
+        uint256 amount = 2 ether;
+        vm.deal(L2_INTEROP_CENTER_ADDR, amount);
 
         vm.prank(L2_INTEROP_CENTER_ADDR);
-        baseTokenHolder.burnAndStartBridging{value: amount}(GATEWAY_CHAIN_ID);
+        baseTokenHolder.burnAndStartBridging{value: amount}(L1_CHAIN_ID);
+
+        (uint256 withdrawals, ) = baseTokenHolder.baseTokenInteropInfo();
+        assertEq(withdrawals, 0, "gateway-settled withdrawal must not be attributed to L1");
     }
 
     /*//////////////////////////////////////////////////////////////
                     ORDERING INVARIANT TESTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Verifies that handleFinalizeBaseTokenBridgingOnL2 is called BEFORE the ETH transfer.
-    /// @dev This ordering is critical: _needToForceSetAssetMigrationOnL2 reads totalSupply() to decide
-    /// whether to force-set the migration number. If the transfer happens first, totalSupply changes
-    /// before the tracker is notified, giving wrong results. The same ordering must be enforced in zksync-os.
-    function test_give_callsAssetTrackerBeforeTransfer() public {
+    /// @notice Verifies that inbound bookkeeping is updated before control reaches the recipient.
+    function test_give_recordsDepositBeforeTransfer() public {
         uint256 amount = 1 ether;
-        uint256 recipientBalanceBefore = recipient.balance;
-
-        // Deploy DummyL2AssetTracker in recording mode — snapshots recipient balance when called
-        DummyL2AssetTracker recorder = new DummyL2AssetTracker(recipient, DummyL2AssetTracker.RecordMode.Balance);
-        vm.etch(L2_ASSET_TRACKER_ADDR, address(recorder).code);
+        BookkeepingObservingRecipient observer = new BookkeepingObservingRecipient(baseTokenHolder);
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
-        baseTokenHolder.give(recipient, amount, ERA_CHAIN_ID);
+        baseTokenHolder.give(address(observer), amount, L1_CHAIN_ID);
 
-        // Read recorded values from the etched address
-        DummyL2AssetTracker etched = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
-        assertTrue(etched.wasCalled(), "Asset tracker should have been called");
-        assertEq(
-            etched.recordedValue(),
-            recipientBalanceBefore,
-            "handleFinalizeBaseTokenBridgingOnL2 must be called BEFORE ETH transfer"
+        assertEq(observer.observedDeposits(), amount, "recipient should observe the completed bookkeeping");
+        assertEq(address(observer).balance, amount, "recipient should receive ETH after bookkeeping");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        BOOKKEEPING INITIALIZATION
+    //////////////////////////////////////////////////////////////*/
+
+    function test_initializeBookkeeping_setsSnapshotOnce() public {
+        SavedTotalSupply memory snapshot = SavedTotalSupply({isSaved: true, amount: 123});
+
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        baseTokenHolder.initializeBookkeeping(snapshot, false);
+
+        (bool isSaved, uint256 amount) = baseTokenHolder.baseTokenPreTrackingTotalSupply();
+        assertTrue(isSaved);
+        assertEq(amount, 123);
+        assertTrue(baseTokenHolder.bookkeepingInitialized());
+
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        vm.expectRevert(BaseTokenBookkeepingAlreadyInitialized.selector);
+        baseTokenHolder.initializeBookkeeping(snapshot, false);
+    }
+
+    function test_initializeBookkeeping_revertsUnsavedSnapshot() public {
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        vm.expectRevert(BaseTokenBookkeepingNotInitialized.selector);
+        baseTokenHolder.initializeBookkeeping(SavedTotalSupply({isSaved: false, amount: 0}), false);
+    }
+
+    function test_initializeBookkeeping_revertsUnauthorized() public {
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
+        baseTokenHolder.initializeBookkeeping(SavedTotalSupply({isSaved: true, amount: 0}), false);
+    }
+
+    function test_backfillBaseTokenPreTrackingTotalSupply() public {
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        baseTokenHolder.initializeBookkeeping(SavedTotalSupply({isSaved: true, amount: 0}), true);
+
+        vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        baseTokenHolder.backfillBaseTokenPreTrackingTotalSupply(456);
+
+        (, uint256 amount) = baseTokenHolder.baseTokenPreTrackingTotalSupply();
+        assertEq(amount, 456);
+
+        vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        vm.expectRevert(BaseTokenTotalSupplyBackfillNotNeeded.selector);
+        baseTokenHolder.backfillBaseTokenPreTrackingTotalSupply(789);
+    }
+
+    function test_backfillBaseTokenPreTrackingTotalSupply_revertsBeforeInitialization() public {
+        vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        vm.expectRevert(BaseTokenBookkeepingNotInitialized.selector);
+        baseTokenHolder.backfillBaseTokenPreTrackingTotalSupply(1);
+    }
+
+    function test_recordBaseTokenDeposit_onlyL2BaseToken() public {
+        vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        baseTokenHolder.recordBaseTokenDeposit(L1_CHAIN_ID, 17);
+
+        (, uint256 deposits) = baseTokenHolder.baseTokenInteropInfo();
+        assertEq(deposits, 17);
+
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
+        baseTokenHolder.recordBaseTokenDeposit(L1_CHAIN_ID, 1);
+    }
+
+    function test_recordBaseTokenDeposit_revertWhenL1ChainIdNotSet() public {
+        vm.mockCall(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            abi.encodeWithSelector(IL2NativeTokenVault.L1_CHAIN_ID.selector),
+            abi.encode(uint256(0))
         );
 
-        // Confirm transfer actually happened
-        assertEq(recipient.balance, recipientBalanceBefore + amount, "Recipient should have received ETH after call");
+        vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        vm.expectRevert(L1ChainIdNotSet.selector);
+        baseTokenHolder.recordBaseTokenDeposit(ERA_CHAIN_ID, 1 ether);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -356,5 +447,18 @@ contract BaseTokenHolderTest is Test {
 contract RejectingETHContract {
     receive() external payable {
         revert("Rejected");
+    }
+}
+
+contract BookkeepingObservingRecipient {
+    BaseTokenHolder internal immutable holder;
+    uint256 public observedDeposits;
+
+    constructor(BaseTokenHolder _holder) {
+        holder = _holder;
+    }
+
+    receive() external payable {
+        (, observedDeposits) = holder.baseTokenInteropInfo();
     }
 }

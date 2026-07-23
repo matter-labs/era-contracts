@@ -32,7 +32,7 @@ import {
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
 import {ClaimFailedDepositFailed, OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
-import {InsufficientChainBalance} from "../asset-tracker/AssetTrackerErrors.sol";
+import {InsufficientChainBalance} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

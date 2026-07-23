@@ -7,7 +7,7 @@ import {
     LegacySharedBridgeAddresses,
     SharedBridgeOnChainId
 } from "contracts/bridge/asset-tracker/LegacySharedBridgeAddresses.sol";
-import {InvalidL1AssetRouter} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {InvalidL1AssetRouter} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Wrapper contract to expose library functions
 contract LegacySharedBridgeAddressesWrapper {

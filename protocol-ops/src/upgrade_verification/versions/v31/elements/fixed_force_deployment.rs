@@ -19,7 +19,6 @@ sol! {
     #[derive(Debug)]
     struct FixedForceDeploymentsData {
         uint256 l1ChainId;
-        uint256 eraGatewayChainId;
         uint256 eraChainId;
         address l1AssetRouter;
         bytes32 l2TokenProxyBytecodeHash;
@@ -32,7 +31,6 @@ sol! {
         bytes chainAssetHandlerBytecodeInfo;
         bytes interopCenterBytecodeInfo;
         bytes interopHandlerBytecodeInfo;
-        bytes assetTrackerBytecodeInfo;
         bytes beaconDeployerInfo;
         bytes baseTokenHolderBytecodeInfo;
         address l2SharedBridgeLegacyImpl;
@@ -142,19 +140,6 @@ impl FixedForceDeploymentsData {
             Err(err) => result.report_error(&format!(
                 "Could not verify FixedForceDeploymentsData l1ChainId: {err}"
             )),
-        }
-
-        let expected_era_gateway_chain_id = U256::from(verifiers.legacy_gateway_chain_id);
-        if self.eraGatewayChainId != expected_era_gateway_chain_id {
-            result.report_error(&format!(
-                "FixedForceDeploymentsData eraGatewayChainId mismatch: expected legacy gateway chain id {}, got {}",
-                verifiers.legacy_gateway_chain_id, self.eraGatewayChainId
-            ));
-        } else {
-            result.report_ok(&format!(
-                "FixedForceDeploymentsData eraGatewayChainId matches legacy gateway chain id ({})",
-                verifiers.legacy_gateway_chain_id
-            ));
         }
 
         let era_chain_id = verifiers.era_chain_id;
@@ -275,13 +260,6 @@ impl FixedForceDeploymentsData {
         expect_bytecode_info(
             result,
             verifiers,
-            &self.assetTrackerBytecodeInfo,
-            "l1-contracts/L2AssetTracker",
-            "l1-contracts/L2AssetTracker",
-        );
-        expect_bytecode_info(
-            result,
-            verifiers,
             &self.beaconDeployerInfo,
             "l1-contracts/UpgradeableBeaconDeployer",
             "l1-contracts/UpgradeableBeaconDeployer",
@@ -331,5 +309,147 @@ impl FixedForceDeploymentsData {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloy::{
+        primitives::{Address, Bytes, FixedBytes, U256},
+        sol,
+        sol_types::SolValue,
+    };
+
+    use super::FixedForceDeploymentsData;
+
+    // Keep this fixture in the exact order of the Solidity source of truth in
+    // l1-contracts/contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol.
+    sol! {
+        struct SolidityFixedForceDeploymentsData {
+            uint256 l1ChainId;
+            uint256 eraChainId;
+            address l1AssetRouter;
+            bytes32 l2TokenProxyBytecodeHash;
+            address aliasedL1Governance;
+            uint256 maxNumberOfZKChains;
+            bytes bridgehubBytecodeInfo;
+            bytes l2AssetRouterBytecodeInfo;
+            bytes l2NtvBytecodeInfo;
+            bytes messageRootBytecodeInfo;
+            bytes chainAssetHandlerBytecodeInfo;
+            bytes interopCenterBytecodeInfo;
+            bytes interopHandlerBytecodeInfo;
+            bytes beaconDeployerInfo;
+            bytes baseTokenHolderBytecodeInfo;
+            address l2SharedBridgeLegacyImpl;
+            address l2BridgedStandardERC20Impl;
+            address aliasedChainRegistrationSender;
+            address dangerousTestOnlyForcedBeacon;
+            bytes32 zkTokenAssetId;
+        }
+    }
+
+    #[test]
+    fn matches_and_decodes_solidity_fixed_force_deployments_layout() {
+        let solidity_source = include_str!(
+            "../../../../../../l1-contracts/contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol"
+        );
+        let struct_body = solidity_source
+            .split_once("struct FixedForceDeploymentsData {")
+            .expect("canonical Solidity struct must exist")
+            .1
+            .split_once('}')
+            .expect("canonical Solidity struct must be closed")
+            .0;
+        let solidity_fields: Vec<_> = struct_body
+            .lines()
+            .map(str::trim)
+            .filter(|line| line.ends_with(';'))
+            .collect();
+        assert_eq!(
+            solidity_fields,
+            [
+                "uint256 l1ChainId;",
+                "uint256 eraChainId;",
+                "address l1AssetRouter;",
+                "bytes32 l2TokenProxyBytecodeHash;",
+                "address aliasedL1Governance;",
+                "uint256 maxNumberOfZKChains;",
+                "bytes bridgehubBytecodeInfo;",
+                "bytes l2AssetRouterBytecodeInfo;",
+                "bytes l2NtvBytecodeInfo;",
+                "bytes messageRootBytecodeInfo;",
+                "bytes chainAssetHandlerBytecodeInfo;",
+                "bytes interopCenterBytecodeInfo;",
+                "bytes interopHandlerBytecodeInfo;",
+                "bytes beaconDeployerInfo;",
+                "bytes baseTokenHolderBytecodeInfo;",
+                "address l2SharedBridgeLegacyImpl;",
+                "address l2BridgedStandardERC20Impl;",
+                "address aliasedChainRegistrationSender;",
+                "address dangerousTestOnlyForcedBeacon;",
+                "bytes32 zkTokenAssetId;",
+            ],
+            "protocol-ops FixedForceDeploymentsData must follow the canonical Solidity fields"
+        );
+
+        let expected = SolidityFixedForceDeploymentsData {
+            l1ChainId: U256::from(1),
+            eraChainId: U256::from(2),
+            l1AssetRouter: Address::from([3; 20]),
+            l2TokenProxyBytecodeHash: FixedBytes::from([4; 32]),
+            aliasedL1Governance: Address::from([5; 20]),
+            maxNumberOfZKChains: U256::from(6),
+            bridgehubBytecodeInfo: Bytes::from(vec![7]),
+            l2AssetRouterBytecodeInfo: Bytes::from(vec![8]),
+            l2NtvBytecodeInfo: Bytes::from(vec![9]),
+            messageRootBytecodeInfo: Bytes::from(vec![10]),
+            chainAssetHandlerBytecodeInfo: Bytes::from(vec![11]),
+            interopCenterBytecodeInfo: Bytes::from(vec![12]),
+            interopHandlerBytecodeInfo: Bytes::from(vec![13]),
+            beaconDeployerInfo: Bytes::from(vec![14]),
+            baseTokenHolderBytecodeInfo: Bytes::from(vec![15]),
+            l2SharedBridgeLegacyImpl: Address::from([16; 20]),
+            l2BridgedStandardERC20Impl: Address::from([17; 20]),
+            aliasedChainRegistrationSender: Address::from([18; 20]),
+            dangerousTestOnlyForcedBeacon: Address::from([19; 20]),
+            zkTokenAssetId: FixedBytes::from([20; 32]),
+        };
+
+        let encoded = expected.abi_encode();
+        let actual = FixedForceDeploymentsData::abi_decode(&encoded)
+            .expect("the protocol-ops mirror must decode the Solidity layout");
+
+        macro_rules! assert_fields {
+            ($actual:ident, $expected:ident; $($field:ident),+ $(,)?) => {
+                $(assert_eq!(
+                    $actual.$field,
+                    $expected.$field,
+                    concat!(stringify!($field), " ABI position drifted")
+                );)+
+            };
+        }
+        assert_fields!(actual, expected;
+            l1ChainId,
+            eraChainId,
+            l1AssetRouter,
+            l2TokenProxyBytecodeHash,
+            aliasedL1Governance,
+            maxNumberOfZKChains,
+            bridgehubBytecodeInfo,
+            l2AssetRouterBytecodeInfo,
+            l2NtvBytecodeInfo,
+            messageRootBytecodeInfo,
+            chainAssetHandlerBytecodeInfo,
+            interopCenterBytecodeInfo,
+            interopHandlerBytecodeInfo,
+            beaconDeployerInfo,
+            baseTokenHolderBytecodeInfo,
+            l2SharedBridgeLegacyImpl,
+            l2BridgedStandardERC20Impl,
+            aliasedChainRegistrationSender,
+            dangerousTestOnlyForcedBeacon,
+            zkTokenAssetId,
+        );
     }
 }

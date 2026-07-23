@@ -114,7 +114,7 @@ uint256 constant L1_TX_CALLDATA_FLOOR_PRICE_L2_GAS_ZKSYNC_OS = 40;
 uint256 constant MAX_NATIVE_COMPUTATIONAL_ZKSYNC_OS = 1 << 35;
 
 /// @dev The intrinsic cost of the L1->l2 transaction in pubdata for ZKsync OS
-/// It includes tx log, coinbase, treasury, refund recipient and asset tracker pubdata.
+/// It includes tx log, coinbase, treasury, refund recipient and base-token bookkeeping pubdata.
 uint256 constant L1_TX_INTRINSIC_PUBDATA_ZKSYNC_OS = 351;
 
 /// @dev The native per gas ratio for l1 -> l2 txs, including upgrade/service/gateway transactions in ZKsync OS.

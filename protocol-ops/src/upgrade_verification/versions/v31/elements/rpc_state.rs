@@ -124,8 +124,8 @@ fn expect_fee_params_eq(result: &mut VerificationResult, actual: &FeeParams, exp
 /// - Runtime bytecode at the ecosystem `transparent_proxy_admin` address.
 /// - EIP-1967 proxy-admin slot for every v31 stage-1 proxy → must equal the
 ///   ecosystem `transparent_proxy_admin`.
-/// - Pre-upgrade core wiring: AssetRouter owner / legacy bridge / NTV,
-///   AssetTracker pending owner and Bridgehub / ChainAssetHandler wiring.
+/// - Pre-upgrade core wiring: AssetRouter owner / legacy bridge / NTV and
+///   Bridgehub / ChainAssetHandler wiring.
 /// - ValidatorTimelock owner and execution delay.
 /// - Era fee params and priority-tx max gas limit.
 ///

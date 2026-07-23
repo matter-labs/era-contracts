@@ -31,6 +31,8 @@ error AssetHandlerNotRegistered(bytes32 assetId);
 error AssetIdAlreadyRegistered();
 // 0x1294e9e1
 error AssetIdMismatch(bytes32 expected, bytes32 supplied);
+// 0xda72d995
+error AssetIdNotRegistered(bytes32 assetId);
 // 0x04a0b7e9
 error AssetIdNotSupported(bytes32 assetId);
 // 0x11832de8
@@ -39,6 +41,10 @@ error AssetRouterAllowanceNotZero();
 error BadTransferDataLength();
 // 0x6ef9a972
 error BaseTokenGasPriceDenominatorNotSet();
+// 0x829ccba4
+error BaseTokenBookkeepingAlreadyInitialized();
+// 0x22cc933f
+error BaseTokenBookkeepingNotInitialized();
 // 0x764c57db
 error BaseTokenHolderAlreadyInitialized();
 // 0xd3cd4bd2
@@ -47,6 +53,8 @@ error BaseTokenHolderMintFailed();
 error BaseTokenPreV31TotalSupplyAlreadySet();
 // 0x00a6b592
 error BaseTokenPreV31TotalSupplyNotSet();
+// 0xca9bc458
+error BaseTokenTotalSupplyBackfillNotNeeded();
 // 0xe3ec2bc9
 error BaseTokenTransferFailed();
 // 0x55ad3fd3
@@ -172,6 +180,8 @@ error IncorrectBatchChainId(uint256, uint256);
 error IncorrectBridgeHubAddress(address bridgehub);
 // 0x1929b7de
 error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
+// 0x07859b3b
+error InsufficientChainBalance(uint256 chainId, bytes32 assetId, uint256 amount);
 // 0x03eb8b54
 error InsufficientFunds(uint256 required, uint256 actual);
 // 0x9bf8b9aa
@@ -180,6 +190,8 @@ error InvalidBatchNumber(uint256 provided, uint256 expected);
 error InvalidBlockRange(uint64 batchNumber, uint64 from, uint64 to);
 // 0xcbd9d2e0
 error InvalidCaller(address);
+// 0xeaa867a8
+error InvalidL1AssetRouter(address l1AssetRouter);
 // 0x7a47c9a2
 error InvalidChainId();
 // 0x92daded2
@@ -236,6 +248,8 @@ error IMTNotInitialized();
 error IMTValueAlreadyExists(uint256 value);
 // 0xbd1de53d
 error IMTValueZero();
+// 0xf63665c1
+error L1ChainIdNotSet();
 // 0xfb5c22e6
 error L2TimestampTooBig();
 // 0x97e1359e

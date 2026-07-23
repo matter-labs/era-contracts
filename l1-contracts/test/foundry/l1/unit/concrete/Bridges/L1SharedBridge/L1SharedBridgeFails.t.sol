@@ -47,7 +47,7 @@ import {
     WithdrawalAlreadyFinalized,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
-import {InsufficientChainBalance} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {InsufficientChainBalance} from "contracts/common/L1ContractErrors.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {
@@ -147,6 +147,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     error EthAlreadyMigratedToL1NTV();
+
     function test_transferFundsToSharedBridge_Eth_CallFailed() public {
         bytes memory emptyData = "";
         vm.mockCallRevert(address(nativeTokenVault), emptyData, "eth transfer failed");

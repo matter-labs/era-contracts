@@ -18,7 +18,6 @@ import {
 import {UnknownCoreContract, UnknownZkSyncOsSystemContract, UnknownEraVmSystemContract} from "./DeployScriptErrors.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
-    L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
@@ -201,7 +200,9 @@ library CoreOnGatewayHelper {
     /// @notice Resolve a CoreContract enum to its contract name for the active VM.
     function _resolveContractName(bool _isZKsyncOS, CoreContract _c) internal pure returns (string memory) {
         // Contracts with different names per VM
-        if (_c == CoreContract.L2NativeTokenVault) return _isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault";
+        if (_c == CoreContract.L2NativeTokenVault) {
+            return _isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault";
+        }
 
         // Contracts with the same name across both VMs
         if (_c == CoreContract.L2Bridgehub) return "L2Bridgehub";
@@ -212,7 +213,6 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.L2ChainAssetHandler) return "L2ChainAssetHandler";
         if (_c == CoreContract.InteropCenter) return "InteropCenter";
         if (_c == CoreContract.InteropHandler) return "InteropHandler";
-        if (_c == CoreContract.L2AssetTracker) return "L2AssetTracker";
         if (_c == CoreContract.L2WrappedBaseToken) return "L2WrappedBaseToken";
         if (_c == CoreContract.L2MessageVerification) return "L2MessageVerification";
         if (_c == CoreContract.L2InteropRootStorage) return "L2InteropRootStorage";
@@ -242,7 +242,6 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.L2ChainAssetHandler) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.L2InteropRootStorage) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.BaseTokenHolder) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2AssetTracker) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.InteropCenter) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.InteropHandler) return ZKsyncOSUpgradeType.SystemProxy;
         revert UnknownCoreContract();
@@ -263,7 +262,6 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.L2ChainAssetHandler) return L2_CHAIN_ASSET_HANDLER_ADDR;
         if (_c == CoreContract.L2InteropRootStorage) return address(L2_INTEROP_ROOT_STORAGE);
         if (_c == CoreContract.BaseTokenHolder) return L2_BASE_TOKEN_HOLDER_ADDR;
-        if (_c == CoreContract.L2AssetTracker) return L2_ASSET_TRACKER_ADDR;
         if (_c == CoreContract.InteropCenter) return L2_INTEROP_CENTER_ADDR;
         if (_c == CoreContract.InteropHandler) return L2_INTEROP_HANDLER_ADDR;
         if (_c == CoreContract.UpgradeableBeaconDeployer) return L2_NTV_BEACON_DEPLOYER_ADDR;

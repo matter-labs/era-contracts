@@ -38,7 +38,6 @@ const ARTIFACTS = {
   L1NativeTokenVault: "L1NativeTokenVault.sol/L1NativeTokenVault.json",
   L1Nullifier: "L1Nullifier.sol/L1Nullifier.json",
   L2AssetRouter: "L2AssetRouter.sol/L2AssetRouter.json",
-  L2AssetTracker: "L2AssetTracker.sol/L2AssetTracker.json",
   L2BaseTokenEra: "L2BaseTokenEra.sol/L2BaseTokenEra.json",
   L2BaseTokenZKOS: "L2BaseTokenZKOS.sol/L2BaseTokenZKOS.json",
   ZKOSContractDeployer: "ZKOSContractDeployer.sol/ZKOSContractDeployer.json",

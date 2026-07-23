@@ -861,17 +861,17 @@
     "name": "InsufficientChainBalance",
     "inputs": [
       {
-        "name": "_chainId",
+        "name": "chainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "_assetId",
+        "name": "assetId",
         "type": "bytes32",
         "internalType": "bytes32"
       },
       {
-        "name": "_amount",
+        "name": "amount",
         "type": "uint256",
         "internalType": "uint256"
       }

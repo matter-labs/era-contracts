@@ -7,7 +7,7 @@
 
 pragma solidity 0.8.28;
 
-import {InvalidL1AssetRouter} from "./AssetTrackerErrors.sol";
+import {InvalidL1AssetRouter} from "../../common/L1ContractErrors.sol";
 
 /// @dev Associates a ZK chain ID with its legacy L2 shared bridge address.
 /// @dev Chains that deployed an L2SharedBridge before the V26 upgrade are recorded here so

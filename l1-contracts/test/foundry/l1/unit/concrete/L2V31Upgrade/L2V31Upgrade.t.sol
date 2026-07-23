@@ -2,10 +2,10 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {SavedTotalSupply} from "contracts/common/L2AssetBookkeeping.sol";
 
 import {
     L2_ASSET_ROUTER_ADDR,
-    L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BRIDGEHUB_ADDR,
@@ -80,13 +80,10 @@ contract MockV31UpgradeNativeTokenVault {
         return address(0);
     }
 
-    function registerBaseTokenIfNeeded() external {
-        // No-op for mock
-    }
-
     function updateL2(
         uint256 _l1ChainId,
-        address /* _aliasedOwner */,
+        address,
+        /* _aliasedOwner */
         bytes32 _l2TokenProxyBytecodeHash,
         address _legacySharedBridge,
         address _wethToken,
@@ -113,46 +110,14 @@ contract MockV31UpgradeNativeTokenVault {
     }
 }
 
-/// @dev Mock AssetTracker that records initL2 and registerBaseTokenDuringUpgrade calls.
-contract MockV31UpgradeAssetTracker {
-    uint256 public L1_CHAIN_ID;
-    bytes32 public BASE_TOKEN_ASSET_ID;
-
-    uint256 public registerCalls;
-    bytes32 public lastRegisteredAssetId;
-    uint256 public initCalls;
-
-    function initL2(uint256 _l1ChainId, bytes32 _baseTokenAssetId, bool /* _backfillBaseTokenSupply */) external {
-        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
-
-        L1_CHAIN_ID = _l1ChainId;
-        BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
-        initCalls++;
-    }
-
-    function registerBaseTokenDuringUpgrade() external {
-        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
-
-        registerCalls++;
-        lastRegisteredAssetId = BASE_TOKEN_ASSET_ID;
-    }
-}
-
-/// @dev Mock BaseToken that records initL2 calls and checks ordering vs AssetTracker.
+/// @dev Mock BaseToken that records initL2 and backfill-initialization calls.
 contract MockV31UpgradeBaseToken {
-    address private immutable _assetTracker;
+    uint256 internal constant PRE_UPGRADE_TOTAL_SUPPLY = 123 ether;
 
     uint256 public initCalls;
     uint256 public lastInitializedL1ChainId;
-    bool public sawRegisteredBaseToken;
-
-    constructor(address _assetTrackerAddr) {
-        _assetTracker = _assetTrackerAddr;
-    }
+    uint256 public initializeBackfillCalls;
+    bool public lastNeedsBackfill;
 
     function initL2(uint256 _l1ChainId) external {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -161,7 +126,37 @@ contract MockV31UpgradeBaseToken {
 
         initCalls++;
         lastInitializedL1ChainId = _l1ChainId;
-        sawRegisteredBaseToken = MockV31UpgradeAssetTracker(_assetTracker).registerCalls() > 0;
+    }
+
+    function initializeTotalSupplyBackfill(bool _needsBackfill) external {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+
+        initializeBackfillCalls++;
+        lastNeedsBackfill = _needsBackfill;
+    }
+
+    function totalSupply() external pure returns (uint256) {
+        return PRE_UPGRADE_TOTAL_SUPPLY;
+    }
+}
+
+contract MockV31UpgradeBaseTokenHolder {
+    uint256 public initializeCalls;
+    bool public snapshotIsSaved;
+    uint256 public snapshotAmount;
+    bool public needsBackfill;
+
+    function initializeBookkeeping(SavedTotalSupply calldata _snapshot, bool _needsBackfill) external {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+
+        initializeCalls++;
+        snapshotIsSaved = _snapshot.isSaved;
+        snapshotAmount = _snapshot.amount;
+        needsBackfill = _needsBackfill;
     }
 }
 
@@ -234,8 +229,8 @@ contract L2V31UpgradeUnitTest is Test {
                 )
             )
         );
-        _etchCode(L2_ASSET_TRACKER_ADDR, address(new MockV31UpgradeAssetTracker()));
-        _etchCode(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(new MockV31UpgradeBaseToken(L2_ASSET_TRACKER_ADDR)));
+        _etchCode(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(new MockV31UpgradeBaseToken()));
+        _etchCode(L2_BASE_TOKEN_HOLDER_ADDR, address(new MockV31UpgradeBaseTokenHolder()));
 
         testUpgrade = new TestL2V31Upgrade();
     }
@@ -250,24 +245,45 @@ contract L2V31UpgradeUnitTest is Test {
             abi.encodeCall(IL2V31Upgrade.upgrade, (false, CTM_DEPLOYER, fixedData, additionalData))
         );
 
-        // Verify AssetTracker: initL2 + registerBaseTokenDuringUpgrade
-        MockV31UpgradeAssetTracker assetTracker = MockV31UpgradeAssetTracker(L2_ASSET_TRACKER_ADDR);
-        assertEq(assetTracker.initCalls(), 1, "asset tracker should be initialized exactly once");
-        assertEq(assetTracker.L1_CHAIN_ID(), L1_CHAIN_ID, "asset tracker L1 chain id mismatch");
-        assertEq(assetTracker.registerCalls(), 1, "base token should be registered exactly once");
-        assertEq(assetTracker.lastRegisteredAssetId(), BASE_TOKEN_ASSET_ID, "registered asset id mismatch");
-
         // Verify NTV: updateL2 called with correct data
         MockV31UpgradeNativeTokenVault nativeTokenVault = MockV31UpgradeNativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
         assertEq(nativeTokenVault.updateCalls(), 1, "native token vault should be updated exactly once");
         assertEq(nativeTokenVault.lastOriginChainId(), BASE_TOKEN_ORIGIN_CHAIN_ID, "origin chain id mismatch");
         assertEq(nativeTokenVault.BASE_TOKEN_ORIGIN_TOKEN(), BASE_TOKEN_ORIGIN_ADDRESS, "origin token mismatch");
 
-        // Verify BaseToken: initL2 called, and it ran AFTER registerBaseTokenDuringUpgrade
+        // Verify BaseToken: initL2 called; the ZKOS-only supply backfill is never enabled on Era.
         MockV31UpgradeBaseToken baseToken = MockV31UpgradeBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
         assertEq(baseToken.initCalls(), 1, "base token should be initialized exactly once");
         assertEq(baseToken.lastInitializedL1ChainId(), L1_CHAIN_ID, "base token L1 chain id mismatch");
-        assertTrue(baseToken.sawRegisteredBaseToken(), "base token should be initialized after registration");
+        assertEq(baseToken.initializeBackfillCalls(), 0, "the supply backfill must not be enabled on Era chains");
+
+        MockV31UpgradeBaseTokenHolder holder = MockV31UpgradeBaseTokenHolder(L2_BASE_TOKEN_HOLDER_ADDR);
+        assertEq(holder.initializeCalls(), 1, "holder bookkeeping should be initialized once");
+        assertTrue(holder.snapshotIsSaved(), "Era pre-upgrade supply snapshot should be saved");
+        assertEq(holder.snapshotAmount(), 123 ether, "Era pre-upgrade supply snapshot mismatch");
+        assertFalse(holder.needsBackfill(), "Era supply does not need a governance backfill");
+    }
+
+    function test_UpgradeViaComplexUpgrader_ZKOSInitializesPendingSupplyBackfill() public {
+        bytes memory fixedData = abi.encode(_buildFixedForceDeploymentsData());
+        bytes memory additionalData = abi.encode(_buildZKChainSpecificData());
+
+        vm.prank(L2_FORCE_DEPLOYER_ADDR);
+        L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(
+            address(testUpgrade),
+            abi.encodeCall(IL2V31Upgrade.upgrade, (true, CTM_DEPLOYER, fixedData, additionalData))
+        );
+
+        MockV31UpgradeBaseToken baseToken = MockV31UpgradeBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        assertEq(baseToken.initCalls(), 1, "base token should be initialized exactly once");
+        assertEq(baseToken.initializeBackfillCalls(), 1, "ZKOS backfill state should be initialized once");
+        assertTrue(baseToken.lastNeedsBackfill(), "an upgraded ZKOS chain needs the pre-v31 supply backfill");
+
+        MockV31UpgradeBaseTokenHolder holder = MockV31UpgradeBaseTokenHolder(L2_BASE_TOKEN_HOLDER_ADDR);
+        assertEq(holder.initializeCalls(), 1, "holder bookkeeping should be initialized once");
+        assertTrue(holder.snapshotIsSaved(), "the provisional ZKOS snapshot should be marked as saved");
+        assertEq(holder.snapshotAmount(), 0, "the ZKOS snapshot stays zero until the service transaction");
+        assertTrue(holder.needsBackfill(), "holder bookkeeping should wait for the same supply backfill");
     }
 
     function _buildFixedForceDeploymentsData() private pure returns (FixedForceDeploymentsData memory) {
@@ -288,7 +304,6 @@ contract L2V31UpgradeUnitTest is Test {
                 chainAssetHandlerBytecodeInfo: dummyBytecodeInfo,
                 interopCenterBytecodeInfo: dummyBytecodeInfo,
                 interopHandlerBytecodeInfo: dummyBytecodeInfo,
-                assetTrackerBytecodeInfo: dummyBytecodeInfo,
                 beaconDeployerInfo: dummyBytecodeInfo,
                 baseTokenHolderBytecodeInfo: dummyBytecodeInfo,
                 l2SharedBridgeLegacyImpl: address(0),

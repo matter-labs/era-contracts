@@ -2,6 +2,8 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
+import {SavedTotalSupply} from "../../common/L2AssetBookkeeping.sol";
+
 /// @title IBaseTokenHolder
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -32,9 +34,9 @@ interface IBaseTokenHolder {
     event BaseTokenMintedInterop(address indexed to, uint256 amount);
 
     /// @notice Emitted when base tokens are received and outbound bridging is initiated.
-    /// @dev This event is only emitted for outbound bridging through BaseTokenHolder.burnAndStartBridging().
-    /// @dev On Era, L1 withdrawals go through L2BaseTokenEra which does NOT route back through this contract.
-    /// @dev Therefore, the sum of BaseTokenBurntInterop amounts may not equal the total outbound base token volume.
+    /// @dev Emitted for every outbound base-token bridge operation on both Era and ZKsync OS:
+    /// withdrawals initiated through L2BaseToken and cross-chain sends initiated through
+    /// InteropCenter or NativeTokenVault all converge in `burnAndStartBridging`.
     /// @param from The address that sent the base tokens.
     /// @param toChainId The destination chain ID for the bridging operation.
     /// @param amount The amount of base tokens burnt.
@@ -46,8 +48,32 @@ interface IBaseTokenHolder {
     /// @param _fromChainId The source chain ID of the bridging operation.
     function give(address _to, uint256 _amount, uint256 _fromChainId) external;
 
-    /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.
-    /// @dev Called by InteropHandler, InteropCenter, NativeTokenVault, and L2BaseToken during bridging operations.
+    /// @notice Receives base tokens and initiates bridging.
+    /// @dev Called by InteropCenter, NativeTokenVault, and L2BaseToken during bridging operations.
     /// @param _toChainId The chain ID which the funds are sent to.
     function burnAndStartBridging(uint256 _toChainId) external payable;
+
+    /// @notice Records an inbound base-token bridge finalized outside this contract.
+    /// @dev Callable only by L2BaseToken; used by the Era bootloader deposit path.
+    function recordBaseTokenDeposit(uint256 _fromChainId, uint256 _amount) external;
+
+    /// @notice Initializes the pre-bookkeeping base-token supply snapshot.
+    /// @dev Callable once by ComplexUpgrader during genesis or the upgrade.
+    function initializeBookkeeping(SavedTotalSupply calldata _preTrackingTotalSupply, bool _needsBackfill) external;
+
+    /// @notice Replaces the provisional zero snapshot after a ZKsync OS pre-v31 supply backfill.
+    /// @dev Callable only by L2BaseToken.
+    function backfillBaseTokenPreTrackingTotalSupply(uint256 _amount) external;
+
+    /// @notice L2-side accounting of base-token L1 <-> L2 flows while this chain settles on L1.
+    function baseTokenInteropInfo()
+        external
+        view
+        returns (uint256 totalWithdrawalsToL1, uint256 totalSuccessfulDepositsFromL1);
+
+    /// @notice Supply captured before the first bridge operation tracked by BaseTokenHolder.
+    function baseTokenPreTrackingTotalSupply() external view returns (bool isSaved, uint256 amount);
+
+    /// @notice Whether the provisional ZKsync OS snapshot still needs its governance backfill.
+    function baseTokenPreTrackingTotalSupplyBackfillPending() external view returns (bool);
 }

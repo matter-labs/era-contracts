@@ -3,8 +3,8 @@
 pragma solidity 0.8.28;
 
 import {
-    L2_ASSET_TRACKER_ADDR,
     L2_ASSET_ROUTER_ADDR,
+    L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
@@ -18,6 +18,9 @@ import {
     L2_INTEROP_CENTER_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2BaseTokenBase} from "../l2-system/interfaces/IL2BaseTokenBase.sol";
+import {IL2BaseTokenZKOS} from "../l2-system/zksync-os/interfaces/IL2BaseTokenZKOS.sol";
+import {IBaseTokenHolder} from "../l2-system/interfaces/IBaseTokenHolder.sol";
+import {SavedTotalSupply} from "../common/L2AssetBookkeeping.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {
     FixedForceDeploymentsData,
@@ -34,8 +37,6 @@ import {L2NativeTokenVault} from "../bridge/ntv/L2NativeTokenVault.sol";
 import {L2MessageRoot} from "../core/message-root/L2MessageRoot.sol";
 import {L2Bridgehub} from "../core/bridgehub/L2Bridgehub.sol";
 import {L2AssetRouter} from "../bridge/asset-router/L2AssetRouter.sol";
-import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
-import {L2AssetTracker} from "../bridge/asset-tracker/L2AssetTracker.sol";
 import {L2ChainAssetHandler} from "../core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {InteropHandler} from "../interop/InteropHandler.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
@@ -248,12 +249,7 @@ library L2GenesisForceDeploymentsHelper {
         }
         _finalizeDeployments(_ctmDeployer, fixedForceDeploymentsData);
 
-        _initializeV31Contracts(
-            _isZKsyncOS,
-            _isGenesisUpgrade,
-            fixedForceDeploymentsData,
-            additionalForceDeploymentsData
-        );
+        _initializeV31Contracts(_isZKsyncOS, _isGenesisUpgrade, fixedForceDeploymentsData);
 
         emit ForceDeployedContractsInitialized(_isZKsyncOS, _isGenesisUpgrade);
     }
@@ -382,48 +378,14 @@ library L2GenesisForceDeploymentsHelper {
         });
     }
 
-    /// @notice Initializes contracts introduced in v31 using ABI-encoded deployment data.
-    function initializeV31Contracts(
-        bool _isZKsyncOS,
-        bool _isGenesisUpgrade,
-        bytes memory _fixedForceDeploymentsData,
-        bytes memory _additionalForceDeploymentsData
-    ) internal {
-        FixedForceDeploymentsData memory fixedForceDeploymentsData = abi.decode(
-            _fixedForceDeploymentsData,
-            (FixedForceDeploymentsData)
-        );
-        ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData = abi.decode(
-            _additionalForceDeploymentsData,
-            (ZKChainSpecificForceDeploymentsData)
-        );
-
-        _initializeV31Contracts(
-            _isZKsyncOS,
-            _isGenesisUpgrade,
-            fixedForceDeploymentsData,
-            additionalForceDeploymentsData
-        );
-    }
-
-    /// @notice Initializes contracts introduced in v31: L2AssetTracker,
-    /// InteropHandler, L2BaseToken, and base token registration.
+    /// @notice Initializes the v31 interop contracts, base token, and its local bookkeeping.
     /// @dev Called after `_finalizeDeployments` as part of `performForceDeployedContractsInit()`.
     /// Keeping this in the library ensures a single source of truth for v31-specific initialization.
     function _initializeV31Contracts(
         bool _isZKsyncOS,
         bool _isGenesisUpgrade,
-        FixedForceDeploymentsData memory _fixedForceDeploymentsData,
-        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData
+        FixedForceDeploymentsData memory _fixedForceDeploymentsData
     ) private {
-        L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(
-            _fixedForceDeploymentsData.l1ChainId,
-            _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
-            // The only chains that need backfill for the base token's total supply are ZKsync OS
-            // chains that existed before the v31 upgrade (i.e. isGenesis is false).
-            _isZKsyncOS && !_isGenesisUpgrade
-        );
-
         InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
 
         InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
@@ -432,19 +394,30 @@ library L2GenesisForceDeploymentsHelper {
             _fixedForceDeploymentsData.zkTokenAssetId
         );
 
-        // Register the base token in the AssetTracker.
-        // During genesis, NTV.registerBaseTokenIfNeeded() handles it.
-        // During upgrades, AssetTracker.registerBaseTokenDuringUpgrade() handles it.
-        if (_isGenesisUpgrade) {
-            L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
-        } else {
-            IL2AssetTracker(L2_ASSET_TRACKER_ADDR).registerBaseTokenDuringUpgrade();
+        // Move the ZKsync OS backfill guard into L2BaseToken before the retired tracker disappears.
+        // Fresh chains have no pre-v31 history; an upgraded chain stays unreadable until governance
+        // supplies its pre-v31 total supply.
+        if (_isZKsyncOS) {
+            IL2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initializeTotalSupplyBackfill(!_isGenesisUpgrade);
         }
 
         // Initialize L2BaseToken: sets L1_CHAIN_ID and initializes the BaseTokenHolder balance.
         // For Era: initializes holder balance, with __DEPRECATED_totalSupply kept in totalSupply().
         // For ZKOS: mints via MINT_BASE_TOKEN_HOOK and transfers to holder.
-        IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
+        IL2BaseTokenBase l2BaseToken = IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        l2BaseToken.initL2(_fixedForceDeploymentsData.l1ChainId);
+
+        // Existing Era chains can expose their exact pre-bookkeeping supply after initL2 establishes
+        // the holder-balance invariant. ZKsync OS chains need the existing service-transaction
+        // backfill and therefore begin with a provisional zero; fresh chains also begin at zero.
+        uint256 preTrackingTotalSupply;
+        if (!_isGenesisUpgrade && !_isZKsyncOS) {
+            preTrackingTotalSupply = l2BaseToken.totalSupply();
+        }
+        IBaseTokenHolder(payable(L2_BASE_TOKEN_HOLDER_ADDR)).initializeBookkeeping(
+            SavedTotalSupply({isSaved: true, amount: preTrackingTotalSupply}),
+            _isZKsyncOS && !_isGenesisUpgrade
+        );
     }
 
     /// @notice Returns the address of the legacy shared bridge from the L2 Asset Router.

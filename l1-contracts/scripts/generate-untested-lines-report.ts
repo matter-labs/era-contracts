@@ -81,7 +81,6 @@ function generateReport(parsed: ParsedLcov, outputPath: string): void {
       // Exclude L2-only contracts (cannot be tested with L1 foundry tests)
       !f.path.includes("L2NativeTokenVault") &&
       !f.path.includes("L2AssetRouter") &&
-      !f.path.includes("L2AssetTracker") &&
       !f.path.includes("L2Bridgehub") &&
       !f.path.includes("L2SharedBridgeLegacy") &&
       !f.path.includes("L2ChainAssetHandler") &&

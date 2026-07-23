@@ -492,7 +492,7 @@ The raw bytes can be decoded with:
 
 ```bash
 cast decode-abi \
-  "f()((uint256,uint256,uint256,address,bytes32,address,uint256,bytes,bytes,bytes,bytes,bytes,bytes,bytes,bytes,bytes,bytes,address,address,address,address,bytes32))" \
+  "f()((uint256,uint256,address,bytes32,address,uint256,bytes,bytes,bytes,bytes,bytes,bytes,bytes,bytes,bytes,address,address,address,address,bytes32))" \
   <force_deployments_data_hex>
 ```
 
@@ -501,7 +501,6 @@ Verify each field:
 - `l1ChainId` equals RPC chain ID;
 - `eraChainId` equals the matrix Era chain ID, even when the reviewed CTM
   flavor is ZKsync OS;
-- `gatewayChainId` is recorded and matches the intended Gateway topology;
 - `l1AssetRouter` equals `l1_asset_router_proxy`;
 - `l2TokenProxyBytecodeHash` maps to `l1-contracts/BeaconProxy`;
 - `aliasedL1Governance` equals the L1-to-L2 alias of the actual governance
@@ -527,7 +526,6 @@ Expected `*BytecodeInfo` mappings:
 | `chainAssetHandlerBytecodeInfo` | `l1-contracts/L2ChainAssetHandler`                                                             |
 | `interopCenterBytecodeInfo`     | `l1-contracts/InteropCenter`                                                                   |
 | `interopHandlerBytecodeInfo`    | `l1-contracts/InteropHandler`                                                                  |
-| `assetTrackerBytecodeInfo`      | `l1-contracts/L2AssetTracker`                                                                  |
 | `beaconDeployerInfo`            | `l1-contracts/UpgradeableBeaconDeployer`                                                       |
 | `baseTokenHolderBytecodeInfo`   | `l1-contracts/BaseTokenHolder`                                                                 |
 

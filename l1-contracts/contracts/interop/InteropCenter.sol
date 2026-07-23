@@ -376,7 +376,7 @@ contract InteropCenter is
             if (_totalBurnedCallsValue > 0) {
                 // TODO(EVM-1395): unify same-base-token interop funding with the L2AssetRouter/L2NTV path
                 // so InteropCenter does not need a dedicated BaseTokenHolder branch here.
-                // Send tokens to BaseTokenHolder and notify L2AssetTracker via burnAndStartBridging
+                // Send tokens to BaseTokenHolder and record the bridge flow via burnAndStartBridging.
                 L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: _totalBurnedCallsValue}(_destinationChainId);
             }
         } else {
