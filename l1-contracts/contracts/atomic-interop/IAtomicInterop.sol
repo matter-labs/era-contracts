@@ -69,6 +69,7 @@ struct ImtProof {
 /// can never be committed under a `flowId` that does not actually contain it — a wrong or stale
 /// preimage (e.g. an off-chain `bundleHash` prediction invalidated by an upgrade between preview and
 /// send) reverts the send instead of stranding the burned funds in an unfinalizable, unrefundable leg.
+/// @param version Preimage format version (see {ATOMIC_FLOW_PREIMAGE_VERSION}).
 /// @param deadline The flow deadline (a settlement-layer timestamp).
 /// @param settlementLayerChainId The single settlement layer every leg must settle on; committed in
 /// `flowId` and asserted equal to each proof's resolved `slChainId`.
@@ -78,6 +79,7 @@ struct ImtProof {
 /// interop chain — a chain with no MessageRoot presence could never prove its leg committed or absent,
 /// which would strand the whole flow, so `append` rejects it at send time.
 struct AtomicFlowPreimage {
+    bytes1 version;
     uint64 deadline;
     uint256 settlementLayerChainId;
     bytes32[] legBundleHashes;
@@ -109,3 +111,12 @@ struct AtomicFinalityProof {
 /// other hashes.
 /// `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
 bytes4 constant ATOMIC_COMMIT_LEAF_TAG = bytes4(keccak256("AtomicInterop.commit.v1"));
+
+/// @dev The current {AtomicFlowPreimage.version} (same versioning convention as {INTEROP_BUNDLE_VERSION}
+/// / {INTEROP_CALL_VERSION}), and today the only accepted one. A new value is introduced whenever the
+/// {AtomicFlowPreimage} field set or its canonicalization changes; each version is validated under its
+/// own rules, so a preimage of one version can never be accepted — or hash to the same `flowId` — under
+/// the rules of another. Introducing a new version does not retire the old one: the {AtomicFlowManager}
+/// accepts both on every path (append/finalize/refund) so in-flight prior-version flows stay finalizable
+/// and refundable.
+bytes1 constant ATOMIC_FLOW_PREIMAGE_VERSION = 0x01;

@@ -12,7 +12,13 @@ import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
-import {AtomicFlow, AtomicFlowPreimage, ImtProof, LegState} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {
+    AtomicFlow,
+    AtomicFlowPreimage,
+    ImtProof,
+    LegState,
+    ATOMIC_FLOW_PREIMAGE_VERSION
+} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
     ManagerCommittedBundleNotInFlow,
     ManagerLegNotRevertable
@@ -201,6 +207,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     function _preimageWithInvalidRemoteLeg(
         bytes32 _localLeg
     ) internal view returns (AtomicFlowPreimage memory preimage, uint256 missingLegIndex) {
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = L1_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](2);
@@ -412,6 +419,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         // A well-formed preimage that simply does not contain the bundle being sent (e.g. a stale
         // prediction): its single leg is the invalid hash, declared on this chain.
         AtomicFlowPreimage memory preimage;
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = L1_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](1);

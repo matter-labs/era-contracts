@@ -10,7 +10,8 @@
  *   - `bundleHash = keccak256(abi.encode(sourceChainId, abi.encode(InteropBundle)))`. The atomic send
  *     params (the full flowId preimage + lowNullifierIndex) travel via the `atomicBundle` attribute, not
  *     the InteropBundle, so `bundleHash` does not depend on the preimage.
- *   - `flowId = keccak256(abi.encode(preimage))`,
+ *   - `flowId = keccak256(abi.encode(preimage))` (`preimage.version` must be a manager-supported version,
+ *     currently ATOMIC_FLOW_PREIMAGE_VERSION),
  *     bundle hashes strictly ascending with source chain ids positionally aligned. Since `bundleHash` is
  *     independent of the preimage, each leg's `bundleHash` (and thus the preimage) is computable off-chain
  *     before the send; on-chain the AtomicFlowManager recomputes `flowId` from the attribute-supplied
@@ -56,6 +57,10 @@ export const MAX_LOW_INDEX_SEARCH_ATTEMPTS = 5;
 export const ATOMIC_COMMIT_LEAF_TAG: string = utils
   .keccak256(utils.toUtf8Bytes("AtomicInterop.commit.v1"))
   .slice(0, 10);
+
+/** The current AtomicFlowPreimage.version — mirrors ATOMIC_FLOW_PREIMAGE_VERSION in IAtomicInterop.sol (the
+ *  only version accepted today; a bump adds the new version alongside the old on all manager paths). */
+export const ATOMIC_FLOW_PREIMAGE_VERSION = "0x01";
 
 /** Indexed-tree leaf, fields as uint256 decimal strings, in the on-chain field order. */
 export interface IMTLeaf {
@@ -105,10 +110,13 @@ export function indexedLeafHash(leaf: IMTLeaf): string {
 
 /**
  * The full `flowId` preimage (mirrors the Solidity `AtomicFlowPreimage` struct — the field set embedded
- * in `AtomicFlow` and carried by the `atomicBundle` attribute). `legBundleHashes` must be strictly
- * ascending with `legSourceChainIds` positionally aligned; `deadline` is a settlement-layer timestamp.
+ * in `AtomicFlow` and carried by the `atomicBundle` attribute). `version` must be a manager-supported
+ * version (currently ATOMIC_FLOW_PREIMAGE_VERSION; the InteropBundle/InteropCall versioning convention);
+ * `legBundleHashes` must be strictly ascending with `legSourceChainIds` positionally aligned; `deadline`
+ * is a settlement-layer timestamp.
  */
 export interface AtomicFlowPreimage {
+  version: string;
   deadline: number;
   settlementLayerChainId: BigNumber | number | string;
   legBundleHashes: string[];
@@ -116,19 +124,20 @@ export interface AtomicFlowPreimage {
 }
 
 /** The Solidity tuple type of `AtomicFlowPreimage`, in struct field order. */
-const FLOW_PREIMAGE_TUPLE_TYPE = "tuple(uint64,uint256,bytes32[],uint256[])";
+const FLOW_PREIMAGE_TUPLE_TYPE = "tuple(bytes1,uint64,uint256,bytes32[],uint256[])";
 
 /**
  * flowId = keccak256(abi.encode(preimage)) — the ABI encoding of the whole `AtomicFlowPreimage`
- * struct, matching {AtomicFlowManager._validateAndComputeFlowId}.
+ * struct (version first), matching {AtomicFlowManager._validateAndComputeFlowId}.
  */
 export function computeFlowId(preimage: AtomicFlowPreimage): string {
   return utils.keccak256(utils.defaultAbiCoder.encode([FLOW_PREIMAGE_TUPLE_TYPE], [flowPreimageTuple(preimage)]));
 }
 
-/** Encode an {AtomicFlowPreimage} as its Solidity tuple: (deadline, settlementLayerChainId, legBundleHashes, legSourceChainIds). */
+/** Encode an {AtomicFlowPreimage} as its Solidity tuple: (version, deadline, settlementLayerChainId, legBundleHashes, legSourceChainIds). */
 export function flowPreimageTuple(preimage: AtomicFlowPreimage): unknown[] {
   return [
+    preimage.version,
     preimage.deadline,
     BigNumber.from(preimage.settlementLayerChainId),
     preimage.legBundleHashes,

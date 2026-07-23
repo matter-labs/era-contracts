@@ -34,6 +34,7 @@ import {
   flowPreimageTuple,
   lowNullifierIndexFor,
   DEFAULT_SL_CHAIN_ID,
+  ATOMIC_FLOW_PREIMAGE_VERSION,
 } from "./imt-engine-lib";
 import type { AtomicFlowPreimage } from "./imt-engine-lib";
 export type { AtomicFlowPreimage } from "./imt-engine-lib";
@@ -65,6 +66,7 @@ async function buildSingleLegAtomicSend(
   // Single-leg flow preimage: this bundle is the only leg, sourced from this chain. `flowId` is
   // recomputed on-chain from this exact preimage, so it must match byte-for-byte at execute time.
   const preimage: AtomicFlowPreimage = {
+    version: ATOMIC_FLOW_PREIMAGE_VERSION,
     deadline: ATOMIC_INTEROP_DEADLINE,
     settlementLayerChainId: DEFAULT_SL_CHAIN_ID,
     legBundleHashes: [bundleHash],
@@ -177,10 +179,11 @@ function decodeAtomicBundleAttribute(attrs: string[]): { flowId: string; preimag
   const decoded = erc7786Iface.decodeFunctionData("atomicBundle", attr);
   const raw = decoded[0];
   const preimage: AtomicFlowPreimage = {
-    deadline: Number(raw[0]),
-    settlementLayerChainId: raw[1],
-    legBundleHashes: raw[2] as string[],
-    legSourceChainIds: raw[3] as BigNumber[],
+    version: raw[0] as string,
+    deadline: Number(raw[1]),
+    settlementLayerChainId: raw[2],
+    legBundleHashes: raw[3] as string[],
+    legSourceChainIds: raw[4] as BigNumber[],
   };
   return { flowId: computeFlowId(preimage), preimage };
 }
@@ -424,6 +427,7 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
   let predictedBundleHash: string | undefined;
   // Empty preimage for the non-atomic withdrawal path (unused on the L1 finalization path).
   const emptyPreimage: AtomicFlowPreimage = {
+    version: ATOMIC_FLOW_PREIMAGE_VERSION,
     deadline: 0,
     settlementLayerChainId: 0,
     legBundleHashes: [],

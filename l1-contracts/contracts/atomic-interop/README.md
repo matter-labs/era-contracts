@@ -14,16 +14,22 @@ message — finality is proven, not dispatched.
 
 - `bundleHash = keccak256(abi.encode(sourceChainId, bundleBytes))` — a leg's bundle, chain-specific.
 - `flowId = keccak256(abi.encode(preimage))` —
-  binds all legs, each leg's source chain, the deadline, and the settlement layer. `legBundleHashes` is
-  strictly ascending (canonical order + dedup); `legSourceChainIds` is positional (aligned 1:1, may
-  repeat); `deadline` is a settlement-layer timestamp.
+  binds all legs, each leg's source chain, the deadline, and the settlement layer. The preimage is
+  versioned like `InteropBundle`/`InteropCall`: its first field `version` must be a version the manager
+  supports (currently only `ATOMIC_FLOW_PREIMAGE_VERSION` = `0x01`), checked identically on every path
+  (append/finalize/refund). Each version is validated under its own rules, so a preimage of one version
+  can never be accepted — or hash to the same `flowId` — under the rules of another; a new version is
+  added alongside the old one (not a drain), so flows in flight under a prior version stay finalizable
+  and refundable. `legBundleHashes` is strictly ascending (canonical order + dedup); `legSourceChainIds` is
+  positional (aligned 1:1, may repeat); `deadline` is a settlement-layer timestamp.
 - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))` — the IMT
   leaf value for a leg. It bakes in `flowId` (hence all legs) and the chain-specific `bundleHash`, so a
   leg's commit value can only ever be inserted into its own source chain's IMT.
 
-The atomic-send parameters (the full `flowId` **preimage** — `deadline`, `settlementLayerChainId`,
-`legBundleHashes`, `legSourceChainIds` — plus `lowNullifierIndex`) travel out-of-band as the ERC-7786
-`atomicBundle((uint64,uint256,bytes32[],uint256[]),uint256)` bundle attribute — deliberately **not**
+The atomic-send parameters (the full `flowId` **preimage** — `version`, `deadline`,
+`settlementLayerChainId`, `legBundleHashes`, `legSourceChainIds` — plus `lowNullifierIndex`) travel
+out-of-band as the ERC-7786
+`atomicBundle((bytes1,uint64,uint256,bytes32[],uint256[]),uint256)` bundle attribute — deliberately **not**
 part of the bundle, so `bundleHash` does not depend on the preimage (which would be circular: the
 preimage's leg hashes include the bundle's own hash). The attribute carries the preimage rather than
 an opaque `flowId` so that `AtomicFlowManager.append` can recompute the id on-chain and verify the
