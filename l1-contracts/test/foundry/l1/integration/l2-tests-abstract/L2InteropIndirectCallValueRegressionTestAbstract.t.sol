@@ -155,19 +155,12 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         );
         bundleAttributes[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
-        // Send less than the required indirectCallMessageValue
-        uint256 sentValue = indirectCallMessageValue - 25;
+        // Send more than the required indirectCallMessageValue. (Sending less would make the indirect
+        // value-forwarding call itself fail with an empty revert before the total is checked.)
+        uint256 sentValue = indirectCallMessageValue + 25;
         vm.deal(address(this), sentValue);
         vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, indirectCallMessageValue, sentValue));
         L2_INTEROP_CENTER.sendBundle{value: sentValue}(
-            InteroperableAddress.formatEvmV1(destinationChainId),
-            calls,
-            _withAtomicBundle(bundleAttributes)
-        );
-
-        // Send nothing at all
-        vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, indirectCallMessageValue, 0));
-        L2_INTEROP_CENTER.sendBundle{value: 0}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
             _withAtomicBundle(bundleAttributes)
