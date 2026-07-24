@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {FeeParams, IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {L2DACommitmentScheme, PubdataContent} from "contracts/common/Config.sol";
 import {PriorityTree} from "contracts/state-transition/libraries/PriorityTree.sol";
 
 contract UtilsFacet is ZKChainBase {
@@ -95,6 +95,10 @@ contract UtilsFacet is ZKChainBase {
 
     function util_getAdmin() external view returns (address) {
         return s.admin;
+    }
+
+    function util_getPubdataContent() external view returns (PubdataContent) {
+        return s.pubdataContent;
     }
 
     function util_setValidator(address _validator, bool _active) external {
