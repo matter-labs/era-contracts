@@ -239,10 +239,24 @@ contract MakePermanentRollupTest is AdminTest {
         utilsFacet.util_setZksyncOS(true);
 
         vm.prank(admin);
+        vm.expectEmit(true, true, false, true, address(adminFacet));
+        emit IAdmin.NewPubdataContent(PubdataContent.FULL_PUBDATA, PubdataContent.LOGS_ONLY);
         adminFacet.setPubdataContent(PubdataContent.LOGS_ONLY);
+        assertEq(
+            uint8(utilsFacet.util_getPubdataContent()),
+            uint8(PubdataContent.LOGS_ONLY),
+            "pubdata content not set to LOGS_ONLY"
+        );
 
         vm.prank(admin);
+        vm.expectEmit(true, true, false, true, address(adminFacet));
+        emit IAdmin.NewPubdataContent(PubdataContent.LOGS_ONLY, PubdataContent.FULL_PUBDATA);
         adminFacet.setPubdataContent(PubdataContent.FULL_PUBDATA);
+        assertEq(
+            uint8(utilsFacet.util_getPubdataContent()),
+            uint8(PubdataContent.FULL_PUBDATA),
+            "pubdata content not set back to FULL_PUBDATA"
+        );
     }
 
     function test_RevertWhen_SetPubdataContentOnNonZKsyncOSChain() public {
