@@ -190,7 +190,7 @@ enum L2DACommitmentScheme {
 /// @dev Data availability mode: which part of the pubdata the batch commits to. Orthogonal to
 /// {L2DACommitmentScheme} (the mechanism). Carried in diamond storage and committed into the batch
 /// public input via the chain config hash, so the settlement layer enforces the chain's configured mode.
-/// @param FULL_PUBDATA The whole pubdata(including state diffs, logs, and messages) is committed and must be published.
+/// @param FULL_PUBDATA The whole pubdata (including state diffs, logs, and messages) is committed and must be published.
 /// @param LOGS_ONLY Only the mandatory L2->L1 log region (log records, incl. interop-commitment (IMT)
 /// leaves) is committed; state diffs and message preimages are published at the operator's discretion.
 /// Used by atomic-interop participants to keep their interop (IMT) data reconstructible from L1. ZKsyncOS only.
