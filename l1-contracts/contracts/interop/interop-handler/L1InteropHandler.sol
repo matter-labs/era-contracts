@@ -38,9 +38,8 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
     /// @dev MessageRoot smart contract that is used to prove message inclusion.
     IMessageRootBase public immutable MESSAGE_ROOT;
 
-    /// @dev The canonical L1 AssetRouter — the only recipient L1-destined interop bundles may target. Pinned as
-    /// an immutable (known at deploy time) so the dispatch target is fixed at construction rather than resolved
-    /// via external calls on every execution. See {_interopCallTarget}.
+    /// @dev The canonical L1 AssetRouter — the only recipient L1-destined bundles may target (see
+    /// {_interopCallTarget}). Immutable, set at construction, to avoid resolving it on every execution.
     address public immutable L1_ASSET_ROUTER;
 
     /// @dev Contract is expected to be used as a proxy implementation.
@@ -82,17 +81,14 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
-        // An L1-destined bundle is a single asset withdrawal (the L2 InteropCenter rejects multi-call L1
-        // bundles at send with `MultiCallToL1NotSupported`); re-assert it here as defense-in-depth so a
-        // malformed source-chain bundle cannot smuggle extra calls onto L1.
+        // An L1-destined bundle is a single asset withdrawal (enforced at send); re-assert as defense-in-depth.
         require(interopBundle.calls.length == 1, MultiCallToL1NotSupported(interopBundle.calls.length));
 
         // Shared pre-gate validation (pause/permission/executability).
         _validateExecutable(bundleHash, interopBundle, status);
 
-        // Proof gate: verify the bundle's L1-message inclusion, if not done yet. `_verifyBundle` also runs the
-        // destination-context / fresh-bundle validation (a bundle already `Verified` had that checked at verify
-        // time; context is a pure function of the bundle + this chain, so once is enough).
+        // Proof gate (if not yet verified). `_verifyBundle` also runs the destination-context / fresh-bundle
+        // check; an already-`Verified` bundle had it checked at verify time, and it's invariant per bundle.
         if (status != BundleStatus.Verified) {
             _verifyBundle(_bundle, interopBundle, _proof, bundleHash, status);
         }
@@ -188,12 +184,9 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
     }
 
     /// @inheritdoc InteropHandlerBase
-    /// @dev Pins the dispatch target to the immutable canonical L1 AssetRouter (`L1_ASSET_ROUTER`), regardless
-    /// of the bundle's caller-selected `_to`. This confines the L1 execution surface to the asset router's
-    /// `finalizeDeposit` path — whose {AssetRouterBase.receiveMessage} independently validates the selector,
-    /// interop sender (L2 AssetRouter), and source chain — so a malformed source-chain bundle can never reach
-    /// an arbitrary L1 `IERC7786Recipient`. A well-formed withdrawal already carries `_to == L1_ASSET_ROUTER`
-    /// (the L2 InteropCenter rewrites the indirect call to it); anything else reverts.
+    /// @dev Pins the target to the canonical L1 AssetRouter regardless of `_to`, confining the L1 execution
+    /// surface to its `finalizeDeposit` path (whose `receiveMessage` validates selector/sender/source-chain).
+    /// A well-formed withdrawal already carries `_to == L1_ASSET_ROUTER`; anything else reverts.
     function _interopCallTarget(address _to) internal view override returns (address) {
         require(_to == L1_ASSET_ROUTER, InteropCallToL1NotToAssetRouter(_to));
         return L1_ASSET_ROUTER;

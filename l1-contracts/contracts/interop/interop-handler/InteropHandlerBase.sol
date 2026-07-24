@@ -80,12 +80,8 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
     /// bundle was proven and moves no assets.
     function _ensureNotPaused() internal view virtual {}
 
-    /// @notice Resolves the actual recipient a bundle call is dispatched to. Base default trusts the bundle's
-    /// caller-selected `_to` (L2->L2 interop can legitimately target any {IERC7786Recipient}).
-    /// @dev L1 overrides this to pin the target to the canonical L1 AssetRouter regardless of `_to`, so a
-    /// malformed source-chain bundle can never reach an arbitrary L1 contract — the only supported L1 recipient
-    /// is the asset router's `finalizeDeposit` path (whose {AssetRouterBase.receiveMessage} independently
-    /// validates selector, interop sender, and source chain).
+    /// @notice Resolves the recipient a bundle call is dispatched to. Default trusts the caller-selected `_to`;
+    /// L1 overrides it to pin every call to the canonical AssetRouter.
     function _interopCallTarget(address _to) internal view virtual returns (address) {
         return _to;
     }
@@ -302,11 +298,9 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         );
     }
 
-    /// @notice Shared pre-gate validation for the derived `executeBundle`: pause gate, caller permission and
-    /// executability. The destination-context check is NOT here — it lives in {_validateVerifiable}, which the
-    /// verify gate (`_verifyBundle` on L1, `verifyAtomicBundle` on L2) runs; the execute paths reach it via
-    /// that gate (or, for the L2 atomic execute path which has no separate verify step, via an explicit
-    /// {_validateBundleDestinationContext} call). This keeps the context check in a single place.
+    /// @notice Shared pre-gate for `executeBundle`: pause, caller permission, executability. The
+    /// destination-context check lives only in {_validateVerifiable} (run by the verify gate); the atomic
+    /// execute path, which has no verify gate, calls {_validateBundleDestinationContext} explicitly.
     function _validateExecutable(
         bytes32 _bundleHash,
         InteropBundle memory _interopBundle,
@@ -383,10 +377,8 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
             }
             InteropCall memory interopCall = _interopBundle.calls[i];
             require(interopCall.version == INTEROP_CALL_VERSION, InvalidInteropCallVersion());
-            // `shadowAccount` is a reserved field the current release does not support. The InteropCenter only
-            // ever sends `false`; reject `true` here so that if a future release starts emitting shadow-account
-            // calls, this (older) handler fails fast rather than silently executing them as non-shadow calls.
-            // Enabling shadow accounts therefore requires an explicit new handler version, not just a sender change.
+            // `shadowAccount` is a reserved field this release does not support; reject `true` so a future
+            // shadow-account call fails fast here instead of being silently executed as a non-shadow call.
             require(!interopCall.shadowAccount, ShadowAccountNotSupported());
 
             // Environment-specific handling of the call's base-token value.

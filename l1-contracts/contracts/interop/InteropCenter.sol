@@ -693,10 +693,8 @@ contract InteropCenter is
                     NonZeroValueToL1NotSupported(_callStarters[i].callAttributes.interopCallValue)
                 );
             }
-            // An indirect call must not carry destination-side value. On the atomic timeout/recovery path a
-            // call's value is refunded to `InteropCall.from` (for an indirect call, the indirect sender such as
-            // the asset router) rather than the actual payer, so a value-bearing indirect call would strand
-            // funds. Such calls have negligible use, so they are disallowed outright rather than special-cased.
+            // Indirect calls must not carry destination-side value: on the atomic recovery path the value is
+            // refunded to `InteropCall.from` (the indirect sender), not the payer, so it would strand funds.
             if (_callStarters[i].callAttributes.indirectCall) {
                 require(
                     _callStarters[i].callAttributes.interopCallValue == 0,

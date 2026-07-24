@@ -54,13 +54,9 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
         // Shared pre-gate validation (pause/permission/executability).
         _validateExecutable(bundleHash, interopBundle, status);
 
-        // Destination-context gate, run explicitly here: unlike the L1/verify paths, the atomic execute path
-        // has no separate verify step to carry it (it calls `requireFlowFinalized` directly), so the check
-        // that otherwise lives in `_validateVerifiable` is invoked directly. `proofChainId` is the bundle's own
-        // `sourceChainId`: an atomic bundle is never published to L1 and self-binds its source chain, so the
-        // `WrongSourceChainId` sub-check is a no-op (value compared to itself) — the *authenticity* of
-        // `sourceChainId` is established by `requireFlowFinalized` below, which verifies each leg's source chain
-        // via the atomic proof's `legSourceChainIds` against the committed IMT.
+        // Destination-context gate, explicit here since the atomic execute path has no verify step to carry it.
+        // `proofChainId` is the bundle's own `sourceChainId` (self-binding), so the source-chain sub-check is a
+        // no-op; source-chain authenticity is instead established by `requireFlowFinalized` below.
         _validateBundleDestinationContext(bundleHash, interopBundle, interopBundle.sourceChainId);
 
         // Atomicity gate: prove the whole flow was committed before the deadline. Skipped if already verified.
