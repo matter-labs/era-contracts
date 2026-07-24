@@ -670,19 +670,6 @@
   },
   {
     "type": "function",
-    "name": "getL2DAMode",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint8",
-        "internalType": "enum L2DAMode"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getL2DefaultAccountBytecodeHash",
     "inputs": [],
     "outputs": [
@@ -820,6 +807,19 @@
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getPubdataContent",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "enum PubdataContent"
       }
     ],
     "stateMutability": "view"
@@ -1948,19 +1948,6 @@
   },
   {
     "type": "function",
-    "name": "setL2DAMode",
-    "inputs": [
-      {
-        "name": "_l2DAMode",
-        "type": "uint8",
-        "internalType": "enum L2DAMode"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "setPendingAdmin",
     "inputs": [
       {
@@ -2006,6 +1993,19 @@
         "name": "_newPriorityTxMaxGasLimit",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setPubdataContent",
+    "inputs": [
+      {
+        "name": "_pubdataContent",
+        "type": "uint8",
+        "internalType": "enum PubdataContent"
       }
     ],
     "outputs": [],
@@ -2626,25 +2626,6 @@
   },
   {
     "type": "event",
-    "name": "NewL2DAMode",
-    "inputs": [
-      {
-        "name": "oldL2DAMode",
-        "type": "uint8",
-        "indexed": true,
-        "internalType": "enum L2DAMode"
-      },
-      {
-        "name": "newL2DAMode",
-        "type": "uint8",
-        "indexed": true,
-        "internalType": "enum L2DAMode"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "NewPendingAdmin",
     "inputs": [
       {
@@ -2834,6 +2815,25 @@
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "NewPubdataContent",
+    "inputs": [
+      {
+        "name": "oldPubdataContent",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "enum PubdataContent"
+      },
+      {
+        "name": "newPubdataContent",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "enum PubdataContent"
       }
     ],
     "anonymous": false

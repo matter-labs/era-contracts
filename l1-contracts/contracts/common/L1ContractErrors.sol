@@ -204,10 +204,10 @@ error InvalidCaller(address);
 error InvalidChainId();
 // 0x92daded2
 error InvalidDAForPermanentRollup();
-// 0x8d8050c0
-error DAModeLockedForPermanentRollup();
-// 0x3bd84586
-error NonRollupDAModeForPermanentRollup();
+// 0xd95d4d82
+error PubdataContentLockedForPermanentRollup();
+// 0x3731bfa2
+error NonFullPubdataContentForPermanentRollup();
 // 0x4fbe5dba
 error InvalidDelay();
 // 0x3f98a77e

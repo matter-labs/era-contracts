@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 // solhint-disable no-unused-import
 import {
     L2DACommitmentScheme,
-    L2DAMode,
+    PubdataContent,
     L2_TO_L1_LOG_SERIALIZE_SIZE,
     L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
     L2_TO_L1_LOGS_MERKLE_TREE_DEPTH,
