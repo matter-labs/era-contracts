@@ -7,7 +7,7 @@ import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {
     L2DACommitmentScheme,
-    L2DAMode,
+    PubdataContent,
     MAX_GAS_PER_TRANSACTION,
     MAX_PRICE_CHANGE_DENOMINATOR,
     MAX_PRICE_CHANGE_NUMERATOR,
@@ -34,7 +34,7 @@ import {
 import {
     AlreadyPermanentRollup,
     BaseTokenPreV31TotalSupplyAlreadySet,
-    DAModeLockedForPermanentRollup,
+    PubdataContentLockedForPermanentRollup,
     DenominatorIsZero,
     DiamondAlreadyFrozen,
     DiamondNotFrozen,
@@ -43,7 +43,7 @@ import {
     InvalidDAForPermanentRollup,
     InvalidL2DACommitmentScheme,
     InvalidPubdataPricingMode,
-    NonRollupDAModeForPermanentRollup,
+    NonFullPubdataContentForPermanentRollup,
     PriorityModeActivationTooEarly,
     PriorityModeIsNotAllowed,
     PriorityModeRequiresPermanentRollup,
@@ -398,15 +398,15 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setL2DAMode(L2DAMode _l2DAMode) external onlyAdmin onlyZKsyncOS {
-        // A permanent rollup is locked to `FULL_PUBDATA` — its DA mode can never be changed (in particular it
+    function setPubdataContent(PubdataContent _pubdataContent) external onlyAdmin onlyZKsyncOS {
+        // A permanent rollup is locked to `FULL_PUBDATA` — its pubdata content can never be changed (in particular it
         // can never be relaxed to `LOGS_ONLY`), mirroring how the permanent-rollup flag itself is one-way.
         if (s.isPermanentRollup) {
-            revert DAModeLockedForPermanentRollup();
+            revert PubdataContentLockedForPermanentRollup();
         }
         _enforceNoUnverifiedBatchesForChainConfigUpdate();
-        emit NewL2DAMode(s.l2DAMode, _l2DAMode);
-        s.l2DAMode = _l2DAMode;
+        emit NewPubdataContent(s.pubdataContent, _pubdataContent);
+        s.pubdataContent = _pubdataContent;
     }
 
     /// @inheritdoc IAdmin
@@ -416,8 +416,8 @@ contract AdminFacet is ZKChainBase, IAdmin {
         }
 
         // A permanent rollup must publish the full pubdata, so the chain must already be in `FULL_PUBDATA` mode.
-        if (s.l2DAMode != L2DAMode.FULL_PUBDATA) {
-            revert NonRollupDAModeForPermanentRollup();
+        if (s.pubdataContent != PubdataContent.FULL_PUBDATA) {
+            revert NonFullPubdataContentForPermanentRollup();
         }
 
         if (!ROLLUP_DA_MANAGER.isPairAllowed(s.l1DAValidator, s.l2DACommitmentScheme)) {

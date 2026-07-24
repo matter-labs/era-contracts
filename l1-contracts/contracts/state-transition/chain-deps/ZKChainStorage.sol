@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../state-transition/libraries/PriorityTree.sol";
-import {L2DACommitmentScheme, L2DAMode, PubdataPricingMode} from "../../common/Config.sol";
+import {L2DACommitmentScheme, PubdataContent, PubdataPricingMode} from "../../common/Config.sol";
 
 /// @notice Indicates whether an upgrade is initiated and if yes what type
 /// @param None Upgrade is NOT initiated
@@ -267,10 +267,10 @@ struct ZKChainStorage {
     /// this field was introduced.
     /// @dev STORAGE SLOT: 68
     uint64 zksyncOSMaxTxGasLimit;
-    /// @dev The DA mode: whether the batch commits the full pubdata (`FULL_PUBDATA`) or only the mandatory
+    /// @dev The pubdata content: whether the batch commits the full pubdata (`FULL_PUBDATA`) or only the mandatory
     /// L2->L1 log region (`LOGS_ONLY`). Orthogonal to `l2DACommitmentScheme` (the mechanism). Committed
     /// into the ZKsync OS batch public input via the chain config hash (see `Executor`). ZKsync OS only.
-    /// Permanent-rollup chains are locked to `FULL_PUBDATA` (see `Admin.setL2DAMode` / `makePermanentRollup`).
+    /// Permanent-rollup chains are locked to `FULL_PUBDATA` (see `Admin.setPubdataContent` / `makePermanentRollup`).
     /// @dev STORAGE SLOT: 68 (packed with baseTokenHasTotalSupply + zksyncOSMaxTxGasLimit)
-    L2DAMode l2DAMode;
+    PubdataContent pubdataContent;
 }

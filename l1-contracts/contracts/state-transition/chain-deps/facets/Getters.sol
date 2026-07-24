@@ -14,7 +14,7 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
-import {L2DACommitmentScheme, L2DAMode} from "../../../common/Config.sol";
+import {L2DACommitmentScheme, PubdataContent} from "../../../common/Config.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -250,8 +250,8 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function getL2DAMode() external view returns (L2DAMode) {
-        return s.l2DAMode;
+    function getPubdataContent() external view returns (PubdataContent) {
+        return s.pubdataContent;
     }
 
     /// @inheritdoc IGetters

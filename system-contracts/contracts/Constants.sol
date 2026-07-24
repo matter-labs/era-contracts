@@ -173,7 +173,7 @@ address constant SERVICE_CALL_PSEUDO_CALLER = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFfff
 
 /// @dev Pubdata commitment scheme used for DA. This is the commitment *mechanism* — how the committed
 /// pubdata is published and hashed. Which *part* of the pubdata is committed (full vs logs-only) is a
-/// separate, orthogonal axis: {L2DAMode}.
+/// separate, orthogonal axis: {PubdataContent}.
 /// @param NONE Invalid option.
 /// @param EMPTY_NO_DA No DA commitment, used by Validiums.
 /// @param PUBDATA_KECCAK256 Keccak of stateDiffHash and keccak(pubdata). Can be used by custom DA solutions.
@@ -194,7 +194,7 @@ enum L2DACommitmentScheme {
 /// @param LOGS_ONLY Only the mandatory L2->L1 log region (log records, incl. interop-commitment (IMT)
 /// leaves) is committed; state diffs and message preimages are published at the operator's discretion.
 /// Used by atomic-interop participants to keep their interop (IMT) data reconstructible from L1. ZKsyncOS only.
-enum L2DAMode {
+enum PubdataContent {
     FULL_PUBDATA,
     LOGS_ONLY
 }
