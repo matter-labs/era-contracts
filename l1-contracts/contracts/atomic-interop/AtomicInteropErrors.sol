@@ -5,6 +5,8 @@ import {LegState} from "./IAtomicInterop.sol";
 
 // 0x742d1b5b
 error CommitmentTreeNotAppender(address sender);
+// 0x6bbd3c7c
+error InteropCommitmentLeafHookFailed();
 // 0x00bf0e3a
 error ManagerAlreadyInitialized();
 // 0xeff05b36

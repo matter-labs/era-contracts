@@ -7,7 +7,7 @@ import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
-import {L2DACommitmentScheme} from "../../common/Config.sol";
+import {L2DACommitmentScheme, PubdataContent} from "../../common/Config.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
@@ -122,6 +122,14 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @param _l2DACommitmentScheme The scheme of the L2 DA commitment
     function setDAValidatorPair(address _l1DAValidator, L2DACommitmentScheme _l2DACommitmentScheme) external;
 
+    /// @notice Sets the pubdata content. Orthogonal to the DA commitment scheme: it selects whether
+    /// the whole pubdata (`FULL_PUBDATA`) or only the mandatory L2->L1 log region (`LOGS_ONLY`) is
+    /// committed. Committed into the ZKsync OS batch public input via the chain config hash, so it is
+    /// enforced by the batch proof. Callable only for ZKsync OS chains — the setting has no meaning on
+    /// Era-VM chains.
+    /// @param _pubdataContent The new pubdata content.
+    function setPubdataContent(PubdataContent _pubdataContent) external;
+
     /// @notice Makes the chain as permanent rollup.
     /// @dev This is a security feature needed for chains that should be
     /// trusted to keep their data available even if the chain admin becomes malicious
@@ -188,6 +196,10 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
         L2DACommitmentScheme indexed oldL2DACommitmentScheme,
         L2DACommitmentScheme indexed newL2DACommitmentScheme
     );
+
+    /// @notice New pubdata content set
+    event NewPubdataContent(PubdataContent indexed oldPubdataContent, PubdataContent indexed newPubdataContent);
+
     event NewL1DAValidator(address indexed oldL1DAValidator, address indexed newL1DAValidator);
 
     event BridgeMint(address indexed _account, uint256 _amount);
