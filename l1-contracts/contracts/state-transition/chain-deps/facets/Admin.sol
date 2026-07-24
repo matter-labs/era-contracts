@@ -398,12 +398,13 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setL2DAMode(L2DAMode _l2DAMode) external onlyAdmin {
-        // A permanent rollup is locked to `ROLLUP` — its DA mode can never be changed (in particular it
-        // can never be relaxed to `VALIDIUM`), mirroring how the permanent-rollup flag itself is one-way.
+    function setL2DAMode(L2DAMode _l2DAMode) external onlyAdmin onlyZKsyncOS {
+        // A permanent rollup is locked to `FULL_PUBDATA` — its DA mode can never be changed (in particular it
+        // can never be relaxed to `LOGS_ONLY`), mirroring how the permanent-rollup flag itself is one-way.
         if (s.isPermanentRollup) {
             revert DAModeLockedForPermanentRollup();
         }
+        _enforceNoUnverifiedBatchesForChainConfigUpdate();
         emit NewL2DAMode(s.l2DAMode, _l2DAMode);
         s.l2DAMode = _l2DAMode;
     }
@@ -414,8 +415,8 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert AlreadyPermanentRollup();
         }
 
-        // A permanent rollup must publish the full pubdata, so the chain must already be in `ROLLUP` mode.
-        if (s.l2DAMode != L2DAMode.ROLLUP) {
+        // A permanent rollup must publish the full pubdata, so the chain must already be in `FULL_PUBDATA` mode.
+        if (s.l2DAMode != L2DAMode.FULL_PUBDATA) {
             revert NonRollupDAModeForPermanentRollup();
         }
 
