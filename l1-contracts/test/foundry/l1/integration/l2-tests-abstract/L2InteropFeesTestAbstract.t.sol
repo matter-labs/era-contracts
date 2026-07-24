@@ -12,6 +12,7 @@ import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 import {IInteropCenter, InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
+import {AtomicFlowPreimage, ATOMIC_FLOW_PREIMAGE_VERSION} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {FeeWithdrawalFailed, ZKTokenNotAvailable} from "contracts/interop/InteropErrors.sol";
@@ -19,7 +20,8 @@ import {
     L2_INTEROP_CENTER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_BRIDGEHUB_ADDR,
-    L2_BOOTLOADER_ADDRESS
+    L2_BOOTLOADER_ADDRESS,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
@@ -189,6 +191,49 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
             l2InteropCenter.accumulatedProtocolFees(coinbaseAddr),
             protocolFee,
             "Protocol fees should be accumulated for coinbase"
+        );
+    }
+
+    /// @notice L2->L1 withdrawals are not interop and are free: no protocol fee applies even when a
+    /// nonzero fee is configured, so the withdrawal goes through with zero msg.value.
+    function test_sendBundle_withdrawalToL1IsFeeFree() public {
+        // Set a nonzero protocol fee.
+        uint256 protocolFee = 0.01 ether;
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        l2InteropCenter.setInteropFee(protocolFee);
+
+        address coinbaseAddr = makeAddr("coinbase");
+        vm.coinbase(coinbaseAddr);
+
+        // A withdrawable L2-native token: mint + approve the NTV (auto-registered during the burn).
+        TestnetERC20Token l2NativeToken = new TestnetERC20Token("token", "T", 18);
+        uint256 withdrawAmount = 100;
+        l2NativeToken.mint(address(this), withdrawAmount);
+        l2NativeToken.approve(L2_NATIVE_TOKEN_VAULT_ADDR, withdrawAmount);
+
+        // All L2->L1 messages pass in this environment.
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSignature("sendToL1(bytes)"),
+            abi.encode(bytes32(uint256(1)))
+        );
+
+        // Withdraw with msg.value = 0 despite the nonzero configured fee.
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(l2NativeToken));
+        l2InteropCenter.sendBundle(
+            InteroperableAddress.formatEvmV1(L1_CHAIN_ID),
+            DataEncoding.encodeInteropWithdrawalCallStarters(
+                assetId,
+                DataEncoding.encodeBridgeBurnData(withdrawAmount, address(1), address(l2NativeToken))
+            ),
+            new bytes[](0)
+        );
+
+        assertEq(l2NativeToken.balanceOf(address(this)), 0, "tokens should be burned by the withdrawal");
+        assertEq(
+            l2InteropCenter.accumulatedProtocolFees(coinbaseAddr),
+            0,
+            "no protocol fee may be accumulated for an L2->L1 withdrawal"
         );
     }
 
@@ -840,11 +885,26 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         address coinbaseAddr = makeAddr("coinbase");
         vm.coinbase(coinbaseAddr);
 
-        // Build bundle attributes WITHOUT useFixedFee (only unbundler)
-        bytes[] memory bundleAttributes = new bytes[](1);
+        // Build bundle attributes WITHOUT useFixedFee (only unbundler + the mandatory atomicBundle attribute).
+        // All interop is atomic, so the send must carry the atomicBundle attribute; useFixedFee is
+        // deliberately omitted to exercise its default (false).
+        bytes[] memory bundleAttributes = new bytes[](2);
         bundleAttributes[0] = abi.encodeCall(
             IERC7786Attributes.unbundlerAddress,
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
+        );
+        bundleAttributes[1] = abi.encodeCall(
+            IERC7786Attributes.atomicBundle,
+            (
+                AtomicFlowPreimage({
+                    version: ATOMIC_FLOW_PREIMAGE_VERSION,
+                    deadline: type(uint64).max,
+                    settlementLayerChainId: 0,
+                    legBundleHashes: new bytes32[](0),
+                    legSourceChainIds: new uint256[](0)
+                }),
+                uint256(0)
+            )
         );
 
         InteropCallStarter[] memory calls = _buildSimpleCall();
@@ -880,8 +940,22 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         bytes memory recipient = InteroperableAddress.formatEvmV1(destinationChainId, interopTargetContract);
         bytes memory payload = hex"";
 
-        // Build attributes WITHOUT useFixedFee (empty attributes)
-        bytes[] memory attributes = new bytes[](0);
+        // Build attributes WITHOUT useFixedFee (only the mandatory atomicBundle attribute — all interop is
+        // atomic — so useFixedFee still defaults to false).
+        bytes[] memory attributes = new bytes[](1);
+        attributes[0] = abi.encodeCall(
+            IERC7786Attributes.atomicBundle,
+            (
+                AtomicFlowPreimage({
+                    version: ATOMIC_FLOW_PREIMAGE_VERSION,
+                    deadline: type(uint64).max,
+                    settlementLayerChainId: 0,
+                    legBundleHashes: new bytes32[](0),
+                    legSourceChainIds: new uint256[](0)
+                }),
+                uint256(0)
+            )
+        );
 
         // Should succeed (useFixedFee defaults to false)
         vm.prank(sender);

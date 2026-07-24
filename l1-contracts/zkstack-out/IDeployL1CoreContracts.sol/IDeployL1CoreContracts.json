@@ -109,6 +109,11 @@
                     "name": "l1NativeTokenVault",
                     "type": "address",
                     "internalType": "address"
+                  },
+                  {
+                    "name": "l1InteropHandler",
+                    "type": "address",
+                    "internalType": "address"
                   }
                 ]
               },
@@ -134,6 +139,11 @@
                   },
                   {
                     "name": "l1NativeTokenVault",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "l1InteropHandler",
                     "type": "address",
                     "internalType": "address"
                   }

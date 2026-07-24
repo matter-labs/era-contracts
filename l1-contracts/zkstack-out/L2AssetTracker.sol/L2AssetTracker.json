@@ -168,6 +168,24 @@
   },
   {
     "type": "function",
+    "name": "handleRecoverBaseTokenBridgingOnL2",
+    "inputs": [
+      {
+        "name": "_toChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "initL2",
     "inputs": [
       {
@@ -480,6 +498,11 @@
   },
   {
     "type": "error",
+    "name": "BaseTokenNativeToThisChain",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "BaseTokenTotalSupplyBackfillNotNeeded",
     "inputs": []
   },
@@ -528,6 +551,11 @@
   {
     "type": "error",
     "name": "MissingBaseTokenAssetId",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "RecoverToL1NotSupported",
     "inputs": []
   },
   {

@@ -489,7 +489,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             CoreContract.UpgradeableBeaconDeployer,
             CoreContract.L2ChainAssetHandler,
             CoreContract.InteropCenter,
-            CoreContract.InteropHandler,
+            CoreContract.L2InteropHandler,
             CoreContract.L2AssetTracker,
             CoreContract.BaseTokenHolder
         ];
@@ -601,7 +601,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             baseTokenHolderBytecodeInfo: _getBytecodeInfo(CoreContract.BaseTokenHolder),
             chainAssetHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.L2ChainAssetHandler),
             interopCenterBytecodeInfo: _getBytecodeInfo(CoreContract.InteropCenter),
-            interopHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.InteropHandler),
+            interopHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.L2InteropHandler),
             assetTrackerBytecodeInfo: _getBytecodeInfo(CoreContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
@@ -629,7 +629,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             IEIP7702Checker(address(1)),
             false
         );
-        ExecutorFacet executorFacet = new ExecutorFacet(block.chainid);
+        ExecutorFacet executorFacet = new ExecutorFacet();
         MigratorFacet migratorFacet = new MigratorFacet(1, false);
         CommitterFacet committerFacet = new CommitterFacet(1);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);

@@ -125,6 +125,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Address of native token vault.
     IL1NativeTokenVault public l1NativeTokenVault;
 
+    /// @dev Address of the L1 interop handler that finalizes L2 -> L1 withdrawals (via `executeBundle`).
+    /// Exposed on the nullifier so deploy scripts and other bridge contracts can discover the handler.
+    address public l1InteropHandler;
+
     /// @notice Checks that the message sender is the asset router..
     modifier onlyAssetRouter() {
         require(msg.sender == address(l1AssetRouter), Unauthorized(msg.sender));
@@ -247,6 +251,15 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         require(address(l1AssetRouter) == address(0), AddressAlreadySet(address(l1AssetRouter)));
         require(_l1AssetRouter != address(0), ZeroAddress());
         l1AssetRouter = IL1AssetRouter(_l1AssetRouter);
+    }
+
+    /// @notice Sets the L1 interop handler contract address.
+    /// @dev Should be called only once by the owner.
+    /// @param _l1InteropHandler The address of the interop handler.
+    function setL1InteropHandler(address _l1InteropHandler) external onlyOwner {
+        require(l1InteropHandler == address(0), AddressAlreadySet(l1InteropHandler));
+        require(_l1InteropHandler != address(0), ZeroAddress());
+        l1InteropHandler = _l1InteropHandler;
     }
 
     /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.

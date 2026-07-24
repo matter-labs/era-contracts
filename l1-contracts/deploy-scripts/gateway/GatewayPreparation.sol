@@ -16,7 +16,8 @@ import {BridgehubBurnCTMAssetData, IBridgehubBase} from "contracts/core/bridgehu
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "contracts/common/Config.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {InteropLibrary} from "../InteropLibrary.sol";
 import {L2_BRIDGEHUB_ADDRESS, Utils} from "../utils/Utils.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -28,12 +29,13 @@ import {
     NEW_ENCODING_VERSION
 } from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
-import {IL2AssetRouter, L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
+import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
+import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -454,15 +456,24 @@ contract GatewayPreparation is Script {
         );
 
         bytes32 ctmAssetId = bridgehub.ctmAssetIdFromChainId(chainId);
-        L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
 
         bytes memory l2Calldata;
 
         {
-            bytes memory data = abi.encodeCall(IL2AssetRouter.withdraw, (ctmAssetId, bridgehubBurnData));
+            // Route the CTM asset withdrawal from the gateway back to L1 through the InteropCenter as a
+            // single-call bundle to the L1 asset router (the unified path that replaced
+            // L2AssetRouter.withdraw). The gateway-side ChainAdmin multicall invokes the InteropCenter.
+            // Each (sender, salt) pair may be used only once by the InteropCenter; derive the salt from the
+            // migration content so distinct migrations get distinct salts deterministically.
+            bytes memory data = InteropLibrary.encodeWithdrawalSendBundleCalldata(
+                l1ChainId,
+                ctmAssetId,
+                bridgehubBurnData,
+                keccak256(abi.encodePacked("ctm-migration-withdrawal", ctmAssetId, bridgehubBurnData))
+            );
 
             Call[] memory calls = new Call[](1);
-            calls[0] = Call({target: L2_ASSET_ROUTER_ADDR, value: 0, data: data});
+            calls[0] = Call({target: L2_INTEROP_CENTER_ADDR, value: 0, data: data});
 
             l2Calldata = abi.encodeCall(ChainAdmin.multicall, (calls, true));
         }
@@ -496,18 +507,16 @@ contract GatewayPreparation is Script {
         initializeConfig();
 
         L1Nullifier l1Nullifier = L1Nullifier(config.l1NullifierProxy);
-        IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehub);
-        bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
+        address l1InteropHandlerAddr = l1Nullifier.l1InteropHandler();
         vm.broadcast();
-        l1Nullifier.finalizeDeposit(
-            FinalizeL1DepositParams({
+        L1InteropHandler(l1InteropHandlerAddr).executeBundle(
+            UnsafeBytes.readRemainingBytes(message, 1),
+            MessageInclusionProof({
                 chainId: gatewayChainId,
-                l2BatchNumber: l2BatchNumber,
+                l1BatchNumber: l2BatchNumber,
                 l2MessageIndex: l2MessageIndex,
-                l2Sender: L2_ASSET_ROUTER_ADDR,
-                l2TxNumberInBatch: l2TxNumberInBatch,
-                message: message,
-                merkleProof: merkleProof
+                message: L2Message({txNumberInBatch: l2TxNumberInBatch, sender: L2_INTEROP_CENTER_ADDR, data: hex""}),
+                proof: merkleProof
             })
         );
     }

@@ -82,6 +82,8 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy, IL1CrossCha
 
     function setNativeTokenVault(INativeTokenVaultBase _nativeTokenVault) external;
 
+    function setL1InteropHandler(address _l1InteropHandler) external;
+
     function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external;
 
     /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on L2.

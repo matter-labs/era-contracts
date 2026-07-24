@@ -11,9 +11,17 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 // solhint-disable no-unused-import
 
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_INTEROP_CENTER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {InteropLibrary} from "../InteropLibrary.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
+import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
+import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -138,8 +146,21 @@ contract DeployZKScript is Script {
         zkToken.approve(L2_NATIVE_TOKEN_VAULT_ADDR, someBigAmount);
         vm.stopBroadcast();
 
+        // The ZK-token L2->L1 withdrawal now goes through the InteropCenter as a single-call bundle to
+        // the L1 asset router (the unified path that replaced L2AssetRouter.withdraw). The deployer
+        // approved the NTV above; the withdrawn amount rides in the bridge-burn transfer data.
+        uint256 l1ChainId = l2AR.L1_CHAIN_ID();
+        bytes memory zkTransferData = DataEncoding.encodeBridgeBurnData(someBigAmount, deployer, zkTokenAddress);
+        // Each (sender, salt) pair may be used only once by the InteropCenter; derive the salt from the
+        // withdrawal content so distinct withdrawals get distinct salts deterministically.
         vm.broadcast();
-        l2AR.withdraw(zkTokenAssetId, abi.encode(someBigAmount, deployer));
+        // slither-disable-next-line unused-return
+        InteropLibrary.sendWithdrawal(
+            l1ChainId,
+            zkTokenAssetId,
+            zkTransferData,
+            keccak256(abi.encodePacked("zk-token-withdrawal", zkTokenAssetId, zkTransferData))
+        );
         uint256 deployerBalanceAfterWithdraw = zkToken.balanceOf(deployer);
         console.log("Deployed balance after withdraw:", deployerBalanceAfterWithdraw);
     }
@@ -173,17 +194,17 @@ contract DeployZKScript is Script {
         initializeConfig(_bridgehub, _chainId);
 
         L1Nullifier l1Nullifier = L1Nullifier(config.l1Nullifier);
+        address l1InteropHandlerAddr = l1Nullifier.l1InteropHandler();
 
         vm.broadcast();
-        l1Nullifier.finalizeDeposit(
-            FinalizeL1DepositParams({
+        L1InteropHandler(l1InteropHandlerAddr).executeBundle(
+            UnsafeBytes.readRemainingBytes(_message, 1),
+            MessageInclusionProof({
                 chainId: _chainId,
-                l2BatchNumber: _l2BatchNumber,
+                l1BatchNumber: _l2BatchNumber,
                 l2MessageIndex: _l2MessageIndex,
-                l2Sender: L2_ASSET_ROUTER_ADDR,
-                l2TxNumberInBatch: _l2TxNumberInBatch,
-                message: _message,
-                merkleProof: _merkleProof
+                message: L2Message({txNumberInBatch: _l2TxNumberInBatch, sender: L2_INTEROP_CENTER_ADDR, data: hex""}),
+                proof: _merkleProof
             })
         );
     }

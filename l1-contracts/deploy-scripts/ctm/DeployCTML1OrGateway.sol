@@ -90,7 +90,7 @@ library DeployCTML1OrGateway {
         } else if (_contractName == CTMContract.ValidatorTimelock) {
             return abi.encode(_config.bridgehubProxy);
         } else if (_contractName == CTMContract.ExecutorFacet) {
-            return abi.encode(_config.l1ChainId);
+            return abi.encode();
         } else if (_contractName == CTMContract.MigratorFacet) {
             return abi.encode(_config.l1ChainId, _config.testnetVerifier);
         } else if (_contractName == CTMContract.CommitterFacet) {

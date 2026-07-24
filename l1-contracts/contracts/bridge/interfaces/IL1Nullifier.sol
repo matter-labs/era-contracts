@@ -53,6 +53,8 @@ interface IL1Nullifier {
 
     function l1AssetRouter() external view returns (IL1AssetRouter);
 
+    function l1InteropHandler() external view returns (address);
+
     function legacyBridge() external view returns (IL1ERC20Bridge);
 
     function depositHappened(uint256 _chainId, bytes32 _l2TxHash) external view returns (bytes32);
@@ -64,6 +66,8 @@ interface IL1Nullifier {
     function setL1NativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external;
 
     function setL1AssetRouter(address _l1AssetRouter) external;
+
+    function setL1InteropHandler(address _l1InteropHandler) external;
 
     function chainBalance(uint256 _chainId, address _token) external view returns (uint256);
 

@@ -13,7 +13,12 @@ import {Unauthorized} from "../common/L1ContractErrors.sol";
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
  * @notice Abstract base contract for L2 Base Token implementations.
- * @dev This contract contains the shared withdrawal logic for both Era and ZK OS versions.
+ * @dev Holds the storage layout, shared access control and the legacy withdrawal logic common to both
+ * the Era and ZK OS versions.
+ * @dev Base-token L2->L1 withdrawals can also go through the InteropCenter as a single-call bundle to
+ * the L2 AssetRouter (`InteropCenter.sendBundle`), the same unified path used by ERC20 withdrawals. The
+ * `withdraw`/`withdrawWithMessage` entrypoints here are kept for backwards compatibility and finalize on
+ * L1 via the L1Nullifier's legacy path.
  * @dev Pre-V31 storage variables (eraAccountBalance, __DEPRECATED_totalSupply) are declared here because they existed before the V31 upgrade. The storage gap allows adding new shared variables in future upgrades.
  */
 abstract contract L2BaseTokenBase is IL2BaseTokenBase {

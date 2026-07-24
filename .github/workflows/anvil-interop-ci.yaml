@@ -80,6 +80,11 @@ jobs:
 
       - name: Run interop tests (preloaded state)
         working-directory: l1-contracts/test/anvil-interop
+        env:
+          # Each worker spawns 6 Anvil chains + a hardhat process; running all 10 spec groups at
+          # once oversubscribes the 4-core runner and causes load-dependent RPC flakes (worker
+          # failures mid-spec). Cap concurrency; locally the suite stays fully parallel.
+          ANVIL_INTEROP_MAX_PARALLEL_WORKERS: "4"
         run: |
           echo "Running interop tests with preloaded chain states..."
           yarn ts-node run-hardhat-interop-test.ts

@@ -11,11 +11,18 @@ import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {
+    ChainBatchRootAlreadyExists,
+    ChainBatchRootZero,
+    OnlyBridgehub,
     MessageRootNotRegistered,
+    NonConsecutiveBatchNumber,
     OnlyBridgehubOrChainAssetHandler
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {StoredInteropRoot} from "contracts/common/Messaging.sol";
+import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {
     L2_COMPLEX_UPGRADER_ADDR,
     L2_BRIDGEHUB_ADDR,
@@ -92,8 +99,168 @@ contract MessageRootTest is Test {
         vm.mockCall(address(bridgeHub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(assetTracker));
     }
 
+    /// @dev The chain root of a fresh chain right after it reported its genesis root: a single-leaf
+    /// tree holding the genesis batch leaf (see `MessageRootBase.seedGenesisRoot`), so the root is
+    /// the leaf itself.
+    function _genesisChainRoot(uint256 _startingBatchNumber) internal view returns (bytes32) {
+        return
+            MessageHashing.batchLeafHash(
+                ChainBatchRootTree.genesisChainBatchRoot(),
+                _startingBatchNumber,
+                block.timestamp
+            );
+    }
+
+    /// @dev Registers `_chainId` (fresh, starting batch 0) with `_sender` as its diamond and seeds
+    /// the genesis root pulled from it — the same two steps `L1Bridgehub.createNewChain` performs in
+    /// one transaction.
+    function _registerFreshChainAndSeedGenesis(uint256 _chainId, address _sender) internal {
+        _mockZkChainGenesisGetters(_chainId, _sender, true, ChainBatchRootTree.genesisChainBatchRoot());
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(_chainId, 0);
+        vm.prank(bridgeHub);
+        messageRoot.seedGenesisRoot(_chainId);
+    }
+
+    /// @dev Mocks the chain getters `seedGenesisRoot` pulls from: the chain address, its VM flag and
+    /// its stored genesis (batch 0) root.
+    function _mockZkChainGenesisGetters(
+        uint256 _chainId,
+        address _zkChain,
+        bool _isZKsyncOS,
+        bytes32 _genesisRoot
+    ) internal {
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, _chainId),
+            abi.encode(_zkChain)
+        );
+        vm.mockCall(_zkChain, abi.encodeWithSelector(IGetters.getZKsyncOS.selector), abi.encode(_isZKsyncOS));
+        vm.mockCall(
+            _zkChain,
+            abi.encodeWithSelector(IGetters.l2LogsRootHash.selector, uint256(0)),
+            abi.encode(_genesisRoot)
+        );
+    }
+
     function test_init() public {
-        assertEq(messageRoot.getAggregatedRoot(), (MessageHashing.chainIdLeafHash(0x00, block.chainid)));
+        // The settlement layer's own entry starts with an empty chain tree: there is no diamond to
+        // report a genesis root for the layer itself, and interop proofs never target it.
+        assertEq(messageRoot.getAggregatedRoot(), (MessageHashing.chainIdLeafHash(bytes32(0), block.chainid)));
+    }
+
+    /// @notice Registration alone leaves the chain tree empty; the Bridgehub then seeds the genesis
+    /// (batch 0) root pulled from the chain, which pushes the genesis leaf and emits
+    /// `AppendedChainBatchRoot` (so off-chain tree reconstructions include the leaf).
+    function test_seedGenesisRoot_seedsGenesisBatchLeaf() public {
+        address alphaChainSender = makeAddr("alphaChainSender");
+        uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
+        _mockZkChainGenesisGetters(alphaChainId, alphaChainSender, true, ChainBatchRootTree.genesisChainBatchRoot());
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(alphaChainId, 0);
+        assertEq(messageRoot.chainTreeLeafCount(alphaChainId), 0);
+        assertEq(messageRoot.getChainRoot(alphaChainId), bytes32(0));
+
+        vm.prank(bridgeHub);
+        vm.expectEmit(true, true, false, true);
+        emit IMessageRootBase.AppendedChainBatchRoot(
+            alphaChainId,
+            0,
+            ChainBatchRootTree.genesisChainBatchRoot(),
+            block.timestamp
+        );
+        messageRoot.seedGenesisRoot(alphaChainId);
+
+        // The single-leaf chain root is the genesis batch leaf itself, and the batch root and its
+        // timestamp are recorded consistently with the leaf. Batch 0 is rejected by message
+        // verification (`BatchZeroNotAllowed`), so recording it cannot shadow any lookup.
+        assertEq(messageRoot.chainTreeLeafCount(alphaChainId), 1);
+        assertEq(messageRoot.getChainRoot(alphaChainId), _genesisChainRoot(0));
+        assertEq(messageRoot.chainBatchRoots(alphaChainId, 0), ChainBatchRootTree.genesisChainBatchRoot());
+        assertEq(messageRoot.chainBatchRootTimestamp(alphaChainId, 0), block.timestamp);
+        // Real batches continue at batch 1, unaffected by the genesis leaf.
+        assertEq(messageRoot.currentChainBatchNumber(alphaChainId), 0);
+
+        // Once-only: a second seeding is rejected.
+        vm.prank(bridgeHub);
+        vm.expectRevert(abi.encodeWithSelector(ChainBatchRootAlreadyExists.selector, alphaChainId, 0));
+        messageRoot.seedGenesisRoot(alphaChainId);
+    }
+
+    /// @notice Seeding is Bridgehub-only, skips EraVM chains (no genesis root stored), and is
+    /// rejected for chains onboarded at a non-zero starting batch number.
+    function test_seedGenesisRoot_gates() public {
+        address alphaChainSender = makeAddr("alphaChainSender");
+        uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
+        _mockZkChainGenesisGetters(alphaChainId, alphaChainSender, false, bytes32(0));
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(alphaChainId, 0);
+
+        // Not the bridgehub.
+        vm.expectRevert(abi.encodeWithSelector(OnlyBridgehub.selector, address(this), bridgeHub));
+        messageRoot.seedGenesisRoot(alphaChainId);
+
+        // EraVM chain: no-op, nothing seeded.
+        vm.prank(bridgeHub);
+        messageRoot.seedGenesisRoot(alphaChainId);
+        assertEq(messageRoot.chainTreeLeafCount(alphaChainId), 0);
+        assertEq(messageRoot.chainBatchRoots(alphaChainId, 0), bytes32(0));
+
+        // Onboarded chain (non-zero starting batch number): rejected.
+        uint256 betaChainId = uint256(uint160(makeAddr("betaChainId")));
+        _mockZkChainGenesisGetters(betaChainId, makeAddr("betaChainSender"), true, keccak256("beta-genesis"));
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(betaChainId, 7);
+        vm.prank(bridgeHub);
+        vm.expectRevert(abi.encodeWithSelector(NonConsecutiveBatchNumber.selector, betaChainId, 0));
+        messageRoot.seedGenesisRoot(betaChainId);
+
+        // A ZKsync OS chain reading a zero genesis root is a bug, not a no-op.
+        uint256 gammaChainId = uint256(uint160(makeAddr("gammaChainId")));
+        _mockZkChainGenesisGetters(gammaChainId, makeAddr("gammaChainSender"), true, bytes32(0));
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(gammaChainId, 0);
+        vm.prank(bridgeHub);
+        vm.expectRevert(ChainBatchRootZero.selector);
+        messageRoot.seedGenesisRoot(gammaChainId);
+    }
+
+    /// @notice A chain onboarded with a non-zero starting batch number (already-deployed chain /
+    /// settlement-layer migration) is NOT seeded: a real batch with that number exists elsewhere, so
+    /// a synthetic leaf would diverge from it. Such chains must settle once before interop
+    /// registration (enforced by `ChainRegistrationSender.chainTreeLeafCount` gate).
+    function test_addNewChain_onboardedChainIsNotSeeded() public {
+        uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
+        uint256 startingBatchNumber = 7;
+
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(alphaChainId, startingBatchNumber);
+
+        assertEq(messageRoot.chainTreeLeafCount(alphaChainId), 0);
+        assertEq(messageRoot.getChainRoot(alphaChainId), bytes32(0));
+        assertEq(messageRoot.chainBatchRoots(alphaChainId, startingBatchNumber), bytes32(0));
+        assertEq(messageRoot.chainBatchRootTimestamp(alphaChainId, startingBatchNumber), 0);
+        assertEq(messageRoot.currentChainBatchNumber(alphaChainId), startingBatchNumber);
+    }
+
+    /// @notice Every historical root is recorded together with its creation timestamp — the
+    /// `(blockNumber, root, timestamp)` tuple chains import and the executor double checks.
+    function test_historicalRootTimestampRecorded() public {
+        uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
+
+        vm.warp(1_700_000_123);
+        vm.roll(100);
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(alphaChainId, 0);
+
+        StoredInteropRoot memory recorded = messageRoot.historicalRoot(100);
+        assertEq(recorded.root, messageRoot.getAggregatedRoot());
+        assertEq(recorded.timestamp, 1_700_000_123);
+
+        // A block with no recorded root has no timestamp either.
+        StoredInteropRoot memory empty = messageRoot.historicalRoot(101);
+        assertEq(empty.root, bytes32(0));
+        assertEq(empty.timestamp, 0);
     }
 
     function test_RevertWhen_addChainNotBridgeHub() public {
@@ -137,6 +304,8 @@ contract MessageRootTest is Test {
         assertTrue(messageRoot.chainRegistered(alphaChainId), "alpha chain 2");
         assertFalse(messageRoot.chainRegistered(betaChainId), "beta chain 2");
 
+        // The chain tree stays empty at registration; the genesis leaf arrives via
+        // `seedGenesisRoot` (triggered by the Bridgehub in the same createNewChain transaction).
         assertEq(messageRoot.getChainRoot(alphaChainId), bytes32(0));
     }
 
@@ -151,7 +320,42 @@ contract MessageRootTest is Test {
 
         vm.prank(alphaChainSender);
         vm.expectRevert(MessageRootNotRegistered.selector);
-        messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
+        messageRoot.addChainBatchRootV32(alphaChainId, 1, bytes32(alphaChainId));
+    }
+
+    /// @notice The legacy (v31) entry point records the root and advances the batch counter but does
+    /// NOT touch the interop trees: only v32 executors (via `addChainBatchRootV32`) populate them, so
+    /// a non-empty chain tree implies v32-format roots. Pre-upgrade executor facets keep calling this
+    /// name, and the consecutive numbering continues seamlessly after the switch to the V32 flow.
+    function test_addChainBatchRoot_v31RecordsWithoutTreePush() public {
+        address alphaChainSender = makeAddr("alphaChainSender");
+        uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, alphaChainId),
+            abi.encode(alphaChainSender)
+        );
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(alphaChainId, 0);
+        bytes32 chainRootBefore = messageRoot.getChainRoot(alphaChainId);
+        bytes32 sharedRootBefore = messageRoot.getAggregatedRoot();
+
+        vm.prank(alphaChainSender);
+        messageRoot.addChainBatchRoot(alphaChainId, 1, keccak256("v31-root-1"));
+
+        // Recorded + counter advanced...
+        assertEq(messageRoot.chainBatchRoots(alphaChainId, 1), keccak256("v31-root-1"));
+        assertEq(messageRoot.currentChainBatchNumber(alphaChainId), 1);
+        // ...but no interop-tree effects.
+        assertEq(messageRoot.getChainRoot(alphaChainId), chainRootBefore, "chain tree must be untouched");
+        assertEq(messageRoot.getAggregatedRoot(), sharedRootBefore, "shared tree must be untouched");
+        assertEq(messageRoot.chainBatchRootTimestamp(alphaChainId, 1), 0, "no leaf timestamp recorded");
+
+        // The V32 flow continues the same numbering afterwards (post-upgrade switch).
+        vm.prank(alphaChainSender);
+        messageRoot.addChainBatchRootV32(alphaChainId, 2, keccak256("v32-root-2"));
+        assertEq(messageRoot.currentChainBatchNumber(alphaChainId), 2);
+        assertTrue(messageRoot.getChainRoot(alphaChainId) != chainRootBefore, "v32 push must move the chain tree");
     }
 
     function test_addChainBatchRoot_1() public {
@@ -174,10 +378,20 @@ contract MessageRootTest is Test {
         vm.chainId(L1_CHAIN_ID);
         vm.prank(alphaChainSender);
         vm.expectRevert();
-        l2MessageRoot.addChainBatchRoot(L1_CHAIN_ID, 1, bytes32(L1_CHAIN_ID));
+        l2MessageRoot.addChainBatchRootV32(L1_CHAIN_ID, 1, bytes32(L1_CHAIN_ID));
 
         vm.prank(L2_BRIDGEHUB_ADDR);
         l2MessageRoot.addNewChain(alphaChainId, 0);
+        // Seed the genesis leaf the way createNewChain does: the chain reports it right after
+        // registration.
+        vm.mockCall(alphaChainSender, abi.encodeWithSelector(IGetters.getZKsyncOS.selector), abi.encode(true));
+        vm.mockCall(
+            alphaChainSender,
+            abi.encodeWithSelector(IGetters.l2LogsRootHash.selector, uint256(0)),
+            abi.encode(ChainBatchRootTree.genesisChainBatchRoot())
+        );
+        vm.prank(L2_BRIDGEHUB_ADDR);
+        l2MessageRoot.seedGenesisRoot(alphaChainId);
 
         // With per-block logId: initL2 + addNewChain(L1_CHAIN_ID) + addNewChain(alphaChainId) all happen
         // in the same block, so only the first _emitRoot call increments interopRootLogId.
@@ -188,11 +402,33 @@ contract MessageRootTest is Test {
         vm.roll(block.number + 1);
 
         vm.prank(alphaChainSender);
-        vm.expectEmit(true, false, false, false);
-        emit IMessageRootBase.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
+        // Check all topics + data so the `l1Timestamp` field (bound into the batch leaf for atomic interop)
+        // is actually asserted, not silently ignored.
+        vm.expectEmit(true, true, true, true);
+        emit IMessageRootBase.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId), block.timestamp);
         vm.expectEmit(true, false, false, false);
         emit IMessageRootBase.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
-        l2MessageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
+        l2MessageRoot.addChainBatchRootV32(alphaChainId, 1, bytes32(alphaChainId));
+
+        // The settlement-layer timestamp is recorded per (chainId, batchNumber) — the value the atomic
+        // deadline check is compared against.
+        assertEq(
+            l2MessageRoot.chainBatchRootTimestamp(alphaChainId, 1),
+            block.timestamp,
+            "chainBatchRootTimestamp should record block.timestamp"
+        );
+        // The chain tree holds the reported genesis batch leaf (batch 0) plus the first real batch
+        // leaf, both timestamp-bound; the two-leaf incremental-Merkle root combines them.
+        assertEq(
+            l2MessageRoot.getChainRoot(alphaChainId),
+            keccak256(
+                bytes.concat(
+                    _genesisChainRoot(0),
+                    MessageHashing.batchLeafHash(bytes32(alphaChainId), 1, block.timestamp)
+                )
+            ),
+            "chain root should combine the genesis leaf and the timestamp-bound first batch leaf"
+        );
 
         // Verify interopRootLogId incremented once for the new block
         assertEq(
@@ -220,16 +456,25 @@ contract MessageRootTest is Test {
         // Verify chain is now registered
         assertTrue(messageRoot.chainRegistered(alphaChainId), "Chain should be registered after addNewChain");
 
-        // Initial chain root should be zero
+        // The chain reports its genesis root right after registration (as createNewChain does); the
+        // chain root then holds the genesis batch leaf.
+        vm.mockCall(alphaChainSender, abi.encodeWithSelector(IGetters.getZKsyncOS.selector), abi.encode(true));
+        vm.mockCall(
+            alphaChainSender,
+            abi.encodeWithSelector(IGetters.l2LogsRootHash.selector, uint256(0)),
+            abi.encode(ChainBatchRootTree.genesisChainBatchRoot())
+        );
+        vm.prank(bridgeHub);
+        messageRoot.seedGenesisRoot(alphaChainId);
         bytes32 initialChainRoot = messageRoot.getChainRoot(alphaChainId);
-        assertEq(initialChainRoot, bytes32(0), "Initial chain root should be zero");
+        assertEq(initialChainRoot, _genesisChainRoot(0), "Initial chain root should be the genesis leaf");
 
         // Verify first batch number is 0 before adding any batches
         uint256 initialBatchNumber = messageRoot.currentChainBatchNumber(alphaChainId);
         assertEq(initialBatchNumber, 0, "Initial batch number should be 0");
 
         vm.prank(alphaChainSender);
-        messageRoot.addChainBatchRoot(
+        messageRoot.addChainBatchRootV32(
             alphaChainId,
             1,
             bytes32(hex"63c4d39ce8f2410a1e65b0ad1209fe8b368928a7124bfa6e10e0d4f0786129dd")
@@ -240,7 +485,7 @@ contract MessageRootTest is Test {
         assertEq(batchNumberAfterBatch1, 1, "Batch number should be 1 after adding first batch");
 
         vm.prank(alphaChainSender);
-        messageRoot.addChainBatchRoot(
+        messageRoot.addChainBatchRootV32(
             alphaChainId,
             2,
             bytes32(hex"bcc3a5584fe0f85e968c0bae082172061e3f3a8a47ff9915adae4a3e6174fc12")
@@ -251,7 +496,7 @@ contract MessageRootTest is Test {
         assertEq(batchNumberAfterBatch2, 2, "Batch number should be 2 after adding second batch");
 
         vm.prank(alphaChainSender);
-        messageRoot.addChainBatchRoot(
+        messageRoot.addChainBatchRootV32(
             alphaChainId,
             3,
             bytes32(hex"8d1ced168691d5e8a2dc778350a2c40a2714cc7d64bff5b8da40a96c47dc5f3e")
@@ -328,14 +573,14 @@ contract MessageRootTest is Test {
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         uint256 betaChainId = uint256(uint160(makeAddr("betaChainId")));
 
-        vm.prank(bridgeHub);
-        messageRoot.addNewChain(alphaChainId, 0);
-        vm.prank(bridgeHub);
-        messageRoot.addNewChain(betaChainId, 0);
+        _registerFreshChainAndSeedGenesis(alphaChainId, makeAddr("alphaChainSender"));
+        _registerFreshChainAndSeedGenesis(betaChainId, makeAddr("betaChainSender"));
 
-        bytes32 hash0 = MessageHashing.chainIdLeafHash(0x00, block.chainid);
-        bytes32 hash1 = MessageHashing.chainIdLeafHash(0x00, alphaChainId);
-        bytes32 hash2 = MessageHashing.chainIdLeafHash(0x00, betaChainId);
+        // Both fresh chains reported their genesis leaf in the same block, so their genesis chain
+        // roots coincide; the settlement layer's own entry (index 0) stays empty.
+        bytes32 hash0 = MessageHashing.chainIdLeafHash(bytes32(0), block.chainid);
+        bytes32 hash1 = MessageHashing.chainIdLeafHash(_genesisChainRoot(0), alphaChainId);
+        bytes32 hash2 = MessageHashing.chainIdLeafHash(_genesisChainRoot(0), betaChainId);
 
         bytes32[] memory pathFor1 = messageRoot.getMerklePathForChain(alphaChainId);
         bytes32[] memory expectedPath = new bytes32[](2);

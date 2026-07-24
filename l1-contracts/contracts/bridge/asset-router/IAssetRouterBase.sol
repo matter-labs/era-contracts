@@ -38,7 +38,7 @@ interface IAssetRouterBase {
 
     event AssetHandlerRegistered(bytes32 indexed assetId, address indexed _assetHandlerAddress);
 
-    event DepositFinalizedAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
+    event DepositFinalizedAssetRouter(uint256 indexed sourceChainId, bytes32 indexed assetId, bytes assetData);
 
     function assetHandlerAddress(bytes32 _assetId) external view returns (address);
 }

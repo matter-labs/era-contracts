@@ -11,6 +11,7 @@ import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {MsgValueMismatch} from "contracts/common/L1ContractErrors.sol";
+import {IndirectCallCannotCarryValue} from "contracts/interop/InteropErrors.sol";
 
 import {
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -75,13 +76,15 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
     }
 
     function test_regression_indirectCallMessageValuePassedCorrectly() public {
-        uint256 interopCallValue = 100;
+        // `interopCallValue` must be 0 on indirect calls (IndirectCallCannotCarryValue); the regression
+        // under test — `indirectCallMessageValue` forwarded (not burnt) — is independent of it.
+        uint256 interopCallValue = 0;
         uint256 indirectCallMessageValue = 50;
         uint256 totalValue = interopCallValue + indirectCallMessageValue;
 
         vm.deal(address(this), totalValue);
 
-        // Build an indirect call with both interopCallValue and indirectCallMessageValue
+        // Build an indirect call carrying only indirectCallMessageValue
         bytes[] memory callAttributes = new bytes[](2);
         callAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (interopCallValue));
         callAttributes[1] = abi.encodeCall(IERC7786Attributes.indirectCall, (indirectCallMessageValue));
@@ -106,7 +109,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: totalValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Verify that the mock received the correct indirectCallMessageValue as msg.value
@@ -128,15 +131,14 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
     }
 
     /// @notice Test that sending with incorrect msg.value reverts
-    /// @dev The total msg.value must equal interopCallValue + indirectCallMessageValue for same base token
+    /// @dev The total msg.value must equal the sum of indirectCallMessageValues for same base token
+    /// (`interopCallValue` must be 0 on indirect calls).
     function test_regression_incorrectMsgValueReverts() public {
-        uint256 interopCallValue = 100;
         uint256 indirectCallMessageValue = 50;
-        uint256 correctTotalValue = interopCallValue + indirectCallMessageValue;
 
         // Build an indirect call
         bytes[] memory callAttributes = new bytes[](2);
-        callAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (interopCallValue));
+        callAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (0));
         callAttributes[1] = abi.encodeCall(IERC7786Attributes.indirectCall, (indirectCallMessageValue));
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
@@ -153,22 +155,15 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         );
         bundleAttributes[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
-        // Test with only interopCallValue (missing indirectCallMessageValue)
-        vm.deal(address(this), interopCallValue);
-        vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, correctTotalValue, interopCallValue));
-        L2_INTEROP_CENTER.sendBundle{value: interopCallValue}(
+        // Send more than the required indirectCallMessageValue. (Sending less would make the indirect
+        // value-forwarding call itself fail with an empty revert before the total is checked.)
+        uint256 sentValue = indirectCallMessageValue + 25;
+        vm.deal(address(this), sentValue);
+        vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, indirectCallMessageValue, sentValue));
+        L2_INTEROP_CENTER.sendBundle{value: sentValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
-        );
-
-        // Test with only indirectCallMessageValue (missing interopCallValue)
-        vm.deal(address(this), indirectCallMessageValue);
-        vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, correctTotalValue, indirectCallMessageValue));
-        L2_INTEROP_CENTER.sendBundle{value: indirectCallMessageValue}(
-            InteroperableAddress.formatEvmV1(destinationChainId),
-            calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
     }
 
@@ -201,7 +196,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: indirectCallMessageValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Verify that the mock received the correct indirectCallMessageValue
@@ -213,17 +208,17 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         assertEq(mockCrossChainSender.lastInteropCallValue(), 0, "interopCallValue should be zero");
     }
 
-    /// @notice Test indirect call with non-zero interopCallValue but zero indirectCallMessageValue
-    /// @dev This tests the edge case where the indirect call doesn't need any msg.value
-    function test_regression_nonZeroInteropCallValueWithZeroIndirectValue() public {
+    /// @notice An indirect call carrying non-zero `interopCallValue` must revert.
+    /// @dev On the atomic timeout-recovery path the value would be refunded to `InteropCall.from` (the
+    /// indirect sender) rather than the actual payer, so the combination is banned at send time.
+    function test_regression_nonZeroInteropCallValueOnIndirectCallReverts() public {
         uint256 interopCallValue = 100;
-        uint256 indirectCallMessageValue = 0;
 
         vm.deal(address(this), interopCallValue);
 
         bytes[] memory callAttributes = new bytes[](2);
         callAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (interopCallValue));
-        callAttributes[1] = abi.encodeCall(IERC7786Attributes.indirectCall, (indirectCallMessageValue));
+        callAttributes[1] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = InteropCallStarter({
@@ -239,18 +234,11 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         );
         bundleAttributes[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
+        vm.expectRevert(abi.encodeWithSelector(IndirectCallCannotCarryValue.selector, interopCallValue));
         L2_INTEROP_CENTER.sendBundle{value: interopCallValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
-        );
-
-        // Verify that the mock received zero msg.value
-        assertEq(mockCrossChainSender.lastReceivedMsgValue(), 0, "Should receive zero msg.value");
-        assertEq(
-            mockCrossChainSender.lastInteropCallValue(),
-            interopCallValue,
-            "interopCallValue should be passed correctly"
+            _withAtomicBundle(bundleAttributes)
         );
     }
 
@@ -259,9 +247,11 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
     function test_regression_multipleIndirectCallsInBundle() public {
         MockL2CrossChainSender mockCrossChainSender2 = new MockL2CrossChainSender(finalRecipient);
 
-        uint256 interopCallValue1 = 100;
+        // `interopCallValue` must be 0 on indirect calls; the tracked regression is the per-call
+        // `indirectCallMessageValue` routing.
+        uint256 interopCallValue1 = 0;
         uint256 indirectCallMessageValue1 = 50;
-        uint256 interopCallValue2 = 200;
+        uint256 interopCallValue2 = 0;
         uint256 indirectCallMessageValue2 = 75;
 
         uint256 totalValue = interopCallValue1 +
@@ -303,7 +293,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: totalValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Verify first mock received correct values
@@ -334,8 +324,9 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
     /// @notice Test mixed bundle with direct and indirect calls
     /// @dev Verifies correct value handling when bundle contains both direct and indirect calls
     function test_regression_mixedDirectAndIndirectCalls() public {
+        // Direct calls may carry `interopCallValue`; indirect calls must not (IndirectCallCannotCarryValue).
         uint256 directCallInteropValue = 100;
-        uint256 indirectInteropValue = 150;
+        uint256 indirectInteropValue = 0;
         uint256 indirectMsgValue = 50;
 
         uint256 totalValue = directCallInteropValue + indirectInteropValue + indirectMsgValue;
@@ -373,7 +364,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: totalValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Verify indirect call mock received correct values
@@ -385,9 +376,10 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         );
     }
 
-    /// @notice Test indirect call with different base tokens between chains
-    /// @dev When destination chain has different base token, interopCallValue is bridged instead of burnt,
-    ///      but indirectCallMessageValue is still passed to the indirect call
+    /// @notice Test indirect call alongside a bridged burned value with different base tokens between chains
+    /// @dev When the destination chain has a different base token, burned `interopCallValue` (carried by a
+    ///      DIRECT call — indirect calls must not carry it) is bridged instead of burnt, while
+    ///      `indirectCallMessageValue` is still passed to the indirect call.
     function test_regression_differentBaseTokenIndirectCall() public {
         uint256 interopCallValue = 100;
         uint256 indirectCallMessageValue = 50;
@@ -424,12 +416,22 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         // because interopCallValue is bridged via ERC20 transfer
         vm.deal(address(this), indirectCallMessageValue);
 
+        // Direct call carrying the burned value (allowed).
+        bytes[] memory directCallAttributes = new bytes[](1);
+        directCallAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (interopCallValue));
+
+        // Indirect call carrying only the indirect message value.
         bytes[] memory callAttributes = new bytes[](2);
-        callAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (interopCallValue));
+        callAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (0));
         callAttributes[1] = abi.encodeCall(IERC7786Attributes.indirectCall, (indirectCallMessageValue));
 
-        InteropCallStarter[] memory calls = new InteropCallStarter[](1);
+        InteropCallStarter[] memory calls = new InteropCallStarter[](2);
         calls[0] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(interopTargetContract),
+            data: hex"",
+            callAttributes: directCallAttributes
+        });
+        calls[1] = InteropCallStarter({
             to: InteroperableAddress.formatEvmV1(address(mockCrossChainSender)),
             data: hex"",
             callAttributes: callAttributes
@@ -446,7 +448,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: indirectCallMessageValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Verify that the mock still received the correct indirectCallMessageValue
@@ -507,7 +509,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: indirectCallMessageValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Verify the indirect call was processed correctly
@@ -579,7 +581,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: totalIndirectValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Verify both indirect calls were processed
@@ -595,20 +597,22 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         );
     }
 
-    /// @notice Test mixed bundle where only some calls have zero interopCallValue
-    /// @dev Ensures the fix only skips bridgehubDepositBaseToken when total burned is 0
+    /// @notice Test mixed bundle where indirect calls carry no burned value but a direct call does
+    /// @dev Ensures the fix only skips bridgehubDepositBaseToken when total burned is 0. The burned value
+    /// rides on a DIRECT call (indirect calls must not carry `interopCallValue`).
     function test_regression_mixedIndirectCallsOneWithZeroInteropValue() public {
         MockL2CrossChainSender mockCrossChainSender2 = new MockL2CrossChainSender(finalRecipient);
 
-        // First call: indirect with interopCallValue = 0
+        // Two indirect calls with interopCallValue = 0
         uint256 interopCallValue1 = 0;
         uint256 indirectCallMessageValue1 = 50;
-
-        // Second call: indirect with interopCallValue > 0
-        uint256 interopCallValue2 = 100;
+        uint256 interopCallValue2 = 0;
         uint256 indirectCallMessageValue2 = 25;
 
-        uint256 totalBurnedValue = interopCallValue1 + interopCallValue2; // = 100
+        // Direct call carrying the burned value
+        uint256 directCallInteropValue = 100;
+
+        uint256 totalBurnedValue = interopCallValue1 + interopCallValue2 + directCallInteropValue; // = 100
         uint256 totalIndirectValue = indirectCallMessageValue1 + indirectCallMessageValue2; // = 75
 
         // Set up different base token for destination chain
@@ -646,12 +650,16 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         callAttributes1[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (interopCallValue1));
         callAttributes1[1] = abi.encodeCall(IERC7786Attributes.indirectCall, (indirectCallMessageValue1));
 
-        // Second indirect call (interopCallValue > 0)
+        // Second indirect call (interopCallValue = 0)
         bytes[] memory callAttributes2 = new bytes[](2);
         callAttributes2[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (interopCallValue2));
         callAttributes2[1] = abi.encodeCall(IERC7786Attributes.indirectCall, (indirectCallMessageValue2));
 
-        InteropCallStarter[] memory calls = new InteropCallStarter[](2);
+        // Direct call carrying the burned value (bridged, since base tokens differ)
+        bytes[] memory directCallAttributes = new bytes[](1);
+        directCallAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (directCallInteropValue));
+
+        InteropCallStarter[] memory calls = new InteropCallStarter[](3);
         calls[0] = InteropCallStarter({
             to: InteroperableAddress.formatEvmV1(address(mockCrossChainSender)),
             data: hex"",
@@ -661,6 +669,11 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
             to: InteroperableAddress.formatEvmV1(address(mockCrossChainSender2)),
             data: hex"",
             callAttributes: callAttributes2
+        });
+        calls[2] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(interopTargetContract),
+            data: hex"",
+            callAttributes: directCallAttributes
         });
 
         bytes[] memory bundleAttributes = new bytes[](2);
@@ -674,15 +687,21 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         L2_INTEROP_CENTER.sendBundle{value: totalIndirectValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
-        // Verify both calls were processed
+        // Verify both indirect calls were processed with their message values and zero interopCallValue
         assertEq(mockCrossChainSender.lastInteropCallValue(), 0, "First call should have 0 interopCallValue");
         assertEq(
-            mockCrossChainSender2.lastInteropCallValue(),
-            interopCallValue2,
-            "Second call should have non-zero interopCallValue"
+            mockCrossChainSender.lastReceivedMsgValue(),
+            indirectCallMessageValue1,
+            "First mock should receive its indirectCallMessageValue"
+        );
+        assertEq(mockCrossChainSender2.lastInteropCallValue(), 0, "Second call should have 0 interopCallValue");
+        assertEq(
+            mockCrossChainSender2.lastReceivedMsgValue(),
+            indirectCallMessageValue2,
+            "Second mock should receive its indirectCallMessageValue"
         );
     }
 }

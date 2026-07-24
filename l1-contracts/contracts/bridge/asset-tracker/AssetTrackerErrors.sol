@@ -5,6 +5,8 @@ pragma solidity ^0.8.21;
 error AssetAlreadyRegistered(bytes32 assetId);
 // 0xda72d995
 error AssetIdNotRegistered(bytes32 _assetId);
+// 0x8361ff70
+error BaseTokenNativeToThisChain();
 // 0xca9bc458
 error BaseTokenTotalSupplyBackfillNotNeeded();
 // 0xd054a77e

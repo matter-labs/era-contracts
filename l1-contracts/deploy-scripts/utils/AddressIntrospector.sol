@@ -124,6 +124,9 @@ library AddressIntrospector {
         return _getBridgesDeployedAddressesInternal(_assetRouter, false);
     }
 
+    /// @dev Naming note: the `V29` suffix marks the LEGACY introspection path. For the bridge contracts the
+    /// only version-dependent getter is `l1InteropHandler()` (introduced in v32), so this variant is correct
+    /// for every pre-v32 deployment (v29/v30/v31), not just v29 itself — hence the `isPreV32` flag it passes.
     function getBridgesDeployedAddressesV29(
         address _assetRouter
     ) public view returns (BridgesDeployedAddresses memory info) {
@@ -135,13 +138,16 @@ library AddressIntrospector {
 
     function _getBridgesDeployedAddressesInternal(
         address _assetRouter,
-        bool isV29
+        bool isPreV32
     ) private view returns (BridgesDeployedAddresses memory info) {
         L1AssetRouter assetRouter = L1AssetRouter(_assetRouter);
 
         address erc20BridgeProxy = address(assetRouter.legacyBridge());
         address l1NullifierProxy = address(assetRouter.L1_NULLIFIER());
         address l1NativeTokenVaultProxy = address(assetRouter.nativeTokenVault());
+        // The L1 interop handler is introduced in v32, so it does not exist on any earlier version (v29/v30/v31);
+        // the nullifier only exposes `l1InteropHandler()` from v32 onward. Skip the call for pre-v32 deployments.
+        address l1InteropHandlerProxy = isPreV32 ? address(0) : L1Nullifier(l1NullifierProxy).l1InteropHandler();
 
         require(l1NativeTokenVaultProxy != address(0), "NativeTokenVault address is zero");
         NativeTokenVaultBase ntv = NativeTokenVaultBase(l1NativeTokenVaultProxy);
@@ -154,13 +160,17 @@ library AddressIntrospector {
             erc20Bridge: erc20BridgeProxy,
             l1AssetRouter: _assetRouter,
             l1Nullifier: l1NullifierProxy,
-            l1NativeTokenVault: l1NativeTokenVaultProxy
+            l1NativeTokenVault: l1NativeTokenVaultProxy,
+            l1InteropHandler: l1InteropHandlerProxy
         });
         BridgeContracts memory implementations = BridgeContracts({
             erc20Bridge: Utils.getImplementation(erc20BridgeProxy),
             l1AssetRouter: Utils.getImplementation(_assetRouter),
             l1Nullifier: Utils.getImplementation(l1NullifierProxy),
-            l1NativeTokenVault: Utils.getImplementation(l1NativeTokenVaultProxy)
+            l1NativeTokenVault: Utils.getImplementation(l1NativeTokenVaultProxy),
+            l1InteropHandler: l1InteropHandlerProxy == address(0)
+                ? address(0)
+                : Utils.getImplementation(l1InteropHandlerProxy)
         });
 
         info = BridgesDeployedAddresses({
