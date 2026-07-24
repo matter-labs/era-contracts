@@ -21,6 +21,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IRollupDAManager} from "../interfaces/IRollupDAManager.sol";
+import {L2LegacySharedBridgeTestHelper} from "../dev/L2LegacySharedBridgeTestHelper.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 
@@ -39,6 +40,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
@@ -213,28 +215,18 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function deployVerifiers() internal {
-        (, string memory fflonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierFflonk);
         (, string memory plonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierPlonk);
         (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(
             config.isZKsyncOS,
             config.testnetVerifier
         );
 
-        ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
+        if (!config.isZKsyncOS) {
+            (, string memory fflonkName) = DeployCTML1OrGateway.resolve(false, CTMContract.VerifierFflonk);
+            ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
+        }
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
         ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, false);
-
-        // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
-        vm.startBroadcast(getDeployerAddress());
-        // Called as library (not through vms) to preserve msg.sender
-        DeployCTML1OrGateway.initializeVerifier(
-            ctmAddresses.stateTransition.verifiers.verifier,
-            ctmAddresses.stateTransition.verifiers.verifierFflonk,
-            ctmAddresses.stateTransition.verifiers.verifierPlonk,
-            config.ownerAddress,
-            config.isZKsyncOS
-        );
-        vm.stopBroadcast();
     }
 
     function setChainTypeManagerInServerNotifier() internal {
@@ -315,14 +307,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         IOwnable(ctmAddresses.stateTransition.proxies.serverNotifier).transferOwnership(ctmAddresses.chainAdmin);
         IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
-
-        // Called as library (not through vms) to preserve msg.sender
-        DeployCTML1OrGateway.transferVerifierOwnership(
-            ctmAddresses.stateTransition.verifiers.verifier,
-            ctmAddresses.admin.governance,
-            config.isZKsyncOS
-        );
-
         vm.stopBroadcast();
         console.log("Owners updated");
     }
@@ -333,6 +317,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "bridgehub_proxy_addr",
             coreAddresses.bridgehub.proxies.bridgehub
         );
+        // Note: AssetRouterAddresses doesn't have legacyBridge, so we get it directly
+        L1AssetRouter assetRouter = L1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
+        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", address(assetRouter.legacyBridge()));
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
         string memory bridges = vm.serializeAddress(
             "bridges",
@@ -463,9 +450,28 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     function prepareForceDeploymentsData() internal returns (bytes memory) {
         require(ctmAddresses.admin.governance != address(0), "Governance address is not set");
 
-        FixedForceDeploymentsData memory data = _buildForceDeploymentsData(ctmAddresses.admin.governance);
+        address dangerousTestOnlyForcedBeacon = _getDangerousTestOnlyForcedBeacon();
+
+        FixedForceDeploymentsData memory data = _buildForceDeploymentsData(
+            ctmAddresses.admin.governance,
+            dangerousTestOnlyForcedBeacon
+        );
 
         return abi.encode(data);
+    }
+
+    function _getDangerousTestOnlyForcedBeacon() private returns (address) {
+        if (!config.supportL2LegacySharedBridgeTest) {
+            return address(0);
+        }
+
+        L1AssetRouter assetRouter = L1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
+        (address beacon, ) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
+            address(assetRouter.legacyBridge()),
+            coreAddresses.bridges.proxies.l1Nullifier,
+            ctmAddresses.admin.governance
+        );
+        return beacon;
     }
 
     /// @dev Scratch file for `_precomputeBlakeHashes`. Set by `runInner`
@@ -483,7 +489,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             CoreContract.UpgradeableBeaconDeployer,
             CoreContract.L2ChainAssetHandler,
             CoreContract.InteropCenter,
-            CoreContract.L2InteropHandler,
+            CoreContract.InteropHandler,
             CoreContract.L2AssetTracker,
             CoreContract.BaseTokenHolder
         ];
@@ -570,7 +576,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function _buildForceDeploymentsData(
-        address _governance
+        address _governance,
+        address _dangerousTestOnlyForcedBeacon
     ) internal virtual returns (FixedForceDeploymentsData memory data) {
         if (config.isZKsyncOS) {
             _precomputeBlakeHashes();
@@ -594,15 +601,14 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             baseTokenHolderBytecodeInfo: _getBytecodeInfo(CoreContract.BaseTokenHolder),
             chainAssetHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.L2ChainAssetHandler),
             interopCenterBytecodeInfo: _getBytecodeInfo(CoreContract.InteropCenter),
-            interopHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.L2InteropHandler),
+            interopHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.InteropHandler),
             assetTrackerBytecodeInfo: _getBytecodeInfo(CoreContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
                 coreAddresses.bridgehub.proxies.chainRegistrationSender
             ),
-            // Retained as address(0) for force-deployments ABI compatibility; the legacy forced beacon is gone.
-            dangerousTestOnlyForcedBeacon: address(0),
+            dangerousTestOnlyForcedBeacon: _dangerousTestOnlyForcedBeacon,
             zkTokenAssetId: config.zkTokenAssetId
         });
     }
@@ -623,7 +629,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             IEIP7702Checker(address(1)),
             false
         );
-        ExecutorFacet executorFacet = new ExecutorFacet();
+        ExecutorFacet executorFacet = new ExecutorFacet(block.chainid);
         MigratorFacet migratorFacet = new MigratorFacet(1, false);
         CommitterFacet committerFacet = new CommitterFacet(1);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);

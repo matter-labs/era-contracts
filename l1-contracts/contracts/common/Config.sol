@@ -69,6 +69,21 @@ uint256 constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = 1 hours;
 /// @dev Shift to apply to verify public input before verifying.
 uint256 constant PUBLIC_INPUT_SHIFT = 32;
 
+/// @dev Proof type used by the ZKsync OS PLONK verifier.
+uint256 constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
+
+/// @dev Proof type used by the proof-skipping ZKsync OS testnet verifier.
+uint256 constant ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
+
+/// @dev Number of proof words consumed by ZKsync OS metadata before the underlying PLONK proof.
+uint256 constant ZKSYNC_OS_PROOF_METADATA_LENGTH = 2;
+
+/// @dev Number of words expected in a proof-skipping ZKsync OS testnet proof.
+uint256 constant ZKSYNC_OS_MOCK_PROOF_LENGTH = 2;
+
+/// @dev Marker expected as the first word in a proof-skipping ZKsync OS testnet proof.
+uint256 constant ZKSYNC_OS_MOCK_PROOF_MAGIC = 13;
+
 /// @dev Padding value for empty/unused leaves in an {IndexedMerkleTree}. Deliberately NOT a valid
 /// `hashLeaf(IMTLeaf)` output, so an unused padded index can't be presented as a `{0,0,0}` low leaf to forge
 /// a non-inclusion proof. The off-chain imt-engine must use the same value.
