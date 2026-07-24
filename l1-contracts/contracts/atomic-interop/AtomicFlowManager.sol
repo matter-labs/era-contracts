@@ -124,19 +124,14 @@ contract AtomicFlowManager is IAtomicFlowManager {
         // enforce SL == L1), so reject it before committing anything.
         _checkSettlementLayerIsL1(_flowPreimage.settlementLayerChainId);
 
-        // Reject a leg of a flow whose deadline has verifiably passed from this chain's point of view:
-        // an imported settlement-layer root created after the deadline is exactly what `authorizeRefund`
-        // needs, so such a flow can already be timed out — a leg committed now could never produce an
-        // in-time inclusion proof and would only burn funds into a flow that must be refunded.
-        //
-        // As a "never commit into an expired flow" protection this is BEST EFFORT only: imported roots
-        // lag the settlement layer's real clock, and other source chains have their own (possibly
-        // fresher or staler) views, so an expired flow may still accept a leg wherever no late root has
-        // been imported yet. What the check DOES enforce, unconditionally, is ordering on this chain:
-        // once one of the flow's legs has been made revertable/reverted here (which requires importing
-        // a root with `timestamp > deadline` — see {AtomicInteropProof.verifyTimeoutAbsence}), the
-        // tracked latest timestamp — a monotone maximum — exceeds the deadline forever, so no new leg
-        // of that flow can ever be committed on this chain afterwards.
+        // Reject a leg of a flow whose deadline has verifiably passed: an imported settlement-layer
+        // root created after the deadline is exactly what `authorizeRefund` needs, so committing now
+        // could only burn funds into a flow that must be refunded. As an expired-flow guard this is
+        // BEST EFFORT only — imported roots lag the settlement layer's clock, and other source chains
+        // have their own views. What it enforces unconditionally is ordering on this chain: reverting
+        // a leg requires importing a root with `timestamp > deadline` (see
+        // {AtomicInteropProof.verifyTimeoutAbsence}) and the tracked timestamp is a monotone maximum,
+        // so once a leg of the flow was reverted here, no new leg can ever be committed here.
         uint256 latestImportedRootTimestamp = L2_INTEROP_ROOT_STORAGE.latestInteropRootTimestamp(
             _flowPreimage.settlementLayerChainId
         );

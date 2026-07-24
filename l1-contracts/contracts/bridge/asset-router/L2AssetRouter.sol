@@ -327,12 +327,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         // `originalCaller` (the source depositor), so the receiver swap no longer happens here.
         // slither-disable-next-line unused-return
         (, bytes32 assetId, bytes memory mintData) = abi.decode(_callData[4:], (uint256, bytes32, bytes));
-        // The burn this call embeds was executed by the asset handler registered for the asset (see
-        // {AssetRouterBase._burn}) — the NTV for standard tokens, or a custom handler. Only that handler
-        // can reverse its own burn (the mint data is in its own format), so recovery routes through the
-        // same `assetHandlerAddress` lookup the burn used rather than assuming the NTV. The handler is
-        // always registered by the time a genuine burn-produced call is recovered: `_burn` either found
-        // it registered or registered the NTV via `tryRegisterTokenFromBurnData`.
+        // Only the asset handler that performed the burn (see {AssetRouterBase._burn}) can reverse it —
+        // the mint data is in its own format — so recovery routes through the same `assetHandlerAddress`
+        // lookup rather than assuming the NTV. The handler is always registered by the time a genuine
+        // burn-produced call is recovered: `_burn` either found it registered or registered the NTV via
+        // `tryRegisterTokenFromBurnData`.
         address assetHandler = assetHandlerAddress[assetId];
         require(assetHandler != address(0), AssetHandlerDoesNotExist(assetId));
         IL2AssetHandler(assetHandler).bridgeRecoverFailedTransfer(_destChainId, assetId, mintData);
