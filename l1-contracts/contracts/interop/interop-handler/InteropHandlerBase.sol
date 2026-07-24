@@ -29,7 +29,8 @@ import {
     WrongDestinationBaseTokenAssetId,
     WrongSourceChainId,
     InvalidInteropBundleVersion,
-    InvalidInteropCallVersion
+    InvalidInteropCallVersion,
+    ShadowAccountNotSupported
 } from "../InteropErrors.sol";
 import {InvalidSelector, PayloadTooShort, Unauthorized} from "../../common/L1ContractErrors.sol";
 
@@ -78,6 +79,16 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
     /// system contract is not pausable). `verifyBundle` is intentionally not guarded: it only records that a
     /// bundle was proven and moves no assets.
     function _ensureNotPaused() internal view virtual {}
+
+    /// @notice Resolves the actual recipient a bundle call is dispatched to. Base default trusts the bundle's
+    /// caller-selected `_to` (L2->L2 interop can legitimately target any {IERC7786Recipient}).
+    /// @dev L1 overrides this to pin the target to the canonical L1 AssetRouter regardless of `_to`, so a
+    /// malformed source-chain bundle can never reach an arbitrary L1 contract — the only supported L1 recipient
+    /// is the asset router's `finalizeDeposit` path (whose {AssetRouterBase.receiveMessage} independently
+    /// validates selector, interop sender, and source chain).
+    function _interopCallTarget(address _to) internal view virtual returns (address) {
+        return _to;
+    }
 
     /// @notice The selector of the derived contract's `executeBundle`, used by `receiveMessage` dispatch.
     /// @dev It differs per layer because the proof type in the signature differs.
@@ -291,20 +302,17 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         );
     }
 
-    /// @notice Shared pre-gate validation for the derived `executeBundle`: pause gate, destination-context
-    /// check, caller permission and executability. Both handlers run this identically; the only per-layer
-    /// difference is the proof gate that follows (message inclusion on L1, atomic IMT finality on L2) and
-    /// the proof-attested source chain id passed here. The handler then calls {_markFullyExecutedAndRun}.
-    /// @param _proofSourceChainId Source chain id attested by the proof — the message-inclusion
-    /// `proof.chainId` on L1, or the bundle's self-binding `sourceChainId` on the L2 atomic path.
+    /// @notice Shared pre-gate validation for the derived `executeBundle`: pause gate, caller permission and
+    /// executability. The destination-context check is NOT here — it lives in {_validateVerifiable}, which the
+    /// verify gate (`_verifyBundle` on L1, `verifyAtomicBundle` on L2) runs; the execute paths reach it via
+    /// that gate (or, for the L2 atomic execute path which has no separate verify step, via an explicit
+    /// {_validateBundleDestinationContext} call). This keeps the context check in a single place.
     function _validateExecutable(
         bytes32 _bundleHash,
         InteropBundle memory _interopBundle,
-        uint256 _proofSourceChainId,
         BundleStatus _status
     ) internal view {
         _ensureNotPaused();
-        _validateBundleDestinationContext(_bundleHash, _interopBundle, _proofSourceChainId);
         _requireExecutionAllowed(_bundleHash, _interopBundle);
         _requireExecutable(_bundleHash, _status);
     }
@@ -375,12 +383,19 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
             }
             InteropCall memory interopCall = _interopBundle.calls[i];
             require(interopCall.version == INTEROP_CALL_VERSION, InvalidInteropCallVersion());
+            // `shadowAccount` is a reserved field the current release does not support. The InteropCenter only
+            // ever sends `false`; reject `true` here so that if a future release starts emitting shadow-account
+            // calls, this (older) handler fails fast rather than silently executing them as non-shadow calls.
+            // Enabling shadow accounts therefore requires an explicit new handler version, not just a sender change.
+            require(!interopCall.shadowAccount, ShadowAccountNotSupported());
 
             // Environment-specific handling of the call's base-token value.
             _handleCallValue(interopCall.value, _sourceChainId);
 
             // slither-disable-next-line arbitrary-send-eth
-            bytes4 selector = IERC7786Recipient(interopCall.to).receiveMessage{value: interopCall.value}({
+            bytes4 selector = IERC7786Recipient(_interopCallTarget(interopCall.to)).receiveMessage{
+                value: interopCall.value
+            }({
                 receiveId: keccak256(abi.encodePacked(_bundleHash, i)),
                 sender: InteroperableAddress.formatEvmV1(_sourceChainId, interopCall.from),
                 payload: interopCall.data

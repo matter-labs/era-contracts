@@ -12,9 +12,15 @@ import {BUNDLE_IDENTIFIER, BundleStatus, InteropBundle, MessageInclusionProof} f
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
+import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {InteropWithdrawalNonZeroValue} from "../../bridge/L1BridgeContractErrors.sol";
 import {ZeroAddress} from "../../common/L1ContractErrors.sol";
-import {MessageNotIncluded, UnauthorizedMessageSender} from "../InteropErrors.sol";
+import {
+    InteropCallToL1NotToAssetRouter,
+    MessageNotIncluded,
+    MultiCallToL1NotSupported,
+    UnauthorizedMessageSender
+} from "../InteropErrors.sol";
 
 /// @title L1InteropHandler
 /// @author Matter Labs
@@ -69,12 +75,19 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
-        // Shared pre-gate validation; the proof attests the source chain via `proof.chainId`.
-        _validateExecutable(bundleHash, interopBundle, _proof.chainId, status);
+        // An L1-destined bundle is a single asset withdrawal (the L2 InteropCenter rejects multi-call L1
+        // bundles at send with `MultiCallToL1NotSupported`); re-assert it here as defense-in-depth so a
+        // malformed source-chain bundle cannot smuggle extra calls onto L1.
+        require(interopBundle.calls.length == 1, MultiCallToL1NotSupported(interopBundle.calls.length));
 
-        // Proof gate: verify the bundle's L1-message inclusion, if not done yet.
+        // Shared pre-gate validation (pause/permission/executability).
+        _validateExecutable(bundleHash, interopBundle, status);
+
+        // Proof gate: verify the bundle's L1-message inclusion, if not done yet. `_verifyBundle` also runs the
+        // destination-context / fresh-bundle validation (a bundle already `Verified` had that checked at verify
+        // time; context is a pure function of the bundle + this chain, so once is enough).
         if (status != BundleStatus.Verified) {
-            _verifyBundle(_bundle, _proof, bundleHash);
+            _verifyBundle(_bundle, interopBundle, _proof, bundleHash, status);
         }
 
         _markFullyExecutedAndRun(bundleHash, interopBundle);
@@ -86,10 +99,9 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
     function verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
-        _validateVerifiable(bundleHash, interopBundle, _proof.chainId, status);
-
-        // Proof gate: message inclusion. `_verifyBundle` marks the bundle `Verified`.
-        _verifyBundle(_bundle, _proof, bundleHash);
+        // `_verifyBundle` runs `_validateVerifiable` (destination-context + fresh-bundle) then the message-
+        // inclusion proof gate, and marks the bundle `Verified`.
+        _verifyBundle(_bundle, interopBundle, _proof, bundleHash, status);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -168,13 +180,38 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
         return DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
     }
 
-    /// @notice Verifies the bundle by checking that its `BUNDLE_IDENTIFIER`-prefixed message was included, sent
-    /// by the canonical L2 InteropCenter. Asset correctness across chains is guaranteed by ZK proofs, so no
-    /// on-chain per-chain balance reconciliation is performed here.
+    /// @inheritdoc InteropHandlerBase
+    /// @dev Pins the dispatch target to the canonical L1 AssetRouter (resolved from the bridgehub), regardless
+    /// of the bundle's caller-selected `_to`. This confines the L1 execution surface to the asset router's
+    /// `finalizeDeposit` path — whose {AssetRouterBase.receiveMessage} independently validates the selector,
+    /// interop sender (L2 AssetRouter), and source chain — so a malformed source-chain bundle can never reach
+    /// an arbitrary L1 `IERC7786Recipient`. A well-formed withdrawal already carries `_to == l1AssetRouter`
+    /// (the L2 InteropCenter rewrites the indirect call to it); anything else reverts.
+    function _interopCallTarget(address _to) internal view override returns (address) {
+        address l1AssetRouter = address(IBridgehubBase(MESSAGE_ROOT.BRIDGE_HUB()).assetRouter());
+        require(_to == l1AssetRouter, InteropCallToL1NotToAssetRouter(_to));
+        return l1AssetRouter;
+    }
+
+    /// @notice Verifies the bundle: runs the shared destination-context / fresh-bundle validation, then checks
+    /// that its `BUNDLE_IDENTIFIER`-prefixed message was included, sent by the canonical L2 InteropCenter. Asset
+    /// correctness across chains is guaranteed by ZK proofs, so no on-chain per-chain balance reconciliation is
+    /// performed here.
     /// @param _bundle The abi-encoded InteropBundle struct to verify.
+    /// @param _interopBundle The decoded bundle (for the destination-context validation).
     /// @param _proof Proof for the message corresponding to the bundle.
     /// @param _bundleHash Hash corresponding to the bundle.
-    function _verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bytes32 _bundleHash) internal {
+    /// @param _status Current bundle status (must be `Unreceived`).
+    function _verifyBundle(
+        bytes memory _bundle,
+        InteropBundle memory _interopBundle,
+        MessageInclusionProof memory _proof,
+        bytes32 _bundleHash,
+        BundleStatus _status
+    ) internal {
+        // Destination-context + fresh-bundle gate. Single home for the context check (see {_validateExecutable}).
+        _validateVerifiable(_bundleHash, _interopBundle, _proof.chainId, _status);
+
         require(
             _proof.message.sender == L2_INTEROP_CENTER_ADDR,
             UnauthorizedMessageSender(L2_INTEROP_CENTER_ADDR, _proof.message.sender)
