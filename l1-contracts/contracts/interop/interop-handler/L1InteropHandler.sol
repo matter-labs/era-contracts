@@ -12,7 +12,6 @@ import {BUNDLE_IDENTIFIER, BundleStatus, InteropBundle, MessageInclusionProof} f
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
-import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {InteropWithdrawalNonZeroValue} from "../../bridge/L1BridgeContractErrors.sol";
 import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {
@@ -39,13 +38,21 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
     /// @dev MessageRoot smart contract that is used to prove message inclusion.
     IMessageRootBase public immutable MESSAGE_ROOT;
 
+    /// @dev The canonical L1 AssetRouter — the only recipient L1-destined interop bundles may target. Pinned as
+    /// an immutable (known at deploy time) so the dispatch target is fixed at construction rather than resolved
+    /// via external calls on every execution. See {_interopCallTarget}.
+    address public immutable L1_ASSET_ROUTER;
+
     /// @dev Contract is expected to be used as a proxy implementation.
     /// @dev Locking the reentrancy guard (and disabling the OZ initializers) in the constructor prevents the
     /// implementation from being initialized.
     /// @param _messageRoot The MessageRoot used to prove message inclusion.
-    constructor(IMessageRootBase _messageRoot) reentrancyGuardInitializer {
+    /// @param _l1AssetRouter The canonical L1 AssetRouter (the only supported L1 bundle-call target).
+    constructor(IMessageRootBase _messageRoot, address _l1AssetRouter) reentrancyGuardInitializer {
         _disableInitializers();
+        require(_l1AssetRouter != address(0), ZeroAddress());
         MESSAGE_ROOT = _messageRoot;
+        L1_ASSET_ROUTER = _l1AssetRouter;
     }
 
     /// @notice Initializes the contract behind its proxy.
@@ -181,16 +188,15 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
     }
 
     /// @inheritdoc InteropHandlerBase
-    /// @dev Pins the dispatch target to the canonical L1 AssetRouter (resolved from the bridgehub), regardless
+    /// @dev Pins the dispatch target to the immutable canonical L1 AssetRouter (`L1_ASSET_ROUTER`), regardless
     /// of the bundle's caller-selected `_to`. This confines the L1 execution surface to the asset router's
     /// `finalizeDeposit` path — whose {AssetRouterBase.receiveMessage} independently validates the selector,
     /// interop sender (L2 AssetRouter), and source chain — so a malformed source-chain bundle can never reach
-    /// an arbitrary L1 `IERC7786Recipient`. A well-formed withdrawal already carries `_to == l1AssetRouter`
+    /// an arbitrary L1 `IERC7786Recipient`. A well-formed withdrawal already carries `_to == L1_ASSET_ROUTER`
     /// (the L2 InteropCenter rewrites the indirect call to it); anything else reverts.
     function _interopCallTarget(address _to) internal view override returns (address) {
-        address l1AssetRouter = address(IBridgehubBase(MESSAGE_ROOT.BRIDGE_HUB()).assetRouter());
-        require(_to == l1AssetRouter, InteropCallToL1NotToAssetRouter(_to));
-        return l1AssetRouter;
+        require(_to == L1_ASSET_ROUTER, InteropCallToL1NotToAssetRouter(_to));
+        return L1_ASSET_ROUTER;
     }
 
     /// @notice Verifies the bundle: runs the shared destination-context / fresh-bundle validation, then checks
