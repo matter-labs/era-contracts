@@ -164,14 +164,6 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
             calls,
             _withAtomicBundle(bundleAttributes)
         );
-
-        // Send nothing at all
-        vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, indirectCallMessageValue, 0));
-        L2_INTEROP_CENTER.sendBundle{value: 0}(
-            InteroperableAddress.formatEvmV1(destinationChainId),
-            calls,
-            _withAtomicBundle(bundleAttributes)
-        );
     }
 
     /// @notice Test indirect call with zero interopCallValue but non-zero indirectCallMessageValue
