@@ -43,7 +43,7 @@ contract ZKsyncOSPublicInputTest is Test {
     /// @dev `BatchPublicInput::hash()` for zero state commitments, `chain_config_hash` of chain id 37
     /// with FRI proof verification disabled, the default max tx gas limit and pubdata content `FULL_PUBDATA` (matching
     /// zksync-os `ChainConfig::new(37, false, DEFAULT_MAX_TX_GAS_LIMIT).hash()`, which defaults to
-    /// `DAMode::Rollup`), and `BATCH_OUTPUT_HASH_GOLDEN`. Shared with zksync-os
+    /// `PubdataContent::FullPubdata`), and `BATCH_OUTPUT_HASH_GOLDEN`. Shared with zksync-os
     /// `batch_public_input_hash_golden_vector`.
     bytes32 internal constant PUBLIC_INPUT_HASH_GOLDEN =
         0x0a5143e28ed3fc1728ef4d96319f2306bb5a81bfccd908154e44029988ef9e7c;
