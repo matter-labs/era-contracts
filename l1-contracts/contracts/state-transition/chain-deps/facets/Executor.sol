@@ -286,16 +286,25 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
-    /// @dev Gets zk proof public input for ZKSync OS
+    /// @dev Gets zk proof public input for ZKSync OS.
     function _getBatchProofPublicInputZKsyncOS(
         bytes32 _prevBatchStateCommitment,
         bytes32 _currentBatchStateCommitment,
         bytes32 _currentBatchCommitment
-    ) internal pure returns (uint256) {
+    ) internal view returns (uint256) {
+        // `fri_proof_verification_enabled` is always disabled, hence the `0` word.
+        bytes32 chainConfigHash = keccak256(
+            abi.encodePacked(s.chainId, uint256(0), uint256(_getZKsyncOSMaxTxGasLimit()))
+        );
         return
             uint256(
                 keccak256(
-                    abi.encodePacked(_prevBatchStateCommitment, _currentBatchStateCommitment, _currentBatchCommitment)
+                    abi.encodePacked(
+                        _prevBatchStateCommitment,
+                        _currentBatchStateCommitment,
+                        chainConfigHash,
+                        _currentBatchCommitment
+                    )
                 )
             ) >> PUBLIC_INPUT_SHIFT;
     }
