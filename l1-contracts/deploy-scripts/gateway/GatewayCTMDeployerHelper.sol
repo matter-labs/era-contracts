@@ -589,12 +589,12 @@ library GatewayCTMDeployerHelper {
     ) internal returns (Verifiers memory result) {
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
 
-        {
+        if (!_isZKsyncOS) {
             (string memory fflonkFile, string memory fflonkName) = DeployCTML1OrGateway.resolve(
-                _isZKsyncOS,
+                false,
                 CTMContract.VerifierFflonk
             );
-            result.verifierFflonk = _deployInternalEmptyParams(fflonkName, fflonkFile, innerConfig, _isZKsyncOS);
+            result.verifierFflonk = _deployInternalEmptyParams(fflonkName, fflonkFile, innerConfig, false);
         }
         {
             (string memory plonkFile, string memory plonkName) = DeployCTML1OrGateway.resolve(
@@ -608,12 +608,9 @@ library GatewayCTMDeployerHelper {
                 _isZKsyncOS,
                 config.testnetVerifier
             );
-            bytes memory creationArgs = DeployCTML1OrGateway.verifierCreationArgs(
-                _isZKsyncOS,
-                result.verifierFflonk,
-                result.verifierPlonk,
-                config.aliasedGovernanceAddress
-            );
+            bytes memory creationArgs = _isZKsyncOS
+                ? abi.encode(result.verifierPlonk)
+                : abi.encode(result.verifierFflonk, result.verifierPlonk);
             result.verifier = _deployInternalWithParams(
                 mainVerifierName,
                 mainVerifierFile,
@@ -825,7 +822,6 @@ library GatewayCTMDeployerHelper {
                 eip7702Checker: address(0),
                 verifierFflonk: _deployedContracts.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: _deployedContracts.stateTransition.verifiers.verifierPlonk,
-                verifierOwner: _config.aliasedGovernanceAddress,
                 permissionlessValidator: address(0)
             });
     }
