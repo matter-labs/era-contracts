@@ -693,8 +693,10 @@ contract InteropCenter is
                     NonZeroValueToL1NotSupported(_callStarters[i].callAttributes.interopCallValue)
                 );
             }
-            // Indirect calls must not carry destination-side value: on the atomic recovery path the value is
-            // refunded to `InteropCall.from` (the indirect sender), not the payer, so it would strand funds.
+            // Indirect calls must not carry destination-side value (`interopCallValue`): on the atomic timeout
+            // recovery path the value is refunded to `InteropCall.from` (the indirect sender), not the payer,
+            // so it would strand funds. All L2->L2 bundles are atomic, so the ban is unconditional here.
+            // (`indirectCallMessageValue` — the source-side value passed to `initiateIndirectCall` — stays allowed.)
             if (_callStarters[i].callAttributes.indirectCall) {
                 require(
                     _callStarters[i].callAttributes.interopCallValue == 0,

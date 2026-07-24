@@ -90,6 +90,7 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
         // Proof gate (if not yet verified). `_verifyBundle` also runs the destination-context / fresh-bundle
         // check; an already-`Verified` bundle had it checked at verify time, and it's invariant per bundle.
         if (status != BundleStatus.Verified) {
+            // solhint-disable-next-line func-named-parameters
             _verifyBundle(_bundle, interopBundle, _proof, bundleHash, status);
         }
 
@@ -104,6 +105,7 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
 
         // `_verifyBundle` runs `_validateVerifiable` (destination-context + fresh-bundle) then the message-
         // inclusion proof gate, and marks the bundle `Verified`.
+        // solhint-disable-next-line func-named-parameters
         _verifyBundle(_bundle, interopBundle, _proof, bundleHash, status);
     }
 

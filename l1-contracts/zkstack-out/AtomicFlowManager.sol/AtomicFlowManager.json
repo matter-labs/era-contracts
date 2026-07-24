@@ -634,6 +634,11 @@
   },
   {
     "type": "error",
+    "name": "ManagerL1ChainIdZero",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "ManagerLegAlreadyCommitted",
     "inputs": [
       {
