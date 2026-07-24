@@ -315,15 +315,12 @@ jobs:
       - name: Compare EraVerifierFflonk.sol
         run: diff tools/verifier-gen/data/EraVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/EraVerifierFflonk.sol
 
-      - name: Generate ZKsyncOS verifiers
+      - name: Generate ZKsyncOS verifier
         working-directory: tools/verifier-gen
         run: cargo run --bin zksync_verifier_contract_generator --release -- --variant zksync-os
 
       - name: Compare ZKsyncOSVerifierPlonk.sol
         run: diff tools/verifier-gen/data/ZKsyncOSVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol
-
-      - name: Compare ZKsyncOSVerifierFflonk.sol
-        run: diff tools/verifier-gen/data/ZKsyncOSVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol
 
   coverage:
     defaults:

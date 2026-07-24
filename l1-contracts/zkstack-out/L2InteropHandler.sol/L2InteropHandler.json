@@ -539,6 +539,11 @@
   },
   {
     "type": "error",
+    "name": "ShadowAccountNotSupported",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "SlotOccupied",
     "inputs": []
   },

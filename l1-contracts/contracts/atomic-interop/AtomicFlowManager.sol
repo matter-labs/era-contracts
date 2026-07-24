@@ -26,6 +26,7 @@ import {
 import {L2_BRIDGEHUB} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {
     ManagerAlreadyInitialized,
+    ManagerL1ChainIdZero,
     ManagerNotInteropCenter,
     ManagerNotInteropHandler,
     ManagerLegAlreadyCommitted,
@@ -84,6 +85,10 @@ contract AtomicFlowManager is IAtomicFlowManager {
     function initL2(uint256 _l1ChainId) external onlyUpgrader {
         if (L1_CHAIN_ID != 0) {
             revert ManagerAlreadyInitialized();
+        }
+        // Zero is the "not initialized" sentinel; a zero argument would leave the manager re-initializable.
+        if (_l1ChainId == 0) {
+            revert ManagerL1ChainIdZero();
         }
         L1_CHAIN_ID = _l1ChainId;
     }

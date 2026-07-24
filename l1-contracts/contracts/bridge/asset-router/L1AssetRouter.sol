@@ -94,13 +94,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         _;
     }
 
-    /// @notice Checks that the message sender is this contract itself.
-    /// @dev `finalizeDeposit` is reached only via `receiveMessage`'s self-call, mirroring the L2 asset router.
-    modifier onlySelf() {
-        require(msg.sender == address(this), Unauthorized(msg.sender));
-        _;
-    }
-
     /// @notice Checks that the message sender is this contract itself or the nullifier.
     /// @dev `finalizeDeposit` is reached either via `receiveMessage`'s self-call (interop-bundle
     /// withdrawals) or via the nullifier's legacy withdrawal-finalization path.

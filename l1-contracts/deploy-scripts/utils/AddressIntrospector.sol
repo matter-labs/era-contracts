@@ -503,9 +503,9 @@ library AddressIntrospector {
         return address(0);
     }
 
-    /// @notice Get fflonk and plonk sub-verifiers from a dual verifier
+    /// @notice Get the sub-verifiers used by the active verifier.
     /// @param _verifier The verifier address
-    /// @param _isZKsyncOS If true, uses ZKsyncOSDualVerifier interface; otherwise EraDualVerifier
+    /// @param _isZKsyncOS If true, returns only the ZKsync OS PLONK verifier; otherwise both Era verifiers.
     function _getSubVerifiers(
         address _verifier,
         bool _isZKsyncOS

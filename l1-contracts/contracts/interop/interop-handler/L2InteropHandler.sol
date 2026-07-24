@@ -40,7 +40,9 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
     /// (via the AtomicFlowManager) that every leg of the flow was committed in its source chain's IMT before
     /// the deadline, and that this bundle is one of the flow's legs.
     /// @dev No gateway-settlement requirement: an atomic bundle's cross-chain binding comes from the per-leg
-    /// IMT inclusion proofs authenticated against the interop root, valid on any settlement layer. No
+    /// IMT inclusion proofs authenticated against the interop root. This release supports only L1 as the
+    /// settlement layer — the flow's `settlementLayerChainId` must equal the L1 chain id, enforced in
+    /// {AtomicFlowManager}/{AtomicInteropProof} (`ManagerSettlementLayerNotL1`). No
     /// nonReentrant guard: replay safety is by CEI (`_markFullyExecutedAndRun` sets `FullyExecuted` before
     /// running any call), so a reentrant call for this bundle hits the status check; a global lock would also
     /// block legitimate nested interop.
@@ -49,13 +51,13 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
     function executeAtomicBundle(bytes memory _bundle, AtomicFinalityProof calldata _finality) public override {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
-        // Shared pre-gate validation. An atomic bundle is never published to L1, so it self-binds its own
-        // source chain id: the `proofChainId` argument here is `interopBundle.sourceChainId` itself, so
-        // `_validateExecutable`'s `WrongSourceChainId` check is a no-op (it compares the value to itself).
-        // That is intentional — the *authenticity* of `interopBundle.sourceChainId` is not established here
-        // but by `requireFlowFinalized` below, which verifies each leg's source chain via the atomic proof's
-        // `legSourceChainIds` against the committed IMT.
-        _validateExecutable(bundleHash, interopBundle, interopBundle.sourceChainId, status);
+        // Shared pre-gate validation (pause/permission/executability).
+        _validateExecutable(bundleHash, interopBundle, status);
+
+        // Destination-context gate, explicit here since the atomic execute path has no verify step to carry it.
+        // `proofChainId` is the bundle's own `sourceChainId` (self-binding), so the source-chain sub-check is a
+        // no-op; source-chain authenticity is instead established by `requireFlowFinalized` below.
+        _validateBundleDestinationContext(bundleHash, interopBundle, interopBundle.sourceChainId);
 
         // Atomicity gate: prove the whole flow was committed before the deadline. Skipped if already verified.
         if (status != BundleStatus.Verified) {
