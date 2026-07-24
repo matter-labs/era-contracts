@@ -99,6 +99,26 @@ contract ZKsyncOSVerifierTest is Test {
         verifier.verify(publicInputs, emptyProof);
     }
 
+    function test_verify_revertsOnPlonkProofMissingInitialHash() public {
+        uint256[] memory publicInputs = new uint256[](1);
+        publicInputs[0] = 123;
+        uint256[] memory proof = new uint256[](1);
+        proof[0] = ZKSYNC_OS_PLONK_VERIFICATION_TYPE;
+
+        vm.expectRevert(EmptyProofLength.selector);
+        verifier.verify(publicInputs, proof);
+    }
+
+    function test_verify_revertsOnMockProofMissingInitialHash() public {
+        uint256[] memory publicInputs = new uint256[](1);
+        publicInputs[0] = 123;
+        uint256[] memory proof = new uint256[](1);
+        proof[0] = ZKSYNC_OS_MOCK_VERIFICATION_TYPE;
+
+        vm.expectRevert(EmptyProofLength.selector);
+        verifier.verify(publicInputs, proof);
+    }
+
     function test_verify_revertsOnEmptyPublicInputs() public {
         uint256[] memory emptyPublicInputs = new uint256[](0);
         uint256[] memory proof = new uint256[](ZKSYNC_OS_PROOF_METADATA_LENGTH);

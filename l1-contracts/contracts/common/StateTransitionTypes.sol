@@ -27,7 +27,7 @@ struct Facets {
 /// @notice Verifier contract addresses.
 // solhint-disable-next-line gas-struct-packing
 struct Verifiers {
-    /// @notice Address of the VerifierFflonk contract. Zero for ZKsync OS.
+    /// @notice Address of the VerifierFflonk contract. Left unset by deployment tooling for ZKsync OS.
     address verifierFflonk;
     /// @notice Address of the VerifierPlonk contract.
     address verifierPlonk;
