@@ -157,7 +157,7 @@ dependency roots; the genesis batch leaf is seeded by `MessageRoot.seedGenesisRo
   every collaborator is referenced by its canonical fixed address: the tree's appender and the manager's
   tree / interop center / interop handler are constant getters, and the AR recognises the manager via
   `_atomicFlowManagerAddr()`. The manager no longer holds an asset-router reference at all — it drives
-  recovery generically through `IAtomicRecoverable` on each bundle call's target.
+  recovery generically through `IAtomicRecoverable` on each bundle call's `from`.
 
 ## Off-chain tooling (`test/anvil-interop/`)
 

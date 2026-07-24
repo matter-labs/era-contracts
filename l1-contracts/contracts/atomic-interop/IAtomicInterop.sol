@@ -92,6 +92,10 @@ struct AtomicFlowPreimage {
 /// and matched before use.
 /// @param flowId `keccak256(abi.encode(preimage))`.
 /// @param preimage The hashed field set (see {AtomicFlowPreimage}).
+/// @dev `flowId` is redundant on-chain — every consumer recomputes it from `preimage` and matches before use.
+/// It is kept intentionally as a convenience for callers/off-chain tooling, which can read the id directly from
+/// calldata rather than re-hashing. General rule: carrying such a recomputed-and-verified value is acceptable
+/// for public entrypoint structs (readability/ergonomics), but should be avoided for purely internal ones.
 struct AtomicFlow {
     bytes32 flowId;
     AtomicFlowPreimage preimage;

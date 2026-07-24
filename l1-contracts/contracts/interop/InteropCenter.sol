@@ -47,6 +47,7 @@ import {
     CannotInitiateInteropOnL1,
     DestinationChainNotRegistered,
     DirectCallToL1NotSupported,
+    IndirectCallCannotCarryValue,
     IndirectCallValueMismatch,
     InteropBundleSaltAlreadyUsed,
     InteropCallToL1NotToAssetRouter,
@@ -692,6 +693,16 @@ contract InteropCenter is
                     NonZeroValueToL1NotSupported(_callStarters[i].callAttributes.interopCallValue)
                 );
             }
+            // An indirect call must not carry destination-side value. On the atomic timeout/recovery path a
+            // call's value is refunded to `InteropCall.from` (for an indirect call, the indirect sender such as
+            // the asset router) rather than the actual payer, so a value-bearing indirect call would strand
+            // funds. Such calls have negligible use, so they are disallowed outright rather than special-cased.
+            if (_callStarters[i].callAttributes.indirectCall) {
+                require(
+                    _callStarters[i].callAttributes.interopCallValue == 0,
+                    IndirectCallCannotCarryValue(_callStarters[i].callAttributes.interopCallValue)
+                );
+            }
             InteropCall memory interopCall = _processCallStarter(_callStarters[i], _destinationChainId);
             bundle.calls[i] = interopCall;
             totalBurnedCallsValue += _callStarters[i].callAttributes.interopCallValue;
@@ -728,7 +739,7 @@ contract InteropCenter is
     ///   are not atomic (they inherently target L1), so they carry no `atomicBundle` attribute.
     /// @dev `_atomicSend` (flowId/deadline/lowNullifierIndex) is passed out-of-band and is intentionally
     /// NOT embedded in `_bundle`, so `bundleHash` is independent of `flowId`. This is required:
-    /// `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`
+    /// `flowId = keccak256(abi.encode(AtomicFlowPreimage))` (whose `legBundleHashes` include this bundle's hash)
     /// must be computable off-chain before the send, which is impossible if a `bundleHash` (a flowId
     /// input) embedded `flowId`.
     /// @return bundleHash Canonical hash of the bundle.

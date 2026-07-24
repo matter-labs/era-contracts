@@ -27,6 +27,8 @@ error EmptyBundle();
 error ExecutingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes executionAddress);
 // 0x16b0fa00
 error FeeWithdrawalFailed();
+// 0x4afc3319
+error IndirectCallCannotCarryValue(uint256 value);
 // 0x62d214aa
 error IndirectCallValueMismatch(uint256 expected, uint256 actual);
 // 0xbfa9bcca
@@ -39,12 +41,12 @@ error InteroperableAddressChainReferenceNotEmpty(bytes interoperableAddress);
 error InteroperableAddressNotEmpty(bytes interoperableAddress);
 // 0x290dc1c0
 error InteropPreviewHash(bytes32 bundleHash);
-// 0x9b021130
-error InteropToSelfNotSupported();
 // 0x2d48e8cf
 error InteropRootAlreadyExists();
 // 0x8a011102
 error InteropRootTimestampIsZero();
+// 0x9b021130
+error InteropToSelfNotSupported();
 // 0xeae192ef
 error InvalidInteropBundleVersion();
 // 0xd5f13973
