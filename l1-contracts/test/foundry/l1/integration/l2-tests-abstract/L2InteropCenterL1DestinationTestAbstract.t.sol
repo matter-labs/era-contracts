@@ -105,7 +105,7 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
     }
 
     /// @notice An L1-destined bundle carrying the `atomicBundle` attribute is rejected (see
-    /// {protocol-docs/atomic-interop.md#flow}); the check fires in `_sendBundle` before any burn or state change.
+    /// {protocol-docs/atomicity/security.md#non-guarantees}); the check fires in `_sendBundle` before any burn or state change.
     function test_sendBundle_RevertWhen_AtomicBundleToL1() public {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = _l1CallStarter(L2_ASSET_ROUTER_ADDR, true, 0);

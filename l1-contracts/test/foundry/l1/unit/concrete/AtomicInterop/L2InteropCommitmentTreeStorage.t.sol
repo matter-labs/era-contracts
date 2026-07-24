@@ -13,7 +13,7 @@ import {
 /// @notice Locks the L2InteropCommitmentTree storage ABI the ZKsync OS bootloader depends on: it reads
 /// `_height` from slot 0 and `_imt.tree._nodes[_height][0]` from base slot 2 at every batch boundary to
 /// commit the begin/end IMT snapshots. Any layout drift is a consensus break — never "fix" these tests
-/// without a matching bootloader change. See {protocol-docs/atomic-interop.md#contracts}.
+/// without a matching bootloader change. See {protocol-docs/atomicity/imt.md}.
 contract L2InteropCommitmentTreeStorageTest is Test {
     /// @dev The bootloader's hardcoded slot of `_imt.tree._height` (the IMT is the first state
     /// variable and `FullMerkle.FullTree` puts `_height` at offset 0).

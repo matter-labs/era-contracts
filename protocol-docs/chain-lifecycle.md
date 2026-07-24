@@ -10,7 +10,7 @@ Related documents, which are the source of truth for their own topics:
   flows (`addChainBatchRoot` vs `addChainBatchRootV32`), and interop-root import/verification.
 - {protocol-docs/interop.md} — the interop message path (`InteropCenter`, `InteropHandler`,
   bundles, interop roots).
-- {protocol-docs/atomic-interop.md} — the atomic (IMT-based) interop protocol, its proofs, and the
+- {protocol-docs/atomicity/README.md} — the atomic (IMT-based) interop protocol, its proofs, and the
   full statement of the timeout-protocol preconditions.
 
 ## Chain creation (`createNewChain`)
@@ -62,7 +62,7 @@ the first real batch continues at 1 exactly as without the genesis leaf.
 Why this exists: the atomic-interop timeout protocol requires that every chain interop can target
 has **at least one batch leaf inside the settlement layer's message root** — otherwise a leg on a
 chain that halts before ever settling could neither finalize nor be proven timed out. Seeding at
-creation satisfies this for fresh chains; see {protocol-docs/atomic-interop.md} for the proof-level
+creation satisfies this for fresh chains; see {protocol-docs/atomicity/proofs.md#completeness} for the proof-level
 reasoning.
 
 Chains added to a message root with a **non-zero** starting batch number (already-deployed chains
@@ -158,7 +158,7 @@ message that previously went through the removed asset tracker.
 ## ZKsync OS genesis force deployments: atomic-interop built-ins
 
 Two new L2 built-ins support atomic interop (protocol details in
-{protocol-docs/atomic-interop.md}):
+{protocol-docs/atomicity/README.md}):
 
 - `L2InteropCommitmentTree` at `0x10012` (`L2_INTEROP_COMMITMENT_TREE_ADDR`) — the per-chain
   append-only Indexed Merkle Tree of leg commitments. Its storage layout is consensus-critical:

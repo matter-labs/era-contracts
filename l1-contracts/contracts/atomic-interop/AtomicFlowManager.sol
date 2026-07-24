@@ -41,7 +41,7 @@ import {RecoverToL1NotSupported} from "../common/L1ContractErrors.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice See {IAtomicFlowManager}. Coordinates atomic interop flows on this chain (send-side commit,
-/// finality gate, timeout refund); it never custodies funds. See {protocol-docs/atomic-interop.md#flow};
+/// finality gate, timeout refund); it never custodies funds. See {protocol-docs/atomicity/flow.md#the-atomicflowmanager};
 /// the exact finalization/timeout conditions live in the {AtomicInteropProof} library header.
 contract AtomicFlowManager is IAtomicFlowManager {
     /// @dev (flowId, bundleHash) => source-leg state on this chain.
@@ -116,7 +116,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
 
         // Every other leg must declare a Bridgehub-registered source chain: registration guarantees
         // MessageRoot presence, without which the leg could never be proven committed OR absent and the
-        // whole flow would be stranded. See {protocol-docs/atomic-interop.md#timeout-protocol-preconditions}.
+        // whole flow would be stranded. See {protocol-docs/atomicity/security.md#timeout-protocol-preconditions}.
         for (uint256 i = 0; i < n; ++i) {
             uint256 legSourceChainId = _flowPreimage.legSourceChainIds[i];
             if (legSourceChainId == block.chainid) {
@@ -186,7 +186,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
 
         // Bind the absence proof to the missing leg's declared source chain: a commit value is trivially
         // absent from any OTHER chain's tree, so an unbound proof would allow a double-mint refund of a
-        // finalized flow. See {protocol-docs/atomic-interop.md#flow}.
+        // finalized flow. See {protocol-docs/atomicity/proofs.md#timeout}.
         AtomicFlowPreimage calldata preimage = _flow.preimage;
         uint256 missingLegChainId = preimage.legSourceChainIds[_missingLegIndex];
         if (_absence.sourceChainId != missingLegChainId) {
@@ -248,7 +248,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
     }
 
     /// @dev Reverses every recoverable call embedded in `_bundle` (best-effort timeout refund — see
-    /// {protocol-docs/atomic-interop.md#flow}, step 4), re-crediting the original depositor.
+    /// {protocol-docs/atomicity/recovery.md}), re-crediting the original depositor.
     /// @dev Each call's local sender (`InteropCall.from`) owns its own reversal via
     /// {IAtomicRecoverable.recoverAtomicCall}: the manager is agnostic to the call/encoding format and
     /// simply forwards `(destinationChainId, data)`, counting the calls that report a recovery. Senders
@@ -296,7 +296,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
         }
     }
 
-    /// @dev Atomic interop is L1-settling only in this release (see {protocol-docs/atomic-interop.md#flow});
+    /// @dev Atomic interop is L1-settling only in this release (see {protocol-docs/atomicity/security.md#trust-assumptions});
     /// checked wherever the settlement layer is consumed: `append`, finality and refund verification.
     function _checkSettlementLayerIsL1(uint256 _settlementLayerChainId) internal view {
         if (_settlementLayerChainId != L1_CHAIN_ID) {

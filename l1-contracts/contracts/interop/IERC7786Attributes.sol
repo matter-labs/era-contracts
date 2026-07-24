@@ -26,7 +26,7 @@ interface IERC7786Attributes {
 
     /// @notice Marks a bundle as an atomic interop leg (bundle-level attribute): the InteropCenter
     ///      appends the bundle's commit value to the interop IMT instead of publishing it to L1.
-    ///      See {protocol-docs/interop.md#atomic-bundles} and {protocol-docs/atomic-interop.md#flow}.
+    ///      See {protocol-docs/interop.md#atomic-bundles} and {protocol-docs/atomicity/flow.md}.
     /// @param _flowPreimage The full `flowId` preimage; the AtomicFlowManager recomputes `flowId` and
     ///      requires this bundle's hash to be one of its legs, else the send reverts.
     /// @param _lowNullifierIndex The low-nullifier slot for this leg's commit value in the IMT.

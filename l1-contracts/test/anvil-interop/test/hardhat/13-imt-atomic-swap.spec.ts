@@ -3,7 +3,7 @@
  * via atomic sends + executeAtomicBundle, the late-batch and halted-chain timeout/refund paths, the
  * send-time flow/bundle coupling checks, and the timeout negatives. Proofs are built off-chain by
  * imt-engine-lib; on the harness the chain-batch-root leaf authentication is mocked and settlement
- * interop roots are added via bootloader impersonation. See {protocol-docs/atomic-interop.md#flow}.
+ * interop roots are added via bootloader impersonation. See {protocol-docs/atomicity/flow.md}.
  */
 
 import { expect } from "chai";
@@ -661,7 +661,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
 
   it("send-time coupling: an atomic send whose preimage does not contain the bundle is rejected", async () => {
     // Regression: committing a bundle under a flow whose preimage does not contain it would strand
-    // the burned funds; the send must revert before any burn. See {protocol-docs/atomic-interop.md#flow}.
+    // the burned funds; the send must revert before any burn. See {protocol-docs/atomicity/flow.md#1-atomic-send-append}.
     const user = chainA.user.address;
     const deadline = (await chainNow(chainA.provider)) + 3600;
     const amount = ethers.utils.parseUnits("1", TEST_TOKEN_DECIMALS);

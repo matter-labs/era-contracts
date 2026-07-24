@@ -38,7 +38,7 @@ contract MockBridgehubRegistry {
 
 /// @notice Covers `AtomicFlowManager.append`: a bundle can only be committed under a `flowId` whose
 /// preimage contains the bundle's own hash with this chain declared as the leg's source, so a wrong or
-/// stale preimage reverts the send instead of stranding burned funds. See {protocol-docs/atomic-interop.md#flow}.
+/// stale preimage reverts the send instead of stranding burned funds. See {protocol-docs/atomicity/flow.md#1-atomic-send-append}.
 /// @dev The manager and commitment tree sit at their canonical predeploys, so `append` exercises the real
 /// `commitmentTree()` wiring and the tree's real appender ACL — no mocks; the caller ACL is exercised by
 /// pranking the canonical InteropCenter address.

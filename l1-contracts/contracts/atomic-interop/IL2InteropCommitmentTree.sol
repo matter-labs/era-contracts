@@ -9,7 +9,7 @@ import {IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
 /// O(log n) proofs of both membership and non-membership. The tree publishes nothing itself: the
 /// ZKsync OS bootloader snapshots the root at every batch boundary into the chain batch root, which
 /// consuming chains authenticate via {AtomicInteropProof}. Deployed as an L2 genesis predeploy (no
-/// constructor; seeded in `initL2`). See {protocol-docs/atomic-interop.md#contracts}.
+/// constructor; seeded in `initL2`). See {protocol-docs/atomicity/imt.md}.
 interface IL2InteropCommitmentTree {
     /// @notice Emitted whenever the root changes. For off-chain indexing only — cross-chain consumers
     /// read the root from the chain batch root, not from events or messages.

@@ -10,7 +10,8 @@ import { join } from "path";
 const DOCS_DIR = "protocol-docs";
 // Extensions whose comments carry `{protocol-docs/...}` pointers.
 const SOURCE_GLOBS = ["*.sol", "*.ts", "*.rs"];
-const POINTER_RE = /\{protocol-docs\/([A-Za-z0-9_-]+\.md)(#[A-Za-z0-9_-]+)?\}/g;
+// The doc target may be nested (e.g. `atomicity/flow.md`), so allow one or more path segments.
+const POINTER_RE = /\{protocol-docs\/((?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.md)(#[A-Za-z0-9_-]+)?\}/g;
 
 // GitHub heading -> anchor slug (mirrors github-slugger): lowercase, drop every
 // character that is not a letter, number, space, hyphen or underscore, then turn
@@ -52,11 +53,21 @@ function listedSourceFiles(): string[] {
   return out.split("\n").filter(Boolean);
 }
 
+// Keyed by path relative to DOCS_DIR (e.g. `atomicity/flow.md`), so nested docs are addressable
+// exactly as they appear in a `{protocol-docs/<relPath>}` pointer.
 function loadDocAnchors(): Map<string, Set<string>> {
   const map = new Map<string, Set<string>>();
-  for (const f of fs.readdirSync(DOCS_DIR)) {
-    if (f.endsWith(".md")) map.set(f, anchorsForDoc(join(DOCS_DIR, f)));
-  }
+  const walk = (dir: string, prefix: string): void => {
+    for (const entry of fs.readdirSync(join(DOCS_DIR, dir), { withFileTypes: true })) {
+      const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        walk(join(dir, entry.name), rel);
+      } else if (entry.name.endsWith(".md")) {
+        map.set(rel, anchorsForDoc(join(DOCS_DIR, rel)));
+      }
+    }
+  };
+  walk("", "");
   return map;
 }
 

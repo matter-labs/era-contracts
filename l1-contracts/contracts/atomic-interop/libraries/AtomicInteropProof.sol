@@ -27,43 +27,9 @@ import {
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Cross-chain authentication for the atomic interop flow: verifies a leg's commit value
 /// present in (finality) or absent from (timeout) its source chain's IMT, with the claimed IMT root
-/// authenticated as a chain-batch-root leaf against an imported interop root (see {ImtProof} and
-/// {protocol-docs/atomic-interop.md#flow} for the mechanics). This header is the canonical spec of the
-/// finality/timeout conditions and their soundness/completeness arguments.
-///
-/// Two authenticated clocks are compared to the flow `deadline` (a settlement-layer timestamp):
-///   - `t` (`l1BatchTimestamp`) — when the batch root was aggregated into the shared root; folded into
-///     the chain batch leaf, hence proven by the same inclusion proof and re-parsed from
-///     `settlementProof`.
-///   - `T` — the imported aggregation root's creation time, stored alongside the root (see
-///     {IL2InteropRootStorage}) and double checked on the settlement layer, so as trustworthy as the
-///     root itself.
-///
-/// A leg FINALIZES iff its commit value is present in the batch-END IMT root (leaf 3) of a batch with
-/// `t <= deadline`.
-///
-/// A leg TIMES OUT (is refundable) via an aggregated root created strictly after the deadline
-/// (`T > deadline`) plus one batch of the source chain inside that root. The prover declares the
-/// branch (`ImtProof.provesAgainstBeginRoot`), validated against the authenticated `t`:
-///   - begin branch (`t > deadline` required): the value is absent from the batch-BEGIN IMT root
-///     (leaf 2). The tree is append-only and `begin(N) == end(N-1)`, so absence at the begin of a
-///     late batch means absence from every batch with `t <= deadline`.
-///   - end branch (`t <= deadline` required): the batch is additionally proven to be the chain's LAST
-///     batch inside the aggregated root, and the value is absent from its batch-END IMT root (leaf 3)
-///     — the final IMT state reachable in time (any later batch has `t' >= T > deadline`). This
-///     branch restores refund liveness for a source chain that HALTS; the required "last batch"
-///     always exists (see {protocol-docs/atomic-interop.md#timeout-protocol-preconditions}).
-///
-/// SOUNDNESS — both timeout branches are mutually exclusive with finalization: a value committed in a
-/// batch `B` with `t_B <= deadline` is contained in `begin(L)` of every batch `L` with
-/// `t_L > deadline` (batch order follows aggregation-time order) and in `end(L')` of the last batch
-/// `L'` of any root with `T > deadline >= t_B` (that root already contains `B`, so `L' >= B`).
-///
-/// COMPLETENESS — if a leg has really timed out, a valid timeout proof can always be produced from
-/// ANY aggregated root with `T > deadline`, even if the source chain inserts the value later: if the
-/// root contains a batch with `t > deadline`, the FIRST such batch works (its begin root equals the
-/// end root of the last in-time batch); otherwise the chain's last batch in the root is in time and
-/// its end root — the final in-time IMT state — cannot contain the value either.
+/// authenticated as a chain-batch-root leaf against an imported interop root. The finality/timeout
+/// conditions and their soundness/completeness arguments are specified canonically in
+/// {protocol-docs/atomicity/proofs.md}.
 library AtomicInteropProof {
     /// @notice The value inserted into a chain's IMT when a flow leg is committed.
     function commitValue(bytes32 _flowId, bytes32 _specHash) internal pure returns (uint256) {

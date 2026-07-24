@@ -2,7 +2,7 @@
 
 This document is the single source of truth for the protocol-level behavior of the bridge contracts
 (`l1-contracts/contracts/bridge/`). Contract doc comments reference this file instead of repeating the
-narrative. For the atomic interop flow itself, see {protocol-docs/atomic-interop.md}.
+narrative. For the atomic interop flow itself, see {protocol-docs/atomicity/README.md}.
 
 ## Contract map
 
@@ -235,7 +235,7 @@ to preserve the deployed storage layout.
 ## Atomic-recovery hook
 
 `L2AssetRouter` implements `IAtomicRecoverable.recoverAtomicCall`, the timeout-refund hook of the atomic
-interop (IMT) flow — see {protocol-docs/atomic-interop.md} for the full flow. Summary:
+interop (IMT) flow — see {protocol-docs/atomicity/flow.md} for the full flow. Summary:
 
 - Callable only by the canonical `AtomicFlowManager`, a genesis built-in at a fixed address
   (`L2_ATOMIC_FLOW_MANAGER_ADDR`); on chains without the atomic-flow stack nothing is deployed there, so

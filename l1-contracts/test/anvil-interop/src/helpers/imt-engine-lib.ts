@@ -2,7 +2,7 @@
  * Off-chain port of the on-chain IndexedMerkleTree/FullMerkle plus builders for the {ImtProof}
  * structs that AtomicFlowManager / AtomicInteropProof verify. Must stay bit-for-bit compatible with
  * IndexedMerkleTree.sol / FullMerkle.sol and the on-chain id derivations (flowId / commitValue).
- * See {protocol-docs/atomic-interop.md#off-chain-tooling-l1-contractstestanvil-interop} and {protocol-docs/message-root.md#indexed-merkle-tree-indexedmerkletree}.
+ * See {protocol-docs/atomicity/README.md#off-chain-tooling} and {protocol-docs/message-root.md#indexed-merkle-tree-indexedmerkletree}.
  */
 
 import type { providers, Wallet } from "ethers";
@@ -30,7 +30,7 @@ export interface IMTLeaf {
 /**
  * Mirror of `ImtProof` in IAtomicInterop.sol, used for both inclusion and non-inclusion. For
  * inclusion `leaf` is the value's own leaf; for non-inclusion it is the low-nullifier (predecessor)
- * leaf. See {protocol-docs/atomic-interop.md#flow} for the proof semantics.
+ * leaf. See {protocol-docs/atomicity/proofs.md} for the proof semantics.
  */
 export interface ImtProof {
   sourceChainId: string;

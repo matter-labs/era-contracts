@@ -21,7 +21,7 @@ import {
 import {IMTLeafValueMismatch, IMTLowLeafNextTooSmall} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Covers the {AtomicInteropProof} library — cross-chain authentication and clock logic of the
-/// atomic finalize/timeout proofs. See {protocol-docs/atomic-interop.md#flow}. Atomicity is deployed only on
+/// atomic finalize/timeout proofs. See {protocol-docs/atomicity/proofs.md}. Atomicity is deployed only on
 /// L1-settled ecosystems, so every fixture uses a single L1 settlement layer.
 /// @dev IMT membership runs against a REAL {L2InteropCommitmentTree} and timeout root tuples against a
 /// REAL {L2InteropRootStorage}; only the cross-chain leaf verifier is mocked (that layer is tested
@@ -463,7 +463,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// @dev Library-level anti-double-mint: a present value's predecessor leaf has `nextValue == value`,
     /// so the bracketing (absence) claim is rejected — a leg cannot be both finalizable and refundable.
     /// Binding an absence proof to the leg's own source chain is the caller's job
-    /// (`AtomicFlowManager.authorizeRefund`) and out of scope here. See {protocol-docs/atomic-interop.md#timeout-protocol-preconditions}.
+    /// (`AtomicFlowManager.authorizeRefund`) and out of scope here. See {protocol-docs/atomicity/security.md#timeout-protocol-preconditions}.
     function test_includedValueCannotBeProvenAbsent() public {
         // Sanity: the committed value verifies as included in time.
         ImtProof memory inclusion = _inclusionProof(

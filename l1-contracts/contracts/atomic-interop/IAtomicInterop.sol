@@ -39,7 +39,7 @@ struct ImtProof {
 /// @notice The full `flowId` preimage: `flowId = keccak256(abi.encode(preimage))`. Supplied by the
 /// sender in the `atomicBundle` ERC-7786 attribute; {AtomicFlowManager.append} recomputes `flowId`
 /// from it and verifies the committing bundle is one of the legs, so a wrong or stale preimage
-/// reverts the send. See {protocol-docs/atomic-interop.md#flow}.
+/// reverts the send. See {protocol-docs/atomicity/flow.md#1-atomic-send-append}.
 /// @param deadline The flow deadline (a settlement-layer timestamp).
 /// @param settlementLayerChainId The single settlement layer every leg must settle on.
 /// @param legBundleHashes All legs' bundle hashes, strictly ascending (canonical order + dedup).

@@ -126,7 +126,7 @@ const L2_MESSAGE_VERIFICATION: Address = Address(FixedBytes::<20>(hex_literal::h
 const L2_INTEROP_COMMITMENT_TREE: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000010012"
 )));
-// 0x10013 is reserved (formerly L2GlobalInteropRootImporter). See {protocol-docs/atomic-interop.md#contracts}.
+// 0x10013 is reserved (formerly L2GlobalInteropRootImporter). See {protocol-docs/atomicity/README.md#contracts}.
 const L2_ATOMIC_FLOW_MANAGER: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000010014"
 )));
@@ -237,7 +237,7 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 24] = [
         L2_MESSAGE_VERIFICATION,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2MessageVerification")),
     ),
-    // Atomic interop built-ins. See {protocol-docs/atomic-interop.md#zksync-os-genesis}.
+    // Atomic interop built-ins. See {protocol-docs/atomicity/README.md#zksync-os-genesis}.
     (
         L2_INTEROP_COMMITMENT_TREE,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2InteropCommitmentTree")),
