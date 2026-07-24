@@ -19,6 +19,7 @@ import {
     DAModeLockedForPermanentRollup,
     NonRollupDAModeForPermanentRollup
 } from "contracts/common/L1ContractErrors.sol";
+import {NotZKsyncOS} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract MakePermanentRollupTest is AdminTest {
     RollupDAManager internal rollupDAManager;
@@ -172,15 +173,17 @@ contract MakePermanentRollupTest is AdminTest {
 
     function test_RevertWhen_MakePermanentRollupWithNonRollupDAMode() public {
         address admin = utilsFacet.util_getAdmin();
+        // `setL2DAMode` is ZKsync OS only.
+        utilsFacet.util_setZksyncOS(true);
 
-        // Set a valid DA pair, but switch the chain to VALIDIUM mode.
+        // Set a valid DA pair, but switch the chain to LOGS_ONLY mode.
         vm.prank(admin);
         adminFacet.setDAValidatorPair(l1DAValidator, L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256);
 
         vm.prank(admin);
-        adminFacet.setL2DAMode(L2DAMode.VALIDIUM);
+        adminFacet.setL2DAMode(L2DAMode.LOGS_ONLY);
 
-        // A permanent rollup must publish full pubdata, so this must revert while in VALIDIUM mode.
+        // A permanent rollup must publish full pubdata, so this must revert while in LOGS_ONLY mode.
         vm.prank(admin);
         vm.expectRevert(NonRollupDAModeForPermanentRollup.selector);
         adminFacet.makePermanentRollup();
@@ -188,15 +191,17 @@ contract MakePermanentRollupTest is AdminTest {
 
     function test_MakePermanentRollupAfterRevertingToRollupDAMode() public {
         address admin = utilsFacet.util_getAdmin();
+        // `setL2DAMode` is ZKsync OS only.
+        utilsFacet.util_setZksyncOS(true);
 
         vm.prank(admin);
         adminFacet.setDAValidatorPair(l1DAValidator, L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256);
 
-        // Move to VALIDIUM and back to ROLLUP; the one-way lock only applies once permanent.
+        // Move to LOGS_ONLY and back to FULL_PUBDATA; the one-way lock only applies once permanent.
         vm.prank(admin);
-        adminFacet.setL2DAMode(L2DAMode.VALIDIUM);
+        adminFacet.setL2DAMode(L2DAMode.LOGS_ONLY);
         vm.prank(admin);
-        adminFacet.setL2DAMode(L2DAMode.ROLLUP);
+        adminFacet.setL2DAMode(L2DAMode.FULL_PUBDATA);
 
         vm.prank(admin);
         adminFacet.makePermanentRollup();
@@ -208,6 +213,8 @@ contract MakePermanentRollupTest is AdminTest {
 
     function test_RevertWhen_SetL2DAModeOnPermanentRollup() public {
         address admin = utilsFacet.util_getAdmin();
+        // `setL2DAMode` is ZKsync OS only.
+        utilsFacet.util_setZksyncOS(true);
 
         // Set a valid DA pair and make the chain a permanent rollup.
         vm.prank(admin);
@@ -216,23 +223,34 @@ contract MakePermanentRollupTest is AdminTest {
         vm.prank(admin);
         adminFacet.makePermanentRollup();
 
-        // The DA mode is now locked; even setting it back to ROLLUP must revert.
+        // The DA mode is now locked; even setting it back to FULL_PUBDATA must revert.
         vm.prank(admin);
         vm.expectRevert(DAModeLockedForPermanentRollup.selector);
-        adminFacet.setL2DAMode(L2DAMode.VALIDIUM);
+        adminFacet.setL2DAMode(L2DAMode.LOGS_ONLY);
 
         vm.prank(admin);
         vm.expectRevert(DAModeLockedForPermanentRollup.selector);
-        adminFacet.setL2DAMode(L2DAMode.ROLLUP);
+        adminFacet.setL2DAMode(L2DAMode.FULL_PUBDATA);
     }
 
     function test_SetL2DAModeSuccessWhenNotPermanentRollup() public {
         address admin = utilsFacet.util_getAdmin();
+        // `setL2DAMode` is ZKsync OS only.
+        utilsFacet.util_setZksyncOS(true);
 
         vm.prank(admin);
-        adminFacet.setL2DAMode(L2DAMode.VALIDIUM);
+        adminFacet.setL2DAMode(L2DAMode.LOGS_ONLY);
 
         vm.prank(admin);
-        adminFacet.setL2DAMode(L2DAMode.ROLLUP);
+        adminFacet.setL2DAMode(L2DAMode.FULL_PUBDATA);
+    }
+
+    function test_RevertWhen_SetL2DAModeOnNonZKsyncOSChain() public {
+        address admin = utilsFacet.util_getAdmin();
+
+        // The DA mode has no meaning on Era-VM chains, so the setter is ZKsync OS only.
+        vm.prank(admin);
+        vm.expectRevert(NotZKsyncOS.selector);
+        adminFacet.setL2DAMode(L2DAMode.LOGS_ONLY);
     }
 }

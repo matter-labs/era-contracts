@@ -123,9 +123,10 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     function setDAValidatorPair(address _l1DAValidator, L2DACommitmentScheme _l2DACommitmentScheme) external;
 
     /// @notice Sets the L2 DA mode (rollup vs validium). Orthogonal to the DA commitment scheme: the
-    /// mode selects whether the whole pubdata (`ROLLUP`) or only the mandatory L2->L1 log region
-    /// (`VALIDIUM`) is committed. Committed into the ZKsync OS batch public input via the chain config
-    /// hash, so it is enforced by the batch proof.
+    /// mode selects whether the whole pubdata (`FULL_PUBDATA`) or only the mandatory L2->L1 log region
+    /// (`LOGS_ONLY`) is committed. Committed into the ZKsync OS batch public input via the chain config
+    /// hash, so it is enforced by the batch proof. Callable only for ZKsync OS chains — the mode has no
+    /// meaning on Era-VM chains.
     /// @param _l2DAMode The new L2 DA mode.
     function setL2DAMode(L2DAMode _l2DAMode) external;
 

@@ -267,10 +267,10 @@ struct ZKChainStorage {
     /// this field was introduced.
     /// @dev STORAGE SLOT: 68
     uint64 zksyncOSMaxTxGasLimit;
-    /// @dev The DA mode: whether the batch commits the full pubdata (`ROLLUP`) or only the mandatory
-    /// L2->L1 log region (`VALIDIUM`). Orthogonal to `l2DACommitmentScheme` (the mechanism). Committed
+    /// @dev The DA mode: whether the batch commits the full pubdata (`FULL_PUBDATA`) or only the mandatory
+    /// L2->L1 log region (`LOGS_ONLY`). Orthogonal to `l2DACommitmentScheme` (the mechanism). Committed
     /// into the ZKsync OS batch public input via the chain config hash (see `Executor`). ZKsync OS only.
-    /// Permanent-rollup chains are locked to `ROLLUP` (see `Admin.setL2DAMode` / `makePermanentRollup`).
+    /// Permanent-rollup chains are locked to `FULL_PUBDATA` (see `Admin.setL2DAMode` / `makePermanentRollup`).
     /// @dev STORAGE SLOT: 68 (packed with baseTokenHasTotalSupply + zksyncOSMaxTxGasLimit)
     L2DAMode l2DAMode;
 }
