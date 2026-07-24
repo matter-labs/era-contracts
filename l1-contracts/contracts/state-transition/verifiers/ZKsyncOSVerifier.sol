@@ -20,8 +20,8 @@ import {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice This contract wraps the ZKsync OS PLONK verifier and supports mock verification on testnets.
-/// It reuses the same interface as on the original `Verifier` contract, while abusing one of the fields
-/// (`_recursiveAggregationInput`) for proof verification type.
+/// It reuses the same interface as the original `Verifier` contract, while using the first element of `_proof`
+/// for the proof verification type.
 contract ZKsyncOSVerifier is IVerifier, IZKsyncOSVerifier {
     /// @notice The PLONK verifier contract.
     IVerifier public immutable PLONK_VERIFIER;
@@ -33,15 +33,14 @@ contract ZKsyncOSVerifier is IVerifier, IZKsyncOSVerifier {
 
     /// @notice Verifies a ZKsync OS PLONK proof or delegates to the testnet mock path.
     /// @param _publicInputs The public inputs to the proof.
-    /// @param _proof The zk-SNARK proof itself.
+    /// @param _proof The proof prefixed with the verifier type and initial hash.
     /// @dev  The first element of the `_proof` determines the verifier type.
     ///     - 2 indicates the ZKsync OS Plonk verifier should be used.
     ///     - 3 indicates the mock verifier (skipping proof verification) should be used.
-    /// @return Returns `true` if the proof verification succeeds, otherwise throws an error.
+    /// @return Returns `true` if verification succeeds and `false` if the underlying verifier rejects the proof.
     function verify(uint256[] calldata _publicInputs, uint256[] calldata _proof) public view virtual returns (bool) {
-        // Ensure the proof has a valid length (at least one element
-        // for the proof system differentiator).
-        if (_proof.length == 0) {
+        // Ensure the verifier type and initial hash metadata are present.
+        if (_proof.length < ZKSYNC_OS_PROOF_METADATA_LENGTH) {
             revert EmptyProofLength();
         }
 
@@ -81,8 +80,9 @@ contract ZKsyncOSVerifier is IVerifier, IZKsyncOSVerifier {
         return PLONK_VERIFIER.verificationKeyHash();
     }
 
-    /// @notice Calculates a keccak256 hash of the runtime loaded verification keys from the selected verifier.
-    /// @return The keccak256 hash of the loaded verification keys based on the verifier.
+    /// @notice Returns the wrapped PLONK verifier's verification key hash for the supported verifier type.
+    /// @dev Kept for backward compatibility; only the ZKsync OS PLONK verifier type is supported.
+    /// @return The wrapped PLONK verifier's verification key hash.
     function verificationKeyHash(uint256 _verifierType) external view returns (bytes32) {
         if (_verifierType == ZKSYNC_OS_PLONK_VERIFICATION_TYPE) {
             return PLONK_VERIFIER.verificationKeyHash();
