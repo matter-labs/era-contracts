@@ -88,8 +88,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
         if (L1_CHAIN_ID != 0) {
             revert ManagerAlreadyInitialized();
         }
-        // `L1_CHAIN_ID == 0` is the sentinel for "not initialized"; a zero argument would leave the manager
-        // permanently re-initializable and defeat that guard.
+        // Zero is the "not initialized" sentinel; a zero argument would leave the manager re-initializable.
         if (_l1ChainId == 0) {
             revert ManagerL1ChainIdZero();
         }

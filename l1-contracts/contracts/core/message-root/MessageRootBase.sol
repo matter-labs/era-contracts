@@ -111,13 +111,10 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// events share the same logId value, and the counter only advances when the block changes.
     uint256 public lastEmitBlock;
 
-    /// @notice The settlement-layer block timestamp at which each `(chainId, batchNumber)` chainBatchRoot
-    /// was aggregated (i.e. when the chain settled on this layer).
-    /// @dev This is the same `l1Timestamp` that is bound into the batch leaf (`MessageHashing.batchLeafHash`),
-    /// so it is provable via the aggregated-root inclusion proof. Stored so that off-chain proof builders
-    /// can retrieve the exact timestamp they must feed into a proof.
-    /// @dev Appended after `lastEmitBlock` (consuming one `__gap` slot) so it does not shift the pre-existing
-    /// v31 storage layout (`interopRootLogId`, `lastEmitBlock`).
+    /// @notice The settlement-layer `l1Timestamp` at which each `(chainId, batchNumber)` chainBatchRoot was
+    /// aggregated. Same value bound into the batch leaf (`MessageHashing.batchLeafHash`), so off-chain proof
+    /// builders can read the exact timestamp to feed into a proof.
+    /// @dev Appended here (consuming one `__gap` slot) to avoid shifting the pre-existing v31 storage layout.
     mapping(uint256 chainId => mapping(uint256 batchNumber => uint256 l1Timestamp)) public chainBatchRootTimestamp;
 
     /**
