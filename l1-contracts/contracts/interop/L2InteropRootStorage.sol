@@ -39,12 +39,26 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
     /// occupies exactly the slot the plain `bytes32` used) does not shift any other storage.
     mapping(uint256 chainId => mapping(uint256 blockOrBatchNumber => StoredInteropRoot)) internal storedInteropRoots;
 
+    /// @notice The maximum creation timestamp over all roots imported for a chain ID (see
+    /// {IL2InteropRootStorage.latestInteropRootTimestamp}). Monotonically non-decreasing by
+    /// construction, so consumers can treat it as this chain's authenticated lower bound on the
+    /// referenced chain's clock (the atomic-interop send path uses it to reject legs of flows whose
+    /// deadline verifiably passed).
+    /// @dev Appended after `storedInteropRoots`, so the v31-compatibility note above is unaffected.
+    mapping(uint256 chainId => uint256 timestamp) internal latestInteropRootTimestamps;
+
     /// @notice Returns the imported `(root, timestamp)` tuple for a chain ID and block or batch number.
     function interopRoots(
         uint256 chainId,
         uint256 blockOrBatchNumber
     ) external view returns (StoredInteropRoot memory) {
         return storedInteropRoots[chainId][blockOrBatchNumber];
+    }
+
+    /// @notice Returns the maximum creation timestamp over all roots imported for `chainId` (zero if
+    /// none was imported yet).
+    function latestInteropRootTimestamp(uint256 chainId) external view returns (uint256) {
+        return latestInteropRootTimestamps[chainId];
     }
 
     /// @dev Adds a message root to the L2InteropRootStorage contract.
@@ -101,6 +115,13 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
 
         // Set interopRoots for specified chainId and blockOrBatchNumber, emit event.
         storedInteropRoots[chainId][blockOrBatchNumber] = StoredInteropRoot({root: sides[0], timestamp: timestamp});
+
+        // Track the chain's freshest imported root creation time. Imports need not arrive in
+        // timestamp order, so keep the maximum rather than the last value — the tracked timestamp
+        // must never decrease.
+        if (timestamp > latestInteropRootTimestamps[chainId]) {
+            latestInteropRootTimestamps[chainId] = timestamp;
+        }
 
         emit InteropRootAdded(chainId, blockOrBatchNumber, timestamp, sides);
     }

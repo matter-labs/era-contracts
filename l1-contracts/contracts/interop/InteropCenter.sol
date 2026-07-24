@@ -391,6 +391,20 @@ contract InteropCenter is
         );
     }
 
+    /// @notice Memory variant of {_ensureEmptyChainReference}, for interoperable addresses produced at
+    /// runtime (an indirect call starter's returned recipient) rather than passed in calldata.
+    /// @param _interoperableAddress The ERC-7930 address to verify.
+    function _ensureEmptyChainReferenceMemory(bytes memory _interoperableAddress) internal pure {
+        require(
+            _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH,
+            InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
+        );
+        require(
+            uint8(_interoperableAddress[0x04]) == 0,
+            InteroperableAddressChainReferenceNotEmpty(_interoperableAddress)
+        );
+    }
+
     /// @notice Verifies that the ERC-7930 address has an empty address field.
     /// @dev This function is used to ensure that the address does not contain an address field.
     ///      The address length is stored at byte offset (0x05 + chainReferenceLength) in the ERC-7930 format.
@@ -816,9 +830,16 @@ contract InteropCenter is
                     indirectCallAttributes.interopCallValue
                 )
             );
-            // Parse the returned 7930 address from actualCallStarter.to
+            // The indirect call starter is an arbitrary user-chosen contract, so its returned recipient
+            // gets the same validation a user-supplied call starter's `to` gets in `_parseBundleInputs`:
+            // the chain reference must be empty (the bundle-level destination chain is authoritative — a
+            // starter must not smuggle a different chain id that would otherwise be silently ignored)
+            // and the address must be non-zero (a zero recipient could never execute and has no refund
+            // path for the value already collected).
+            _ensureEmptyChainReferenceMemory(actualCallStarter.to);
             // slither-disable-next-line unused-return
             (, address actualCallRecipient) = InteroperableAddress.parseEvmV1(actualCallStarter.to);
+            require(actualCallRecipient != address(0), ZeroAddress());
             interopCall = InteropCall({
                 version: INTEROP_CALL_VERSION,
                 shadowAccount: false,

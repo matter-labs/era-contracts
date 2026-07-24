@@ -80,7 +80,8 @@ be refunded.
    (implemented by `L2AssetRouter`, whose burn path produced the call), re-minting to the original
    depositor. Recovery is **best-effort**: only burn-produced (asset-router) calls are recovered; direct
    calls move no funds at send, have nothing to reverse, and are skipped (their `from` — possibly an
-   EOA — need not implement the interface); the refund succeeds as long as at least one call recovered.
+   EOA — need not implement the interface); a bundle where nothing is recoverable simply flips to
+   `Reverted` without moving funds.
    Consequently the protocol does not guarantee full refundability of an arbitrary bundle — making a
    fund-moving leg recoverable (an asset-router deposit) is the flow author's responsibility. Atomic
    sends reject only native-`value` legs (which can never be reversed) and L1 destinations (an atomic
@@ -124,6 +125,42 @@ The timeout proof relies on three preconditions, each enforced on chain:
    `MessageRoot.historicalRoot` on the settlement layer, imported into
    `L2InteropRootStorage.interopRoots` and double checked at batch execution — which anchors the
    "root from after the deadline" requirement.
+
+## Known issues and accepted limitations
+
+1. **Pre-v33 counterparty chains can still brick funds.** Atomic interop requires protocol version
+
+   > = v33 on every participating chain. If pre-v33 chains are allowed into the ecosystem, it is the
+   > **user's responsibility** to pick a counterparty chain that supports atomic interop (version >=
+   > v33). The on-chain checks (`append`'s registered-source-chain check, the timeout-protocol
+   > preconditions above) may make it look like the protocol aims for funds never bricking — that is
+   > NOT the case: a leg sent towards, or declared from, a chain that never gained atomic-interop
+   > support can strand its funds.
+
+2. **The "default" unbundler does not work for L2->L1 bundles.** For L2->L2 interop, a sender who
+   sets no `unbundlerAddress` gets a working default: the attribute is pinned to `(sourceChainId,
+sender)`, and the sender can always unbundle by making an L2->L2 interop call through the
+   InteropCenter to the destination `L2InteropHandler`'s `receiveMessage` rescue path. For L2->L1
+   bundles (withdrawals) that escape hatch does not exist: generic L2->L1 interop calls are not
+   supported (only asset-router withdrawals are), so the default unbundler — pinned to the source L2
+   chain id — can neither call `L1InteropHandler.unbundleBundle` directly (wrong chain id) nor reach
+   it via `receiveMessage`. Unbundling on L1 is formally supported (an explicit `unbundlerAddress`
+   with the L1 chain id, or the chain-wildcard form, works), but the default is broken.
+   **Recommendation:** forbid unbundling on L1 entirely until normal L2->L1 interop calls are
+   supported.
+
+3. **A refund receiver that rejects the base token blocks its own claim.** On the timeout path, a
+   direct value leg's refund pushes native base-token value to the call's `from`. A contract that
+   (permanently or temporarily) rejects native-token transfers makes `claimRefund` revert until it
+   can accept the transfer; the leg stays `Revertable` the whole time. Hard to fix without a
+   pull-based escrow, but a potential footgun for contract senders.
+
+4. **Bundle version is checked at verification, call versions only at execution.** `verifyBundle` /
+   the atomic finality gate validate `InteropBundle.version`, but the per-call
+   `InteropCall.version` fields are validated only when a call is actually executed
+   (`_executeCalls`). A bundle whose calls carry a wrong version can therefore be verified — and
+   cancelled via unbundling — yet never executed. This is considered acceptable: such a bundle can
+   only be produced by a malformed sender, and cancellation remains available.
 
 ## Contracts
 

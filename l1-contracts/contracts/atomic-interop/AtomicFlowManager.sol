@@ -11,7 +11,8 @@ import {
     AtomicFlowPreimage,
     ImtProof,
     AtomicFinalityProof,
-    ATOMIC_FLOW_PREIMAGE_VERSION
+    ATOMIC_FLOW_PREIMAGE_VERSION,
+    MAX_ATOMIC_FLOW_LEGS
 } from "./IAtomicInterop.sol";
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
 import {InteropDataEncoding} from "../interop/InteropDataEncoding.sol";
@@ -23,7 +24,7 @@ import {
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_INTEROP_HANDLER_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
-import {L2_BRIDGEHUB} from "../common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_BRIDGEHUB, L2_INTEROP_ROOT_STORAGE} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {
     ManagerAlreadyInitialized,
     ManagerL1ChainIdZero,
@@ -31,16 +32,17 @@ import {
     ManagerNotInteropHandler,
     ManagerLegAlreadyCommitted,
     ManagerLegNotRevertable,
+    ManagerFlowDeadlinePassed,
     ManagerFlowIdMismatch,
     ManagerFlowPreimageVersionMismatch,
     ManagerBundleHashesNotSorted,
     ManagerCommittedBundleNotInFlow,
     ManagerCommittedLegSourceChainMismatch,
     ManagerLegSourceChainNotRegistered,
+    ManagerTooManyLegs,
     ManagerLegSourceChainIdsLengthMismatch,
     ManagerProofCountMismatch,
     ManagerExecutingBundleNotInFlow,
-    ManagerNoRecoverableCalls,
     ManagerSettlementLayerNotL1,
     ProofSourceChainMismatch
 } from "./AtomicInteropErrors.sol";
@@ -121,6 +123,26 @@ contract AtomicFlowManager is IAtomicFlowManager {
         // A flow with a non-L1 settlement layer could neither finalize nor refund (both proof paths
         // enforce SL == L1), so reject it before committing anything.
         _checkSettlementLayerIsL1(_flowPreimage.settlementLayerChainId);
+
+        // Reject a leg of a flow whose deadline has verifiably passed from this chain's point of view:
+        // an imported settlement-layer root created after the deadline is exactly what `authorizeRefund`
+        // needs, so such a flow can already be timed out — a leg committed now could never produce an
+        // in-time inclusion proof and would only burn funds into a flow that must be refunded.
+        //
+        // As a "never commit into an expired flow" protection this is BEST EFFORT only: imported roots
+        // lag the settlement layer's real clock, and other source chains have their own (possibly
+        // fresher or staler) views, so an expired flow may still accept a leg wherever no late root has
+        // been imported yet. What the check DOES enforce, unconditionally, is ordering on this chain:
+        // once one of the flow's legs has been made revertable/reverted here (which requires importing
+        // a root with `timestamp > deadline` — see {AtomicInteropProof.verifyTimeoutAbsence}), the
+        // tracked latest timestamp — a monotone maximum — exceeds the deadline forever, so no new leg
+        // of that flow can ever be committed on this chain afterwards.
+        uint256 latestImportedRootTimestamp = L2_INTEROP_ROOT_STORAGE.latestInteropRootTimestamp(
+            _flowPreimage.settlementLayerChainId
+        );
+        if (latestImportedRootTimestamp > _flowPreimage.deadline) {
+            revert ManagerFlowDeadlinePassed(_flowPreimage.deadline, latestImportedRootTimestamp);
+        }
 
         // The committing bundle must be one of the flow's legs, declared with this chain as its
         // source. This is the coupling guarantee the preimage exists for: a bundle can never be
@@ -267,7 +289,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
         // guarded (no shared mutable state). The manager never holds funds.
         _state[_flowId][bundleHash] = LegState.Reverted;
 
-        _recoverBundle(_flowId, bundleHash, bundle);
+        _recoverBundle(bundle);
 
         emit FlowRefunded(_flowId, bundleHash);
     }
@@ -308,12 +330,13 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// Router-produced calls (`from == asset router`) do not take this branch: they carry no base-token
     /// `value` (indirect calls force `interopCallValue == 0`); what they move is a bridged asset, which
     /// {IAtomicRecoverable.recoverAtomicCall} reverses directly (re-minting / unlocking that asset), not a
-    /// separate base-token value. Every direct value leg counts as a recovery.
+    /// separate base-token value.
     ///
     /// Recovery is best-effort by design. An atomic bundle may mix fund-moving calls with calls that move no
-    /// funds and have nothing to reverse (e.g. flipping a flag). The latter contribute nothing. We only
-    /// require that *some* call recovered (`recovered != 0`): a bundle where nothing is recoverable has no
-    /// source funds to return, so a refund would be a no-op and we reject it.
+    /// funds and have nothing to reverse (e.g. flipping a flag). The latter contribute nothing. A bundle
+    /// where no call is recoverable has no source funds to return: the refund then simply flips the leg to
+    /// `Reverted` without moving anything, which is fine — the state transition (releasing the leg from the
+    /// flow) is meaningful on its own and must not be blocked.
     ///
     /// Consequence: the protocol does not guarantee full refundability of an arbitrary bundle. A flow author
     /// must make any bespoke fund-moving leg that does not carry `value` recoverable; otherwise it would
@@ -327,7 +350,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// forfeits its value — unchanged from prior interop, where a finalized call to a reverting recipient
     /// was likewise un-executable and un-refundable. Extending refundability to those cases is possible
     /// future work.
-    function _recoverBundle(bytes32 _flowId, bytes32 _bundleHash, InteropBundle memory _bundle) internal {
+    function _recoverBundle(InteropBundle memory _bundle) internal {
         uint256 destChainId = _bundle.destinationChainId;
         // L2->L1 atomic bundles are rejected at send time ({InteropCenter.AtomicBundleToL1NotSupported}), so a
         // recovered bundle never targets L1. Assert it explicitly: this keeps recovery from ever reaching the
@@ -337,16 +360,16 @@ contract AtomicFlowManager is IAtomicFlowManager {
         require(destChainId != L1_CHAIN_ID, RecoverToL1NotSupported());
         bytes32 destBaseTokenAssetId = _bundle.destinationBaseTokenAssetId;
         uint256 callsLen = _bundle.calls.length;
-        uint256 recovered = 0;
         for (uint256 i = 0; i < callsLen; ++i) {
             InteropCall memory c = _bundle.calls[i];
             // Only ask burn-producing calls (from == asset router, as set by `initiateIndirectCall`) to
             // reverse themselves. A direct call never burned through a recoverable sender, so its `from`
             // (possibly an EOA) is skipped here; any base-token value it carried is handled below.
+            // The sender reports via the return value whether it recognised (and reversed) the call;
+            // nothing is done with the answer — an unrecognised call simply has nothing to recover.
             if (c.from == L2_ASSET_ROUTER_ADDR) {
-                if (IAtomicRecoverable(c.from).recoverAtomicCall(destChainId, c.data)) {
-                    ++recovered;
-                }
+                // slither-disable-next-line unused-return
+                IAtomicRecoverable(c.from).recoverAtomicCall(destChainId, c.data);
             }
             if (c.from != L2_ASSET_ROUTER_ADDR && c.value != 0) {
                 IAssetRouterShared(L2_ASSET_ROUTER_ADDR).bridgehubRecoverBaseToken(
@@ -355,11 +378,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
                     c.from,
                     c.value
                 );
-                ++recovered;
             }
-        }
-        if (recovered == 0) {
-            revert ManagerNoRecoverableCalls(_flowId, _bundleHash);
         }
     }
 
@@ -397,6 +416,11 @@ contract AtomicFlowManager is IAtomicFlowManager {
             revert ManagerFlowPreimageVersionMismatch(ATOMIC_FLOW_PREIMAGE_VERSION, _preimage.version);
         }
         uint256 n = _preimage.legBundleHashes.length;
+        // See {MAX_ATOMIC_FLOW_LEGS}: appending a leg is cheap, but finalization verifies one Merkle
+        // proof per leg, so the leg count must stay bounded.
+        if (n > MAX_ATOMIC_FLOW_LEGS) {
+            revert ManagerTooManyLegs(MAX_ATOMIC_FLOW_LEGS, n);
+        }
         for (uint256 i = 1; i < n; ++i) {
             if (_preimage.legBundleHashes[i] <= _preimage.legBundleHashes[i - 1]) {
                 revert ManagerBundleHashesNotSorted();

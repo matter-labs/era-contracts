@@ -17,8 +17,16 @@ contract DummyL2InteropRootStorage {
 
     event InteropRootAdded(uint256 indexed chainId, uint256 indexed batchNumber, uint256 timestamp, bytes32[] sides);
 
+    /// @notice Mirrors `L2InteropRootStorage.latestInteropRootTimestamps`: the maximum creation
+    /// timestamp over all imported roots per chain.
+    mapping(uint256 chainId => uint256 timestamp) internal latestInteropRootTimestamps;
+
     function interopRoots(uint256 chainId, uint256 batchNumber) external view returns (StoredInteropRoot memory) {
         return storedInteropRoots[chainId][batchNumber];
+    }
+
+    function latestInteropRootTimestamp(uint256 chainId) external view returns (uint256) {
+        return latestInteropRootTimestamps[chainId];
     }
 
     function addInteropRootWithTimestamp(
@@ -30,6 +38,9 @@ contract DummyL2InteropRootStorage {
         emit InteropRootAdded(chainId, batchNumber, timestamp, sides);
         if (sides.length == 1) {
             storedInteropRoots[chainId][batchNumber] = StoredInteropRoot({root: sides[0], timestamp: timestamp});
+            if (timestamp > latestInteropRootTimestamps[chainId]) {
+                latestInteropRootTimestamps[chainId] = timestamp;
+            }
         }
     }
 }

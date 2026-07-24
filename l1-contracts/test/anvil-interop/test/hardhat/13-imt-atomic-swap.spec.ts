@@ -543,8 +543,9 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const deadline = 1_000;
     // The settlement interop root used by the absence proof must have been created after the deadline.
     // This fixed block is unique within the spec. The helper makes reruns against retained state idempotent.
+    // NOTE: it is imported only AFTER the send below — `AtomicFlowManager.append` rejects a leg once a
+    // root created after the flow's deadline has been imported (the flow could already be timed out).
     const settlementInteropRootBlock = 201;
-    await ensureSettlementInteropRoot(chainA.provider, settlementInteropRootBlock, deadline + 5);
 
     const refundRecipient = chainB.user.address; // irrelevant for refund; distinct dest recipient
     const aTimeoutAmount = ethers.utils.parseUnits("3", TEST_TOKEN_DECIMALS);
@@ -585,6 +586,10 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       aBalanceBefore.sub(aTimeoutAmount).toString(),
       "AB depositor burned tokens at commit"
     );
+
+    // Now that the leg is committed, import the post-deadline settlement interop root the absence
+    // proof anchors on (importing it earlier would make `append` reject the send: deadline passed).
+    await ensureSettlementInteropRoot(chainA.provider, settlementInteropRootBlock, deadline + 5);
 
     // ── Build the timeout proof for the missing BA leg against B's IMT: non-inclusion against the
     //    batch-begin root of a late batch (`t > deadline`), checked against the post-deadline
@@ -661,9 +666,11 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     // the boundary). The proof then checks absence against the batch-END IMT root of that last batch
     // (the zero-length batch-leaf path of the single-leaf chain tree trivially satisfies the
     // last-batch check).
-    const deadline = 1_000;
+    // Strictly above the late-batch test's imported root timestamp (1005): tests share chain state,
+    // and `append` rejects a flow whose deadline predates any root already imported on the source
+    // chain. The root anchoring this test's absence proof is imported after the send, as above.
+    const deadline = 2_000;
     const settlementInteropRootBlock = 202;
-    await ensureSettlementInteropRoot(chainA.provider, settlementInteropRootBlock, deadline + 5);
 
     const refundRecipient = chainB.user.address;
     const aTimeoutAmount = ethers.utils.parseUnits("2", TEST_TOKEN_DECIMALS);
@@ -694,6 +701,8 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       salt: saltAB,
     });
     expect(await chainA.stack.manager.legState(flowId, hAB)).to.equal(LegState.Committed, "AB committed on A");
+
+    await ensureSettlementInteropRoot(chainA.provider, settlementInteropRootBlock, deadline + 5);
 
     // Halted-source absence proof: `t <= deadline` selects the END-root branch (t == deadline pins
     // the boundary), and the empty batch-leaf path marks the batch as the chain's last inside the

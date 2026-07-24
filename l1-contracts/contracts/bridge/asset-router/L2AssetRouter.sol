@@ -8,6 +8,7 @@ import {AssetRouterBase} from "./AssetRouterBase.sol";
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 
 import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
+import {IL2AssetHandler} from "../interfaces/IL2AssetHandler.sol";
 import {NativeTokenVaultBase} from "../ntv/NativeTokenVaultBase.sol";
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
@@ -31,6 +32,7 @@ import {
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {
     AmountMustBeGreaterThanZero,
+    AssetHandlerDoesNotExist,
     AssetIdNotSupported,
     EmptyAddress,
     RecoverToL1NotSupported,
@@ -321,11 +323,19 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         }
 
         // Decode finalizeDeposit(sourceChainId, assetId, bridgeMintData); the source chain id is unused.
-        // The bundle's mint data is forwarded verbatim: NTV.bridgeRecoverFailedTransfer refunds the data's
+        // The bundle's mint data is forwarded verbatim: `bridgeRecoverFailedTransfer` refunds the data's
         // `originalCaller` (the source depositor), so the receiver swap no longer happens here.
         // slither-disable-next-line unused-return
         (, bytes32 assetId, bytes memory mintData) = abi.decode(_callData[4:], (uint256, bytes32, bytes));
-        IL2NativeTokenVault(_nativeTokenVaultAddr()).bridgeRecoverFailedTransfer(_destChainId, assetId, mintData);
+        // The burn this call embeds was executed by the asset handler registered for the asset (see
+        // {AssetRouterBase._burn}) — the NTV for standard tokens, or a custom handler. Only that handler
+        // can reverse its own burn (the mint data is in its own format), so recovery routes through the
+        // same `assetHandlerAddress` lookup the burn used rather than assuming the NTV. The handler is
+        // always registered by the time a genuine burn-produced call is recovered: `_burn` either found
+        // it registered or registered the NTV via `tryRegisterTokenFromBurnData`.
+        address assetHandler = assetHandlerAddress[assetId];
+        require(assetHandler != address(0), AssetHandlerDoesNotExist(assetId));
+        IL2AssetHandler(assetHandler).bridgeRecoverFailedTransfer(_destChainId, assetId, mintData);
         return true;
     }
 

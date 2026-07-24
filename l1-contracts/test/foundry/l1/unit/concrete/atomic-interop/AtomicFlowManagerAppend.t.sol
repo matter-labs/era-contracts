@@ -16,19 +16,24 @@ import {
     ManagerBundleHashesNotSorted,
     ManagerCommittedBundleNotInFlow,
     ManagerCommittedLegSourceChainMismatch,
+    ManagerFlowDeadlinePassed,
     ManagerFlowPreimageVersionMismatch,
     ManagerLegAlreadyCommitted,
     ManagerLegSourceChainIdsLengthMismatch,
     ManagerLegSourceChainNotRegistered,
     ManagerNotInteropCenter,
-    ManagerSettlementLayerNotL1
+    ManagerSettlementLayerNotL1,
+    ManagerTooManyLegs
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
+import {MAX_ATOMIC_FLOW_LEGS} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {DummyL2InteropRootStorage} from "contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 import {
     L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_CENTER_ADDR,
-    L2_INTEROP_COMMITMENT_TREE_ADDR
+    L2_INTEROP_COMMITMENT_TREE_ADDR,
+    L2_INTEROP_ROOT_STORAGE_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @dev Minimal Bridgehub stand-in exposing only the `baseTokenAssetId` registry mapping the manager
@@ -59,11 +64,16 @@ contract AtomicFlowManagerAppendTest is Test {
 
     AtomicFlowManager internal manager;
     L2InteropCommitmentTree internal tree;
+    DummyL2InteropRootStorage internal rootStorage;
 
     function setUp() public {
         deployCodeTo("AtomicFlowManager.sol:AtomicFlowManager", L2_ATOMIC_FLOW_MANAGER_ADDR);
         deployCodeTo("L2InteropCommitmentTree.sol:L2InteropCommitmentTree", L2_INTEROP_COMMITMENT_TREE_ADDR);
         deployCodeTo("AtomicFlowManagerAppend.t.sol:MockBridgehubRegistry", L2_BRIDGEHUB_ADDR);
+        // `append`'s deadline-freshness gate reads the latest imported root timestamp from the canonical
+        // root storage; the dummy mirrors the production tracking without the bootloader-only ACL.
+        deployCodeTo("DummyL2InteropRootStorage.sol:DummyL2InteropRootStorage", L2_INTEROP_ROOT_STORAGE_ADDR);
+        rootStorage = DummyL2InteropRootStorage(L2_INTEROP_ROOT_STORAGE_ADDR);
         manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
         tree = L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR);
 
@@ -287,6 +297,99 @@ contract AtomicFlowManagerAppendTest is Test {
             uint256(LegState.Committed),
             "all-local leg must commit without any registry entry"
         );
+    }
+
+    /// @dev Imports a settlement-layer root with the given creation timestamp into the dummy root
+    /// storage, bumping the tracked latest timestamp.
+    function _importL1Root(uint256 _blockNumber, uint256 _timestamp) internal {
+        bytes32[] memory sides = new bytes32[](1);
+        sides[0] = keccak256(abi.encode("root", _blockNumber));
+        rootStorage.addInteropRootWithTimestamp(L1_CHAIN_ID, _blockNumber, _timestamp, sides);
+    }
+
+    /// @notice Once a settlement-layer root created after the deadline has been imported, the flow can
+    /// already be timed out from this chain's point of view (that root is exactly what `authorizeRefund`
+    /// needs), so committing a new leg into it is rejected. In particular this enforces that after a
+    /// leg of the flow was reverted on this chain, no new leg of that flow can ever be appended here.
+    function test_append_RevertWhen_ImportedRootPostdatesDeadline() public {
+        bytes32 localLeg = keccak256("local leg");
+        AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
+        _importL1Root(100, DEADLINE + 1);
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerFlowDeadlinePassed.selector, DEADLINE, DEADLINE + 1));
+        _appendAsInteropCenter(localLeg, preimage);
+
+        assertEq(uint256(manager.legState(_flowId(preimage), localLeg)), uint256(LegState.Unset));
+        assertEq(tree.leafCount(), 1, "nothing may be inserted into the commitment tree");
+    }
+
+    /// @notice Boundary: a root created exactly AT the deadline does not expire the flow (the timeout
+    /// proof requires a root created strictly after the deadline), so the leg still commits. The tracked
+    /// timestamp is a monotone maximum, so a later import of an older root cannot re-open an expired flow.
+    function test_append_AllowedWhen_LatestImportedRootAtDeadline() public {
+        bytes32 localLeg = keccak256("local leg");
+        AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
+        _importL1Root(100, DEADLINE);
+
+        _appendAsInteropCenter(localLeg, preimage);
+
+        assertEq(uint256(manager.legState(_flowId(preimage), localLeg)), uint256(LegState.Committed));
+    }
+
+    /// @notice The deadline gate keys on the flow's settlement layer only: a late root imported for some
+    /// other chain says nothing about the SL clock and must not expire the flow.
+    function test_append_IgnoresLateRootsOfOtherChains() public {
+        bytes32 localLeg = keccak256("local leg");
+        AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
+        bytes32[] memory sides = new bytes32[](1);
+        sides[0] = keccak256("other chain root");
+        rootStorage.addInteropRootWithTimestamp(OTHER_CHAIN_ID, 100, DEADLINE + 1, sides);
+
+        _appendAsInteropCenter(localLeg, preimage);
+
+        assertEq(uint256(manager.legState(_flowId(preimage), localLeg)), uint256(LegState.Committed));
+    }
+
+    /// @dev Builds an all-local preimage with `_legCount` strictly ascending leg hashes; returns the
+    /// preimage and its lowest leg hash (a valid committing bundle).
+    function _manyLegPreimage(
+        uint256 _legCount
+    ) internal view returns (AtomicFlowPreimage memory preimage, bytes32 firstLeg) {
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
+        preimage.deadline = DEADLINE;
+        preimage.settlementLayerChainId = L1_CHAIN_ID;
+        preimage.legBundleHashes = new bytes32[](_legCount);
+        preimage.legSourceChainIds = new uint256[](_legCount);
+        for (uint256 i = 0; i < _legCount; ++i) {
+            // Strictly ascending by construction.
+            preimage.legBundleHashes[i] = bytes32(i + 1);
+            preimage.legSourceChainIds[i] = block.chainid;
+        }
+        firstLeg = preimage.legBundleHashes[0];
+    }
+
+    /// @notice A flow with more than {MAX_ATOMIC_FLOW_LEGS} legs is rejected: appending is cheap but
+    /// finalization verifies one Merkle proof per leg, so the leg count is bounded. The check lives in
+    /// the shared preimage validation, so the oversized flow is invalid on every path and no leg of it
+    /// can ever be committed.
+    function test_append_RevertWhen_TooManyLegs() public {
+        (AtomicFlowPreimage memory preimage, bytes32 firstLeg) = _manyLegPreimage(MAX_ATOMIC_FLOW_LEGS + 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ManagerTooManyLegs.selector, MAX_ATOMIC_FLOW_LEGS, MAX_ATOMIC_FLOW_LEGS + 1)
+        );
+        _appendAsInteropCenter(firstLeg, preimage);
+
+        assertEq(tree.leafCount(), 1, "nothing may be inserted into the commitment tree");
+    }
+
+    /// @notice Boundary: a flow with exactly {MAX_ATOMIC_FLOW_LEGS} legs commits fine.
+    function test_append_AllowsMaxLegs() public {
+        (AtomicFlowPreimage memory preimage, bytes32 firstLeg) = _manyLegPreimage(MAX_ATOMIC_FLOW_LEGS);
+
+        _appendAsInteropCenter(firstLeg, preimage);
+
+        assertEq(uint256(manager.legState(_flowId(preimage), firstLeg)), uint256(LegState.Committed));
     }
 
     /// @notice A `(flowId, bundleHash)` leg can only be committed once.
