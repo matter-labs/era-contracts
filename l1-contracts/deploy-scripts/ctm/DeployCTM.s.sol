@@ -215,28 +215,18 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function deployVerifiers() internal {
-        (, string memory fflonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierFflonk);
         (, string memory plonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierPlonk);
         (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(
             config.isZKsyncOS,
             config.testnetVerifier
         );
 
-        ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
+        if (!config.isZKsyncOS) {
+            (, string memory fflonkName) = DeployCTML1OrGateway.resolve(false, CTMContract.VerifierFflonk);
+            ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
+        }
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
         ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, false);
-
-        // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
-        vm.startBroadcast(getDeployerAddress());
-        // Called as library (not through vms) to preserve msg.sender
-        DeployCTML1OrGateway.initializeVerifier(
-            ctmAddresses.stateTransition.verifiers.verifier,
-            ctmAddresses.stateTransition.verifiers.verifierFflonk,
-            ctmAddresses.stateTransition.verifiers.verifierPlonk,
-            config.ownerAddress,
-            config.isZKsyncOS
-        );
-        vm.stopBroadcast();
     }
 
     function setChainTypeManagerInServerNotifier() internal {
@@ -316,15 +306,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         ctm.setPendingAdmin(ctmAddresses.chainAdmin);
 
         IOwnable(ctmAddresses.stateTransition.proxies.serverNotifier).transferOwnership(ctmAddresses.chainAdmin);
-        IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
-
-        // Called as library (not through vms) to preserve msg.sender
-        DeployCTML1OrGateway.transferVerifierOwnership(
-            ctmAddresses.stateTransition.verifiers.verifier,
-            ctmAddresses.admin.governance,
-            config.isZKsyncOS
-        );
-
         IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
         vm.stopBroadcast();
         console.log("Owners updated");

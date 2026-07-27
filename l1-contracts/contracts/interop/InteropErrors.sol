@@ -59,6 +59,8 @@ error MultiCallToL1NotSupported(uint256 callCount);
 error NonAtomicSendUnsupported();
 // 0xd72e81d8
 error NonZeroValueToL1NotSupported(uint256 value);
+// 0x5af78ecd
+error ShadowAccountNotSupported();
 // 0x2f59bd0d
 error SidesLengthNotOne();
 // 0x89fd2c76

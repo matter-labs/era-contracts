@@ -14,7 +14,12 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
 import {InteropWithdrawalNonZeroValue} from "../../bridge/L1BridgeContractErrors.sol";
 import {ZeroAddress} from "../../common/L1ContractErrors.sol";
-import {MessageNotIncluded, UnauthorizedMessageSender} from "../InteropErrors.sol";
+import {
+    InteropCallToL1NotToAssetRouter,
+    MessageNotIncluded,
+    MultiCallToL1NotSupported,
+    UnauthorizedMessageSender
+} from "../InteropErrors.sol";
 
 /// @title L1InteropHandler
 /// @author Matter Labs
@@ -33,13 +38,20 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
     /// @dev MessageRoot smart contract that is used to prove message inclusion.
     IMessageRootBase public immutable MESSAGE_ROOT;
 
+    /// @dev The canonical L1 AssetRouter — the only recipient L1-destined bundles may target (see
+    /// {_interopCallTarget}). Immutable, set at construction, to avoid resolving it on every execution.
+    address public immutable L1_ASSET_ROUTER;
+
     /// @dev Contract is expected to be used as a proxy implementation.
     /// @dev Locking the reentrancy guard (and disabling the OZ initializers) in the constructor prevents the
     /// implementation from being initialized.
     /// @param _messageRoot The MessageRoot used to prove message inclusion.
-    constructor(IMessageRootBase _messageRoot) reentrancyGuardInitializer {
+    /// @param _l1AssetRouter The canonical L1 AssetRouter (the only supported L1 bundle-call target).
+    constructor(IMessageRootBase _messageRoot, address _l1AssetRouter) reentrancyGuardInitializer {
         _disableInitializers();
+        require(_l1AssetRouter != address(0), ZeroAddress());
         MESSAGE_ROOT = _messageRoot;
+        L1_ASSET_ROUTER = _l1AssetRouter;
     }
 
     /// @notice Initializes the contract behind its proxy.
@@ -69,12 +81,17 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
-        // Shared pre-gate validation; the proof attests the source chain via `proof.chainId`.
-        _validateExecutable(bundleHash, interopBundle, _proof.chainId, status);
+        // An L1-destined bundle is a single asset withdrawal (enforced at send); re-assert as defense-in-depth.
+        require(interopBundle.calls.length == 1, MultiCallToL1NotSupported(interopBundle.calls.length));
 
-        // Proof gate: verify the bundle's L1-message inclusion, if not done yet.
+        // Shared pre-gate validation (pause/permission/executability).
+        _validateExecutable(bundleHash, interopBundle, status);
+
+        // Proof gate (if not yet verified). `_verifyBundle` also runs the destination-context / fresh-bundle
+        // check; an already-`Verified` bundle had it checked at verify time, and it's invariant per bundle.
         if (status != BundleStatus.Verified) {
-            _verifyBundle(_bundle, _proof, bundleHash);
+            // solhint-disable-next-line func-named-parameters
+            _verifyBundle(_bundle, interopBundle, _proof, bundleHash, status);
         }
 
         _markFullyExecutedAndRun(bundleHash, interopBundle);
@@ -86,10 +103,10 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
     function verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
-        _validateVerifiable(bundleHash, interopBundle, _proof.chainId, status);
-
-        // Proof gate: message inclusion. `_verifyBundle` marks the bundle `Verified`.
-        _verifyBundle(_bundle, _proof, bundleHash);
+        // `_verifyBundle` runs `_validateVerifiable` (destination-context + fresh-bundle) then the message-
+        // inclusion proof gate, and marks the bundle `Verified`.
+        // solhint-disable-next-line func-named-parameters
+        _verifyBundle(_bundle, interopBundle, _proof, bundleHash, status);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -168,13 +185,34 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
         return DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
     }
 
-    /// @notice Verifies the bundle by checking that its `BUNDLE_IDENTIFIER`-prefixed message was included, sent
-    /// by the canonical L2 InteropCenter. Asset correctness across chains is guaranteed by ZK proofs, so no
-    /// on-chain per-chain balance reconciliation is performed here.
+    /// @inheritdoc InteropHandlerBase
+    /// @dev Pins the target to the canonical L1 AssetRouter regardless of `_to`, confining the L1 execution
+    /// surface to its `finalizeDeposit` path (whose `receiveMessage` validates selector/sender/source-chain).
+    /// A well-formed withdrawal already carries `_to == L1_ASSET_ROUTER`; anything else reverts.
+    function _interopCallTarget(address _to) internal view override returns (address) {
+        require(_to == L1_ASSET_ROUTER, InteropCallToL1NotToAssetRouter(_to));
+        return L1_ASSET_ROUTER;
+    }
+
+    /// @notice Verifies the bundle: runs the shared destination-context / fresh-bundle validation, then checks
+    /// that its `BUNDLE_IDENTIFIER`-prefixed message was included, sent by the canonical L2 InteropCenter. Asset
+    /// correctness across chains is guaranteed by ZK proofs, so no on-chain per-chain balance reconciliation is
+    /// performed here.
     /// @param _bundle The abi-encoded InteropBundle struct to verify.
+    /// @param _interopBundle The decoded bundle (for the destination-context validation).
     /// @param _proof Proof for the message corresponding to the bundle.
     /// @param _bundleHash Hash corresponding to the bundle.
-    function _verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bytes32 _bundleHash) internal {
+    /// @param _status Current bundle status (must be `Unreceived`).
+    function _verifyBundle(
+        bytes memory _bundle,
+        InteropBundle memory _interopBundle,
+        MessageInclusionProof memory _proof,
+        bytes32 _bundleHash,
+        BundleStatus _status
+    ) internal {
+        // Destination-context + fresh-bundle gate. Single home for the context check (see {_validateExecutable}).
+        _validateVerifiable(_bundleHash, _interopBundle, _proof.chainId, _status);
+
         require(
             _proof.message.sender == L2_INTEROP_CENTER_ADDR,
             UnauthorizedMessageSender(L2_INTEROP_CENTER_ADDR, _proof.message.sender)
