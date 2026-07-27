@@ -73,9 +73,20 @@ interop-registration time instead (next section).
 ## Interop registration (`ChainRegistrationSender`)
 
 `ChainRegistrationSender` registers a chain on another chain's `L2Bridgehub`
-(`registerChainForInterop`) via a normal Bridgehub deposit (the two-bridges flow). Anyone can
-trigger it, but the caller pays the base tokens for the L1->L2 transaction; no ETH `msg.value` is
-accepted.
+(`registerChainForInterop`). There are two entry points, differing only in who pays:
+
+- **`registerChain(chainToBeRegistered, chainRegisteredOn)`** — the free ease-of-use path. It sends
+  the registration as an **L2 service transaction**
+  (`IMailbox.requestL2ServiceTransaction` on the target chain), so the caller supplies no base
+  tokens at all. Because it is free it is rate-limited structurally: the
+  `chainRegisteredOnChain[a][b]` mapping makes it callable **once per ordered chain pair**
+  (`ChainAlreadyRegistered` on a repeat), which prevents spamming service transactions.
+- **`bridgehubDeposit`** — the caller-funded path, driven through the Bridgehub's two-bridges flow.
+  Anyone can trigger it, but the caller pays the base tokens for the L1->L2 transaction; no ETH
+  `msg.value` is accepted. Not once-per-pair, since the caller bears the cost.
+
+Both call `_checkSettlementLayers` directly and build their payload with the shared
+`_getL2TxCalldata`, so every check below applies on both paths regardless of who pays.
 
 Checks performed before sending the registration:
 

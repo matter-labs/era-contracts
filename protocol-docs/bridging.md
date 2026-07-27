@@ -13,7 +13,8 @@ narrative. For the atomic interop flow itself, see {protocol-docs/atomicity/READ
 | `L2AssetTracker`                                                                                  | every ZK chain             | Chain-local token bookkeeping: outbound/inbound amounts, pre-v31 total-supply snapshots, L1-deposit/withdrawal counters used by the L1 -> Gateway migration. |
 | `L1Nullifier`                                                                                     | L1                         | Tracks initiated L1 -> L2 deposits (`depositHappened`) and verifies/clears them when a failed deposit is claimed back on L1.                                 |
 | `BaseTokenHolder` (`l2-system/`)                                                                  | every ZK chain             | Escrow of the chain's base-token reserves; replaces mint/burn with transfers for EVM compatibility.                                                          |
-| `BridgedStandardERC20`, `L2WrappedBaseToken`                                                      | ZK chains (beacon-proxied) | The standard bridged-token implementation and the canonical wrapped-base-token (WETH-style) implementation.                                                  |
+| `BridgedStandardERC20`                                                                            | ZK chains (beacon-proxied) | The standard bridged-token implementation, deployed per token behind the NTV's beacon.                                                                       |
+| `L2WrappedBaseToken`                                                                              | ZK chains                  | The canonical wrapped-base-token (WETH-style) implementation. An `ERC20PermitUpgradeable`, deployed behind its own proxy — **not** the bridged-token beacon. |
 
 The `L2AssetRouter`, `L2NativeTokenVault`, `L2AssetTracker`, `BaseTokenHolder`, interop center/handler and
 atomic-flow manager are genesis-deployed built-ins at fixed, identical addresses on every ZK chain
@@ -80,8 +81,10 @@ returns `bridgeMintData`; the destination-side handler's `bridgeMint` consumes t
 
 ### Finalization (destination side)
 
-`finalizeDeposit(sourceChainId, assetId, transferData)` is the single (new-format) finalization entry
-point — the legacy `finalizeWithdrawal` path and old message format were removed. It looks up the asset
+`finalizeDeposit(sourceChainId, assetId, transferData)` is the new-format finalization entry point. It
+is not the only one: `L1AssetRouter.finalizeWithdrawal` is still live and forwards to
+`L1Nullifier.finalizeWithdrawal`, which serves the legacy withdrawal-message format (see
+[Legacy compatibility](#legacy-compatibility)). It looks up the asset
 handler and calls `bridgeMint`; if no handler is registered yet, it registers the NTV as the handler and
 mints through it (`msg.value` is forwarded so ETH cannot get stuck in the router; whether non-zero value is
 supported is decided at the handler layer). `_sourceChainId` is the source chain of the _message_, not
@@ -104,9 +107,13 @@ Authorization:
   - Reverts of the inner call are bubbled up verbatim so callers can react to specific errors (e.g. the
     TBM flow retries withdrawals on `InsufficientChainBalance`).
 - On L2, `finalizeDeposit` is additionally callable by the aliased L1 asset router (L1 -> L2 deposits) and
-  rejects the chain's own base-token asset ID. On L1 it is `onlySelf` only.
-- Withdrawal replay protection lives in the interop handler's `bundleStatus` mapping (a bundle executes at
-  most once); the old `isWithdrawalFinalized` mapping in `L1Nullifier` is deprecated.
+  rejects the chain's own base-token asset ID. On L1 it is `onlySelfOrNullifier`: the router itself, or
+  `L1Nullifier` finalizing a legacy-format withdrawal.
+- Replay protection depends on the path. A new-format bundle executes at most once via the interop
+  handler's `bundleStatus` mapping. The legacy `finalizeWithdrawal` path is guarded by
+  `L1Nullifier.isWithdrawalFinalized[chainId][batch][messageIndex]` — actively written and checked
+  (`WithdrawalAlreadyFinalized`), not deprecated — and it additionally consults the legacy bridge's own
+  `isWithdrawalFinalized` for pre-migration withdrawals.
 
 ## Native Token Vault
 
@@ -274,8 +281,9 @@ mintData)`, forwarding the bundle's mint data verbatim; the NTV refunds the data
 
 ## Legacy compatibility
 
-- The legacy bridges (`L1ERC20Bridge`, `L2SharedBridgeLegacy`, the legacy `finalizeWithdrawal`/withdrawal
-  message format, and the L1-side legacy-deposit special-casing) were removed. Numerous
+- The legacy **withdrawal** path is still supported: `L1AssetRouter.finalizeWithdrawal` ->
+  `L1Nullifier.finalizeWithdrawal` parses the old message format and nullifies via
+  `isWithdrawalFinalized`. Numerous
   `__DEPRECATED_*` storage slots remain across `L1AssetRouter`, `L2AssetRouter`, `L1Nullifier`,
   `L2NativeTokenVault`, `L1NativeTokenVault` and `L2AssetTracker` solely to preserve the upgradeable
   storage layouts of already-deployed proxies; they are never read or written and must not be reused.

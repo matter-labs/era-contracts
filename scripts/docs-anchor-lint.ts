@@ -75,22 +75,47 @@ export function anchorToSlug(anchor: string): string {
   return anchor.slice(1).replace(/\\/g, "").toLowerCase();
 }
 
-// Returns the set of valid anchor slugs for a markdown file, honouring fenced code
-// blocks (```) so a `#` inside a code sample is not mistaken for a heading.
-function anchorsForDoc(mdPath: string): Set<string> {
+// Extracts the heading slugs of a markdown document.
+//
+// Fenced code blocks are skipped so a `#` in a code sample is not read as a heading. GFM allows both
+// backtick and tilde fences, and a fence is closed only by a fence of the SAME character that is at
+// least as long as the opener — treating ``` and ~~~ as interchangeable (or ignoring tildes, as an
+// earlier version did) would let a heading-like line inside a code block register as a real anchor,
+// which in turn lets a broken pointer resolve. Exported for `--selftest`.
+export function headingSlugs(markdown: string): Set<string> {
   const slugs = new Set<string>();
   const seen = new Map<string, number>();
-  let inFence = false;
-  for (const line of fs.readFileSync(mdPath, "utf-8").split("\n")) {
-    if (/^\s*```/.test(line)) {
-      inFence = !inFence;
+  let fence: { char: string; len: number } | null = null;
+
+  for (const line of markdown.split("\n")) {
+    const f = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    if (f) {
+      const char = f[1][0];
+      const len = f[1].length;
+      if (!fence) {
+        // An opening backtick fence may carry an info string, but it must not contain a backtick.
+        if (char === "`" && line.slice(f[0].length).includes("`")) {
+          // not a fence — an inline-code span such as ``a`b``
+        } else {
+          fence = { char, len };
+        }
+        continue;
+      }
+      // Closing fence: same character, at least as long, and nothing but whitespace after it.
+      if (char === fence.char && len >= fence.len && line.slice(f[0].length).trim() === "") {
+        fence = null;
+      }
       continue;
     }
-    if (inFence) continue;
+    if (fence) continue;
     const m = /^(#{1,6})\s+(.*)$/.exec(line);
     if (m) slugs.add(slugify(m[2], seen));
   }
   return slugs;
+}
+
+function anchorsForDoc(mdPath: string): Set<string> {
+  return headingSlugs(fs.readFileSync(mdPath, "utf-8"));
 }
 
 // This file is excluded from its own scan: it defines the grammar and deliberately contains
@@ -233,6 +258,18 @@ function selftest(): number {
   // allowlisted file, string not on its list -> not exempt (this is the fail-open case)
   expectTemplate("AGENTS.md", "{protocol-docs/interop.md#does...not-exist}", false);
   expectTemplate("protocol-docs/README.md", "{protocol-docs/interop.md#a...b}", false);
+
+  // fence handling — a heading-like line inside ANY fence must not become an anchor
+  const hasSlug = (md: string, slug: string) => headingSlugs(md).has(slug);
+  if (hasSlug("~~~\n# Fake\n~~~\n", "fake")) failures.push("tilde fence: heading inside ~~~ leaked");
+  if (hasSlug("```\n# Fake\n```\n", "fake")) failures.push("backtick fence: heading inside ``` leaked");
+  if (hasSlug("~~~sol\n# Fake\n~~~\n", "fake")) failures.push("tilde fence with info string leaked");
+  if (hasSlug("````\n# Fake\n````\n", "fake")) failures.push("4-backtick fence leaked");
+  // a fence is only closed by the SAME character — ``` must not close a ~~~ block
+  if (hasSlug("~~~\n```\n# Fake\n~~~\n", "fake")) failures.push("mismatched fence char closed the block");
+  // real headings around fences must still be found
+  if (!hasSlug("# Real\n\n~~~\n# Fake\n~~~\n\n## After\n", "real")) failures.push("heading before fence lost");
+  if (!hasSlug("# Real\n\n~~~\n# Fake\n~~~\n\n## After\n", "after")) failures.push("heading after fence lost");
 
   // slug rules
   const seen = new Map<string, number>();
