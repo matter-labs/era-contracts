@@ -35,9 +35,8 @@ interface IL2BaseTokenBase {
     /// @notice Returns the total circulating supply of base tokens.
     function totalSupply() external view returns (uint256);
 
-    /// @notice Initializes the L2 Base Token contract during genesis or V31 upgrade.
-    /// @dev Sets the L1 chain ID and initializes the BaseTokenHolder balance.
-    /// @dev The implementation varies between Era and ZK OS but both require this initialization.
+    /// @notice Initializes the L2 Base Token contract during genesis or the V31 upgrade.
+    /// @dev Sets the L1 chain ID and seeds the BaseTokenHolder balance.
     /// @param _l1ChainId The chain ID of L1.
     function initL2(uint256 _l1ChainId) external;
 }

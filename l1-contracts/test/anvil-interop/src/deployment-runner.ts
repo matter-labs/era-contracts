@@ -71,14 +71,10 @@ export class DeploymentRunner {
   }
 
   /**
-   * Protocol version string used to name the chain-states folder (e.g. "v0.32.0").
-   *
-   * Read from the anvil-interop harness's OWN config (`config/anvil-config.json`
-   * → `stateVersion`), NOT the shared `configs/genesis/era/latest.json`. The
-   * shared genesis is the base protocol version for the L1 foundry suite (v31);
-   * the anvil harness runs atomic-interop (v32). Keeping the harness version
-   * local decouples the two, so the anvil state can live under `v0.32.0` without
-   * re-versioning the whole L1 test suite (which pins v31).
+   * Protocol version string used to name the chain-states folder (e.g. "v0.32.0"). Read from the
+   * harness's OWN config (`stateVersion`), NOT the shared `configs/genesis/era/latest.json`: the
+   * shared genesis pins the L1 foundry suite's base version (v31) while the anvil harness runs
+   * atomic-interop (v32), and keeping the harness version local decouples the two.
    */
   getProtocolVersionString(): string {
     const cfg = JSON.parse(fs.readFileSync(this.configPath, "utf-8")) as { stateVersion?: string };
@@ -837,11 +833,9 @@ export class DeploymentRunner {
       delete raw.transactions;
       delete raw.historical_states;
 
-      // Commit the state gzip-compressed (`<chainId>.json.gz`) rather than as raw
-      // JSON. These dumps are multi-MB; committing them as text floods every
-      // regeneration with an enormous, unreviewable diff. GitHub renders .gz as
-      // binary ("Binary file not shown"), keeping it out of PR diffs, and gzip
-      // shrinks the files ~10x. loadChainStates() gunzips them on the fly.
+      // Commit the state gzip-compressed (`<chainId>.json.gz`): the dumps are multi-MB, and as raw
+      // JSON every regeneration floods PRs with an unreviewable text diff. loadChainStates()
+      // gunzips them on the fly.
       const gzipPath = `${statePath}.gz`;
       fs.writeFileSync(gzipPath, zlib.gzipSync(JSON.stringify(raw), { level: 9 }));
       // Drop the raw JSON dump so only the compressed artifact is committed.
@@ -965,9 +959,8 @@ export class DeploymentRunner {
    * Full setup: deploy + test tokens + wrapped-ZK seeding.
    *
    * Used by both `setup-and-dump-state.ts` and `run-hardhat-interop-test.ts` (fresh deploy path).
-   * Thin wrapper over {@link deployAndSetup} that additionally seeds wrapped ZK
-   * balances on ETH-base-token L2 chains. Cross-chain asset correctness is
-   * guaranteed by ZK proofs, so no on-chain balance migration step is needed.
+   * Thin wrapper over {@link deployAndSetup} that additionally seeds wrapped ZK balances on
+   * ETH-base-token L2 chains (no on-chain balance migration step is needed anymore).
    */
   async deployAndSetupWithTBM(
     anvilManager: AnvilManager,

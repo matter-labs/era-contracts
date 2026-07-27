@@ -8,9 +8,9 @@ import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {AssetIdMismatch} from "contracts/common/L1ContractErrors.sol";
 
-/// @notice Regression tests for the `BASE_TOKEN_ASSET_ID` freeze: `L2NativeTokenVault.updateL2` must freeze it once set — the
-/// same "set-once" pattern already applied to `WETH_TOKEN` and `L1_CHAIN_ID`. A base-token change would strand
-/// every in-flight bundle whose snapshotted `destinationBaseTokenAssetId` no longer matches the vault's value.
+/// @notice Regression tests for the `BASE_TOKEN_ASSET_ID` freeze in `L2NativeTokenVault.updateL2`
+/// (set-once, like `WETH_TOKEN` and `L1_CHAIN_ID`): a base-token change would strand every in-flight
+/// bundle whose snapshotted `destinationBaseTokenAssetId` no longer matches the vault's value.
 contract L2NativeTokenVaultUpdateL2Test is Test {
     L2NativeTokenVault internal ntv;
 

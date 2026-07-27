@@ -357,10 +357,8 @@ contract BaseTokenHolderTest is Test {
                         recoverBaseToken() TESTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Regression tests for base-token bridge-out recovery: a failed/timed-out base-token bridge-out is
-    /// refunded via recoverBaseToken, which returns the escrowed value to the depositor (and reverses the
-    /// burn-side accounting). Without this path the escrowed base token would be permanently stranded on an
-    /// atomic timeout.
+    /// @notice Covers base-token bridge-out recovery via `recoverBaseToken`.
+    /// See {protocol-docs/bridging.md#base-token-handling}.
     function test_recoverBaseToken_successFromNativeTokenVault() public {
         uint256 amount = 3 ether;
         uint256 recipientBalanceBefore = recipient.balance;

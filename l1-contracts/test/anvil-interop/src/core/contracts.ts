@@ -69,10 +69,7 @@ const ARTIFACTS = {
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
   TestnetERC20Token: "TestnetERC20Token.sol/TestnetERC20Token.json",
-  // Atomic interop (bundle model). The global IMT + importer were removed on-chain; the
-  // per-chain commitment-tree root is carried by the standard interop-root channel, and the
-  // (formerly escrow-direct) flow now runs through InteropCenter / InteropHandler with the
-  // AtomicFlowManager coordinating the IMT commits and timeout recovery.
+  // Atomic interop (bundle model) — see {protocol-docs/atomicity/README.md#contracts}.
   L2InteropCommitmentTree: "L2InteropCommitmentTree.sol/L2InteropCommitmentTree.json",
   AtomicFlowManager: "AtomicFlowManager.sol/AtomicFlowManager.json",
   IAtomicFlowManager: "IAtomicFlowManager.sol/IAtomicFlowManager.json",

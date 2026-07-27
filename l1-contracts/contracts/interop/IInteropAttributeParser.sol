@@ -24,7 +24,8 @@ interface IInteropAttributeParser {
         IInteropCenter.AttributeParsingRestrictions _restriction
     ) external pure returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes);
 
-    /// @notice Extracts the `atomicBundle` send metadata (flowId/deadline/lowNullifierIndex) from the attributes.
+    /// @notice Extracts the `atomicBundle` send metadata (the full {AtomicFlowPreimage} plus
+    /// `lowNullifierIndex`) from the attributes.
     /// @dev Kept separate from {parseAttributes} so the metadata never enters the cross-chain bundle (which would
     /// make `bundleHash` depend on `flowId` — a circular dependency). Returns `isAtomic = false` if absent.
     /// @param _attributes The raw ERC-7786 attribute entries.

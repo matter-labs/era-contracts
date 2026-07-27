@@ -29,12 +29,12 @@ import {
     L2_CHAIN_ASSET_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-// Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
+// Chain-tree leaves are batch commitments; the empty leaf is the hash of "new bytes(96)".
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
     0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
 );
 
-// Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
+// Shared-tree empty leaf: also the hash of "new bytes(96)".
 bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
     0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
 );
@@ -289,7 +289,6 @@ contract MessageRootTest is Test {
     }
 
     function test_addNewChain() public {
-        // kl todo: enable these tests if commented out.
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         uint256 betaChainId = uint256(uint160(makeAddr("betaChainId")));
 
@@ -430,7 +429,6 @@ contract MessageRootTest is Test {
             "chain root should combine the genesis leaf and the timestamp-bound first batch leaf"
         );
 
-        // Verify interopRootLogId incremented once for the new block
         assertEq(
             l2MessageRoot.interopRootLogId(),
             countBefore + 1,
@@ -447,13 +445,11 @@ contract MessageRootTest is Test {
             abi.encode(alphaChainSender)
         );
 
-        // Verify chain is not registered initially
         assertFalse(messageRoot.chainRegistered(alphaChainId), "Chain should not be registered initially");
 
         vm.prank(bridgeHub);
         messageRoot.addNewChain(alphaChainId, 0);
 
-        // Verify chain is now registered
         assertTrue(messageRoot.chainRegistered(alphaChainId), "Chain should be registered after addNewChain");
 
         // The chain reports its genesis root right after registration (as createNewChain does); the
@@ -469,7 +465,6 @@ contract MessageRootTest is Test {
         bytes32 initialChainRoot = messageRoot.getChainRoot(alphaChainId);
         assertEq(initialChainRoot, _genesisChainRoot(0), "Initial chain root should be the genesis leaf");
 
-        // Verify first batch number is 0 before adding any batches
         uint256 initialBatchNumber = messageRoot.currentChainBatchNumber(alphaChainId);
         assertEq(initialBatchNumber, 0, "Initial batch number should be 0");
 
@@ -480,7 +475,6 @@ contract MessageRootTest is Test {
             bytes32(hex"63c4d39ce8f2410a1e65b0ad1209fe8b368928a7124bfa6e10e0d4f0786129dd")
         );
 
-        // Verify batch number incremented after adding first batch
         uint256 batchNumberAfterBatch1 = messageRoot.currentChainBatchNumber(alphaChainId);
         assertEq(batchNumberAfterBatch1, 1, "Batch number should be 1 after adding first batch");
 
@@ -491,7 +485,6 @@ contract MessageRootTest is Test {
             bytes32(hex"bcc3a5584fe0f85e968c0bae082172061e3f3a8a47ff9915adae4a3e6174fc12")
         );
 
-        // Verify batch number incremented after adding second batch
         uint256 batchNumberAfterBatch2 = messageRoot.currentChainBatchNumber(alphaChainId);
         assertEq(batchNumberAfterBatch2, 2, "Batch number should be 2 after adding second batch");
 
@@ -502,14 +495,11 @@ contract MessageRootTest is Test {
             bytes32(hex"8d1ced168691d5e8a2dc778350a2c40a2714cc7d64bff5b8da40a96c47dc5f3e")
         );
 
-        // Verify batch number incremented after adding third batch
         uint256 finalBatchNumber = messageRoot.currentChainBatchNumber(alphaChainId);
         assertEq(finalBatchNumber, 3, "Final batch number should be 3");
 
-        // Get the final chain root (may or may not be zero depending on tree implementation)
+        // No root assertion: the value depends on the tree implementation; the call just must not revert.
         bytes32 finalChainRoot = messageRoot.getChainRoot(alphaChainId);
-        // Chain root is computed - the test verifies the function can be called without reverting
-        // The actual root value depends on the merkle tree implementation
     }
 
     /// @notice Verify that multiple _emitRoot calls within the same block share the same logId.

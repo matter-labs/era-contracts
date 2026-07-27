@@ -19,7 +19,8 @@ import {Unauthorized} from "../common/L1ContractErrors.sol";
  * the L2 AssetRouter (`InteropCenter.sendBundle`), the same unified path used by ERC20 withdrawals. The
  * `withdraw`/`withdrawWithMessage` entrypoints here are kept for backwards compatibility and finalize on
  * L1 via the L1Nullifier's legacy path.
- * @dev Pre-V31 storage variables (eraAccountBalance, __DEPRECATED_totalSupply) are declared here because they existed before the V31 upgrade. The storage gap allows adding new shared variables in future upgrades.
+ * @dev Pre-V31 storage variables are declared here because they predate the V31 upgrade; the storage
+ * gap allows adding new shared variables in future upgrades.
  */
 abstract contract L2BaseTokenBase is IL2BaseTokenBase {
     /// @notice Ensures that only the ComplexUpgrader can call the function.
@@ -34,9 +35,9 @@ abstract contract L2BaseTokenBase is IL2BaseTokenBase {
     /// @dev Only used by the Era implementation. Declared in the base contract because it existed prior to V31.
     mapping(address account => uint256 balance) internal eraAccountBalance;
 
-    /// @notice Deprecated: The old storage variable for total supply.
-    /// @dev Only read during the V31 upgrade to initialize the BaseTokenHolder balance correctly. After V31, totalSupply is computed dynamically from the BaseTokenHolder's balance.
-    /// @dev Only used by the Era implementation. Declared in the base contract because it existed prior to V31.
+    /// @notice Deprecated: the old (Era-only) total-supply variable.
+    /// @dev After V31 `totalSupply` is derived from the BaseTokenHolder's balance; this is only read to
+    /// account for the pre-V31 supply.
     // slither-disable-next-line uninitialized-state
     uint256 internal __DEPRECATED_totalSupply;
 

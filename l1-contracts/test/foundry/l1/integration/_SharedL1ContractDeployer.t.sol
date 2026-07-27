@@ -140,11 +140,8 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         }
     }
 
-    /// @dev Nonce making each reconstructed withdrawal bundle unique. On a real chain the on-chain
-    /// `interopBundleSalt` is `keccak256(msg.sender, userSalt)` where `userSalt` is supplied by the caller via
-    /// the `interopBundleSalt` ERC-7786 attribute (not assigned by the InteropCenter); under mocked proofs we
-    /// only need per-bundle uniqueness so repeated withdrawals do not collide into the same bundle hash
-    /// (`BundleAlreadyProcessed`).
+    /// @dev Nonce making each reconstructed withdrawal bundle unique, so repeated withdrawals do not
+    /// collide into the same bundle hash (`BundleAlreadyProcessed`).
     uint256 private withdrawalBundleSaltNonce;
 
     /// @notice Wraps an asset-router `finalizeDeposit` payload in the single-call InteropBundle message
