@@ -45,7 +45,7 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
     /// referenced chain's clock (the atomic-interop send path uses it to reject legs of flows whose
     /// deadline verifiably passed).
     /// @dev Appended after `storedInteropRoots`, so the v31-compatibility note above is unaffected.
-    mapping(uint256 chainId => uint256 timestamp) internal latestInteropRootTimestamps;
+    mapping(uint256 chainId => uint256 timestamp) public latestInteropRootTimestamp;
 
     /// @notice Returns the imported `(root, timestamp)` tuple for a chain ID and block or batch number.
     function interopRoots(
@@ -53,12 +53,6 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
         uint256 blockOrBatchNumber
     ) external view returns (StoredInteropRoot memory) {
         return storedInteropRoots[chainId][blockOrBatchNumber];
-    }
-
-    /// @notice Returns the maximum creation timestamp over all roots imported for `chainId` (zero if
-    /// none was imported yet).
-    function latestInteropRootTimestamp(uint256 chainId) external view returns (uint256) {
-        return latestInteropRootTimestamps[chainId];
     }
 
     /// @dev Adds a message root to the L2InteropRootStorage contract.
@@ -119,8 +113,8 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
         // Track the chain's freshest imported root creation time. Imports need not arrive in
         // timestamp order, so keep the maximum rather than the last value — the tracked timestamp
         // must never decrease.
-        if (timestamp > latestInteropRootTimestamps[chainId]) {
-            latestInteropRootTimestamps[chainId] = timestamp;
+        if (timestamp > latestInteropRootTimestamp[chainId]) {
+            latestInteropRootTimestamp[chainId] = timestamp;
         }
 
         emit InteropRootAdded(chainId, blockOrBatchNumber, timestamp, sides);

@@ -7,8 +7,8 @@ pragma solidity ^0.8.21;
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The L2 counterpart of {IL1AssetHandler}: the recovery surface an L2 asset handler exposes
 /// so that burns it performed on the atomic-interop send path can be reversed on timeout (see
-/// {L2AssetRouter.recoverAtomicCall}). The native token vault implements it (see
-/// {INativeTokenVaultBase}); a custom asset handler that wants its burns to be recoverable on the
+/// {L2AssetRouter.recoverAtomicCall}). The native token vault implements it ({INativeTokenVaultBase}
+/// inherits this interface); a custom asset handler that wants its burns to be recoverable on the
 /// atomic timeout path MUST implement it as well — otherwise the recovery call (and with it the whole
 /// refund claim for the bundle) reverts.
 interface IL2AssetHandler {
