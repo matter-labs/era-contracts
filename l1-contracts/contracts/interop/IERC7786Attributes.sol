@@ -35,7 +35,7 @@ interface IERC7786Attributes {
     /// @notice Specifies a user-provided salt for the interop bundle.
     /// @param _salt Arbitrary 32-byte salt chosen by the sender.
     /// @dev Mixed with `msg.sender` into `interopBundleSalt`; each (sender, salt) pair may be used at
-    ///      most once, and a random salt keeps the bundle hash unpredictable. Omitting it (salt 0) works
-    ///      at most once per sender. See {protocol-docs/interop.md#replay-protection-and-bundle-uniqueness}.
+    ///      most once, so the salt must be fresh per bundle. Omitting it (salt 0) works at most once per
+    ///      sender. See {protocol-docs/interop.md#replay-protection-and-bundle-uniqueness}.
     function interopBundleSalt(bytes32 _salt) external pure;
 }

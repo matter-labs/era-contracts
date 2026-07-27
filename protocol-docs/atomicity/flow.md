@@ -134,7 +134,8 @@ to either.
 ### 4. Timeout / refund
 
 If a leg never commits in time, `authorizeRefund` takes one absence proof and flips this chain's
-`Committed` legs to `Revertable`; `claimRefund` then reverses each burn. Detailed in
+`Committed` legs to `Revertable`; `claimRefund` then _attempts_ to reverse the burns — it succeeds only
+if at least one recovery reports success and none reverts. Detailed in
 {protocol-docs/atomicity/recovery.md}; the absence-proof conditions in
 {protocol-docs/atomicity/proofs.md#timeout}.
 

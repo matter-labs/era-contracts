@@ -25,11 +25,20 @@ const CANDIDATE_RE = /\{protocol-docs[^}\n]*\}/g;
 // An opener with no closing brace on the line: also malformed, and invisible to the above.
 const UNTERMINATED_RE = /\{protocol-docs[^}\n]*$/gm;
 
-// Prose that documents the pointer *syntax* (AGENTS.md, protocol-docs/README.md) writes templates
-// like `{protocol-docs/<path>.md}` or `{protocol-docs/...}`. A real pointer can never contain an
-// angle bracket or an ellipsis, so skipping these does not fail open: a realistic typo such as
-// `#does.not-exist` has neither and is still reported.
-const TEMPLATE_RE = /[<>]|\.\.\./;
+// Prose that documents the pointer *syntax* writes templates rather than real pointers. This is an
+// EXACT allowlist keyed by file: a pattern-based exemption (e.g. "skip anything containing `...`")
+// would fail open, silently passing a real-looking typo such as `{protocol-docs/interop.md#a...b}`.
+// Adding a template here is a deliberate, reviewable act.
+const SYNTAX_DOC_TEMPLATES: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+  ["AGENTS.md", new Set(["{protocol-docs/<path>.md}"])],
+  ["CLAUDE.md", new Set(["{protocol-docs/<path>.md}"])],
+  ["protocol-docs/README.md", new Set(["{protocol-docs/<name>.md}", "{protocol-docs/...}"])],
+]);
+
+// True only for an exact (file, candidate) pair on the allowlist above.
+export function isSyntaxTemplate(file: string, candidate: string): boolean {
+  return SYNTAX_DOC_TEMPLATES.get(file)?.has(candidate) ?? false;
+}
 
 // Phase 2 — the strict grammar a pointer must satisfy.
 // Path segments allow dots so filenames like `foo.bar.md` parse; the anchor accepts
@@ -145,7 +154,7 @@ function check(docAnchors: Map<string, Set<string>>): number {
     CANDIDATE_RE.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = CANDIDATE_RE.exec(content)) !== null) {
-      if (TEMPLATE_RE.test(m[0])) continue; // syntax documentation, not a pointer
+      if (isSyntaxTemplate(file, m[0])) continue; // allowlisted syntax documentation, not a pointer
       checked++;
       const where = `${file}:${lineOf(content, m.index)}`;
       const parsed = parsePointer(m[0]);
@@ -207,16 +216,23 @@ function selftest(): number {
   expectBad("{protocol-docs/}");
   expectBad("{protocol-docs/interop.md #send-flow}");
 
-  // syntax-documentation templates are skipped, but only because of `<`/`>`/`...`
-  const expectTemplate = (s: string, isTemplate: boolean) => {
-    if (TEMPLATE_RE.test(s) !== isTemplate) {
-      failures.push(`TEMPLATE_RE.test('${s}') should be ${isTemplate}`);
+  // ellipsis/angle-bracket typos must be reported as malformed, never treated as templates
+  expectBad("{protocol-docs/interop.md#does...not-exist}");
+  expectBad("{protocol-docs/interop.md#a<b}");
+
+  // the template exemption is an exact (file, string) allowlist — not a pattern
+  const expectTemplate = (file: string, s: string, want: boolean) => {
+    if (isSyntaxTemplate(file, s) !== want) {
+      failures.push(`isSyntaxTemplate('${file}', '${s}') should be ${want}`);
     }
   };
-  expectTemplate("{protocol-docs/<path>.md}", true);
-  expectTemplate("{protocol-docs/...}", true);
-  expectTemplate("{protocol-docs/interop.md#does.not-exist}", false); // a real typo must NOT be exempted
-  expectTemplate("{protocol-docs/atomicity/flow.md#data-structures}", false);
+  expectTemplate("AGENTS.md", "{protocol-docs/<path>.md}", true);
+  expectTemplate("protocol-docs/README.md", "{protocol-docs/...}", true);
+  // same string, file not on the allowlist -> not exempt
+  expectTemplate("protocol-docs/interop.md", "{protocol-docs/...}", false);
+  // allowlisted file, string not on its list -> not exempt (this is the fail-open case)
+  expectTemplate("AGENTS.md", "{protocol-docs/interop.md#does...not-exist}", false);
+  expectTemplate("protocol-docs/README.md", "{protocol-docs/interop.md#a...b}", false);
 
   // slug rules
   const seen = new Map<string, number>();

@@ -70,8 +70,12 @@ check on the finality path is therefore defense-in-depth; on the timeout path it
 
 ## Timeout
 
-> **A leg TIMES OUT (is refundable) via an aggregated root created strictly after the deadline
-> (`T > deadline`) plus one batch of the source chain inside that root.**
+> **A leg TIMES OUT (becomes refund-_authorizable_) via an aggregated root created strictly after the
+> deadline (`T > deadline`) plus one batch of the source chain inside that root.**
+
+Throughout this page, "times out" means a valid timeout proof exists, so `authorizeRefund` will mark the
+flow's committed legs `Revertable`. Whether the assets are then actually returned is a separate,
+conditional step (`claimRefund`) — see {protocol-docs/atomicity/recovery.md#non-guarantees}.
 
 The prover declares the branch (`ImtProof.provesAgainstBeginRoot`), which `verifyTimeoutAbsence`
 validates against the authenticated `t` — no unverified value drives control flow. Both branches first
@@ -86,8 +90,8 @@ imported) and `slChainId == settlementLayerChainId`, then a non-inclusion (low-n
   **last** batch inside the aggregated root (`_verifyLastBatchInRoot`: wherever the batch-leaf path node
   is a left child, its right sibling must be the empty-subtree hash of the `DynamicIncrementalMerkle`
   zero cascade), and the value is absent from its batch-**end** IMT root (leaf 3) — the final IMT state
-  reachable in time, since any later batch has `t' >= T > deadline`. This branch restores refund
-  liveness for a source chain that **halts** and never settles a post-deadline batch; the required
+  reachable in time, since any later batch has `t' >= T > deadline`. This branch keeps a timeout proof
+  producible for a source chain that **halts** and never settles a post-deadline batch; the required
   "last batch" always exists (see {protocol-docs/atomicity/security.md#timeout-protocol-preconditions}).
 
 The absence proof is bound to the missing leg's declared source chain by the caller
@@ -107,7 +111,7 @@ with `t_B <= deadline` is contained in:
   `B`, so `L' >= B`) — so the end branch cannot succeed for it.
 
 Hence no value that satisfies the finality condition can also produce a valid timeout proof, and vice
-versa: a flow is either finalizable or refundable, never both.
+versa: a flow is either finalizable or refund-authorizable, never both.
 
 ## Completeness
 
@@ -119,7 +123,9 @@ root with `T > deadline`, even if the source chain inserts the value later:
 - otherwise the chain's last batch in the root is in time, and its end root — the final in-time IMT
   state — cannot contain the value either (end branch).
 
-So refund liveness does not depend on catching any particular root; any post-deadline root suffices.
+So this liveness — of the _proof_, hence of `authorizeRefund` — does not depend on catching any
+particular root; any post-deadline root suffices. It does not extend to `claimRefund` returning the
+assets ({protocol-docs/atomicity/recovery.md#non-guarantees}).
 
 ## Error surface
 

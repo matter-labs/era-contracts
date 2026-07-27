@@ -221,7 +221,7 @@ struct CallAttributes {
 ///                    Fee model details: {protocol-docs/interop.md#fee-model}.
 /// @param salt User-provided salt used to derive `interopBundleSalt` as
 ///             `keccak256(abi.encodePacked(msg.sender, salt))`. Must be unique per sender for every
-///             bundle; a random salt also keeps the bundle hash unpredictable (privacy).
+///             bundle (`InteropBundleSaltAlreadyUsed` otherwise).
 struct BundleAttributes {
     bytes executionAddress;
     bytes unbundlerAddress;

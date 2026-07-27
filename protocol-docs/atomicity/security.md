@@ -136,9 +136,12 @@ logs reproduces the tree — and hence every root snapshot the proofs authentica
 
 ## Edge cases
 
-- **Halted source chain.** A chain that stops settling after the deadline still cannot strand a flow:
-  the end-branch timeout proof anchors on the chain's last batch inside a post-deadline aggregated root,
-  which precondition 1 guarantees exists.
+- **Halted source chain.** A chain that stops settling after the deadline cannot block the _refund
+  authorization_: the end-branch timeout proof anchors on the chain's last batch inside a post-deadline
+  aggregated root, which precondition 1 guarantees exists, so `authorizeRefund` stays available and the
+  legs on live chains become `Revertable`. Note this does not by itself return the assets — `claimRefund`
+  is a separate conditional step, and legs committed on the halted chain itself cannot be claimed while
+  it is down (its `AtomicFlowManager` is unreachable).
 - **Reserved address `0x10013`.** Intentionally empty — it formerly held a global-root importer removed
   when atomic interop moved to the interop-root channel. It must stay reserved.
 - **Stale bundle-hash prediction.** If an off-chain `bundleHash` preview goes stale (e.g. an upgrade
