@@ -245,7 +245,8 @@ interop (IMT) flow — see {protocol-docs/atomicity/flow.md} for the full flow. 
 - For a recognized burn it calls `IL2NativeTokenVault.bridgeRecoverFailedTransfer(destChainId, assetId,
 mintData)`, forwarding the bundle's mint data verbatim; the NTV refunds the data's `originalCaller` (the
   source depositor) regardless of the intended `remoteReceiver`, reversing the `bridgeBurn` performed at
-  `commitSend`. `_chainId` must be the burn-time destination chain so the accounting reverses correctly.
+  send time by `initiateIndirectCall`. `_chainId` must be the burn-time destination chain so the
+  accounting reverses correctly.
 - Recovery to L1 is rejected (`RecoverToL1NotSupported`), see below.
 
 ## Security notes

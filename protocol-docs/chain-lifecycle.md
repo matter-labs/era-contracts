@@ -44,7 +44,7 @@ L2->L1 logs, no multichain root, and a freshly seeded (empty) interop commitment
 boundaries, so this value is exact and computable in advance (see `ChainBatchRootTree` for the
 fixed 8-leaf layout of a ZKsync OS chain batch root).
 
-### Genesis batch root seeding (`MessageRoot.seedGenesisRoot`)
+### Genesis batch root seeding
 
 Called by the Bridgehub right after registration, inside the same `createNewChain` transaction.
 It is a one-time, Bridgehub-only entry point, and a no-op for EraVM chains

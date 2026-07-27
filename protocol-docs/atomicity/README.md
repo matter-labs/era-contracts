@@ -1,7 +1,10 @@
 # Atomic interop without L1 coordination
 
-The `l1-contracts/contracts/atomic-interop/` module makes a multi-leg interop flow **atomic** — every
-leg executes or none does — **without a central L1 coordinator**. It rides on the normal interop bundle
+The `l1-contracts/contracts/atomic-interop/` module makes a multi-leg interop flow **atomic** — no leg's
+destination may execute unless _every_ leg was committed in time, and otherwise the committed legs
+become refundable — **without a central L1 coordinator**. (Atomicity gates whether execution is
+_permitted_, not whether every destination actually runs; see
+{protocol-docs/atomicity/security.md#guarantees}.) It rides on the normal interop bundle
 path (`InteropCenter.sendBundle` -> `L2AssetRouter` -> `InteropHandler.executeAtomicBundle`) — and is in
 fact the _only_ L2->L2 path: the `atomicBundle` attribute is mandatory on every L2->L2 send, since
 L1-published (non-atomic) L2->L2 interop was removed; the only non-atomic send left is an L2->L1
@@ -100,7 +103,7 @@ The flow's entry points live outside this directory: `InteropCenter`
 
 The two L2 contracts are predeployed in the ZKsync OS genesis (settlement-layer support lives in the
 core protocol: the `Executor` pushes batch roots via `addChainBatchRootV32` and verifies imported
-dependency roots; the genesis batch leaf is seeded by `MessageRoot.seedGenesisRoot`):
+dependency roots; the genesis batch leaf is seeded by `MessageRootBase.seedGenesisRoot`):
 
 - registered in the genesis-gen tool (`tools/zksync-os-genesis-gen`) at `0x10012`
   (`L2InteropCommitmentTree`) and `0x10014` (`AtomicFlowManager`) — constants in

@@ -8,10 +8,13 @@ import { join } from "path";
 // as `protocol-docs/` evolves. See AGENTS.md "Documentation and Comments".
 
 const DOCS_DIR = "protocol-docs";
-// Extensions whose comments carry `{protocol-docs/...}` pointers.
-const SOURCE_GLOBS = ["*.sol", "*.ts", "*.rs"];
+// Extensions carrying `{protocol-docs/...}` pointers. `*.md` is included because the docs
+// cross-reference each other with the same syntax, and those pointers rot just as easily.
+const SOURCE_GLOBS = ["*.sol", "*.ts", "*.rs", "*.md"];
 // The doc target may be nested (e.g. `atomicity/flow.md`), so allow one or more path segments.
-const POINTER_RE = /\{protocol-docs\/((?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.md)(#[A-Za-z0-9_-]+)?\}/g;
+// The anchor accepts a backslash before `_` because prettier escapes underscores in markdown
+// prose (`#\_recoverbundle`); such a pointer must still be validated, not silently skipped.
+const POINTER_RE = /\{protocol-docs\/((?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.md)(#(?:\\?[A-Za-z0-9_-])+)?\}/g;
 
 // GitHub heading -> anchor slug (mirrors github-slugger): lowercase, drop every
 // character that is not a letter, number, space, hyphen or underscore, then turn
@@ -94,7 +97,8 @@ function check(docAnchors: Map<string, Set<string>>): number {
         continue;
       }
       if (anchor) {
-        const slug = anchor.slice(1);
+        // Drop prettier's markdown escaping (`#\_foo` -> `#_foo`) before matching slugs.
+        const slug = anchor.slice(1).replace(/\\/g, "");
         if (!anchors.has(slug)) {
           violations.push(`${where}: anchor '${anchor}' not found in ${DOCS_DIR}/${docFile}`);
         }

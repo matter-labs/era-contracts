@@ -36,7 +36,7 @@ library ChainBatchRootTree {
 
     /// @notice The chain batch root of a chain's genesis batch (batch 0): zero logs and multichain
     /// roots, freshly seeded (empty) IMT at both batch boundaries. Seeded into the `MessageRoot` at
-    /// chain creation; see {protocol-docs/chain-lifecycle.md#genesis-batch-root-seeding-messagerootseedgenesisroot}.
+    /// chain creation; see {protocol-docs/chain-lifecycle.md#genesis-batch-root-seeding}.
     function genesisChainBatchRoot() internal pure returns (bytes32) {
         return compute(bytes32(0), bytes32(0), EMPTY_IMT_ROOT, EMPTY_IMT_ROOT);
     }

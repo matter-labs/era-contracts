@@ -278,7 +278,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
 
     /// @dev Adds a single chain to the message root with an empty chain tree. Genesis seeding of
     /// freshly created ZKsync OS chains happens separately via {seedGenesisRoot}; see
-    /// {protocol-docs/chain-lifecycle.md#genesis-batch-root-seeding-messagerootseedgenesisroot}.
+    /// {protocol-docs/chain-lifecycle.md#genesis-batch-root-seeding}.
     /// @param _chainId The ID of the chain that is being added to the message root.
     /// @param _startingBatchNumber The batch number the chain's numbering continues from on this layer.
     function _addNewChain(uint256 _chainId, uint256 _startingBatchNumber) internal {

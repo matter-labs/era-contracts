@@ -7,10 +7,22 @@ release. The proof-level soundness/completeness arguments live in
 
 ## Guarantees
 
-- **All-or-nothing execution.** A flow either finalizes (every leg's destination executes) or unwinds
-  (committed legs are refunded); a leg can never both finalize and be refunded. This follows from the
-  mutual exclusivity of the finality and timeout conditions
-  ({protocol-docs/atomicity/proofs.md#soundness}).
+- **Finalizability and refundability are mutually exclusive.** For a given flow, exactly one of the two
+  outcomes is ever provable: either every leg is proven committed before the deadline (so any leg's
+  destination _may_ execute), or a leg is proven absent past it (so committed legs _may_ be refunded) —
+  never both. This follows from the mutual exclusivity of the finality and timeout conditions
+  ({protocol-docs/atomicity/proofs.md#soundness}), and it is the guarantee the protocol actually
+  enforces.
+
+  This is deliberately weaker than "every destination call executes". The atomicity gate governs
+  **whether execution is permitted**, not whether it happens: `requireFlowFinalized` proves all legs
+  committed, but each destination is then driven independently by whoever submits
+  `executeAtomicBundle`, and a bundle that only reached `Verified` can still be partially executed or
+  have individual calls `Cancelled` through `unbundleBundle`
+  ({protocol-docs/interop.md#unbundling-unbundlebundle}). What atomicity rules out is the dangerous
+  asymmetry — a leg being burned on one chain while the flow is refunded on another — not
+  under-execution by a passive or adversarial destination caller.
+
 - **No back-dating.** A batch's settlement inclusion time `t` only ever rises, so a commit that lands
   late cannot be made to look in-time; the deadline check is monotone.
 - **Refund liveness.** If a flow genuinely times out, a valid timeout proof can always be produced from
