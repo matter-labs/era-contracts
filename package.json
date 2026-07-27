@@ -35,7 +35,7 @@
     "calculate-hashes:check": "ts-node scripts/calculate-hashes.ts --check-only",
     "calculate-hashes:fix": "ts-node scripts/calculate-hashes.ts",
     "calculate-hashes:rebuild-and-fix": "./recompute_hashes.sh",
-    "docs-anchor-lint": "ts-node scripts/docs-anchor-lint.ts",
+    "docs-anchor-lint": "ts-node scripts/docs-anchor-lint.ts --selftest && ts-node scripts/docs-anchor-lint.ts",
     "lint:check": "yarn lint:md && yarn lint:sol && yarn lint:ts && yarn prettier:check && yarn docs-anchor-lint",
     "lint:fix": "yarn lint:md --fix && yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix",
     "lint:md": "markdownlint \"**/*.md\"",

@@ -755,8 +755,10 @@ contract InteropCenter is
         address recipientAddress = _callStarter.to;
 
         if (_callStarter.callAttributes.indirectCall) {
-            // Whether a particular indirect path supports non-zero interopCallValue is defined by the
-            // concrete IL2CrossChainSender implementation (the current L2AssetRouter/NTV path does not).
+            // `interopCallValue` is already required to be zero for every indirect call (see the
+            // `IndirectCallCannotCarryValue` check in `_buildInteropBundle`); it is still forwarded so the
+            // returned starter can be checked against it (`IndirectCallValueMismatch`). Only
+            // `indirectCallMessageValue` (source-side `msg.value`) actually moves value here.
             // slither-disable-next-line arbitrary-send-eth
             InteropCallStarter memory actualCallStarter = IL2CrossChainSender(recipientAddress).initiateIndirectCall{
                 value: _callStarter.callAttributes.indirectCallMessageValue

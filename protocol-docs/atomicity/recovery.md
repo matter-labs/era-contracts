@@ -46,13 +46,28 @@ The manager is agnostic to call/encoding formats — it forwards `(destChainId, 
 sender own its reversal; the L2 asset router is the only `IAtomicRecoverable` sender today, and the
 `from == L2_ASSET_ROUTER_ADDR` test is what selects the hook. Implementations **must** gate both hooks
 to the canonical `AtomicFlowManager` (`onlyAtomicFlowManager`) and **must** return `false` rather than
-revert for calls they do not recognize, so one unrecognized call cannot brick the whole refund.
+revert for calls they do not recognize.
+
+### The walk is all-or-nothing, not per-call isolated
+
+`_recoverBundle` invokes `recoverAtomicCall` / `bridgehubRecoverBaseToken` as **plain external calls**
+with no failure containment (the codebase forbids `try`/`catch`). So a revert in _any_ attempted
+recovery propagates and rolls back the whole `claimRefund` transaction — including recoveries that
+already succeeded earlier in the loop, and the `Revertable -> Reverted` state change. The leg stays
+`Revertable` and the claim can be retried, but it cannot be partially applied.
+
+Returning `false` is therefore the _only_ way a sender can decline a call without taking the whole
+refund down with it. "Best-effort" means exactly that — unrecognized calls are skipped — and nothing
+more: it does **not** isolate a reverting recovery from the rest of the bundle.
 
 ### Nothing recoverable → revert
 
 If the walk recovers **nothing** (`recovered == 0`), `claimRefund` reverts with
 `ManagerNoRecoverableCalls`. A bundle with no fund-moving leg has nothing to return, so a "refund" would
 be a no-op; rejecting it keeps `Reverted` meaning "funds were actually returned."
+
+Putting the two conditions together: a claim succeeds iff **at least one** recovery reports success
+**and no** attempted recovery reverts.
 
 ### L1 destinations are asserted out
 
@@ -71,9 +86,15 @@ Recovery is best-effort, and the protocol is explicit about what it does **not**
 
 - **Direct calls that moved no funds are skipped.** Their `from` (possibly an EOA) need not implement
   `IAtomicRecoverable`; there is nothing to reverse.
-- **A refund succeeds as long as at least one call recovered** — not necessarily all of them.
-- **Full refundability of an arbitrary bundle is not guaranteed.** Making a fund-moving leg recoverable
-  (e.g. an asset-router deposit rather than a raw direct call) is the **flow author's responsibility**.
+- **A claim needs one success and zero reverts.** At least one recovery must report success, and no
+  attempted recovery may revert — a single reverting call rolls the whole claim back (see
+  [above](#the-walk-is-all-or-nothing-not-per-call-isolated)). Not every call has to recover, but every
+  call that is _attempted_ has to not throw.
+- **Full refundability of an arbitrary bundle is not guaranteed**, and neither is eventual
+  recoverability: a bundle containing a call whose recovery reverts deterministically (malformed
+  recognized calldata, or a downstream NTV failure) can leave the leg permanently stuck at `Revertable`,
+  since every retry hits the same revert. Making a fund-moving leg recoverable — and its recovery
+  robust — is the **flow author's responsibility**.
 - **Indirect calls may not carry destination-side `interopCallValue`** (`IndirectCallCannotCarryValue`,
   rejected at send). Recovery refunds a call's `value` to its `InteropCall.from`, which for an indirect
   call is the sender contract (the asset router), not the payer — the funds would be stranded. Direct

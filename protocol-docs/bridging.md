@@ -70,7 +70,9 @@ returns `bridgeMintData`; the destination-side handler's `bridgeMint` consumes t
   `depositHappened[chainId][l2TxHash] = txDataHash` (rejecting duplicates).
 - For L2 -> L2 the `InteropCallStarter` targets the L2 asset router (same address on every ZK chain); for an
   L2 -> L1 withdrawal it targets the known `L1_ASSET_ROUTER` address instead — the `finalizeDeposit`
-  calldata is identical. The bridged value is attached as an ERC-7786 `interopCallValue` attribute.
+  calldata is identical. The bridged amount travels inside that calldata, not as call value: the returned
+  starter merely echoes the requested `interopCallValue` (always zero for an indirect call) so the
+  InteropCenter's `IndirectCallValueMismatch` check passes.
 - `bridgehubDepositBaseToken` lets the Bridgehub (L1; or the Era diamond proxy for `ERA_CHAIN_ID`) /
   `InteropCenter` (L2) acquire the destination chain's `mintValue`: it burns the base token through the
   handler but records nothing, because a failed transaction refunds the base token to the L2
@@ -241,7 +243,11 @@ interop (IMT) flow — see {protocol-docs/atomicity/flow.md} for the full flow. 
   (`L2_ATOMIC_FLOW_MANAGER_ADDR`); on chains without the atomic-flow stack nothing is deployed there, so
   the gate never passes.
 - Given the original bundle call's calldata, it recognizes only `finalizeDeposit` calls and returns `false`
-  for anything else (never reverting), so the manager can skip non-recoverable calls in a mixed bundle.
+  for anything else, so the manager can skip non-recoverable calls in a mixed bundle. Returning `false`
+  (rather than reverting) is what keeps an unrecognized call from failing the whole refund — but a
+  _recognized_ call can still revert: on malformed `finalizeDeposit` payload (the `abi.decode` throws) or
+  if the downstream `bridgeRecoverFailedTransfer` fails. Such a revert takes the entire `claimRefund`
+  with it; see {protocol-docs/atomicity/recovery.md#the-walk-is-all-or-nothing-not-per-call-isolated}.
 - For a recognized burn it calls `IL2NativeTokenVault.bridgeRecoverFailedTransfer(destChainId, assetId,
 mintData)`, forwarding the bundle's mint data verbatim; the NTV refunds the data's `originalCaller` (the
   source depositor) regardless of the intended `remoteReceiver`, reversing the `bridgeBurn` performed at

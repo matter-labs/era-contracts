@@ -5,7 +5,8 @@ destination may execute unless _every_ leg was committed in time, and otherwise 
 become refundable — **without a central L1 coordinator**. (Atomicity gates whether execution is
 _permitted_, not whether every destination actually runs; see
 {protocol-docs/atomicity/security.md#guarantees}.) It rides on the normal interop bundle
-path (`InteropCenter.sendBundle` -> `L2AssetRouter` -> `InteropHandler.executeAtomicBundle`) — and is in
+path (`InteropCenter.sendBundle`/`sendMessage` -> `InteropHandler.executeAtomicBundle`, hopping through
+`L2AssetRouter` only for indirect asset-transfer calls — a direct call never touches it) — and is in
 fact the _only_ L2->L2 path: the `atomicBundle` attribute is mandatory on every L2->L2 send, since
 L1-published (non-atomic) L2->L2 interop was removed; the only non-atomic send left is an L2->L1
 withdrawal (see {protocol-docs/interop.md#atomic-bundles}). The only addition to that path is an
@@ -116,9 +117,11 @@ dependency roots; the genesis batch leaf is seeded by `MessageRootBase.seedGenes
 
 No further wiring is needed — every collaborator is referenced by its canonical fixed address: the
 tree's appender and the manager's tree / interop center / interop handler are constant getters, and the
-asset router recognises the manager via `_atomicFlowManagerAddr()`. The manager holds no asset-router
-reference at all — it drives recovery generically through `IAtomicRecoverable` on each bundle call's
-target (see [recovery.md](./recovery.md)).
+asset router recognises the manager via `_atomicFlowManagerAddr()`. For recovery the manager calls
+`IAtomicRecoverable.recoverAtomicCall` on a bundle call's **local sender** (`InteropCall.from`), and only
+when that sender is the canonical L2 asset router (`from == L2_ASSET_ROUTER_ADDR`) — the interface is not
+dispatched generically, and not to the call's target. Supporting another `IAtomicRecoverable` sender would
+require changing the manager (see [recovery.md](./recovery.md)).
 
 ## Off-chain tooling
 

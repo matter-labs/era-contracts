@@ -25,9 +25,11 @@ release. The proof-level soundness/completeness arguments live in
 
 - **No back-dating.** A batch's settlement inclusion time `t` only ever rises, so a commit that lands
   late cannot be made to look in-time; the deadline check is monotone.
-- **Refund liveness.** If a flow genuinely times out, a valid timeout proof can always be produced from
-  any post-deadline aggregated root — including for a source chain that halts
-  ({protocol-docs/atomicity/proofs.md#completeness}), provided the preconditions below hold.
+- **Timeout-proof liveness.** If a flow genuinely times out, a valid timeout proof can always be
+  produced from any post-deadline aggregated root — including for a source chain that halts
+  ({protocol-docs/atomicity/proofs.md#completeness}), provided the preconditions below hold. Note this is
+  liveness of the _proof_, hence of `authorizeRefund`: it guarantees the legs become `Revertable`, not
+  that `claimRefund` then succeeds in returning the assets (see the recovery non-guarantees below).
 - **No trusted coordinator.** There is no L1 atomic contract and no global-root registry; finality and
   timeout are both proven against the ordinary interop-root channel. Nothing the tree emits is on the
   critical path either: the per-leaf L2->L1 logs exist purely for data availability (see
@@ -35,9 +37,14 @@ release. The proof-level soundness/completeness arguments live in
 
 ## Non-guarantees
 
-- **Refunds are best-effort.** A refund succeeds if at least one call recovered; full refundability of
-  an arbitrary bundle is not guaranteed. Making a fund-moving leg recoverable is the flow author's
-  responsibility. See {protocol-docs/atomicity/recovery.md#non-guarantees}.
+- **Refunds are best-effort, and the claim is all-or-nothing.** `claimRefund` succeeds iff at least one
+  recovery reports success **and** no attempted recovery reverts — the recovery calls have no failure
+  containment, so one revert rolls the whole claim back. "Best-effort" only means a sender may _decline_
+  a call it does not recognize (by returning `false`); it does not isolate failures between calls. Full
+  refundability of an arbitrary bundle is not guaranteed, and a deterministically-reverting recovery can
+  leave a leg permanently stuck at `Revertable`. Making a fund-moving leg recoverable, and its recovery
+  robust, is the flow author's responsibility. See
+  {protocol-docs/atomicity/recovery.md#non-guarantees}.
 - **Indirect calls may not carry destination-side value.** `interopCallValue != 0` on an indirect call
   is rejected at send (`IndirectCallCannotCarryValue`): on the recovery path native value is returned to
   `InteropCall.from`, which for an indirect call is the asset router rather than the payer, so allowing

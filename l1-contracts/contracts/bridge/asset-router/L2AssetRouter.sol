@@ -351,7 +351,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
             _nativeTokenVault: ntvAddr
         });
 
-        // The bridged amount is attached as an ERC-7786 `interopCallValue` attribute.
+        // Echo the requested `interopCallValue` back so the InteropCenter's `IndirectCallValueMismatch`
+        // check passes. It is always zero for an indirect call; the bridged token amount travels in the
+        // `finalizeDeposit` calldata built above, not as call value.
         bytes[] memory attributes = new bytes[](1);
         attributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, _value);
 
