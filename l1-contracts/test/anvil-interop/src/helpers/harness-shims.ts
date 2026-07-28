@@ -129,10 +129,8 @@ export async function setSettlementLayerViaBootloader(params: {
  * Deploy the `L2ChainAssetHandlerDev` implementation at `L2_CHAIN_ASSET_HANDLER_ADDR`
  * on the given provider via `anvil_setCode`.
  *
- * The production v32 implementation disables chain migrations at bridgeBurn/bridgeMint.
- * Gateway integration tests install the Dev variant, which explicitly re-enables those
- * entry points, so the preserved migration machinery remains covered without weakening
- * the production contract.
+ * The production v32 implementation disables chain migrations at bridgeBurn/bridgeMint; the Dev
+ * variant re-enables them so the preserved migration machinery stays covered by tests.
  *
  * Reverse TBM testing needs to drive the chain's `migrationNumber` counter on the
  * Gateway without going through the production `bridgeBurn` → `Migrator.forwardedBridgeBurn`
@@ -217,10 +215,8 @@ export async function simulateGWChainMigrationBurn(params: {
  * `L1ChainAssetHandler` TransparentUpgradeableProxy on L1 via the real upgrade
  * surface (no `anvil_setCode` on the impl slot, no storage writes).
  *
- * The production v32 implementation disables chain migrations at bridgeBurn/bridgeMint.
- * Gateway integration tests install the Dev variant, which explicitly re-enables those
- * entry points, so the preserved migration machinery remains covered without weakening
- * the production contract.
+ * The production v32 implementation disables chain migrations at bridgeBurn/bridgeMint; the Dev
+ * variant re-enables them so the preserved migration machinery stays covered by tests.
  *
  * L1 `_getChainMigrationNumber(chainId)` reads `L1ChainAssetHandler.migrationNumber[chainId]`,
  * which production bumps via `bridgeMint` during the chain-level migrate-from-gateway

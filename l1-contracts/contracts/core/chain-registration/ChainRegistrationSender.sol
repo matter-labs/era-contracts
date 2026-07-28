@@ -29,7 +29,8 @@ bytes1 constant CHAIN_REGISTRATION_SENDER_ENCODING_VERSION = 0x01;
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev The ChainRegistrationSender contract is used to register chains in other chains for interop via a service transaction.
+/// @notice Registers chains on other chains' L2 Bridgehubs to enable interop between them.
+/// See {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}.
 contract ChainRegistrationSender is
     IChainRegistrationSender,
     IL1CrossChainSender,
@@ -53,17 +54,16 @@ contract ChainRegistrationSender is
         BRIDGE_HUB = _bridgehub;
     }
 
-    /// @notice used to initialize the contract
-    /// @notice this contract is also deployed on L2 as a system contract there the owner and the related functions will not be used
+    /// @notice Used to initialize the contract.
+    /// @dev Also deployed on L2 as a system contract; there the owner and related functions are unused.
     /// @param _owner the owner of the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
     }
 
-    /// @notice used to register a chain for interop via a service transaction.abi
-    /// @notice this is provided for ease of use, base tokens does not have to be provided.
-    /// @notice to prevent spamming, we only allow this to be called once.
-    /// @notice only chains that are settling on the same settlement layer may be registered.
+    /// @notice Registers a chain for interop via a service transaction, so no base tokens are
+    /// needed (ease-of-use path). Callable only once per pair to prevent spamming; both chains must
+    /// settle on the same settlement layer.
     /// @param chainToBeRegistered the chain to be registered
     /// @param chainRegisteredOn the chain to register on
     function registerChain(uint256 chainToBeRegistered, uint256 chainRegisteredOn) external {
@@ -81,8 +81,8 @@ contract ChainRegistrationSender is
     }
 
     /// @inheritdoc IL1CrossChainSender
-    /// @notice Registers a chain on the L2 via a normal deposit.
-    /// @notice This can be called by anyone (via the bridgehub), but base tokens need to be provided.
+    /// @dev Registers a chain on the L2 via a normal deposit: anyone can trigger it (via the
+    /// Bridgehub), but the caller provides the base tokens.
     // slither-disable-next-line locked-ether
     function bridgehubDeposit(
         uint256 chainRegisteredOn,
@@ -110,22 +110,16 @@ contract ChainRegistrationSender is
             l2Contract: L2_BRIDGEHUB_ADDR,
             l2Calldata: _getL2TxCalldata(chainToBeRegistered),
             factoryDeps: new bytes[](0),
-            // The `txDataHash` is typically used in usual ERC20 bridges to commit to the transaction data
-            // so that the user can recover funds in case the bridging fails on L2.
-            // However, this contract uses the `requestL2TransactionTwoBridges` method just to perform an L1->L2 transaction.
-            // We do not need to recover anything and so `bytes32(0)` here is okay.
+            // `txDataHash` exists so token bridges can recover funds after a failed L2 leg; nothing
+            // to recover here, so `bytes32(0)` is fine.
             txDataHash: bytes32(0)
         });
     }
 
     /// @notice Used to get the L2 transaction calldata for the chain registration.
-    /// @dev Also enforces the atomic-interop timeout-protocol precondition: the chain being
-    /// registered must already have at least one batch inside this layer's message root (see the
-    /// {AtomicInteropProof} library docs for why).
-    /// @dev No backfill of pre-existing chains is needed: during v31 the ZK Gateway was never
-    /// activated, and registration required that a chain does NOT settle on L1 — so at the start of
-    /// v32 no chains have been registered here, and every chain passes through this gate (and gets
-    /// its tree populated) before interop can target it.
+    /// @dev Also enforces the atomic-interop timeout precondition: the chain being registered must
+    /// already have at least one batch inside this layer's message root. No backfill of
+    /// pre-existing chains is needed — see {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}.
     /// @param chainToBeRegistered the chain to be registered
     /// @return the L2 transaction calldata
     function _getL2TxCalldata(uint256 chainToBeRegistered) internal view returns (bytes memory) {
@@ -139,8 +133,8 @@ contract ChainRegistrationSender is
         return abi.encodeCall(IL2Bridgehub.registerChainForInterop, (chainToBeRegistered, baseTokenAssetId));
     }
 
-    /// @notice Checks that both chains are settling on the same settlement layer (settling
-    /// directly on L1 is permitted — see the body note).
+    /// @notice Checks that both chains are settling on the same settlement layer. As of v32 both
+    /// settling directly on L1 is permitted — see {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}.
     /// @param chainToBeRegistered the chain to be registered
     /// @param chainRegisteredOn the chain to register on
     function _checkSettlementLayers(uint256 chainToBeRegistered, uint256 chainRegisteredOn) internal view {
@@ -149,13 +143,9 @@ contract ChainRegistrationSender is
         if (chainToBeRegisteredSettlementLayer != chainRegisteredOnSettlementLayer) {
             revert ChainsSettlementLayerMismatch(chainToBeRegisteredSettlementLayer, chainRegisteredOnSettlementLayer);
         }
-        // Both chains settling directly on L1 is now permitted: L1 builds interop roots
-        // (MessageRootBase.addChainBatchRootV32) and serves the corresponding inclusion proofs, so
-        // L1-settled chains can participate in interop without a gateway. The same-settlement-layer
-        // check above still applies (a flow's legs must share a settlement layer).
     }
 
     /// @inheritdoc IL1CrossChainSender
-    /// @notice This function is not used for ChainRegistrationSender, since we do not need to support failed L1->L2 transactions.
+    /// @dev No-op: failed L1->L2 transactions need no recovery here.
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external override {}
 }

@@ -111,23 +111,19 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             destinationBaseTokenAssetId: destinationBaseTokenAssetId,
             interopBundleSalt: bytes32(uint256(1)),
             calls: innerCalls,
-            // The nested `executeBundle` is authorized against the interop-message sender, whose ERC-7930 chain
-            // id is the SOURCE chain — so the inner execution address must carry `sourceChainId` for the nested
-            // execution to be permitted (which is what lets this test assert full success rather than a
-            // permission revert).
+            // The nested `executeBundle` is authorized against the interop-message sender, whose ERC-7930
+            // chain id is the SOURCE chain — so the inner execution address must carry `sourceChainId`.
             bundleAttributes: _createBundleAttributes(sourceChainId, bundleExecutor)
         });
 
         bytes memory encodedInnerBundle = abi.encode(innerBundle);
         AtomicFinalityProof memory innerProof;
 
-        // Payload for receiveMessage that dispatches to executeBundle(innerBundle)
         bytes memory innerPayload = abi.encodeCall(
             L2InteropHandler.executeAtomicBundle,
             (encodedInnerBundle, innerProof)
         );
 
-        // Outer bundle: its call targets L2InteropHandler.receiveMessage with the above payload.
         // Call chain: executeAtomicBundle(outer) -> _executeCalls -> receiveMessage -> this.executeAtomicBundle(inner)
         InteropCall[] memory outerCalls = new InteropCall[](1);
         outerCalls[0] = InteropCall({
@@ -208,13 +204,11 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         bytes memory encodedInnerBundle = abi.encode(innerBundle);
         AtomicFinalityProof memory innerProof;
 
-        // Payload for receiveMessage that dispatches to verifyBundle(innerBundle)
         bytes memory innerPayload = abi.encodeCall(
             L2InteropHandler.verifyAtomicBundle,
             (encodedInnerBundle, innerProof)
         );
 
-        // Outer bundle: its call targets L2InteropHandler.receiveMessage with the above payload.
         // Call chain: executeAtomicBundle(outer) -> _executeCalls -> receiveMessage -> this.verifyAtomicBundle(inner)
         InteropCall[] memory outerCalls = new InteropCall[](1);
         outerCalls[0] = InteropCall({

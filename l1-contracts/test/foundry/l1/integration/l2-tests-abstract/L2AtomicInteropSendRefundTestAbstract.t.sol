@@ -113,7 +113,7 @@ contract ReentrantRefundClaimer {
 ///   5. Reentrancy: a malicious depositor re-entering `claimRefund` from the recovery ETH push is rejected
 ///      by the CEI leg-state machine (no `nonReentrant` guard exists by design).
 abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, AtomicInteropProofBuilder {
-    /// @dev The remote leg the reviewer's flow prescribes: a bundle hash no chain will ever commit.
+    /// @dev A remote-leg bundle hash no chain will ever commit.
     bytes32 internal constant INVALID_REMOTE_LEG = keccak256("invalid");
     /// @dev Native base-token value carried by the same-base direct value legs.
     uint256 internal constant NATIVE_VALUE_LEG_AMOUNT = 3 ether;
@@ -128,9 +128,8 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     /// @dev Claimed source-batch number for the absence proof (arbitrary; authentication is mocked).
     uint256 internal constant REMOTE_BATCH_NUMBER = 1;
 
-    /// @dev Deploys the atomic predeploys at their canonical addresses (the shared L2-in-L1 deployer
-    /// does not include them) and the proof fixtures. Called at the start of each test rather than in
-    /// `setUp` to stay independent of the deployer's own setUp chain.
+    /// @dev Deploys the atomic predeploys (not part of the shared L2-in-L1 deployer) and the proof fixtures.
+    /// Called at the start of each test rather than in `setUp` to stay independent of the deployer's setUp chain.
     /// @dev These refund tests exercise the REAL append/finalize/refund logic, so the shared deployer's
     /// void mock of `AtomicFlowManager.append`/`requireFlowFinalized` (installed in its `setUp`) is disabled
     /// here via the {_mockAtomicFlowManager} override; the real contracts are deployed below.
@@ -143,14 +142,12 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(L1_CHAIN_ID);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
-        // Proof fixtures from the builder: `tree` below acts as the REMOTE chain's IMT oracle (only
-        // its genesis head leaf — the invalid leg is never committed there), plus the real
-        // L2InteropRootStorage etched at its canonical address for the timeout clock.
+        // The builder's `tree` acts as the REMOTE chain's IMT oracle (genesis head leaf only — the invalid
+        // leg is never committed there); L2InteropRootStorage is etched for the timeout clock.
         _setUpAtomicFixtures();
     }
 
-    /// @dev The exact single-call token-transfer starter `InteropLibrary.sendToken` sends: an indirect
-    /// call through the L2 AssetRouter, which burns `_amount` of `_l2Token` from the sender.
+    /// @dev Single indirect asset-router call that burns `_amount` of `_l2Token` from the sender.
     function _tokenCallStarter(address _l2Token, uint256 _amount) internal returns (InteropCallStarter[] memory calls) {
         bytes memory secondBridgeCalldata = InteropLibrary.buildSecondBridgeCalldata(
             L2_NATIVE_TOKEN_VAULT.assetId(_l2Token),
@@ -202,8 +199,8 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         }
     }
 
-    /// @dev Two-leg preimage: the local (predicted) leg on this chain + `INVALID_REMOTE_LEG` declared
-    /// on the (Bridgehub-registered) destination chain, leg hashes strictly ascending.
+    /// @dev Two-leg preimage: local leg on this chain + `INVALID_REMOTE_LEG` on the destination chain,
+    /// leg hashes strictly ascending.
     function _preimageWithInvalidRemoteLeg(
         bytes32 _localLeg
     ) internal view returns (AtomicFlowPreimage memory preimage, uint256 missingLegIndex) {
@@ -250,10 +247,8 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
 
     uint256 internal constant TRANSFER_AMOUNT = 100;
 
-    /// @notice The reviewer-prescribed flow: an atomic send whose preimage pairs the (real, burned)
-    /// local leg with an invalid remote leg that can never be committed. The send commits fine — and
-    /// the user recovers the burned tokens through the timeout path once the invalid leg is proven
-    /// absent from its declared source chain after the deadline.
+    /// @notice Atomic send whose preimage pairs the real (burned) local leg with a never-committable remote
+    /// leg; after the deadline the missing leg is proven absent and the burn is refunded.
     function test_atomicSend_WithInvalidRemoteLeg_IsRefundableAfterTimeout() public {
         _setUpAtomicStack();
         _sendAtomicLegWithInvalidRemotePeer();
@@ -308,8 +303,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         );
     }
 
-    /// @dev Phase 1+2: predict the local leg's hash, send the atomic bundle for real (asset-router
-    /// burn + IMT commit) and record everything the refund phases need.
+    /// @dev Send phase: real burn + IMT commit; records everything the refund phases need.
     function _sendAtomicLegWithInvalidRemotePeer() internal {
         AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
         ctx.l2Token = initializeTokenByDeposit();
@@ -332,7 +326,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
             _atomicAttributes(preimage, salt)
         );
 
-        // The full bundle rides in the InteropBundleSent event; its bytes are what claimRefund takes.
+        // The full bundle rides in the InteropBundleSent event; `claimRefund` consumes its bytes.
         (, , InteropBundle memory sentBundle) = abi.decode(
             extractFirstBundleFromLogs(vm.getRecordedLogs()),
             (bytes32, bytes32, InteropBundle)
@@ -357,10 +351,8 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         );
     }
 
-    /// @dev Phase 3: the invalid remote leg can never be committed, so after the deadline it is
-    /// provably absent from its declared source chain's IMT (the builder's `tree` oracle, still at its
-    /// genesis head leaf). Late-batch branch: batch settled after the deadline, anchored on a
-    /// post-deadline settlement interop root.
+    /// @dev Refund-authorization phase: proves the invalid leg absent from its source chain's IMT. Uses the
+    /// late-batch branch — batch settled after the deadline, anchored on a post-deadline settlement root.
     function _authorizeRefundForInvalidRemoteLeg() internal {
         AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
         _seedSettlementLayerInteropRoot(L1_CHAIN_ID, SL_BLOCK, uint256(DEADLINE) + 5);
@@ -384,8 +376,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         );
     }
 
-    /// @dev Phase 4: claimRefund reverses the burn through the real recovery path (asset router ->
-    /// NTV re-mint) and the depositor ends where they started.
+    /// @dev Claim phase: `claimRefund` reverses the burn through the real asset-router -> NTV re-mint path.
     function _claimRefundAndAssertRecovery() internal {
         AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
         vm.expectEmit(true, true, true, true, address(manager));
@@ -403,9 +394,8 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         );
     }
 
-    /// @notice Send-time coupling through the real entry point: a preimage that does not contain the
-    /// sent bundle reverts the whole `sendBundle`, unwinding the already-performed burn — the sender's
-    /// balance is untouched and no leg state exists afterwards.
+    /// @notice A preimage that does not contain the sent bundle reverts the whole `sendBundle`, unwinding the
+    /// already-performed burn.
     function test_atomicSend_RevertWhen_BundleNotInPreimage_NothingBurned() public {
         _setUpAtomicStack();
         AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
@@ -416,8 +406,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         InteropCallStarter[] memory calls = _tokenCallStarter(l2Token, amount);
 
         bytes32 predicted = _predictBundleHash(calls, salt);
-        // A well-formed preimage that simply does not contain the bundle being sent (e.g. a stale
-        // prediction): its single leg is the invalid hash, declared on this chain.
+        // Well-formed preimage that does not contain the bundle being sent (e.g. a stale prediction).
         AtomicFlowPreimage memory preimage;
         preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         preimage.deadline = DEADLINE;

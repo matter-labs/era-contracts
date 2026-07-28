@@ -5,23 +5,16 @@ import {IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Per-chain **Indexed Merkle Tree** of interop commit values. Whenever a participant does
-/// their part in a flow, the leg's commit value is inserted here. Each {IMTLeaf} points to the
-/// next-larger value in the tree, so the structure supports O(log n) proofs of both membership and
-/// non-membership (via a "low nullifier" leaf). The tree publishes nothing itself: the ZKsync OS
-/// bootloader reads the root directly from this contract's storage at every batch boundary and
-/// commits both snapshots (batch begin / batch end) into the batch's chain batch root (see
-/// {ChainBatchRootTree}); consuming chains authenticate a claimed root as that leaf against the
-/// interop root they imported for the settling batch (see {AtomicInteropProof}), which is what makes
-/// the root trustworthy. The tree publishes no timestamp either: the deadline is checked against the
-/// batch's `l1Timestamp`, which is folded into the chain batch leaf and re-derived from the inclusion proof.
-///
-/// Deployed as an L2 genesis predeploy (no constructor); the one-time seeding is done in `initL2`,
-/// called by the genesis upgrade like the other L2 built-ins.
+/// @notice Per-chain append-only **Indexed Merkle Tree** of atomic-interop commit values, supporting
+/// O(log n) proofs of both membership and non-membership. The tree never publishes its root: the
+/// ZKsync OS bootloader snapshots it at every batch boundary into the chain batch root, which
+/// consuming chains authenticate via {AtomicInteropProof}. Each inserted leaf is reported to
+/// {INTEROP_COMMITMENT_LEAF_HOOK} as an L2->L1 log so the tree stays reconstructible from L1 data.
+/// Deployed as an L2 genesis predeploy (no constructor; seeded in `initL2`).
+/// See {protocol-docs/atomicity/imt.md}.
 interface IL2InteropCommitmentTree {
-    /// @notice Emitted whenever the root changes: the `{0,0,0}` head seed at `initL2`, then one
-    /// per inserted value. For off-chain indexing only — cross-chain consumers read the root from the
-    /// chain batch root, not from events or messages.
+    /// @notice Emitted whenever the root changes. For off-chain indexing only — cross-chain consumers
+    /// read the root from the chain batch root, not from events or messages.
     event RootUpdated(uint256 indexed leafIndex, bytes32 root);
 
     /// @notice Insert `_value` into the indexed tree. Callable only by the configured appender.

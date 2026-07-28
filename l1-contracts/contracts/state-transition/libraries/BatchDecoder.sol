@@ -23,9 +23,8 @@ library BatchDecoder {
     /// @notice The supported encoding version for EraVM commit data, precommit data, and prove data
     /// (prove encoding is shared by EraVM and ZKsync OS chains).
     uint8 internal constant SUPPORTED_ENCODING_VERSION = 1;
-    /// @notice The currently supported encoding version for execute data. Bumped to 2 when the
-    /// execute wire changed from the v31 flat tuple to `abi.encode(DecodedExecuteData)` (a breaking
-    /// re-encoding must not reuse the old version byte).
+    /// @notice The currently supported encoding version for execute data.
+    /// @dev A breaking re-encoding of the execute wire must bump this version, never reuse an old byte.
     uint8 internal constant SUPPORTED_ENCODING_VERSION_EXECUTE = 2;
     /// @notice The currently supported encoding version for ZKSync OS commit data.
     /// We use different encoding only for commit, while prove/execute are common for Era VM and ZKsync OS chains.
@@ -252,8 +251,6 @@ library BatchDecoder {
     }
 
     /// @notice Decodes execution data from a calldata byte array.
-    /// @dev The wire data after the version byte is `abi.encode(DecodedExecuteData)`, so the whole
-    /// struct is decoded directly in one pass.
     /// @param _executeData The calldata byte array containing the execution data to decode.
     /// @return decoded The decoded execute data (see {DecodedExecuteData}).
     function _decodeExecuteData(bytes calldata _executeData) private pure returns (DecodedExecuteData memory decoded) {

@@ -67,7 +67,6 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
 
     IL2ChainAssetHandler public l2ChainAssetHandler;
 
-    // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {
         require(users.length == 0, "Addresses already generated");
 
@@ -102,16 +101,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         vm.prank(Ownable2StepUpgradeable(addresses.l1NativeTokenVault).pendingOwner());
         Ownable2StepUpgradeable(addresses.l1NativeTokenVault).acceptOwnership();
 
-        l2ChainAssetHandler = IL2ChainAssetHandler(
-            address(
-                new L2ChainAssetHandler()
-                // L1_CHAIN_ID,
-                // address(this),
-                // ecosystemAddresses.bridgehub.proxies.bridgehub,
-                // ecosystemAddresses.bridgehub.assetRouterProxy,
-                // ecosystemAddresses.bridgehub.proxies.messageRoot
-            )
-        );
+        l2ChainAssetHandler = IL2ChainAssetHandler(address(new L2ChainAssetHandler()));
         address owner = _owner();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         L2ChainAssetHandler(address(l2ChainAssetHandler)).initL2(block.chainid, owner);
@@ -121,10 +111,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         address handler = address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler);
         address owner = Ownable2StepUpgradeable(handler).owner();
 
-        // Verify owner is valid
         assertTrue(owner != address(0), "Owner should be a valid address");
 
-        // Verify migration is not paused initially
         assertFalse(
             IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
             "Migration should not be paused initially"
@@ -135,13 +123,11 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         IChainAssetHandlerBase(handler).pauseMigration();
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // Verify migration is paused
         assertTrue(
             IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
             "Migration should be paused after calling pauseMigration"
         );
 
-        // Verify event was emitted
         Vm.Log memory pauseLog = logs.requireOneFrom("PausedMigration(address)", handler);
         assertEq(pauseLog.topics[1], bytes32(uint256(uint160(owner))), "PausedMigration pauser mismatch");
     }
@@ -150,26 +136,21 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         address handler = address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler);
         address owner = Ownable2StepUpgradeable(handler).owner();
 
-        // First pause migration
         vm.prank(owner);
         IChainAssetHandlerBase(handler).pauseMigration();
 
-        // Verify migration is paused
         assertTrue(IChainAssetHandlerBase(handler).migrationPaused(), "Migration should be paused before unpause");
 
-        // Now unpause migration
         vm.recordLogs();
         vm.prank(owner);
         IChainAssetHandlerBase(handler).unpauseMigration();
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // Verify migration is no longer paused
         assertFalse(
             IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
             "Migration should not be paused after calling unpauseMigration"
         );
 
-        // Verify event was emitted
         Vm.Log memory unpauseLog = logs.requireOneFrom("UnpausedMigration(address)", handler);
         assertEq(unpauseLog.topics[1], bytes32(uint256(uint160(owner))), "UnpausedMigration pauser mismatch");
     }
@@ -178,30 +159,24 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
             .owner();
 
-        // Verify owner is valid
         assertTrue(owner != address(0), "Owner should be a valid address");
 
-        // Verify contract is not paused initially
         assertFalse(
             PausableUpgradeable(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).paused(),
             "Contract should not be paused initially"
         );
 
-        // Pause the contract
         vm.prank(owner);
         IPausable(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).pause();
 
-        // Verify contract is now paused
         assertTrue(
             PausableUpgradeable(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).paused(),
             "Contract should be paused after calling pause()"
         );
 
-        // Unpause the contract
         vm.prank(owner);
         IPausable(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).unpause();
 
-        // Verify contract is no longer paused
         assertFalse(
             PausableUpgradeable(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).paused(),
             "Contract should not be paused after calling unpause()"
@@ -272,16 +247,13 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     }
 
     function test_setSettlementLayerChainId_sameChainId() public {
-        // Get migration number before the call
         uint256 migrationNumBefore = IChainAssetHandlerBase(address(l2ChainAssetHandler)).migrationNumber(
             block.chainid
         );
 
-        // Set the settlement layer chain ID (same chain ID = no migration increment)
         vm.prank(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR);
         l2ChainAssetHandler.setSettlementLayerChainId(eraZKChainId, eraZKChainId);
 
-        // When previous and current are the same, migration number should not change
         uint256 migrationNumAfter = IChainAssetHandlerBase(address(l2ChainAssetHandler)).migrationNumber(block.chainid);
         assertEq(
             migrationNumAfter,
@@ -295,7 +267,6 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
             block.chainid
         );
 
-        // Different previous and current chain IDs triggers migration number increment
         uint256 previousChainId = 100;
         uint256 currentChainId = 200;
 
@@ -347,7 +318,6 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         vm.prank(_owner());
         _l1ChainAssetHandler().setHistoricalMigrationInterval(eraZKChainId, 0, interval);
 
-        // Verify the mapping was populated correctly
         MigrationInterval memory stored = _l1ChainAssetHandler().migrationInterval(eraZKChainId, 0);
         assertEq(stored.migrateToGWBatchNumber, 10, "migrateToGWBatchNumber mismatch");
         assertEq(stored.migrateFromGWBatchNumber, 50, "migrateFromGWBatchNumber mismatch");
@@ -518,7 +488,6 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         // Clear the mock so the real function is called
         vm.clearMockedCalls();
 
-        // No migration set for eraZKChainId → all batches should report L1
         bool result = _l1ChainAssetHandler().isValidSettlementLayer(eraZKChainId, 5, block.chainid, 0);
         assertTrue(result, "Batch should be on L1 when no migration is set");
 
@@ -550,7 +519,6 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         vm.prank(_owner());
         _l1ChainAssetHandler().setHistoricalMigrationInterval(eraZKChainId, 0, interval);
 
-        // Verify the interval was stored correctly
         MigrationInterval memory stored = _l1ChainAssetHandler().migrationInterval(eraZKChainId, 0);
         assertEq(stored.migrateToGWBatchNumber, 10, "migrateToGWBatchNumber mismatch");
         assertEq(stored.migrateFromGWBatchNumber, 50, "migrateFromGWBatchNumber mismatch");
