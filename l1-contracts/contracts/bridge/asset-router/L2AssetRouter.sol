@@ -227,7 +227,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     /// CLAIM time, not at burn time, so rotating the handler while burns are in flight misroutes their
     /// recovery to the new handler (which may revert — blocking the refund — or no-op, consuming it).
     /// Migrations should use a new asset id instead of re-pointing an existing one. See the
-    /// handler-rotation known issue in the atomic-interop README.
+    /// handler-rotation known issue in
+    /// contracts/atomic-interop/README.md#known-issues-and-accepted-limitations.
     function setAssetHandlerAddress(
         uint256 _sourceChainId,
         bytes32 _assetId,
@@ -331,7 +332,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         // to `Reverted` regardless of the value returned below, so if an upgraded router stopped
         // recognizing an in-flight burn's encoding, `false` would be returned, the claim would succeed
         // as a no-op, and the burned funds would be stranded permanently. A future encoding change must
-        // therefore ADD a recognized format, never replace the old ones.
+        // therefore ADD a recognized format, never replace the old ones. See the per-bundle refund
+        // consumption known issue in
+        // contracts/atomic-interop/README.md#known-issues-to-be-fixed-in-this-release.
         if (_callData.length < 4 || bytes4(_callData[:4]) != AssetRouterBase.finalizeDeposit.selector) {
             return false;
         }
@@ -346,8 +349,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         // lookup rather than assuming the NTV. The handler is registered by the burn itself (`_burn`
         // either found it registered or registered the NTV via `tryRegisterTokenFromBurnData`); the
         // lookup is only correct as long as the registration has not been overwritten since — see the
-        // handler-rotation known issue in the atomic-interop README and the warnings on the
-        // `setAssetHandlerAddress*` entry points.
+        // handler-rotation known issue in
+        // contracts/atomic-interop/README.md#known-issues-and-accepted-limitations and the warnings on
+        // the `setAssetHandlerAddress*` entry points.
         address assetHandler = assetHandlerAddress[assetId];
         require(assetHandler != address(0), AssetHandlerDoesNotExist(assetId));
         IL2AssetHandler(assetHandler).bridgeRecoverFailedTransfer(_destChainId, assetId, mintData);
