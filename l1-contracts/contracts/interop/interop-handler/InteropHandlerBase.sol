@@ -51,10 +51,10 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
     // slither-disable-next-line uninitialized-state
     uint256 internal __DEPRECATED_L1_CHAIN_ID;
 
-    /// @notice Tracks the processing status of a bundle by its hash.
+    /// @inheritdoc IInteropHandlerBase
     mapping(bytes32 bundleHash => BundleStatus bundleStatus) public bundleStatus;
 
-    /// @notice Tracks the individual call statuses within a bundle.
+    /// @inheritdoc IInteropHandlerBase
     mapping(bytes32 bundleHash => mapping(uint256 callIndex => CallStatus callStatus)) public callStatus;
 
     /// @dev Reserved storage to allow future additions to this shared base without shifting the storage of
@@ -113,15 +113,14 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
     function unbundleBundle(bytes memory _bundle, CallStatus[] calldata _providedCallStatus) public {
         _ensureNotPaused();
 
-        // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
         (uint256 unbundlerChainId, address unbundlerAddress) = InteroperableAddress.parseEvmV1(
             interopBundle.bundleAttributes.unbundlerAddress
         );
 
-        // Verify that the caller has permission to unbundle the bundle.
-        // It's also possible that the caller is InteropHandler itself, in case the unbundling was initiated through receiveMessage.
+        // Unbundler permission gate; `msg.sender == address(this)` covers unbundling initiated through
+        // `receiveMessage`, which validates the cross-chain sender itself.
         require(
             msg.sender == address(this) ||
                 ((unbundlerChainId == block.chainid || unbundlerChainId == 0) && unbundlerAddress == msg.sender),
@@ -132,15 +131,11 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
             )
         );
 
-        // Verify that the provided call statuses array has the same length as the number of calls in the bundle.
-        // That's a measure to protect user from unintended unbundling calls.
         require(
             interopBundle.calls.length == _providedCallStatus.length,
             WrongCallStatusLength(interopBundle.calls.length, _providedCallStatus.length)
         );
 
-        // The bundle status have to be either verified (we know that it's received, but not processed yet), or unbundled.
-        // Note, that on the first call to unbundle the status of the bundle should be verified, which validates bundle correctness.
         require(status == BundleStatus.Verified || status == BundleStatus.Unbundled, CanNotUnbundle(bundleHash));
 
         // No destination-context re-validation is needed here: `Verified`/`Unbundled` status is only ever
@@ -148,28 +143,24 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         // context input is immutable afterwards — the chain ids are committed in the bundle hash and the
         // chain's base-token asset id is set-once (see `L2NativeTokenVault.updateL2`).
 
-        // Mark the given bundle as unbundled, following CEI pattern.
+        // Mark the bundle Unbundled (CEI) before any external call runs.
         bundleStatus[bundleHash] = BundleStatus.Unbundled;
 
-        // We iterate over provided desired statuses of the calls and verify if they are valid (i.e. noncontradictory with current state of the bundle).
         uint256 callsLength = interopBundle.calls.length;
         for (uint256 i = 0; i < callsLength; ++i) {
             CallStatus recordedCallStatus = callStatus[bundleHash][i];
             CallStatus requestedCallStatus = _providedCallStatus[i];
             if (requestedCallStatus == CallStatus.Executed) {
-                // We can only execute unprocessed calls.
                 require(recordedCallStatus == CallStatus.Unprocessed, CallNotExecutable(bundleHash, i));
                 callStatus[bundleHash][i] = CallStatus.Executed;
                 emit CallProcessed(bundleHash, i, CallStatus.Executed);
             } else if (requestedCallStatus == CallStatus.Cancelled) {
-                // We can only cancel calls which haven't been executed yet.
                 require(recordedCallStatus != CallStatus.Executed, CallAlreadyExecuted(bundleHash, i));
                 if (recordedCallStatus == CallStatus.Unprocessed) {
-                    // We update the call status if needed.
                     callStatus[bundleHash][i] = CallStatus.Cancelled;
                     emit CallProcessed(bundleHash, i, CallStatus.Cancelled);
                 }
-            } // If the specified requestedCallStatus is neither Executed or Cancelled, it means we should skip it.
+            } // Any other requested status leaves the call untouched (skip).
         }
 
         _executeCalls({
@@ -180,7 +171,6 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
             _providedCallStatus: _providedCallStatus
         });
 
-        // Emit event stating that the bundle was unbundled.
         emit BundleUnbundled(bundleHash);
     }
 
@@ -201,8 +191,6 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         bytes calldata sender,
         bytes calldata payload
     ) external payable override returns (bytes4) {
-        // Verify that call to this function is a result of a call being executed, meaning this message came from a valid bundle.
-        // This is the only way receiveMessage can be invoked on InteropHandler by itself.
         require(msg.sender == address(this), Unauthorized(msg.sender));
 
         // Revert cleanly on a payload too short to carry a selector, instead of the slice-out-of-bounds panic.
@@ -371,7 +359,6 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
             if (!_executeAllCalls) {
                 CallStatus requestedCallStatus = _providedCallStatus[i];
                 if (requestedCallStatus != CallStatus.Executed) {
-                    // We skip the call.
                     continue;
                 }
             }
@@ -381,7 +368,6 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
             // shadow-account call fails fast here instead of being silently executed as a non-shadow call.
             require(!interopCall.shadowAccount, ShadowAccountNotSupported());
 
-            // Environment-specific handling of the call's base-token value.
             _handleCallValue(interopCall.value, _sourceChainId);
 
             // slither-disable-next-line arbitrary-send-eth
@@ -406,19 +392,16 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
         InteropBundle memory interopBundle,
         uint256 proofChainId
     ) internal view {
-        // Verify that the source chainId of the bundle matches the proof's chainId
         require(
             interopBundle.sourceChainId == proofChainId,
             WrongSourceChainId(bundleHash, interopBundle.sourceChainId, proofChainId)
         );
 
-        // Verify that the destination chainId of the bundle is equal to the chainId where it's trying to get executed
         require(
             interopBundle.destinationChainId == block.chainid,
             WrongDestinationChainId(bundleHash, interopBundle.destinationChainId, block.chainid)
         );
 
-        // Verify that the destination base token asset ID of the bundle is equal to the base token asset ID of the chain
         bytes32 baseTokenAssetId = _expectedDestinationBaseTokenAssetId();
         require(
             interopBundle.destinationBaseTokenAssetId == baseTokenAssetId,
@@ -435,14 +418,12 @@ abstract contract InteropHandlerBase is IInteropHandlerBase, IERC7786Recipient, 
     ) internal {
         (bytes memory bundle, CallStatus[] memory providedCallStatus) = abi.decode(payload[4:], (bytes, CallStatus[]));
 
-        // Decode the bundle to get unbundling permissions
         (InteropBundle memory interopBundle, bytes32 bundleHash, ) = _getBundleData(bundle);
 
         (uint256 unbundlerChainId, address unbundlerAddress) = InteroperableAddress.parseEvmV1(
             interopBundle.bundleAttributes.unbundlerAddress
         );
 
-        // Verify sender has unbundling permission
         require(
             (unbundlerChainId == senderChainId || unbundlerChainId == 0) && unbundlerAddress == senderAddress,
             UnbundlingNotAllowed(bundleHash, sender, interopBundle.bundleAttributes.unbundlerAddress)

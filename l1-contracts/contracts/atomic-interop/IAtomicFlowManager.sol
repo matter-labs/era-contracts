@@ -5,85 +5,55 @@ import {LegState, AtomicFlow, AtomicFlowPreimage, ImtProof, AtomicFinalityProof}
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Per-chain coordinator for the **atomic interop** flow. It is *not* an escrow: it
-/// never custodies funds. The asset burn happens through the normal interop path
-/// ({InteropCenter.sendBundle} -> {L2AssetRouter.initiateIndirectCall}); this contract only
-/// coordinates the cross-chain atomicity and the timeout recovery, gated by **IMT proofs** against
-/// the interop root the verifying chain imports for a settled source batch (see {AtomicInteropProof}).
-///
-///   1. `append` — called by the {InteropCenter} when a bundle carries the `atomicBundle` attribute,
-///      in place of publishing the bundle to L1. It recomputes `flowId` from the attribute-supplied
-///      preimage ({AtomicFlowPreimage}), verifies the committing bundle is one of the flow's legs
-///      (with this chain as its declared source), inserts the leg's commit value
-///      (`commitValue(flowId, bundleHash)`) into this chain's indexed interop IMT and records the
-///      source leg as `Committed`. The burn already happened during `sendBundle`.
-///   2. `requireFlowFinalized` — called by the {L2InteropHandler} from `executeAtomicBundle` in place of
-///      the L1-message inclusion proof: it verifies that *every* leg of the flow was committed before
-///      the deadline. The handler then executes the bundle (and owns the double-execute guard).
-///   3. `authorizeRefund` / `claimRefund` — the timeout path: prove (O(log n) non-inclusion) that a leg
-///      can no longer be committed in time, then **recover** the burned source funds to the depositor
-///      by asking each burn-producing call's local sender (`InteropCall.from`) to reverse itself via
-///      {IAtomicRecoverable.recoverAtomicCall}.
-///
-/// `flowId = keccak256(abi.encode(preimage))`,
-/// `bundleHash = keccak256(abi.encode(sourceChainId, interopBundleBytes))`. `legBundleHashes` is strictly
-/// ascending (canonical order + dedup); `legSourceChainIds` is positionally aligned with it (may repeat,
-/// need not be ascending). All legs settle on one `settlementLayerChainId`, so the deadline (a settlement-
-/// layer timestamp) is comparable to each batch's `l1Timestamp`.
-///
-/// Deployed as an L2 predeploy (no constructor).
+/// @notice Per-chain coordinator for the atomic interop flow: `append` commits a source leg at send
+/// time, `requireFlowFinalized` gates atomic execution on the destination, and
+/// `authorizeRefund`/`claimRefund` implement the timeout path. Never custodies funds. Deployed as an
+/// L2 predeploy (no constructor). See {protocol-docs/atomicity/flow.md#the-atomicflowmanager}.
 interface IAtomicFlowManager {
+    /// @notice Emitted when a source leg is committed to this chain's IMT.
     event FlowCommitted(bytes32 indexed flowId, bytes32 indexed bundleHash, uint64 deadline, uint256 leafIndex);
+    /// @notice Emitted per source leg marked `Revertable` by a timeout proof.
     event FlowRefundAuthorized(bytes32 indexed flowId, bytes32 indexed bundleHash);
+    /// @notice Emitted when a `Revertable` leg's burned funds are recovered.
     event FlowRefunded(bytes32 indexed flowId, bytes32 indexed bundleHash);
 
-    /// @notice Record an atomic source leg: recompute `flowId` from the supplied preimage, verify the
-    /// committing bundle is one of the flow's legs (declared with this chain as its source) and that
-    /// every other leg declares an interop-registered source chain, insert the leg's commit value into
-    /// the interop IMT and mark it `Committed`. Callable only by the {InteropCenter}.
-    /// State `Unset -> Committed`.
-    /// @dev Taking the full preimage — rather than an opaque, sender-supplied `flowId` — is what couples
-    /// the committed leg to its flow. With an opaque id, a bundle committed under a `flowId` whose
-    /// preimage does not contain its hash (e.g. because an upgrade changed the bundle encoding between
-    /// the sender's off-chain hash preview and the send) would be stranded forever: it could neither
-    /// finalize nor be refunded, since both paths require the leg to be inside the preimage. Here such a
-    /// mismatch makes the whole send revert before any state is committed.
-    /// @dev Every non-local leg's declared source chain must be Bridgehub-registered. A leg declaring a
-    /// chain with no presence in the settlement layer's MessageRoot could never be proven committed OR
-    /// absent (the refund path binds the absence proof to the declared source chain), so committing
-    /// alongside it would strand this chain's burned leg; registration guarantees that presence.
-    /// @param _bundleHash `keccak256(abi.encode(sourceChainId, interopBundleBytes))` of this leg.
+    /// @notice Records an atomic source leg: recomputes `flowId` from the supplied preimage, verifies
+    /// the committing bundle is one of the flow's legs (declared with this chain as its source) and
+    /// that every other leg declares an interop-registered source chain, then inserts the leg's commit
+    /// value into the interop IMT. State `Unset -> Committed`. Callable only by the {InteropCenter}.
+    /// @dev Taking the full preimage (not an opaque `flowId`) is what couples the committed leg to its
+    /// flow; a wrong or stale preimage reverts the whole send instead of stranding the burned funds.
+    /// See {protocol-docs/atomicity/flow.md#1-atomic-send-append}.
+    /// @param _bundleHash `keccak256(interopBundleBytes)` of this leg (chain-specific via the bundle's
+    /// own `sourceChainId` field).
     /// @param _lowNullifierIndex The low-nullifier slot for the commit value (from the IMT engine).
-    /// @param _flowPreimage The full `flowId` preimage ({AtomicFlowPreimage}): the flow's deadline,
-    /// settlement layer, leg bundle hashes (strictly ascending) and their aligned source chain ids.
+    /// @param _flowPreimage The full `flowId` preimage ({AtomicFlowPreimage}).
     function append(
         bytes32 _bundleHash,
         uint256 _lowNullifierIndex,
         AtomicFlowPreimage calldata _flowPreimage
     ) external;
 
-    /// @notice Revert if the flow is not fully committed in time. Callable only by the {InteropHandler}.
-    /// Verifies an inclusion proof for every leg against its source chain's IMT (the finality
-    /// condition — see the {AtomicInteropProof} library header), recomputes `flowId`, ties each proof
-    /// to its source chain and the flow's settlement layer, and asserts the bundle being executed is
-    /// a leg of the flow.
+    /// @notice Reverts unless every leg of the flow was committed in time (per-leg IMT inclusion
+    /// proofs — see the {AtomicInteropProof} library header) and the executing bundle is a leg of the
+    /// flow. Callable only by the {InteropHandler}.
     /// @param _executingBundleHash The bundle hash the handler is about to execute.
     /// @param _finality The flow definition + per-leg inclusion proofs.
     function requireFlowFinalized(bytes32 _executingBundleHash, AtomicFinalityProof calldata _finality) external view;
 
     /// @notice Mark this chain's committed source legs `Revertable` for a flow that can no longer
     /// finalize, proven by a timeout for one leg. Permissionless.
-    /// @param _flow The flow definition ({AtomicFlow}); its `flowId` is recomputed from the other fields
-    /// and matched. The absence proof for the missing leg must target
+    /// @param _flow The flow definition ({AtomicFlow}). The absence proof must target
     /// `_flow.preimage.legSourceChainIds[_missingLegIndex]`.
     /// @param _missingLegIndex Index into `_flow.preimage.legBundleHashes` of the leg proven absent.
-    /// @param _absence Timeout proof for the missing leg's commit value (the timeout condition —
-    /// see {AtomicInteropProof.verifyTimeoutAbsence} and the {AtomicInteropProof} library header).
+    /// @param _absence Timeout proof for the missing leg's commit value
+    /// (see {AtomicInteropProof.verifyTimeoutAbsence}).
     function authorizeRefund(AtomicFlow calldata _flow, uint256 _missingLegIndex, ImtProof calldata _absence) external;
 
-    /// @notice Recover the burned source funds for a `Revertable` leg by reversing the bundle's
+    /// @notice Recovers the burned source funds for a `Revertable` leg by reversing the bundle's
     /// asset-router calls (re-minting each burned asset to its depositor). Permissionless. State
     /// `Revertable -> Reverted`.
+    /// @param _flowId The flow the leg belongs to.
     /// @param _bundle The ABI-encoded {InteropBundle} of the source leg (hashes to the committed leg).
     function claimRefund(bytes32 _flowId, bytes calldata _bundle) external;
 

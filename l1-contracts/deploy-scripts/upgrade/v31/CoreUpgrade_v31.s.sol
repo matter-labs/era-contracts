@@ -78,7 +78,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
 
     function deployNewEcosystemContractsL1() public virtual override {
         deployNewEcosystemContractsL1NoConnections();
-        // Configure new-contract connections after deployment
         updateContractConnections();
     }
 

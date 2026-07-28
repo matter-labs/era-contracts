@@ -14,11 +14,9 @@ import {
 import {MessageRootIsZero} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-/// @notice Unit tests for the `L2InteropRootStorage` import gates: the full `(root, timestamp)`
-/// tuple is stored, and malformed imports (zero root, zero timestamp, duplicates, extra sides) are
-/// rejected. The zero-timestamp gate keeps the {IL2InteropRootStorage} invariant — a zero stored
-/// timestamp only ever means "nothing imported at this key" — structural rather than relying on the
-/// executor's settlement-layer double check.
+/// @notice Covers the `L2InteropRootStorage` import gates: the `(root, timestamp)` tuple is stored and
+/// malformed imports are rejected, keeping the {IL2InteropRootStorage} zero-timestamp invariant
+/// structural. See {protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}.
 contract L2InteropRootStorageTest is Test {
     uint256 internal constant CHAIN_ID = 320;
     uint256 internal constant BLOCK_NUMBER = 7;

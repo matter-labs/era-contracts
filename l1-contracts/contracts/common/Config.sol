@@ -298,14 +298,8 @@ uint256 constant INITIAL_BASE_TOKEN_HOLDER_BALANCE = (2 ** 127) - 1;
 uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 7;
 
 /// @dev Whether chain migrations between settlement layers are enabled in the current release.
-/// @dev In the v32 release the protocol operates under the invariant that all chains settle on L1,
-/// so chain migrations are explicitly disabled to remove any migration-related risks for the time being.
-/// The whole migration machinery (chain asset handlers, Migrator facet, migration intervals, etc.)
-/// is intentionally kept intact and covered by tests, so that a future release can bring settlement
-/// layers (e.g. ZK Gateway) back by simply setting this constant to `true`.
-/// @dev Note that this is a release-level switch: lifting the ban requires deploying new
-/// implementations as part of a protocol upgrade; it cannot be lifted by a governance call alone
-/// (unlike the runtime `migrationPaused` flag in `ChainAssetHandlerBase`).
+/// @dev Release-level switch (disabled in v32): lifting the ban requires a protocol upgrade, unlike
+/// the runtime `migrationPaused` flag. See {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}.
 bool constant CHAIN_MIGRATIONS_ENABLED = false;
 
 /// @dev Migration number used when a chain migrates from L1 to a settlement layer.

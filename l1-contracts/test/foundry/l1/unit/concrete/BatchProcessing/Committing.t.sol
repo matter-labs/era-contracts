@@ -569,8 +569,7 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        // BlockCommit is now followed by a ReportCommittedBatchProtocolVersion event for every committed batch
-        // (its values are asserted in test_emitsProtocolVersionEvent).
+        // A ReportCommittedBatchProtocolVersion event follows BlockCommit (see test_emitsProtocolVersionEvent).
         assertEq(entries.length, 2 + EVENT_INDEX);
         assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
         assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
@@ -688,8 +687,7 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        // BlockCommit is now followed by a ReportCommittedBatchProtocolVersion event for every committed batch
-        // (its values are asserted in test_emitsProtocolVersionEvent).
+        // A ReportCommittedBatchProtocolVersion event follows BlockCommit (see test_emitsProtocolVersionEvent).
         assertEq(entries.length, 2 + EVENT_INDEX);
         assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
         assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
@@ -759,8 +757,7 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        // BlockCommit is now followed by a ReportCommittedBatchProtocolVersion event for every committed batch
-        // (its values are asserted in test_emitsProtocolVersionEvent).
+        // A ReportCommittedBatchProtocolVersion event follows BlockCommit (see test_emitsProtocolVersionEvent).
         assertEq(entries.length, 2 + EVENT_INDEX);
         assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
         assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber

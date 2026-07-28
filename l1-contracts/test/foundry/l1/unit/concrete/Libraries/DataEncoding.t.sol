@@ -286,11 +286,8 @@ contract DataEncodingTest is Test {
 
     // ============ encodeInteropWithdrawalCallStarters Tests ============
 
-    /// @notice The withdrawal encoder produces exactly one indirect call to the L2 AssetRouter that carries
-    /// ZERO value (both the `indirectCall` message value and `interopCallValue` are 0). This is precisely why
-    /// it cannot be used for base-token withdrawals: the base token can only be withdrawn by actually moving
-    /// value, whereas this call moves the amount purely inside `_transferData` for the asset handler to release
-    /// on L1. Base-token withdrawals instead go through the InteropCenter's value-carrying path.
+    /// @notice The withdrawal encoder emits a single zero-value indirect call to the L2 AssetRouter,
+    /// which is why it cannot carry base-token withdrawals. See {protocol-docs/bridging.md#deposit-initiation-source-side}.
     function test_encodeInteropWithdrawalCallStarters_isZeroValueIndirectCallToAssetRouter() public pure {
         bytes32 assetId = keccak256("some-erc20-asset");
         bytes memory transferData = hex"c0ffee";
@@ -311,7 +308,6 @@ contract DataEncodingTest is Test {
             "call data must be the bridgehub-deposit payload"
         );
 
-        // Exactly two attributes, both encoding a value of 0: indirectCall(0) and interopCallValue(0).
         // Byte-equality against the zero-value encodings proves no base-token value can ride this call.
         assertEq(starter.callAttributes.length, 2, "exactly two call attributes");
         assertEq(
@@ -326,10 +322,8 @@ contract DataEncodingTest is Test {
         );
     }
 
-    /// @notice The base-token withdrawal encoder produces the same single indirect call to the L2 AssetRouter,
-    /// but with the withdrawn amount riding as the `indirectCall` message value (burned from the `sendBundle`
-    /// transaction value). `interopCallValue` must stay zero — destination-side call value is rejected for L1
-    /// destinations by the InteropCenter.
+    /// @notice The base-token variant rides the withdrawn amount as the `indirectCall` message value;
+    /// `interopCallValue` must stay zero for L1 destinations. See {protocol-docs/bridging.md#base-token-handling}.
     function test_encodeInteropBaseTokenWithdrawalCallStarters_carriesAmountAsIndirectCallValue() public pure {
         bytes32 assetId = keccak256("base-token-asset");
         bytes memory transferData = hex"c0ffee";

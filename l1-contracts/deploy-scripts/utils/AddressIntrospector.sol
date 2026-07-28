@@ -124,9 +124,8 @@ library AddressIntrospector {
         return _getBridgesDeployedAddressesInternal(_assetRouter, false);
     }
 
-    /// @dev Naming note: the `V29` suffix marks the LEGACY introspection path. For the bridge contracts the
-    /// only version-dependent getter is `l1InteropHandler()` (introduced in v32), so this variant is correct
-    /// for every pre-v32 deployment (v29/v30/v31), not just v29 itself — hence the `isPreV32` flag it passes.
+    /// @dev Despite the `V29` name, this legacy path is correct for every pre-v32 deployment (v29/v30/v31):
+    /// the only version-dependent bridge getter is `l1InteropHandler()`, added in v32.
     function getBridgesDeployedAddressesV29(
         address _assetRouter
     ) public view returns (BridgesDeployedAddresses memory info) {
@@ -145,8 +144,7 @@ library AddressIntrospector {
         address erc20BridgeProxy = address(assetRouter.legacyBridge());
         address l1NullifierProxy = address(assetRouter.L1_NULLIFIER());
         address l1NativeTokenVaultProxy = address(assetRouter.nativeTokenVault());
-        // The L1 interop handler is introduced in v32, so it does not exist on any earlier version (v29/v30/v31);
-        // the nullifier only exposes `l1InteropHandler()` from v32 onward. Skip the call for pre-v32 deployments.
+        // `l1InteropHandler()` only exists on the nullifier from v32 onward; skip the call for pre-v32 deployments.
         address l1InteropHandlerProxy = isPreV32 ? address(0) : L1Nullifier(l1NullifierProxy).l1InteropHandler();
 
         require(l1NativeTokenVaultProxy != address(0), "NativeTokenVault address is zero");

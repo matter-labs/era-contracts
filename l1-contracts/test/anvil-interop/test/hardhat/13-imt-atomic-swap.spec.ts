@@ -1,65 +1,9 @@
 /**
- * End-to-end test for the atomic-interop stack (bundle model).
- *
- * Topology (two GW-settled chains):
- *   Chain A: depositor (anvil acct #0) sends aAmount of testTokenA -> recipient on B.
- *   Chain B: depositor (anvil acct #0) sends bAmount of testTokenB -> recipient on A.
- *
- * The flow runs through the production interop contracts:
- *   SEND    `InteropCenter.sendBundle(dstChainId, [indirect AR call starter], [atomicBundle attr])`.
- *           The bridge transfer burns via `initiateIndirectCall`; the `atomicBundle` attribute makes
- *           the InteropCenter append the leg's commit value to the L2InteropCommitmentTree instead of
- *           publishing to L1.
- *   RECEIVE `L2InteropHandler.executeAtomicBundle(bundleBytes, AtomicFinalityProof)`. Proves every leg
- *           was committed in its source chain's IMT before the deadline (one inclusion proof per leg),
- *           then executes the bundle's calls (the destination mint). `bundleStatus` guards double-execute.
- *   TIMEOUT `AtomicFlowManager.authorizeRefund(...)`: checked against a settlement interop root created
- *           strictly after the deadline (the timestamp in `interopRoots[slChainId][slBlock]` is
- *           `> deadline`, added on the harness via bootloader impersonation), proves the missing leg
- *           absent from the batch-begin IMT root of a late batch (`t > deadline`) — or, for a halted source
- *           chain, absent from the batch-end IMT root of the chain's LAST batch inside that settlement
- *           interop root (`t <= deadline`) — then `claimRefund(flowId, bundleBytes)` recovers the burned
- *           source funds to the depositor via L2AssetRouter's recoverAtomicCall. See the
- *           AtomicInteropProof.sol library header for the canonical protocol description.
- *
- * Ids:
- *   - `bundleHash = keccak256(abi.encode(sourceChainId, abi.encode(InteropBundle)))`. The atomic send
- *     params (the full flowId preimage + lowNullifierIndex) ride in the `atomicBundle` attribute and are
- *     not part of the InteropBundle, so `bundleHash` is independent of the preimage (whose leg hashes
- *     include the bundle's own hash). We predict each leg's bundleHash off-chain with the static
- *     `previewBundleHash` (which runs the real assembly but persists nothing), then cross-check it against
- *     the real send's `InteropBundleSent` event and fail loudly on mismatch. On-chain, the AtomicFlowManager
- *     additionally requires the sent bundle's hash to be one of the preimage's legs, so a stale prediction
- *     reverts the send.
- *   - `flowId = keccak256(abi.encode(preimage))` (`preimage.version` = ATOMIC_FLOW_PREIMAGE_VERSION)
- *     (bundle hashes ascending, source chain ids positionally aligned), recomputed on-chain from the
- *     attribute-supplied preimage rather than accepted from the sender.
- *   - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
- *
- * The deadline is a settlement-layer timestamp, compared on-chain against each batch's settlement
- * timestamp `t` from the real `MessageHashing._getProofData` parse of `settlementProof`, so the
- * off-chain builders embed a chosen `t` in format-valid multi-hop proof bytes (including the exact
- * 3-hop chain-batch-root leaf path the verifier enforces). Chain-batch-root leaf authentication is
- * mocked to `true` on the anvil harness. The off-chain IMT engine reconstructs the root / Merkle paths
- * from the live leaf set and asserts it matches `tree.root()` before emitting a proof, so a passing
- * test also confirms the off-chain engine agrees with the on-chain one.
- *
- * Verifies:
- *   - HAPPY PATH: atomic send (source burn + IMT insert) on both legs -> executeAtomicBundle (every-leg
- *     inclusion proof, `t <= deadline` — exercised exactly AT the boundary) on each destination.
- *     Recipients receive the bridged token; source legs stay terminal at Committed; both destination
- *     bundles end FullyExecuted.
- *   - TIMEOUT PATH (late batch): one leg commits, the other never does -> a single absence proof
- *     (missing leg absent from the batch-begin IMT root of a batch with `t > deadline`, checked against
- *     a post-deadline settlement interop root) authorizes a refund -> claimRefund recovers the
- *     depositor's tokens; the source leg ends Reverted.
- *   - TIMEOUT PATH (halted chain): same setup, but the absence proof uses an in-time batch
- *     (`t <= deadline`, exercised exactly AT the boundary) that is the chain's LAST batch inside a
- *     post-deadline settlement interop root, checked against the batch-end IMT root.
- *   - TIMEOUT NEGATIVES: a settlement interop root not created strictly after the deadline is rejected
- *     (`ProofInteropRootNotAfterDeadline`, exercised exactly AT the boundary `T == deadline`), and an
- *     in-time batch that is NOT the last batch in the settlement interop root is rejected
- *     (`ProofNotLastBatchInRoot`).
+ * End-to-end atomic-interop tests (bundle model) between two GW-settled chains: A <-> B token swap
+ * via atomic sends + executeAtomicBundle, the late-batch and halted-chain timeout/refund paths, the
+ * send-time flow/bundle coupling checks, and the timeout negatives. Proofs are built off-chain by
+ * imt-engine-lib; on the harness the chain-batch-root leaf authentication is mocked and settlement
+ * interop roots are added via bootloader impersonation. See {protocol-docs/atomicity/flow.md}.
  */
 
 import { expect } from "chai";
@@ -118,10 +62,9 @@ enum LegState {
 }
 
 /**
- * Handles to the atomic-interop built-ins on one L2 chain. These contracts are predeployed into the
- * ZKsync OS genesis (see `src/core/predeploys.ts`) and the {L2InteropCommitmentTree}'s IMT is seeded
- * by the harness's relayed v31 genesis upgrade (`_initializeV31Contracts` -> `tree.initL2()`), so
- * no install/seed step is needed here — we just bind contract objects to their canonical addresses.
+ * Handles to the atomic-interop built-ins on one L2 chain. They are predeployed and genesis-seeded
+ * (see `src/core/predeploys.ts` and the relayed v31 genesis upgrade), so no install/seed step is
+ * needed — the stack just binds contract objects to their canonical addresses.
  */
 type AtomicStack = {
   chainId: number;
@@ -136,7 +79,6 @@ type AtomicStack = {
   interopHandler: Contract;
 };
 
-/** Bind the predeployed, genesis-seeded atomic-interop built-ins to their canonical addresses. */
 function atomicStack(chainId: number, provider: ethers.providers.JsonRpcProvider, wallet: Wallet): AtomicStack {
   return {
     chainId,
@@ -286,8 +228,6 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
         const tokenAddress = state.testTokens![chainId];
         if (!tokenAddress) throw new Error(`No test token registered for chain ${chainId}`);
         const testToken = new Contract(tokenAddress, getAbi("TestnetERC20Token"), user);
-        // Atomic-interop built-ins are predeployed in genesis and the tree is genesis-seeded
-        // (leafCount=1), so just bind handles to their canonical addresses — no install/initialize.
         const stack = atomicStack(chainId, provider, user);
         return { chainId, rpcUrl, provider, user, testToken, stack };
       })
@@ -557,9 +497,6 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const hAB = await predictLegBundleHash(chainA, chainB, aTimeoutAmount, refundRecipient, saltAB);
     const hBA = await predictLegBundleHash(chainB, chainA, bTimeoutAmount, refundRecipient, saltBA);
 
-    // Legs sorted by ascending bundleHash; each leg's source chain id stays positionally aligned:
-    // chainIdsAsc[i] is the source chain of legHashesAsc[i]. Sorting the chain ids independently
-    // would misalign them, which the on-chain source-chain binding rejects.
     const legs = [
       { hash: hAB, chainId: chainA.chainId },
       { hash: hBA, chainId: chainB.chainId },
@@ -591,10 +528,8 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     // proof anchors on (importing it earlier would make `append` reject the send: deadline passed).
     await ensureSettlementInteropRoot(chainA.provider, settlementInteropRootBlock, deadline + 5);
 
-    // ── Build the timeout proof for the missing BA leg against B's IMT: non-inclusion against the
-    //    batch-begin root of a late batch (`t > deadline`), checked against the post-deadline
-    //    settlement interop root added above. The live tree root stands in for the begin-root snapshot
-    //    (leaf 2 of the chain batch root) on the harness.
+    // ── Absence proof for the missing BA leg: batch-begin root of a late batch (`t > deadline`),
+    //    checked against the post-deadline settlement interop root added above. ─────────────────
     const baValue = commitValue(flowId, hBA);
     const absence = await buildNonInclusionProof({
       l2Tree: chainB.stack.tree,
@@ -661,14 +596,11 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
 
   it("timeout path (halted chain): in-time LAST batch + end-root absence authorizes the refund", async () => {
     const user = chainA.user.address;
-    // Same shape as the late-batch timeout test, but the source chain "halted": its last batch inside
-    // the post-deadline settlement interop root is still in time (`t <= deadline`, pinned exactly AT
-    // the boundary). The proof then checks absence against the batch-END IMT root of that last batch
-    // (the zero-length batch-leaf path of the single-leaf chain tree trivially satisfies the
-    // last-batch check).
-    // Strictly above the late-batch test's imported root timestamp (1005): tests share chain state,
-    // and `append` rejects a flow whose deadline predates any root already imported on the source
-    // chain. The root anchoring this test's absence proof is imported after the send, as above.
+    // Same shape as the late-batch test, but the source chain "halted": the absence proof uses the
+    // batch-END root of its last in-time batch (`t <= deadline`, pinned exactly AT the boundary).
+    // Deadline strictly above the late-batch test's imported root timestamp (1005): tests share chain
+    // state, and `append` rejects a flow whose deadline predates an already-imported root. The anchor
+    // root is imported after the send, as above.
     const deadline = 2_000;
     const settlementInteropRootBlock = 202;
 
@@ -739,11 +671,8 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
   });
 
   it("send-time coupling: an atomic send whose preimage does not contain the bundle is rejected", async () => {
-    // Regression for the flowId footgun: before the attribute carried the full preimage, a sender could
-    // commit a bundle under an arbitrary flowId whose preimage did not contain the bundle's hash (e.g.
-    // built from a stale off-chain prediction), stranding the burned funds forever. Now the whole send
-    // reverts before any burn: the AtomicFlowManager recomputes flowId from the preimage and requires
-    // the sent bundle to be one of its legs, declared with the sending chain as its source.
+    // Regression: committing a bundle under a flow whose preimage does not contain it would strand
+    // the burned funds; the send must revert before any burn. See {protocol-docs/atomicity/flow.md#1-atomic-send-append}.
     const user = chainA.user.address;
     const deadline = (await chainNow(chainA.provider)) + 3600;
     const amount = ethers.utils.parseUnits("1", TEST_TOKEN_DECIMALS);
@@ -784,9 +713,8 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
       customError("AtomicFlowManager", "ManagerCommittedLegSourceChainMismatch(bytes32,uint256,uint256)")
     );
 
-    // 3. Preimage whose co-leg declares a source chain the Bridgehub does not know. Such a phantom
-    //    leg could never be proven committed OR absent (no MessageRoot presence), so without this
-    //    send-time gate the local burned leg would be stranded with neither finalization nor refund.
+    // 3. Preimage whose co-leg declares a source chain the Bridgehub does not know (a phantom leg
+    //    could never be proven committed OR absent).
     const unregisteredChainId = 999_999;
     const phantomLegs = [
       { hash: realHash, chainId: chainA.chainId },

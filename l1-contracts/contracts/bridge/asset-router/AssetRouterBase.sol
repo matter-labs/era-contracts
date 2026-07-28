@@ -31,22 +31,16 @@ import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol"
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Routes asset transfers for both L1 <-> ZK chain bridging and interop between ZK chains,
-/// supporting both ETH and ERC20 tokens.
+/// @notice Routes asset transfers (L1 <-> ZK chain bridging and L2 <-> L2 interop) to per-asset
+/// handlers. See {protocol-docs/bridging.md#asset-routing-burn--mint}.
 /// @dev Designed for use with a proxy for upgradability.
 abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
-    /// @dev Maps asset ID to address of corresponding asset handler.
-    /// @dev Tracks the address of Asset Handler contracts, where bridged funds are locked for each asset.
-    /// @dev P.S. this liquidity was locked directly in SharedBridge before.
-    /// @dev Current AssetHandlers: NTV for tokens, Bridgehub for chains.
+    /// @notice Maps asset ID to the asset handler where bridged funds are locked/minted for that asset.
     mapping(bytes32 assetId => address assetHandlerAddress) public assetHandlerAddress;
 
-    /// @dev Maps asset ID to the asset deployment tracker address.
-    /// @dev Tracks the address of Deployment Tracker contract on L1, which sets Asset Handlers on L2s (ZK chain).
-    /// @dev For the asset and stores respective addresses.
-    /// @dev Current AssetDeploymentTrackers: NTV for tokens, CTMDeploymentTracker for chains.
+    /// @notice Maps asset ID to the deployment tracker allowed to set the asset's handler on remote chains.
     mapping(bytes32 assetId => address assetDeploymentTracker) public assetDeploymentTracker;
 
     /**
@@ -58,11 +52,9 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
 
     function _bridgehub() internal view virtual returns (IBridgehubBase);
 
-    /// @notice Sets the asset handler address for a specified asset ID on the chain of the asset deployment tracker.
-    /// @dev The caller of this function is encoded within the `assetId`, therefore, it should be invoked by the asset deployment tracker contract.
-    /// @dev Access control restricts the caller to either the NTV or the asset deployment tracker for the specific asset.
-    /// @dev Typically, for most tokens, ADT is the native token vault. However, custom tokens may have their own specific asset deployment trackers.
-    /// @dev `setAssetHandlerAddressOnCounterpart` should be called on L1 to set asset handlers on L2 chains for a specific asset ID.
+    /// @notice Sets the asset handler address for a specified asset ID on this chain.
+    /// @dev The caller is encoded into the asset ID, so only the NTV or the asset's registered deployment
+    /// tracker may call it. See {protocol-docs/bridging.md#asset-ids-asset-handlers-deployment-trackers}.
     /// @param _assetRegistrationData The asset data which may include the asset address and any additional required data or encodings.
     /// @param _assetHandlerAddress The address of the asset handler to be set for the provided asset.
     function setAssetHandlerAddressThisChain(
@@ -88,6 +80,13 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
                             INITIATE BRIDGE Functions
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Allows the Bridgehub (L1) / InteropCenter (L2) to acquire the destination chain's `mintValue`.
+    /// @dev Records nothing: if the L2 transaction fails, the base token is refunded to the L2
+    /// `refundRecipient` rather than being claimable on L1. See {protocol-docs/bridging.md#deposit-initiation-source-side}.
+    /// @param _chainId The chain ID of the ZK chain to which to deposit.
+    /// @param _assetId The base token asset ID of the destination chain.
+    /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
+    /// @param _amount The total amount of tokens to be bridged.
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         bytes32 _assetId,
@@ -113,7 +112,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
             _data: DataEncoding.encodeBridgeBurnData(_amount, address(0), address(0))
         });
 
-        // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
         emit BridgehubDepositBaseTokenInitiated(_chainId, _originalCaller, _assetId, _amount);
     }
 
@@ -234,12 +232,9 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
             InvalidSelector(bytes4(payload[0:4]))
         );
 
-        // The chain id of the interop message sender (authenticated via the ERC-7930 `sender` and, on the
-        // receiving side, the message-inclusion proof) MUST equal the `_sourceChainId` the deposit will be
-        // finalized under. Under the honest-proof trust model these are always equal (both are the origin
-        // chain), but we enforce it explicitly so a payload can never finalize a deposit under a chain id
-        // other than the one whose message inclusion was proven — the security of asset accounting depends
-        // on this equality.
+        // The proven message sender's chain id must equal the payload's `_sourceChainId`, so a payload can
+        // never finalize a deposit under a chain id other than the one whose message inclusion was proven.
+        // Asset accounting depends on this equality; see {protocol-docs/bridging.md#finalization-destination-side}.
         uint256 payloadSourceChainId = uint256(bytes32(payload[4:36]));
         require(
             senderChainId == payloadSourceChainId,
@@ -258,17 +253,14 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         return IERC7786Recipient.receiveMessage.selector;
     }
 
-    /// @notice Finalize the withdrawal and release funds.
+    /// @notice Finalizes a deposit/withdrawal and releases funds via the asset handler.
     /// @param _sourceChainId The chain ID the deposit/withdrawal message originates from. Note that this is the
     /// source chain of the message, not necessarily the origin chain of the bridged token.
     /// @param _assetId The bridged asset ID.
-    /// @param _transferData The data used to finalize the withdrawal, it includes the data needed for the asset handler (e.g. NativeTokenVault).
-    /// @dev Important note is that chains can be potentially malicious and provide arbitrary data here, so in case
-    /// a piece of data affects other chains than the `_sourceChainId`, special care needs to be applied for validation.
-    /// @dev This is the single (new-format) finalization entry point — the legacy `finalizeWithdrawal` path and
-    /// old message format were removed. Cross-chain messages reach it only through the interop
-    /// `receiveMessage` self-call above; on L2 it is additionally callable by the aliased asset-router
-    /// counterpart for L1 -> L2 deposit finalization.
+    /// @param _transferData The data needed by the asset handler (e.g. NativeTokenVault) to finalize the transfer.
+    /// @dev The single finalization entry point; cross-chain messages reach it only through the interop
+    /// `receiveMessage` self-call above. Chains can be malicious, so data affecting chains other than
+    /// `_sourceChainId` needs special validation. See {protocol-docs/bridging.md#finalization-destination-side}.
     function finalizeDeposit(
         uint256 _sourceChainId,
         bytes32 _assetId,
@@ -287,9 +279,8 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
             IAssetHandler(assetHandler).bridgeMint{value: msg.value}(_sourceChainId, _assetId, _transferData);
         } else {
             _setAssetHandler(_assetId, _nativeTokenVault);
-            // Native token vault may not support non-zero `msg.value`, but we still provide it here to
-            // prevent the passed ETH from being stuck in the asset router and also for consistency.
-            // So the decision on whether to support non-zero `msg.value` is done at the asset handler layer.
+            // `msg.value` is forwarded (even though the NTV may not support non-zero value) so ETH cannot
+            // get stuck in the router; value support is decided at the asset handler layer.
             IAssetHandler(_nativeTokenVault).bridgeMint{value: msg.value}(_sourceChainId, _assetId, _transferData); // ToDo: Maybe it's better to receive amount and receiver here? transferData may have different encoding
         }
     }
@@ -303,8 +294,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         emit AssetHandlerRegistered(_assetId, _assetHandlerAddress);
     }
 
-    /// @dev send the burn message to the asset
-    /// @notice Forwards the burn request for specific asset to respective asset handler.
+    /// @notice Forwards the burn request for a specific asset to the respective asset handler.
     /// @param _chainId The chain ID of the ZK chain to which to deposit.
     /// @param _nextMsgValue The L2 `msg.value` from the L1 -> L2 deposit transaction.
     /// @param _assetId The deposited asset ID.
@@ -324,17 +314,12 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
     ) internal returns (bytes memory bridgeMintCalldata) {
         address assetHandler = assetHandlerAddress[_assetId];
         if (assetHandler == address(0)) {
-            // As a UX feature, whenever an asset handler is not present, we always try to register asset within native token vault.
-            // The Native Token Vault is trusted to revert in an asset does not belong to it.
-            //
-            // Note, that it may "pollute" error handling a bit: instead of getting error for asset handler not being
-            // present, the user will get whatever error the native token vault will return, however, providing
-            // more advanced error handling requires more extensive code and will be added in the future releases.
+            // UX feature: with no handler registered, try to register the token in the NTV on the fly.
+            // The NTV is trusted to revert if the asset does not belong to it (the user then sees the
+            // NTV's error rather than a "handler not present" one).
             INativeTokenVaultBase(_nativeTokenVault).tryRegisterTokenFromBurnData(_transferData, _assetId);
 
-            // We do not do any additional transformations here (like setting `assetHandler` in the mapping),
-            // because we expect that all those happened inside `tryRegisterTokenFromBurnData`
-
+            // `tryRegisterTokenFromBurnData` already updates the `assetHandler` mapping, nothing else to do.
             assetHandler = _nativeTokenVault;
         }
 
@@ -348,7 +333,8 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         });
     }
 
-    /// @dev The request data that is passed to the bridgehub.
+    /// @notice Builds the request data that is passed to the bridgehub.
+    /// @param _chainId The chain ID of the destination ZK chain.
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _assetId The deposited asset ID.
     /// @param _bridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
@@ -378,6 +364,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         return L2_ASSET_ROUTER_ADDR;
     }
 
+    /// @notice Builds the `finalizeDeposit` calldata executed on the destination chain.
     function getDepositCalldata(
         address,
         bytes32 _assetId,
