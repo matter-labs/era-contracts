@@ -129,17 +129,16 @@ The timeout proof relies on three preconditions, each enforced on chain:
 ## Known issues and accepted limitations
 
 1. **Pre-v33 counterparty chains can still brick funds.** Atomic interop requires protocol version
-
-   > = v33 on every participating chain. If pre-v33 chains are allowed into the ecosystem, it is the
-   > **user's responsibility** to pick a counterparty chain that supports atomic interop (version >=
-   > v33). The on-chain checks (`append`'s registered-source-chain check, the timeout-protocol
-   > preconditions above) may make it look like the protocol aims for funds never bricking — that is
-   > NOT the case: a leg sent towards, or declared from, a chain that never gained atomic-interop
-   > support can strand its funds.
+   v33 or newer on every participating chain. If pre-v33 chains are allowed into the ecosystem, it is
+   the **user's responsibility** to pick a counterparty chain that supports atomic interop (v33 or
+   newer). The on-chain checks (`append`'s registered-source-chain check, the timeout-protocol
+   preconditions above) may make it look like the protocol aims for funds never bricking — that is
+   NOT the case: a leg sent towards, or declared from, a chain that never gained atomic-interop
+   support can strand its funds.
 
 2. **The "default" unbundler does not work for L2->L1 bundles.** For L2->L2 interop, a sender who
-   sets no `unbundlerAddress` gets a working default: the attribute is pinned to `(sourceChainId,
-sender)`, and the sender can always unbundle by making an L2->L2 interop call through the
+   sets no `unbundlerAddress` gets a working default: the attribute is pinned to the source chain id
+   and sender, and the sender can always unbundle by making an L2->L2 interop call through the
    InteropCenter to the destination `L2InteropHandler`'s `receiveMessage` rescue path. For L2->L1
    bundles (withdrawals) that escape hatch does not exist: generic L2->L1 interop calls are not
    supported (only asset-router withdrawals are), so the default unbundler — pinned to the source L2
@@ -161,6 +160,15 @@ sender)`, and the sender can always unbundle by making an L2->L2 interop call th
    (`_executeCalls`). A bundle whose calls carry a wrong version can therefore be verified — and
    cancelled via unbundling — yet never executed. This is considered acceptable: such a bundle can
    only be produced by a malformed sender, and cancellation remains available.
+
+5. **Rotating an asset handler strands in-flight atomic burns.** Timeout recovery
+   (`L2AssetRouter.recoverAtomicCall`) resolves the handler for the burned asset through the mutable
+   `assetHandlerAddress` mapping at CLAIM time, while the burn used the handler registered at SEND
+   time. If the registration is overwritten between the two (`setAssetHandlerAddress` /
+   `setAssetHandlerAddressThisChain`), recovery of the in-flight burn is misrouted to the new
+   handler: it may revert (blocking the refund until rotated back) or silently no-op (consuming the
+   claim — the leg is marked `Reverted` regardless). Accepted for this release; both entry points
+   carry a warning, and migrations should use a new asset id instead of re-pointing an existing one.
 
 ## Contracts
 

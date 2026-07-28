@@ -379,22 +379,11 @@ contract InteropCenter is
     /// @notice Verifies that the ERC-7930 address has an empty ChainReference field.
     /// @dev Ensures that CallStarters in `sendBundle` do not include a ChainReference, as required by our
     ///      implementation. The ChainReference length is stored at byte offset 0x04 in the ERC-7930 format.
+    /// @dev Takes `bytes memory` so one implementation serves both user-supplied (calldata, implicitly
+    ///      copied — these addresses are tens of bytes) and runtime-produced (an indirect call starter's
+    ///      returned recipient) values.
     /// @param _interoperableAddress The ERC-7930 address to verify.
-    function _ensureEmptyChainReference(bytes calldata _interoperableAddress) internal pure {
-        require(
-            _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH,
-            InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
-        );
-        require(
-            uint8(_interoperableAddress[0x04]) == 0,
-            InteroperableAddressChainReferenceNotEmpty(_interoperableAddress)
-        );
-    }
-
-    /// @notice Memory variant of {_ensureEmptyChainReference}, for interoperable addresses produced at
-    /// runtime (an indirect call starter's returned recipient) rather than passed in calldata.
-    /// @param _interoperableAddress The ERC-7930 address to verify.
-    function _ensureEmptyChainReferenceMemory(bytes memory _interoperableAddress) internal pure {
+    function _ensureEmptyChainReference(bytes memory _interoperableAddress) internal pure {
         require(
             _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH,
             InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
@@ -836,7 +825,7 @@ contract InteropCenter is
             // starter must not smuggle a different chain id that would otherwise be silently ignored)
             // and the address must be non-zero (a zero recipient could never execute and has no refund
             // path for the value already collected).
-            _ensureEmptyChainReferenceMemory(actualCallStarter.to);
+            _ensureEmptyChainReference(actualCallStarter.to);
             // slither-disable-next-line unused-return
             (, address actualCallRecipient) = InteroperableAddress.parseEvmV1(actualCallStarter.to);
             require(actualCallRecipient != address(0), ZeroAddress());

@@ -313,8 +313,8 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// {IAtomicRecoverable.recoverAtomicCall}: it is the contract that authorized (and burned for) the call
     /// on this chain, while the call's target (`InteropCall.to`) lives on the destination chain and need
     /// not even exist here. The manager is agnostic to the call/encoding format and simply forwards
-    /// `(destinationChainId, data)`, counting the calls that report a recovery. Senders must return `false`
-    /// (not revert) for calls they do not recognise.
+    /// `(destinationChainId, data)`. Senders must return `false` (not revert) for calls they do not
+    /// recognise.
     ///
     /// A second reversal applies to native base-token value. A call carrying `value` had that base token
     /// collected at send time (see {InteropCenter._ensureCorrectTotalValue}) — held by the {BaseTokenHolder}

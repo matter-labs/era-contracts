@@ -222,6 +222,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     }
 
     /// @inheritdoc IL2AssetRouter
+    /// @dev WARNING: overwriting an already-set handler is dangerous in this release. Atomic-interop
+    /// timeout recovery ({recoverAtomicCall}) resolves the handler through this mutable mapping at
+    /// CLAIM time, not at burn time, so rotating the handler while burns are in flight misroutes their
+    /// recovery to the new handler (which may revert — blocking the refund — or no-op, consuming it).
+    /// Migrations should use a new asset id instead of re-pointing an existing one. See the
+    /// handler-rotation known issue in the atomic-interop README.
     function setAssetHandlerAddress(
         uint256 _sourceChainId,
         bytes32 _assetId,
@@ -231,6 +237,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     }
 
     /// @inheritdoc AssetRouterBase
+    /// @dev WARNING: overwriting an already-set handler is dangerous in this release — see
+    /// {setAssetHandlerAddress}.
     function setAssetHandlerAddressThisChain(
         bytes32 _assetRegistrationData,
         address _assetHandlerAddress
@@ -318,6 +326,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         // so no L1-destined burn can ever be recovered. Assert it: the L1-withdrawal accounting
         // (`totalWithdrawalsToL1`, consumed once during the L1->GW migration) must stay append-only.
         require(_destChainId != L1_CHAIN_ID, RecoverToL1NotSupported());
+        // IMPORTANT: every calldata format this router has EVER produced for atomic-bundle calls must
+        // stay recognized (and reversible) here forever. {AtomicFlowManager.claimRefund} flips the leg
+        // to `Reverted` regardless of the value returned below, so if an upgraded router stopped
+        // recognizing an in-flight burn's encoding, `false` would be returned, the claim would succeed
+        // as a no-op, and the burned funds would be stranded permanently. A future encoding change must
+        // therefore ADD a recognized format, never replace the old ones.
         if (_callData.length < 4 || bytes4(_callData[:4]) != AssetRouterBase.finalizeDeposit.selector) {
             return false;
         }
@@ -329,9 +343,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         (, bytes32 assetId, bytes memory mintData) = abi.decode(_callData[4:], (uint256, bytes32, bytes));
         // Only the asset handler that performed the burn (see {AssetRouterBase._burn}) can reverse it —
         // the mint data is in its own format — so recovery routes through the same `assetHandlerAddress`
-        // lookup rather than assuming the NTV. The handler is always registered by the time a genuine
-        // burn-produced call is recovered: `_burn` either found it registered or registered the NTV via
-        // `tryRegisterTokenFromBurnData`.
+        // lookup rather than assuming the NTV. The handler is registered by the burn itself (`_burn`
+        // either found it registered or registered the NTV via `tryRegisterTokenFromBurnData`); the
+        // lookup is only correct as long as the registration has not been overwritten since — see the
+        // handler-rotation known issue in the atomic-interop README and the warnings on the
+        // `setAssetHandlerAddress*` entry points.
         address assetHandler = assetHandlerAddress[assetId];
         require(assetHandler != address(0), AssetHandlerDoesNotExist(assetId));
         IL2AssetHandler(assetHandler).bridgeRecoverFailedTransfer(_destChainId, assetId, mintData);

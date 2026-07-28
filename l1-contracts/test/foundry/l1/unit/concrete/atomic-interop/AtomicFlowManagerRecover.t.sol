@@ -139,9 +139,9 @@ contract AtomicFlowManagerRecoverTest is Test {
         manager.exposedRecoverBundle(_bundle(SOURCE_BASE_TOKEN_ASSET_ID, 5 ether));
     }
 
-    function test_recoverBundle_pureValueCallCountsAsRecovered() public {
-        // A value leg whose direct sender has no per-sender recovery must still succeed: the value refund
-        // itself counts, so the bundle is not rejected as non-recoverable.
+    function test_recoverBundle_pureValueCallIsRefunded() public {
+        // A value leg whose direct sender has no per-sender recovery must still succeed: the value
+        // refund is dispatched through the router on its own.
         vm.mockCall(
             L2_ASSET_ROUTER_ADDR,
             abi.encodeWithSelector(IAssetRouterShared.bridgehubRecoverBaseToken.selector),
