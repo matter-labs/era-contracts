@@ -33,6 +33,10 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
     mapping(uint256 chainId => mapping(uint256 blockOrBatchNumber => StoredInteropRoot)) internal storedInteropRoots;
 
     /// @inheritdoc IL2InteropRootStorage
+    /// @dev Appended after `storedInteropRoots`, so the v31 layout note above is unaffected.
+    mapping(uint256 chainId => uint256 timestamp) public latestInteropRootTimestamp;
+
+    /// @inheritdoc IL2InteropRootStorage
     function interopRoots(
         uint256 chainId,
         uint256 blockOrBatchNumber
@@ -88,6 +92,13 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
         }
 
         storedInteropRoots[chainId][blockOrBatchNumber] = StoredInteropRoot({root: sides[0], timestamp: timestamp});
+
+        // Track the chain's freshest imported root creation time. Imports need not arrive in
+        // timestamp order, so keep the maximum rather than the last value — the tracked timestamp
+        // must never decrease.
+        if (timestamp > latestInteropRootTimestamp[chainId]) {
+            latestInteropRootTimestamp[chainId] = timestamp;
+        }
 
         emit InteropRootAdded(chainId, blockOrBatchNumber, timestamp, sides);
     }

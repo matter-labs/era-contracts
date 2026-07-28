@@ -2,11 +2,15 @@
 
 pragma solidity 0.8.28;
 
+import {IL2AssetHandler} from "../interfaces/IL2AssetHandler.sol";
+
 /// @title Base Native token vault contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The NTV is an Asset Handler for the L1AssetRouter to handle native tokens
-interface INativeTokenVaultBase {
+/// @dev Inherits {IL2AssetHandler} for `bridgeRecoverFailedTransfer`, the atomic-interop recovery
+/// surface shared by every recoverable asset handler.
+interface INativeTokenVaultBase is IL2AssetHandler {
     /// @notice Returns the chain ID of the origin chain for a given asset ID
     function originChainId(bytes32 assetId) external view returns (uint256);
 
@@ -46,13 +50,4 @@ interface INativeTokenVaultBase {
         address receiver,
         uint256 amount
     );
-
-    /// @notice Returns a failed/expired atomic-interop transfer's funds to the depositor: unlock for an
-    /// origin-native asset, re-mint for a bridged one — reversing the `bridgeBurn` performed at commit.
-    /// @dev Callable only by the asset router, which gates it on a proven IMT non-inclusion (timeout).
-    /// @param _chainId The chain the asset was being bridged to at burn time (so the chain-balance
-    /// accounting reverses correctly).
-    /// @param _assetId The asset being recovered.
-    /// @param _data Bridge-mint-formatted data whose receiver is the original depositor.
-    function bridgeRecoverFailedTransfer(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable;
 }

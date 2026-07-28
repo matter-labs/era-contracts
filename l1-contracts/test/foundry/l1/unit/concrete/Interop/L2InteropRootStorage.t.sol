@@ -70,6 +70,39 @@ contract L2InteropRootStorageTest is Test {
         rootStorage.addSingleInteropRoot(_root(TIMESTAMP + 1, keccak256("other")));
     }
 
+    /// @notice The tracked latest timestamp is the MAXIMUM over all imports for the chain — imports
+    /// need not arrive in timestamp order, and the value must never decrease (the atomic-interop send
+    /// path relies on its monotonicity to keep expired flows closed for good).
+    function test_latestInteropRootTimestamp_tracksMaximumAcrossImports() public {
+        assertEq(rootStorage.latestInteropRootTimestamp(CHAIN_ID), 0, "no import yet");
+
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        rootStorage.addSingleInteropRoot(_root(TIMESTAMP, keccak256("root")));
+        assertEq(rootStorage.latestInteropRootTimestamp(CHAIN_ID), TIMESTAMP);
+
+        // A fresher root bumps the tracked value.
+        InteropRoot memory fresher = _root(TIMESTAMP + 100, keccak256("fresher"));
+        fresher.blockOrBatchNumber = BLOCK_NUMBER + 1;
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        rootStorage.addSingleInteropRoot(fresher);
+        assertEq(rootStorage.latestInteropRootTimestamp(CHAIN_ID), TIMESTAMP + 100);
+
+        // An out-of-order (older) root must NOT lower it.
+        InteropRoot memory older = _root(TIMESTAMP + 50, keccak256("older"));
+        older.blockOrBatchNumber = BLOCK_NUMBER + 2;
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        rootStorage.addSingleInteropRoot(older);
+        assertEq(rootStorage.latestInteropRootTimestamp(CHAIN_ID), TIMESTAMP + 100, "maximum must be kept");
+    }
+
+    /// @notice Tracking is per chain id: an import for one chain leaves other chains' values untouched.
+    function test_latestInteropRootTimestamp_isPerChain() public {
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        rootStorage.addSingleInteropRoot(_root(TIMESTAMP, keccak256("root")));
+
+        assertEq(rootStorage.latestInteropRootTimestamp(CHAIN_ID + 1), 0);
+    }
+
     function test_RevertWhen_sidesLengthNotOne() public {
         InteropRoot memory interopRoot = _root(TIMESTAMP, keccak256("root"));
         interopRoot.sides = new bytes32[](2);

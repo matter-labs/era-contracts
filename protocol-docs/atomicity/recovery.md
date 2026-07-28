@@ -31,16 +31,16 @@ depositor. There are two disjoint mechanisms, chosen per call by its local sende
 
 - **Router-produced calls (`from == L2_ASSET_ROUTER_ADDR`).** These are the burns created by
   `initiateIndirectCall`. The manager asks the sender to reverse itself via
-  `IAtomicRecoverable.recoverAtomicCall(destChainId, data)`, which returns a bool: `true` counts as a
-  recovery, `false` (an unrecognized call) is skipped without reverting. The asset-router side of this
-  hook — selector-pinned to `finalizeDeposit`, refunding the mint data's `originalCaller` through the
-  NTV's failed-transfer path — is documented in {protocol-docs/bridging.md#atomic-recovery-hook}.
+  `IAtomicRecoverable.recoverAtomicCall(destChainId, data)`, which returns a bool: `true` means the
+  burn was reversed, `false` (an unrecognized call) is skipped without reverting. The asset-router side
+  of this hook — selector-pinned to `finalizeDeposit`, refunding the mint data's `originalCaller`
+  through the failed-transfer path of the asset handler registered for the asset — is documented in
+  {protocol-docs/bridging.md#atomic-recovery-hook}.
   Indirect calls force `interopCallValue == 0`, so router-produced calls never also carry native value.
 - **Native base-token value on direct calls (`from != L2_ASSET_ROUTER_ADDR` and `value != 0`).** A
   direct call moves no asset-router funds, but it may carry base-token `value`. That value is reversed
   through `IAssetRouterShared.bridgehubRecoverBaseToken(destChainId, destBaseTokenAssetId, from, value)`,
-  which reuses the same NTV failed-transfer recovery to re-credit the call's `from`. Every such leg
-  counts as a recovery.
+  which reuses the same NTV failed-transfer recovery to re-credit the call's `from`.
 
 The manager is agnostic to call/encoding formats — it forwards `(destChainId, data)` and lets the
 sender own its reversal; the L2 asset router is the only `IAtomicRecoverable` sender today, and the
@@ -60,14 +60,15 @@ Returning `false` is therefore the _only_ way a sender can decline a call withou
 refund down with it. "Best-effort" means exactly that — unrecognized calls are skipped — and nothing
 more: it does **not** isolate a reverting recovery from the rest of the bundle.
 
-### Nothing recoverable → revert
+### Nothing recoverable → no-op claim
 
-If the walk recovers **nothing** (`recovered == 0`), `claimRefund` reverts with
-`ManagerNoRecoverableCalls`. A bundle with no fund-moving leg has nothing to return, so a "refund" would
-be a no-op; rejecting it keeps `Reverted` meaning "funds were actually returned."
+A bundle where no call is recoverable has no source funds to return: the claim then simply flips the
+leg to `Reverted` without moving anything. The state transition (releasing the leg from the flow) is
+meaningful on its own and is deliberately not blocked, so `Reverted` means "the refund was claimed",
+not necessarily "funds were returned".
 
-Putting the two conditions together: a claim succeeds iff **at least one** recovery reports success
-**and no** attempted recovery reverts.
+Putting it together: a claim succeeds iff **no** attempted recovery reverts — including when nothing
+was recoverable at all.
 
 ### L1 destinations are asserted out
 
@@ -86,10 +87,10 @@ Recovery is best-effort, and the protocol is explicit about what it does **not**
 
 - **Direct calls that moved no funds are skipped.** Their `from` (possibly an EOA) need not implement
   `IAtomicRecoverable`; there is nothing to reverse.
-- **A claim needs one success and zero reverts.** At least one recovery must report success, and no
-  attempted recovery may revert — a single reverting call rolls the whole claim back (see
-  [above](#the-walk-is-all-or-nothing-not-per-call-isolated)). Not every call has to recover, but every
-  call that is _attempted_ has to not throw.
+- **A claim needs zero reverts.** No attempted recovery may revert — a single reverting call rolls the
+  whole claim back (see [above](#the-walk-is-all-or-nothing-not-per-call-isolated)). Not every call has
+  to recover (a claim that recovers nothing still consumes the leg), but every call that is _attempted_
+  has to not throw.
 - **Full refundability of an arbitrary bundle is not guaranteed**, and neither is eventual
   recoverability: a bundle containing a call whose recovery reverts deterministically (malformed
   recognized calldata, or a downstream NTV failure) can leave the leg permanently stuck at `Revertable`,

@@ -37,13 +37,13 @@ release. The proof-level soundness/completeness arguments live in
 
 ## Non-guarantees
 
-- **Refunds are best-effort, and the claim is all-or-nothing.** `claimRefund` succeeds iff at least one
-  recovery reports success **and** no attempted recovery reverts — the recovery calls have no failure
-  containment, so one revert rolls the whole claim back. "Best-effort" only means a sender may _decline_
-  a call it does not recognize (by returning `false`); it does not isolate failures between calls. Full
-  refundability of an arbitrary bundle is not guaranteed, and a deterministically-reverting recovery can
-  leave a leg permanently stuck at `Revertable`. Making a fund-moving leg recoverable, and its recovery
-  robust, is the flow author's responsibility. See
+- **Refunds are best-effort, and the claim is all-or-nothing.** `claimRefund` succeeds iff no attempted
+  recovery reverts — the recovery calls have no failure containment, so one revert rolls the whole claim
+  back, while a claim that recovers nothing still consumes the leg. "Best-effort" only means a sender may
+  _decline_ a call it does not recognize (by returning `false`); it does not isolate failures between
+  calls. Full refundability of an arbitrary bundle is not guaranteed, and a deterministically-reverting
+  recovery can leave a leg permanently stuck at `Revertable`. Making a fund-moving leg recoverable, and
+  its recovery robust, is the flow author's responsibility. See
   {protocol-docs/atomicity/recovery.md#non-guarantees}.
 - **Indirect calls may not carry destination-side value.** `interopCallValue != 0` on an indirect call
   is rejected at send (`IndirectCallCannotCarryValue`): on the recovery path native value is returned to
@@ -98,6 +98,61 @@ The timeout proof relies on three preconditions, each enforced on chain:
    `L2InteropRootStorage.interopRoots` and double-checked at batch execution — which anchors the "root
    from after the deadline" requirement. See the two clocks in
    {protocol-docs/atomicity/proofs.md#two-authenticated-clocks}.
+
+## Known issues (to be fixed in this release)
+
+1. **Refund consumption is per bundle, not per call.** `claimRefund` flips the whole leg to `Reverted`
+   up front and then dispatches every call's recovery in one shot, ignoring the per-call
+   `recoverAtomicCall` result. If any single call's recovery silently no-ops — e.g. a future router
+   revision no longer recognizes an in-flight call's calldata encoding and returns `false` — that
+   call's funds are permanently stranded while the rest of the bundle recovers (this is why the
+   `IMPORTANT` note in `L2AssetRouter.recoverAtomicCall` requires every historical calldata format to
+   stay recognized forever). The proper fix is to track the reverted status per call rather than per
+   bundle, so a not-yet-recovered call stays claimable on its own.
+
+## Known issues and accepted limitations
+
+1. **Pre-v33 counterparty chains can still brick funds.** Atomic interop requires protocol version
+   v33 or newer on every participating chain. If pre-v33 chains are allowed into the ecosystem, it is
+   the **user's responsibility** to pick a counterparty chain that supports atomic interop (v33 or
+   newer). The on-chain checks (`append`'s registered-source-chain check, the timeout-protocol
+   preconditions above) may make it look like the protocol aims for funds never bricking — that is
+   NOT the case: a leg sent towards, or declared from, a chain that never gained atomic-interop
+   support can strand its funds.
+
+2. **The "default" unbundler does not work for L2->L1 bundles.** For L2->L2 interop, a sender who
+   sets no `unbundlerAddress` gets a working default: the attribute is pinned to the source chain id
+   and sender, and the sender can always unbundle by making an L2->L2 interop call through the
+   InteropCenter to the destination `L2InteropHandler`'s `receiveMessage` rescue path. For L2->L1
+   bundles (withdrawals) that escape hatch does not exist: generic L2->L1 interop calls are not
+   supported (only asset-router withdrawals are), so the default unbundler — pinned to the source L2
+   chain id — can neither call `L1InteropHandler.unbundleBundle` directly (wrong chain id) nor reach
+   it via `receiveMessage`. Unbundling on L1 is formally supported (an explicit `unbundlerAddress`
+   with the L1 chain id, or the chain-wildcard form, works), but the default is broken.
+   **Recommendation:** forbid unbundling on L1 entirely until normal L2->L1 interop calls are
+   supported.
+
+3. **A refund receiver that rejects the base token blocks its own claim.** On the timeout path, a
+   direct value leg's refund pushes native base-token value to the call's `from`. A contract that
+   (permanently or temporarily) rejects native-token transfers makes `claimRefund` revert until it
+   can accept the transfer; the leg stays `Revertable` the whole time. Hard to fix without a
+   pull-based escrow, but a potential footgun for contract senders.
+
+4. **Bundle version is checked at verification, call versions only at execution.** `verifyBundle` /
+   the atomic finality gate validate `InteropBundle.version`, but the per-call
+   `InteropCall.version` fields are validated only when a call is actually executed
+   (`_executeCalls`). A bundle whose calls carry a wrong version can therefore be verified — and
+   cancelled via unbundling — yet never executed. This is considered acceptable: such a bundle can
+   only be produced by a malformed sender, and cancellation remains available.
+
+5. **Rotating an asset handler strands in-flight atomic burns.** Timeout recovery
+   (`L2AssetRouter.recoverAtomicCall`) resolves the handler for the burned asset through the mutable
+   `assetHandlerAddress` mapping at CLAIM time, while the burn used the handler registered at SEND
+   time. If the registration is overwritten between the two (`setAssetHandlerAddress` /
+   `setAssetHandlerAddressThisChain`), recovery of the in-flight burn is misrouted to the new
+   handler: it may revert (blocking the refund until rotated back) or silently no-op (consuming the
+   claim — the leg is marked `Reverted` regardless). Accepted for this release; both entry points
+   carry a warning, and migrations should use a new asset id instead of re-pointing an existing one.
 
 ## Trust assumptions
 
