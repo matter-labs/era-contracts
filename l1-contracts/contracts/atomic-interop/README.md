@@ -126,6 +126,17 @@ The timeout proof relies on three preconditions, each enforced on chain:
    `L2InteropRootStorage.interopRoots` and double checked at batch execution — which anchors the
    "root from after the deadline" requirement.
 
+## Known issues (to be fixed in this release)
+
+1. **Refund consumption is per bundle, not per call.** `claimRefund` flips the whole leg to
+   `Reverted` up front and then dispatches every call's recovery in one shot, ignoring the per-call
+   `recoverAtomicCall` result. If any single call's recovery silently no-ops — e.g. a future router
+   revision no longer recognizes an in-flight call's calldata encoding and returns `false` — that
+   call's funds are permanently stranded while the rest of the bundle recovers (this is why the
+   `IMPORTANT` note in `L2AssetRouter.recoverAtomicCall` requires every historical calldata format to
+   stay recognized forever). The proper fix is to track the reverted status per call rather than per
+   bundle, so a not-yet-recovered call stays claimable on its own.
+
 ## Known issues and accepted limitations
 
 1. **Pre-v33 counterparty chains can still brick funds.** Atomic interop requires protocol version
