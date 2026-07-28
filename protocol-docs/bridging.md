@@ -256,7 +256,7 @@ interop (IMT) flow — see {protocol-docs/atomicity/flow.md} for the full flow. 
   if the downstream `bridgeRecoverFailedTransfer` fails. Such a revert takes the entire `claimRefund`
   with it; see {protocol-docs/atomicity/recovery.md#the-walk-is-all-or-nothing-not-per-call-isolated}.
 - For a recognized burn it calls `IL2AssetHandler.bridgeRecoverFailedTransfer(destChainId, assetId,
-  mintData)` on the asset handler registered for the asset (`assetHandlerAddress[assetId]` — the same
+mintData)` on the asset handler registered for the asset (`assetHandlerAddress[assetId]` — the same
   lookup the burn used; the NTV for standard tokens, a custom handler otherwise), forwarding the
   bundle's mint data verbatim; the handler refunds the data's `originalCaller` (the source depositor)
   regardless of the intended `remoteReceiver`, reversing the `bridgeBurn` performed at send time by
