@@ -277,6 +277,19 @@
   },
   {
     "type": "function",
+    "name": "setPubdataContent",
+    "inputs": [
+      {
+        "name": "_pubdataContent",
+        "type": "uint8",
+        "internalType": "enum PubdataContent"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setPubdataPricingMode",
     "inputs": [
       {
@@ -758,6 +771,25 @@
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "NewPubdataContent",
+    "inputs": [
+      {
+        "name": "oldPubdataContent",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "enum PubdataContent"
+      },
+      {
+        "name": "newPubdataContent",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "enum PubdataContent"
       }
     ],
     "anonymous": false

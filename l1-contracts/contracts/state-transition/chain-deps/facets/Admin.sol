@@ -7,6 +7,7 @@ import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {
     L2DACommitmentScheme,
+    PubdataContent,
     MAX_GAS_PER_TRANSACTION,
     MAX_PRICE_CHANGE_DENOMINATOR,
     MAX_PRICE_CHANGE_NUMERATOR,
@@ -33,6 +34,7 @@ import {
 import {
     AlreadyPermanentRollup,
     BaseTokenPreV31TotalSupplyAlreadySet,
+    PubdataContentLockedForPermanentRollup,
     DenominatorIsZero,
     DiamondAlreadyFrozen,
     DiamondNotFrozen,
@@ -41,6 +43,7 @@ import {
     InvalidDAForPermanentRollup,
     InvalidL2DACommitmentScheme,
     InvalidPubdataPricingMode,
+    NonFullPubdataContentForPermanentRollup,
     PriorityModeActivationTooEarly,
     PriorityModeIsNotAllowed,
     PriorityModeRequiresPermanentRollup,
@@ -380,13 +383,10 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert InvalidL2DACommitmentScheme(_l2DACommitmentScheme);
         }
 
-        // `BLOBS_ZKSYNC_OS` and `L2_TO_L1_ONLY` are only supported on ZKsync OS, where the STF interprets the
-        // scheme. They have no commitment implementation on the Era VM (`L2DAValidator.makeDACommitment`
-        // reverts for them), so reject them here to avoid configuring an unusable DA pair.
-        if (
-            (_l2DACommitmentScheme == L2DACommitmentScheme.BLOBS_ZKSYNC_OS ||
-                _l2DACommitmentScheme == L2DACommitmentScheme.L2_TO_L1_ONLY) && !s.zksyncOS
-        ) {
+        // `BLOBS_ZKSYNC_OS` is only supported on ZKsync OS, where the STF interprets the scheme. It has
+        // no commitment implementation on the Era VM (`L2DAValidator.makeDACommitment` reverts for it),
+        // so reject it here to avoid configuring an unusable DA pair.
+        if (_l2DACommitmentScheme == L2DACommitmentScheme.BLOBS_ZKSYNC_OS && !s.zksyncOS) {
             revert NotZKsyncOS();
         }
 
@@ -398,9 +398,26 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
+    function setPubdataContent(PubdataContent _pubdataContent) external onlyAdmin onlyZKsyncOS {
+        // A permanent rollup is locked to `FULL_PUBDATA` — its pubdata content can never be changed (in particular it
+        // can never be relaxed to `LOGS_ONLY`), mirroring how the permanent-rollup flag itself is one-way.
+        if (s.isPermanentRollup) {
+            revert PubdataContentLockedForPermanentRollup();
+        }
+        _enforceNoUnverifiedBatchesForChainConfigUpdate();
+        emit NewPubdataContent(s.pubdataContent, _pubdataContent);
+        s.pubdataContent = _pubdataContent;
+    }
+
+    /// @inheritdoc IAdmin
     function makePermanentRollup() external onlyAdmin onlySettlementLayer {
         if (s.isPermanentRollup) {
             revert AlreadyPermanentRollup();
+        }
+
+        // A permanent rollup must publish the full pubdata, so the chain must already be in `FULL_PUBDATA` mode.
+        if (s.pubdataContent != PubdataContent.FULL_PUBDATA) {
+            revert NonFullPubdataContentForPermanentRollup();
         }
 
         if (!ROLLUP_DA_MANAGER.isPairAllowed(s.l1DAValidator, s.l2DACommitmentScheme)) {
