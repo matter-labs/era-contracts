@@ -7,6 +7,7 @@ import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
@@ -21,7 +22,6 @@ import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {CoreDeployedAddresses} from "../utils/Types.sol";
@@ -138,6 +138,8 @@ contract DeployL1CoreUtils is DeployUtils {
                     config.eraChainId,
                     config.eraDiamondProxyAddress
                 );
+        } else if (compareStrings(contractName, "L1InteropHandler")) {
+            return abi.encode(coreAddresses.bridgehub.proxies.messageRoot, coreAddresses.bridges.proxies.l1AssetRouter);
         } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
             return abi.encode(config.ownerAddress, coreAddresses.bridgehub.proxies.bridgehub);
         } else if (compareStrings(contractName, "L1AssetRouter")) {
@@ -173,13 +175,6 @@ contract DeployL1CoreUtils is DeployUtils {
                 );
         } else if (compareStrings(contractName, "ChainAdminOwnable")) {
             return abi.encode(config.ownerAddress, address(0));
-        } else if (compareStrings(contractName, "L1AssetTracker")) {
-            return
-                abi.encode(
-                    coreAddresses.bridgehub.proxies.bridgehub,
-                    coreAddresses.bridges.proxies.l1NativeTokenVault,
-                    coreAddresses.bridgehub.proxies.messageRoot
-                );
         } else if (compareStrings(contractName, "ChainAdmin")) {
             address[] memory restrictions = new address[](1);
             restrictions[0] = coreAddresses.shared.accessControlRestrictionAddress;
@@ -221,14 +216,14 @@ contract DeployL1CoreUtils is DeployUtils {
                 return abi.encodeCall(L1MessageRoot.initialize, ());
             } else if (compareStrings(contractName, "ChainRegistrationSender")) {
                 return abi.encodeCall(ChainRegistrationSender.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "L1AssetTracker")) {
-                return abi.encodeCall(L1AssetTracker.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
                 return abi.encodeCall(L1ChainAssetHandler.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
                 return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1Nullifier")) {
                 return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1, 1, 1, 0));
+            } else if (compareStrings(contractName, "L1InteropHandler")) {
+                return abi.encodeCall(L1InteropHandler.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1AssetRouter")) {
                 return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1ERC20Bridge")) {

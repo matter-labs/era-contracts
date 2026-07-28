@@ -15,7 +15,7 @@ import {
     SystemLogKey,
     TOTAL_BLOBS_IN_COMMITMENT
 } from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {CommitBatchInfo, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 
 import {BLOB_DATA_OFFSET} from "../../../da-contracts-imports/CalldataDA.sol";
@@ -569,7 +569,8 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        assertEq(entries.length, 1 + EVENT_INDEX);
+        // A ReportCommittedBatchProtocolVersion event follows BlockCommit (see test_emitsProtocolVersionEvent).
+        assertEq(entries.length, 2 + EVENT_INDEX);
         assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
         assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
         assertEq(entries[EVENT_INDEX].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
@@ -577,6 +578,83 @@ contract CommittingTest is ExecutorTest {
 
         uint256 totalBatchesCommitted = getters.getTotalBatchesCommitted();
         assertEq(totalBatchesCommitted, 1);
+    }
+
+    /// @notice A committed Era batch emits ReportCommittedBatchProtocolVersion carrying the chain's protocol
+    /// version (0 in the harness) and a zero upgrade transaction hash when there is no pending protocol upgrade.
+    function test_emitsProtocolVersionEvent() public {
+        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
+        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+        );
+
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
+        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
+
+        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
+        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            genesisStoredBatchInfo,
+            correctCommitBatchInfoArray
+        );
+
+        vm.prank(validator);
+        vm.blobhashes(defaultBlobVersionedHashes);
+        vm.expectEmit(true, true, true, true, address(committer));
+        emit ICommitter.ReportCommittedBatchProtocolVersion(1, 0, bytes32(0));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    /// @notice For the first Era batch committed after a protocol upgrade, the event reports the system upgrade
+    /// transaction hash (which the commit verifies against the L2 system logs), and the batch is recorded as the
+    /// upgrade batch. This exercises the non-zero upgrade-tx-hash path, which Era explicitly supports.
+    function test_emitsProtocolVersionEventForUpgradeBatch() public {
+        bytes32 upgradeTxHash = Utils.randomBytes32("upgradeTx");
+        utilsFacet.util_setL2SystemContractsUpgradeTxHash(upgradeTxHash);
+
+        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
+        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+        );
+        // The first batch after an upgrade must additionally carry the expected system-contract upgrade tx hash log.
+        bytes[] memory logsWithUpgrade = new bytes[](correctL2Logs.length + 1);
+        for (uint256 i = 0; i < correctL2Logs.length; ++i) {
+            logsWithUpgrade[i] = correctL2Logs[i];
+        }
+        logsWithUpgrade[correctL2Logs.length] = Utils.constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY),
+            upgradeTxHash
+        );
+
+        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(logsWithUpgrade);
+        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
+
+        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
+        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            genesisStoredBatchInfo,
+            correctCommitBatchInfoArray
+        );
+
+        vm.prank(validator);
+        vm.blobhashes(defaultBlobVersionedHashes);
+        vm.expectEmit(true, true, true, true, address(committer));
+        emit ICommitter.ReportCommittedBatchProtocolVersion(1, 0, upgradeTxHash);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+
+        assertEq(utilsFacet.util_getL2SystemContractsUpgradeBatchNumber(), 1, "upgrade batch number recorded");
     }
 
     function test_SuccessfullyCommitBatchWithOneBlob() public {
@@ -609,7 +687,8 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        assertEq(entries.length, 1 + EVENT_INDEX);
+        // A ReportCommittedBatchProtocolVersion event follows BlockCommit (see test_emitsProtocolVersionEvent).
+        assertEq(entries.length, 2 + EVENT_INDEX);
         assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
         assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
 
@@ -678,7 +757,8 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        assertEq(entries.length, 1 + EVENT_INDEX);
+        // A ReportCommittedBatchProtocolVersion event follows BlockCommit (see test_emitsProtocolVersionEvent).
+        assertEq(entries.length, 2 + EVENT_INDEX);
         assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
         assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
 
@@ -1092,21 +1172,34 @@ contract CommittingTest is ExecutorTest {
 
     function test_recalculateinteropRootRollingHash() public {
         InteropRoot[] memory interopRoots = new InteropRoot[](2);
-        InteropRoot memory interopRoot1 = InteropRoot({chainId: 260, blockOrBatchNumber: 1, sides: new bytes32[](1)});
+        InteropRoot memory interopRoot1 = InteropRoot({
+            chainId: 260,
+            blockOrBatchNumber: 1,
+            timestamp: 1700000001,
+            sides: new bytes32[](1)
+        });
         interopRoot1.sides[0] = 0xfb2eb93318710c98f501f6ff6b11c373baccd0ffcaefe15f97debe09cb7939e1;
         interopRoots[0] = interopRoot1;
-        InteropRoot memory interopRoot2 = InteropRoot({chainId: 506, blockOrBatchNumber: 17, sides: new bytes32[](1)});
+        InteropRoot memory interopRoot2 = InteropRoot({
+            chainId: 506,
+            blockOrBatchNumber: 17,
+            timestamp: 1700000017,
+            sides: new bytes32[](1)
+        });
         interopRoot2.sides[0] = 0xf83b13aa476ef3253e6acff5779276da7924fabaec9a8c39274cf021efe1255a;
         interopRoots[1] = interopRoot2;
         bytes32 rollingHash = 0x0000000000000000000000000000000000000000000000000000000000000000;
         for (uint256 i = 0; i < interopRoots.length; i++) {
             InteropRoot memory interopRoot = interopRoots[i];
+            // The `uint256(128)` is the ABI head offset of `sides` inside `abi.encode(InteropRoot)`
+            // (4 fields: chainId, blockOrBatchNumber, timestamp, sides pointer).
             console.logBytes(
                 abi.encodePacked(
                     rollingHash,
                     interopRoot.chainId,
                     interopRoot.blockOrBatchNumber,
-                    uint256(96),
+                    interopRoot.timestamp,
+                    uint256(128),
                     interopRoot.sides.length,
                     interopRoot.sides
                 )
@@ -1116,7 +1209,8 @@ contract CommittingTest is ExecutorTest {
                     rollingHash,
                     interopRoot.chainId,
                     interopRoot.blockOrBatchNumber,
-                    uint256(96),
+                    interopRoot.timestamp,
+                    uint256(128),
                     interopRoot.sides.length,
                     interopRoot.sides
                 )

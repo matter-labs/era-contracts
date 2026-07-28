@@ -267,6 +267,11 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 _lastCommittedBatchData.batchHash,
                 _lastCommittedBatchData.commitment
             );
+            emit ReportCommittedBatchProtocolVersion(
+                _lastCommittedBatchData.batchNumber,
+                s.protocolVersion,
+                _systemContractUpgradeTxHash
+            );
 
             if (i == 0) {
                 // The upgrade transaction must only be included in the first batch.
@@ -309,6 +314,11 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 _lastCommittedBatchData.batchNumber,
                 _lastCommittedBatchData.batchHash,
                 _lastCommittedBatchData.commitment
+            );
+            emit ReportCommittedBatchProtocolVersion(
+                _lastCommittedBatchData.batchNumber,
+                s.protocolVersion,
+                upgradeTxHash
             );
 
             // reset upgradeTxHash after the first batch
@@ -478,12 +488,13 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             revert SettlementLayerChainIdMismatch();
         }
 
-        // The batch proof public input can be calculated as keccak256(state_commitment_before & state_commitment_after & batch_output_hash)
+        // The batch proof public input can be calculated as
+        // keccak256(state_commitment_before & state_commitment_after & chain_config & batch_output_hash),
+        // where chain_config is the chain id and the runtime chain config words (see `_getBatchProofPublicInputZKsyncOS`).
         // batch output hash commits to information about batch that needs to be opened on l1.
         // So below we are calculating batch output hash to later include it in the batch public input and thereby verify batch values correctness.
         bytes32 batchOutputHash = keccak256(
             abi.encodePacked(
-                _newBatch.chainId,
                 _newBatch.firstBlockTimestamp,
                 _newBatch.lastBlockTimestamp,
                 uint256(_newBatch.daCommitmentScheme),

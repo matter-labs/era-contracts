@@ -14,11 +14,11 @@ import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
-import {FinalizeL1DepositParams, IL1Nullifier, TRANSIENT_SETTLEMENT_LAYER_SLOT} from "./interfaces/IL1Nullifier.sol";
+import {FinalizeL1DepositParams, IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
 
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IMailboxLegacy} from "../state-transition/chain-interfaces/IMailboxLegacy.sol";
-import {ConfirmTransferResultData, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
+import {ConfirmTransferResultData, L2Message, TxStatus} from "../common/Messaging.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
@@ -41,13 +41,12 @@ import {
     ZeroAddress
 } from "../common/L1ContractErrors.sol";
 import {EthAlreadyMigratedToL1NTV, NativeTokenVaultAlreadySet, WrongL2Sender} from "./L1BridgeContractErrors.sol";
-import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
-import {TransientPrimitivesLib} from "../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Bridges assets between L1 and ZK chain, supporting both ETH and ERC20 tokens.
+/// @notice Tracks initiated L1 -> L2 deposits and verifies/clears them when a failed deposit is claimed
+/// back on L1. See {protocol-docs/bridging.md#l1nullifier-and-failed-deposit-recovery}.
 /// @dev Designed for use with a proxy for upgradability.
 contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
@@ -93,10 +92,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => address l2Bridge) public __DEPRECATED_l2BridgeAddress;
 
-    /// @dev A mapping chainId => L2 deposit transaction hash => dataHash
-    // keccak256(abi.encode(account, tokenAddress, amount)) for legacy transfers
-    // keccak256(abi.encode(_originalCaller, assetId, transferData)) for new transfers
-    /// @dev Tracks deposit transactions to L2 to enable users to claim their funds if a deposit fails.
+    /// @dev Maps chainId => L2 deposit tx hash => the deposit's txDataHash
+    /// (`keccak256(0x01 || abi.encode(originalCaller, assetId, transferData))`), enabling users to claim
+    /// their funds back if a deposit fails.
     mapping(uint256 chainId => mapping(bytes32 l2DepositTxHash => bytes32 depositDataHash))
         public
         override depositHappened;
@@ -127,7 +125,11 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Address of native token vault.
     IL1NativeTokenVault public l1NativeTokenVault;
 
-    /// @notice Checks that the message sender is the asset router..
+    /// @dev Address of the L1 interop handler that finalizes L2 -> L1 withdrawals (via `executeBundle`).
+    /// Exposed on the nullifier so deploy scripts and other bridge contracts can discover the handler.
+    address public l1InteropHandler;
+
+    /// @notice Checks that the message sender is the asset router.
     modifier onlyAssetRouter() {
         require(msg.sender == address(l1AssetRouter), Unauthorized(msg.sender));
         _;
@@ -251,11 +253,16 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         l1AssetRouter = IL1AssetRouter(_l1AssetRouter);
     }
 
-    /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
-    /// This function is utilized by `requestL2TransactionTwoBridges` to validate the execution of a transaction.
-    /// @param _chainId The chain ID of the ZK chain to which confirm the deposit.
-    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
-    /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit.
+    /// @notice Sets the L1 interop handler contract address.
+    /// @dev Should be called only once by the owner.
+    /// @param _l1InteropHandler The address of the interop handler.
+    function setL1InteropHandler(address _l1InteropHandler) external onlyOwner {
+        require(l1InteropHandler == address(0), AddressAlreadySet(l1InteropHandler));
+        require(_l1InteropHandler != address(0), ZeroAddress());
+        l1InteropHandler = _l1InteropHandler;
+    }
+
+    /// @inheritdoc IL1Nullifier
     function bridgehubConfirmL2TransactionForwarded(
         uint256 _chainId,
         bytes32 _txDataHash,
@@ -288,6 +295,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         });
     }
 
+    /// @inheritdoc IL1Nullifier
     function bridgeConfirmTransferResult(
         ConfirmTransferResultData memory _confirmTransferResultData
     ) public nonReentrant {
@@ -357,23 +365,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _status: _confirmTransferResultData._txStatus
             });
             require(proofValid, InvalidProof());
-            L2Log memory l2Log = MessageHashing.getL2LogFromL1ToL2Transaction(
-                _confirmTransferResultData._l2TxNumberInBatch,
-                _confirmTransferResultData._l2TxHash,
-                _confirmTransferResultData._txStatus
-            );
-
-            bytes32 leaf = MessageHashing.getLeafHashFromLog(l2Log);
-            ProofData memory proofData = MESSAGE_ROOT.getProofData({
-                _chainId: _confirmTransferResultData._chainId,
-                _batchNumber: _confirmTransferResultData._l2BatchNumber,
-                _leafProofMask: _confirmTransferResultData._l2MessageIndex,
-                _leaf: leaf,
-                _proof: _confirmTransferResultData._merkleProof
-            });
-            TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT, proofData.settlementLayerChainId);
-            TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT + 1, _confirmTransferResultData._l2BatchNumber);
-            emit TransientSettlementLayerSet(proofData.settlementLayerChainId);
         }
 
         bool notCheckedInLegacyBridgeOrWeCanCheckDeposit;
@@ -558,26 +549,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         });
         // withdrawal wrong proof
         require(success, InvalidProof());
-
-        bytes32 leaf = MessageHashing.getLeafHashFromMessage(l2ToL1Message);
-        ProofData memory proofData = MESSAGE_ROOT.getProofData({
-            _chainId: _finalizeWithdrawalParams.chainId,
-            _batchNumber: _finalizeWithdrawalParams.l2BatchNumber,
-            _leafProofMask: _finalizeWithdrawalParams.l2MessageIndex,
-            _leaf: leaf,
-            _proof: _finalizeWithdrawalParams.merkleProof
-        });
-        TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT, proofData.settlementLayerChainId);
-        TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT + 1, _finalizeWithdrawalParams.l2BatchNumber);
-        emit TransientSettlementLayerSet(proofData.settlementLayerChainId);
-    }
-
-    /// @inheritdoc IL1Nullifier
-    function getTransientSettlementLayer() external view returns (uint256, uint256) {
-        return (
-            TransientPrimitivesLib.getUint256(TRANSIENT_SETTLEMENT_LAYER_SLOT),
-            TransientPrimitivesLib.getUint256(TRANSIENT_SETTLEMENT_LAYER_SLOT + 1)
-        );
     }
 
     /// @notice Parses the withdrawal message and returns withdrawal details.

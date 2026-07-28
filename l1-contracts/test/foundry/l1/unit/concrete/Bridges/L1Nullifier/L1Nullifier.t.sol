@@ -464,17 +464,6 @@ contract L1NullifierTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        TRANSIENT SETTLEMENT LAYER TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_GetTransientSettlementLayer() public view {
-        (uint256 settlementLayer, uint256 batchNumber) = l1Nullifier.getTransientSettlementLayer();
-        // Should return 0 initially since no transaction has set it
-        assertEq(settlementLayer, 0);
-        assertEq(batchNumber, 0);
-    }
-
-    /*//////////////////////////////////////////////////////////////
                             FUZZ TESTS
     //////////////////////////////////////////////////////////////*/
 

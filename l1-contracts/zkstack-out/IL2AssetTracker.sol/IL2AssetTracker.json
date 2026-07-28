@@ -27,53 +27,27 @@
   },
   {
     "type": "function",
-    "name": "confirmMigrationOnL2",
+    "name": "chainBalance",
     "inputs": [
       {
-        "name": "_migrationConfirmationData",
-        "type": "tuple",
-        "internalType": "struct MigrationConfirmationData",
-        "components": [
-          {
-            "name": "chainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "assetId",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "tokenOriginChainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "originToken",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "assetMigrationNumber",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "isL1ToGateway",
-            "type": "bool",
-            "internalType": "bool"
-          }
-        ]
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -174,6 +148,24 @@
   },
   {
     "type": "function",
+    "name": "handleRecoverBaseTokenBridgingOnL2",
+    "inputs": [
+      {
+        "name": "_toChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "initL2",
     "inputs": [
       {
@@ -197,7 +189,7 @@
   },
   {
     "type": "function",
-    "name": "initiateL1ToGatewayMigrationOnL2",
+    "name": "isAssetRegistered",
     "inputs": [
       {
         "name": "_assetId",
@@ -205,8 +197,14 @@
         "internalType": "bytes32"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -242,6 +240,24 @@
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "registerNewTokenIfNeeded",
+    "inputs": [
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_originChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
     "type": "event",
     "name": "BaseTokenRegisteredDuringUpgrade",
     "inputs": [
@@ -250,25 +266,6 @@
         "type": "bytes32",
         "indexed": true,
         "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "L1ToGatewayMigrationInitiated",
-    "inputs": [
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
       }
     ],
     "anonymous": false

@@ -113,6 +113,20 @@ interface ICommitter is IZKChainBase {
     /// @dev It has the name "BlockCommit" and not "BatchCommit" due to backward compatibility considerations
     event BlockCommit(uint256 indexed batchNumber, bytes32 indexed batchHash, bytes32 indexed commitment);
 
+    /// @notice Reports the protocol version a batch was committed with, together with the system upgrade
+    /// transaction hash applied in that batch (if any).
+    /// @dev Emitted for every committed batch (both Era and ZKsync OS). For ZKsync OS the `upgradeTxHash` is
+    /// additionally folded into the batch commitment, enabling independent recomputation of the commitment.
+    /// @param batchNumber Number of the batch committed.
+    /// @param protocolVersion The protocol version the batch was committed with.
+    /// @param upgradeTxHash Hash of the system upgrade transaction applied in this batch; non-zero only for
+    /// the first batch committed after a protocol upgrade.
+    event ReportCommittedBatchProtocolVersion(
+        uint64 indexed batchNumber,
+        uint256 indexed protocolVersion,
+        bytes32 indexed upgradeTxHash
+    );
+
     /// @notice Emitted when a new precommitment is set for a batch.
     /// @param batchNumber The batch number for which the precommitment was recorded.
     /// @param untrustedLastL2BlockNumberHint The hint to what L2 block number the precommitment should correspond to. Note, that there are no

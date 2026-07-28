@@ -85,7 +85,6 @@ library ContractsBytecodesLib {
         string[56] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction",
             "BaseTokenHolder",
-            "GWAssetTracker",
             "L2AssetTracker",
             "L2BaseTokenEra",
             "L2BaseTokenZKOS",
@@ -108,9 +107,10 @@ library ContractsBytecodesLib {
             "EraSettlementLayerV31Upgrade",
             "ZKsyncOSSettlementLayerV31Upgrade",
             "InteropCenter",
-            "InteropHandler",
+            "InteropAttributeParser",
+            "L2InteropHandler",
             "EraDualVerifier",
-            "ZKsyncOSDualVerifier",
+            "ZKsyncOSVerifier",
             "L1GenesisUpgrade",
             "L2AdminFactory",
             "L2AssetRouter",
@@ -177,8 +177,6 @@ library ContractsBytecodesLib {
             return Utils.readBytecodeL1(false, "EraVerifierFflonk.sol", "EraVerifierFflonk");
         } else if (Utils.compareStrings(contractIdentifier, "EraVerifierPlonk")) {
             return Utils.readBytecodeL1(false, "EraVerifierPlonk.sol", "EraVerifierPlonk");
-        } else if (Utils.compareStrings(contractIdentifier, "ZKsyncOSVerifierFflonk")) {
-            return Utils.readBytecodeL1(false, "ZKsyncOSVerifierFflonk.sol", "ZKsyncOSVerifierFflonk");
         } else if (Utils.compareStrings(contractIdentifier, "ZKsyncOSVerifierPlonk")) {
             return Utils.readBytecodeL1(false, "ZKsyncOSVerifierPlonk.sol", "ZKsyncOSVerifierPlonk");
         }

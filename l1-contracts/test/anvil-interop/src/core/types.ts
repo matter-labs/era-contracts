@@ -16,7 +16,6 @@ export interface CoreDeployedAddresses {
   l1SharedBridge: string;
   l1NullifierProxy: string;
   l1NativeTokenVault: string;
-  l1AssetTracker: string;
   l1ERC20Bridge: string;
   governance: string;
   transparentProxyAdmin: string;
@@ -31,34 +30,6 @@ export interface BalanceSnapshot {
   // Actual token balances
   l1TokenBalance: string;
   l2TokenBalance: string;
-
-  // L1AssetTracker.chainBalance under the chain's own ID
-  l1ChainBalance: string;
-
-  // L1AssetTracker.chainBalance under the GW chain ID (for GW-settled chains)
-  l1GwChainBalance?: string;
-
-  // GWAssetTracker state (for GW-settled chains)
-  gwChainBalance?: string;
-}
-
-/** Subset of BalanceSnapshot with only chain-level balances (no wallet balances). */
-export interface ChainBalanceSnapshot {
-  l1ChainBalance: string;
-  l1GwChainBalance?: string;
-  gwChainBalance?: string;
-}
-
-export interface TbmAccountingSnapshot {
-  chainId: number;
-  assetId: string;
-  l1SourceBefore: string;
-  l1SourceAfter: string;
-  gwChainBefore: string;
-  gwChainAfter: string;
-  gwPendingBefore: string;
-  gwPendingAfter: string;
-  migratedAmount: string;
 }
 
 export interface CTMDeployedAddresses {
@@ -132,8 +103,6 @@ export interface DeploymentState {
   testTokens?: Record<number, string>;
   /** L1 address of the custom ERC20 base token, keyed by chain ID. */
   customBaseTokens?: Record<number, string>;
-  /** Pre/post accounting captured during setup TBM, keyed by `${chainId}:${assetId.toLowerCase()}`. */
-  tbmAccountingSnapshots?: Record<string, TbmAccountingSnapshot>;
   zkToken?: {
     l1Address: string;
     assetId: string;

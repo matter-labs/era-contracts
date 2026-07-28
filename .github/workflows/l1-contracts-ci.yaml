@@ -193,26 +193,6 @@ jobs:
       - name: Check selectors
         run: yarn l1 selectors --check
 
-  check-legacy-bridge-sol:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Use Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: yarn
-      - name: Install dependencies
-        run: yarn
-
-      - name: Check LegacySharedBridgeAddresses.sol is up to date
-        run: yarn l1 check-legacy-bridge-sol
-
   test-foundry:
     needs: [build]
     runs-on: ubuntu-latest
@@ -335,15 +315,12 @@ jobs:
       - name: Compare EraVerifierFflonk.sol
         run: diff tools/verifier-gen/data/EraVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/EraVerifierFflonk.sol
 
-      - name: Generate ZKsyncOS verifiers
+      - name: Generate ZKsyncOS verifier
         working-directory: tools/verifier-gen
         run: cargo run --bin zksync_verifier_contract_generator --release -- --variant zksync-os
 
       - name: Compare ZKsyncOSVerifierPlonk.sol
         run: diff tools/verifier-gen/data/ZKsyncOSVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol
-
-      - name: Compare ZKsyncOSVerifierFflonk.sol
-        run: diff tools/verifier-gen/data/ZKsyncOSVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol
 
   coverage:
     defaults:

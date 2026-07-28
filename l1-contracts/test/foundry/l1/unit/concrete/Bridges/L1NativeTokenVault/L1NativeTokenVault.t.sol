@@ -14,9 +14,9 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
-import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 
 import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
+import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -29,6 +29,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 import {OriginChainIdNotFound, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {InsufficientChainBalance} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 
 /// @dev Test helper contract that exposes internal functions
 contract L1NativeTokenVaultTestHelper is L1NativeTokenVault {
@@ -65,7 +66,6 @@ contract L1NativeTokenVaultTest is Test {
     L1NativeTokenVaultTestHelper public nativeTokenVault;
     L1AssetRouter public assetRouter;
     L1Nullifier public l1Nullifier;
-    L1AssetTracker public l1AssetTracker;
     TestnetERC20Token public testToken;
 
     address public owner;
@@ -151,13 +151,6 @@ contract L1NativeTokenVaultTest is Test {
             abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
             abi.encode(0)
         );
-
-        // Deploy L1AssetTracker
-        l1AssetTracker = new L1AssetTracker(bridgehubAddress, address(nativeTokenVault), messageRootAddress);
-
-        // Set asset tracker
-        vm.prank(owner);
-        nativeTokenVault.setAssetTracker(address(l1AssetTracker));
 
         // Setup L1Nullifier
         vm.prank(owner);
@@ -287,13 +280,6 @@ contract L1NativeTokenVaultTest is Test {
         // Create bridge burn data
         bytes memory data = DataEncoding.encodeBridgeBurnData(100, owner, address(0));
 
-        // Mock the asset tracker call
-        vm.mockCall(
-            address(l1AssetTracker),
-            abi.encodeWithSelector(L1AssetTracker.handleChainBalanceDecreaseOnL1.selector),
-            abi.encode()
-        );
-
         vm.prank(address(assetRouter));
         vm.expectRevert(OriginChainIdNotFound.selector);
         nativeTokenVault.bridgeConfirmTransferResult(chainId, TxStatus.Failure, unknownAssetId, owner, data);
@@ -315,13 +301,6 @@ contract L1NativeTokenVaultTest is Test {
         uint256 amount = 100;
         bytes memory data = DataEncoding.encodeBridgeBurnData(amount, owner, address(0));
 
-        // Mock the asset tracker call
-        vm.mockCall(
-            address(l1AssetTracker),
-            abi.encodeWithSelector(L1AssetTracker.handleChainBalanceDecreaseOnL1.selector),
-            abi.encode()
-        );
-
         // Mock the bridgeMint call
         vm.mockCall(
             mockBridgedToken,
@@ -334,19 +313,100 @@ contract L1NativeTokenVaultTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        onlyAssetTracker modifier Tests
+                    bridgedOut net flow accounting
     //////////////////////////////////////////////////////////////*/
 
-    function test_migrateTokenBalanceToAssetTracker_RevertWhen_NotAssetTracker() public {
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        nativeTokenVault.migrateTokenBalanceToAssetTracker(chainId, tokenAssetId);
+    /// @dev Deposits `_amount` of the native test token through the real
+    /// assetRouter->bridgeBurn path and returns the burn data used.
+    function _depositNativeTestToken(uint256 _amount) internal returns (bytes memory data) {
+        testToken.mint(owner, _amount);
+        vm.prank(owner);
+        testToken.approve(address(nativeTokenVault), _amount);
+
+        data = DataEncoding.encodeBridgeBurnData(_amount, owner, address(testToken));
+        vm.prank(address(assetRouter));
+        nativeTokenVault.bridgeBurn(chainId, 0, tokenAssetId, owner, data);
     }
 
-    function test_migrateTokenBalanceToAssetTracker_Success() public {
-        // This should work when called by asset tracker
-        vm.prank(address(l1AssetTracker));
-        uint256 result = nativeTokenVault.migrateTokenBalanceToAssetTracker(chainId, tokenAssetId);
-        assertEq(result, 0); // No deprecated balance set
+    function test_bridgedOut_IncreasesOnNativeDeposit() public {
+        uint256 amount = 100;
+        assertEq(nativeTokenVault.bridgedOut(tokenAssetId), 0);
+
+        _depositNativeTestToken(amount);
+
+        assertEq(nativeTokenVault.bridgedOut(tokenAssetId), amount, "outbound flow recorded");
+
+        // Direct transfers into the vault (donations) must not affect the accounting,
+        // unlike the vault's raw balanceOf.
+        testToken.mint(address(this), 999);
+        testToken.transfer(address(nativeTokenVault), 999);
+        assertEq(nativeTokenVault.bridgedOut(tokenAssetId), amount, "donation ignored");
+    }
+
+    function test_bridgedOut_DecreasesOnNativeWithdrawal() public {
+        uint256 amount = 100;
+        _depositNativeTestToken(amount);
+
+        bytes memory mintData = DataEncoding.encodeBridgeMintData({
+            _originalCaller: owner,
+            _remoteReceiver: owner,
+            _originToken: address(testToken),
+            _amount: amount,
+            _erc20Metadata: BridgeHelper.getERC20Getters(address(testToken), block.chainid)
+        });
+        vm.prank(address(assetRouter));
+        nativeTokenVault.bridgeMint(chainId, tokenAssetId, mintData);
+
+        assertEq(nativeTokenVault.bridgedOut(tokenAssetId), 0, "net bridged-out back to zero after round trip");
+    }
+
+    function test_bridgedOut_DecreasesOnFailedDepositRefund() public {
+        uint256 amount = 100;
+        bytes memory data = _depositNativeTestToken(amount);
+
+        vm.prank(address(assetRouter));
+        nativeTokenVault.bridgeConfirmTransferResult(chainId, TxStatus.Failure, tokenAssetId, owner, data);
+
+        assertEq(nativeTokenVault.bridgedOut(tokenAssetId), 0, "refund cancels the outbound flow");
+    }
+
+    function test_bridgedOut_RevertsWhenInboundExceedsOutstanding() public {
+        // More of an L1-native asset coming back than is currently bridged out means bridged
+        // representations were forged upstream; the transfer must be blocked, not recorded.
+        uint256 amount = 100;
+        _depositNativeTestToken(amount);
+
+        bytes memory mintData = DataEncoding.encodeBridgeMintData({
+            _originalCaller: owner,
+            _remoteReceiver: owner,
+            _originToken: address(testToken),
+            _amount: amount + 1,
+            _erc20Metadata: BridgeHelper.getERC20Getters(address(testToken), block.chainid)
+        });
+        vm.prank(address(assetRouter));
+        vm.expectRevert(abi.encodeWithSelector(InsufficientChainBalance.selector, chainId, tokenAssetId, amount + 1));
+        nativeTokenVault.bridgeMint(chainId, tokenAssetId, mintData);
+    }
+
+    function test_bridgedOut_UntouchedForNonNativeToken() public {
+        // A bridged (non-L1-native) token: originChainId != block.chainid.
+        address mockBridgedToken = makeAddr("mockBridgedToken");
+        bytes32 bridgedAssetId = keccak256(abi.encode("bridgedAsset"));
+        nativeTokenVault.setTokenAddress(bridgedAssetId, mockBridgedToken);
+        nativeTokenVault.setOriginChainId(bridgedAssetId, 999);
+
+        uint256 amount = 100;
+        bytes memory data = DataEncoding.encodeBridgeBurnData(amount, owner, address(0));
+        vm.mockCall(
+            mockBridgedToken,
+            abi.encodeWithSelector(IBridgedStandardToken.bridgeMint.selector, owner, amount),
+            abi.encode()
+        );
+
+        vm.prank(address(assetRouter));
+        nativeTokenVault.bridgeConfirmTransferResult(chainId, TxStatus.Failure, bridgedAssetId, owner, data);
+
+        assertEq(nativeTokenVault.bridgedOut(bridgedAssetId), 0, "no accounting for a non-L1-native token");
     }
 
     // add this to be excluded from coverage report

@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../state-transition/libraries/PriorityTree.sol";
-import {L2DACommitmentScheme, PubdataPricingMode} from "../../common/Config.sol";
+import {L2DACommitmentScheme, PubdataContent, PubdataPricingMode} from "../../common/Config.sol";
 
 /// @notice Indicates whether an upgrade is initiated and if yes what type
 /// @param None Upgrade is NOT initiated
@@ -230,14 +230,15 @@ struct ZKChainStorage {
     /// @dev STORAGE SLOT: 59
     bytes32 precommitmentForTheLatestBatch;
     /// @dev ZKsync OS flag, if `true` state transition is done with ZKsync OS, otherwise Era VM
-    /// @dev STORAGE SLOT: 60 (packed: bool + enum + address — shares with l2DACommitmentScheme + assetTracker)
+    /// @dev STORAGE SLOT: 60 (packed: bool + enum + address — shares with l2DACommitmentScheme + __DEPRECATED_assetTracker)
     bool zksyncOS;
     /// @dev The scheme of L2 DA commitment. Different L1 validators may use different schemes.
-    /// @dev STORAGE SLOT: 60 (packed with zksyncOS + assetTracker)
+    /// @dev STORAGE SLOT: 60 (packed with zksyncOS + __DEPRECATED_assetTracker)
     L2DACommitmentScheme l2DACommitmentScheme;
-    /// @dev The address of the asset tracker
+    /// @dev Deprecated: previously held the address of the asset tracker, which has been removed.
+    /// The slot is retained (and kept packed) to preserve the storage layout of all following slots.
     /// @dev STORAGE SLOT: 60 (packed with zksyncOS + l2DACommitmentScheme)
-    address assetTracker;
+    address __DEPRECATED_assetTracker;
     /// @dev The address of the native token vault
     /// @dev STORAGE SLOT: 61
     address nativeTokenVault;
@@ -260,4 +261,16 @@ struct ZKChainStorage {
     /// except for ZKsync OS chains that have existed before the v31 upgrade.
     /// @dev STORAGE SLOT: 68
     bool baseTokenHasTotalSupply;
+    /// @dev The ZKsync OS single-transaction gas limit (EIP-7825), committed into each batch proof
+    /// public input. A chain may raise the cap above the Ethereum limit but must not set it below.
+    /// `0` means the default (`ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`) for chains that existed before
+    /// this field was introduced.
+    /// @dev STORAGE SLOT: 68
+    uint64 zksyncOSMaxTxGasLimit;
+    /// @dev The pubdata content: whether the batch commits the full pubdata (`FULL_PUBDATA`) or only the mandatory
+    /// L2->L1 log region (`LOGS_ONLY`). Orthogonal to `l2DACommitmentScheme` (the mechanism). Committed
+    /// into the ZKsync OS batch public input via the chain config hash (see `Executor`). ZKsync OS only.
+    /// Permanent-rollup chains are locked to `FULL_PUBDATA` (see `Admin.setPubdataContent` / `makePermanentRollup`).
+    /// @dev STORAGE SLOT: 68 (packed with baseTokenHasTotalSupply + zksyncOSMaxTxGasLimit)
+    PubdataContent pubdataContent;
 }

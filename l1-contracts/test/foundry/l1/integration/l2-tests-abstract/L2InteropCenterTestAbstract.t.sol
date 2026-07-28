@@ -7,12 +7,14 @@ import {L2InteropLibraryBasicTestAbstract} from "./L2InteropLibraryBasicTestAbst
 import {L2InteropNativeTokenDifferentBaseTestAbstract} from "./L2InteropNativeTokenDifferentBaseTestAbstract.t.sol";
 import {L2InteropNativeTokenSimpleTestAbstract} from "./L2InteropNativeTokenSimpleTestAbstract.t.sol";
 import {L2InteropMessageHandlerTestAbstract} from "./L2InteropMessageHandlerTestAbstract.t.sol";
+import {L2InteropCenterL1DestinationTestAbstract} from "./L2InteropCenterL1DestinationTestAbstract.t.sol";
 
 abstract contract L2InteropCenterTestAbstract is
     L2InteropLibraryBasicTestAbstract,
     L2InteropNativeTokenDifferentBaseTestAbstract,
     L2InteropNativeTokenSimpleTestAbstract,
-    L2InteropMessageHandlerTestAbstract
+    L2InteropMessageHandlerTestAbstract,
+    L2InteropCenterL1DestinationTestAbstract
 {
     // This contract combines all the split test abstracts to maintain backward compatibility
     // with existing test files that inherit from L2InteropCenterTestAbstract

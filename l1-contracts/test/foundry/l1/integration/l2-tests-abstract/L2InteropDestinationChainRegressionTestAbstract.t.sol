@@ -55,7 +55,11 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
 
         // Attempt to send the bundle - should revert with DestinationChainNotRegistered
         vm.expectRevert(abi.encodeWithSelector(DestinationChainNotRegistered.selector, UNREGISTERED_CHAIN_ID));
-        L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(UNREGISTERED_CHAIN_ID), calls, bundleAttributes);
+        L2_INTEROP_CENTER.sendBundle(
+            InteroperableAddress.formatEvmV1(UNREGISTERED_CHAIN_ID),
+            calls,
+            _withAtomicBundle(bundleAttributes)
+        );
     }
 
     /// @notice Test that sending with value to an unregistered chain also reverts
@@ -91,7 +95,7 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
         L2_INTEROP_CENTER.sendBundle{value: interopCallValue}(
             InteroperableAddress.formatEvmV1(UNREGISTERED_CHAIN_ID),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
     }
 
@@ -115,7 +119,7 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
         bytes32 bundleHash = L2_INTEROP_CENTER.sendBundle(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
 
         // Verify a bundle hash was returned
@@ -140,19 +144,27 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
         bytes32 bundleHash1 = L2_INTEROP_CENTER.sendBundle(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
-            bundleAttributes
+            _withAtomicBundle(bundleAttributes)
         );
         assertNotEq(bundleHash1, bytes32(0), "First bundle to registered chain should succeed");
 
-        // Now try to send to unregistered chain - should fail
+        // Now try to send to unregistered chain - should fail.
+        // Use a fresh salt so the call reaches the destination check rather than the unique-salt guard.
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
             abi.encodeCall(IBridgehubBase.baseTokenAssetId, (UNREGISTERED_CHAIN_ID)),
             abi.encode(bytes32(0))
         );
+        bytes[] memory bundleAttributes2 = new bytes[](2);
+        bundleAttributes2[0] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
+        bundleAttributes2[1] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (bytes32(uint256(1))));
 
         vm.expectRevert(abi.encodeWithSelector(DestinationChainNotRegistered.selector, UNREGISTERED_CHAIN_ID));
-        L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(UNREGISTERED_CHAIN_ID), calls, bundleAttributes);
+        L2_INTEROP_CENTER.sendBundle(
+            InteroperableAddress.formatEvmV1(UNREGISTERED_CHAIN_ID),
+            calls,
+            _withAtomicBundle(bundleAttributes2)
+        );
     }
 
     /// @notice Fuzz test with various unregistered chain IDs
@@ -162,7 +174,8 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
         vm.assume(randomChainId != destinationChainId);
         vm.assume(randomChainId != block.chainid);
         vm.assume(randomChainId != 0);
-        // Skip L1_CHAIN_ID - sending to L1 triggers NotL2ToL2 error before DestinationChainNotRegistered
+        // Skip L1_CHAIN_ID - an L1 destination is the withdrawal path and is validated via the call
+        // attributes rather than the destination registry, so it never reverts with DestinationChainNotRegistered.
         vm.assume(randomChainId != L1_CHAIN_ID);
 
         // Mock the bridgehub to return bytes32(0) for this random chain
@@ -183,6 +196,10 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
         bundleAttributes[0] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
         vm.expectRevert(abi.encodeWithSelector(DestinationChainNotRegistered.selector, randomChainId));
-        L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(randomChainId), calls, bundleAttributes);
+        L2_INTEROP_CENTER.sendBundle(
+            InteroperableAddress.formatEvmV1(randomChainId),
+            calls,
+            _withAtomicBundle(bundleAttributes)
+        );
     }
 }

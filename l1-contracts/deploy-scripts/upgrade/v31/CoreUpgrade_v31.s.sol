@@ -10,17 +10,12 @@ import {Governance} from "contracts/governance/Governance.sol";
 
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
-import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {MigrationInterval} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
@@ -43,9 +38,9 @@ import {TokenMigrationUtils} from "./TokenMigrationUtils.s.sol";
 /// FIXME currently we accept ownership as part of stage1, but in fact we should do it as part of stage0.
 /// @notice Script used for v31 upgrade flow.
 /// @dev Owns all v31-specific core-side ecosystem behavior:
-///      - stage 1: AssetTracker.acceptOwnership, NTV.setAssetTracker, ChainAssetHandler.setAddresses
+///      - stage 1: ChainRegistrationSender.acceptOwnership, ChainAssetHandler.setAddresses
 ///      - stage 2: legacy-GW historical migration intervals + old-GW blacklist (read from upgrade input TOML)
-///      - stage3 (post-governance): bridged-token registration + balance migration
+///      - stage3 (post-governance): bridged-token registration in the NTV
 contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     using stdToml for string;
 
@@ -83,7 +78,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
 
     function deployNewEcosystemContractsL1() public virtual override {
         deployNewEcosystemContractsL1NoConnections();
-        // Configure AssetTracker connections after deployment
         updateContractConnections();
     }
 
@@ -95,10 +89,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier", false);
         coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter", false);
         coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault", false);
-        (
-            coreAddresses.bridgehub.implementations.assetTracker,
-            coreAddresses.bridgehub.proxies.assetTracker
-        ) = deployTuppWithContract("L1AssetTracker", false);
         coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract(
             "CTMDeploymentTracker",
             false
@@ -111,33 +101,9 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     }
 
     /// @notice Configure contract connections after deployment
-    /// @dev AssetTracker is new in v31, we initialize it here with deployer as owner, then transfer ownership
-    /// @dev The same is done for ChainRegistrationSender
+    /// @dev ChainRegistrationSender is new in v31, we initialize it with deployer as owner, then transfer ownership
     function updateContractConnections() internal {
-        /////// AssetTracker
-        console.log("Configuring AssetTracker connections...");
-
-        address assetTrackerProxy = coreAddresses.bridgehub.proxies.assetTracker;
-        require(assetTrackerProxy != address(0), "AssetTracker proxy not deployed");
-
-        console.log("AssetTracker proxy:", assetTrackerProxy);
-        console.log("Current AssetTracker owner:", Ownable2StepUpgradeable(assetTrackerProxy).owner());
-        console.log("Deployer (msg.sender):", msg.sender);
-
-        // Initialize AssetTracker with ChainAssetHandler reference
-        // This sets: chainAssetHandler = IChainAssetHandler(BRIDGE_HUB.chainAssetHandler())
-        // At this point, deployer is the owner (set in initialize() during proxy deployment)
-        console.log("Calling setAddresses() on AssetTracker...");
-        vm.broadcast(getBroadcasterAddress());
-        IL1AssetTracker(assetTrackerProxy).setAddresses();
-        console.log("AssetTracker.setAddresses() completed");
-
-        // Transfer ownership to the proper owner (governance)
         address properOwner = getOwnerAddress();
-        console.log("Transferring AssetTracker ownership from deployer to governance:", properOwner);
-        vm.broadcast(getBroadcasterAddress());
-        Ownable2StepUpgradeable(assetTrackerProxy).transferOwnership(properOwner);
-        console.log("AssetTracker ownership transfer initiated (pending acceptance by governance)");
 
         /////// ChainRegistrationSender
         console.log("Configuring ChainRegistrationSender connections...");
@@ -192,11 +158,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     ) internal virtual override returns (bytes memory) {
         if (compareStrings(contractName, "L1MessageRoot") || compareStrings(contractName, _messageRootContractName())) {
             return abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ());
-        } else if (compareStrings(contractName, "L1AssetTracker")) {
-            // Initialize AssetTracker with config.deployerAddress which is now properly set
-            // to tx.origin (the address of the private key being used for broadcasts)
-            console.log("Initializing L1AssetTracker with deployer as owner:", config.deployerAddress);
-            return abi.encodeCall(L1AssetTracker.initialize, (config.deployerAddress));
         }
         return super.getInitializeCalldata(contractName, isZkBytecode);
     }
@@ -204,36 +165,22 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     /// @notice Override to add version-specific governance calls for stage 1
     /// @dev Stage 1 runs after proxy upgrades, so the new `L1ChainAssetHandler`
     ///      implementation is already in place when these calls execute.
-    /// @dev Four calls are emitted:
+    /// @dev Two calls are emitted:
     ///      1. ChainRegistrationSender.acceptOwnership (completes 2-step transfer started during deploy)
-    ///      2. AssetTracker.acceptOwnership (completes 2-step transfer started during deploy)
-    ///      3. NTV.setAssetTracker (wires AssetTracker into NTV)
-    ///      4. L1ChainAssetHandler.setAddresses (caches messageRoot/assetRouter from bridgehub)
+    ///      2. L1ChainAssetHandler.setAddresses (caches messageRoot/assetRouter from bridgehub)
     function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
         console.log("Preparing v31-specific stage1 governance calls...");
 
-        // Get NativeTokenVault from AssetRouter
-        IL1AssetRouter assetRouter = IL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
-        address ntvProxy = address(assetRouter.nativeTokenVault());
-        address assetTrackerProxy = coreAddresses.bridgehub.proxies.assetTracker;
         address chainRegistrationSenderProxy = coreAddresses.bridgehub.proxies.chainRegistrationSender;
         address chainAssetHandlerProxy = coreAddresses.bridgehub.proxies.chainAssetHandler;
 
-        require(ntvProxy != address(0), "NTV proxy address not found");
-        require(assetTrackerProxy != address(0), "AssetTracker proxy address not found");
         require(chainRegistrationSenderProxy != address(0), "ChainRegistrationSender proxy address not found");
         require(chainAssetHandlerProxy != address(0), "ChainAssetHandler proxy address not found");
 
-        console.log("Accepting AssetTracker ownership and setting in NativeTokenVault");
-        console.log("NTV address:", ntvProxy);
-        console.log("AssetTracker address:", assetTrackerProxy);
         console.log("ChainRegistrationSender address:", chainRegistrationSenderProxy);
         console.log("ChainAssetHandler address:", chainAssetHandlerProxy);
-        // Note: AssetTracker.setAddresses() was already called during deployment
-        // in updateContractConnections(), and ownership was transferred to governance.
-        // Now governance needs to accept the ownership transfer.
 
-        calls = new Call[](4);
+        calls = new Call[](2);
 
         // First, accept ownership of ChainRegistrationSender (completes the two-step transfer)
         calls[0] = Call({
@@ -242,39 +189,15 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
             data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
         });
 
-        // Accept ownership of AssetTracker (completes the two-step transfer)
-        calls[1] = Call({
-            target: assetTrackerProxy,
-            value: 0,
-            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
-        });
-
-        // Set AssetTracker reference in NTV
-        calls[2] = Call({
-            target: ntvProxy,
-            value: 0,
-            data: abi.encodeCall(L1NativeTokenVault.setAssetTracker, (assetTrackerProxy))
-        });
-
         // Cache messageRoot/assetRouter inside the new ChainAssetHandler implementation
         // so its facets don't re-query bridgehub on every call.
-        calls[3] = Call({
+        calls[1] = Call({
             target: chainAssetHandlerProxy,
             value: 0,
             data: abi.encodeCall(L1ChainAssetHandler.setAddresses, ())
         });
 
         return calls;
-    }
-
-    /// @notice Save v31-specific addresses to output file
-    function saveOutputVersionSpecific() public virtual override {
-        // Save AssetTracker address for Rust test to read
-        vm.writeToml(
-            vm.toString(coreAddresses.bridgehub.proxies.assetTracker),
-            upgradeConfig.outputPath,
-            ".asset_tracker_proxy_addr"
-        );
     }
 
     /// @notice Stage 2 governance calls (post-upgrade-contracts):
@@ -293,30 +216,17 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         return _buildLegacyGatewayDecommissionCalls();
     }
 
-    /// @notice Post-governance migration: register bridged tokens in NTV and
-    ///         migrate token balances from NTV into the AssetTracker.
+    /// @notice Post-governance step: register legacy bridged tokens in the NTV bridged-tokens list.
     /// @dev Caller signs as any EOA — no governance privileges required.
     function stage3(address bridgehubProxy) public {
-        console.log("Starting v31 stage3 post-governance migration...");
+        console.log("Starting v31 stage3 post-governance registration...");
         console.log("Bridgehub proxy:", bridgehubProxy);
 
-        IBridgehubBase bridgehub = IBridgehubBase(bridgehubProxy);
-        IL1AssetRouter assetRouter = IL1AssetRouter(address(bridgehub.assetRouter()));
-        L1NativeTokenVault ntv = L1NativeTokenVault(payable(address(assetRouter.nativeTokenVault())));
-        IL1AssetTracker assetTracker = ntv.l1AssetTracker();
-
-        console.log("AssetRouter:", address(assetRouter));
-        console.log("NativeTokenVault:", address(ntv));
-        console.log("AssetTracker:", address(assetTracker));
-
-        require(address(assetTracker) != address(0), "AssetTracker not set");
-
         vm.startBroadcast();
-        TokenMigrationUtils.registerBridgedTokensInNTV(address(bridgehub));
-        TokenMigrationUtils.migrateAllTokenBalances(address(ntv), address(assetTracker), bridgehub);
+        TokenMigrationUtils.registerBridgedTokensInNTV(bridgehubProxy);
         vm.stopBroadcast();
 
-        console.log("v31 stage3 migration complete!");
+        console.log("v31 stage3 registration complete!");
     }
 
     /// @notice Pick the L1 MessageRoot impl to deploy.

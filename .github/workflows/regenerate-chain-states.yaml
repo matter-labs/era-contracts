@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: true
+          submodules: recursive
           token: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Get PR branch info
@@ -51,7 +51,12 @@ jobs:
         run: |
           git fetch origin "${{ steps.pr.outputs.head_ref }}"
           git checkout "${{ steps.pr.outputs.head_ref }}"
-          git submodule update --init --recursive
+          # The recursive checkout above already populated submodules at their
+          # (branch-identical) pins via the checkout action's smarter fetch. A
+          # plain `git submodule update` can fail on pins the submodule remote no
+          # longer advertises directly (e.g. lib/@matterlabs/zksync-contracts), so
+          # keep it non-fatal — the working tree is already at the correct commit.
+          git submodule update --init --recursive || true
 
       - name: Install Foundry (no foundry-zksync — deterministic bytecode)
         uses: foundry-rs/foundry-toolchain@v1
@@ -95,7 +100,11 @@ jobs:
           git config user.name "zksync[bot]"
           git config user.email "zksync[bot]@users.noreply.github.com"
 
-          git add l1-contracts/test/anvil-interop/chain-states/
+          # -A so the committed directory exactly mirrors what was generated:
+          # new/updated `<chainId>.json.gz` are added, and any stale files (e.g.
+          # a leftover raw `.json` from before the gzip migration, or a chain
+          # dropped from the config) are removed from the index.
+          git add -A l1-contracts/test/anvil-interop/chain-states/
           git diff --cached --quiet && { echo "No chain state changes to commit"; exit 0; }
           git commit -m "chore: regenerate anvil-interop chain states
 

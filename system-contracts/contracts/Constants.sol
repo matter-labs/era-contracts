@@ -75,7 +75,6 @@ address constant L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDRESS = address(USER_CONTRACTS
 address constant L2_INTEROP_CENTER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0d);
 address constant L2_INTEROP_HANDLER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0e);
 address constant L2_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0f);
-address constant GW_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x10);
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.
@@ -172,7 +171,9 @@ uint8 constant EVM_BYTECODE_FLAG = 2;
 
 address constant SERVICE_CALL_PSEUDO_CALLER = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
 
-/// @dev Pubdata commitment scheme used for DA.
+/// @dev Pubdata commitment scheme used for DA. This is the commitment *mechanism* — how the committed
+/// pubdata is published and hashed. Which *part* of the pubdata is committed (full vs logs-only) is a
+/// separate, orthogonal axis: {PubdataContent}.
 /// @param NONE Invalid option.
 /// @param EMPTY_NO_DA No DA commitment, used by Validiums.
 /// @param PUBDATA_KECCAK256 Keccak of stateDiffHash and keccak(pubdata). Can be used by custom DA solutions.
@@ -184,6 +185,18 @@ enum L2DACommitmentScheme {
     PUBDATA_KECCAK256,
     BLOBS_AND_PUBDATA_KECCAK256,
     BLOBS_ZKSYNC_OS
+}
+
+/// @dev Data availability mode: which part of the pubdata the batch commits to. Orthogonal to
+/// {L2DACommitmentScheme} (the mechanism). Carried in diamond storage and committed into the batch
+/// public input via the chain config hash, so the settlement layer enforces the chain's configured mode.
+/// @param FULL_PUBDATA The whole pubdata (including state diffs, logs, and messages) is committed and must be published.
+/// @param LOGS_ONLY Only the mandatory L2->L1 log region (log records, incl. interop-commitment (IMT)
+/// leaves) is committed; state diffs and message preimages are published at the operator's discretion.
+/// Used by atomic-interop participants to keep their interop (IMT) data reconstructible from L1. ZKsyncOS only.
+enum PubdataContent {
+    FULL_PUBDATA,
+    LOGS_ONLY
 }
 
 /// @dev The metadata version that is supported by the ZK Chains to prove that an L2->L1 log was included in a batch.

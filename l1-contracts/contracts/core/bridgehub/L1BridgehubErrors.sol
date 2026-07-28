@@ -18,12 +18,12 @@ error ChainBatchRootAlreadyExists(uint256 chainId, uint256 batchNumber);
 error ChainBatchRootZero();
 // 0x65e8a019
 error ChainExists();
+// 0xc21d238a
+error ChainHasNoBatchesInMessageRoot(uint256 chainId);
 // 0xf8d5f418
 error ChainNotReadyForMigration(uint256 chainId);
 // 0x824e4e26
 error ChainsSettlementLayerMismatch(uint256 chainToRegisterSL, uint256 chainRegisteredOnSL);
-// 0x1ed6c04f
-error ChainsSettlingOnL1();
 // 0x5d03f19d
 error CurrentBatchNumberAlreadySet();
 // 0x68d91b49
@@ -70,8 +70,6 @@ error NotOwnerViaRouter(address msgSender, address originalCaller);
 error NotRelayedSender(address msgSender, address settlementLayerRelaySender);
 // 0xb35a7373
 error NotSystemContext(address _sender);
-// 0x3db511f4
-error OnlyAssetTracker(address, address);
 // 0x527b87c7
 error OnlyBridgehub(address msgSender, address bridgehub);
 // 0x2d396674

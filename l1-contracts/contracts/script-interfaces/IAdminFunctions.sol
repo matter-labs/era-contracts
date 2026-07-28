@@ -78,7 +78,6 @@ interface IAdminFunctions {
         address accessControlRestriction,
         address bridgehub,
         uint256 chainId,
-        uint256 newProtocolVersion,
         uint256 timestamp
     ) external;
 

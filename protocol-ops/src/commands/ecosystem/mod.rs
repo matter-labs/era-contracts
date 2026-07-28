@@ -60,13 +60,9 @@ pub enum EcosystemCommands {
     /// signed by its declared `target`. Direct EOA broadcast — no Safe UI.
     #[command(name = "upgrade-broadcast")]
     UpgradeBroadcast(UpgradeBroadcastArgs),
-    /// Phase 3 of the ecosystem upgrade: legacy-token registration. Calls
-    /// `CoreUpgrade_v31.stage3(bridgehub)`, which registers ETH + every
-    /// v31-bridged token in NTV's bridgedTokens list and calls
-    /// `registerLegacyToken` on the L1AssetTracker (moves chainBalances out
-    /// of the NTV). Runs *before* per-chain upgrades so each chain's
-    /// withdrawals come back online as soon as its diamond upgrade lands.
-    /// Any signer.
+    /// Phase 3 of the ecosystem upgrade: bridged-token registration via
+    /// `CoreUpgrade_v31.stage3(bridgehub)`. Runs *before* the per-chain
+    /// upgrades (Phase 4). Any signer.
     Stage3(Stage3Args),
     /// Print a starter `--ctm-config` TOML by enumerating every CTM
     /// registered on the supplied bridgehub. Use this on stage / mainnet to

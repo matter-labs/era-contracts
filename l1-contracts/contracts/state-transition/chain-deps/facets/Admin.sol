@@ -7,13 +7,16 @@ import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {
     L2DACommitmentScheme,
+    PubdataContent,
     MAX_GAS_PER_TRANSACTION,
     MAX_PRICE_CHANGE_DENOMINATOR,
     MAX_PRICE_CHANGE_NUMERATOR,
     PRICE_REFERENCE_L1_GAS,
     PRICE_UPDATE_INTERVAL,
     PRIORITY_EXPIRATION,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
+    ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT
 } from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
@@ -22,6 +25,7 @@ import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {
     L1DAValidatorAddressIsZero,
     NotL1,
+    NotZKsyncOS,
     PriorityModeAlreadyAllowed,
     ExecutedIsNotConsistentWithVerified,
     VerifiedIsNotConsistentWithCommitted,
@@ -30,6 +34,7 @@ import {
 import {
     AlreadyPermanentRollup,
     BaseTokenPreV31TotalSupplyAlreadySet,
+    PubdataContentLockedForPermanentRollup,
     DenominatorIsZero,
     DiamondAlreadyFrozen,
     DiamondNotFrozen,
@@ -38,6 +43,7 @@ import {
     InvalidDAForPermanentRollup,
     InvalidL2DACommitmentScheme,
     InvalidPubdataPricingMode,
+    NonFullPubdataContentForPermanentRollup,
     PriorityModeActivationTooEarly,
     PriorityModeIsNotAllowed,
     PriorityModeRequiresPermanentRollup,
@@ -49,7 +55,10 @@ import {
     TooMuchGas,
     Unauthorized,
     UpgradeTimestampNotReached,
-    NotCompatibleWithPriorityMode
+    NotCompatibleWithPriorityMode,
+    ZKsyncOSChainConfigUpdateWithUnverifiedBatches,
+    ZKsyncOSMaxTxGasLimitTooHigh,
+    ZKsyncOSMaxTxGasLimitTooLow
 } from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
@@ -167,6 +176,32 @@ contract AdminFacet is ZKChainBase, IAdmin {
         uint256 oldPriorityTxMaxGasLimit = s.priorityTxMaxGasLimit;
         s.priorityTxMaxGasLimit = _newPriorityTxMaxGasLimit;
         emit NewPriorityTxMaxGasLimit(oldPriorityTxMaxGasLimit, _newPriorityTxMaxGasLimit);
+    }
+
+    /// @inheritdoc IAdmin
+    function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external onlyAdmin onlySettlementLayer onlyZKsyncOS {
+        // The cap may only be raised above Ethereum's EIP-7825 single-tx gas limit, never below.
+        if (_newMaxTxGasLimit < ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT) {
+            revert ZKsyncOSMaxTxGasLimitTooLow();
+        }
+        // The cap must not exceed the ZKsync OS block gas limit: a higher value will halt the block production.
+        if (_newMaxTxGasLimit > ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT) {
+            revert ZKsyncOSMaxTxGasLimitTooHigh();
+        }
+        _enforceNoUnverifiedBatchesForChainConfigUpdate();
+
+        uint64 oldMaxTxGasLimit = _getZKsyncOSMaxTxGasLimit();
+        s.zksyncOSMaxTxGasLimit = _newMaxTxGasLimit;
+        emit NewZKsyncOSMaxTxGasLimit(oldMaxTxGasLimit, _newMaxTxGasLimit);
+    }
+
+    /// @dev The runtime chain config is read from storage when the batch proof public input is
+    /// computed, so it must not change while committed-but-unverified batches exist: those batches
+    /// were executed by ZKsync OS under the old config and would become unprovable.
+    function _enforceNoUnverifiedBatchesForChainConfigUpdate() internal view {
+        if (s.totalBatchesCommitted != s.totalBatchesVerified) {
+            revert ZKsyncOSChainConfigUpdateWithUnverifiedBatches(s.totalBatchesVerified, s.totalBatchesCommitted);
+        }
     }
 
     /// @inheritdoc IAdmin
@@ -348,6 +383,13 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert InvalidL2DACommitmentScheme(_l2DACommitmentScheme);
         }
 
+        // `BLOBS_ZKSYNC_OS` is only supported on ZKsync OS, where the STF interprets the scheme. It has
+        // no commitment implementation on the Era VM (`L2DAValidator.makeDACommitment` reverts for it),
+        // so reject it here to avoid configuring an unusable DA pair.
+        if (_l2DACommitmentScheme == L2DACommitmentScheme.BLOBS_ZKSYNC_OS && !s.zksyncOS) {
+            revert NotZKsyncOS();
+        }
+
         if (s.isPermanentRollup && !ROLLUP_DA_MANAGER.isPairAllowed(_l1DAValidator, _l2DACommitmentScheme)) {
             revert InvalidDAForPermanentRollup();
         }
@@ -356,9 +398,26 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
+    function setPubdataContent(PubdataContent _pubdataContent) external onlyAdmin onlyZKsyncOS {
+        // A permanent rollup is locked to `FULL_PUBDATA` — its pubdata content can never be changed (in particular it
+        // can never be relaxed to `LOGS_ONLY`), mirroring how the permanent-rollup flag itself is one-way.
+        if (s.isPermanentRollup) {
+            revert PubdataContentLockedForPermanentRollup();
+        }
+        _enforceNoUnverifiedBatchesForChainConfigUpdate();
+        emit NewPubdataContent(s.pubdataContent, _pubdataContent);
+        s.pubdataContent = _pubdataContent;
+    }
+
+    /// @inheritdoc IAdmin
     function makePermanentRollup() external onlyAdmin onlySettlementLayer {
         if (s.isPermanentRollup) {
             revert AlreadyPermanentRollup();
+        }
+
+        // A permanent rollup must publish the full pubdata, so the chain must already be in `FULL_PUBDATA` mode.
+        if (s.pubdataContent != PubdataContent.FULL_PUBDATA) {
+            revert NonFullPubdataContentForPermanentRollup();
         }
 
         if (!ROLLUP_DA_MANAGER.isPairAllowed(s.l1DAValidator, s.l2DACommitmentScheme)) {

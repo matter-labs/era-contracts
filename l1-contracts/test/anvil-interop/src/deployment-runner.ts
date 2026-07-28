@@ -16,7 +16,6 @@ import type {
   DeploymentState,
   L2ChainInfo,
   PriorityRequestData,
-  TbmAccountingSnapshot,
 } from "./core/types";
 import { getChainIdsByRole, timeIt } from "./core/utils";
 import { getAbi, getCreationBytecode } from "./core/contracts";
@@ -25,7 +24,6 @@ import { getInteropSourcePrivateKey, isLiveInteropMode } from "./core/accounts";
 import { encodeNtvAssetId } from "./core/data-encoding";
 import { deployTestTokens } from "./helpers/deploy-test-token";
 import { depositERC20ToL2 } from "./helpers/l1-deposit-helper";
-import { registerAndMigrateTestTokens, tbmAccountingSnapshotKey } from "./helpers/token-balance-migration-helper";
 import { asViemAddress, createLiveZksyncSdk } from "./helpers/temp-sdk";
 
 const ZERO_ADDRESS = ethers.constants.AddressZero;
@@ -72,12 +70,18 @@ export class DeploymentRunner {
     return config;
   }
 
-  /** Read protocol version from configs/genesis/era/latest.json (the source of truth). */
+  /**
+   * Protocol version string used to name the chain-states folder (e.g. "v0.32.0"). Read from the
+   * harness's OWN config (`stateVersion`), NOT the shared `configs/genesis/era/latest.json`: the
+   * shared genesis pins the L1 foundry suite's base version (v31) while the anvil harness runs
+   * atomic-interop (v32), and keeping the harness version local decouples the two.
+   */
   getProtocolVersionString(): string {
-    const genesisPath = path.resolve(this.configDir, "../../../../configs/genesis/era/latest.json");
-    const genesis = JSON.parse(fs.readFileSync(genesisPath, "utf-8"));
-    const { major, minor, patch } = genesis.protocol_semantic_version;
-    return `v${major}.${minor}.${patch}`;
+    const cfg = JSON.parse(fs.readFileSync(this.configPath, "utf-8")) as { stateVersion?: string };
+    if (!cfg.stateVersion) {
+      throw new Error(`stateVersion missing in ${this.configPath}`);
+    }
+    return cfg.stateVersion;
   }
 
   loadState(): DeploymentState {
@@ -129,7 +133,6 @@ export class DeploymentRunner {
       l1SharedBridge: params.l1AssetRouter,
       l1NullifierProxy: params.l1Nullifier ?? ZERO_ADDRESS,
       l1NativeTokenVault: params.l1NativeTokenVault ?? ZERO_ADDRESS,
-      l1AssetTracker: ZERO_ADDRESS,
       l1ERC20Bridge: ZERO_ADDRESS,
       governance: ZERO_ADDRESS,
       transparentProxyAdmin: ZERO_ADDRESS,
@@ -665,23 +668,30 @@ export class DeploymentRunner {
   }
 
   /**
-   * Decompress a hex-gzip state file (produced by --dump-state) into native JSON
-   * that --load-state CLI accepts. Writes a temp file and returns its path.
+   * Decompress a committed state file into the native JSON that the --load-state
+   * CLI accepts. Writes a temp file and returns its path.
    *
-   * State files from --dump-state contain a hex-encoded gzip string ("0x1f8b08...").
-   * The --load-state CLI expects native JSON (SerializableState struct), so we
-   * decompress on the fly. This avoids anvil version issues with anvil_loadState RPC.
+   * Committed states are gzip-compressed (`<chainId>.json.gz`, gzip magic bytes
+   * 0x1f 0x8b) — see dumpAllStates() for why. We gunzip on the fly. The other
+   * branches are backward-compat for older dumps: a hex-encoded gzip string
+   * ("0x1f8b08...") as produced directly by anvil --dump-state, or plain native
+   * JSON. --load-state expects the native SerializableState struct.
    */
-  private decompressStateFile(hexGzipFile: string, outputFile: string): void {
-    const raw = JSON.parse(fs.readFileSync(hexGzipFile, "utf-8"));
+  private decompressStateFile(stateFile: string, outputFile: string): void {
+    const rawBuf = fs.readFileSync(stateFile);
+    // Binary gzip (current format): decompress raw bytes → native JSON.
+    if (rawBuf.length >= 2 && rawBuf[0] === 0x1f && rawBuf[1] === 0x8b) {
+      fs.writeFileSync(outputFile, zlib.gunzipSync(rawBuf));
+      return;
+    }
+    const raw = JSON.parse(rawBuf.toString("utf-8"));
     if (typeof raw === "string" && raw.startsWith("0x1f8b")) {
-      // Hex-encoded gzip: decode hex → decompress gzip → native JSON
+      // Hex-encoded gzip string: decode hex → decompress gzip → native JSON.
       const gzipBuf = Buffer.from(raw.slice(2), "hex");
-      const nativeJson = zlib.gunzipSync(gzipBuf);
-      fs.writeFileSync(outputFile, nativeJson);
+      fs.writeFileSync(outputFile, zlib.gunzipSync(gzipBuf));
     } else {
-      // Already native JSON — copy as-is
-      fs.copyFileSync(hexGzipFile, outputFile);
+      // Already native JSON — copy as-is.
+      fs.writeFileSync(outputFile, rawBuf);
     }
   }
 
@@ -703,8 +713,7 @@ export class DeploymentRunner {
       throw new Error(`addresses.json not found in ${stateDir}`);
     }
     const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf-8"));
-    const { l1Addresses, ctmAddresses, chainAddresses, testTokens, customBaseTokens, tbmAccountingSnapshots, zkToken } =
-      addresses;
+    const { l1Addresses, ctmAddresses, chainAddresses, testTokens, customBaseTokens, zkToken } = addresses;
 
     // Decompress hex-gzip state files to native JSON for --load-state CLI.
     // This is more portable than anvil_loadState RPC across anvil versions.
@@ -714,7 +723,7 @@ export class DeploymentRunner {
 
     const loadStatePaths: Record<number, string> = {};
     for (const chainConfig of config.chains) {
-      const stateFile = path.join(stateDir, `${chainConfig.chainId}.json`);
+      const stateFile = path.join(stateDir, `${chainConfig.chainId}.json.gz`);
       if (!fs.existsSync(stateFile)) {
         throw new Error(`State file not found: ${stateFile}`);
       }
@@ -761,9 +770,6 @@ export class DeploymentRunner {
     }
     if (customBaseTokens) {
       state.customBaseTokens = customBaseTokens;
-    }
-    if (tbmAccountingSnapshots) {
-      state.tbmAccountingSnapshots = tbmAccountingSnapshots;
     }
     if (zkToken) {
       state.zkToken = zkToken;
@@ -826,10 +832,17 @@ export class DeploymentRunner {
       const raw = JSON.parse(fs.readFileSync(statePath, "utf-8"));
       delete raw.transactions;
       delete raw.historical_states;
-      fs.writeFileSync(statePath, JSON.stringify(raw, null, 2));
 
-      const size = fs.statSync(statePath).size;
-      console.log(`  Chain ${chainConfig.chainId} state saved (${(size / 1024).toFixed(0)} KB)`);
+      // Commit the state gzip-compressed (`<chainId>.json.gz`): the dumps are multi-MB, and as raw
+      // JSON every regeneration floods PRs with an unreviewable text diff. loadChainStates()
+      // gunzips them on the fly.
+      const gzipPath = `${statePath}.gz`;
+      fs.writeFileSync(gzipPath, zlib.gzipSync(JSON.stringify(raw), { level: 9 }));
+      // Drop the raw JSON dump so only the compressed artifact is committed.
+      fs.rmSync(statePath);
+
+      const size = fs.statSync(gzipPath).size;
+      console.log(`  Chain ${chainConfig.chainId} state saved (${(size / 1024).toFixed(0)} KB, gzip)`);
     }
   }
 
@@ -908,7 +921,6 @@ export class DeploymentRunner {
       gwSettledChainIds,
       l2ChainRpcUrls
     );
-    this.saveTbmAccountingSnapshots(gatewaySetupResult.tbmAccountingSnapshots);
     const gatewayCTMAddr = gatewaySetupResult.gatewayCTMAddr;
 
     console.log(`  Gateway CTM: ${gatewayCTMAddr}`);
@@ -944,11 +956,11 @@ export class DeploymentRunner {
   }
 
   /**
-   * Full setup: deploy + test tokens + Token Balance Migration (TBM).
+   * Full setup: deploy + test tokens + wrapped-ZK seeding.
    *
    * Used by both `setup-and-dump-state.ts` and `run-hardhat-interop-test.ts` (fresh deploy path).
-   * TBM registers and migrates test tokens on GW-settled chains so that
-   * assetMigrationNumber matches migrationNumber (required for interop transfers).
+   * Thin wrapper over {@link deployAndSetup} that additionally seeds wrapped ZK balances on
+   * ETH-base-token L2 chains (no on-chain balance migration step is needed anymore).
    */
   async deployAndSetupWithTBM(
     anvilManager: AnvilManager,
@@ -956,49 +968,10 @@ export class DeploymentRunner {
   ): Promise<FullDeploymentResult> {
     const result = await this.deployAndSetup(anvilManager, options);
 
-    const config = this.getConfig();
-    const gwSettledChainIds = getChainIdsByRole(config.chains, "gwSettled");
-    const gatewayConfig = config.chains.find((c) => c.role === "gateway");
-
-    if (gwSettledChainIds.length > 0 && gatewayConfig) {
-      const state = this.loadState();
-      if (state.testTokens && Object.keys(state.testTokens).length > 0) {
-        const gwChain = state.chains!.l2.find((c) => c.chainId === gatewayConfig.chainId)!;
-        const gwDiamondProxy = state.chainAddresses!.find((c) => c.chainId === gatewayConfig.chainId)!.diamondProxy;
-        const l2ChainRpcUrls = new Map(state.chains!.l2.map((c) => [c.chainId, c.rpcUrl]));
-
-        const tbmAccountingSnapshots = await registerAndMigrateTestTokens({
-          gwSettledChainIds,
-          l2ChainRpcUrls,
-          testTokens: state.testTokens,
-          l1RpcUrl: state.chains!.l1!.rpcUrl,
-          gwRpcUrl: gwChain.rpcUrl,
-          l1AssetTrackerAddr: result.l1Addresses.l1AssetTracker,
-          gwDiamondProxyAddr: gwDiamondProxy,
-          chainAddresses: state.chainAddresses!,
-          logger: (line) => console.log(line),
-        });
-        this.saveTbmAccountingSnapshots(tbmAccountingSnapshots);
-      }
-    }
-
-    const stateAfterTbm = this.loadState();
-    await this.seedWrappedZkOnEthChains(stateAfterTbm);
+    const state = this.loadState();
+    await this.seedWrappedZkOnEthChains(state);
 
     return result;
-  }
-
-  private saveTbmAccountingSnapshots(snapshots: TbmAccountingSnapshot[] | undefined): void {
-    if (!snapshots || snapshots.length === 0) {
-      return;
-    }
-
-    const state = this.loadState();
-    state.tbmAccountingSnapshots = state.tbmAccountingSnapshots || {};
-    for (const snapshot of snapshots) {
-      state.tbmAccountingSnapshots[tbmAccountingSnapshotKey(snapshot.chainId, snapshot.assetId)] = snapshot;
-    }
-    this.saveState(state);
   }
 }
 

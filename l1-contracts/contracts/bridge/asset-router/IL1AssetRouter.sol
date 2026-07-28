@@ -12,9 +12,10 @@ import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {TxStatus} from "../../common/Messaging.sol";
 
-/// @title L1 Bridge contract interface
+/// @title L1 Asset Router interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
+/// @notice The L1 side of asset routing. See {protocol-docs/bridging.md#asset-routing-burn--mint}.
 interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy, IL1CrossChainSender {
     event ClaimedFailedDepositAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
@@ -82,14 +83,18 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy, IL1CrossCha
 
     function setNativeTokenVault(INativeTokenVaultBase _nativeTokenVault) external;
 
+    function setL1InteropHandler(address _l1InteropHandler) external;
+
     function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external;
 
-    /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on L2.
+    /// @notice Confirms the result of an initiated deposit, dispatching it to the asset handler
+    /// (on failure the deposited funds are disbursed back to the depositor).
+    /// @dev Called by the L1Nullifier after it has verified and cleared the recorded deposit.
     /// @param _chainId The ZK chain id to which the deposit was initiated.
+    /// @param _txStatus The status the L1 -> L2 deposit transaction finalized with.
     /// @param _depositSender The address of the entity that initiated the deposit.
     /// @param _assetId The unique identifier of the deposited L1 token.
     /// @param _assetData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver. Might include extra information.
-    /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
     function bridgeConfirmTransferResult(
         uint256 _chainId,
         TxStatus _txStatus,

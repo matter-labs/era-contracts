@@ -937,14 +937,10 @@ fn write_merged_ecosystem_toml(
     extra_stage0: &[crate::common::governance_calls::GovernanceCall],
     zk_governance: Option<&crate::commands::ecosystem::zk_governance::ZkGovernanceOutcome>,
     new_gateway_tomls: &[PathBuf],
-    zk_token_asset_id: B256,
+    _zk_token_asset_id: B256,
     dst: &Path,
 ) -> anyhow::Result<()> {
-    use alloy::primitives::{keccak256, U256};
-
-    use crate::common::governance_calls::{
-        empty_calls_hex, encode_calls, merge_call_array_hex, GovernanceCall,
-    };
+    use crate::common::governance_calls::{empty_calls_hex, encode_calls, merge_call_array_hex};
     use toml::value::{Table, Value};
 
     if let Some(parent) = dst.parent() {
@@ -1040,33 +1036,10 @@ fn write_merged_ecosystem_toml(
     // the rest (per-contract addresses + diamond cut data) under a top-level
     // `[new_gateway]` block so reviewers can still audit the deployed addresses.
     //
-    // Before appending the GW bundle, *prepend* a call to
-    // `L1AssetTracker.registerLegacyToken(zkTokenAssetId)`. The GW bundle
-    // contains L1→L2 priority txs that charge the GW's base token (ZK on
-    // ZKsyncOS chains); after stage 1 swaps the NTV to v31, those base-token
-    // burns route through `L1AssetTracker.handleChainBalanceIncreaseOnL1`
-    // which calls `_requireRegistered`. The registration normally happens in
-    // stage3 (post-governance), so without this prepend the GW priority txs
-    // revert with `AssetIdNotRegistered`. The injected call is idempotent on
-    // the assetId (its `isAssetRegistered` guard short-circuits a second
-    // call), so stage3 still succeeds when it walks the same assetId later.
-    // When `[new_gateway]` is configured, prepend a `registerLegacyToken`
-    // call (once), then append each GW TOML's `governance_calls_to_execute`
-    // to stage 2. Multiple GW TOMLs arise when more than one CTM is
-    // deployed on the gateway (e.g. both Era + ZKsyncOS).
+    // When `[new_gateway]` is configured, append each GW TOML's
+    // `governance_calls_to_execute` to stage 2. Multiple GW TOMLs arise when
+    // more than one CTM is deployed on the gateway (e.g. both Era + ZKsyncOS).
     let new_gateway_body: Option<Table> = if !new_gateway_tomls.is_empty() {
-        let asset_tracker = read_asset_tracker_proxy_from_core(core_toml)?;
-        let selector = &keccak256(b"registerLegacyToken(bytes32)")[..4];
-        let mut data = Vec::with_capacity(36);
-        data.extend_from_slice(selector);
-        data.extend_from_slice(zk_token_asset_id.as_slice());
-        let prefix = vec![GovernanceCall {
-            target: asset_tracker,
-            value: U256::ZERO,
-            data,
-        }];
-        stage2.push(format!("0x{}", hex::encode(encode_calls(&prefix))));
-
         let mut first_body: Option<Table> = None;
         for path in new_gateway_tomls {
             let raw =
@@ -1250,33 +1223,6 @@ pub(super) fn read_pre_governance_accept_ownership_calls(
         format!(
             "decode pre_governance_accept_ownerships.calls from {}",
             path.display()
-        )
-    })
-}
-
-/// `GatewayVotePreparation` emitted. After phase 2 broadcasts those bundles
-/// the new pendingOwner becomes `new_pending_owner`; stage-2 governance's
-/// `acceptOwnership()` (also routed to PUH by the merge step) then succeeds.
-///
-/// Pull `asset_tracker_proxy_addr` off the core prepare TOML. Same data
-/// `prepare_new_gateway::read_asset_tracker_proxy` reads — duplicated here
-/// because the merge step also needs it for the stage-2 prefix call, and
-/// keeping it crate-local avoids pulling the gateway-prepare module into
-/// the merge module.
-fn read_asset_tracker_proxy_from_core(core_toml: &Path) -> anyhow::Result<Address> {
-    #[derive(serde::Deserialize)]
-    struct Top {
-        asset_tracker_proxy_addr: String,
-    }
-    let raw =
-        fs::read_to_string(core_toml).with_context(|| format!("read {}", core_toml.display()))?;
-    let top: Top =
-        toml::from_str(&raw).with_context(|| format!("parse {}", core_toml.display()))?;
-    top.asset_tracker_proxy_addr.parse().with_context(|| {
-        format!(
-            "asset_tracker_proxy_addr in {} is not a valid address: {}",
-            core_toml.display(),
-            top.asset_tracker_proxy_addr,
         )
     })
 }

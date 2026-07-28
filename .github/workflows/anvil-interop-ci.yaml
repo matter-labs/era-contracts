@@ -80,6 +80,11 @@ jobs:
 
       - name: Run interop tests (preloaded state)
         working-directory: l1-contracts/test/anvil-interop
+        env:
+          # Each worker spawns 6 Anvil chains + a hardhat process; running all 10 spec groups at
+          # once oversubscribes the 4-core runner and causes load-dependent RPC flakes (worker
+          # failures mid-spec). Cap concurrency; locally the suite stays fully parallel.
+          ANVIL_INTEROP_MAX_PARALLEL_WORKERS: "4"
         run: |
           echo "Running interop tests with preloaded chain states..."
           yarn ts-node run-hardhat-interop-test.ts
@@ -198,14 +203,20 @@ jobs:
         run: |
           bash cleanup.sh
 
-  # TODO: Re-enable after merging to main. The 'Regenerate Anvil Interop Chain States'
-  # workflow_dispatch workflow needs to be on main before it can be triggered from the UI/CLI.
-  # Once on main, re-enable this check and use the regenerate workflow to update states.
+  # Mandatory determinism gate for the current protocol version's chain state:
+  # rebuilds the state from scratch and verifies it matches the committed
+  # snapshots. If a contract change alters genesis state, this fails —
+  # regenerate via the 'Regenerate Anvil Interop Chain States' workflow and push.
   #
-  # Parallel job: rebuilds chain state from scratch and verifies determinism.
-  # This ensures the committed chain-states stay reproducible.
+  # The compare tolerates block-number-derived drift: the harness runs Anvil with
+  # interval mining (`--block-time 1`, required so the interop relayers/TBM keep
+  # progressing), so the block count is wall-clock-dependent. compare-chain-states
+  # ignores block.number and storage slots that just hold a block number (values
+  # ≤ block height), plus the block-indexed MessageRoot storage. Everything else
+  # (balances, roots, addresses, code, protocol version) must match exactly, so
+  # this still catches real drift. To block merges, add "state-generation-check"
+  # to the branch protection required checks.
   state-generation-check:
-    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -258,7 +269,7 @@ jobs:
             echo "Committed chain states are up to date"
           else
             echo ""
-            echo "Committed chain-states differ from freshly generated state."
+            echo "Committed chain-states differ from freshly generated state (beyond block-number drift)."
             echo "Run the 'Regenerate Anvil Interop Chain States' workflow from the Actions tab to update them."
             exit 1
           fi

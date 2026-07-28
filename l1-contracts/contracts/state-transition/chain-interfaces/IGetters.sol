@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
 import {IZKChainBase} from "./IZKChainBase.sol";
-import {L2DACommitmentScheme} from "../../common/Config.sol";
+import {L2DACommitmentScheme, PubdataContent} from "../../common/Config.sol";
 
 /// @title The interface of the Getters Contract that implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs
@@ -128,6 +128,10 @@ interface IGetters is IZKChainBase {
     /// @return The maximum number of L2 gas that a user can request for L1 -> L2 transactions
     function getPriorityTxMaxGasLimit() external view returns (uint256);
 
+    /// @return The effective ZKsync OS single-transaction gas limit (EIP-7825), with the default
+    /// substituted when the value was never set explicitly.
+    function getZKsyncOSMaxTxGasLimit() external view returns (uint64);
+
     /// @return Whether a withdrawal has been finalized.
     /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
     /// @param _l2MessageIndex The index of the L2->L1 message denoting the withdrawal.
@@ -177,6 +181,9 @@ interface IGetters is IZKChainBase {
 
     /// @return DA configuration.
     function getDAValidatorPair() external view returns (address, L2DACommitmentScheme);
+
+    /// @return The pubdata content (full pubdata vs logs-only).
+    function getPubdataContent() external view returns (PubdataContent);
 
     /// @return Whether the chain uses ZKsyncOS.
     function getZKsyncOS() external view returns (bool);

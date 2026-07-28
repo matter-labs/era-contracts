@@ -19,6 +19,7 @@ import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
 
 import {
+    CHAIN_MIGRATIONS_ENABLED,
     L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS,
     MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
     MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1,
@@ -37,7 +38,12 @@ import {
     ZKChainNotRegistered,
     IteratedMigrationsNotSupported
 } from "../bridgehub/L1BridgehubErrors.sol";
-import {ChainIdNotRegistered, MigrationPaused, NotAssetRouter} from "../../common/L1ContractErrors.sol";
+import {
+    ChainIdNotRegistered,
+    ChainMigrationsDisabled,
+    MigrationPaused,
+    NotAssetRouter
+} from "../../common/L1ContractErrors.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetHandlerModifiers} from "../../bridge/interfaces/AssetHandlerModifiers.sol";
@@ -46,9 +52,8 @@ import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev The ChainAssetHandler contract is used for migrating chains between settlement layers,
-/// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
-/// between different settlement layers (for example from L1 to Gateway).
+/// @notice The asset handler that treats chains themselves as bridgeable assets of their CTM,
+/// used to migrate chains between settlement layers. See {protocol-docs/chain-lifecycle.md#settlement-layer-migration-chainassethandler}.
 abstract contract ChainAssetHandlerBase is
     IChainAssetHandlerBase,
     IChainAssetHandlerShared,
@@ -124,6 +129,27 @@ abstract contract ChainAssetHandlerBase is
         _;
     }
 
+    /// @notice Only when chain migrations are enabled in the current release.
+    /// @dev A release-level ban (unlike the runtime `migrationPaused` flag); disabled in v32.
+    /// See {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}.
+    modifier whenMigrationsEnabled() {
+        if (!_chainMigrationsEnabled()) {
+            revert ChainMigrationsDisabled();
+        }
+        _;
+    }
+
+    /// @inheritdoc IChainAssetHandlerBase
+    function migrationsEnabled() external view returns (bool) {
+        return _chainMigrationsEnabled();
+    }
+
+    /// @dev Virtual ONLY so dev/test variants can re-enable migrations for test coverage;
+    /// production contracts MUST NOT override this.
+    function _chainMigrationsEnabled() internal view virtual returns (bool) {
+        return CHAIN_MIGRATIONS_ENABLED;
+    }
+
     modifier onlySystemContext() {
         if (msg.sender != L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR) {
             revert NotSystemContext(msg.sender);
@@ -148,11 +174,13 @@ abstract contract ChainAssetHandlerBase is
                         Chain migration
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice IL1AssetHandler interface, used to migrate (transfer) a chain to the settlement layer.
-    /// @param _settlementChainId the chainId of the settlement chain, i.e. where the message and the migrating chain is sent.
-    /// @param _assetId the assetId of the migrating chain's CTM
-    /// @param _originalCaller the message sender initiated a set of calls that leads to bridge burn
-    /// @param _data the data for the migration
+    /// @notice `IAssetHandler` entry point that migrates (transfers) a chain to the settlement layer
+    /// `_settlementChainId`: collects the chain's migration data and de-registers it locally.
+    /// See {protocol-docs/chain-lifecycle.md#role}.
+    /// @param _settlementChainId The chainId of the settlement chain the migrating chain is sent to.
+    /// @param _assetId The assetId of the migrating chain's CTM.
+    /// @param _originalCaller The sender that initiated the calls leading to this bridge burn.
+    /// @param _data The data for the migration.
     // slither-disable-next-line locked-ether
     function bridgeBurn(
         uint256 _settlementChainId,
@@ -168,6 +196,7 @@ abstract contract ChainAssetHandlerBase is
         onlyAssetRouter
         whenNotPaused
         whenMigrationsNotPaused
+        whenMigrationsEnabled
         returns (bytes memory bridgehubMintData)
     {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
@@ -294,8 +323,9 @@ abstract contract ChainAssetHandlerBase is
             originChainId: 0
         });
         if (block.chainid == _l1ChainId()) {
-            // We only need to define these values when migrating to GW
-            // This is so that the GW Asset Tracker can register the chain's base token
+            // We only need to define these values when migrating to GW.
+            // The destination chain's L2NativeTokenVault.updateL2 consumes originToken/originChainId
+            // to initialize its base token.
             IL1AssetRouter l1AssetRouter = IL1AssetRouter(address(_assetRouter()));
             INativeTokenVaultBase l1Ntv = l1AssetRouter.nativeTokenVault();
             baseTokenBridgingData.originToken = l1Ntv.originToken(assetId);
@@ -320,15 +350,25 @@ abstract contract ChainAssetHandlerBase is
 
     function _setMigrationInProgressOnL1(uint256 _chainId) internal virtual {}
 
-    /// @dev IAssetHandler interface, used to receive a chain on the settlement layer.
-    /// @param _assetId the assetId of the chain's CTM
-    /// @param _bridgehubMintData the data for the mint
+    /// @notice `IAssetHandler` entry point that receives a chain on the settlement layer:
+    /// deploys/re-registers it there. See {protocol-docs/chain-lifecycle.md#role}.
+    /// @param _assetId The assetId of the chain's CTM.
+    /// @param _bridgehubMintData The data for the mint.
     // slither-disable-next-line locked-ether
     function bridgeMint(
         uint256, // unused originChainId: chain assets are identified by _assetId.
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
-    ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused whenMigrationsNotPaused {
+    )
+        external
+        payable
+        override
+        requireZeroValue(msg.value)
+        onlyAssetRouter
+        whenNotPaused
+        whenMigrationsNotPaused
+        whenMigrationsEnabled
+    {
         BridgehubMintCTMAssetData memory bridgehubMintData = abi.decode(
             _bridgehubMintData,
             (BridgehubMintCTMAssetData)
@@ -368,12 +408,14 @@ abstract contract ChainAssetHandlerBase is
             // We allow migrating chains that were not previously registered on this settlement layer,
             // so the chain is registered here during bridgeMint.
             IBridgehubBase(_bridgehub()).registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
+            // IMPORTANT: a chain registered here gets NO genesis batch leaf in this layer's message
+            // root — safe only while L1 is the sole anchor for atomic-interop timeout proofs.
+            // See "Migrated chains and the message root" in {protocol-docs/chain-lifecycle.md#migrated-chains-and-the-message-root-important}.
             _messageRoot().addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
         } else {
-            // Note, that here we rely on the correctness of the provided data.
-            // A malicious settlement layer could provide invalid values here.
-            // To support untrusted CTMs, we would need to at the very least enforce
-            // that the `v31UpgradeChainBatchNumber` is not in conflict with the existing values.
+            // Trusts the provided data; a malicious settlement layer could supply invalid values.
+            // Supporting untrusted CTMs would at least require checking `v31UpgradeChainBatchNumber`
+            // for conflicts with existing values.
             _messageRoot().setMigratingChainBatchNumber(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
         }
 

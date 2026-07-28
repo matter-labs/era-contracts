@@ -217,15 +217,6 @@ pub mod i_register_on_all_chains {
 }
 pub use i_register_on_all_chains::IRegisterOnAllChainsAbi;
 
-pub mod i_gateway_migrate_token_balances {
-    alloy::sol!(
-        #[sol(rpc)]
-        IGatewayMigrateTokenBalancesAbi,
-        "../l1-contracts/zkstack-out/IGatewayMigrateTokenBalances.sol/IGatewayMigrateTokenBalances.json"
-    );
-}
-pub use i_gateway_migrate_token_balances::IGatewayMigrateTokenBalancesAbi;
-
 pub mod i_finalize_upgrade {
     alloy::sol!(
         #[sol(rpc)]
@@ -271,24 +262,6 @@ pub mod il2_asset_router {
 }
 pub use il2_asset_router::IL2AssetRouterAbi;
 
-pub mod i_asset_tracker_base {
-    alloy::sol!(
-        #[sol(rpc)]
-        IAssetTrackerBaseAbi,
-        "../l1-contracts/zkstack-out/IAssetTrackerBase.sol/IAssetTrackerBase.json"
-    );
-}
-pub use i_asset_tracker_base::IAssetTrackerBaseAbi;
-
-pub mod il1_asset_tracker {
-    alloy::sol!(
-        #[sol(rpc)]
-        IL1AssetTrackerAbi,
-        "../l1-contracts/zkstack-out/IL1AssetTracker.sol/IL1AssetTracker.json"
-    );
-}
-pub use il1_asset_tracker::IL1AssetTrackerAbi;
-
 pub mod il2_asset_tracker {
     alloy::sol!(
         #[sol(rpc)]
@@ -297,15 +270,6 @@ pub mod il2_asset_tracker {
     );
 }
 pub use il2_asset_tracker::IL2AssetTrackerAbi;
-
-pub mod igw_asset_tracker {
-    alloy::sol!(
-        #[sol(rpc)]
-        IGWAssetTrackerAbi,
-        "../l1-contracts/zkstack-out/IGWAssetTracker.sol/IGWAssetTracker.json"
-    );
-}
-pub use igw_asset_tracker::IGWAssetTrackerAbi;
 
 pub mod i_setup_legacy_bridge {
     alloy::sol!(

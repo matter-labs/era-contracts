@@ -69,6 +69,14 @@ contract TestAssetRouterBase is AssetRouterBase {
         return IBridgehubBase(address(1));
     }
 
+    function _interopHandler() internal view override returns (address) {
+        return address(1);
+    }
+
+    function _isValidInteropSender(uint256, address) internal view override returns (bool) {
+        return true;
+    }
+
     function _l1ChainId() internal view returns (uint256) {
         return 1;
     }

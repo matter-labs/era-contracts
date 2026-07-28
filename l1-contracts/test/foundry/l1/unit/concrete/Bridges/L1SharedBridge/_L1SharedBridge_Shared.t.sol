@@ -14,13 +14,11 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 
-import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {IBaseTokenAssetHandler} from "contracts/bridge/interfaces/IBaseTokenAssetHandler.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -82,7 +80,6 @@ contract L1AssetRouterTest is Test {
     address l1WethAddress;
     address l2SharedBridge;
     address l1NullifierAddress;
-    L1AssetTracker l1AssetTracker;
     TestnetERC20Token token;
     bytes32 tokenAssetId;
     uint256 eraPostUpgradeFirstBatch;
@@ -194,10 +191,6 @@ contract L1AssetRouterTest is Test {
             abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
             abi.encode(0)
         );
-        l1AssetTracker = new L1AssetTracker(bridgehubAddress, address(nativeTokenVault), messageRootAddress);
-        vm.prank(owner);
-        nativeTokenVault.setAssetTracker(address(l1AssetTracker));
-
         vm.prank(owner);
         l1Nullifier.setL1AssetRouter(address(sharedBridge));
         vm.prank(owner);
@@ -247,25 +240,8 @@ contract L1AssetRouterTest is Test {
             abi.encodeWithSelector(IL1Bridgehub.requestL2TransactionDirect.selector),
             abi.encode(txHash)
         );
-        bytes32 ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
-        stdstore
-            .target(address(l1AssetTracker))
-            .sig(IAssetTrackerBase.chainBalance.selector)
-            .with_key(eraChainId)
-            .with_key(ETH_TOKEN_ASSET_ID)
-            .checked_write(100);
-        stdstore
-            .target(address(l1AssetTracker))
-            .sig(IAssetTrackerBase.chainBalance.selector)
-            .with_key(chainId)
-            .with_key(ETH_TOKEN_ASSET_ID)
-            .checked_write(100);
-        stdstore
-            .target(address(l1AssetTracker))
-            .sig(IAssetTrackerBase.chainBalance.selector)
-            .with_key(chainId)
-            .with_key(tokenAssetId)
-            .checked_write(100);
+        _setAssetTrackerChainBalance(eraChainId, ETH_TOKEN_ADDRESS, 100);
+        _setAssetTrackerChainBalance(chainId, address(token), 100);
 
         token.mint(address(nativeTokenVault), amount);
 
@@ -316,11 +292,6 @@ contract L1AssetRouterTest is Test {
         );
 
         vm.mockCall(
-            l1NullifierAddress,
-            abi.encodeWithSelector(IL1Nullifier.getTransientSettlementLayer.selector),
-            abi.encode(0)
-        );
-        vm.mockCall(
             messageRootAddress,
             abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
@@ -336,6 +307,7 @@ contract L1AssetRouterTest is Test {
                     batchLeafProofLen: 0,
                     batchSettlementRoot: 0,
                     chainIdLeaf: 0,
+                    l1BatchTimestamp: 0,
                     ptr: 0,
                     finalProofNode: false
                 })
@@ -352,12 +324,15 @@ contract L1AssetRouterTest is Test {
             .checked_write(_txDataHash);
     }
 
+    /// @dev Per-chain balance enforcement was removed together with the L1 asset tracker; the
+    /// equivalent accounting is the NTV's per-asset `bridgedOut` net outflow. The `_chainId`
+    /// parameter is kept so historical call sites read unchanged.
+    // solhint-disable-next-line no-unused-vars
     function _setAssetTrackerChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
         stdstore
-            .target(address(l1AssetTracker))
-            .sig(IAssetTrackerBase.chainBalance.selector)
-            .with_key(_chainId)
+            .target(address(nativeTokenVault))
+            .sig(nativeTokenVault.bridgedOut.selector)
             .with_key(assetId)
             .checked_write(_value);
     }

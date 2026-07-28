@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-use alloy::primitives::{Address, B256, U256};
+use alloy::primitives::{Address, B256};
 use anyhow::Context;
 use serde::Deserialize;
 
@@ -94,12 +94,6 @@ pub struct ChainInterval {
 pub struct NewGatewayConfig {
     /// Chain ID of the gateway being brought up (e.g. 2708 for stage).
     pub chain_id: u64,
-    /// Initial `gatewaySettlementFee` (wrapped-ZK wei) to write to the GW's
-    /// `GWAssetTracker.setGatewaySettlementFee` via L1→L2 priority tx.
-    /// Quoted with a `0x` prefix in TOML — alloy's `U256` serde reads quoted
-    /// strings as hex (raw decimal in quotes is treated as a hex literal),
-    /// so the TOML value must look like `settlement_fee = "0x3b9aca00"`.
-    pub settlement_fee: U256,
     /// Where unused L1→L2 priority-tx gas is refunded. EOAs work as-is
     /// (`AddressAliasHelper` is a no-op on them), so the natural default is
     /// the deployer EOA that publishes the call on L1 — `prepare_new_gateway`
@@ -547,8 +541,6 @@ mod tests {
             .expect("permanent-values/stage.toml must carry [legacy_gateway]");
         assert_eq!(legacy_gateway.chain_id, 123);
         assert_eq!(ng.chain_id, 2709);
-        // 0.2 ZK = 2e17 wei, sized for ~$0.01 per interop call at ZK ≈ $0.05.
-        assert_eq!(ng.settlement_fee, U256::from(200_000_000_000_000_000u128));
         // GW 2708 is a ZKsync OS chain → CTM source is Atlas (witness 2702).
         assert_eq!(ng.ctm_representative_chain_id, 2702);
     }

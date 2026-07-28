@@ -15,13 +15,12 @@ struct SetUpgradeTimestampOutput {
     access_control_restriction: Address,
     bridgehub: Address,
     chain_id: u64,
-    new_protocol_version: String,
     upgrade_timestamp: String,
 }
 
 /// Set chain-upgrade timestamp, prepare-only.
 ///
-/// Drives `AdminFunctions.s.sol::adminScheduleUpgrade(admin, acr, version, ts)`
+/// Drives `AdminFunctions.s.sol::adminScheduleUpgrade(admin, acr, bridgehub, chainId, ts)`
 /// against a forked anvil, emits a Gnosis Safe Transaction Builder JSON bundle
 /// via `--out`, and never broadcasts. Apply the bundle via
 /// `protocol-ops dev execute-safe` (or any Safe-bundle-aware executor).
@@ -36,9 +35,6 @@ pub struct ChainSetUpgradeTimestampArgs {
     /// Pass explicitly when the chain uses an access-control-restriction.
     #[clap(long, default_value = ZERO_ADDRESS)]
     pub access_control_restriction: Address,
-    /// New packed protocol version (uint256)
-    #[clap(long)]
-    pub new_protocol_version: String,
     /// Upgrade timestamp (unix seconds)
     #[clap(long)]
     pub upgrade_timestamp: String,
@@ -51,10 +47,6 @@ pub struct ChainSetUpgradeTimestampArgs {
 pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
-    let new_protocol_version = args
-        .new_protocol_version
-        .parse::<U256>()
-        .context("invalid new_protocol_version: expected decimal or hex uint256")?;
     let upgrade_timestamp = args
         .upgrade_timestamp
         .parse::<U256>()
@@ -76,7 +68,6 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
             _accessControlRestriction: args.access_control_restriction,
             _bridgehub: bridgehub,
             _chainId: U256::from(chain_id),
-            _newProtocolVersion: new_protocol_version,
             _timestamp: upgrade_timestamp,
         })
         // `--broadcast` against the anvil fork. In this mode the
@@ -95,10 +86,6 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     ));
     logger::info(format!("Bridgehub: {:#x}", bridgehub));
     logger::info(format!("Chain ID: {}", chain_id));
-    logger::info(format!(
-        "New protocol version: {}",
-        args.new_protocol_version
-    ));
     logger::info(format!("Upgrade timestamp: {}", args.upgrade_timestamp));
     logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));
 
@@ -116,7 +103,6 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
             access_control_restriction: args.access_control_restriction,
             bridgehub,
             chain_id,
-            new_protocol_version: args.new_protocol_version.clone(),
             upgrade_timestamp: args.upgrade_timestamp.clone(),
         },
     )

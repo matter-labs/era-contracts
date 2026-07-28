@@ -83,7 +83,6 @@ export class ForgeDeployer {
       l1SharedBridge: bridges.shared_bridge_proxy_addr as string,
       l1NullifierProxy: bridges.l1_nullifier_proxy_addr as string,
       l1NativeTokenVault: deployed.native_token_vault_addr as string,
-      l1AssetTracker: bridgehub.l1_asset_tracker_proxy_addr as string,
       l1ERC20Bridge: bridges.erc20_bridge_proxy_addr as string,
       governance: deployed.governance_addr as string,
       transparentProxyAdmin: deployed.transparent_proxy_admin_addr as string,

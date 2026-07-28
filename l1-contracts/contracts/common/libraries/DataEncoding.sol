@@ -2,10 +2,13 @@
 
 pragma solidity 0.8.28;
 
-import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_ROUTER_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
 import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1ERC20Bridge} from "../../bridge/interfaces/IL1ERC20Bridge.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
+import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
+import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
+import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 import {
     AssetIdMismatch,
     IncorrectTokenAddressFromNTV,
@@ -16,11 +19,8 @@ import {
     EmptyData
 } from "../L1ContractErrors.sol";
 import {WrongMsgLength} from "../../bridge/L1BridgeContractErrors.sol";
-import {InvalidFunctionSignature} from "../../bridge/asset-tracker/AssetTrackerErrors.sol";
-import {IAssetTrackerDataEncoding} from "../../bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 import {UnsafeBytes} from "./UnsafeBytes.sol";
-import {GatewayToL1TokenBalanceMigrationData, L1ToGatewayTokenBalanceMigrationData} from "../../common/Messaging.sol";
-import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
+import {InteropCallStarter} from "../../common/Messaging.sol";
 
 /**
  * @author Matter Labs
@@ -227,51 +227,6 @@ library DataEncoding {
         return bytes.concat(NEW_ENCODING_VERSION, abi.encode(_chainId, _name, _symbol, _decimals));
     }
 
-    /// @notice Encodes the asset tracker data by combining chain id, asset id, amount, minting chain status and settlement layer balance.
-    /// @param _chainId The id of the chain being migrated.
-    /// @param _assetId The id of the asset being migrated.
-    /// @param _amount The amount being migrated.
-    /// @param _migratingChainIsMinter Whether the migrating chain is a minter.
-    /// @param _hasSettlingMintingChains Whether there are still settling minting chains.
-    /// @param _newSLBalance The new settlement layer balance.
-    /// @return The encoded asset tracker data.
-    function encodeAssetTrackerData(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        bool _migratingChainIsMinter,
-        bool _hasSettlingMintingChains,
-        uint256 _newSLBalance
-    ) internal pure returns (bytes memory) {
-        return
-            abi.encode(_chainId, _assetId, _amount, _migratingChainIsMinter, _hasSettlingMintingChains, _newSLBalance);
-    }
-
-    /// @notice Decodes the asset tracker data into its component parts.
-    /// @param _data The encoded asset tracker data.
-    /// @return chainId The id of the chain being migrated.
-    /// @return assetId The id of the asset being migrated.
-    /// @return amount The amount being migrated.
-    /// @return migratingChainIsMinter Whether the migrating chain is a minter.
-    /// @return hasSettlingMintingChains Whether there are still settling minting chains.
-    /// @return newSLBalance The new settlement layer balance.
-    function decodeAssetTrackerData(
-        bytes calldata _data
-    )
-        internal
-        pure
-        returns (
-            uint256 chainId,
-            bytes32 assetId,
-            uint256 amount,
-            bool migratingChainIsMinter,
-            bool hasSettlingMintingChains,
-            uint256 newSLBalance
-        )
-    {
-        return abi.decode(_data, (uint256, bytes32, uint256, bool, bool, uint256));
-    }
-
     /// @notice Checks if the assetId is correct.
     /// @param _tokenOriginChainId The chain id of the token origin.
     /// @param _assetId The asset id to check.
@@ -282,20 +237,6 @@ library DataEncoding {
             // Make sure that a NativeTokenVault sent the message
             revert AssetIdMismatch(expectedAssetId, _assetId);
         }
-    }
-
-    function decodeBaseTokenFinalizeWithdrawalData(
-        bytes memory _l2ToL1message
-    ) internal pure returns (bytes4 functionSignature, address l1Receiver, uint256 amount) {
-        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
-        functionSignature = bytes4(functionSignatureUint);
-
-        // The data is expected to be at least 56 bytes long.
-        require(_l2ToL1message.length >= 56, L2WithdrawalMessageWrongLength(_l2ToL1message.length));
-        // this message is a base token withdrawal
-        (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-        // slither-disable-next-line unused-return
-        (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
     }
 
     function encodeL1ERC20BridgeFinalizeWithdrawalData(
@@ -368,30 +309,73 @@ library DataEncoding {
         transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
     }
 
-    function decodeL1ToGatewayTokenBalanceMigrationData(
+    /// @notice Decodes the base token withdrawal message emitted by the L2 base token system contract.
+    /// @param _l2ToL1message The L2 to L1 message to be decoded.
+    /// @return functionSignature The function signature of the message.
+    /// @return l1Receiver The address of the L1 receiver.
+    /// @return amount The amount of base token withdrawn.
+    function decodeBaseTokenFinalizeWithdrawalData(
         bytes memory _l2ToL1message
-    ) internal pure returns (bytes4 functionSignature, L1ToGatewayTokenBalanceMigrationData memory data) {
+    ) internal pure returns (bytes4 functionSignature, address l1Receiver, uint256 amount) {
         (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         functionSignature = bytes4(functionSignatureUint);
-        require(
-            functionSignature == IAssetTrackerDataEncoding.receiveL1ToGatewayMigrationOnL1.selector,
-            InvalidFunctionSignature(functionSignature)
-        );
-        bytes memory transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
-        data = abi.decode(transferData, (L1ToGatewayTokenBalanceMigrationData));
+
+        // The data is expected to be at least 56 bytes long.
+        require(_l2ToL1message.length >= 56, L2WithdrawalMessageWrongLength(_l2ToL1message.length));
+        // this message is a base token withdrawal
+        (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
+        // slither-disable-next-line unused-return
+        (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
     }
 
-    function decodeGatewayToL1TokenBalanceMigrationData(
-        bytes memory _l2ToL1message
-    ) internal pure returns (bytes4 functionSignature, GatewayToL1TokenBalanceMigrationData memory data) {
-        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
-        functionSignature = bytes4(functionSignatureUint);
-        require(
-            functionSignature == IAssetTrackerDataEncoding.receiveGatewayToL1MigrationOnL1.selector,
-            InvalidFunctionSignature(functionSignature)
-        );
-        bytes memory transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
-        data = abi.decode(transferData, (GatewayToL1TokenBalanceMigrationData));
+    /// @notice Builds the single indirect-call `InteropCallStarter` for an L2->L1 withdrawal of a registered,
+    /// NON-base-token asset (an ERC20 or the CTM/ZK asset). See {protocol-docs/interop.md#direct-vs-indirect-calls}.
+    /// @dev No base-token value rides the bundle (both value attributes are zero); the withdrawn amount is
+    /// carried inside `_transferData`. For the chain's base token use
+    /// `encodeInteropBaseTokenWithdrawalCallStarters` instead.
+    /// @param _assetId The asset being withdrawn — an ERC20 assetId or the CTM/ZK assetId, NOT a base-token assetId.
+    /// @param _transferData The bridgehub-burn/transfer data for the asset.
+    function encodeInteropWithdrawalCallStarters(
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) internal pure returns (InteropCallStarter[] memory callStarters) {
+        return _encodeInteropWithdrawalCallStarters(_assetId, _transferData, 0);
+    }
+
+    /// @notice Builds the single indirect-call `InteropCallStarter` for an L2->L1 withdrawal of the chain's
+    /// BASE token. See {protocol-docs/interop.md#direct-vs-indirect-calls}.
+    /// @dev The withdrawn amount rides as the `indirectCall` message value, so the caller of
+    /// `InteropCenter.sendBundle` MUST send `_amount` as the transaction value. `interopCallValue` stays zero
+    /// (`NonZeroValueToL1NotSupported`).
+    /// @param _assetId The base-token assetId of the withdrawn token.
+    /// @param _transferData The bridgehub-burn/transfer data for the base token; the amount it encodes must
+    /// match `_amount`.
+    /// @param _amount The withdrawn base-token amount, burned from the `sendBundle` transaction value.
+    function encodeInteropBaseTokenWithdrawalCallStarters(
+        bytes32 _assetId,
+        bytes memory _transferData,
+        uint256 _amount
+    ) internal pure returns (InteropCallStarter[] memory callStarters) {
+        return _encodeInteropWithdrawalCallStarters(_assetId, _transferData, _amount);
+    }
+
+    /// @dev Shared builder for the two withdrawal encoders above; `_indirectCallMessageValue` is the base-token
+    /// amount riding along the indirect call (zero for registered-asset withdrawals).
+    function _encodeInteropWithdrawalCallStarters(
+        bytes32 _assetId,
+        bytes memory _transferData,
+        uint256 _indirectCallMessageValue
+    ) private pure returns (InteropCallStarter[] memory callStarters) {
+        bytes[] memory callAttributes = new bytes[](2);
+        callAttributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (_indirectCallMessageValue));
+        callAttributes[1] = abi.encodeCall(IERC7786Attributes.interopCallValue, (0));
+
+        callStarters = new InteropCallStarter[](1);
+        callStarters[0] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(L2_ASSET_ROUTER_ADDR),
+            data: encodeAssetRouterBridgehubDepositData(_assetId, _transferData),
+            callAttributes: callAttributes
+        });
     }
 
     function getSelector(bytes memory _data) internal pure returns (bytes4) {

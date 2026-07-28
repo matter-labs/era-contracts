@@ -40,6 +40,29 @@
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "recoverBaseToken",
+    "inputs": [
+      {
+        "name": "_to",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_toChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
     "type": "event",
     "name": "BaseTokenBurntInterop",
     "inputs": [
@@ -67,6 +90,25 @@
   {
     "type": "event",
     "name": "BaseTokenMintedInterop",
+    "inputs": [
+      {
+        "name": "to",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "BaseTokenRecovered",
     "inputs": [
       {
         "name": "to",

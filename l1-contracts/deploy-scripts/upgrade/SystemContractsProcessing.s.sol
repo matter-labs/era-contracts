@@ -5,7 +5,6 @@ import {console2 as console} from "forge-std/Script.sol";
 import {Utils} from "../utils/Utils.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {
-    GW_ASSET_TRACKER_ADDR,
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
@@ -200,8 +199,9 @@ library SystemContractsProcessing {
         ids[i++] = CoreContract.BaseTokenHolder;
         ids[i++] = CoreContract.L2AssetTracker;
         ids[i++] = CoreContract.InteropCenter;
-        ids[i++] = CoreContract.InteropHandler;
-        ids[i++] = CoreContract.GWAssetTracker;
+        // Stateless parser called by the InteropCenter on every send; must be co-deployed with it.
+        ids[i++] = CoreContract.InteropAttributeParser;
+        ids[i++] = CoreContract.L2InteropHandler;
         // Under-filling would silently leave `CoreContract(0)` entries; over-filling
         // already reverts with an out-of-bounds access on the fixed-length array.
         require(i == FIXED_ADDRESS_CORE_CONTRACTS_COUNT, "fixed-address core contract count mismatch");

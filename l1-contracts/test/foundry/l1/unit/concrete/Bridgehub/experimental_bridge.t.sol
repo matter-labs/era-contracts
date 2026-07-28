@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
@@ -69,8 +70,6 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {IL1AssetTracker, L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
-
 import {IMessageVerification} from "contracts/common/MessageVerification.sol";
 
 contract ExperimentalBridgeTest is Test {
@@ -95,7 +94,6 @@ contract ExperimentalBridgeTest is Test {
     L1NativeTokenVault ntv;
     IMessageRootBase messageRoot;
     L1Nullifier l1Nullifier;
-    L1AssetTracker assetTracker;
     SimpleExecutor simpleExecutor;
 
     bytes32 tokenAssetId;
@@ -177,10 +175,6 @@ contract ExperimentalBridgeTest is Test {
 
         // kl todo: clean this up. NTV id deployed below in deployNTV. its was a mess before this upgrade.
         ntv = _deployNTVWithoutEthToken(address(mockSharedBridge));
-        assetTracker = new L1AssetTracker(address(bridgehub), address(ntv), address(0));
-
-        vm.prank(bridgeOwner);
-        ntv.setAssetTracker(address(assetTracker));
         ntv.registerEthToken();
 
         mockSecondSharedBridge.setNativeTokenVault(ntv);
@@ -248,12 +242,6 @@ contract ExperimentalBridgeTest is Test {
         vm.store(address(mockChainContract), baseTokenGasPriceDenominatorLocation, bytes32(uint256(1)));
         // The ownership can only be transferred by the current owner to a new owner via the two-step approach
 
-        vm.mockCall(
-            address(assetTracker),
-            abi.encodeWithSelector(IL1AssetTracker.handleChainBalanceIncreaseOnL1.selector),
-            abi.encode()
-        );
-
         // Default owner calls transferOwnership
         vm.prank(defaultOwner);
         bridgehub.transferOwnership(bridgeOwner);
@@ -284,18 +272,6 @@ contract ExperimentalBridgeTest is Test {
     function _deployNTV(address _sharedBridgeAddr) internal returns (L1NativeTokenVault addr) {
         addr = _deployNTVWithoutEthToken(_sharedBridgeAddr);
 
-        assetTracker = new L1AssetTracker(address(bridgehub), address(addr), address(0));
-
-        vm.prank(bridgeOwner);
-        addr.setAssetTracker(address(assetTracker));
-
-        // re-do the mock that has been set before inside the `setUp` function, since the assetTracker address has changed
-        vm.mockCall(
-            address(assetTracker),
-            abi.encodeWithSelector(IL1AssetTracker.handleChainBalanceIncreaseOnL1.selector),
-            abi.encode()
-        );
-
         addr.registerEthToken();
     }
 
@@ -325,7 +301,6 @@ contract ExperimentalBridgeTest is Test {
             address(0),
             address(0)
         );
-        // interopCenter.setAddresses(sharedBridgeAddress, address(assetTracker));
         vm.stopPrank();
 
         vm.prank(l1Nullifier.owner());
@@ -914,6 +889,10 @@ contract ExperimentalBridgeTest is Test {
             ),
             abi.encode(newChainAddress)
         );
+        // The Bridgehub seeds the fresh chain's genesis root right after registration by pulling
+        // from the chain's getters; `newChainAddress` is a fuzzed address, so mock the VM flag to
+        // the EraVM no-op branch.
+        vm.mockCall(newChainAddress, abi.encodeWithSelector(IGetters.getZKsyncOS.selector), abi.encode(false));
 
         vm.expectEmit(true, true, true, true, address(bridgehub));
         emit NewChain(chainId, address(mockCTM), admin);

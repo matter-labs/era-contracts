@@ -49,22 +49,6 @@ const V31_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
         &[
             "upgrade_addresses",
             "bridgehub",
-            "l1_asset_tracker_proxy_addr",
-        ],
-        "asset_tracker_proxy",
-    ),
-    (
-        &[
-            "upgrade_addresses",
-            "bridgehub",
-            "l1_asset_tracker_implementation_addr",
-        ],
-        "l1_asset_tracker_implementation_addr",
-    ),
-    (
-        &[
-            "upgrade_addresses",
-            "bridgehub",
             "chain_asset_handler_proxy_addr",
         ],
         "chain_asset_handler_proxy",

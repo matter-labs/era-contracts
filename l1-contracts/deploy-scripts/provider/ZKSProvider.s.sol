@@ -7,7 +7,9 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {stdJson} from "forge-std/StdJson.sol";
 
-import {FinalizeL1DepositParams} from "contracts/common/Messaging.sol";
+import {FinalizeL1DepositParams, MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
+import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
+import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
 import {Utils} from "../utils/Utils.sol";
 import {
     AltL2ToL1Log,
@@ -44,7 +46,16 @@ contract ZKSProvider is Script {
 
         // Send the transaction
         vm.startBroadcast();
-        nullifier.finalizeDeposit(params);
+        L1InteropHandler(nullifier.l1InteropHandler()).executeBundle(
+            UnsafeBytes.readRemainingBytes(params.message, 1),
+            MessageInclusionProof({
+                chainId: params.chainId,
+                l1BatchNumber: params.l2BatchNumber,
+                l2MessageIndex: params.l2MessageIndex,
+                message: L2Message({txNumberInBatch: params.l2TxNumberInBatch, sender: params.l2Sender, data: hex""}),
+                proof: params.merkleProof
+            })
+        );
         vm.stopBroadcast();
     }
 
@@ -60,7 +71,7 @@ contract ZKSProvider is Script {
     }
 
     /// we might not need this.
-    /// nullifier.finalizeDeposit simulation probably happens at an earlier blocknumber.
+    /// the interop handler's executeBundle simulation probably happens at an earlier blocknumber.
     /// It might be enough to wait for the merkle proof from the server.
     function waitForBatchToBeExecuted(
         address l1Bridgehub,

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {StdStorage, Test, stdStorage, console2} from "forge-std/Test.sol";
+import {Test, console2} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
-import {L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {
     CHAIN_REGISTRATION_SENDER_ENCODING_VERSION,
     ChainRegistrationSender
@@ -23,10 +23,11 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/co
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {
     ChainsSettlementLayerMismatch,
-    ChainsSettlingOnL1,
-    ChainAlreadyRegistered
+    ChainAlreadyRegistered,
+    ChainHasNoBatchesInMessageRoot
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
@@ -34,7 +35,6 @@ import {LogFinder} from "test-utils/LogFinder.sol";
 import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
 
 contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
-    using stdStorage for StdStorage;
     using LogFinder for Vm.Log[];
 
     uint256 constant TEST_USERS_COUNT = 10;
@@ -42,7 +42,6 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
     address[] public users;
     address[] public l2ContractAddresses;
 
-    // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {
         if (users.length != 0) {
             revert AddressesAlreadyGenerated();
@@ -81,18 +80,27 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
             abi.encode(10)
         );
 
-        // Simulate gateway mode for integration tests.
-        for (uint256 i = 0; i < zkChainIds.length; i++) {
-            stdstore
-                .target(address(addresses.bridgehub))
-                .sig("settlementLayer(uint256)")
-                .with_key(zkChainIds[i])
-                .checked_write(GATEWAY_CHAIN_ID);
-        }
+        _settleFirstBatchRoot(zkChainIds[0]);
     }
 
-    function test_chainRegistrationSender() public {
-        // Verify chain is not registered in fresh deployment
+    /// @dev Freshly created EraVM chains have an empty tree in the MessageRoot (only ZKsync OS
+    /// chains get a seeded genesis batch leaf), so they only become registrable for interop after
+    /// their first settled batch. Settle one batch root through the real executor entry point.
+    function _settleFirstBatchRoot(uint256 _chainId) internal {
+        vm.prank(getZKChainAddress(_chainId));
+        IMessageRootBase(address(ecosystemAddresses.bridgehub.proxies.messageRoot)).addChainBatchRootV32(
+            _chainId,
+            1,
+            keccak256("first-settled-chain-batch-root")
+        );
+    }
+
+    /// @notice Freshly deployed chains settle directly on L1. Registration must succeed in this real
+    /// deployment state; this prevents the removed L1-settlement prohibition from being reintroduced.
+    function test_chainRegistrationSender_succeedsWhenBothChainsSettleOnL1() public {
+        assertEq(addresses.bridgehub.settlementLayer(zkChainIds[0]), block.chainid);
+        assertEq(addresses.bridgehub.settlementLayer(zkChainIds[1]), block.chainid);
+
         assertFalse(
             addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
             "Chain should not be registered before calling registerChain"
@@ -102,13 +110,12 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // Storage: chainRegisteredOnChain flag set to true
         assertTrue(
             addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
             "Chain should be registered after calling registerChain"
         );
 
-        // Event: NewPriorityRequest from the mailbox (service transaction was queued)
+        // NewPriorityRequest from the mailbox proves the registration service transaction was queued.
         logs.requireOne(NEW_PRIORITY_REQUEST_SIGNATURE);
     }
 
@@ -119,8 +126,7 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
     }
 
-    /// This function use requestL2TransactionTwoBridges function through ChainRegistrationSender.
-    /// No ERC20 tokens are involved — only ETH for base token gas.
+    /// @dev Runs requestL2TransactionTwoBridges through ChainRegistrationSender; only ETH for base-token gas.
     function _chainRegistrationSenderDeposit() private returns (bytes32, Vm.Log[] memory) {
         uint256 currentChainId = zkChainIds[0];
         address currentUser = users[0];
@@ -162,7 +168,6 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: mintValue}(requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // Balance assertion
         console2.log("balance before", userEthBefore);
         console2.log("mint value", mintValue);
         assertEq(currentUser.balance, userEthBefore - mintValue, "User ETH should decrease by mintValue");
@@ -171,48 +176,37 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
     }
 
     function test_chainRegistrationSenderDeposit() public {
-        // Verify chain is not registered initially
         assertFalse(
             addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
             "Chain should not be registered before deposit"
         );
 
-        // Perform deposit and capture the transaction hash and emitted events
         (bytes32 txHash, Vm.Log[] memory logs) = _chainRegistrationSenderDeposit();
 
-        // Verify the L2 transaction was submitted successfully
-        // The txHash is the canonical transaction hash for the L2 transaction
         assertNotEq(txHash, bytes32(0), "Transaction hash should be non-zero after successful deposit");
 
-        // Verify event: BridgehubDepositBaseTokenInitiated
         Vm.Log memory baseTokenLog = logs.requireOne(
             "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
         );
         assertEq(uint256(baseTokenLog.topics[1]), zkChainIds[0], "Base token deposit event chainId mismatch");
 
-        // The TwoBridges path through ChainRegistrationSender does NOT update
-        // chainRegisteredOnChain. Verify it remains unchanged.
+        // The TwoBridges path through ChainRegistrationSender does NOT update chainRegisteredOnChain.
         assertFalse(
             addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
             "chainRegisteredOnChain should remain false after TwoBridges deposit"
         );
     }
 
-    function test_chainRegistrationSender_revertWhen_chainsSettleOnL1() public {
-        // Override settlement layers to L1 (block.chainid) to trigger the ChainsSettlingOnL1 guard
-        stdstore
-            .target(address(addresses.bridgehub))
-            .sig("settlementLayer(uint256)")
-            .with_key(zkChainIds[0])
-            .checked_write(block.chainid);
+    /// @notice A chain with an empty tree in the MessageRoot cannot be registered for interop (see
+    /// {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}). The happy path settles a batch first; here the empty tree is mocked.
+    function test_chainRegistrationSender_revertWhen_chainHasNoBatchesInMessageRoot() public {
+        vm.mockCall(
+            address(ecosystemAddresses.bridgehub.proxies.messageRoot),
+            abi.encodeWithSelector(IMessageRootBase.chainTreeLeafCount.selector, zkChainIds[0]),
+            abi.encode(uint256(0))
+        );
 
-        stdstore
-            .target(address(addresses.bridgehub))
-            .sig("settlementLayer(uint256)")
-            .with_key(zkChainIds[1])
-            .checked_write(block.chainid);
-
-        vm.expectRevert(ChainsSettlingOnL1.selector);
+        vm.expectRevert(abi.encodeWithSelector(ChainHasNoBatchesInMessageRoot.selector, zkChainIds[0]));
         addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
     }
 
@@ -220,18 +214,18 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         uint256 firstSettlementLayer = GATEWAY_CHAIN_ID;
         uint256 secondSettlementLayer = GATEWAY_CHAIN_ID + 1;
 
-        // Override settlement layers to different values to trigger the mismatch guard
-        stdstore
-            .target(address(addresses.bridgehub))
-            .sig("settlementLayer(uint256)")
-            .with_key(zkChainIds[0])
-            .checked_write(firstSettlementLayer);
-
-        stdstore
-            .target(address(addresses.bridgehub))
-            .sig("settlementLayer(uint256)")
-            .with_key(zkChainIds[1])
-            .checked_write(secondSettlementLayer);
+        // Isolate ChainRegistrationSender's comparison from the separately-tested migration machinery.
+        // Exact-calldata mocks avoid mutating Bridgehub storage and only affect the two queried chains.
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeCall(IBridgehubBase.settlementLayer, (zkChainIds[0])),
+            abi.encode(firstSettlementLayer)
+        );
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeCall(IBridgehubBase.settlementLayer, (zkChainIds[1])),
+            abi.encode(secondSettlementLayer)
+        );
 
         vm.expectRevert(
             abi.encodeWithSelector(ChainsSettlementLayerMismatch.selector, firstSettlementLayer, secondSettlementLayer)

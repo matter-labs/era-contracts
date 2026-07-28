@@ -249,6 +249,48 @@
   },
   {
     "type": "function",
+    "name": "bridgeRecoverFailedTransfer",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_data",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "bridgedOut",
+    "inputs": [
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "bridgedTokenBeacon",
     "inputs": [],
     "outputs": [
@@ -403,43 +445,6 @@
   },
   {
     "type": "function",
-    "name": "l1AssetTracker",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IL1AssetTracker"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "migrateTokenBalanceToAssetTracker",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "originChainId",
     "inputs": [
       {
@@ -546,19 +551,6 @@
     "type": "function",
     "name": "renounceOwnership",
     "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setAssetTracker",
-    "inputs": [
-      {
-        "name": "_l1AssetTracker",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -727,6 +719,37 @@
   },
   {
     "type": "event",
+    "name": "BridgeRecoverFailedTransfer",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "receiver",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "Initialized",
     "inputs": [
       {
@@ -864,11 +887,6 @@
   },
   {
     "type": "error",
-    "name": "ClaimFailedDepositFailed",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "DeployingBridgedTokenForNativeToken",
     "inputs": []
   },
@@ -886,6 +904,27 @@
     "type": "error",
     "name": "EmptyToken",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InsufficientChainBalance",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",

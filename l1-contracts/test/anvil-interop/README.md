@@ -1,12 +1,12 @@
 # Multi-Chain Anvil Interop Tests
 
-End-to-end tests for ZKsync interoperability across 5 Anvil chains: L1 contract deployment, L1<->L2 bridging (ETH + ERC20), L2<->L2 interop transfers, gateway setup with chain migration, and balance tracking via L1AssetTracker.
+End-to-end tests for ZKsync interoperability across 5 Anvil chains: L1 contract deployment, L1<->L2 bridging (ETH + ERC20), L2<->L2 interop transfers, and gateway setup with chain migration.
 
 ## Chain Topology
 
 ```
 ┌──────────────┐
-│  L1 (31337)  │  port 9545 — Bridgehub, CTM, L1AssetRouter, L1NTV, L1AssetTracker
+│  L1 (31337)  │  port 9545 — Bridgehub, CTM, L1AssetRouter, L1NTV
 │  settlement  │
 └──────┬───────┘
        │
@@ -36,9 +36,11 @@ yarn test:hardhat:interop --keep-chains
 
 ## Pregenerated Chain States
 
-Tests load pregenerated Anvil snapshots from `chain-states/v0.31.0/` by default. This skips the full deployment and cuts test time from ~5 min to ~85s.
+Tests load pregenerated Anvil snapshots from `chain-states/v0.32.0/` by default (the current protocol version). This skips the full deployment and cuts test time from ~5 min to ~85s.
 
-The runner auto-detects pregenerated state by checking for `chain-states/<protocol-version>/addresses.json`. If found, it decompresses the dumped state and starts each Anvil process with `--load-state`. If not found (or `FRESH_DEPLOY=1`), it runs the full 5-step deployment.
+The runner auto-detects pregenerated state by checking for `chain-states/<protocol-version>/addresses.json`. If found, it gunzips each `<chainId>.json.gz` dump and starts each Anvil process with `--load-state`. If not found (or `FRESH_DEPLOY=1`), it runs the full 5-step deployment.
+
+The per-chain state dumps are committed **gzip-compressed** (`<chainId>.json.gz`). These snapshots are multi-MB; storing them as raw JSON floods every regeneration with an enormous, unreviewable diff. GitHub renders `.gz` as binary ("Binary file not shown"), keeping them out of PR diffs, and gzip shrinks them ~10x. `addresses.json` stays plain text so contract-address changes remain reviewable. Compression/decompression is handled automatically by `dumpAllStates()` / `loadChainStates()` in `deployment-runner.ts` — no manual step.
 
 To regenerate pregenerated state after contract changes:
 
@@ -120,10 +122,10 @@ Live environment variables:
 | Spec                         | What it tests                                                                                                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `01-deployment-verification` | L1 contracts deployed, CTM registered, all 4 L2 chains have diamond proxies, L2 system contracts present, test tokens deployed, initial chainBalance is zero |
-| `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 10 (direct L1 settlement), L1AssetTracker chainBalance tracking, net flow assertions                     |
+| `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 10 (direct L1 settlement), net flow assertions                                                           |
 | `03-interop-transfer`        | Unsupported interop routes revert; only GW-settled L2<->GW-settled L2 interop is intentionally registered                                                    |
 | `04-gateway-setup`           | GW chain contracts deployed, interop chains registered on GW L2Bridgehub, GW designated as settlement layer on L1                                            |
-| `05-gateway-bridge`          | L1->L2A ETH deposit + L2A->L1 ETH withdrawal on chain 12 (via GW), L1AssetTracker chainBalance tracking, token balance migration, processLogsAndMessages     |
+| `05-gateway-bridge`          | L1->L2A ETH deposit + L2A->L1 ETH withdrawal on chain 12 (via GW)                                                                                            |
 | `06-gateway-interop`         | L2A<->L2B interop transfers between GW-settled L2 chains                                                                                                     |
 
 ## Environment Variables
@@ -171,9 +173,9 @@ test/anvil-interop/
 │   ├── permanent-values.toml      # Immutable protocol values
 │   └── chain-{10,11,12,13}.toml   # Per-chain deployment params (generated)
 ├── chain-states/
-│   └── v0.31.0/                   # Pregenerated Anvil state snapshots
-│       ├── 31337.json             # L1 state dump
-│       ├── {10,11,12,13}.json     # L2 chain state dumps
+│   └── v0.32.0/                   # Pregenerated Anvil state snapshots
+│       ├── 31337.json.gz          # L1 state dump (gzip; kept out of diffs)
+│       ├── {10,11,12,13}.json.gz  # L2 chain state dumps (gzip)
 │       └── addresses.json         # All contract addresses + test tokens
 ├── src/
 │   ├── deployment-runner.ts       # Orchestrates all deployment steps
@@ -197,9 +199,7 @@ test/anvil-interop/
 │       ├── l1-deposit-helper.ts   # L1->L2 ETH/ERC20 deposits
 │       ├── l2-withdrawal-helper.ts          # L2->L1 ETH/ERC20 withdrawals
 │       ├── token-transfer.ts                # L2<->L2 interop token transfers
-│       ├── token-balance-migration-helper.ts # Token balance migration (L2->L1->GW)
-│       ├── process-logs-helper.ts           # Build/process withdrawal logs on GW
-│       ├── balance-tracker.ts               # L1AssetTracker balance snapshots
+│       ├── bridged-out-helper.ts            # Read L1NativeTokenVault.bridgedOut in bridge tests
 │       └── deploy-test-token.ts             # Deploy ERC20 test tokens to L2 chains
 ├── test/hardhat/
 │   ├── 01-deployment-verification.spec.ts

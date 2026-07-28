@@ -99,7 +99,12 @@ abstract contract L2InteropNativeTokenDifferentBaseTestAbstract is L2InteropTest
             data: empty,
             callAttributes: callAttributes
         });
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false);
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(
+            address(0),
+            UNBUNDLER_ADDRESS,
+            false,
+            bytes32(0)
+        );
 
         L2_INTEROP_CENTER.sendBundle{value: amount}(
             InteroperableAddress.formatEvmV1(destinationChainId),

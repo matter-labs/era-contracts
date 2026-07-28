@@ -337,8 +337,8 @@ image's binary is used and no host cross-build runs.
 
 The biggest footgun: `regen-and-verify-stage.sh` forks **current Sepolia tip**,
 and Sepolia state diverges every time you broadcast deployer-setup bundles
-(steps 4 below: `addVerifier`, `transferOwnership`, ChainTypeManager init,
-ServerNotifier ProxyAdmin upgrade, etc.). The prepare's Solidity isn't
+(steps 4 below: ChainTypeManager init, ServerNotifier ProxyAdmin upgrade,
+etc.). The prepare's Solidity isn't
 idempotent against that state, so subsequent regens revert with
 `AddressAlreadySet(...)`, `OperationMustBePending()`, or `Ownable: caller is
 not the new owner` depending on which step the chain has already moved past.
@@ -347,14 +347,13 @@ Symptom-to-cause map:
 
 | Revert in prepare                              | What's already on chain                                             |
 | ---------------------------------------------- | ------------------------------------------------------------------- |
-| `AddressAlreadySet(<verifier-addr>)`           | `ZKsyncOSDualVerifier.addVerifier(version, fflonk, plonk)` ran      |
 | `OperationMustBePending()` on `executeInstant` | the legacy-Gov ceremony already ran (op is Done)                    |
 | `OperationExists()` on `scheduleTransparent`   | the legacy-Gov ceremony is scheduled (Pending) but not yet executed |
 | `Ownable2Step: caller is not the new owner`    | `transferOwnership(PUH)` didn't run on chain (or already accepted)  |
 
 **Fix**: mint **fresh CREATE2 salts** in
 `l1-contracts/upgrade-envs/v0.31.0-interopB/stage.toml` so the new prepare
-deploys _new_ contracts (DualVerifier, ChainTypeManager impl, ServerNotifier,
+deploys _new_ contracts (Verifier, ChainTypeManager impl, ServerNotifier,
 …) that don't collide with the on-chain state of their predecessors.
 
 ```bash

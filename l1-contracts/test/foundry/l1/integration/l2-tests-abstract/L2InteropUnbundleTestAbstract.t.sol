@@ -10,23 +10,22 @@ import "forge-std/console.sol";
 import {
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_HANDLER,
-    L2_INTEROP_HANDLER_ADDR,
-    L2_MESSAGE_VERIFICATION
+    L2_INTEROP_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
-import {CallStatus, InteropBundle, MessageInclusionProof} from "contracts/common/Messaging.sol";
+import {CallStatus, InteropBundle} from "contracts/common/Messaging.sol";
+import {AtomicFinalityProof} from "contracts/atomic-interop/IAtomicInterop.sol";
 
 import {BundleExecutionResult, L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
-import {InteropHandler} from "contracts/interop/InteropHandler.sol";
+import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 
 abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
     function test_unbundleBundleViaReceiveMessage() public {
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
 
-        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100, false);
+        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100, false, bytes32(0));
         Vm.Log[] memory logs1 = vm.getRecordedLogs();
 
         // Verify the first bundle emission
@@ -40,27 +39,25 @@ abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
             (bytes32, bytes32, InteropBundle)
         );
 
-        // Verify the original bundle has valid data
-        assertTrue(l2l1MsgHash != bytes32(0), "L2 to L1 message hash should be non-zero");
+        // Verify the original bundle has valid data. Atomic bundles are never published to L1, so the
+        // InteropBundleSent event carries a zero L2->L1 message hash; only the interop bundle hash is set.
+        assertEq(l2l1MsgHash, bytes32(0), "Atomic bundle should have no L2->L1 message hash");
         assertTrue(interopBundleHash != bytes32(0), "Interop bundle hash should be non-zero");
 
         bytes memory bundle = abi.encode(interopBundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR, block.chainid);
+        // Atomic interop: finality is proven via the AtomicFlowManager IMT gate (mocked in setUp), so a
+        // default AtomicFinalityProof suffices and the cross-chain binding is the bundle's sourceChainId.
+        AtomicFinalityProof memory proof;
 
         // Calculate bundle hash for assertions
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
 
         vm.chainId(destinationChainId);
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
-        L2_INTEROP_HANDLER.verifyBundle(bundle, proof);
+        L2_INTEROP_HANDLER.verifyAtomicBundle(bundle, proof);
 
         // Verify bundle status is Verified after verifyBundle call
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
             1,
             "Bundle status should be Verified after verifyBundle"
         );
@@ -77,7 +74,8 @@ abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
             L2_INTEROP_HANDLER_ADDR,
             abi.encodeCall(L2_INTEROP_HANDLER.unbundleBundle, (bundle, callStatuses)),
             UNBUNDLER_ADDRESS,
-            UNBUNDLER_ADDRESS
+            UNBUNDLER_ADDRESS,
+            bytes32(0)
         );
         Vm.Log[] memory logs2 = vm.getRecordedLogs();
 
@@ -96,14 +94,14 @@ abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
 
         // Verify the original bundle status is Unbundled (value 3)
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
             3,
             "Original bundle status should be Unbundled"
         );
 
         // Verify call status of the original bundle is Executed (value 1)
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 0)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 0)),
             1,
             "Original bundle call 0 status should be Executed"
         );

@@ -29,6 +29,8 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+
 import {LogFinder} from "test-utils/LogFinder.sol";
 
 abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
@@ -114,9 +116,15 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         // Verify asset ID is properly constructed
         assertTrue(assetId != bytes32(0), "Asset ID should be non-zero");
 
-        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).withdraw(
-            assetId,
-            DataEncoding.encodeBridgeBurnData(mintAmount, address(1), address(l2NativeToken))
+        // L2->L1 withdrawals go through the InteropCenter as a single indirect asset-router call; the burn
+        // auto-registers the fresh native token. No bundle attributes needed (fee defaults to 0).
+        l2InteropCenter.sendBundle(
+            InteroperableAddress.formatEvmV1(L1_CHAIN_ID),
+            DataEncoding.encodeInteropWithdrawalCallStarters(
+                assetId,
+                DataEncoding.encodeBridgeBurnData(mintAmount, address(1), address(l2NativeToken))
+            ),
+            new bytes[](0)
         );
 
         // After withdrawal, tokens should be burned from the sender

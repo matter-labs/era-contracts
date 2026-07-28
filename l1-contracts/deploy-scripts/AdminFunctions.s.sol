@@ -38,8 +38,8 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {BridgehubBurnCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {InteropLibrary} from "./InteropLibrary.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -611,22 +611,14 @@ contract AdminFunctions is Script, IAdminFunctions {
         address _accessControlRestriction,
         address _bridgehub,
         uint256 _chainId,
-        uint256 _newProtocolVersion,
         uint256 _timestamp
     ) public {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
-        Call[] memory calls = new Call[](2);
-        // Admin.sol's upgradeChainFromVersion reads protocolVersionToUpgradeTimestamp from
-        // ChainAdmin for non-admin/non-CTM callers, so we must keep this write.
-        calls[0] = Call({
-            target: _adminAddr,
-            value: 0,
-            data: abi.encodeCall(ChainAdmin.setUpgradeTimestamp, (_newProtocolVersion, _timestamp))
-        });
+        Call[] memory calls = new Call[](1);
         // ServerNotifier.setUpgradeTimestamp validates upgrade cut data exists, eliminating
         // the race between timestamp and diamond-cut availability that exists on ChainAdmin alone.
-        calls[1] = Call({
+        calls[0] = Call({
             target: chainInfo.serverNotifier,
             value: 0,
             data: abi.encodeCall(ServerNotifier.setUpgradeTimestamp, (_chainId, _timestamp))
@@ -1225,14 +1217,24 @@ contract AdminFunctions is Script, IAdminFunctions {
         );
 
         bytes32 ctmAssetId = IL1Bridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
-        bytes memory l2Calldata = abi.encodeCall(IL2AssetRouter.withdraw, (ctmAssetId, bridgehubBurnData));
+        // The bundle destination is L1: this script runs on L1, so `block.chainid` is the L1 chain id.
+        bytes memory l2Calldata;
+        {
+            // Content-derived salt: distinct migrations get distinct salts deterministically.
+            l2Calldata = InteropLibrary.encodeWithdrawalSendBundleCalldata(
+                block.chainid,
+                ctmAssetId,
+                bridgehubBurnData,
+                keccak256(abi.encodePacked("ctm-migration-withdrawal", ctmAssetId, bridgehubBurnData))
+            );
+        }
 
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
             l2Calldata,
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
-            L2_ASSET_ROUTER_ADDR,
+            L2_INTEROP_CENTER_ADDR,
             0,
             data.gatewayChainId,
             data.bridgehub,

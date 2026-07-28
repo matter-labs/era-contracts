@@ -13,8 +13,6 @@ import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
-import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
-import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 
@@ -30,11 +28,7 @@ import {
     WithdrawFailed,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
-import {
-    ClaimFailedDepositFailed,
-    WrongCounterpart,
-    OnlyFailureStatusAllowed
-} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {WrongCounterpart, OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 
 contract MockERC20 is ERC20 {
     constructor() ERC20("MockToken", "MTK") {
@@ -74,7 +68,6 @@ contract L1NativeTokenVaultExtendedTest is Test {
     address public wethToken;
     address public assetRouter;
     address public l1Nullifier;
-    address public assetTracker;
     address public bridgedTokenBeacon;
 
     MockERC20 public token;
@@ -88,7 +81,6 @@ contract L1NativeTokenVaultExtendedTest is Test {
         wethToken = makeAddr("wethToken");
         assetRouter = makeAddr("assetRouter");
         l1Nullifier = makeAddr("l1Nullifier");
-        assetTracker = makeAddr("assetTracker");
 
         token = new MockERC20();
         baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
@@ -110,10 +102,6 @@ contract L1NativeTokenVaultExtendedTest is Test {
         );
 
         l1NTV = L1NativeTokenVault(payable(proxy));
-
-        // Set asset tracker
-        vm.prank(owner);
-        l1NTV.setAssetTracker(assetTracker);
     }
 
     function test_Initialize_SetsOwner() public view {
@@ -135,36 +123,10 @@ contract L1NativeTokenVaultExtendedTest is Test {
         );
     }
 
-    function test_SetAssetTracker_Success() public {
-        L1NativeTokenVault freshNTV = _deployFreshNTV();
-        address newAssetTracker = makeAddr("newAssetTracker");
-
-        vm.prank(owner);
-        freshNTV.setAssetTracker(newAssetTracker);
-
-        assertEq(address(freshNTV.l1AssetTracker()), newAssetTracker);
-    }
-
-    function test_SetAssetTracker_RevertWhen_NotOwner() public {
-        L1NativeTokenVault freshNTV = _deployFreshNTV();
-        address notOwner = makeAddr("notOwner");
-        address newAssetTracker = makeAddr("newAssetTracker");
-
-        vm.prank(notOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
-        freshNTV.setAssetTracker(newAssetTracker);
-    }
-
     function test_RegisterEthToken() public {
         vm.mockCall(
             assetRouter,
             abi.encodeWithSelector(AssetRouterBase.setAssetHandlerAddressThisChain.selector),
-            abi.encode()
-        );
-
-        vm.mockCall(
-            assetTracker,
-            abi.encodeWithSelector(IAssetTrackerBase.registerNewTokenIfNeeded.selector),
             abi.encode()
         );
 
@@ -201,26 +163,6 @@ contract L1NativeTokenVaultExtendedTest is Test {
         assertEq(balance, 0);
     }
 
-    function test_MigrateTokenBalanceToAssetTracker() public {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
-
-        // Only asset tracker can call this
-        vm.prank(assetTracker);
-        uint256 migratedAmount = l1NTV.migrateTokenBalanceToAssetTracker(CHAIN_ID, assetId);
-
-        // Since we didn't set a balance, it should be 0
-        assertEq(migratedAmount, 0);
-    }
-
-    function test_MigrateTokenBalanceToAssetTracker_RevertWhen_NotAssetTracker() public {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
-        address notAssetTracker = makeAddr("notAssetTracker");
-
-        vm.prank(notAssetTracker);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notAssetTracker));
-        l1NTV.migrateTokenBalanceToAssetTracker(CHAIN_ID, assetId);
-    }
-
     function test_BridgeConfirmTransferResult_RevertWhen_NotFailure() public {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
         bytes memory data = abi.encode(uint256(1000), address(0), address(0));
@@ -233,18 +175,6 @@ contract L1NativeTokenVaultExtendedTest is Test {
     function test_BridgeConfirmTransferResult_RevertWhen_NoFundsTransferred() public {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
         bytes memory data = abi.encode(uint256(0), address(0), address(0)); // 0 amount
-
-        vm.mockCall(
-            assetTracker,
-            abi.encodeWithSelector(IL1AssetTracker.handleChainBalanceDecreaseOnL1.selector),
-            abi.encode()
-        );
-
-        vm.mockCall(
-            assetTracker,
-            abi.encodeWithSelector(IAssetTrackerBase.registerNewTokenIfNeeded.selector),
-            abi.encode()
-        );
 
         vm.mockCall(
             assetRouter,
