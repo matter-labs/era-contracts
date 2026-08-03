@@ -3,8 +3,6 @@ pragma solidity ^0.8.21;
 
 import {LegState} from "./IAtomicInterop.sol";
 
-// 0xdc0327e9
-error AtomicFlowManagerL1ChainIdMismatch(uint256 recorded, uint256 expected);
 // 0x742d1b5b
 error CommitmentTreeNotAppender(address sender);
 // 0x6bbd3c7c

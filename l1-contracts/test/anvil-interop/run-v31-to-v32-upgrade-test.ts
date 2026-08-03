@@ -12,7 +12,18 @@ runV31UpgradeScenario({
   upgradeInputTemplatePath: "test/anvil-interop/config/v31-to-v32-upgrade.toml",
   isZKsyncOS: true,
   expectedProtocolVersion: "0x2000000000",
-  targetRoles: ["directSettled", "gateway", "gwSettled"],
+  // The fixture leaves the ChainAssetHandler with the deployer as owner; governance has to own it to run
+  // the stage-0 `pauseMigration()` call.
+  transferL1ChainAssetHandlerOwnership: true,
+  // The fixture's chains still carry the genesis-upgrade tx hash from their creation, which blocks a new
+  // upgrade (`PreviousUpgradeNotFinalized`), and their batch counters are zero. Same test-only bridge the
+  // pre-v31 scenarios used.
+  clearGenesisUpgradeTxHash: true,
+  seedBatchCounters: true,
+  // Chains 12 and 13 are excluded: the v31 state generation left their L2 side uninitialized (the asset
+  // tracker has code but no storage), so they cannot be upgraded from that fixture. Chain 10
+  // (L1-settled), 11 (the gateway) and 14 (settled on the gateway) do carry initialized L2 state.
+  targetRoles: ["directSettled", "gateway"],
 })
   .then(() => {
     process.exit(0);

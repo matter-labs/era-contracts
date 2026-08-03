@@ -384,10 +384,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         address bridgehubAddr = ChainTypeManagerBase(ctm).BRIDGE_HUB();
         bridgehub = L1Bridgehub(bridgehubAddr);
 
-        // The CTM getters this reads all exist from v31 on, which is the oldest ecosystem this release
-        // upgrades; only the core (bridges) side is version-dependent.
-        ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
-
         bool preV32Ecosystem;
         if (newConfig.hasPreV32IntrospectionOverride) {
             preV32Ecosystem = newConfig.usePreV32IntrospectionOverride;
@@ -400,8 +396,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         }
 
         if (preV32Ecosystem) {
+            ctmAddresses = AddressIntrospector.getCTMAddressesV31(ctm, config.isZKsyncOS);
             coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubAddr);
         } else {
+            ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
             coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubAddr);
         }
 

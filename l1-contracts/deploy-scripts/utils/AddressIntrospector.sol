@@ -207,12 +207,28 @@ library AddressIntrospector {
     // ============ CTM Addresses ============
 
     function getCTMAddresses(ChainTypeManagerBase _ctm) public view returns (CTMDeployedAddresses memory info) {
-        return _getCTMAddressesInternal(address(_ctm), _ctm.isZKsyncOS());
+        return _getCTMAddressesInternal(address(_ctm), _ctm.isZKsyncOS(), false);
+    }
+
+    /// @notice CTM discovery for a v31 ecosystem.
+    /// @dev The sub-verifier getters differ: a v31 ZKsync OS verifier exposes `fflonkVerifiers(i)` /
+    /// `plonkVerifiers(i)`, while this release's exposes a single `PLONK_VERIFIER()`. Reading the v32 shape
+    /// off a v31 verifier reverts, and the upgrade deploys fresh verifiers anyway, so the sub-verifiers are
+    /// reported as absent — the same thing the v29 path used to do.
+    function getCTMAddressesV31(
+        address _ctmAddr,
+        bool isZKsyncOS
+    ) public view returns (CTMDeployedAddresses memory info) {
+        if (_ctmAddr == address(0) || _ctmAddr.code.length == 0) {
+            return info;
+        }
+        return _getCTMAddressesInternal(_ctmAddr, isZKsyncOS, true);
     }
 
     function _getCTMAddressesInternal(
         address _ctmAddr,
-        bool isZKsyncOS
+        bool isZKsyncOS,
+        bool isPreV32
     ) private view returns (CTMDeployedAddresses memory info) {
         ChainTypeManagerBase ctm = ChainTypeManagerBase(_ctmAddr);
 
@@ -220,9 +236,11 @@ library AddressIntrospector {
 
         Facets memory facets = _getFacetsFromUptoDateZkChain(ctm);
         address verifier = _getVerifierFromUptoDateZkChain(ctm);
-        // The sub-verifier getters, the bytecodes supplier and the permissionless validator all exist from
-        // v31 on, which is the oldest ecosystem this release can upgrade.
-        (address verifierFflonk, address verifierPlonk) = _getSubVerifiers(verifier, isZKsyncOS);
+        // The bytecodes supplier and the permissionless validator exist from v31 on, which is the oldest
+        // ecosystem this release can upgrade; the sub-verifier shape does not (see `getCTMAddressesV31`).
+        (address verifierFflonk, address verifierPlonk) = isPreV32
+            ? (address(0), address(0))
+            : _getSubVerifiers(verifier, isZKsyncOS);
         address bytecodesSupplier = ctm.L1_BYTECODES_SUPPLIER();
 
         // Note: daAddresses is left zero-initialized (Solidity default)

@@ -181,18 +181,8 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // same state a fresh one gets from genesis.
         _assertAtomicInteropInitialized();
 
-        // Re-running must be a no-op: a ZKsync OS chain created at a v31 genesis already has both
-        // built-ins seeded and reaches this same non-genesis path when it upgrades.
-        vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
-        L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
-            true,
-            ctmDeployerAddress,
-            fixedEncoded,
-            additionalEncoded,
-            false
-        );
-        vm.stopPrank();
-        _assertAtomicInteropInitialized();
+        // Note: no ZKsync OS chain can arrive here with the built-ins already seeded — neither they nor
+        // their addresses existed in v31 — so the initialization is unconditional and one-shot.
     }
 
     function testEraForceDeployment() public {

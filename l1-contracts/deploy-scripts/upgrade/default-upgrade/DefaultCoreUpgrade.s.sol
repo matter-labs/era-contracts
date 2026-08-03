@@ -44,6 +44,9 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         bool isZKsyncOS;
         bool hasPreV32IntrospectionOverride;
         bool usePreV32IntrospectionOverride;
+        /// @dev Whether the ecosystem being upgraded still runs pre-v32 contracts. Decides both which
+        ///      discovery shape to use and which one-time initializers have already run on it.
+        bool isPreV32Ecosystem;
     }
     AdditionalConfigParams internal additionalConfig;
 
@@ -179,6 +182,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         } else {
             preV32Ecosystem = AddressIntrospector.shouldUsePreV32Introspection(bridgehubProxy);
         }
+
+        additionalConfig.isPreV32Ecosystem = preV32Ecosystem;
 
         if (preV32Ecosystem) {
             // v31 ecosystem: the nullifier has no `l1InteropHandler` getter yet, so the discovered
@@ -451,12 +456,18 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridges.implementations.l1NativeTokenVault
         );
 
-        // L1MessageRoot: Use upgradeAndCall to call initializeL1V31Upgrade
-        calls[4] = _buildCallProxyUpgradeAndCall(
-            coreAddresses.bridgehub.proxies.messageRoot,
-            coreAddresses.bridgehub.implementations.messageRoot,
-            "L1MessageRoot"
-        );
+        // L1MessageRoot: `initializeL1V31Upgrade` is a v31 reinitializer, so it only runs for an ecosystem
+        // that has not been through v31 yet; a v31 one would revert with "already initialized".
+        calls[4] = additionalConfig.isPreV32Ecosystem
+            ? _buildCallProxyUpgrade(
+                coreAddresses.bridgehub.proxies.messageRoot,
+                coreAddresses.bridgehub.implementations.messageRoot
+            )
+            : _buildCallProxyUpgradeAndCall(
+                coreAddresses.bridgehub.proxies.messageRoot,
+                coreAddresses.bridgehub.implementations.messageRoot,
+                "L1MessageRoot"
+            );
 
         calls[5] = _buildCallProxyUpgrade(
             coreAddresses.bridgehub.proxies.ctmDeploymentTracker,

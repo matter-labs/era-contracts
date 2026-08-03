@@ -18,9 +18,47 @@ import {CTMUpgrade_v31} from "deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 ///      (`chain_upgrade_diamond_cut` + `state_transition.default_upgrade_addr`)
 ///      so accumulated `vm.serialize*` JSON does not blow forge's 128 MB EVM memory.
 contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
+    using stdToml for string;
+
+    /// @dev Optional `contracts.new_protocol_version` from the upgrade input, used as the upgrade target.
+    ///      The production flow reads the target from the genesis config, which pins the release the
+    ///      foundry suite is built against (v31); a harness scenario upgrading a v31 ecosystem onto this
+    ///      release has to say which version it is moving to, the same way the local foundry fixture does
+    ///      with `ctmUpgrade.setNewProtocolVersion`.
     function prepareCTMUpgrade() public override {
         setSkipFactoryDepsCheck_TestOnly(true);
         super.prepareCTMUpgrade();
+    }
+
+    // solhint-disable-next-line func-named-parameters
+    function initializeWithArgs(
+        address _ctmProxy,
+        address _bytecodesSupplier,
+        bool _isZKsyncOS,
+        address _rollupDAManager,
+        bytes32 _create2FactorySalt,
+        string memory _newConfigPath,
+        string memory _outputPath,
+        address _governance,
+        bytes32 _zkTokenAssetId
+    ) public virtual override {
+        // solhint-disable-next-line func-named-parameters
+        super.initializeWithArgs(
+            _ctmProxy,
+            _bytecodesSupplier,
+            _isZKsyncOS,
+            _rollupDAManager,
+            _create2FactorySalt,
+            _newConfigPath,
+            _outputPath,
+            _governance,
+            _zkTokenAssetId
+        );
+
+        string memory upgradeToml = vm.readFile(string.concat(vm.projectRoot(), _newConfigPath));
+        if (upgradeToml.keyExists("$.contracts.new_protocol_version")) {
+            setNewProtocolVersion(upgradeToml.readUint("$.contracts.new_protocol_version"));
+        }
     }
 
     /// @dev Skip loading zkout bytecodes — they are already on L2 via `anvil_setCode`.

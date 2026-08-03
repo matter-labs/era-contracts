@@ -234,6 +234,7 @@ async function transferL1Ownership(
     bridgehub: string;
     l1SharedBridge: string;
     l1NativeTokenVault: string;
+    l1NullifierProxy?: string;
     l1ChainAssetHandler?: string;
   },
   ctmAddresses: { chainTypeManager: string },
@@ -244,12 +245,56 @@ async function transferL1Ownership(
   await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1SharedBridge);
   await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1NativeTokenVault);
   await transferOwnership2Step(provider, defaultSigner, gov, ctmAddresses.chainTypeManager);
+  // A production ecosystem hands the nullifier to governance at deploy time; the fixtures leave it with
+  // the deployer. Governance needs it to wire the interop handler in stage 1.
+  if (l1Addresses.l1NullifierProxy) {
+    await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1NullifierProxy);
+  }
   // The pre-v31 chain states record the old L1ChainAssetHandler proxy (the v31 ecosystem
   // upgrade reuses this proxy in place). Governance must own it to run the stage-0
   // pauseMigration() governance call.
   if (scenario.transferL1ChainAssetHandlerOwnership && l1Addresses.l1ChainAssetHandler) {
     await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1ChainAssetHandler);
   }
+  await normalizeProxyAdminOwnerToEoa(provider, defaultSigner, ctmAddresses.chainTypeManager);
+}
+
+/**
+ * Hand the CTM's ProxyAdmin to the deployer EOA when a contract owns it.
+ *
+ * `AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps` can only act through owners it
+ * knows how to wrap, and the wrap registry comes from `permanent-values/<env>.toml`, which the harness
+ * does not use (it passes addresses explicitly instead of `--env`). A real environment declares its
+ * governance under `[[ownable_proxies]]`; here the equivalent is to normalize the owner to an EOA, in
+ * the same spirit as the ownership transfers above. In the v31 fixture the CTM deployment leaves its
+ * ProxyAdmin owned by its own `Governance.sol` instance.
+ */
+async function normalizeProxyAdminOwnerToEoa(
+  provider: ethers.providers.JsonRpcProvider,
+  defaultSigner: ethers.Wallet,
+  proxyAddress: string
+): Promise<void> {
+  const adminSlot = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
+  const rawAdmin = await provider.getStorageAt(proxyAddress, adminSlot);
+  const proxyAdmin = ethers.utils.getAddress(ethers.utils.hexDataSlice(rawAdmin, 12));
+
+  const proxyAdminContract = new ethers.Contract(proxyAdmin, getAbi("ProxyAdmin"), provider);
+  const owner: string = await proxyAdminContract.owner();
+  if ((await provider.getCode(owner)) === "0x") {
+    return;
+  }
+
+  console.log(`   Normalizing ProxyAdmin ${proxyAdmin} owner ${owner} -> ${defaultSigner.address}`);
+  await provider.send("anvil_impersonateAccount", [owner]);
+  await provider.send("anvil_setBalance", [owner, "0x56BC75E2D63100000"]);
+  const ownerSigner = provider.getSigner(owner);
+  const tx = await ownerSigner.sendTransaction({
+    to: proxyAdmin,
+    data: proxyAdminContract.interface.encodeFunctionData("transferOwnership", [defaultSigner.address]),
+    gasLimit: 5_000_000,
+  });
+  await tx.wait();
+  await provider.send("anvil_stopImpersonatingAccount", [owner]);
 }
 
 async function deployChainAdmins(
