@@ -166,11 +166,12 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
     }
 
     /// @dev Mirror the batchOutputHash formula from Committer._commitOneBatchZKsyncOS.
+    /// Note: the chain id is not part of the batch output; it is committed via the chain config
+    /// section of the batch proof public input instead.
     function _batchOutputHash(CommitBatchInfoZKsyncOS memory c) internal pure returns (bytes32) {
         return
             keccak256(
                 abi.encodePacked(
-                    c.chainId,
                     c.firstBlockTimestamp,
                     c.lastBlockTimestamp,
                     uint256(c.daCommitmentScheme),

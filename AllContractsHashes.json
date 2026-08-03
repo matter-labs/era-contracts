@@ -120,6 +120,16 @@
     "evmDeployedBytecodeLength": null
   },
   {
+    "contractName": "system-contracts/DummyInteropHandler",
+    "zkBytecodeHash": "0x0100010d6bb5c36e84c56647eb7e3d6a10a16c02182b3c28df86073c1d0ec635",
+    "zkBytecodePath": "/system-contracts/zkout/DummyInteropHandler.sol/DummyInteropHandler.json",
+    "evmBytecodeHash": null,
+    "evmBytecodePath": null,
+    "evmDeployedBytecodeHash": null,
+    "evmDeployedBytecodeBlakeHash": null,
+    "evmDeployedBytecodeLength": null
+  },
+  {
     "contractName": "system-contracts/DummyL2AssetRouter",
     "zkBytecodeHash": "0x0100002d502a8c05eafb5bace0450639be66aa22c4c5c1c22d279d5ae4f9f461",
     "zkBytecodePath": "/system-contracts/zkout/DummyL2AssetRouter.sol/DummyL2AssetRouter.json",
