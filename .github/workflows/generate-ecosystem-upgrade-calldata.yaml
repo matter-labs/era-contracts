@@ -103,7 +103,17 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 # full workflow → `protocol_ops` subcommand map.
 #
 # ── TROUBLESHOOTING ───────────────────────────────────────────────────────
-# `default aa hash factory dep mismatch`      → step 0; Era CTMs only.
+# `default aa hash factory dep mismatch`      → Era CTMs only (the check is
+#                                               skipped for ZKsync-OS). Try step 0.
+#                                               KNOWN OPEN ISSUE on this branch: a
+#                                               fresh build can produce a
+#                                               DefaultAccount that differs from the
+#                                               pinned genesis value even though the
+#                                               canonical regen reports the hashes as
+#                                               matching, so step 0 may not clear it.
+#                                               Until the system-contracts build is
+#                                               bit-reproducible, only ZKsync-OS-only
+#                                               ecosystems can be prepared here.
 # prepare reverts on owner-gated calls        → the ecosystem is already upgraded;
 #                                               pass `fork_block` = a block BEFORE
 #                                               that deployment (ownership has since
@@ -285,14 +295,19 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      # Build ALL FOUR packages in THIS ORDER — da → l1 → l2 → system-contracts.
-      # It is the order `recompute_hashes.sh` and `update-hashes-on-demand.yaml`
-      # use to produce the committed `AllContractsHashes.json`, and it is
-      # load-bearing: building system-contracts earlier (or skipping l2-contracts)
-      # yields a DIFFERENT DefaultAccount bytecode, which then trips
-      # `CTMUpgrade_v31`'s factory-deps check against the hashes pinned in
-      # `configs/genesis/era/latest.json` ("default aa hash factory dep mismatch")
-      # on every Era-CTM env. Keep this list in step with those two files.
+      # Build ALL FOUR packages in the order `recompute_hashes.sh` and
+      # `update-hashes-on-demand.yaml` use to produce the committed
+      # `AllContractsHashes.json` — da → l1 → l2 → system-contracts. Keeping the
+      # calldata generation on the same sequence as the artifact generation is the
+      # cheapest way to not have to wonder whether a difference came from here.
+      #
+      # NOTE it does not by itself make the system-contracts build reproduce the
+      # committed hashes: at the time of writing a fresh build of this branch can
+      # produce a DefaultAccount that differs from the pinned
+      # `configs/genesis/era/latest.json` value, which trips `CTMUpgrade_v31`'s
+      # factory-deps check ("default aa hash factory dep mismatch") on every
+      # Era-CTM env — while the same canonical pipeline reports the hashes as
+      # matching. See the RUNBOOK's step 0 and TROUBLESHOOTING.
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
       - name: Build l1-contracts artifacts (EVM + zkout)
