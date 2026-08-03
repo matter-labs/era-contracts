@@ -1,5 +1,126 @@
 name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 
+# ═════════════════════════════════════════════════════════════════════════════
+# RUNBOOK — from "nothing" to "this chain is upgraded"
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# Terminology: the ECOSYSTEM upgrade (this workflow) deploys the new shared
+# contracts and moves the CTM's protocol version. Each individual CHAIN is then
+# upgraded separately (step 5) — a chain cannot go to v31 before its ecosystem
+# has.
+#
+# ── 0. Once per branch: make the generated artifacts match a clean build ─────
+# The prepare asserts that the factory deps it builds equal the hashes pinned in
+# `configs/genesis/<flavor>/latest.json` and the env config. If the committed
+# `AllContractsHashes.json` / `zkstack-out` were regenerated on a warm working
+# tree they can disagree with a clean build, and the prepare then dies with
+# `default aa hash factory dep mismatch` (Era CTMs only — the check is skipped
+# for ZKsync-OS). Symptom to watch for: a red `check-zkstack-out`.
+#
+#   gh workflow run update-generated-artifacts.yaml --ref <branch> -f pr_number=<PR#>
+#
+# It builds da → l1 → l2 → system-contracts on a clean runner (the order
+# `recompute_hashes.sh` prescribes), runs `calculate-hashes:fix`, regenerates the
+# anvil-interop chain states, and pushes the result to the PR branch. Needs the
+# `RELEASE_TOKEN` secret, and the PR's head must live in this repo (not a fork of
+# it). `git pull --ff-only` afterwards.
+#
+# ── 1. Generate the ecosystem calldata (THIS workflow) ──────────────────────
+#
+#   gh workflow run generate-ecosystem-upgrade-calldata.yaml --ref <branch> \
+#     -f environment=<env> \
+#     -f verify_mode=strict \                 # report-only for battlechain
+#     -f deployer_address=0x…                 # public; impersonated, nothing signed
+#     [-f fork_block=<n>]                     # see TROUBLESHOOTING
+#
+# `environment` is the basename of a config pair
+# (`upgrade-envs/permanent-values/<env>.toml` + `upgrade-envs/v0.31.0-interopB/<env>.toml`);
+# the L1 to fork is taken from that env's `l1_chain_id`. Nothing is signed and
+# nothing touches real L1 — this runs entirely against an anvil fork.
+#
+# Two artifacts come out:
+#
+#   ecosystem-upgrade-calldata-<env>      the review set: ecosystem.toml (addresses
+#                                         + governance stage 0/1/2 calldata),
+#                                         sim-inputs/, transaction-simulator.json
+#   ecosystem-upgrade-deploy-inputs-<env> the DEPLOY BUNDLE (see below): the
+#                                         deployer calls + provenance + a README
+#
+# The `verify-bundle-handoff` job then re-deploys and re-verifies that bundle from
+# scratch with no contract build. If it is green, the bundle is provably enough to
+# deploy and verify from — that is the artifact to hand to whoever deploys.
+#
+# ── 2. Deploy the new contracts ─────────────────────────────────────────────
+# In CI (signs with `DEPLOYER_PRIVATE_KEY_<net>`):
+#
+#   gh workflow run deploy-ecosystem-upgrade.yaml --ref <branch> \
+#     -f environment=<env> -f generate_run_id=<step-1 run id>
+#
+# Or locally from the downloaded bundle — same `protocol_ops` code path:
+#
+#   ./l1-contracts/test/anvil-interop/replay-bundle-and-verify.sh \
+#     --bundle <unpacked-bundle> --rpc <l1-rpc> --key "$DEPLOYER_KEY"
+#
+# Broadcast ONLY the deployer's bundles; the governance-signed ones are the
+# ceremony (step 4). Both paths are idempotent — re-run after a partial deploy.
+# Do NOT re-generate to "refresh" a bundle: bytecode is specific to the build that
+# produced it, so a re-run yields different addresses and different calldata.
+#
+# ── 3. Verify what landed (PUVT), yourself ─────────────────────────────────
+# From the bundle, no compiler needed (check out the commit its
+# `bundle-metadata.json` names — PUVT matches deployed code against that commit's
+# `AllContractsHashes.json`):
+#
+#   cd protocol-ops && cargo build --release && cd ..
+#   ./l1-contracts/test/anvil-interop/replay-bundle-and-verify.sh \
+#     --bundle <unpacked-bundle> --rpc <l1-rpc> --verify-only     # already deployed
+#   #  … or --fork-url <l1-rpc> to rehearse the whole thing on a throw-away fork
+#
+# ── 4. Execute the governance ceremony ────────────────────────────────────
+# `ecosystem.toml`'s `[governance_calls]` holds stages 0/1/2;
+# `transaction-simulator.json` is the ready-to-paste simulator input for a dry run
+# before signing. Stage timing is enforced on-chain by the GovernanceUpgradeTimer.
+# Re-run step 3 afterwards: pre-ceremony PUVT reports the expected exemptions for
+# contracts still owned by the old governor, and those must be gone after it.
+#
+# ── 5. Upgrade an individual chain ────────────────────────────────────────
+# Once the ecosystem is on the new version, per chain (`chain_name` is a key under
+# `chains:` in `environments/<env>/ecosystem.yaml`):
+#
+#   # a) the chain's upgrade calldata for its ChainAdmin
+#   gh workflow run generate-chain-upgrade-calldata.yaml --ref <branch> \
+#     -f environment=<env> -f protocol_ops_tag=<tag> \
+#     -f l1_rpc_url=<l1-rpc> -f chain_name=<chain>
+#
+#   # b) when the chain schedules the switch itself
+#   gh workflow run generate-chain-set-upgrade-timestamp-calldata.yaml --ref <branch> \
+#     -f environment=<env> -f protocol_ops_tag=<tag> -f l1_rpc_url=<l1-rpc> \
+#     -f chain_name=<chain> -f new_protocol_version=<packed> -f upgrade_timestamp=<unix>
+#
+# Both emit `safe-bundles-*` artifacts for the chain's admin multisig. Bundles
+# targeting the ecosystem deployer EOA instead go through
+# `execute-deployer-safe-bundles.yaml`. See `.github/workflows/README.md` for the
+# full workflow → `protocol_ops` subcommand map.
+#
+# ── TROUBLESHOOTING ───────────────────────────────────────────────────────
+# `default aa hash factory dep mismatch`      → step 0; Era CTMs only.
+# prepare reverts on owner-gated calls        → the ecosystem is already upgraded;
+#                                               pass `fork_block` = a block BEFORE
+#                                               that deployment (ownership has since
+#                                               moved off the deployer). CREATE2
+#                                               addresses are deterministic, so the
+#                                               output matches a tip run.
+# PUVT fails on PUH / Era-diamond checks      → expected for a legacy-Governance or
+#                                               single-chain ecosystem; use
+#                                               `verify_mode=report-only` and READ
+#                                               the printed output. Never for a
+#                                               PUH-governed env.
+# `No deploy bundle was published`            → the prepare died before the pack
+#                                               step; fix the generate job first.
+#
+# Full prose version: `docs/ecosystem-upgrade-deploy.md`.
+# ═════════════════════════════════════════════════════════════════════════════
+
 # Regenerates the v31 ecosystem upgrade calldata for one environment and
 # verifies it with PUVT, on a Linux runner so the compiled bytecode — and
 # therefore the CREATE2 addresses baked into `ecosystem.toml` — is
@@ -164,14 +285,22 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      # `yarn l1 build:foundry` builds both EVM (out/) and EraVM (zkout/)
-      # artifacts; da + sc artifacts are referenced by the prepare/PUVT.
+      # Build ALL FOUR packages in THIS ORDER — da → l1 → l2 → system-contracts.
+      # It is the order `recompute_hashes.sh` and `update-hashes-on-demand.yaml`
+      # use to produce the committed `AllContractsHashes.json`, and it is
+      # load-bearing: building system-contracts earlier (or skipping l2-contracts)
+      # yields a DIFFERENT DefaultAccount bytecode, which then trips
+      # `CTMUpgrade_v31`'s factory-deps check against the hashes pinned in
+      # `configs/genesis/era/latest.json` ("default aa hash factory dep mismatch")
+      # on every Era-CTM env. Keep this list in step with those two files.
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
-      - name: Build system-contracts artifacts
-        run: yarn sc build:foundry
       - name: Build l1-contracts artifacts (EVM + zkout)
         run: yarn l1 build:foundry
+      - name: Build l2-contracts artifacts
+        run: yarn l2 build:foundry
+      - name: Build system-contracts artifacts
+        run: yarn sc build:foundry
 
       - name: Build protocol_ops
         working-directory: protocol-ops
