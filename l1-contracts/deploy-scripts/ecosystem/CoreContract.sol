@@ -81,8 +81,8 @@ enum CoreContract {
     DiamondProxy,
     ProxyAdmin,
     TransparentUpgradeableProxy,
-    // Atomic-interop built-ins. ZKsync OS only: the commitment tree's storage is read by the ZKsync OS
-    // bootloader, and Era chains have no atomic interop.
+    // Atomic-interop built-ins, part of `getZKsyncOSOnlyContracts`: the commitment tree's storage is read
+    // by the ZKsync OS bootloader, and Era chains have no atomic interop.
     L2InteropCommitmentTree,
     AtomicFlowManager
 }

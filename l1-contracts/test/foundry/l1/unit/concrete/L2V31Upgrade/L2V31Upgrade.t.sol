@@ -240,7 +240,11 @@ contract L2V31UpgradeUnitTest is Test {
         testUpgrade = new TestL2V31Upgrade();
     }
 
-    function test_UpgradeViaComplexUpgrader_RegistersBaseTokenAndInitializesBaseToken() public {
+    /// @dev The contracts introduced in v31 are initialized on the genesis path only: their `initL2`s are
+    /// unchanged since v31 and one-shot, so a chain that already went through v31 must not run them again.
+    /// This upgrade therefore leaves the asset tracker and the base token alone; what it does run for them is
+    /// covered by `L2GenesisForceDeploymentHelper.t.sol`.
+    function test_UpgradeViaComplexUpgrader_LeavesV31ContractsAlone() public {
         bytes memory fixedData = abi.encode(_buildFixedForceDeploymentsData());
         bytes memory additionalData = abi.encode(_buildZKChainSpecificData());
 
@@ -250,12 +254,10 @@ contract L2V31UpgradeUnitTest is Test {
             abi.encodeCall(IL2V31Upgrade.upgrade, (false, CTM_DEPLOYER, fixedData, additionalData))
         );
 
-        // Verify AssetTracker: initL2 + registerBaseTokenDuringUpgrade
+        // AssetTracker: neither re-initialized nor asked to register the base token again.
         MockV31UpgradeAssetTracker assetTracker = MockV31UpgradeAssetTracker(L2_ASSET_TRACKER_ADDR);
-        assertEq(assetTracker.initCalls(), 1, "asset tracker should be initialized exactly once");
-        assertEq(assetTracker.L1_CHAIN_ID(), L1_CHAIN_ID, "asset tracker L1 chain id mismatch");
-        assertEq(assetTracker.registerCalls(), 1, "base token should be registered exactly once");
-        assertEq(assetTracker.lastRegisteredAssetId(), BASE_TOKEN_ASSET_ID, "registered asset id mismatch");
+        assertEq(assetTracker.initCalls(), 0, "asset tracker must not be re-initialized on an upgrade");
+        assertEq(assetTracker.registerCalls(), 0, "base token must not be registered again on an upgrade");
 
         // Verify NTV: updateL2 called with correct data
         MockV31UpgradeNativeTokenVault nativeTokenVault = MockV31UpgradeNativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
@@ -263,11 +265,9 @@ contract L2V31UpgradeUnitTest is Test {
         assertEq(nativeTokenVault.lastOriginChainId(), BASE_TOKEN_ORIGIN_CHAIN_ID, "origin chain id mismatch");
         assertEq(nativeTokenVault.BASE_TOKEN_ORIGIN_TOKEN(), BASE_TOKEN_ORIGIN_ADDRESS, "origin token mismatch");
 
-        // Verify BaseToken: initL2 called, and it ran AFTER registerBaseTokenDuringUpgrade
+        // BaseToken: its `initL2` is a genesis-path call as well.
         MockV31UpgradeBaseToken baseToken = MockV31UpgradeBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
-        assertEq(baseToken.initCalls(), 1, "base token should be initialized exactly once");
-        assertEq(baseToken.lastInitializedL1ChainId(), L1_CHAIN_ID, "base token L1 chain id mismatch");
-        assertTrue(baseToken.sawRegisteredBaseToken(), "base token should be initialized after registration");
+        assertEq(baseToken.initCalls(), 0, "base token must not be re-initialized on an upgrade");
     }
 
     function _buildFixedForceDeploymentsData() private pure returns (FixedForceDeploymentsData memory) {

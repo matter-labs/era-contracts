@@ -86,11 +86,12 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
 contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
     /// @notice Override to skip the ownership-acceptance and `setAddresses` calls, which need ownership
     ///         hand-offs the fixture does not perform.
-    /// @dev The pre-v32 parity calls are kept: they are what makes a v31 ecosystem match a from-scratch v32
-    ///      one, and they are no-ops once the ecosystem is already wired.
+    /// @dev The `ChainRegistrationSender` registration is kept: it is what makes a v31 ecosystem match a
+    ///      from-scratch v32 one, and it is a no-op once the bridgehub knows a sender. The interop-handler
+    ///      wiring is emitted by `DefaultCoreUpgrade` and therefore unaffected by this override.
     function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
-        console.log("Test mode: keeping only the pre-v32 parity calls in stage 1");
-        return _buildPreV32ParityCalls();
+        console.log("Test mode: keeping only the ChainRegistrationSender registration in stage 1");
+        return _buildChainRegistrationSenderCall();
     }
 }
 

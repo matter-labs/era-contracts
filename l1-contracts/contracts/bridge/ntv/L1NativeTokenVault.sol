@@ -128,13 +128,18 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         // complement is the net amount bridged out of L1. Reading it instead of summing the per-chain
         // amounts keeps the result immune to balance moves between chains, which the tracker's own
         // migration entry points can still perform after the upgrade.
+        // Registration in the tracker also means this vault's own buckets hold nothing for the asset:
+        // `L1AssetTracker.registerLegacyToken` moved each chain's amount over with
+        // `migrateTokenBalanceToAssetTracker`, which zeroed the bucket it read, for every chain except the
+        // asset's origin chain — and the origin chain is L1, whose bucket is excluded below anyway. Nothing
+        // has written those buckets since, so chains registered later hold nothing either.
         if (legacyTracker != address(0) && ILegacyL1AssetTracker(legacyTracker).isAssetRegistered(_assetId)) {
             return MAX_TOKEN_BALANCE - ILegacyL1AssetTracker(legacyTracker).chainBalance(L1_CHAIN_ID, _assetId);
         }
 
-        // Pre-v31 ecosystems, and assets the tracker never registered, kept the accounting in this vault.
-        // Nothing writes those entries anymore, so summing them over the registered chains is exact. L1's
-        // own entry is skipped: it only ever tracked assets native to other chains.
+        // Assets that never went through the tracker migration still have their amounts in this vault's own
+        // buckets. Nothing writes them anymore, so summing them over the registered chains is exact. L1's
+        // own bucket is skipped: it only ever tracked assets native to other chains.
         uint256[] memory chainIds = IBridgehubBase(address(L1_NULLIFIER.BRIDGE_HUB())).getAllZKChainChainIDs();
         uint256 chainIdsLength = chainIds.length;
         for (uint256 i = 0; i < chainIdsLength; ++i) {

@@ -181,17 +181,9 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // same state a fresh one gets from genesis.
         _assertAtomicInteropInitialized();
 
-        // Running the same upgrade again must not attempt to re-initialize them.
-        vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
-        L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
-            true,
-            ctmDeployerAddress,
-            fixedEncoded,
-            additionalEncoded,
-            false
-        );
-        vm.stopPrank();
-        _assertAtomicInteropInitialized();
+        // Note: the initialization is one-shot by design — this release's upgrade transaction is applied to
+        // a chain exactly once, and both built-ins reject a second seeding (`IMTAlreadyInitialized` /
+        // `ManagerAlreadyInitialized`) rather than silently accepting it.
     }
 
     function testEraForceDeployment() public {
@@ -375,7 +367,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
     }
 
     /// @dev The atomic-interop built-ins are etched with their real code, not the generic mock, so that
-    ///      `_initializeV31Contracts` initializing them is observable (`leafCount` / `L1_CHAIN_ID`).
+    ///      `_initializeV32Contracts` initializing them is observable (`leafCount` / `L1_CHAIN_ID`).
     function _etchAtomicInteropBuiltIns() internal {
         if (L2_INTEROP_COMMITMENT_TREE_ADDR.code.length == 0) {
             vm.etch(L2_INTEROP_COMMITMENT_TREE_ADDR, address(new L2InteropCommitmentTree()).code);
