@@ -79,7 +79,10 @@ done
 # (deployer_address), with which tools (toolchain).
 CONTRACTS_COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
 CONTRACTS_DIRTY=false
-if ! git -C "$REPO_ROOT" diff --quiet HEAD 2>/dev/null; then CONTRACTS_DIRTY=true; fi
+# `--ignore-submodules=all`: a checkout's submodule pointers routinely read as
+# modified (worktrees, different lib/ checkouts) and say nothing about the
+# contract sources that were compiled.
+if ! git -C "$REPO_ROOT" diff --quiet HEAD --ignore-submodules=all 2>/dev/null; then CONTRACTS_DIRTY=true; fi
 HASHES_SHA="$(sha256sum "$REPO_ROOT/AllContractsHashes.json" | cut -d' ' -f1)"
 L1_CHAIN_ID="$(read_toml_int "$PERMANENT_VALUES" l1_chain_id)"
 FORGE_VERSION="$(forge --version 2>/dev/null | head -1 || echo unknown)"

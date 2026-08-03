@@ -48,6 +48,10 @@ while [[ $# -gt 0 ]]; do
 done
 [[ -n "$BUNDLE" ]] || usage
 [[ -n "$FORK_URL" || -n "$RPC" ]] || usage
+if [[ -n "$FORK_URL" && -n "$RPC" ]]; then
+  echo "pass either --fork-url (start a fork) or --rpc (use an existing chain), not both" >&2
+  exit 1
+fi
 [[ -f "$BUNDLE/bundle-metadata.json" ]] || { echo "not a deploy bundle (no bundle-metadata.json): $BUNDLE" >&2; exit 1; }
 
 meta() { jq -r "$1 // empty" "$BUNDLE/bundle-metadata.json"; }
@@ -117,6 +121,11 @@ if [[ -n "$FORK_URL" ]]; then
     # Pin to the height the bundle was computed against: a later state may have
     # moved ownership off the deployer or started the upgrade timer, either of
     # which makes the replay revert.
+    if [[ -z "$FORK_BLOCK" ]]; then
+      echo "WARNING: the bundle records no fork height — forking at chain tip." >&2
+      echo "         If the upgrade is already live the replay will revert; re-pack the" >&2
+      echo "         bundle with FORKED_AT_BLOCK set, or fork manually and pass --rpc." >&2
+    fi
     start_anvil_fork "$PORT" "$FORK_URL" "$FORK_BLOCK" "$WORK/anvil.log"
   fi
 fi
