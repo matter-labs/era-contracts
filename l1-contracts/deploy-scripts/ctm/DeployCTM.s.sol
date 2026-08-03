@@ -265,15 +265,16 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
         vm.startBroadcast(getDeployerAddress());
         // Single-VK lane: every proof, single batch or many, verifies through
-        // the aggregation verifier, so the deploy must set it before
-        // MultiProofVerifier can accept a proof. The aggregator VK is a
-        // deferred step; while zisk_range_verifier_addr is unset an operator
-        // sets the range verifier later with setZiskRangeVerifier.
-        if (config.ziskRangeVerifierAddr != address(0)) {
-            MultiProofVerifier(multiProofAddresses.multiProofVerifier).setZiskRangeVerifier(
-                IVerifier(config.ziskRangeVerifierAddr)
-            );
-        }
+        // the range verifier, which reconstructs the ZiSK public values from
+        // its own pinned VKs. Default it to the ZiskVerifier just deployed; an
+        // operator may override with a separately deployed aggregator verifier
+        // via zisk_range_verifier_addr.
+        address ziskRangeVerifierAddr = config.ziskRangeVerifierAddr != address(0)
+            ? config.ziskRangeVerifierAddr
+            : multiProofAddresses.ziskVerifier;
+        MultiProofVerifier(multiProofAddresses.multiProofVerifier).setZiskRangeVerifier(
+            IVerifier(ziskRangeVerifierAddr)
+        );
         MultiProofVerifier(multiProofAddresses.multiProofVerifier).transferOwnership(config.ownerAddress);
         vm.stopBroadcast();
 

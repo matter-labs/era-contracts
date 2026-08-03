@@ -75,7 +75,8 @@ struct Opt {
     #[structopt(long = "plonk_output_path", default_value = "data/VerifierPlonk.sol")]
     plonk_output_path: String,
 
-    /// ZiSK VK input JSON (programVK + rootCVadcopFinal).
+    /// ZiSK VK input JSON (inner programVK, aggregator programVK,
+    /// rootCVadcopFinal).
     #[structopt(long = "zisk_vk_path", default_value = "data/ZiSK_vk.json")]
     zisk_vk_path: String,
 

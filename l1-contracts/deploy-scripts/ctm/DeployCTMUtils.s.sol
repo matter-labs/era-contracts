@@ -159,9 +159,10 @@ abstract contract DeployCTMUtils is DeployUtils {
             config.ziskPlonkVerifierAddr = toml.readAddress("$.zisk_plonk_verifier_addr");
         }
         // The aggregation verifier for the single-VK ZiSK lane. It pins the
-        // AGGREGATOR guest programVK and checks the SNARK for every range
-        // size. The aggregator VK is a deferred step, so this defaults to
-        // zero; when set, the deploy wires it with setZiskRangeVerifier.
+        // aggregator guest programVK, the inner guest programVK and the
+        // vadcop-final root, and checks the SNARK for every range size. The
+        // aggregator VK is a deferred step, so this defaults to zero; when set,
+        // the deploy wires it with setZiskRangeVerifier.
         if (toml.keyExists("$.zisk_range_verifier_addr")) {
             config.ziskRangeVerifierAddr = toml.readAddress("$.zisk_range_verifier_addr");
         }

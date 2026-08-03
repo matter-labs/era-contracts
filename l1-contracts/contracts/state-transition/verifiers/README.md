@@ -2,10 +2,33 @@
 
 `MultiProofVerifier` accepts a combined proof (type 5) and requires BOTH an
 Airbender SNARK and a ZiSK SNARK for every state transition. `ZiskVerifier`
-is its inner ZiSK verifier: it pins the guest `programVK` and
-`rootCVadcopFinal`, checks the 320-byte public values, and delegates the
-Plonk check to a standalone snarkJS-generated verifier referenced through
-`ISnarkPlonkVerifier`.
+is its range verifier: it pins three values, RECONSTRUCTS the 320-byte ZiSK
+public values on-chain from those pins and the batch public inputs (the
+self-contained seed-0 chain), and delegates the Plonk check to a standalone
+snarkJS-generated verifier referenced through `ISnarkPlonkVerifier`. The
+public values are not carried in the proof, so there is nothing redundant to
+cross-check and the cross-proof binding is inherent.
+
+The three pins are:
+
+- `innerProgramVK` — the programVK of the inner state-transition guest ELF.
+  It enters the binding digest
+  `keccak256(innerProgramVK || rootCVadcopFinal || chainedPI)`, because the
+  aggregator guest builds that digest from the inner proofs it ingests.
+- `aggregatorProgramVK` — the programVK of the aggregator guest ELF. The
+  aggregated proof attests to that program, so this pin is public-values
+  bytes `[0..32]`. The aggregator ELF setup is deferred, so the current pin
+  is the documented stand-in
+  `keccak256("zisk-aggregator-programvk-standin")`. Run
+  `cargo-zisk rom-setup` on the aggregator ELF, put the four limbs into
+  `tools/data/ZiSK_vk.json`, and regenerate the contract.
+- `rootCVadcopFinal` — the vadcop-final recursive-setup constant of the ZiSK
+  release. One cargo-zisk setup produces the inner proofs and the aggregated
+  proof, so a single pin serves both the digest and public-values bytes
+  `[288..320]`.
+
+`verificationKeyHash()` is `keccak256` over the three pins in that order, so
+a rotation of any pin rotates the hash.
 
 ## Generating the snarkJS Plonk verifier
 
