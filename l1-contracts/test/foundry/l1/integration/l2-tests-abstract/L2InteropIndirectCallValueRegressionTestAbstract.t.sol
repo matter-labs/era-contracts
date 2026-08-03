@@ -10,7 +10,8 @@ import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {MsgValueMismatch} from "contracts/common/L1ContractErrors.sol";
+import {MsgValueMismatch, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {InteroperableAddressChainReferenceNotEmpty} from "contracts/interop/InteropErrors.sol";
 
 import {
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -31,9 +32,16 @@ contract MockL2CrossChainSender is IL2CrossChainSender {
     address public lastOriginalCaller;
     address public returnRecipient;
     uint256 public callCount;
+    /// @dev When non-empty, returned verbatim as the starter's `to` — lets tests exercise the
+    /// InteropCenter's validation of the RETURNED recipient (chain-carrying / zero forms).
+    bytes public returnToOverride;
 
     constructor(address _returnRecipient) {
         returnRecipient = _returnRecipient;
+    }
+
+    function setReturnToOverride(bytes memory _to) external {
+        returnToOverride = _to;
     }
 
     function initiateIndirectCall(
@@ -52,7 +60,7 @@ contract MockL2CrossChainSender is IL2CrossChainSender {
         callAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (_value));
 
         interopCallStarter = InteropCallStarter({
-            to: InteroperableAddress.formatEvmV1(returnRecipient),
+            to: returnToOverride.length > 0 ? returnToOverride : InteroperableAddress.formatEvmV1(returnRecipient),
             data: _data,
             callAttributes: callAttributes
         });
@@ -683,6 +691,75 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
             mockCrossChainSender2.lastInteropCallValue(),
             interopCallValue2,
             "Second call should have non-zero interopCallValue"
+        );
+    }
+
+    /// @dev Builds the canonical single-indirect-call sendBundle inputs used by the returned-`to`
+    /// validation tests below.
+    function _singleIndirectCallInputs(
+        uint256 _interopCallValue,
+        uint256 _indirectCallMessageValue
+    ) internal view returns (InteropCallStarter[] memory calls, bytes[] memory bundleAttributes) {
+        bytes[] memory callAttributes = new bytes[](2);
+        callAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (_interopCallValue));
+        callAttributes[1] = abi.encodeCall(IERC7786Attributes.indirectCall, (_indirectCallMessageValue));
+
+        calls = new InteropCallStarter[](1);
+        calls[0] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(address(mockCrossChainSender)),
+            data: hex"",
+            callAttributes: callAttributes
+        });
+
+        bundleAttributes = new bytes[](2);
+        bundleAttributes[0] = abi.encodeCall(
+            IERC7786Attributes.unbundlerAddress,
+            (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
+        );
+        bundleAttributes[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
+    }
+
+    /// @notice The recipient RETURNED by an (arbitrary, user-chosen) indirect call starter gets the same
+    /// validation as a user-supplied one: a chain-carrying ERC-7930 form is rejected — the bundle-level
+    /// destination chain is authoritative, and a smuggled chain reference would otherwise be silently
+    /// ignored.
+    function test_indirectStarterReturnedRecipientWithChainReferenceReverts() public {
+        bytes memory chainCarryingTo = InteroperableAddress.formatEvmV1(destinationChainId + 1, finalRecipient);
+        mockCrossChainSender.setReturnToOverride(chainCarryingTo);
+
+        uint256 indirectCallMessageValue = 50;
+        (InteropCallStarter[] memory calls, bytes[] memory bundleAttributes) = _singleIndirectCallInputs(
+            0,
+            indirectCallMessageValue
+        );
+
+        vm.deal(address(this), indirectCallMessageValue);
+        vm.expectRevert(abi.encodeWithSelector(InteroperableAddressChainReferenceNotEmpty.selector, chainCarryingTo));
+        L2_INTEROP_CENTER.sendBundle{value: indirectCallMessageValue}(
+            InteroperableAddress.formatEvmV1(destinationChainId),
+            calls,
+            _withAtomicBundle(bundleAttributes)
+        );
+    }
+
+    /// @notice A zero recipient returned by an indirect call starter is rejected, mirroring the
+    /// user-supplied starter check: a call to address(0) could never execute and the collected value
+    /// would have no refund path.
+    function test_indirectStarterReturnedRecipientZeroAddressReverts() public {
+        mockCrossChainSender.setReturnToOverride(InteroperableAddress.formatEvmV1(address(0)));
+
+        uint256 indirectCallMessageValue = 50;
+        (InteropCallStarter[] memory calls, bytes[] memory bundleAttributes) = _singleIndirectCallInputs(
+            0,
+            indirectCallMessageValue
+        );
+
+        vm.deal(address(this), indirectCallMessageValue);
+        vm.expectRevert(ZeroAddress.selector);
+        L2_INTEROP_CENTER.sendBundle{value: indirectCallMessageValue}(
+            InteroperableAddress.formatEvmV1(destinationChainId),
+            calls,
+            _withAtomicBundle(bundleAttributes)
         );
     }
 }

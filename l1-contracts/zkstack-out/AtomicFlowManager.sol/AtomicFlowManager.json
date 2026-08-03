@@ -587,6 +587,22 @@
   },
   {
     "type": "error",
+    "name": "ManagerFlowDeadlinePassed",
+    "inputs": [
+      {
+        "name": "deadline",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "latestImportedRootTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ManagerFlowIdMismatch",
     "inputs": [
       {
@@ -667,22 +683,6 @@
   },
   {
     "type": "error",
-    "name": "ManagerNoRecoverableCalls",
-    "inputs": [
-      {
-        "name": "flowId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "bundleHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "ManagerNotInteropCenter",
     "inputs": [
       {
@@ -730,6 +730,22 @@
       },
       {
         "name": "actual",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ManagerTooManyLegs",
+    "inputs": [
+      {
+        "name": "maxLegs",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "legs",
         "type": "uint256",
         "internalType": "uint256"
       }

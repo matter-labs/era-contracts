@@ -5,7 +5,14 @@ import {IAtomicFlowManager} from "./IAtomicFlowManager.sol";
 import {IL2InteropCommitmentTree} from "./IL2InteropCommitmentTree.sol";
 import {IAtomicRecoverable} from "./IAtomicRecoverable.sol";
 import {AtomicInteropProof} from "./libraries/AtomicInteropProof.sol";
-import {LegState, AtomicFlow, AtomicFlowPreimage, ImtProof, AtomicFinalityProof} from "./IAtomicInterop.sol";
+import {
+    LegState,
+    AtomicFlow,
+    AtomicFlowPreimage,
+    ImtProof,
+    AtomicFinalityProof,
+    MAX_ATOMIC_FLOW_LEGS
+} from "./IAtomicInterop.sol";
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
 import {InteropDataEncoding} from "../interop/InteropDataEncoding.sol";
 import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol";
@@ -16,22 +23,23 @@ import {
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_INTEROP_HANDLER_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
-import {L2_BRIDGEHUB} from "../common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_BRIDGEHUB, L2_INTEROP_ROOT_STORAGE} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {
     ManagerAlreadyInitialized,
     ManagerNotInteropCenter,
     ManagerNotInteropHandler,
     ManagerLegAlreadyCommitted,
     ManagerLegNotRevertable,
+    ManagerFlowDeadlinePassed,
     ManagerFlowIdMismatch,
     ManagerBundleHashesNotSorted,
     ManagerCommittedBundleNotInFlow,
     ManagerCommittedLegSourceChainMismatch,
     ManagerLegSourceChainNotRegistered,
+    ManagerTooManyLegs,
     ManagerLegSourceChainIdsLengthMismatch,
     ManagerProofCountMismatch,
     ManagerExecutingBundleNotInFlow,
-    ManagerNoRecoverableCalls,
     ManagerSettlementLayerNotL1,
     ProofSourceChainMismatch
 } from "./AtomicInteropErrors.sol";
@@ -91,6 +99,21 @@ contract AtomicFlowManager is IAtomicFlowManager {
     ) external onlyInteropCenter {
         bytes32 flowId = _validateAndComputeFlowId(_flowPreimage);
         _checkSettlementLayerIsL1(_flowPreimage.settlementLayerChainId);
+
+        // Reject a leg of a flow whose deadline has verifiably passed: an imported settlement-layer
+        // root created after the deadline is exactly what `authorizeRefund` needs, so committing now
+        // could only burn funds into a flow that must be refunded. As an expired-flow guard this is
+        // BEST EFFORT only — imported roots lag the settlement layer's clock, and other source chains
+        // have their own views. What it enforces unconditionally is ordering on this chain: reverting
+        // a leg requires importing a root with `timestamp > deadline` (see
+        // {AtomicInteropProof.verifyTimeoutAbsence}) and the tracked timestamp is a monotone maximum,
+        // so once a leg of the flow was reverted here, no new leg can ever be committed here.
+        uint256 latestImportedRootTimestamp = L2_INTEROP_ROOT_STORAGE.latestInteropRootTimestamp(
+            _flowPreimage.settlementLayerChainId
+        );
+        if (latestImportedRootTimestamp > _flowPreimage.deadline) {
+            revert ManagerFlowDeadlinePassed(_flowPreimage.deadline, latestImportedRootTimestamp);
+        }
 
         // The committing bundle must be one of the flow's legs, declared with this chain as its source
         // (see {AtomicFlowPreimage}). `legBundleHashes` is strictly ascending (checked above), so
@@ -222,7 +245,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
         // calls, so a reentrant claim hits the `Revertable` check above. The manager never holds funds.
         _state[_flowId][bundleHash] = LegState.Reverted;
 
-        _recoverBundle(_flowId, bundleHash, bundle);
+        _recoverBundle(bundle);
 
         emit FlowRefunded(_flowId, bundleHash);
     }
@@ -251,16 +274,15 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// {protocol-docs/atomicity/recovery.md}), re-crediting the original depositor.
     /// @dev Each call's local sender (`InteropCall.from`) owns its own reversal via
     /// {IAtomicRecoverable.recoverAtomicCall}: the manager is agnostic to the call/encoding format and
-    /// simply forwards `(destinationChainId, data)`, counting the calls that report a recovery. Senders
-    /// MUST return `false` (not revert) for calls they do not recognise.
+    /// simply forwards `(destinationChainId, data)`. Senders MUST return `false` (not revert) for calls
+    /// they do not recognise.
     /// @dev Native base-token `value` is reversed separately. Router-produced calls (`from == asset
     /// router`) never carry it (indirect calls force `interopCallValue == 0`) and take only the
     /// `recoverAtomicCall` branch. A direct call's `value` routes through the asset router/NTV base-token
-    /// recovery path (reusing the existing accounting) back to its `from`, and every such leg counts as a
-    /// recovery.
-    /// @dev `recovered != 0` is required: a bundle with nothing recoverable has no source funds to return,
-    /// so the refund would be a no-op and is rejected.
-    function _recoverBundle(bytes32 _flowId, bytes32 _bundleHash, InteropBundle memory _bundle) internal {
+    /// recovery path (reusing the existing accounting) back to its `from`.
+    /// @dev A bundle where no call is recoverable has no source funds to return: the refund then simply
+    /// flips the leg to `Reverted` without moving anything — the state transition must not be blocked.
+    function _recoverBundle(InteropBundle memory _bundle) internal {
         uint256 destChainId = _bundle.destinationChainId;
         // L2->L1 atomic bundles are rejected at send time ({InteropCenter.AtomicBundleToL1NotSupported}), so a
         // recovered bundle never targets L1. Assert it explicitly: this keeps recovery from ever reaching the
@@ -270,16 +292,16 @@ contract AtomicFlowManager is IAtomicFlowManager {
         require(destChainId != L1_CHAIN_ID, RecoverToL1NotSupported());
         bytes32 destBaseTokenAssetId = _bundle.destinationBaseTokenAssetId;
         uint256 callsLen = _bundle.calls.length;
-        uint256 recovered = 0;
         for (uint256 i = 0; i < callsLen; ++i) {
             InteropCall memory c = _bundle.calls[i];
             // Only ask burn-producing calls (from == asset router, as set by `initiateIndirectCall`) to
             // reverse themselves. A direct call never burned through a recoverable sender, so its `from`
             // (possibly an EOA) is skipped here; any base-token value it carried is handled below.
+            // The sender reports via the return value whether it recognised (and reversed) the call;
+            // nothing is done with the answer — an unrecognised call simply has nothing to recover.
             if (c.from == L2_ASSET_ROUTER_ADDR) {
-                if (IAtomicRecoverable(c.from).recoverAtomicCall(destChainId, c.data)) {
-                    ++recovered;
-                }
+                // slither-disable-next-line unused-return
+                IAtomicRecoverable(c.from).recoverAtomicCall(destChainId, c.data);
             }
             if (c.from != L2_ASSET_ROUTER_ADDR && c.value != 0) {
                 IAssetRouterShared(L2_ASSET_ROUTER_ADDR).bridgehubRecoverBaseToken(
@@ -288,11 +310,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
                     c.from,
                     c.value
                 );
-                ++recovered;
             }
-        }
-        if (recovered == 0) {
-            revert ManagerNoRecoverableCalls(_flowId, _bundleHash);
         }
     }
 
@@ -319,6 +337,11 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// Shared by the send path (`append`) and `_checkFlowId`, so canonicalization cannot drift.
     function _validateAndComputeFlowId(AtomicFlowPreimage calldata _preimage) internal pure returns (bytes32) {
         uint256 n = _preimage.legBundleHashes.length;
+        // See {MAX_ATOMIC_FLOW_LEGS}: appending a leg is cheap, but finalization verifies one Merkle
+        // proof per leg, so the leg count must stay bounded.
+        if (n > MAX_ATOMIC_FLOW_LEGS) {
+            revert ManagerTooManyLegs(MAX_ATOMIC_FLOW_LEGS, n);
+        }
         for (uint256 i = 1; i < n; ++i) {
             if (_preimage.legBundleHashes[i] <= _preimage.legBundleHashes[i - 1]) {
                 revert ManagerBundleHashesNotSorted();

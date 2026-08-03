@@ -76,3 +76,11 @@ struct AtomicFinalityProof {
 /// other hashes.
 /// `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
 bytes4 constant ATOMIC_COMMIT_LEAF_TAG = bytes4(keccak256("AtomicInterop.commit.v1"));
+
+/// @dev The maximum number of legs in an atomic flow. Committing a leg is cheap (one IMT insert), but
+/// finalizing ANY leg requires verifying one full inclusion proof — a settlement-layer Merkle proof
+/// plus an IMT membership proof — per leg of the flow ({AtomicFlowManager.requireFlowFinalized}), so
+/// an unbounded leg count would make destination-side execution arbitrarily expensive. The cap is
+/// part of preimage validation ({AtomicFlowManager._validateAndComputeFlowId}), so an oversized flow
+/// is rejected identically on the append, finalize and refund paths and can never commit a leg.
+uint256 constant MAX_ATOMIC_FLOW_LEGS = 8;

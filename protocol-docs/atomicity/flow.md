@@ -74,20 +74,28 @@ The source burn flows through the normal `initiateIndirectCall` / `L2AssetRouter
 publishing the bundle to L1, `InteropCenter` calls `AtomicFlowManager.append(bundleHash,
 lowNullifierIndex, preimage)`. `append`:
 
-1. **Recomputes and validates `flowId`** from the preimage (`_validateAndComputeFlowId`):
+1. **Recomputes and validates `flowId`** from the preimage (`_validateAndComputeFlowId`): at most
+   `MAX_ATOMIC_FLOW_LEGS` (8) legs (`ManagerTooManyLegs` — appending is cheap, but finalization
+   verifies one Merkle proof per leg),
    `legBundleHashes` strictly ascending, `legSourceChainIds` length matching.
 2. **Requires L1 settlement** (`_checkSettlementLayerIsL1`) — this release anchors proofs only on the L1
    message root (see {protocol-docs/atomicity/security.md#trust-assumptions}).
-3. **Requires the committing bundle to be one of the legs**, declared with **this** chain as its source
+3. **Rejects flows whose deadline verifiably passed** (`ManagerFlowDeadlinePassed`): if a
+   settlement-layer root with creation timestamp `> deadline` has been imported on this chain (tracked
+   as a monotone maximum by `L2InteropRootStorage.latestInteropRootTimestamp`), the flow can already be
+   timed out, so committing would only burn funds into a flow that must be refunded. Best effort as an
+   expired-flow guard (imported roots lag the SL clock); what it enforces unconditionally is ordering:
+   once a leg of the flow was reverted on this chain, no new leg can ever be committed here.
+4. **Requires the committing bundle to be one of the legs**, declared with **this** chain as its source
    (`legSourceChainIds[legIndex] == block.chainid`). A wrong or stale preimage — e.g. an off-chain
    bundle-hash prediction invalidated by an encoding change — reverts the whole send, burn included,
    rather than committing a leg under a `flowId` that could neither finalize nor be refunded.
-4. **Requires every _other_ leg to declare a Bridgehub-registered source chain**
+5. **Requires every _other_ leg to declare a Bridgehub-registered source chain**
    (`L2_BRIDGEHUB.baseTokenAssetId(chainId) != 0`). Registration guarantees MessageRoot presence,
    without which the leg could never be proven committed _or_ absent and the flow would be stranded (see
    {protocol-docs/atomicity/security.md#timeout-protocol-preconditions}). This also rejects L1 as a
    declared leg source (L1 is never a registered interop chain).
-5. **Marks the leg `Committed`** — rejecting a re-commit of the same `(flowId, bundleHash)` with
+6. **Marks the leg `Committed`** — rejecting a re-commit of the same `(flowId, bundleHash)` with
    `ManagerLegAlreadyCommitted` — and then, effects before interaction, **inserts** the leg's
    `commitValue` into this chain's `L2InteropCommitmentTree`, emitting
    `FlowCommitted(flowId, bundleHash, deadline, leafIndex)`. The tree additionally mirrors the inserted
@@ -122,8 +130,8 @@ to either.
 ### 4. Timeout / refund
 
 If a leg never commits in time, `authorizeRefund` takes one absence proof and flips this chain's
-`Committed` legs to `Revertable`; `claimRefund` then _attempts_ to reverse the burns — it succeeds only
-if at least one recovery reports success and none reverts. Detailed in
+`Committed` legs to `Revertable`; `claimRefund` then _attempts_ to reverse the burns — it succeeds as
+long as no attempted recovery reverts (a claim that recovers nothing still consumes the leg). Detailed in
 {protocol-docs/atomicity/recovery.md}; the absence-proof conditions in
 {protocol-docs/atomicity/proofs.md#timeout}.
 

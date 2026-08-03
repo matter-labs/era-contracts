@@ -251,11 +251,17 @@ interop (IMT) flow — see {protocol-docs/atomicity/flow.md} for the full flow. 
   _recognized_ call can still revert: on malformed `finalizeDeposit` payload (the `abi.decode` throws) or
   if the downstream `bridgeRecoverFailedTransfer` fails. Such a revert takes the entire `claimRefund`
   with it; see {protocol-docs/atomicity/recovery.md#the-walk-is-all-or-nothing-not-per-call-isolated}.
-- For a recognized burn it calls `IL2NativeTokenVault.bridgeRecoverFailedTransfer(destChainId, assetId,
-mintData)`, forwarding the bundle's mint data verbatim; the NTV refunds the data's `originalCaller` (the
-  source depositor) regardless of the intended `remoteReceiver`, reversing the `bridgeBurn` performed at
-  send time by `initiateIndirectCall`. `_chainId` must be the burn-time destination chain so the
-  accounting reverses correctly.
+- For a recognized burn it calls `IL2AssetHandler.bridgeRecoverFailedTransfer(destChainId, assetId,
+mintData)` on the asset handler registered for the asset (`assetHandlerAddress[assetId]` — the same
+  lookup the burn used; the NTV for standard tokens, a custom handler otherwise), forwarding the
+  bundle's mint data verbatim; the handler refunds the data's `originalCaller` (the source depositor)
+  regardless of the intended `remoteReceiver`, reversing the `bridgeBurn` performed at send time by
+  `initiateIndirectCall`. `_chainId` must be the burn-time destination chain so the accounting reverses
+  correctly. Two caveats: every calldata format the router has ever produced must stay recognized
+  forever (see the `IMPORTANT` note in `recoverAtomicCall` and
+  {protocol-docs/atomicity/security.md#known-issues-to-be-fixed-in-this-release}), and overwriting a
+  registered handler misroutes in-flight recoveries
+  ({protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations}).
 - Recovery to L1 is rejected (`RecoverToL1NotSupported`), see below.
 
 ## Security notes

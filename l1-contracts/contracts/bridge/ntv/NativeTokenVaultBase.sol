@@ -12,6 +12,7 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {INativeTokenVaultBase} from "./INativeTokenVaultBase.sol";
+import {IL2AssetHandler} from "../interfaces/IL2AssetHandler.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "../asset-router/AssetRouterBase.sol";
@@ -187,7 +188,7 @@ abstract contract NativeTokenVaultBase is
         emit BridgeMint(_chainId, _assetId, receiver, amount);
     }
 
-    /// @inheritdoc INativeTokenVaultBase
+    /// @inheritdoc IL2AssetHandler
     /// @dev The mint data is forwarded verbatim from the bundle, so the refund targets the data's
     /// `originalCaller` regardless of its `remoteReceiver`. `_chainId` must be the destination chain used
     /// at burn time so `_handleBridgeFromChain` undoes the matching `_handleBridgeToChain`.
