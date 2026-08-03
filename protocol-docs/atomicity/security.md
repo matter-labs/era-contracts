@@ -45,12 +45,11 @@ release. The proof-level soundness/completeness arguments live in
   recovery can leave a leg permanently stuck at `Revertable`. Making a fund-moving leg recoverable, and
   its recovery robust, is the flow author's responsibility. See
   {protocol-docs/atomicity/recovery.md#non-guarantees}.
-- **Destination-side value on an indirect call is refunded to the sender contract, not the payer.**
-  Recovery returns native value to `InteropCall.from`, which for an indirect call is the sender contract
-  (e.g. the asset router) rather than the payer, so a fund-moving indirect call must reverse its own
-  value through its `recoverAtomicCall` hook (the asset-router path carries the bridged amount in the
-  mint data and requests no destination-side value at all). Direct calls may carry value — theirs is
-  refunded to their own `from` through the base-token recovery path (see
+- **Indirect calls may not carry destination-side value.** `interopCallValue != 0` on an indirect call
+  is rejected at send (`IndirectCallCannotCarryValue`): on the recovery path native value is returned to
+  `InteropCall.from`, which for an indirect call is the asset router rather than the payer, so allowing
+  it would strand funds. Direct calls may carry value — theirs is refunded to their own `from` through
+  the base-token recovery path (see
   {protocol-docs/atomicity/recovery.md#\_recoverbundle-reversing-the-burns}).
 - **L1 destinations are rejected.** An atomic bundle is never published to L1, so it could only ever
   time out; and L2->L1 withdrawal accounting must stay append-only and never revertable (see

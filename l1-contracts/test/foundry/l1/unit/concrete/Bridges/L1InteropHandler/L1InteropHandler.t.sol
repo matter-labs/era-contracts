@@ -89,7 +89,9 @@ contract L1InteropHandlerTest is Test {
     function setUp() public {
         messageRoot = address(new MockMessageRoot());
         recipient = new MockInteropRecipient();
-        handlerImpl = new L1InteropHandler(IMessageRootBase(messageRoot));
+        // The handler pins every L1 bundle-call target to its immutable `L1_ASSET_ROUTER`; inject the mock
+        // recipient as that router so the dispatch tests (which target `address(recipient)`) resolve to it.
+        handlerImpl = new L1InteropHandler(IMessageRootBase(messageRoot), address(recipient));
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(handlerImpl),
             proxyAdmin,

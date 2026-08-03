@@ -36,8 +36,7 @@ depositor. There are two disjoint mechanisms, chosen per call by its local sende
   of this hook — selector-pinned to `finalizeDeposit`, refunding the mint data's `originalCaller`
   through the failed-transfer path of the asset handler registered for the asset — is documented in
   {protocol-docs/bridging.md#atomic-recovery-hook}.
-  The asset-router path carries the bridged amount in the mint data and requests no destination-side
-  `interopCallValue`, so router-produced calls do not also carry native value.
+  Indirect calls force `interopCallValue == 0`, so router-produced calls never also carry native value.
 - **Native base-token value on direct calls (`from != L2_ASSET_ROUTER_ADDR` and `value != 0`).** A
   direct call moves no asset-router funds, but it may carry base-token `value`. That value is reversed
   through `IAssetRouterShared.bridgehubRecoverBaseToken(destChainId, destBaseTokenAssetId, from, value)`,
@@ -97,8 +96,8 @@ Recovery is best-effort, and the protocol is explicit about what it does **not**
   recognized calldata, or a downstream NTV failure) can leave the leg permanently stuck at `Revertable`,
   since every retry hits the same revert. Making a fund-moving leg recoverable — and its recovery
   robust — is the **flow author's responsibility**.
-- **Destination-side `interopCallValue` on an indirect call is refunded to the sender contract.**
-  Recovery refunds a call's `value` to its `InteropCall.from`, which for an indirect call is the sender
-  contract (e.g. the asset router), not the payer — reversing it is the sender's own
-  `recoverAtomicCall` job. Direct calls carry their value themselves; that is exactly the second
-  mechanism above. See {protocol-docs/atomicity/security.md#non-guarantees}.
+- **Indirect calls may not carry destination-side `interopCallValue`** (`IndirectCallCannotCarryValue`,
+  rejected at send). Recovery refunds a call's `value` to its `InteropCall.from`, which for an indirect
+  call is the sender contract (the asset router), not the payer — the funds would be stranded. Direct
+  calls _may_ carry value; that is exactly the second mechanism above. See
+  {protocol-docs/atomicity/security.md#non-guarantees}.

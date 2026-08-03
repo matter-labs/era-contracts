@@ -40,6 +40,7 @@ struct ImtProof {
 /// sender in the `atomicBundle` ERC-7786 attribute; {AtomicFlowManager.append} recomputes `flowId`
 /// from it and verifies the committing bundle is one of the legs, so a wrong or stale preimage
 /// reverts the send. See {protocol-docs/atomicity/flow.md#1-atomic-send-append}.
+/// @param version Preimage format version (see {ATOMIC_FLOW_PREIMAGE_VERSION}).
 /// @param deadline The flow deadline (a settlement-layer timestamp).
 /// @param settlementLayerChainId The single settlement layer every leg must settle on.
 /// @param legBundleHashes All legs' bundle hashes, strictly ascending (canonical order + dedup).
@@ -47,6 +48,7 @@ struct ImtProof {
 /// repeat, need not be ascending). Every entry must be the sending chain itself or a
 /// Bridgehub-registered interop chain.
 struct AtomicFlowPreimage {
+    bytes1 version;
     uint64 deadline;
     uint256 settlementLayerChainId;
     bytes32[] legBundleHashes;
@@ -57,6 +59,8 @@ struct AtomicFlowPreimage {
 /// `flowId` is always recomputed from `preimage` and matched before use.
 /// @param flowId `keccak256(abi.encode(preimage))`.
 /// @param preimage The hashed field set (see {AtomicFlowPreimage}).
+/// @dev `flowId` is redundant (recomputed from `preimage` and matched before use); kept for calldata
+/// readability. Such recomputed-and-verified fields are acceptable on public entrypoint structs, not internal ones.
 struct AtomicFlow {
     bytes32 flowId;
     AtomicFlowPreimage preimage;
@@ -76,6 +80,15 @@ struct AtomicFinalityProof {
 /// other hashes.
 /// `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
 bytes4 constant ATOMIC_COMMIT_LEAF_TAG = bytes4(keccak256("AtomicInterop.commit.v1"));
+
+/// @dev The current {AtomicFlowPreimage.version} (same versioning convention as {INTEROP_BUNDLE_VERSION}
+/// / {INTEROP_CALL_VERSION}), and today the only accepted one. A new value is introduced whenever the
+/// {AtomicFlowPreimage} field set or its canonicalization changes; each version is validated under its
+/// own rules, so a preimage of one version can never be accepted — or hash to the same `flowId` — under
+/// the rules of another. Introducing a new version does not retire the old one: the {AtomicFlowManager}
+/// accepts both on every path (append/finalize/refund) so in-flight prior-version flows stay finalizable
+/// and refundable.
+bytes1 constant ATOMIC_FLOW_PREIMAGE_VERSION = 0x01;
 
 /// @dev The maximum number of legs in an atomic flow. Committing a leg is cheap (one IMT insert), but
 /// finalizing ANY leg requires verifying one full inclusion proof — a settlement-layer Merkle proof

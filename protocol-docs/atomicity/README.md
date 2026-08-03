@@ -40,8 +40,8 @@ machinery in {protocol-docs/message-root.md}.
 
 - `bundleHash = keccak256(abi.encode(bundle))` (`InteropDataEncoding.encodeInteropBundleHash`) — a leg's
   bundle. Chain-specific, because `sourceChainId` is one of the bundle's own fields.
-- `flowId = keccak256(abi.encode(preimage))` — binds all legs, each leg's source chain, the deadline,
-  and the settlement layer. `legBundleHashes` is strictly ascending (a canonical,
+- `flowId = keccak256(abi.encode(preimage))` — binds the preimage `version`, all legs, each leg's source
+  chain, the deadline, and the settlement layer. `legBundleHashes` is strictly ascending (a canonical,
   deduplicated order); `legSourceChainIds` is positional (aligned 1:1, may repeat); `deadline` is a
   settlement-layer timestamp. See {protocol-docs/atomicity/flow.md#data-structures}.
 - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))` — the IMT

@@ -47,6 +47,7 @@ import {
     CannotInitiateInteropOnL1,
     DestinationChainNotRegistered,
     DirectCallToL1NotSupported,
+    IndirectCallCannotCarryValue,
     IndirectCallValueMismatch,
     InteropBundleSaltAlreadyUsed,
     InteropCallToL1NotToAssetRouter,
@@ -653,6 +654,16 @@ contract InteropCenter is
                     NonZeroValueToL1NotSupported(_callStarters[i].callAttributes.interopCallValue)
                 );
             }
+            // Indirect calls must not carry destination-side value (`interopCallValue`): on the atomic timeout
+            // recovery path the value is refunded to `InteropCall.from` (the indirect sender), not the payer,
+            // so it would strand funds. All L2->L2 bundles are atomic, so the ban is unconditional here.
+            // (`indirectCallMessageValue` — the source-side value passed to `initiateIndirectCall` — stays allowed.)
+            if (_callStarters[i].callAttributes.indirectCall) {
+                require(
+                    _callStarters[i].callAttributes.interopCallValue == 0,
+                    IndirectCallCannotCarryValue(_callStarters[i].callAttributes.interopCallValue)
+                );
+            }
             InteropCall memory interopCall = _processCallStarter(_callStarters[i], _destinationChainId);
             bundle.calls[i] = interopCall;
             totalBurnedCallsValue += _callStarters[i].callAttributes.interopCallValue;
@@ -691,7 +702,7 @@ contract InteropCenter is
     ///   are not atomic (they inherently target L1), so they carry no `atomicBundle` attribute.
     /// @dev `_atomicSend` (the {AtomicFlowPreimage} plus `lowNullifierIndex`) is passed out-of-band and is intentionally
     /// NOT embedded in `_bundle`, so `bundleHash` is independent of `flowId`. This is required:
-    /// `flowId = keccak256(abi.encode(legBundleHashes, legSourceChainIds, deadline, settlementLayerChainId))`
+    /// `flowId = keccak256(abi.encode(AtomicFlowPreimage))` (whose `legBundleHashes` include this bundle's hash)
     /// must be computable off-chain before the send, which is impossible if a `bundleHash` (a flowId
     /// input) embedded `flowId`.
     /// @return bundleHash Canonical hash of the bundle.
@@ -749,9 +760,9 @@ contract InteropCenter is
         address recipientAddress = _callStarter.to;
 
         if (_callStarter.callAttributes.indirectCall) {
-            // `interopCallValue` is forwarded so the returned starter can be checked against it
-            // (`IndirectCallValueMismatch`); whether a particular indirect path supports a non-zero value
-            // is defined by the concrete `IL2CrossChainSender` implementation. Only
+            // `interopCallValue` is already required to be zero for every indirect call (see the
+            // `IndirectCallCannotCarryValue` check in `_buildInteropBundle`); it is still forwarded so the
+            // returned starter can be checked against it (`IndirectCallValueMismatch`). Only
             // `indirectCallMessageValue` (source-side `msg.value`) actually moves value here.
             // slither-disable-next-line arbitrary-send-eth
             InteropCallStarter memory actualCallStarter = IL2CrossChainSender(recipientAddress).initiateIndirectCall{

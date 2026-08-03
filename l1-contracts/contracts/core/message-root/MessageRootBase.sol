@@ -89,11 +89,6 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// @dev An expected invariant is that for all batches starting from currentChainBatchNumber + 1, the `chainBatchRoots` is 0.
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
-    /// @notice The settlement-layer `l1Timestamp` at which each `(chainId, batchNumber)` chainBatchRoot was
-    /// aggregated. Same value bound into the batch leaf (`MessageHashing.batchLeafHash`), so off-chain proof
-    /// builders can read the exact timestamp to feed into a proof.
-    mapping(uint256 chainId => mapping(uint256 batchNumber => uint256 l1Timestamp)) public chainBatchRootTimestamp;
-
     /// @notice The current logId value emitted in `NewInteropRoot` events; increments at most once
     /// per block, counting from v31 only.
     uint256 public interopRootLogId;
@@ -102,12 +97,18 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// logId only once per block.
     uint256 public lastEmitBlock;
 
+    /// @notice The settlement-layer `l1Timestamp` at which each `(chainId, batchNumber)` chainBatchRoot was
+    /// aggregated. Same value bound into the batch leaf (`MessageHashing.batchLeafHash`), so off-chain proof
+    /// builders can read the exact timestamp to feed into a proof.
+    /// @dev Appended here (consuming one `__gap` slot) to avoid shifting the pre-existing v31 storage layout.
+    mapping(uint256 chainId => mapping(uint256 batchNumber => uint256 l1Timestamp)) public chainBatchRootTimestamp;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[35] private __gap;
+    uint256[34] private __gap;
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {

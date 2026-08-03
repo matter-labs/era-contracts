@@ -40,6 +40,7 @@ import type { AtomicFlowPreimage } from "../../src/helpers/interop-helpers";
 import {
   DEFAULT_SL_CHAIN_ID,
   atomicFinalityProofTuple,
+  ATOMIC_FLOW_PREIMAGE_VERSION,
   atomicFlowTuple,
   buildInclusionProof,
   buildNonInclusionProof,
@@ -283,6 +284,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
    */
   function flowPreimageOf(legHashesAsc: string[], chainIdsAsc: number[], deadline: number): AtomicFlowPreimage {
     return {
+      version: ATOMIC_FLOW_PREIMAGE_VERSION,
       deadline,
       settlementLayerChainId: DEFAULT_SL_CHAIN_ID,
       legBundleHashes: legHashesAsc,

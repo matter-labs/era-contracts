@@ -6,12 +6,18 @@ import {Test} from "forge-std/Test.sol";
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
-import {AtomicFlowPreimage, LegState, ATOMIC_COMMIT_LEAF_TAG} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {
+    AtomicFlowPreimage,
+    LegState,
+    ATOMIC_COMMIT_LEAF_TAG,
+    ATOMIC_FLOW_PREIMAGE_VERSION
+} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
     ManagerBundleHashesNotSorted,
     ManagerCommittedBundleNotInFlow,
     ManagerCommittedLegSourceChainMismatch,
     ManagerFlowDeadlinePassed,
+    ManagerFlowPreimageVersionMismatch,
     ManagerLegAlreadyCommitted,
     ManagerLegSourceChainIdsLengthMismatch,
     ManagerLegSourceChainNotRegistered,
@@ -84,6 +90,7 @@ contract AtomicFlowManagerAppendTest is Test {
         bytes32 _localLeg,
         bytes32 _remoteLeg
     ) internal view returns (AtomicFlowPreimage memory preimage) {
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = L1_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](2);
@@ -124,6 +131,35 @@ contract AtomicFlowManagerAppendTest is Test {
         assertEq(uint256(manager.legState(flowId, localLeg)), uint256(LegState.Committed), "leg must be Committed");
         assertEq(tree.leafCount(), 2, "commit value must be inserted after the seeded head leaf");
         assertEq(tree.leafAt(1).value, _commitValue(flowId, localLeg), "inserted leaf must hold the commit value");
+    }
+
+    /// @notice `append` rejects a preimage whose `version` the manager does not support (0x02 here),
+    /// so it can never commit a leg. See {ATOMIC_FLOW_PREIMAGE_VERSION}.
+    function test_append_RevertWhen_FlowPreimageVersionMismatch() public {
+        assertEq(ATOMIC_FLOW_PREIMAGE_VERSION, bytes1(0x01), "v1 preimage version literal must be pinned");
+
+        bytes32 localLeg = keccak256("local leg");
+        AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
+        bytes1 unknownVersion = 0x02;
+        preimage.version = unknownVersion;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ManagerFlowPreimageVersionMismatch.selector,
+                ATOMIC_FLOW_PREIMAGE_VERSION,
+                unknownVersion
+            )
+        );
+        _appendAsInteropCenter(localLeg, preimage);
+
+        // Nothing committed under either version's hash.
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
+        assertEq(
+            uint256(manager.legState(_flowId(preimage), localLeg)),
+            uint256(LegState.Unset),
+            "no leg state may exist after the rejected append"
+        );
+        assertEq(tree.leafCount(), 1, "nothing may be inserted into the commitment tree");
     }
 
     /// @notice Footgun regression: a preimage not containing the committing bundle's hash is rejected —
@@ -237,6 +273,7 @@ contract AtomicFlowManagerAppendTest is Test {
         bytes32 legA = keccak256("local leg A");
         bytes32 legB = keccak256("local leg B");
         AtomicFlowPreimage memory preimage;
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = L1_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](2);
@@ -309,6 +346,7 @@ contract AtomicFlowManagerAppendTest is Test {
     function _manyLegPreimage(
         uint256 _legCount
     ) internal view returns (AtomicFlowPreimage memory preimage, bytes32 firstLeg) {
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = L1_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](_legCount);

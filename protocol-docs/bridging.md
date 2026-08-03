@@ -72,8 +72,8 @@ returns `bridgeMintData`; the destination-side handler's `bridgeMint` consumes t
 - For L2 -> L2 the `InteropCallStarter` targets the L2 asset router (same address on every ZK chain); for an
   L2 -> L1 withdrawal it targets the known `L1_ASSET_ROUTER` address instead — the `finalizeDeposit`
   calldata is identical. The bridged amount travels inside that calldata, not as call value: the returned
-  starter merely echoes the requested `interopCallValue` (zero on the asset-router path, which takes no
-  destination-side value) so the InteropCenter's `IndirectCallValueMismatch` check passes.
+  starter merely echoes the requested `interopCallValue` (always zero for an indirect call) so the
+  InteropCenter's `IndirectCallValueMismatch` check passes.
 - `bridgehubDepositBaseToken` lets the Bridgehub (L1; or the Era diamond proxy for `ERA_CHAIN_ID`) /
   `InteropCenter` (L2) acquire the destination chain's `mintValue`: it burns the base token through the
   handler but records nothing, because a failed transaction refunds the base token to the L2

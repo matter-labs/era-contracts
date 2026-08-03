@@ -11,6 +11,7 @@ import {
     AtomicFlowPreimage,
     ImtProof,
     AtomicFinalityProof,
+    ATOMIC_FLOW_PREIMAGE_VERSION,
     MAX_ATOMIC_FLOW_LEGS
 } from "./IAtomicInterop.sol";
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
@@ -26,12 +27,14 @@ import {
 import {L2_BRIDGEHUB, L2_INTEROP_ROOT_STORAGE} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {
     ManagerAlreadyInitialized,
+    ManagerL1ChainIdZero,
     ManagerNotInteropCenter,
     ManagerNotInteropHandler,
     ManagerLegAlreadyCommitted,
     ManagerLegNotRevertable,
     ManagerFlowDeadlinePassed,
     ManagerFlowIdMismatch,
+    ManagerFlowPreimageVersionMismatch,
     ManagerBundleHashesNotSorted,
     ManagerCommittedBundleNotInFlow,
     ManagerCommittedLegSourceChainMismatch,
@@ -71,6 +74,10 @@ contract AtomicFlowManager is IAtomicFlowManager {
     function initL2(uint256 _l1ChainId) external onlyUpgrader {
         if (L1_CHAIN_ID != 0) {
             revert ManagerAlreadyInitialized();
+        }
+        // Zero is the "not initialized" sentinel; a zero argument would leave the manager re-initializable.
+        if (_l1ChainId == 0) {
+            revert ManagerL1ChainIdZero();
         }
         L1_CHAIN_ID = _l1ChainId;
     }
@@ -332,10 +339,14 @@ contract AtomicFlowManager is IAtomicFlowManager {
     }
 
     /// @dev Canonicalizes and hashes a flowId preimage: `flowId = keccak256(abi.encode(preimage))`.
-    /// `legBundleHashes` must be strictly ascending; `legSourceChainIds` is positional (1:1, may repeat — a
-    /// set would let a sibling chain in it enable a wrong-chain refund), so only its length is checked.
+    /// `version` must be manager-supported (see {ATOMIC_FLOW_PREIMAGE_VERSION}); `legBundleHashes` must be
+    /// strictly ascending; `legSourceChainIds` is positional (1:1, may repeat — a set would let a sibling
+    /// chain in it enable a wrong-chain refund), so only its length is checked.
     /// Shared by the send path (`append`) and `_checkFlowId`, so canonicalization cannot drift.
     function _validateAndComputeFlowId(AtomicFlowPreimage calldata _preimage) internal pure returns (bytes32) {
+        if (_preimage.version != ATOMIC_FLOW_PREIMAGE_VERSION) {
+            revert ManagerFlowPreimageVersionMismatch(ATOMIC_FLOW_PREIMAGE_VERSION, _preimage.version);
+        }
         uint256 n = _preimage.legBundleHashes.length;
         // See {MAX_ATOMIC_FLOW_LEGS}: appending a leg is cheap, but finalization verifies one Merkle
         // proof per leg, so the leg count must stay bounded.

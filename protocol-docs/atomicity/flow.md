@@ -12,12 +12,23 @@ All defined in `atomic-interop/IAtomicInterop.sol` unless noted.
 
 | Type                  | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AtomicFlowPreimage`  | The hashed field set that defines a flow: `deadline` (a settlement-layer timestamp), `settlementLayerChainId`, `legBundleHashes[]`, `legSourceChainIds[]`.                                                                                                                                                                                                                                                                              |
+| `AtomicFlowPreimage`  | The hashed field set that defines a flow: `version` (a `bytes1` format tag), `deadline` (a settlement-layer timestamp), `settlementLayerChainId`, `legBundleHashes[]`, `legSourceChainIds[]`.                                                                                                                                                                                                                                           |
 | `AtomicFlow`          | `{ flowId, preimage }`. `flowId` is always recomputed from `preimage` and matched before use, so it is a convenience field, never a trust anchor.                                                                                                                                                                                                                                                                                       |
 | `ImtProof`            | One IMT proof against a source chain's commitment tree — used for both inclusion (finality) and non-inclusion (timeout). See below and proofs.md.                                                                                                                                                                                                                                                                                       |
 | `AtomicFinalityProof` | `{ flow, proofs[] }` — the flow definition plus one inclusion proof per leg, in `legBundleHashes` order. The whole thing a destination needs to execute.                                                                                                                                                                                                                                                                                |
 | `LegState`            | Per-`(flowId, bundleHash)` source-leg lifecycle: `Unset -> Committed -> Revertable -> Reverted`.                                                                                                                                                                                                                                                                                                                                        |
 | `AtomicSend`          | Out-of-band send metadata (`interop/IInteropCenter.sol`): `{ flowPreimage, lowNullifierIndex, isAtomic }`, parsed from the `atomicBundle` ERC-7786 attribute by `InteropAttributeParser.parseAtomicSend`. `isAtomic` is simply "the attribute was present" — the `InteropCenter` requires it for every L2->L2 send and forbids it for an L2->L1 withdrawal. Never enters the bundle, so `bundleHash` stays independent of the preimage. |
+
+### The preimage `version`
+
+`AtomicFlowPreimage.version` is a `bytes1` format tag, following the same convention as
+`INTEROP_BUNDLE_VERSION` / `INTEROP_CALL_VERSION`. The only value the manager accepts today is
+`ATOMIC_FLOW_PREIMAGE_VERSION` (`0x01`); anything else reverts with `ManagerFlowPreimageVersionMismatch`.
+Because `version` is a hashed field, a preimage of one version can never collide with — or be
+reinterpreted under the rules of — another. A new value is introduced whenever the field set or its
+canonicalization changes, and introducing one does not retire the old: the manager is expected to accept
+every live version on **all** paths (append, finalize, refund), so flows sent under a prior version stay
+finalizable and refundable while in flight.
 
 ### `legBundleHashes` vs `legSourceChainIds`
 
@@ -74,9 +85,9 @@ The source burn flows through the normal `initiateIndirectCall` / `L2AssetRouter
 publishing the bundle to L1, `InteropCenter` calls `AtomicFlowManager.append(bundleHash,
 lowNullifierIndex, preimage)`. `append`:
 
-1. **Recomputes and validates `flowId`** from the preimage (`_validateAndComputeFlowId`): at most
-   `MAX_ATOMIC_FLOW_LEGS` (8) legs (`ManagerTooManyLegs` — appending is cheap, but finalization
-   verifies one Merkle proof per leg),
+1. **Recomputes and validates `flowId`** from the preimage (`_validateAndComputeFlowId`): `version`
+   manager-supported (`ManagerFlowPreimageVersionMismatch`), at most `MAX_ATOMIC_FLOW_LEGS` (8) legs
+   (`ManagerTooManyLegs` — appending is cheap, but finalization verifies one Merkle proof per leg),
    `legBundleHashes` strictly ascending, `legSourceChainIds` length matching.
 2. **Requires L1 settlement** (`_checkSettlementLayerIsL1`) — this release anchors proofs only on the L1
    message root (see {protocol-docs/atomicity/security.md#trust-assumptions}).
@@ -171,7 +182,7 @@ because it never holds funds.
 ### `flowId` canonicalization is shared
 
 `_validateAndComputeFlowId` is called by **both** `append` (send) and `_checkFlowId` (finalize/refund),
-so the canonical shape (`flowId = keccak256(abi.encode(preimage))`, ascending leg hashes, aligned
-source ids) cannot drift between the path that commits a leg and the path that later spends the proof.
-Any mismatch reverts (`ManagerFlowIdMismatch`, `ManagerBundleHashesNotSorted`,
-`ManagerLegSourceChainIdsLengthMismatch`).
+so the canonical shape (`flowId = keccak256(abi.encode(preimage))`, supported `version`, ascending leg
+hashes, aligned source ids) cannot drift between the path that commits a leg and the path that later
+spends the proof. Any mismatch reverts (`ManagerFlowIdMismatch`, `ManagerFlowPreimageVersionMismatch`,
+`ManagerBundleHashesNotSorted`, `ManagerLegSourceChainIdsLengthMismatch`).

@@ -11,7 +11,7 @@ import {L2_INTEROP_CENTER_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
-import {AtomicFlowPreimage} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {AtomicFlowPreimage, ATOMIC_FLOW_PREIMAGE_VERSION} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {
     AtomicBundleToL1NotSupported,
@@ -120,6 +120,7 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
             IERC7786Attributes.atomicBundle,
             (
                 AtomicFlowPreimage({
+                    version: ATOMIC_FLOW_PREIMAGE_VERSION,
                     deadline: uint64(block.timestamp + 1 days),
                     settlementLayerChainId: L1_CHAIN_ID,
                     legBundleHashes: legBundleHashes,

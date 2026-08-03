@@ -32,6 +32,11 @@
         "internalType": "struct AtomicFlowPreimage",
         "components": [
           {
+            "name": "version",
+            "type": "bytes1",
+            "internalType": "bytes1"
+          },
+          {
             "name": "deadline",
             "type": "uint64",
             "internalType": "uint64"
@@ -76,6 +81,11 @@
             "type": "tuple",
             "internalType": "struct AtomicFlowPreimage",
             "components": [
+              {
+                "name": "version",
+                "type": "bytes1",
+                "internalType": "bytes1"
+              },
               {
                 "name": "deadline",
                 "type": "uint64",
@@ -296,6 +306,11 @@
                 "type": "tuple",
                 "internalType": "struct AtomicFlowPreimage",
                 "components": [
+                  {
+                    "name": "version",
+                    "type": "bytes1",
+                    "internalType": "bytes1"
+                  },
                   {
                     "name": "deadline",
                     "type": "uint64",
@@ -616,6 +631,27 @@
         "internalType": "bytes32"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "ManagerFlowPreimageVersionMismatch",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "bytes1",
+        "internalType": "bytes1"
+      },
+      {
+        "name": "actual",
+        "type": "bytes1",
+        "internalType": "bytes1"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ManagerL1ChainIdZero",
+    "inputs": []
   },
   {
     "type": "error",

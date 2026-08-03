@@ -20,6 +20,10 @@ export const ATOMIC_COMMIT_LEAF_TAG: string = utils
   .keccak256(utils.toUtf8Bytes("AtomicInterop.commit.v1"))
   .slice(0, 10);
 
+/** The current AtomicFlowPreimage.version — mirrors ATOMIC_FLOW_PREIMAGE_VERSION in IAtomicInterop.sol (the
+ *  only version accepted today; a bump adds the new version alongside the old on all manager paths). */
+export const ATOMIC_FLOW_PREIMAGE_VERSION = "0x01";
+
 /** Indexed-tree leaf, fields as uint256 decimal strings, in the on-chain field order. */
 export interface IMTLeaf {
   value: string;
@@ -62,10 +66,12 @@ export function indexedLeafHash(leaf: IMTLeaf): string {
 }
 
 /**
- * Mirror of the Solidity `AtomicFlowPreimage` struct. `legBundleHashes` must be strictly ascending with
- * `legSourceChainIds` positionally aligned; `deadline` is a settlement-layer timestamp.
+ * Mirror of the Solidity `AtomicFlowPreimage` struct. `version` must be manager-supported (currently
+ * ATOMIC_FLOW_PREIMAGE_VERSION); `legBundleHashes` must be strictly ascending with `legSourceChainIds`
+ * positionally aligned; `deadline` is a settlement-layer timestamp.
  */
 export interface AtomicFlowPreimage {
+  version: string;
   deadline: number;
   settlementLayerChainId: BigNumber | number | string;
   legBundleHashes: string[];
@@ -73,19 +79,20 @@ export interface AtomicFlowPreimage {
 }
 
 /** The Solidity tuple type of `AtomicFlowPreimage`, in struct field order. */
-const FLOW_PREIMAGE_TUPLE_TYPE = "tuple(uint64,uint256,bytes32[],uint256[])";
+const FLOW_PREIMAGE_TUPLE_TYPE = "tuple(bytes1,uint64,uint256,bytes32[],uint256[])";
 
 /**
  * flowId = keccak256(abi.encode(preimage)) — the ABI encoding of the whole `AtomicFlowPreimage`
- * struct, matching {AtomicFlowManager._validateAndComputeFlowId}.
+ * struct (version first), matching {AtomicFlowManager._validateAndComputeFlowId}.
  */
 export function computeFlowId(preimage: AtomicFlowPreimage): string {
   return utils.keccak256(utils.defaultAbiCoder.encode([FLOW_PREIMAGE_TUPLE_TYPE], [flowPreimageTuple(preimage)]));
 }
 
-/** Encode an {AtomicFlowPreimage} as its Solidity tuple: (deadline, settlementLayerChainId, legBundleHashes, legSourceChainIds). */
+/** Encode an {AtomicFlowPreimage} as its Solidity tuple: (version, deadline, settlementLayerChainId, legBundleHashes, legSourceChainIds). */
 export function flowPreimageTuple(preimage: AtomicFlowPreimage): unknown[] {
   return [
+    preimage.version,
     preimage.deadline,
     BigNumber.from(preimage.settlementLayerChainId),
     preimage.legBundleHashes,
