@@ -73,8 +73,7 @@ returns `bridgeMintData`; the destination-side handler's `bridgeMint` consumes t
   L2 -> L1 withdrawal it targets the known `L1_ASSET_ROUTER` address instead — the `finalizeDeposit`
   calldata is identical. The bridged amount travels inside that calldata, not as call value: the returned
   starter merely echoes the requested `interopCallValue` (zero on the asset-router path, which takes no
-  destination-side value) so the
-  InteropCenter's `IndirectCallValueMismatch` check passes.
+  destination-side value) so the InteropCenter's `IndirectCallValueMismatch` check passes.
 - `bridgehubDepositBaseToken` lets the Bridgehub (L1; or the Era diamond proxy for `ERA_CHAIN_ID`) /
   `InteropCenter` (L2) acquire the destination chain's `mintValue`: it burns the base token through the
   handler but records nothing, because a failed transaction refunds the base token to the L2
@@ -84,8 +83,7 @@ returns `bridgeMintData`; the destination-side handler's `bridgeMint` consumes t
 
 `finalizeDeposit(sourceChainId, assetId, transferData)` is the finalization entry point: there is no
 legacy withdrawal-message path on this branch, every finalization arrives as an interop bundle call. It
-looks up the asset
-handler and calls `bridgeMint`; if no handler is registered yet, it registers the NTV as the handler and
+looks up the asset handler and calls `bridgeMint`; if no handler is registered yet, it registers the NTV as the handler and
 mints through it (`msg.value` is forwarded so ETH cannot get stuck in the router; whether non-zero value is
 supported is decided at the handler layer). `_sourceChainId` is the source chain of the _message_, not
 necessarily the origin chain of the token; since chains can be malicious and supply arbitrary transfer
