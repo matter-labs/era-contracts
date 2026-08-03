@@ -403,12 +403,10 @@ library L2GenesisForceDeploymentsHelper {
         bool _isZKsyncOS,
         FixedForceDeploymentsData memory _fixedForceDeploymentsData
     ) private {
-        if (!_isZKsyncOS) {
-            return;
+        if (_isZKsyncOS) {
+            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
+            IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
         }
-
-        L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
-        IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
     }
 
     /// @notice Returns the address of the legacy shared bridge from the L2 Asset Router.

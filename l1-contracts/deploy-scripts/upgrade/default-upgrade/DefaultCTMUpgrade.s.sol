@@ -388,9 +388,16 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         // upgrades; only the core (bridges) side is version-dependent.
         ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
 
-        bool preV32Ecosystem = newConfig.hasPreV32IntrospectionOverride
-            ? newConfig.usePreV32IntrospectionOverride
-            : AddressIntrospector.shouldUsePreV32Introspection(bridgehubAddr);
+        bool preV32Ecosystem;
+        if (newConfig.hasPreV32IntrospectionOverride) {
+            preV32Ecosystem = newConfig.usePreV32IntrospectionOverride;
+        } else if (!AddressIntrospector.hasRegisteredChains(bridgehubAddr)) {
+            // A chainless ecosystem has no protocol version to inspect. It cannot have been upgraded into
+            // existence either, so it was deployed from scratch with the current contracts.
+            preV32Ecosystem = false;
+        } else {
+            preV32Ecosystem = AddressIntrospector.shouldUsePreV32Introspection(bridgehubAddr);
+        }
 
         if (preV32Ecosystem) {
             coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubAddr);

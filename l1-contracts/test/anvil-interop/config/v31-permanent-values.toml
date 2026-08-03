@@ -1,3 +1,5 @@
+# Permanent values for the v31 -> v32 upgrade scenario. `era_chain_id`, `bridgehub_proxy_addr`,
+# `ctm_proxy_addr` and `is_zk_sync_os` are substituted by the harness from the loaded chain states.
 era_chain_id = 10
 
 is_zk_sync_os = true
@@ -7,17 +9,14 @@ is_zk_sync_os = true
 zk_token_asset_id = "0x0000000000000000000000000000000000000000000000000000000000000001"
 
 [core_contracts]
-bridgehub_proxy_addr = "0x6Cc160222EaFE8498E336f57b4f97303aD6d72CB"
+bridgehub_proxy_addr = "0x0000000000000000000000000000000000000000"
 
 [ctm_contracts]
-ctm_proxy_addr = "0x1bbfe0aF215c21A824681a1Df59F0BA6023d35AD"
+ctm_proxy_addr = "0x0000000000000000000000000000000000000000"
 rollup_da_manager = "0x0000000000000000000000000000000000000000"
+# Resolved from the CTM by the introspector on a v31 ecosystem.
 l1_bytecodes_supplier_addr = "0x0000000000000000000000000000000000000000"
 
 [permanent_contracts]
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 create2_factory_salt = "0x0000000000000000000000000000000000000000000000000000000000000000"
-
-# [legacy_gateway] intentionally omitted: the v29 fixture never registers a
-# legacy GW chain as a settlement layer, so emitting
-# `setSettlementLayerStatus(_, false)` would revert during stage-2 multicall.

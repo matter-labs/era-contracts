@@ -804,36 +804,6 @@
   },
   {
     "type": "function",
-    "name": "prepareL1InteropHandlerWiringCalls",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "calls",
-        "type": "tuple[]",
-        "internalType": "struct Call[]",
-        "components": [
-          {
-            "name": "target",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "value",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "data",
-            "type": "bytes",
-            "internalType": "bytes"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "preparePauseGatewayMigrationsCall",
     "inputs": [],
     "outputs": [

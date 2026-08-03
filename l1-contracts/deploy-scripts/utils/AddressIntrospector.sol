@@ -365,21 +365,23 @@ library AddressIntrospector {
 
     /// @notice Whether the ecosystem predates v32, i.e. its nullifier has no `l1InteropHandler` getter and
     /// the upgrade still has to deploy and wire the interop handler.
+    /// @dev Reverts on an ecosystem with no registered chains: there is nothing to read a protocol version
+    /// from, and answering anyway would silently pick a discovery path. Callers decide what such an
+    /// ecosystem means for them — see `hasRegisteredChains`.
     function shouldUsePreV32Introspection(address _bridgehubProxy) public view returns (bool) {
-        return _ecosystemProtocolVersion(_bridgehubProxy) < SemVer.packSemVer(0, 32, 0);
-    }
-
-    /// @notice Protocol version of the ecosystem, taken from its first registered chain.
-    function _ecosystemProtocolVersion(address _bridgehubProxy) private view returns (uint256) {
         require(_bridgehubProxy != address(0) && _bridgehubProxy.code.length > 0, "Bridgehub contract does not exist");
 
         address[] memory zkChains = IL1Bridgehub(_bridgehubProxy).getAllZKChains();
-        if (zkChains.length == 0) {
-            // No chain to read a version from. Such an ecosystem cannot have been upgraded into existence —
-            // it was deployed from scratch with the current contracts — so it needs no legacy discovery.
-            return type(uint256).max;
-        }
-        return IZKChain(zkChains[0]).getProtocolVersion();
+        require(zkChains.length != 0, "Ecosystem has no chain to read a protocol version from");
+
+        return IZKChain(zkChains[0]).getProtocolVersion() < SemVer.packSemVer(0, 32, 0);
+    }
+
+    /// @notice Whether the ecosystem has at least one registered chain, i.e. whether its protocol version
+    /// can be inspected at all.
+    function hasRegisteredChains(address _bridgehubProxy) public view returns (bool) {
+        require(_bridgehubProxy != address(0) && _bridgehubProxy.code.length > 0, "Bridgehub contract does not exist");
+        return IL1Bridgehub(_bridgehubProxy).getAllZKChains().length != 0;
     }
 
     /// @notice Convenience method to fetch everything for a specific chainId

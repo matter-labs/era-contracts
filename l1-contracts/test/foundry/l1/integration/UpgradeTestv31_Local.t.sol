@@ -86,12 +86,11 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
 contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
     /// @notice Override to skip the ownership-acceptance and `setAddresses` calls, which need ownership
     ///         hand-offs the fixture does not perform.
-    /// @dev The `ChainRegistrationSender` registration is kept: it is what makes a v31 ecosystem match a
-    ///      from-scratch v32 one, and it is a no-op once the bridgehub knows a sender. The interop-handler
-    ///      wiring is emitted by `DefaultCoreUpgrade` and therefore unaffected by this override.
+    /// @dev The interop-handler wiring is kept: it is what makes a v31 ecosystem match a from-scratch v32
+    ///      one, and it collapses to nothing once the ecosystem already has a wired handler.
     function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
-        console.log("Test mode: keeping only the ChainRegistrationSender registration in stage 1");
-        return _buildChainRegistrationSenderCall();
+        console.log("Test mode: keeping only the L1InteropHandler wiring in stage 1");
+        return _buildL1InteropHandlerWiringCalls();
     }
 }
 

@@ -1,0 +1,27 @@
+# Upgrade input for the v31 -> v32 scenario. `bridgehub_proxy_address`, `owner_address` and the chain id
+# are substituted by the harness from the loaded chain states.
+
+old_protocol_version = 0x1f00000000
+bridgehub_proxy_address = "0x0000000000000000000000000000000000000000"
+owner_address = "0x0000000000000000000000000000000000000000"
+
+# The fixture's chains are at v31 while its L1 contracts are, too, so autodetection would be right here;
+# stating it keeps the scenario independent of how the states were generated.
+pre_v32_introspection = true
+
+[chain]
+chain_id = 10
+
+[contracts]
+
+genesis_root = "0x0000000000000000000000000000000000000000000000000000000000000000"
+genesis_rollup_leaf_index = 0
+genesis_batch_commitment = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+bootloader_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+default_aa_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+evm_emulator_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+latest_protocol_version = 0x2000000000
+new_protocol_version = 0x2000000000

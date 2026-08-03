@@ -95,9 +95,11 @@ jobs:
         run: |
           bash cleanup.sh
 
-  # V29 → V31 upgrade test: loads v29 chain states, runs the v31 ecosystem upgrade,
-  # executes governance calls, and verifies protocol version is updated.
-  v29-to-v31-upgrade-test:
+  # V31 → V32 upgrade test: loads v31 chain states, runs this release's ecosystem upgrade,
+  # executes governance calls, and verifies protocol version is updated. Replaces the former
+  # v29 → v31 job: this release initializes the contracts introduced in v31 on the genesis path
+  # only, so a v29 ecosystem can no longer be upgraded straight onto it.
+  v31-to-v32-upgrade-test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -137,11 +139,11 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn install
 
-      - name: Run V29 to V31 upgrade test
+      - name: Run V31 to V32 upgrade test
         working-directory: l1-contracts/test/anvil-interop
         run: |
-          echo "Running V29 -> V31 upgrade test..."
-          yarn ts-node run-v29-to-v31-upgrade-test.ts
+          echo "Running V31 -> V32 upgrade test..."
+          yarn ts-node run-v31-to-v32-upgrade-test.ts
 
       - name: Cleanup
         if: always()

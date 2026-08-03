@@ -14,9 +14,6 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {Call} from "contracts/governance/Common.sol";
 
 import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
@@ -51,10 +48,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     AdditionalConfigParams internal additionalConfig;
 
     EcosystemUpgradeConfig internal upgradeConfig;
-
-    /// @notice Whether this run deployed the `L1InteropHandler` proxy, i.e. the ecosystem was pre-v32.
-    ///         Its ownership then has to be handed to governance and its address wired into the bridges.
-    bool internal deployedL1InteropHandler;
 
     function initializeWithArgs(
         address bridgehubProxyAddress,
@@ -176,9 +169,16 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     function setAddressesBasedOnBridgehub() internal virtual {
         address bridgehubProxy = coreAddresses.bridgehub.proxies.bridgehub;
 
-        bool preV32Ecosystem = additionalConfig.hasPreV32IntrospectionOverride
-            ? additionalConfig.usePreV32IntrospectionOverride
-            : AddressIntrospector.shouldUsePreV32Introspection(bridgehubProxy);
+        bool preV32Ecosystem;
+        if (additionalConfig.hasPreV32IntrospectionOverride) {
+            preV32Ecosystem = additionalConfig.usePreV32IntrospectionOverride;
+        } else if (!AddressIntrospector.hasRegisteredChains(bridgehubProxy)) {
+            // A chainless ecosystem has no protocol version to inspect. It cannot have been upgraded into
+            // existence either, so it was deployed from scratch with the current contracts.
+            preV32Ecosystem = false;
+        } else {
+            preV32Ecosystem = AddressIntrospector.shouldUsePreV32Introspection(bridgehubProxy);
+        }
 
         if (preV32Ecosystem) {
             // v31 ecosystem: the nullifier has no `l1InteropHandler` getter yet, so the discovered
@@ -370,7 +370,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](5);
+        Call[][] memory allCalls = new Call[][](4);
 
         // Re-assert the migration pause as the first stage-1 call. When this upgrade is executed via the
         // EmergencyUpgradeBoard, PUH.executeEmergencyUpgrade runs a built-in unfreeze/unpause pre-step that
@@ -383,67 +383,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         allCalls[2] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
         allCalls[3] = prepareVersionSpecificStage1GovernanceCallsL1();
-        allCalls[4] = prepareL1InteropHandlerWiringCalls();
 
         calls = UpgradeUtils.mergeCallsArray(allCalls);
-    }
-
-    /// @notice Deploys the `L1InteropHandler` when the ecosystem has none, and refreshes its implementation
-    ///         otherwise.
-    /// @dev The handler is new in v32: a pre-v32 ecosystem has no proxy for it, so the upgrade creates one
-    ///      and {prepareL1InteropHandlerWiringCalls} wires it into the bridges.
-    function deployL1InteropHandler() internal virtual {
-        if (coreAddresses.bridges.proxies.l1InteropHandler == address(0)) {
-            (
-                coreAddresses.bridges.implementations.l1InteropHandler,
-                coreAddresses.bridges.proxies.l1InteropHandler
-            ) = deployTuppWithContract("L1InteropHandler", false);
-            deployedL1InteropHandler = true;
-        } else {
-            coreAddresses.bridges.implementations.l1InteropHandler = deploySimpleContract("L1InteropHandler", false);
-        }
-    }
-
-    /// @notice Hands a freshly deployed `L1InteropHandler` over to governance, which accepts it in stage 1.
-    function transferL1InteropHandlerOwnership() internal virtual {
-        if (!deployedL1InteropHandler) {
-            return;
-        }
-        address properOwner = getOwnerAddress();
-        console.log("Transferring L1InteropHandler ownership to governance:", properOwner);
-        vm.broadcast(getBroadcasterAddress());
-        Ownable2StepUpgradeable(coreAddresses.bridges.proxies.l1InteropHandler).transferOwnership(properOwner);
-    }
-
-    /// @notice Stage-1 calls that wire a freshly deployed `L1InteropHandler` into the bridges.
-    /// @dev Empty on an ecosystem that already runs v32, so the same script serves an upgrade and a re-run.
-    ///      Both setters are one-shot and only exist on the new implementations, hence stage 1 rather than
-    ///      the deploy step.
-    function prepareL1InteropHandlerWiringCalls() public virtual returns (Call[] memory calls) {
-        address l1InteropHandlerProxy = coreAddresses.bridges.proxies.l1InteropHandler;
-        require(l1InteropHandlerProxy != address(0), "L1InteropHandler proxy not deployed");
-
-        if (!deployedL1InteropHandler) {
-            return calls;
-        }
-
-        console.log("Wiring the freshly deployed L1InteropHandler:", l1InteropHandlerProxy);
-        calls = new Call[](3);
-        calls[0] = Call({
-            target: l1InteropHandlerProxy,
-            value: 0,
-            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
-        });
-        calls[1] = Call({
-            target: coreAddresses.bridges.proxies.l1Nullifier,
-            value: 0,
-            data: abi.encodeCall(IL1Nullifier.setL1InteropHandler, (l1InteropHandlerProxy))
-        });
-        calls[2] = Call({
-            target: coreAddresses.bridges.proxies.l1AssetRouter,
-            value: 0,
-            data: abi.encodeCall(IL1AssetRouter.setL1InteropHandler, (l1InteropHandlerProxy))
-        });
     }
 
     /// @notice The second step of upgrade. By default it unpauses migrations.

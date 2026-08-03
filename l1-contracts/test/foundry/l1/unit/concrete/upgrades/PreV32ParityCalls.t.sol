@@ -17,7 +17,6 @@ import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandl
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
-import {BridgehubBase} from "contracts/core/bridgehub/BridgehubBase.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 
 /// @dev Exposes the pre-v32 parity call builder and lets the test place the discovered addresses, which the
@@ -29,8 +28,7 @@ contract CoreUpgradeParityHarness is CoreUpgrade_v31 {
         address _l1AssetRouter,
         address _l1InteropHandler,
         address _chainRegistrationSender,
-        bool _deployedL1InteropHandler,
-        bool _deployedChainRegistrationSender
+        bool _deployedL1InteropHandler
     ) external {
         coreAddresses.bridgehub.proxies.bridgehub = _bridgehub;
         coreAddresses.bridges.proxies.l1Nullifier = _l1Nullifier;
@@ -38,20 +36,15 @@ contract CoreUpgradeParityHarness is CoreUpgrade_v31 {
         coreAddresses.bridges.proxies.l1InteropHandler = _l1InteropHandler;
         coreAddresses.bridgehub.proxies.chainRegistrationSender = _chainRegistrationSender;
         deployedL1InteropHandler = _deployedL1InteropHandler;
-        deployedChainRegistrationSender = _deployedChainRegistrationSender;
     }
 
     function buildInteropHandlerWiringCalls() external returns (Call[] memory) {
-        return prepareL1InteropHandlerWiringCalls();
-    }
-
-    function buildChainRegistrationSenderCall() external returns (Call[] memory) {
-        return _buildChainRegistrationSenderCall();
+        return _buildL1InteropHandlerWiringCalls();
     }
 }
 
 /// @notice Covers the stage-1 calls that bring a v31 ecosystem to the wiring a from-scratch v32 deployment
-/// has: the interop handler (new in v32) and the bridgehub's `chainRegistrationSender`.
+/// has: the interop handler, which is new in v32.
 contract PreV32ParityCallsTest is Test {
     CoreUpgradeParityHarness internal upgradeScript;
     L1Nullifier internal l1Nullifier;
@@ -134,7 +127,7 @@ contract PreV32ParityCallsTest is Test {
         }
     }
 
-    function test_wiresTheNewInteropHandlerAndTheRegistrationSender() public {
+    function test_wiresTheNewInteropHandler() public {
         // Ownership of the freshly deployed handler is pending for governance, as the deploy step leaves it.
         interopHandler.transferOwnership(owner);
 
@@ -144,7 +137,6 @@ contract PreV32ParityCallsTest is Test {
             address(assetRouter),
             address(interopHandler),
             chainRegistrationSender,
-            true,
             true
         );
 
@@ -153,15 +145,6 @@ contract PreV32ParityCallsTest is Test {
 
         assertEq(l1Nullifier.l1InteropHandler(), address(0), "v31 nullifier starts unwired");
         assertEq(assetRouter.l1InteropHandler(), address(0), "v31 asset router starts unwired");
-
-        Call[] memory senderCalls = upgradeScript.buildChainRegistrationSenderCall();
-        assertEq(senderCalls.length, 1, "the bridgehub is told about the sender");
-        assertEq(senderCalls[0].target, bridgehub, "registration sender call goes to the bridgehub");
-        assertEq(
-            senderCalls[0].data,
-            abi.encodeCall(BridgehubBase.setAddressesV31, (chainRegistrationSender)),
-            "registration sender is passed to the bridgehub"
-        );
 
         _executeAsOwners(calls);
 
@@ -180,31 +163,10 @@ contract PreV32ParityCallsTest is Test {
             address(assetRouter),
             address(interopHandler),
             chainRegistrationSender,
-            false,
             false
         );
 
         assertEq(upgradeScript.buildInteropHandlerWiringCalls().length, 0, "nothing left to wire");
-        assertEq(upgradeScript.buildChainRegistrationSenderCall().length, 0, "sender already registered");
-    }
-
-    function test_onlyRegistersTheSenderWhenTheHandlerAlreadyExists() public {
-        // An ecosystem that has a wired handler but no registration sender on the bridgehub: only the
-        // sender call is emitted.
-        upgradeScript.setDiscoveredAddresses(
-            bridgehub,
-            address(l1Nullifier),
-            address(assetRouter),
-            address(interopHandler),
-            chainRegistrationSender,
-            false,
-            true
-        );
-
-        assertEq(upgradeScript.buildInteropHandlerWiringCalls().length, 0, "handler already wired");
-        Call[] memory calls = upgradeScript.buildChainRegistrationSenderCall();
-        assertEq(calls.length, 1, "only the registration sender is missing");
-        assertEq(calls[0].target, bridgehub);
     }
 
     function test_revertWhen_NoInteropHandlerAddress() public {
@@ -216,7 +178,6 @@ contract PreV32ParityCallsTest is Test {
             address(assetRouter),
             address(0),
             chainRegistrationSender,
-            false,
             false
         );
 
