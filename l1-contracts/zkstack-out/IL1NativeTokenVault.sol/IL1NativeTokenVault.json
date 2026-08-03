@@ -119,11 +119,6 @@
     "name": "bridgedOutPopulated",
     "inputs": [
       {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
         "name": "_assetId",
         "type": "bytes32",
         "internalType": "bytes32"
@@ -239,13 +234,8 @@
   },
   {
     "type": "function",
-    "name": "legacyBridgedOutForChain",
+    "name": "legacyBridgedOut",
     "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
       {
         "name": "_assetId",
         "type": "bytes32",
@@ -316,11 +306,6 @@
     "type": "function",
     "name": "populateBridgedOut",
     "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
       {
         "name": "_assetIds",
         "type": "bytes32[]",
@@ -428,12 +413,6 @@
     "type": "event",
     "name": "BridgedOutPopulated",
     "inputs": [
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
       {
         "name": "assetId",
         "type": "bytes32",

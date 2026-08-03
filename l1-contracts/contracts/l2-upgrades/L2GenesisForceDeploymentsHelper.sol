@@ -439,9 +439,11 @@ library L2GenesisForceDeploymentsHelper {
         // at these addresses, hence the guards.
         // See {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}.
         if (_isZKsyncOS) {
+            // `leafCount`, not `root`: an unseeded tree has an empty node array, so reading its root
+            // reverts instead of returning zero.
             if (
                 L2_INTEROP_COMMITMENT_TREE_ADDR.code.length > 0 &&
-                L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).root() == bytes32(0)
+                L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount() == 0
             ) {
                 L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
             }

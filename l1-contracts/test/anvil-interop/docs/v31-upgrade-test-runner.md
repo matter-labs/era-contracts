@@ -247,7 +247,9 @@ ZKsync VM (bytecode hashing, validation, etc.) and do not work. The test patches
 
 Runs the production `stage3()` Forge script, which uses `TokenMigrationUtils` to register
 legacy bridged tokens in the NTV bridged-tokens list and then `BridgedOutPopulationLib` to
-populate the NTV's `bridgedOut` accounting for every registered chain.
+populate the NTV's `bridgedOut` accounting for every L1-native asset. On a fixture with no
+legacy accounting left the population is a no-op, so step 8 does not assert its amounts —
+they are covered by the foundry tests instead.
 **No patches** -- this is pure L1 logic.
 
 ### 8. Verification

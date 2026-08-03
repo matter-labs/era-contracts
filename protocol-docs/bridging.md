@@ -157,27 +157,25 @@ tokens) and rejects fee-on-transfer tokens (`TokensWithFeesNotSupported`).
 
 A vault that is upgraded in place starts with `bridgedOut == 0` while still holding all of the escrow that
 was bridged out before the upgrade. Every withdrawal of an L1-native asset would therefore look like an
-inbound amount exceeding the outstanding one and be rejected as forged. `populateBridgedOut(chainId,
-assetIds)` folds the pre-upgrade accounting into `bridgedOut`, one chain at a time so that the work can be
-split across transactions, and `stage3` of the upgrade runs it for every registered chain and every
-L1-native asset in the vault's `bridgedTokens` enumeration (see
+inbound amount exceeding the outstanding one and be rejected as forged. `populateBridgedOut(assetIds)` folds
+the pre-upgrade accounting into `bridgedOut`, once per asset, and `stage3` of the upgrade runs it for every
+L1-native asset in the vault's `bridgedTokens` enumeration, batched across transactions (see
 `deploy-scripts/upgrade/default-upgrade/BridgedOutPopulationLib.sol`).
 
-- The amounts come from the two legacy per-chain bulkhead sources, summed: the vault's own
-  `DEPRECATED_chainBalance` (pre-v31 ecosystems) and the `chainBalance` of the removed v31
-  `L1AssetTracker`, located through the vault's retained `__DEPRECATED_l1AssetTracker` slot. The v31
-  upgrade zeroed the vault's entries as it copied them into the tracker, so no amount is counted twice.
-  On an ecosystem deployed after the tracker was removed both sources are empty and the population is a
-  no-op.
-- L1's own entry is never counted: L1 is the origin chain of these assets, so its bulkhead starts at
-  `MAX_TOKEN_BALANCE` rather than at a real balance. Its complement is what the tracker recorded as the
-  total ever bridged out of L1, which the population script cross-checks against the sum of the per-chain
-  amounts before touching anything.
-- No privileges are required. The legacy state is frozen once the new implementations are live — nothing
-  writes to it anymore — so the values a caller can produce are fully determined, and each (chain, asset)
-  pair can only be folded in once. Amounts bridged in the window between the upgrade and the population
-  are preserved, since the population only ever adds to `bridgedOut`.
-- Withdrawals of an asset stay blocked until its amounts are populated. Legacy tokens that predate the
+- For an asset the removed v31 `L1AssetTracker` registered, the amount is the complement of **L1's own
+  bulkhead** there: L1 is the origin chain of these assets, so its bulkhead starts at `MAX_TOKEN_BALANCE`
+  and moves by exactly the amount of every outflow from and inflow to L1. Reading that instead of summing
+  the tracker's per-chain buckets makes the result immune to amounts being moved between chains, which the
+  tracker's own migration entry points can still do after the upgrade. The tracker is located through the
+  vault's retained `__DEPRECATED_l1AssetTracker` slot.
+- Otherwise the amount is the sum of the vault's own `DEPRECATED_chainBalance` over the chains the
+  bridgehub reports — the pre-v31 accounting, which nothing writes anymore. The chain list is read by the
+  vault itself rather than supplied by the caller, so an incomplete list cannot silently undercount. On an
+  ecosystem deployed after the trackers were removed both sources are empty and the population is a no-op.
+- No privileges are required. Neither source can be influenced by the caller, and an asset can only be
+  folded in once. Amounts bridged in the window between the upgrade and the population are preserved, since
+  the population only ever adds to `bridgedOut`.
+- Withdrawals of an asset stay blocked until its amount is populated. Legacy tokens that predate the
   `bridgedTokens` enumeration must therefore be backfilled into it first, which is why `stage3` registers
   them before populating.
 

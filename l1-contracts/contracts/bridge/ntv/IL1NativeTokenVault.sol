@@ -28,34 +28,28 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     /// @notice Net amount of the given L1-native asset currently bridged out of L1.
     function bridgedOut(bytes32 _assetId) external view returns (uint256);
 
-    /// @notice Whether the pre-upgrade amount of `_assetId` attributed to `_chainId` has already been
-    /// folded into `bridgedOut`.
-    function bridgedOutPopulated(uint256 _chainId, bytes32 _assetId) external view returns (bool);
+    /// @notice Whether the pre-upgrade amount of `_assetId` has already been folded into `bridgedOut`.
+    function bridgedOutPopulated(bytes32 _assetId) external view returns (bool);
 
     /// @notice The removed V31 `L1AssetTracker`, which holds the legacy per-chain accounting that
     /// `populateBridgedOut` reads. Zero on ecosystems deployed after the tracker was removed.
     function legacyL1AssetTracker() external view returns (address);
 
-    /// @notice Amount of `_assetId` that the pre-upgrade accounting attributed to `_chainId`.
-    /// @param _chainId The chain the legacy amount is attributed to.
+    /// @notice Net amount of `_assetId` that the pre-upgrade accounting had bridged out of L1.
     /// @param _assetId The asset to read the legacy amount of.
-    /// @return amount The legacy amount, zero for L1 itself.
-    function legacyBridgedOutForChain(uint256 _chainId, bytes32 _assetId) external view returns (uint256 amount);
+    /// @return amount The legacy amount; zero on an ecosystem with no legacy accounting left.
+    function legacyBridgedOut(bytes32 _assetId) external view returns (uint256 amount);
 
-    /// @notice Folds the pre-upgrade amounts that the legacy accounting attributed to `_chainId` into
-    /// `bridgedOut`, once per (chain, asset) pair.
+    /// @notice Folds the pre-upgrade amount the legacy accounting recorded for each asset into
+    /// `bridgedOut`, once per asset.
     /// See {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}.
-    /// @param _chainId The chain whose legacy amounts are being folded in.
-    /// @param _assetIds The L1-native assets to populate; pairs already populated are skipped.
+    /// @param _assetIds The L1-native assets to populate; assets already populated are skipped.
     /// @return populatedAmounts Per entry of `_assetIds`, the amount added to that asset's
-    /// `bridgedOut`; zero for pairs that were skipped or had no legacy amount.
-    function populateBridgedOut(
-        uint256 _chainId,
-        bytes32[] calldata _assetIds
-    ) external returns (uint256[] memory populatedAmounts);
+    /// `bridgedOut`; zero for assets that were skipped or had no legacy amount.
+    function populateBridgedOut(bytes32[] calldata _assetIds) external returns (uint256[] memory populatedAmounts);
 
     event TokenBeaconUpdated(address indexed l2TokenBeacon);
 
-    /// @notice Emitted for every (chain, asset) pair folded into `bridgedOut`, including zero amounts.
-    event BridgedOutPopulated(uint256 indexed chainId, bytes32 indexed assetId, uint256 amount);
+    /// @notice Emitted for every asset folded into `bridgedOut`, including zero amounts.
+    event BridgedOutPopulated(bytes32 indexed assetId, uint256 amount);
 }

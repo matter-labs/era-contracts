@@ -25,7 +25,6 @@ import {TxStatus} from "../../common/Messaging.sol";
 
 import {
     AssetIdAlreadyRegistered,
-    InvalidChainId,
     NoFundsTransferred,
     OriginChainIdNotFound,
     WithdrawFailed,
@@ -34,6 +33,8 @@ import {
 import {AssetNotNativeToL1, OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
 import {InsufficientChainBalance} from "../asset-tracker/AssetTrackerErrors.sol";
 import {ILegacyL1AssetTracker} from "../asset-tracker/ILegacyL1AssetTracker.sol";
+import {MAX_TOKEN_BALANCE} from "../asset-tracker/IL2AssetTracker.sol";
+import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -73,10 +74,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// See {protocol-docs/bridging.md#native-token-vault}.
     mapping(bytes32 assetId => uint256 amount) public bridgedOut;
 
-    /// @notice Whether the pre-upgrade amount of `assetId` attributed to `chainId` has already been
-    /// folded into `bridgedOut`.
+    /// @notice Whether the pre-upgrade amount of `assetId` has already been folded into `bridgedOut`.
     /// See {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}.
-    mapping(uint256 chainId => mapping(bytes32 assetId => bool populated)) public bridgedOutPopulated;
+    mapping(bytes32 assetId => bool populated) public bridgedOutPopulated;
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
@@ -120,33 +120,36 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     }
 
     /// @inheritdoc IL1NativeTokenVault
-    function legacyBridgedOutForChain(uint256 _chainId, bytes32 _assetId) public view returns (uint256 amount) {
-        // L1's own entry is not part of the bridged-out amount: in the legacy tracker L1 is the origin
-        // chain of these assets, so its bulkhead starts at `MAX_TOKEN_BALANCE` instead of at a real
-        // balance, and in `DEPRECATED_chainBalance` it only ever tracked assets native to other chains.
-        if (_chainId == L1_CHAIN_ID) {
-            return 0;
+    function legacyBridgedOut(bytes32 _assetId) public view returns (uint256 amount) {
+        address legacyTracker = __DEPRECATED_l1AssetTracker;
+
+        // The v31 tracker seeds the asset's origin chain — L1, for the assets `bridgedOut` tracks — with
+        // `MAX_TOKEN_BALANCE` and moves amounts in and out of it on every L1 outflow and inflow, so its
+        // complement is the net amount bridged out of L1. Reading it instead of summing the per-chain
+        // amounts keeps the result immune to balance moves between chains, which the tracker's own
+        // migration entry points can still perform after the upgrade.
+        if (legacyTracker != address(0) && ILegacyL1AssetTracker(legacyTracker).isAssetRegistered(_assetId)) {
+            return MAX_TOKEN_BALANCE - ILegacyL1AssetTracker(legacyTracker).chainBalance(L1_CHAIN_ID, _assetId);
         }
 
-        // Pre-v31 deployments kept the accounting here; the v31 upgrade moved it to the tracker and zeroed
-        // these entries, so summing both sources can never double count.
-        amount = DEPRECATED_chainBalance[_chainId][_assetId];
-
-        address legacyTracker = __DEPRECATED_l1AssetTracker;
-        if (legacyTracker != address(0)) {
-            amount += ILegacyL1AssetTracker(legacyTracker).chainBalance(_chainId, _assetId);
+        // Pre-v31 ecosystems, and assets the tracker never registered, kept the accounting in this vault.
+        // Nothing writes those entries anymore, so summing them over the registered chains is exact. L1's
+        // own entry is skipped: it only ever tracked assets native to other chains.
+        uint256[] memory chainIds = IBridgehubBase(address(L1_NULLIFIER.BRIDGE_HUB())).getAllZKChainChainIDs();
+        uint256 chainIdsLength = chainIds.length;
+        for (uint256 i = 0; i < chainIdsLength; ++i) {
+            if (chainIds[i] == L1_CHAIN_ID) {
+                continue;
+            }
+            amount += DEPRECATED_chainBalance[chainIds[i]][_assetId];
         }
     }
 
     /// @inheritdoc IL1NativeTokenVault
-    function populateBridgedOut(
-        uint256 _chainId,
-        bytes32[] calldata _assetIds
-    ) external returns (uint256[] memory populatedAmounts) {
-        require(_chainId != L1_CHAIN_ID, InvalidChainId());
-
+    function populateBridgedOut(bytes32[] calldata _assetIds) external returns (uint256[] memory populatedAmounts) {
         uint256 assetIdsLength = _assetIds.length;
         populatedAmounts = new uint256[](assetIdsLength);
+
         for (uint256 i = 0; i < assetIdsLength; ++i) {
             bytes32 assetIdToPopulate = _assetIds[i];
             uint256 assetOriginChainId = originChainId[assetIdToPopulate];
@@ -154,19 +157,19 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             // rather than a no-op worth tolerating.
             require(assetOriginChainId == L1_CHAIN_ID, AssetNotNativeToL1(assetIdToPopulate, assetOriginChainId));
 
-            // Repeated (chain, asset) pairs are skipped rather than reverted so that a partially mined
-            // batch can simply be re-submitted.
-            if (bridgedOutPopulated[_chainId][assetIdToPopulate]) {
+            // Repeated assets are skipped rather than reverted so that a partially mined batch can simply
+            // be re-submitted.
+            if (bridgedOutPopulated[assetIdToPopulate]) {
                 continue;
             }
-            bridgedOutPopulated[_chainId][assetIdToPopulate] = true;
+            bridgedOutPopulated[assetIdToPopulate] = true;
 
-            uint256 legacyAmount = legacyBridgedOutForChain(_chainId, assetIdToPopulate);
+            uint256 legacyAmount = legacyBridgedOut(assetIdToPopulate);
             if (legacyAmount != 0) {
                 bridgedOut[assetIdToPopulate] += legacyAmount;
                 populatedAmounts[i] = legacyAmount;
             }
-            emit BridgedOutPopulated(_chainId, assetIdToPopulate, legacyAmount);
+            emit BridgedOutPopulated(assetIdToPopulate, legacyAmount);
         }
     }
 

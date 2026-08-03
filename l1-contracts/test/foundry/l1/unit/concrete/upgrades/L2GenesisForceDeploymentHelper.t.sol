@@ -24,6 +24,8 @@ import "contracts/bridge/interfaces/IL2WrappedBaseToken.sol";
 import "contracts/bridge/UpgradeableBeaconDeployer.sol";
 import "contracts/l2-upgrades/SystemContractProxyAdmin.sol";
 import "contracts/l2-upgrades/ISystemContractProxy.sol";
+import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
+import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 
 /**
  * @title L2GenesisForceDeploymentsHelperTest
@@ -105,6 +107,8 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         assertEq(_countLogs(logs, CONTRACT_UPGRADED_SIG), 0);
         assertEq(_countLogs(logs, FORCE_DEPLOYED_CONTRACTS_INITIALIZED_SIG), 1);
 
+        _assertAtomicInteropInitialized();
+
         // Verify deployments occurred - use the etched contract at the system address
         MockZKOSContractDeployer etchedDeployer = MockZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
         assertEq(etchedDeployer.deploymentCount(L2_MESSAGE_ROOT_ADDR), 0); // proxy only
@@ -142,9 +146,9 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         _deployMockContract(L2_INTEROP_CENTER_ADDR);
         _deployMockContract(L2_INTEROP_HANDLER_ADDR);
         _deployMockContract(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
-        // Atomic interop predeploys (initialized in `_initializeV31Contracts` when `_isZKsyncOS`).
-        _deployMockContract(L2_INTEROP_COMMITMENT_TREE_ADDR);
-        _deployMockContract(L2_ATOMIC_FLOW_MANAGER_ADDR);
+        // The atomic-interop built-ins arrive with the upgrade's force deployments on a pre-existing chain;
+        // etch their real code so the helper initializing them is observable.
+        _etchAtomicInteropBuiltIns();
 
         vm.mockCall(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, abi.encodeWithSignature("owner()"), abi.encode(address(this)));
 
@@ -172,6 +176,22 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
         );
         assertEq(etchedProxyAdmin.upgradeCallCount(), 0);
+
+        // The upgrade path initializes the atomic-interop built-ins, so an upgraded chain ends up with the
+        // same state a fresh one gets from genesis.
+        _assertAtomicInteropInitialized();
+
+        // Running the same upgrade again must not attempt to re-initialize them.
+        vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
+        L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
+            true,
+            ctmDeployerAddress,
+            fixedEncoded,
+            additionalEncoded,
+            false
+        );
+        vm.stopPrank();
+        _assertAtomicInteropInitialized();
     }
 
     function testEraForceDeployment() public {
@@ -332,7 +352,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
     function _etchAllDeferredContracts() internal {
         // Etch contracts to addresses that need function calls to work
-        address[] memory addressesToEtch = new address[](12);
+        address[] memory addressesToEtch = new address[](10);
         addressesToEtch[0] = L2_MESSAGE_ROOT_ADDR;
         addressesToEtch[1] = L2_BRIDGEHUB_ADDR;
         addressesToEtch[2] = L2_ASSET_ROUTER_ADDR;
@@ -343,9 +363,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         addressesToEtch[7] = L2_INTEROP_HANDLER_ADDR;
         addressesToEtch[8] = L2_ASSET_TRACKER_ADDR;
         addressesToEtch[9] = L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
-        // Atomic interop predeploys (initialized in `_initializeV31Contracts` when `_isZKsyncOS`).
-        addressesToEtch[10] = L2_INTEROP_COMMITMENT_TREE_ADDR;
-        addressesToEtch[11] = L2_ATOMIC_FLOW_MANAGER_ADDR;
 
         for (uint256 i = 0; i < addressesToEtch.length; i++) {
             if (addressesToEtch[i].code.length == 0) {
@@ -353,6 +370,30 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
                 vm.etch(addressesToEtch[i], address(mock).code);
             }
         }
+
+        _etchAtomicInteropBuiltIns();
+    }
+
+    /// @dev The atomic-interop built-ins are etched with their real code, not the generic mock, so that
+    ///      `_initializeV31Contracts` initializing them is observable (`leafCount` / `L1_CHAIN_ID`).
+    function _etchAtomicInteropBuiltIns() internal {
+        if (L2_INTEROP_COMMITMENT_TREE_ADDR.code.length == 0) {
+            vm.etch(L2_INTEROP_COMMITMENT_TREE_ADDR, address(new L2InteropCommitmentTree()).code);
+        }
+        if (L2_ATOMIC_FLOW_MANAGER_ADDR.code.length == 0) {
+            vm.etch(L2_ATOMIC_FLOW_MANAGER_ADDR, address(new AtomicFlowManager()).code);
+        }
+    }
+
+    /// @dev Both built-ins seeded exactly once: the tree holds its sentinel leaf and the manager the L1
+    ///      chain id. `initL2` reverts on a second call, so reaching this state twice is impossible.
+    function _assertAtomicInteropInitialized() internal {
+        assertEq(L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(), 1, "tree not seeded");
+        assertEq(
+            AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).L1_CHAIN_ID(),
+            L1_CHAIN_ID,
+            "flow manager not initialized"
+        );
     }
 }
 
@@ -464,10 +505,10 @@ contract MockContract {
 
     function setAddresses(address, address, address, address) external {}
 
-    // `L2InteropCommitmentTree.root()` and `AtomicFlowManager.L1_CHAIN_ID()`. Zero is the
+    // `L2InteropCommitmentTree.leafCount()` and `AtomicFlowManager.L1_CHAIN_ID()`. Zero is the
     // "not initialized yet" sentinel both guards look for, so the helper proceeds to call `initL2`.
-    function root() external view returns (bytes32) {
-        return bytes32(0);
+    function leafCount() external view returns (uint256) {
+        return 0;
     }
 
     // solhint-disable-next-line func-name-mixedcase

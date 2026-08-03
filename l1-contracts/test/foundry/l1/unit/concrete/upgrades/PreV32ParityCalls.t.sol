@@ -6,6 +6,8 @@ import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {CoreUpgrade_v31} from "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
+import {AddressIntrospector} from "deploy-scripts/utils/AddressIntrospector.sol";
+import {BridgesDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
@@ -16,6 +18,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {BridgehubBase} from "contracts/core/bridgehub/BridgehubBase.sol";
+import {Utils} from "deploy-scripts/utils/Utils.sol";
 
 /// @dev Exposes the pre-v32 parity call builder and lets the test place the discovered addresses, which the
 /// script normally fills in from on-chain introspection.
@@ -224,6 +227,67 @@ contract PreV32ParityCallsTest is Test {
 
         vm.expectRevert("L1InteropHandler proxy not deployed");
         upgradeScript.buildPreV32ParityCalls();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        v31 address discovery
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Discovery walks from the asset router to the vault; this fixture has no vault, so stand one in.
+    function _mockNativeTokenVaultForDiscovery() internal {
+        address nativeTokenVault = makeAddr("nativeTokenVault");
+        vm.mockCall(address(assetRouter), abi.encodeWithSignature("nativeTokenVault()"), abi.encode(nativeTokenVault));
+        vm.mockCall(nativeTokenVault, abi.encodeWithSignature("bridgedTokenBeacon()"), abi.encode(address(0)));
+    }
+
+    /// @dev A v31 nullifier has no `l1InteropHandler()` at all, which a call into the missing function
+    /// surfaces as a revert — exactly what the version-aware discovery has to avoid.
+    function _makeNullifierLookPreV32() internal {
+        vm.mockCallRevert(
+            address(l1Nullifier),
+            abi.encodeWithSignature("l1InteropHandler()"),
+            "function does not exist"
+        );
+    }
+
+    function test_discovery_v31PathSkipsTheInteropHandlerGetter() public {
+        _mockNativeTokenVaultForDiscovery();
+        _makeNullifierLookPreV32();
+
+        BridgesDeployedAddresses memory bridges = AddressIntrospector.getBridgesDeployedAddressesV29(
+            address(assetRouter)
+        );
+
+        assertEq(bridges.proxies.l1Nullifier, address(l1Nullifier), "nullifier still discovered");
+        assertEq(bridges.proxies.l1InteropHandler, address(0), "handler reported as absent");
+        assertEq(bridges.implementations.l1InteropHandler, address(0), "no implementation either");
+    }
+
+    function test_discovery_v32PathNeedsTheInteropHandlerGetter() public {
+        // The same discovery a v32 ecosystem uses cannot be applied to a v31 one: it reads a getter that
+        // only exists from v32 on. This is what made the upgrade impossible to prepare.
+        _makeNullifierLookPreV32();
+
+        vm.expectRevert();
+        AddressIntrospector.getBridgesDeployedAddresses(address(assetRouter));
+    }
+
+    function test_discovery_v32PathIsUsedOnceTheGetterExists() public {
+        _mockNativeTokenVaultForDiscovery();
+
+        BridgesDeployedAddresses memory bridges = AddressIntrospector.getBridgesDeployedAddresses(address(assetRouter));
+        assertEq(bridges.proxies.l1InteropHandler, address(0), "unwired ecosystem reports no handler");
+
+        vm.prank(owner);
+        l1Nullifier.setL1InteropHandler(address(interopHandler));
+
+        bridges = AddressIntrospector.getBridgesDeployedAddresses(address(assetRouter));
+        assertEq(bridges.proxies.l1InteropHandler, address(interopHandler), "wired handler discovered");
+        assertEq(
+            bridges.implementations.l1InteropHandler,
+            Utils.getImplementation(address(interopHandler)),
+            "implementation resolved behind the proxy"
+        );
     }
 
     // add this to be excluded from coverage report

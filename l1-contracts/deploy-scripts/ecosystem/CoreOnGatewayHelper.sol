@@ -158,11 +158,21 @@ library CoreOnGatewayHelper {
             // `FixedForceDeploymentsData.beaconDeployerInfo` references but
             // which is not one of the fixed-address core contracts.
             CoreContract[] memory fixedAddressCoreContracts = SystemContractsProcessing.getFixedAddressCoreContracts();
-            dependencyContracts = new CoreContract[](fixedAddressCoreContracts.length + 1);
+            // The atomic-interop built-ins are force-deployed by `getBaseZKsyncOSForceDeployments` from a
+            // separate list, so their preimages have to be merged in here as well.
+            CoreContract[] memory atomicInteropContracts = SystemContractsProcessing
+                .getZKsyncOSAtomicInteropContracts();
+            dependencyContracts = new CoreContract[](
+                fixedAddressCoreContracts.length + atomicInteropContracts.length + 1
+            );
+            uint256 index;
             for (uint256 i = 0; i < fixedAddressCoreContracts.length; i++) {
-                dependencyContracts[i] = fixedAddressCoreContracts[i];
+                dependencyContracts[index++] = fixedAddressCoreContracts[i];
             }
-            dependencyContracts[fixedAddressCoreContracts.length] = CoreContract.UpgradeableBeaconDeployer;
+            for (uint256 i = 0; i < atomicInteropContracts.length; i++) {
+                dependencyContracts[index++] = atomicInteropContracts[i];
+            }
+            dependencyContracts[index] = CoreContract.UpgradeableBeaconDeployer;
             return dependencyContracts;
         }
 
