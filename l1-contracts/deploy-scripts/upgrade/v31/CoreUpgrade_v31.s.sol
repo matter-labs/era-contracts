@@ -34,13 +34,14 @@ import {ICoreUpgradeV31} from "contracts/script-interfaces/IUpgradeV31.sol";
 import {UpgradeUtils} from "../default-upgrade/UpgradeUtils.sol";
 import {CoreUpgradeParams} from "../default-upgrade/UpgradeParams.sol";
 import {TokenMigrationUtils} from "./TokenMigrationUtils.s.sol";
+import {BridgedOutPopulationLib} from "../default-upgrade/BridgedOutPopulationLib.sol";
 
 /// FIXME currently we accept ownership as part of stage1, but in fact we should do it as part of stage0.
 /// @notice Script used for v31 upgrade flow.
 /// @dev Owns all v31-specific core-side ecosystem behavior:
 ///      - stage 1: ChainRegistrationSender.acceptOwnership, ChainAssetHandler.setAddresses
 ///      - stage 2: legacy-GW historical migration intervals + old-GW blacklist (read from upgrade input TOML)
-///      - stage3 (post-governance): bridged-token registration in the NTV
+///      - stage3 (post-governance): bridged-token registration in the NTV + `bridgedOut` population
 contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     using stdToml for string;
 
@@ -216,14 +217,18 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         return _buildLegacyGatewayDecommissionCalls();
     }
 
-    /// @notice Post-governance step: register legacy bridged tokens in the NTV bridged-tokens list.
+    /// @notice Post-governance step: register legacy bridged tokens in the NTV bridged-tokens list, then
+    ///         populate the vault's `bridgedOut` accounting from the legacy per-chain balances.
     /// @dev Caller signs as any EOA — no governance privileges required.
+    /// @dev The registration has to come first: the population only sees assets that are present in the
+    ///      vault's `bridgedTokens` enumeration.
     function stage3(address bridgehubProxy) public {
         console.log("Starting v31 stage3 post-governance registration...");
         console.log("Bridgehub proxy:", bridgehubProxy);
 
         vm.startBroadcast();
         TokenMigrationUtils.registerBridgedTokensInNTV(bridgehubProxy);
+        BridgedOutPopulationLib.populateBridgedOutForAllChains(bridgehubProxy);
         vm.stopBroadcast();
 
         console.log("v31 stage3 registration complete!");

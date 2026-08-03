@@ -245,8 +245,9 @@ ZKsync VM (bytecode hashing, validation, etc.) and do not work. The test patches
 
 ### 7. Stage 3: post-governance migration
 
-Runs the production `stage3()` Forge script which uses `TokenMigrationUtils` to register
-legacy bridged tokens in the NTV bridged-tokens list.
+Runs the production `stage3()` Forge script, which uses `TokenMigrationUtils` to register
+legacy bridged tokens in the NTV bridged-tokens list and then `BridgedOutPopulationLib` to
+populate the NTV's `bridgedOut` accounting for every registered chain.
 **No patches** -- this is pure L1 logic.
 
 ### 8. Verification

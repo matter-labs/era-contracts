@@ -153,6 +153,34 @@ tokens) and rejects fee-on-transfer tokens (`TokensWithFeesNotSupported`).
   L2 it exists only for shared-code reasons and should not be used as an emergency mechanism — future L2
   logic should rely on the L1/Gateway freeze flow.
 
+### Populating `bridgedOut` during an in-place upgrade
+
+A vault that is upgraded in place starts with `bridgedOut == 0` while still holding all of the escrow that
+was bridged out before the upgrade. Every withdrawal of an L1-native asset would therefore look like an
+inbound amount exceeding the outstanding one and be rejected as forged. `populateBridgedOut(chainId,
+assetIds)` folds the pre-upgrade accounting into `bridgedOut`, one chain at a time so that the work can be
+split across transactions, and `stage3` of the upgrade runs it for every registered chain and every
+L1-native asset in the vault's `bridgedTokens` enumeration (see
+`deploy-scripts/upgrade/default-upgrade/BridgedOutPopulationLib.sol`).
+
+- The amounts come from the two legacy per-chain sources, summed: the vault's own
+  `DEPRECATED_chainBalance` (pre-v31 ecosystems) and the `chainBalance` of the removed v31
+  `L1AssetTracker`, located through the vault's retained `__DEPRECATED_l1AssetTracker` slot. The v31
+  upgrade zeroed the vault's entries as it copied them into the tracker, so no amount is counted twice.
+  On an ecosystem deployed after the tracker was removed both sources are empty and the population is a
+  no-op.
+- L1's own entry is never counted: in the tracker it is the `MAX_TOKEN_BALANCE` sentinel of the asset's
+  origin chain rather than a balance. Its complement is what the tracker recorded as the total ever
+  bridged out of L1, which the population script cross-checks against the sum of the per-chain amounts
+  before touching anything.
+- No privileges are required. The legacy state is frozen once the new implementations are live — nothing
+  writes to it anymore — so the values a caller can produce are fully determined, and each (chain, asset)
+  pair can only be folded in once. Amounts bridged in the window between the upgrade and the population
+  are preserved, since the population only ever adds to `bridgedOut`.
+- Withdrawals of an asset stay blocked until its amounts are populated. Legacy tokens that predate the
+  `bridgedTokens` enumeration must therefore be backfilled into it first, which is why `stage3` registers
+  them before populating.
+
 ## Base-token handling
 
 - The chain's base token is escrowed off-vault in `BaseTokenHolder`, initialized with `2^127 - 1` base
@@ -292,7 +320,9 @@ mintData)` on the asset handler registered for the asset (`assetHandlerAddress[a
   `isWithdrawalFinalized`. Numerous
   `__DEPRECATED_*` storage slots remain across `L1AssetRouter`, `L2AssetRouter`, `L1Nullifier`,
   `L2NativeTokenVault`, `L1NativeTokenVault` and `L2AssetTracker` solely to preserve the upgradeable
-  storage layouts of already-deployed proxies; they are never read or written and must not be reused.
+  storage layouts of already-deployed proxies; they must not be reused. The only one that is still read is
+  `L1NativeTokenVault.__DEPRECATED_l1AssetTracker`, which locates the legacy accounting for the
+  `bridgedOut` population.
 - Legacy bridged tokens on L2 may predate the NTV: `BridgedStandardERC20.onlyNTV` lazily migrates them by
   setting `nativeTokenVault` to `L2_NATIVE_TOKEN_VAULT_ADDR` and deriving the asset ID on first use.
   `addLegacyTokenToBridgedTokensList` backfills such tokens into the vault's `bridgedTokens` enumeration,
