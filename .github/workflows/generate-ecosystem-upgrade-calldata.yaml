@@ -384,12 +384,13 @@ jobs:
           echo "=== files"
           find "$GITHUB_WORKSPACE/deploy-bundle" -type f | sed "s|$GITHUB_WORKSPACE/||" | sort
 
-      - name: Select + mask the L1 RPC to fork
+      - name: Select + mask the L1 RPC to fork (and the GW RPC for PUVT)
         env:
           ENVIRONMENT: ${{ inputs.environment }}
           INPUT_RPC: ${{ inputs.l1_rpc_url }}
           RPC_SEPOLIA: ${{ secrets.L1_RPC_URL_SEPOLIA }}
           RPC_MAINNET: ${{ secrets.L1_RPC_URL_MAINNET }}
+          GW_RPC_URL: ${{ secrets.GW_RPC_URL }}
         run: |
           set -euo pipefail
           if [ "$ENVIRONMENT" = "mainnet" ]; then rpc="$RPC_MAINNET"; else rpc="$RPC_SEPOLIA"; fi
@@ -399,6 +400,12 @@ jobs:
           fi
           echo "::add-mask::$rpc"
           echo "L1_FORK_URL=$rpc" >> "$GITHUB_ENV"
+          # PUVT's read-only gateway checks (gateway-enabled envs only). Blank
+          # falls back to the replay script's built-in, as it does for the regen.
+          if [ -n "${GW_RPC_URL:-}" ]; then
+            echo "::add-mask::$GW_RPC_URL"
+            echo "GW_RPC_URL=$GW_RPC_URL" >> "$GITHUB_ENV"
+          fi
 
       # The same command an operator runs locally against a downloaded bundle.
       - name: Replay the bundle on a fresh fork + PUVT

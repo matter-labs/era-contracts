@@ -130,7 +130,12 @@ if [[ -n "$FORK_URL" ]]; then
   fi
 fi
 echo "L1 RPC:       $RPC"
-GW_RPC_URL="${GW_RPC_URL:-$RPC}"
+# Gateway RPC — PUVT uses it for read-only GW-side checks (only exercised on
+# gateway-enabled envs; gateway-less envs skip them, so the URL is just a
+# reachable placeholder there). Same built-in default as regen-and-verify.sh:
+# stage's gateway. Override GW_RPC_URL for other gateway-enabled envs.
+GW_RPC_URL="${GW_RPC_URL:-https://zksync-os-stage-gateway.zksync.dev}"
+echo "GW RPC:       $GW_RPC_URL"
 
 MANIFEST="$BUNDLE/prepare/manifest.json"
 EXECUTED="$WORK/executed.json"
