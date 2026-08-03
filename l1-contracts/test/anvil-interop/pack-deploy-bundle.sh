@@ -87,6 +87,7 @@ HASHES_SHA="$(sha256sum "$REPO_ROOT/AllContractsHashes.json" | cut -d' ' -f1)"
 L1_CHAIN_ID="$(read_toml_int "$PERMANENT_VALUES" l1_chain_id)"
 FORGE_VERSION="$(forge --version 2>/dev/null | head -1 || echo unknown)"
 RUSTC_VERSION="$(rustc --version 2>/dev/null || echo unknown)"
+CREATE2_FACTORY="$(read_toml_str "$PERMANENT_VALUES" create2_factory_addr)"
 
 BUNDLE="$BUNDLE" \
 ENV="$ENV" \
@@ -96,6 +97,7 @@ HASHES_SHA="$HASHES_SHA" \
 L1_CHAIN_ID="$L1_CHAIN_ID" \
 FORGE_VERSION="$FORGE_VERSION" \
 RUSTC_VERSION="$RUSTC_VERSION" \
+CREATE2_FACTORY="$CREATE2_FACTORY" \
 ECOSYSTEM_TOML="$BUNDLE/ecosystem.toml" \
 python3 - <<'PY'
 import hashlib, json, os, re
@@ -104,11 +106,35 @@ bundle = os.environ["BUNDLE"]
 manifest = json.load(open(f"{bundle}/prepare/manifest.json"))
 deployer = (os.environ.get("DEPLOYER_ADDR") or "").lower()
 
+create2_factory = (os.environ.get("CREATE2_FACTORY") or "").lower()
+
 bundles = []
+calls_md = []
 for b in sorted(manifest["bundles"], key=lambda b: b["index"]):
     path = f"{bundle}/prepare/{b['file']}"
     safe = json.load(open(path))
     txs = safe.get("transactions", [])
+    # A flat, reviewable listing of what will actually be sent. `data` itself can
+    # be hundreds of KB of init code, so show its size + selector and point at
+    # the JSON for the bytes.
+    role = "DEPLOYER" if deployer and b["target"].lower() == deployer else "other signer"
+    calls_md.append(
+        f"\n### Bundle {b['index']} — signer `{b['target']}` ({role})\n\n"
+        f"`{b['file']}` · {len(txs)} transaction(s)\n\n"
+        "| # | to | value | kind | selector / CREATE2 salt | data bytes |\n|---|---|---|---|---|---|"
+    )
+    for n, tx in enumerate(txs, 1):
+        data = tx.get("data") or "0x"
+        to = (tx.get("to") or "").lower()
+        if to == create2_factory:
+            # Arachnid factory calldata is salt(32 bytes) ++ init code.
+            kind, tag = "CREATE2 deploy", "0x" + data[2:66]
+        else:
+            kind, tag = "call", data[:10]
+        calls_md.append(
+            f"| {n} | `{tx.get('to')}` | {tx.get('value', '0')} | {kind} | `{tag}` |"
+            f" {max(len(data) - 2, 0) // 2} |"
+        )
     bundles.append({
         "index": b["index"],
         "file": b["file"],
@@ -228,6 +254,12 @@ That forks L1 at block `{meta['l1']['forked_at_block']}`, funds the bundle
 signers, replays every bundle under impersonation, and runs
 `ecosystem verify-upgrade` against the result. Pass `--rpc <url>` instead of
 `--fork-url` to verify an already-deployed chain.
+
+## The calls, in execution order
+
+Bundles are sent in `index` order and each bundle's transactions in listed order.
+`data` is authoritative in the JSON; the sizes below are just for orientation.
+{chr(10).join(calls_md)}
 """
 open(f"{bundle}/README.md", "w").write(readme)
 PY
