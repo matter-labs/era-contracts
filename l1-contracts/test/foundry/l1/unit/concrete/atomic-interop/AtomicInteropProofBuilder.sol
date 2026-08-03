@@ -50,27 +50,14 @@ contract AtomicInteropProofWrapper {
 }
 
 /// @notice Shared fixtures + on-chain proof builders for the {AtomicInteropProof} unit tests.
-///
-/// Design:
-///   - A REAL {L2InteropCommitmentTree} is the IMT oracle: we insert commit values through the real
-///     `insert` path and read `root()`/`leafAt`/`merklePath` to assemble genuine inclusion /
-///     non-inclusion `ImtProof`s. No second (off-chain) IMT implementation is maintained, so on-chain
-///     and off-chain layouts cannot drift.
-///   - A REAL {L2InteropRootStorage} is etched at its canonical address and seeded through the
-///     production `addSingleInteropRoot` entry point (pranked as the bootloader), so the timeout
-///     protocol's settlement-layer interop root `(root, timestamp)` tuples are served by the real storage — no mocked
-///     root values.
-///   - The one system contract that IS mocked (justified: it isolates this library from the
-///     separately-tested machinery) is `L2_MESSAGE_VERIFICATION.proveL2LeafInclusionShared` — the
-///     cross-chain leaf-inclusion layer is covered by L2MessageVerification.t.sol; here we drive it
-///     to true/false to reach the library's own branches. It does NOT bypass
-///     `MessageHashing._getProofData`, which still parses the real `settlementProof` blob we build
-///     below (so the SL-match / clock / last-batch branches stay live).
-///
-/// The `settlementProof` blob is a minimal well-formed non-final proof carrying a caller-chosen
-/// `(settlementLayerChainId, slBlock, l1Timestamp)` and batch-leaf path; `_getProofData` only
-/// *parses* it (it does not re-verify the terminal root, which is the mocked verifier's job), so it
-/// does not need to hash to any real interop root.
+/// @dev Mock policy: a REAL {L2InteropCommitmentTree} is the IMT oracle (proofs are assembled from its
+/// own `root()`/`leafAt`/`merklePath`, so no second IMT implementation can drift) and a REAL
+/// {L2InteropRootStorage} is etched at its canonical address and seeded via the production bootloader
+/// entry point. Only `L2_MESSAGE_VERIFICATION.proveL2LeafInclusionShared` is mocked — that layer is
+/// covered by L2MessageVerification.t.sol; driving it true/false reaches this library's own branches.
+/// The mock does NOT bypass `MessageHashing._getProofData`: the `settlementProof` blob built here is
+/// still parsed for real (it only needs to parse, not hash to a real root, since the terminal-root
+/// check is the mocked verifier's job), so the SL-match / clock / last-batch branches stay live.
 abstract contract AtomicInteropProofBuilder is Test {
     /// @dev The flow deadline all proofs are built against (shared with the tests so the builders
     /// can declare the honest timeout branch for a given batch timestamp).
@@ -89,8 +76,8 @@ abstract contract AtomicInteropProofBuilder is Test {
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         tree.initL2();
 
-        // The timeout protocol reads the settlement-layer interop root tuple from the canonical L2InteropRootStorage; give
-        // that address the REAL contract so tests seed it through the production write path.
+        // The timeout protocol reads the root tuple from the canonical address; etch the REAL contract
+        // there so tests seed it through the production write path.
         rootStorage = L2InteropRootStorage(L2_INTEROP_ROOT_STORAGE_ADDR);
         vm.etch(L2_INTEROP_ROOT_STORAGE_ADDR, address(new L2InteropRootStorage()).code);
     }
@@ -198,15 +185,12 @@ abstract contract AtomicInteropProofBuilder is Test {
             );
     }
 
-    /// @dev A minimal, well-formed *non-final* `settlementProof` that `MessageHashing` parses into
-    /// `(settlementLayerChainId = _slChainId, slBlock = _slBlock, l1BatchTimestamp = _l1Timestamp)`
-    /// with the given batch-leaf Merkle path. The leaf-to-chain-batch-root section is exactly
-    /// {ChainBatchRootTree.TREE_DEPTH} hops, as the library enforces. The dummy sibling words only
-    /// need to be non-reverting inputs to the internal Merkle hashing; the resulting roots are never
-    /// checked here because the leaf verifier is mocked.
-    /// @param _batchLeafSiblings The batch-leaf path inside the chain's batch tree (empty = the
-    /// chain tree has a single leaf, which trivially satisfies the timeout protocol's last-batch
-    /// check; the zero cascade from `CHAIN_TREE_EMPTY_ENTRY_HASH` satisfies it at depth).
+    /// @dev A minimal well-formed *non-final* `settlementProof` parsing to the given
+    /// `(slChainId, slBlock, l1Timestamp)` and batch-leaf path, with the leaf-to-chain-batch-root
+    /// section at exactly {ChainBatchRootTree.TREE_DEPTH} hops as the library enforces. Dummy siblings
+    /// suffice: the resulting roots are never checked here because the leaf verifier is mocked.
+    /// @param _batchLeafSiblings Batch-leaf path in the chain's batch tree (empty = single-leaf tree,
+    /// which trivially satisfies the timeout protocol's last-batch check).
     function _settlementProof(
         uint256 _slChainId,
         uint256 _slBlock,
@@ -234,8 +218,8 @@ abstract contract AtomicInteropProofBuilder is Test {
         proof[topLen + 4 + _batchLeafSiblings.length] = bytes32(_slChainId);
     }
 
-    /// @dev A *final* `settlementProof` (single-level / commit-based) that carries no settlement-layer
-    /// settlement-layer batch reference, so `AtomicInteropProof` rejects it with `ProofMissingSettlementLayerBatch`.
+    /// @dev A *final* `settlementProof` (single-level / commit-based): carries no settlement-layer
+    /// batch reference, so `AtomicInteropProof` rejects it with `ProofMissingSettlementLayerBatch`.
     function _finalSettlementProof() internal pure returns (bytes32[] memory proof) {
         uint256 topLen = ChainBatchRootTree.TREE_DEPTH;
         proof = new bytes32[](topLen + 1);

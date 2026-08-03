@@ -17,7 +17,8 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     /// @notice The base token asset ID
     function BASE_TOKEN_ASSET_ID() external view returns (bytes32);
 
-    /// @notice Returns the total number of specific tokens locked for some chain
+    /// @notice Deprecated per-chain balance getter, kept for backwards compatibility only; it will
+    /// revert in the next release. Use `bridgedOut` instead.
     function chainBalance(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
 
     /// @notice Registers ETH token. Should be called once on local/new deployments.

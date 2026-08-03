@@ -11,8 +11,6 @@ import {StoredInteropRoot} from "../../common/Messaging.sol";
  * bootloader-only access control, mirroring the production `interopRoots` read ABI.
  */
 contract DummyL2InteropRootStorage {
-    /// @notice Mirrors `L2InteropRootStorage`: `(blockOrBatchNumber, root, timestamp)`
-    /// tuples per chain, consulted by message verification and time-sensitive proofs.
     mapping(uint256 chainId => mapping(uint256 batchNumber => StoredInteropRoot)) internal storedInteropRoots;
 
     event InteropRootAdded(uint256 indexed chainId, uint256 indexed batchNumber, uint256 timestamp, bytes32[] sides);

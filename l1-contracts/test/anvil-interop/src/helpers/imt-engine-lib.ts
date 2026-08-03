@@ -1,45 +1,8 @@
 /**
- * Off-chain counterpart of the atomic-interop proof system (InteropCenter / InteropHandler /
- * AtomicFlowManager). It ports the on-chain IndexedMerkleTree exactly, so the harness can:
- *   - reproduce the per-chain {L2InteropCommitmentTree} root and Merkle paths from the live leaf set
- *     (checked against `tree.root()` / `tree.merklePath(i)` over RPC),
- *   - compute the low-nullifier index needed to insert a value (forwarded to `AtomicFlowManager.append`),
- *   - build the inclusion / non-inclusion {ImtProof} structs the {AtomicFlowManager} verifies.
- *
- * Id derivations:
- *   - `bundleHash = keccak256(abi.encode(sourceChainId, abi.encode(InteropBundle)))`. The atomic send
- *     params (the full flowId preimage + lowNullifierIndex) travel via the `atomicBundle` attribute, not
- *     the InteropBundle, so `bundleHash` does not depend on the preimage.
- *   - `flowId = keccak256(abi.encode(preimage))`,
- *     bundle hashes strictly ascending with source chain ids positionally aligned. Since `bundleHash` is
- *     independent of the preimage, each leg's `bundleHash` (and thus the preimage) is computable off-chain
- *     before the send; on-chain the AtomicFlowManager recomputes `flowId` from the attribute-supplied
- *     preimage and requires the sent bundle to be one of its legs.
- *   - `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
- *
- * Tree specifics (match IndexedMerkleTree.sol + FullMerkle.sol, the dynamic-height tree):
- *   - the FullMerkle tree starts at height 0 and grows by one whenever a leaf lands at index (1 << height);
- *     root() is the top-level node and merklePath(i) has length == the current height,
- *   - leaf is `IMTLeaf { uint256 value; uint256 nextIndex; uint256 nextValue }` (note the field order),
- *   - leaf hash = keccak256(abi.encode(value, nextIndex, nextValue)),
- *   - node hashing via efficientHash(a,b) = keccak256(a ++ b); zeros[0] = keccak256("zkSync:IndexedMerkleTree:emptyLeaf")
- *     (the domain-separated empty-leaf padding, NOT hashLeaf({0,0,0}) — see IMT_EMPTY_LEAF_HASH in Config.sol),
- *     zeros[i+1] = efficientHash(zeros[i], zeros[i]), built lazily as the tree grows,
- *   - the tree seeds the {0,0,0} head at index 0, then appends each inserted leaf and repoints its
- *     low-nullifier, splicing the sorted linked list (forward search bounded by MAX_LOW_INDEX_SEARCH_ATTEMPTS).
- *
- * A chain's IMT root is authenticated as a **chain-batch-root leaf** (leaf 2 = batch begin, leaf 3 =
- * batch end; see ChainBatchRootTree.sol) via {L2_MESSAGE_VERIFICATION}.proveL2LeafInclusionShared. On
- * the harness that address hosts {MockL2MessageVerification}, which always returns true, so the root
- * check is out of harness scope. {AtomicInteropProof} re-parses the same `settlementProof` bytes with
- * the real {MessageHashing} accessors and REQUIRES the leaf-to-batch-root section of the proof to be
- * exactly CHAIN_BATCH_ROOT_TREE_DEPTH (3) hops, so the harness builds format-valid multi-hop proof
- * bytes carrying a chosen `l1Timestamp` and batch-leaf path ({buildSlProofBytes}). The parts actually
- * exercised are the IMT membership / low-nullifier layer and the timeout-protocol clock checks; the
- * protocol itself (finality/timeout conditions, branches, boundaries) is described ONCE in the
- * AtomicInteropProof.sol library header — the settlement interop root timestamps it reads come from
- * the REAL `L2InteropRootStorage.interopRoots[slChainId][slBlock]` tuples, which the harness adds via
- * bootloader impersonation.
+ * Off-chain port of the on-chain IndexedMerkleTree/FullMerkle plus builders for the {ImtProof}
+ * structs that AtomicFlowManager / AtomicInteropProof verify. Must stay bit-for-bit compatible with
+ * IndexedMerkleTree.sol / FullMerkle.sol and the on-chain id derivations (flowId / commitValue).
+ * See {protocol-docs/atomicity/README.md#off-chain-tooling} and {protocol-docs/message-root.md#indexed-merkle-tree-indexedmerkletree}.
  */
 
 import type { providers, Wallet } from "ethers";
@@ -65,21 +28,16 @@ export interface IMTLeaf {
 }
 
 /**
- * Mirror of `ImtProof` in IAtomicInterop.sol, used for both inclusion and non-inclusion. The IMT part
- * (chainImtRoot/leaf/imtLeafIndex/imtProof) is built from the engine; the settlement part
- * (batchNumber/settlementProof) authenticates `chainImtRoot` as a chain-batch-root leaf (2 = batch
- * begin for absence, 3 = batch end for inclusion — the mask is hardcoded on-chain per verify path)
- * and, via {MessageHashing._getProofData}, carries the `l1Timestamp` used for the deadline check.
- * For inclusion `leaf` is the value's own leaf; for non-inclusion it is the low-nullifier
- * (predecessor) leaf.
+ * Mirror of `ImtProof` in IAtomicInterop.sol, used for both inclusion and non-inclusion. For
+ * inclusion `leaf` is the value's own leaf; for non-inclusion it is the low-nullifier (predecessor)
+ * leaf. See {protocol-docs/atomicity/proofs.md} for the proof semantics.
  */
 export interface ImtProof {
   sourceChainId: string;
   batchNumber: string;
   chainImtRoot: string;
-  /** Timeout-branch selector: true authenticates against the batch-BEGIN root (leaf 2), false the
-   * batch-END root (leaf 3). Validated on-chain against the authenticated batch `l1Timestamp`
-   * (begin => late batch, end => in-time last batch); ignored by the finality path. */
+  /** Timeout-branch selector: true authenticates against the batch-BEGIN root, false the batch-END
+   * root; ignored by the finality path. */
   provesAgainstBeginRoot: boolean;
   settlementProof: string[];
   leaf: IMTLeaf;
@@ -104,9 +62,8 @@ export function indexedLeafHash(leaf: IMTLeaf): string {
 }
 
 /**
- * The full `flowId` preimage (mirrors the Solidity `AtomicFlowPreimage` struct — the field set embedded
- * in `AtomicFlow` and carried by the `atomicBundle` attribute). `legBundleHashes` must be strictly
- * ascending with `legSourceChainIds` positionally aligned; `deadline` is a settlement-layer timestamp.
+ * Mirror of the Solidity `AtomicFlowPreimage` struct. `legBundleHashes` must be strictly ascending with
+ * `legSourceChainIds` positionally aligned; `deadline` is a settlement-layer timestamp.
  */
 export interface AtomicFlowPreimage {
   deadline: number;
@@ -145,20 +102,12 @@ function efficientHash(left: string, right: string): string {
 
 /**
  * Dynamic-height Indexed Merkle Tree, a byte-for-byte off-chain port of
- * {FullMerkle}+{IndexedMerkleTree}. It replays the EXACT on-chain build sequence
- * (`setup` -> `pushNewLeaf` per leaf, with `updateLeaf` mutating the populated path) so that
- * `root()` and `merklePath(i)` equal the on-chain `tree.root()` / `tree.merklePath(i)`.
+ * {FullMerkle}+{IndexedMerkleTree}: it replays the exact on-chain build sequence so `root()` and
+ * `merklePath(i)` equal the on-chain values.
  *
- * The constructor takes the index-ordered leaf set (index 0 = the {0,0,0} sentinel head, exactly
- * what `setup` seeds). It does NOT re-derive the sorted linked list; the leaves passed in are the
- * live on-chain leaf preimages (or the result of local `insert` calls), so their `nextIndex`/
- * `nextValue` are already spliced. Only the FullMerkle node bookkeeping is replayed here.
- *
- * FullMerkle storage mirror:
- *   - `height`             : current tree height (0 for a single-leaf tree),
- *   - `nodes[level][index]`: written node hashes (dynamic arrays, matching `_nodes`),
- *   - `zeros[level]`       : zero-subtree hash at `level` (matching `_zeros`),
- *   - `leafNumber`         : number of leaves pushed so far.
+ * The constructor takes the index-ordered leaf set (index 0 = the {0,0,0} sentinel head). It does
+ * NOT re-derive the sorted linked list: the leaves passed in must already carry their spliced
+ * `nextIndex`/`nextValue` (live on-chain preimages); only the FullMerkle node bookkeeping is replayed.
  */
 export class IndexedMerkleTree {
   /** Index-ordered leaves (leaf 0 = head). */
@@ -183,17 +132,15 @@ export class IndexedMerkleTree {
       throw new Error("IndexedMerkleTree requires at least the sentinel leaf at index 0");
     }
 
-    // Mirror IndexedMerkleTree.setup: seed the domain-separated padding value (NOT hashLeaf({0,0,0}), so
-    // padded indices can't forge a {0,0,0} low leaf — see IMT_EMPTY_LEAF_HASH in Config.sol; must match
-    // on-chain), then push the real {0,0,0} sentinel at index 0.
+    // Mirror IndexedMerkleTree.setup: the padding is the domain-separated empty-leaf value
+    // (IMT_EMPTY_LEAF_HASH in Config.sol), NOT hashLeaf({0,0,0}); must match on-chain.
     const emptyLeafPadding = utils.keccak256(utils.toUtf8Bytes("zkSync:IndexedMerkleTree:emptyLeaf"));
     const sentinelLeafHash = indexedLeafHash({ value: "0", nextIndex: "0", nextValue: "0" });
     this.setup(emptyLeafPadding);
     this.pushNewLeaf(sentinelLeafHash);
 
-    // The `setup`/`pushNewLeaf` above seed index 0 from a pristine {0,0,0} sentinel. In a live tree the
-    // head leaf has been repointed (its `nextIndex`/`nextValue` splice to the smallest inserted value),
-    // so re-write index 0 with its actual on-chain preimage before pushing leaves 1..n-1 in order.
+    // In a live tree the head leaf has been repointed, so re-write index 0 with its actual
+    // on-chain preimage before pushing leaves 1..n-1 in order.
     this.updateLeaf(0, indexedLeafHash(leaves[0]));
     for (let i = 1; i < leaves.length; i++) {
       this.pushNewLeaf(indexedLeafHash(leaves[i]));
@@ -351,10 +298,8 @@ export async function lowNullifierIndexFor(tree: Contract, value: string, blockT
 
 // ── Proof builders ────────────────────────────────────────────────────────────────────────
 
-/** Default settlement-layer chain id encoded into proof bytes and bound into flow ids. Must equal
- * the L1 chain id the AtomicFlowManager was initialized with (`initL2`): in this release interop
- * legs settle on L1 only and the manager rejects flows declaring any other settlement layer. The
- * harness L1 is the default anvil chain (31337). */
+/** Default settlement-layer chain id for proof bytes and flow ids. Must equal the L1 chain id the
+ * AtomicFlowManager was initialized with; the harness L1 is the default anvil chain (31337). */
 export const DEFAULT_SL_CHAIN_ID = 31337;
 
 /** Depth of the chain batch root tree — mirrors ChainBatchRootTree.TREE_DEPTH; the on-chain
@@ -362,28 +307,21 @@ export const DEFAULT_SL_CHAIN_ID = 31337;
 export const CHAIN_BATCH_ROOT_TREE_DEPTH = 3;
 
 /**
- * Builds the minimal format-valid multi-hop leaf inclusion proof bytes that
- * {MessageHashing._getProofData} parses into a chosen `l1Timestamp` and settlement-layer
- * chain id (with `finalProofNode == false`). `slBlock` identifies the settlement interop root tuple
- * that the timeout path reads from `interopRoots[slChainId][slBlock]`.
+ * Builds minimal format-valid proof bytes that {MessageHashing._getProofData} parses into a chosen
+ * `l1Timestamp`, SL chain id and SL snapshot block. On the harness {MockL2MessageVerification}
+ * accepts any leaf/root, so the siblings are placeholders — only the parsed fields matter.
  *
- * Byte layout (logLeafProofLen=3 — the chain-batch-root top-tree path {AtomicInteropProof} enforces):
- *   [0]      metadata header = version(0x01) | logLeafProofLen(3) | batchLeafProofLen(n) |
- *            finalProofNode(0); the low 28 bytes MUST be zero (new versioned format).
- *   [1..3]   the 3 top-tree siblings hashing the IMT-root leaf up to the chain batch root. Placeholders
- *            on the harness ({MockL2MessageVerification} accepts any leaf/root); in production these are
- *            the real siblings (other IMT root, node(logsRoot, multichainRoot), reserved-subtree node).
- *   [4]      l1Timestamp = the settlement-layer timestamp bound into the batch leaf (read right after
- *            the leaf proof). Format-only on the harness, so a chosen value.
+ * Byte layout (logLeafProofLen=3, the top-tree depth {AtomicInteropProof} enforces):
+ *   [0]      metadata = version(0x01) | logLeafProofLen(3) | batchLeafProofLen(n) | finalProofNode(0);
+ *            low 28 bytes MUST be zero.
+ *   [1..3]   top-tree siblings (placeholders on the harness).
+ *   [4]      l1Timestamp — the SL timestamp bound into the batch leaf.
  *   [5]      batchLeafProofMask (`batchLeafMask`).
- *   [6..6+n) the batch-leaf path siblings (`batchLeafSiblings`; the chain's batch tree inside the SL
- *            shared root). Empty by default — a single-leaf (genesis-only) chain tree has a
- *            zero-length path — which also makes the timeout protocol's "last batch in root" check
- *            trivially pass. Supply non-empty siblings to exercise that check.
+ *   [6..6+n) batch-leaf path siblings (`batchLeafSiblings`). Empty by default — a zero-length path
+ *            makes the timeout protocol's "last batch in root" check trivially pass; supply
+ *            non-empty siblings to exercise it.
  *   [last-1] settlementLayerPackedBatchInfo = (slBlock << 128) | mask(0).
  *   [last]   settlementLayerChainId.
- * The leaf-proof mask is supplied on-chain by the verify path (2 = batch-begin leaf, 3 = batch-end
- * leaf, selected by the verify function / timeout branch).
  */
 export function buildSlProofBytes(
   slBlock: number,
@@ -416,12 +354,7 @@ export function buildSlProofBytes(
   ];
 }
 
-/**
- * Well-formed settlement proof carrying a chosen `l1Timestamp`, batch number and SL snapshot block.
- * {MockL2MessageVerification} accepts any leaf, but {MessageHashing._getProofData} parses these bytes
- * to derive `t`, the SL chain id and the SL snapshot block, which {AtomicInteropProof} uses for the
- * clock checks (see the AtomicInteropProof.sol library header for the conditions).
- */
+/** Settlement proof carrying a chosen `l1Timestamp`, batch number and SL snapshot block. */
 function settlementProofForBatch(params: {
   l1Timestamp: BigNumber | number | string;
   batchNumber?: number | string;
@@ -448,8 +381,8 @@ function settlementProofForBatch(params: {
 }
 
 /**
- * Build an inclusion {ImtProof} for `value` against `chainId`'s live IMT (`leaf` is the value's own leaf),
- * carrying `l1Timestamp` (must satisfy the finality bound — see AtomicInteropProof.sol).
+ * Build an inclusion {ImtProof} for `value` against `chainId`'s live IMT, carrying `l1Timestamp`
+ * (must satisfy the finality bound — see AtomicInteropProof.sol).
  */
 export async function buildInclusionProof(params: {
   l2Tree: Contract;
@@ -483,12 +416,9 @@ export async function buildInclusionProof(params: {
 }
 
 /**
- * Build the timeout absence {ImtProof}: proves `value` is absent from `chainId`'s live IMT (`leaf` is
- * the low-nullifier / predecessor leaf). The live tree root stands in for the batch-begin (late
- * batch) or batch-end (last in-time batch) IMT root snapshot on the harness; the timeout conditions
- * the proof is checked against are described in the AtomicInteropProof.sol library header, and the
- * settlement interop root it resolves is added via bootloader impersonation (see the spec's
- * `ensureSettlementInteropRoot`).
+ * Build the timeout absence {ImtProof}: proves `value` is absent from `chainId`'s live IMT. On the
+ * harness the live tree root stands in for the batch-begin/batch-end IMT root snapshot; the
+ * settlement interop root it resolves against is added via bootloader impersonation.
  */
 export async function buildNonInclusionProof(params: {
   l2Tree: Contract;

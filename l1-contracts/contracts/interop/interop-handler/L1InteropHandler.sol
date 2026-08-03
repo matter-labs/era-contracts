@@ -153,11 +153,8 @@ contract L1InteropHandler is InteropHandlerBase, Ownable2StepUpgradeable, Pausab
     }
 
     /// @inheritdoc InteropHandlerBase
-    /// @dev L1-destined calls carry no base-token call value; any transferred amount rides inside the call
-    /// payload (e.g. a withdrawal's `finalizeDeposit` transfer data).
-    /// @dev Deliberate double-defense: the same invariant is already enforced at SEND time by the L2
-    /// InteropCenter (`NonZeroValueToL1NotSupported`); this receive-side check re-verifies it with its own
-    /// error (`InteropWithdrawalNonZeroValue`) in case a malformed bundle ever reaches L1.
+    /// @dev Deliberate double-defense: also enforced at send time on L2 (`NonZeroValueToL1NotSupported`),
+    /// re-verified here in case a malformed bundle ever reaches L1.
     function _handleCallValue(uint256 _value, uint256 /* _sourceChainId */) internal pure override {
         require(_value == 0, InteropWithdrawalNonZeroValue(_value));
     }

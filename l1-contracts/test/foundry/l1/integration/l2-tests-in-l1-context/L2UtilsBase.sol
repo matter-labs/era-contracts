@@ -122,9 +122,8 @@ library L2UtilsBase {
             vm.etch(L2_INTEROP_ATTRIBUTE_PARSER_ADDR, l2InteropAttributeParser.code);
             address l2MessageRootStorage = address(new DummyL2InteropRootStorage());
             vm.etch(address(L2_INTEROP_ROOT_STORAGE), l2MessageRootStorage.code);
-            // The Dev variant re-enables chain migrations, which are explicitly disabled in the
-            // production contracts for the v32 release (see `CHAIN_MIGRATIONS_ENABLED` in `Config.sol`),
-            // so that the L2 migration machinery stays covered by these tests.
+            // The Dev variant re-enables chain migrations (disabled in production for v32, see
+            // `CHAIN_MIGRATIONS_ENABLED` in `Config.sol`) so the L2 migration machinery stays covered.
             address l2ChainAssetHandler = address(new L2ChainAssetHandlerDev());
             vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, l2ChainAssetHandler.code);
 
@@ -140,8 +139,8 @@ library L2UtilsBase {
             address l2AssetTrackerAddress = address(new L2AssetTracker());
             vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            // Initialize with the real base token asset id (the same one the NTV below is initialized
-            // with), so tests can exercise base-token paths against properly initialized state.
+            // Use the same base token asset id the NTV below is initialized with, so tests can
+            // exercise base-token paths against properly initialized state.
             L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(_args.l1ChainId, baseTokenAssetId, false);
         }
         {

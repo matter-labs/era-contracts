@@ -33,7 +33,8 @@ import {DummyL2L1Messenger} from "contracts/dev-contracts/test/DummyL2L1Messenge
 import {DummyL2BaseTokenHolder} from "contracts/dev-contracts/test/DummyL2BaseTokenHolder.sol";
 
 /// @title L2BaseTokenZKOSTest
-/// @notice Unit tests for L2BaseTokenZKOS contract
+/// @notice Unit tests for L2BaseTokenZKOS (init, pre-V31 total-supply backfill, totalSupply).
+/// See {protocol-docs/bridging.md#l2-asset-tracker}.
 contract L2BaseTokenZKOSTest is Test {
     L2BaseTokenZKOS internal l2BaseToken;
 
@@ -57,19 +58,16 @@ contract L2BaseTokenZKOSTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_initL2_success() public {
-        // Mock the mint hook to succeed
         vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
 
-        // Give the L2BaseToken contract the minted balance (simulating what mint hook does)
+        // The mocked mint hook does not actually mint, so fund the contract manually.
         vm.deal(address(l2BaseToken), INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
         uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
 
-        // Call from ComplexUpgrader
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2BaseToken.initL2(1);
 
-        // Verify BaseTokenHolder received the tokens
         assertEq(
             L2_BASE_TOKEN_HOLDER_ADDR.balance,
             holderBalanceBefore + INITIAL_BASE_TOKEN_HOLDER_BALANCE,
@@ -86,24 +84,19 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     function test_initL2_revertsOnSecondCall() public {
-        // Mock the mint hook to succeed
         vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
 
-        // Give the L2BaseToken contract the minted balance
         vm.deal(address(l2BaseToken), INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
-        // First call succeeds
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2BaseToken.initL2(1);
 
-        // Second call reverts with BaseTokenHolderAlreadyInitialized
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         vm.expectRevert(BaseTokenHolderAlreadyInitialized.selector);
         l2BaseToken.initL2(1);
     }
 
     function test_initL2_revertIfMintFails() public {
-        // Mock the mint hook to fail
         vm.mockCallRevert(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), "Mint failed");
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
@@ -112,13 +105,10 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     function test_initL2_revertIfTransferFails() public {
-        // Mock the mint hook to succeed
         vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
 
-        // Give the contract some balance but not enough
         vm.deal(address(l2BaseToken), INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
-        // Make BaseTokenHolder reject transfers
         RejectingContract rejecting = new RejectingContract();
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(rejecting).code);
 
@@ -127,28 +117,22 @@ contract L2BaseTokenZKOSTest is Test {
         l2BaseToken.initL2(1);
     }
 
-    /// @notice Verifies that initL2 works with actual BaseTokenHolder
-    /// @dev This test ensures L2BaseToken is in the trusted sender list of BaseTokenHolder
-    /// @dev CRITICAL: This test validates that BaseTokenHolder can receive ETH from L2BaseToken
+    /// @notice initL2 works against the real BaseTokenHolder: L2BaseToken must be a trusted sender.
     function test_initL2_withActualBaseTokenHolder() public {
         // Deploy real BaseTokenHolder for this integration test
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
 
-        // Deploy L2BaseTokenZKOS at the expected system contract address
         L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
 
-        // Mock the mint hook to succeed
         vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
 
-        // Give the L2BaseToken contract the minted balance (simulating what mint hook does)
+        // The mocked mint hook does not actually mint, so fund the contract manually.
         vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
-        // Call from ComplexUpgrader - this should succeed because L2BaseToken is a trusted sender
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(1);
 
-        // Verify BaseTokenHolder received the tokens
         assertEq(
             L2_BASE_TOKEN_HOLDER_ADDR.balance,
             INITIAL_BASE_TOKEN_HOLDER_BALANCE,
@@ -156,12 +140,10 @@ contract L2BaseTokenZKOSTest is Test {
         );
     }
 
-    /// @notice Verifies that BaseTokenHolder rejects ETH from untrusted senders via receive()
-    /// @dev This test ensures that only L2BaseToken can send ETH via receive()
+    /// @notice BaseTokenHolder rejects receive() from untrusted senders.
     function test_baseTokenHolder_rejectsUntrustedSenders_receive() public {
         // Deploy real BaseTokenHolder for access-control tests
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
-        // Try to send ETH from an untrusted address via receive()
         address untrustedSender = makeAddr("untrustedSender");
         vm.deal(untrustedSender, 1 ether);
 
@@ -170,12 +152,10 @@ contract L2BaseTokenZKOSTest is Test {
         assertFalse(success, "Transfer should fail from untrusted sender");
     }
 
-    /// @notice Verifies that BaseTokenHolder rejects burnAndStartBridging from untrusted senders
-    /// @dev This test ensures that only bridging callers can use burnAndStartBridging
+    /// @notice BaseTokenHolder rejects burnAndStartBridging from non-bridging callers.
     function test_baseTokenHolder_rejectsUntrustedSenders_burnAndStartBridging() public {
         // Deploy real BaseTokenHolder for access-control tests
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
-        // Try to call burnAndStartBridging from an untrusted address
         address untrustedSender = makeAddr("untrustedSender");
         vm.deal(untrustedSender, 1 ether);
 
@@ -184,39 +164,33 @@ contract L2BaseTokenZKOSTest is Test {
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: 1 ether}(0);
     }
 
-    /// @notice Verifies that BaseTokenHolder notifies L2AssetTracker when receiving ETH via burnAndStartBridging from InteropCenter
-    /// @dev This test ensures bridging operations are properly tracked
+    /// @notice burnAndStartBridging from the InteropCenter notifies the L2AssetTracker.
     function test_baseTokenHolder_notifiesAssetTrackerOnBridging() public {
         // Deploy real BaseTokenHolder for integration tests
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
         uint256 burnAmount = 1 ether;
 
-        // Expect the AssetTracker call when InteropCenter calls burnAndStartBridging
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
             abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 0, burnAmount)
         );
 
-        // InteropCenter calls burnAndStartBridging (simulating a bridging burn)
         vm.deal(L2_INTEROP_CENTER_ADDR, burnAmount);
         vm.prank(L2_INTEROP_CENTER_ADDR);
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(0);
     }
 
-    /// @notice Verifies that BaseTokenHolder notifies L2AssetTracker when receiving ETH via burnAndStartBridging from NativeTokenVault
-    /// @dev This test ensures bridging operations are properly tracked
+    /// @notice burnAndStartBridging from the NativeTokenVault notifies the L2AssetTracker.
     function test_baseTokenHolder_notifiesAssetTrackerFromNTV() public {
         // Deploy real BaseTokenHolder for integration tests
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
         uint256 burnAmount = 2 ether;
 
-        // Expect the AssetTracker call when NativeTokenVault calls burnAndStartBridging
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
             abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 0, burnAmount)
         );
 
-        // NativeTokenVault calls burnAndStartBridging (simulating a bridging burn)
         vm.deal(L2_NATIVE_TOKEN_VAULT_ADDR, burnAmount);
         vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(0);
@@ -236,42 +210,34 @@ contract L2BaseTokenZKOSTest is Test {
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(0);
     }
 
-    /// @notice Verifies that BaseTokenHolder does NOT notify L2AssetTracker when receiving ETH via receive() from L2BaseToken
-    /// @dev L2BaseToken sends via receive() during initialization, which is not a bridging operation
+    /// @notice receive() from L2BaseToken (the init path, not a bridging operation) must NOT notify
+    /// the L2AssetTracker.
     function test_baseTokenHolder_doesNotNotifyAssetTrackerFromL2BaseToken() public {
         // Deploy real BaseTokenHolder for integration tests
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
         uint256 initAmount = 1 ether;
 
-        // Expect the AssetTracker to NOT be called (count = 0)
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
             abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 0, initAmount),
             0 // count = 0 means we expect it NOT to be called
         );
 
-        // L2BaseToken sends ETH to BaseTokenHolder via receive() (during initialization)
-        // We should NOT see a call to L2AssetTracker
         vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, initAmount);
         vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
         (bool success, ) = L2_BASE_TOKEN_HOLDER_ADDR.call{value: initAmount}("");
         assertTrue(success, "Transfer should succeed");
     }
 
-    /// @notice Verifies that initL2 does NOT trigger L2AssetTracker
-    /// @dev This tests the full initialization flow to ensure asset tracker is not notified
+    /// @notice The full initL2 flow must NOT notify the L2AssetTracker.
     function test_initL2_doesNotTriggerAssetTracker() public {
-        // Deploy L2BaseTokenZKOS at the expected system contract address
         L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
 
-        // Mock the mint hook to succeed
         vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
 
-        // Give the L2BaseToken contract the minted balance
         vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
-        // Expect the AssetTracker to NOT be called during initialization
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
             abi.encodeWithSignature(
@@ -282,11 +248,9 @@ contract L2BaseTokenZKOSTest is Test {
             0 // count = 0 means we expect it NOT to be called
         );
 
-        // Call initL2
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(1);
 
-        // Verify BaseTokenHolder received the initial balance
         assertEq(
             L2_BASE_TOKEN_HOLDER_ADDR.balance,
             INITIAL_BASE_TOKEN_HOLDER_BALANCE,
@@ -339,7 +303,6 @@ contract L2BaseTokenZKOSTest is Test {
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, hex"00");
         vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
-        // Set the pre-V31 total supply
         vm.prank(SERVICE_TRANSACTION_SENDER);
         L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).setZKsyncOSPreV31TotalSupply(preV31Supply);
 
@@ -354,7 +317,6 @@ contract L2BaseTokenZKOSTest is Test {
     function test_setZkosPreV31TotalSupply_callsBackfill() public {
         uint256 totalSupply = 42 ether;
 
-        // Expect the backfill call to L2AssetTracker
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
             abi.encodeWithSelector(IL2AssetTracker.backFillZKSyncOSBaseTokenV31MigrationData.selector, totalSupply)
@@ -367,11 +329,9 @@ contract L2BaseTokenZKOSTest is Test {
     function test_setZkosPreV31TotalSupply_revertsOnSecondCall() public {
         uint256 totalSupply = 42 ether;
 
-        // First call succeeds
         vm.prank(SERVICE_TRANSACTION_SENDER);
         l2BaseToken.setZKsyncOSPreV31TotalSupply(totalSupply);
 
-        // Second call reverts with local re-call guard
         vm.prank(SERVICE_TRANSACTION_SENDER);
         vm.expectRevert(BaseTokenPreV31TotalSupplyAlreadySet.selector);
         l2BaseToken.setZKsyncOSPreV31TotalSupply(totalSupply);
@@ -382,11 +342,9 @@ contract L2BaseTokenZKOSTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_totalSupply_revertsWhenBackfillNeeded() public {
-        // Deploy at system address
         L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
 
-        // Mock needBaseTokenTotalSupplyBackfill to return true
         vm.mockCall(
             L2_ASSET_TRACKER_ADDR,
             abi.encodeWithSelector(IL2AssetTracker.needBaseTokenTotalSupplyBackfill.selector),
@@ -398,15 +356,12 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     function test_totalSupply_worksWhenBackfillNotNeeded() public {
-        // Deploy at system address
         L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
 
         // Deploy BaseTokenHolder so holder balance is known
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, hex"00");
         vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
-
-        // needBaseTokenTotalSupplyBackfill returns false (from setUp mock)
 
         // Without setting preV31Supply, totalSupply = 0 + (INITIAL - INITIAL) = 0
         assertEq(
@@ -417,7 +372,6 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     function test_totalSupply_worksWhenBaseTokenHolderBalanceGreaterThanInitial() public {
-        // Deploy at system address
         L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
 
@@ -425,7 +379,6 @@ contract L2BaseTokenZKOSTest is Test {
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, hex"00");
         vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE + 100);
 
-        // Set the pre-V31 total supply
         vm.prank(SERVICE_TRANSACTION_SENDER);
         L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).setZKsyncOSPreV31TotalSupply(200);
 
@@ -442,7 +395,6 @@ contract L2BaseTokenZKOSTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_implementsIL2BaseTokenBase() public view {
-        // Verify the contract implements the interface
         IL2BaseTokenBase token = IL2BaseTokenBase(address(l2BaseToken));
         assert(address(token) == address(l2BaseToken));
     }

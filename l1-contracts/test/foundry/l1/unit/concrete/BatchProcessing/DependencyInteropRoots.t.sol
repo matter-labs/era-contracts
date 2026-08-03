@@ -15,12 +15,11 @@ import {
     MessageRootIsZero
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
 
-/// @dev Exposes the internal dependency-root verification for isolated unit testing. The facet
-/// reads only `s.bridgehub` on this path, so the harness provides a setter for it. The full execute
-/// flow is exercised by the batch-processing tests (the previous dependency-root execute tests are
-/// retired/commented in `Executing.t.sol`); this file isolates the `(blockNumber, root, timestamp)`
-/// tuple checks and the rolling-hash wire format against a REAL `L1MessageRoot` populated through
-/// its production entry points (`addNewChain` / `addChainBatchRootV32`) — no mocked root values.
+/// @dev Exposes the internal dependency-root verification for isolated unit testing (the facet reads
+/// only `s.bridgehub` on this path, hence the setter). Isolates the `(blockNumber, root, timestamp)`
+/// tuple checks and the rolling-hash wire format against a REAL `L1MessageRoot` populated through its
+/// production entry points — no mocked root values; the full execute flow is covered by the
+/// batch-processing tests.
 contract DependencyInteropRootsHarness is ExecutorFacet {
     function setBridgehub(address _bridgehub) external {
         s.bridgehub = _bridgehub;

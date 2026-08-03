@@ -144,8 +144,6 @@ contract MessageRootTest is Test {
     ///      specifically the `proveL2MessageInclusion` call within the
     ///      'Can check withdrawal hash in L2' test.
     function test_ProveL2MessageInclusion() public {
-        // --- Test Setup ---
-        // Parameters derived from the integration test context (file_context_0)
         uint256 batchNumber = 14;
         uint256 l2MessageIndex = 2; // Corresponds to _index in Merkle proof verification
         // L2Message struct corresponding to the withdrawal message
@@ -190,8 +188,6 @@ contract MessageRootTest is Test {
             abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
             abi.encode(bytes32(0xe63ec2d2ec32cbe198cf5fcafe5a375aab6b6ca4e3b66abd50c6648b539ef5ed), uint256(0))
         );
-        // --- Execution ---
-        // Call the function under test via the contract instance
         bool isIncluded = l2MessageVerification.proveL2MessageInclusionShared(
             271,
             batchNumber,
@@ -199,7 +195,6 @@ contract MessageRootTest is Test {
             message,
             proof
         );
-        // --- Assertion ---
         assertTrue(isIncluded, "L2 message inclusion proof failed");
     }
 }

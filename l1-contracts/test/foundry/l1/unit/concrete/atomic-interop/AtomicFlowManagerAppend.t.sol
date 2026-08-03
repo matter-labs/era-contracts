@@ -26,9 +26,8 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @dev Minimal Bridgehub stand-in exposing only the `baseTokenAssetId` registry mapping the manager
-/// consults, deployed at the canonical `L2_BRIDGEHUB_ADDR`. A real Bridgehub needs the full ecosystem
-/// bootstrap, which is irrelevant to `append`'s registration gate — the mock deliberately isolates
-/// exactly the registry surface under test.
+/// consults: a real Bridgehub needs the full ecosystem bootstrap, irrelevant to `append`'s registration
+/// gate.
 contract MockBridgehubRegistry {
     mapping(uint256 chainId => bytes32 assetId) public baseTokenAssetId;
 
@@ -37,15 +36,12 @@ contract MockBridgehubRegistry {
     }
 }
 
-/// @notice Covers `AtomicFlowManager.append`, which now receives the full `flowId` preimage instead of
-/// an opaque, sender-supplied `flowId`. The load-bearing property under test: a bundle can only ever be
-/// committed under a `flowId` whose preimage contains the bundle's own hash (with this chain declared as
-/// the leg's source), so a wrong or stale preimage reverts the send instead of stranding the burned funds
-/// in a leg that could neither finalize nor be refunded.
-///
-/// The manager and the commitment tree are deployed at their canonical predeploy addresses, so `append`
-/// exercises the real `commitmentTree()` wiring and the tree's real appender ACL — no mocks. The caller
-/// ACL is exercised by pranking the canonical InteropCenter address.
+/// @notice Covers `AtomicFlowManager.append`: a bundle can only be committed under a `flowId` whose
+/// preimage contains the bundle's own hash with this chain declared as the leg's source, so a wrong or
+/// stale preimage reverts the send instead of stranding burned funds. See {protocol-docs/atomicity/flow.md#1-atomic-send-append}.
+/// @dev The manager and commitment tree sit at their canonical predeploys, so `append` exercises the real
+/// `commitmentTree()` wiring and the tree's real appender ACL — no mocks; the caller ACL is exercised by
+/// pranking the canonical InteropCenter address.
 contract AtomicFlowManagerAppendTest is Test {
     uint256 internal constant L1_CHAIN_ID = 5;
     uint64 internal constant DEADLINE = 1_700_000_000;
@@ -104,8 +100,7 @@ contract AtomicFlowManagerAppendTest is Test {
         manager.append(_bundleHash, 0, _preimage);
     }
 
-    /// @notice Happy path: the committing bundle is a leg of the supplied preimage with this chain as its
-    /// declared source. The leg flips `Unset -> Committed` under the recomputed `flowId` and the leg's
+    /// @notice Happy path: the leg flips `Unset -> Committed` under the recomputed `flowId` and its
     /// commit value lands in the commitment tree (leaf 1, after the genesis-seeded head).
     function test_append_CommitsLegAndInsertsCommitValue() public {
         bytes32 localLeg = keccak256("local leg");
@@ -121,9 +116,8 @@ contract AtomicFlowManagerAppendTest is Test {
         assertEq(tree.leafAt(1).value, _commitValue(flowId, localLeg), "inserted leaf must hold the commit value");
     }
 
-    /// @notice The footgun regression: a preimage that does not contain the committing bundle's hash is
-    /// rejected outright. Before this check the leg would have been committed under a `flowId` that does
-    /// not contain it — unfinalizable and unrefundable, i.e. the burned funds stuck forever.
+    /// @notice Footgun regression: a preimage not containing the committing bundle's hash is rejected —
+    /// committing under such a `flowId` would be unfinalizable and unrefundable (funds stuck forever).
     function test_append_RevertWhen_CommittingBundleNotInFlow() public {
         AtomicFlowPreimage memory preimage = _twoLegPreimage(keccak256("local leg"), keccak256("remote leg"));
         bytes32 strayBundleHash = keccak256("stale off-chain prediction");
@@ -151,9 +145,8 @@ contract AtomicFlowManagerAppendTest is Test {
         _appendAsInteropCenter(remoteLeg, preimage);
     }
 
-    /// @notice A non-canonical preimage (leg hashes not strictly ascending) is rejected at send time.
-    /// Committing under it would strand the leg: the finalize and refund paths canonicalize the same way
-    /// and would never accept the resulting `flowId`.
+    /// @notice A non-canonical preimage (leg hashes not strictly ascending) is rejected at send time:
+    /// the finalize and refund paths canonicalize the same way and would never accept its `flowId`.
     function test_append_RevertWhen_BundleHashesNotSorted() public {
         bytes32 localLeg = keccak256("local leg");
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
@@ -183,8 +176,7 @@ contract AtomicFlowManagerAppendTest is Test {
     }
 
     /// @notice A flow declaring a non-L1 settlement layer is rejected at send time: neither finalization
-    /// nor refund proofs would ever accept it (both enforce SL == L1), so committing it would strand the
-    /// burned funds.
+    /// nor refund proofs would ever accept it (both enforce SL == L1).
     function test_append_RevertWhen_SettlementLayerNotL1() public {
         bytes32 localLeg = keccak256("local leg");
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
@@ -195,9 +187,8 @@ contract AtomicFlowManagerAppendTest is Test {
     }
 
     /// @notice A co-leg declaring a source chain the Bridgehub does not know is rejected: such a leg
-    /// could never be proven committed OR absent (no MessageRoot presence to prove against), so
-    /// committing alongside it would strand this chain's burned leg with neither finalization nor
-    /// refund possible.
+    /// could never be proven committed OR absent (no MessageRoot presence to prove against), stranding
+    /// this chain's burned leg.
     function test_append_RevertWhen_CoLegSourceChainNotRegistered() public {
         bytes32 localLeg = keccak256("local leg");
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
@@ -213,9 +204,9 @@ contract AtomicFlowManagerAppendTest is Test {
         _appendAsInteropCenter(localLeg, preimage);
     }
 
-    /// @notice L1 as a declared co-leg source is rejected via the same registration gate: interop
-    /// bundles can never be initiated on L1, and L1 is never registered as an interop chain in the L2
-    /// Bridgehub, so an "L1 leg" is exactly the unprovable-phantom-leg case.
+    /// @notice L1 as a declared co-leg source hits the same registration gate: bundles can never be
+    /// initiated on L1 and L1 is never registered in the L2 Bridgehub, so an "L1 leg" is the
+    /// unprovable-phantom-leg case.
     function test_append_RevertWhen_CoLegSourceChainIsL1() public {
         bytes32 localLeg = keccak256("local leg");
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
