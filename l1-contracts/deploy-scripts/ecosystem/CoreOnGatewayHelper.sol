@@ -38,7 +38,9 @@ import {
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
     L2_VERSION_SPECIFIC_UPGRADER_ADDR,
-    L2_INTEROP_ATTRIBUTE_PARSER_ADDR
+    L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
+    L2_INTEROP_COMMITMENT_TREE_ADDR,
+    L2_ATOMIC_FLOW_MANAGER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @title CoreOnGatewayHelper
@@ -213,6 +215,8 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.L2ChainAssetHandler) return "L2ChainAssetHandler";
         if (_c == CoreContract.InteropCenter) return "InteropCenter";
         if (_c == CoreContract.InteropAttributeParser) return "InteropAttributeParser";
+        if (_c == CoreContract.L2InteropCommitmentTree) return "L2InteropCommitmentTree";
+        if (_c == CoreContract.AtomicFlowManager) return "AtomicFlowManager";
         if (_c == CoreContract.L2InteropHandler) return "L2InteropHandler";
         if (_c == CoreContract.L2AssetTracker) return "L2AssetTracker";
         if (_c == CoreContract.L2WrappedBaseToken) return "L2WrappedBaseToken";
@@ -271,6 +275,8 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.InteropAttributeParser) return L2_INTEROP_ATTRIBUTE_PARSER_ADDR;
         if (_c == CoreContract.L2InteropHandler) return L2_INTEROP_HANDLER_ADDR;
         if (_c == CoreContract.UpgradeableBeaconDeployer) return L2_NTV_BEACON_DEPLOYER_ADDR;
+        if (_c == CoreContract.L2InteropCommitmentTree) return L2_INTEROP_COMMITMENT_TREE_ADDR;
+        if (_c == CoreContract.AtomicFlowManager) return L2_ATOMIC_FLOW_MANAGER_ADDR;
         revert UnknownCoreContract();
     }
 

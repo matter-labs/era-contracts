@@ -464,6 +464,17 @@ contract MockContract {
 
     function setAddresses(address, address, address, address) external {}
 
+    // `L2InteropCommitmentTree.root()` and `AtomicFlowManager.L1_CHAIN_ID()`. Zero is the
+    // "not initialized yet" sentinel both guards look for, so the helper proceeds to call `initL2`.
+    function root() external view returns (bytes32) {
+        return bytes32(0);
+    }
+
+    // solhint-disable-next-line func-name-mixedcase
+    function L1_CHAIN_ID() external view returns (uint256) {
+        return 0;
+    }
+
     function L2_LEGACY_SHARED_BRIDGE() external view returns (address) {
         return address(0);
     }

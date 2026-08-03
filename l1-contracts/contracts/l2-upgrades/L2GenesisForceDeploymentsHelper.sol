@@ -41,6 +41,7 @@ import {L2AssetTracker} from "../bridge/asset-tracker/L2AssetTracker.sol";
 import {L2ChainAssetHandler} from "../core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {L2InteropHandler} from "../interop/interop-handler/L2InteropHandler.sol";
 import {L2InteropCommitmentTree} from "../atomic-interop/L2InteropCommitmentTree.sol";
+import {AtomicFlowManager} from "../atomic-interop/AtomicFlowManager.sol";
 import {IAtomicFlowManager} from "../atomic-interop/IAtomicFlowManager.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL2SharedBridgeLegacy} from "../bridge/interfaces/IL2SharedBridgeLegacy.sol";
@@ -432,13 +433,24 @@ library L2GenesisForceDeploymentsHelper {
 
         IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
 
-        // The atomic-interop built-ins are predeployed only in the ZKsync OS genesis; a pre-existing
-        // chain upgraded to v31 has no code at these addresses and calling `initL2()` there would
-        // revert the whole upgrade.
+        // The atomic-interop built-ins come from the ZKsync OS genesis on a new chain and from the
+        // upgrade's force deployments on a pre-existing one, so both paths initialize them here. Both
+        // `initL2`s revert if already applied, and a chain that never received the built-ins has no code
+        // at these addresses, hence the guards.
         // See {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}.
-        if (_isZKsyncOS && _isGenesisUpgrade) {
-            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
-            IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
+        if (_isZKsyncOS) {
+            if (
+                L2_INTEROP_COMMITMENT_TREE_ADDR.code.length > 0 &&
+                L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).root() == bytes32(0)
+            ) {
+                L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
+            }
+            if (
+                L2_ATOMIC_FLOW_MANAGER_ADDR.code.length > 0 &&
+                AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).L1_CHAIN_ID() == 0
+            ) {
+                IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
+            }
         }
     }
 

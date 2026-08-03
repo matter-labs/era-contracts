@@ -80,7 +80,11 @@ enum CoreContract {
     BridgedStandardERC20,
     DiamondProxy,
     ProxyAdmin,
-    TransparentUpgradeableProxy
+    TransparentUpgradeableProxy,
+    // Atomic-interop built-ins. ZKsync OS only: the commitment tree's storage is read by the ZKsync OS
+    // bootloader, and Era chains have no atomic interop.
+    L2InteropCommitmentTree,
+    AtomicFlowManager
 }
 
 /// @notice System contracts that have ZKsyncOS-specific implementations in l1-contracts.

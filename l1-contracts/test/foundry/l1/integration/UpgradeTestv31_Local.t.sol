@@ -18,6 +18,8 @@ import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {UpgradeIntegrationTestBase} from "./UpgradeTestShared.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "contracts/core/message-root/IMessageRoot.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -80,13 +82,15 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
     }
 }
 
-/// @notice Test-only Core upgrade that skips problematic governance calls
+/// @notice Test-only Core upgrade that skips governance calls the local fixture cannot satisfy.
 contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
-    /// @notice Override to skip setAssetTracker call (requires NTV ownership in test)
+    /// @notice Override to skip the ownership-acceptance and `setAddresses` calls, which need ownership
+    ///         hand-offs the fixture does not perform.
+    /// @dev The pre-v32 parity calls are kept: they are what makes a v31 ecosystem match a from-scratch v32
+    ///      one, and they are no-ops once the ecosystem is already wired.
     function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
-        console.log("Test mode: Skipping setAssetTracker governance call (requires proper NTV ownership)");
-        // Return empty array - setAssetTracker will be called via stage3 with proper owner
-        calls = new Call[](0);
+        console.log("Test mode: keeping only the pre-v32 parity calls in stage 1");
+        return _buildPreV32ParityCalls();
     }
 }
 
@@ -274,6 +278,26 @@ contract UpgradeIntegrationTest_Local is
         assertTrue(
             IBridgehubBase(bridgehub).assetIdIsRegistered(_expectedBaseTokenAssetId),
             "Base token assetId not registered"
+        );
+
+        // Post-upgrade wiring that a from-scratch v32 deployment has, and that the upgrade therefore has
+        // to establish as well (see `CoreUpgrade_v31._buildPreV32ParityCalls`).
+        address l1InteropHandler = coreUpgrade.getCoreAddresses().bridges.proxies.l1InteropHandler;
+        assertTrue(l1InteropHandler != address(0), "No L1InteropHandler after the upgrade");
+        assertEq(
+            L1Nullifier(payable(coreUpgrade.getCoreAddresses().bridges.proxies.l1Nullifier)).l1InteropHandler(),
+            l1InteropHandler,
+            "Nullifier not wired to the interop handler"
+        );
+        assertEq(
+            L1AssetRouter(payable(coreUpgrade.getCoreAddresses().bridges.proxies.l1AssetRouter)).l1InteropHandler(),
+            l1InteropHandler,
+            "Asset router not wired to the interop handler"
+        );
+        assertEq(
+            IBridgehubBase(bridgehub).chainRegistrationSender(),
+            coreUpgrade.getDiscoveredBridgehub().proxies.chainRegistrationSender,
+            "Bridgehub does not know the ChainRegistrationSender"
         );
 
         if (_serverNotifierProxy != address(0)) {

@@ -44,6 +44,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         bool isZKsyncOS;
         bool hasV29IntrospectionOverride;
         bool useV29IntrospectionOverride;
+        bool hasPreV32IntrospectionOverride;
+        bool usePreV32IntrospectionOverride;
     }
     AdditionalConfigParams internal additionalConfig;
 
@@ -129,6 +131,15 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             additionalConfig.useV29IntrospectionOverride = upgradeToml.readBool("$.use_v29_introspection");
         }
 
+        // Optional override for pre-v32 introspection selection. Autodetection reads the protocol version of
+        // a registered chain, which lags the L1 contracts: an ecosystem whose core contracts are already v32
+        // while its chains have not upgraded yet (mid-upgrade, or a fixture deployed from current code with a
+        // v31 genesis) must state so here.
+        if (upgradeToml.keyExists("$.pre_v32_introspection")) {
+            additionalConfig.hasPreV32IntrospectionOverride = true;
+            additionalConfig.usePreV32IntrospectionOverride = upgradeToml.readBool("$.pre_v32_introspection");
+        }
+
         // Protocol version comes from genesis config
         additionalConfig.newProtocolVersion = loadProtocolVersionFromGenesis();
 
@@ -173,6 +184,14 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
         if (useV29Introspection) {
             coreAddresses = AddressIntrospector.getCoreDeployedAddressesV29(bridgehubProxy);
+        } else if (
+            additionalConfig.hasPreV32IntrospectionOverride
+                ? additionalConfig.usePreV32IntrospectionOverride
+                : AddressIntrospector.shouldUsePreV32Introspection(bridgehubProxy)
+        ) {
+            // v31 ecosystem: the nullifier has no `l1InteropHandler` getter yet, so the discovered
+            // address stays zero and the upgrade deploys the handler itself.
+            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubProxy);
         } else {
             coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubProxy);
         }
@@ -259,6 +278,13 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             "bridged_standard_erc20_impl",
             coreAddresses.bridges.bridgedStandardERC20Implementation
         );
+        // Same keys as the from-scratch deployment writes, so downstream tooling reads one shape.
+        vm.serializeAddress(
+            "bridges",
+            "l1_interop_handler_implementation_addr",
+            coreAddresses.bridges.implementations.l1InteropHandler
+        );
+        vm.serializeAddress("bridges", "l1_interop_handler_proxy_addr", coreAddresses.bridges.proxies.l1InteropHandler);
 
         string memory bridgesSerialized = vm.serializeAddress(
             "bridges",

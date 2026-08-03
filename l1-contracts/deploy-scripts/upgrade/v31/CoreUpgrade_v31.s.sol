@@ -14,6 +14,9 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {BridgehubBase} from "contracts/core/bridgehub/BridgehubBase.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
@@ -48,6 +51,10 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     /// @notice Path to the upgrade input TOML, captured from `initializeWithArgs`
     ///         so that stage-2 helpers can re-read the optional `[legacy_gateway]` section.
     string internal v31UpgradeInputRelPath;
+
+    /// @notice Whether this run deployed the `L1InteropHandler` proxy, i.e. the ecosystem was pre-v32.
+    ///         Its ownership then has to be handed to governance and its address wired into the bridges.
+    bool internal deployedL1InteropHandler;
 
     /// @notice Single-call entry point invoked by the protocol-ops CLI.
     ///         Runs the ecosystem-wide core deploys; CTM deploys are handled by `CTMUpgrade_v31`.
@@ -99,6 +106,18 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
             coreAddresses.bridgehub.implementations.chainRegistrationSender,
             coreAddresses.bridgehub.proxies.chainRegistrationSender
         ) = deployTuppWithContract("ChainRegistrationSender", false);
+
+        // The interop handler is new in v32: a pre-v32 ecosystem has none, so the upgrade deploys it
+        // (proxy included) and stage 1 wires it into the nullifier and the asset router.
+        if (coreAddresses.bridges.proxies.l1InteropHandler == address(0)) {
+            (
+                coreAddresses.bridges.implementations.l1InteropHandler,
+                coreAddresses.bridges.proxies.l1InteropHandler
+            ) = deployTuppWithContract("L1InteropHandler", false);
+            deployedL1InteropHandler = true;
+        } else {
+            coreAddresses.bridges.implementations.l1InteropHandler = deploySimpleContract("L1InteropHandler", false);
+        }
     }
 
     /// @notice Configure contract connections after deployment
@@ -124,6 +143,13 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         vm.broadcast(getBroadcasterAddress());
         Ownable2StepUpgradeable(chainRegistrationSenderProxy).transferOwnership(properOwner);
         console.log("ChainRegistrationSender ownership transfer initiated (pending acceptance by governance)");
+
+        if (deployedL1InteropHandler) {
+            address l1InteropHandlerProxy = coreAddresses.bridges.proxies.l1InteropHandler;
+            console.log("Transferring L1InteropHandler ownership to governance:", properOwner);
+            vm.broadcast(getBroadcasterAddress());
+            Ownable2StepUpgradeable(l1InteropHandlerProxy).transferOwnership(properOwner);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -181,10 +207,12 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         console.log("ChainRegistrationSender address:", chainRegistrationSenderProxy);
         console.log("ChainAssetHandler address:", chainAssetHandlerProxy);
 
-        calls = new Call[](2);
+        Call[][] memory allCalls = new Call[][](2);
+
+        allCalls[0] = new Call[](2);
 
         // First, accept ownership of ChainRegistrationSender (completes the two-step transfer)
-        calls[0] = Call({
+        allCalls[0][0] = Call({
             target: chainRegistrationSenderProxy,
             value: 0,
             data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
@@ -192,13 +220,67 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
 
         // Cache messageRoot/assetRouter inside the new ChainAssetHandler implementation
         // so its facets don't re-query bridgehub on every call.
-        calls[1] = Call({
+        allCalls[0][1] = Call({
             target: chainAssetHandlerProxy,
             value: 0,
             data: abi.encodeCall(L1ChainAssetHandler.setAddresses, ())
         });
 
-        return calls;
+        allCalls[1] = _buildPreV32ParityCalls();
+
+        return UpgradeUtils.mergeCallsArray(allCalls);
+    }
+
+    /// @notice Stage-1 calls that bring a pre-v32 ecosystem to the state a from-scratch v32 deployment has.
+    /// @dev All of them are no-ops on an ecosystem that already runs v32, so the same script serves both a
+    ///      v31 -> v32 upgrade and a re-run on an already-upgraded ecosystem:
+    ///      - the interop handler, new in v32, has to be wired into the nullifier and the asset router
+    ///        (both setters are one-shot and only exist on the new implementations, hence stage 1);
+    ///      - `Bridgehub.chainRegistrationSender` is only ever written by `setAddresses` on a fresh
+    ///        deployment, so an ecosystem that reached v31 through an upgrade still has it unset.
+    function _buildPreV32ParityCalls() internal virtual returns (Call[] memory calls) {
+        address l1InteropHandlerProxy = coreAddresses.bridges.proxies.l1InteropHandler;
+        require(l1InteropHandlerProxy != address(0), "L1InteropHandler proxy not deployed");
+
+        address chainRegistrationSenderProxy = coreAddresses.bridgehub.proxies.chainRegistrationSender;
+        address bridgehubProxy = coreAddresses.bridgehub.proxies.bridgehub;
+        bool chainRegistrationSenderKnown = IL1Bridgehub(bridgehubProxy).chainRegistrationSender() ==
+            chainRegistrationSenderProxy;
+
+        uint256 callCount = (deployedL1InteropHandler ? 3 : 0) + (chainRegistrationSenderKnown ? 0 : 1);
+        calls = new Call[](callCount);
+        if (callCount == 0) {
+            return calls;
+        }
+
+        uint256 i;
+        if (deployedL1InteropHandler) {
+            console.log("Wiring the freshly deployed L1InteropHandler:", l1InteropHandlerProxy);
+            calls[i++] = Call({
+                target: l1InteropHandlerProxy,
+                value: 0,
+                data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
+            });
+            calls[i++] = Call({
+                target: coreAddresses.bridges.proxies.l1Nullifier,
+                value: 0,
+                data: abi.encodeCall(IL1Nullifier.setL1InteropHandler, (l1InteropHandlerProxy))
+            });
+            calls[i++] = Call({
+                target: coreAddresses.bridges.proxies.l1AssetRouter,
+                value: 0,
+                data: abi.encodeCall(IL1AssetRouter.setL1InteropHandler, (l1InteropHandlerProxy))
+            });
+        }
+
+        if (!chainRegistrationSenderKnown) {
+            console.log("Registering the ChainRegistrationSender on the bridgehub");
+            calls[i++] = Call({
+                target: bridgehubProxy,
+                value: 0,
+                data: abi.encodeCall(BridgehubBase.setAddressesV31, (chainRegistrationSenderProxy))
+            });
+        }
     }
 
     /// @notice Stage 2 governance calls (post-upgrade-contracts):

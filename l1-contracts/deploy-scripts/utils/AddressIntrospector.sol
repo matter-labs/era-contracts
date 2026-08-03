@@ -194,6 +194,27 @@ library AddressIntrospector {
         coreAddresses.shared.governance = IOwnable(_bridgehubProxy).owner();
     }
 
+    /// @notice Discovery for a v31 ecosystem: the bridgehub already exposes `chainRegistrationSender`,
+    /// but the nullifier has no `l1InteropHandler` yet — that arrives with the v32 implementations.
+    /// @dev Calling `getCoreDeployedAddresses` on a v31 ecosystem reverts on the missing nullifier getter.
+    function getCoreDeployedAddressesV31(
+        address _bridgehubProxy
+    ) public view returns (CoreDeployedAddresses memory coreAddresses) {
+        require(_bridgehubProxy != address(0), "Bridgehub address is zero");
+        require(_bridgehubProxy.code.length > 0, "Bridgehub has no code");
+
+        coreAddresses.bridgehub = getBridgehubAddresses(IL1Bridgehub(_bridgehubProxy));
+
+        address assetRouter = address(IL1Bridgehub(_bridgehubProxy).assetRouter());
+        require(assetRouter != address(0), "AssetRouter address is zero");
+        require(assetRouter.code.length > 0, "AssetRouter has no code");
+
+        coreAddresses.bridges = getBridgesDeployedAddressesV29(assetRouter);
+        coreAddresses.shared.transparentProxyAdmin = Utils.getProxyAdminAddress(_bridgehubProxy);
+        coreAddresses.shared.bridgehubAdmin = address(IL1Bridgehub(_bridgehubProxy).admin());
+        coreAddresses.shared.governance = IOwnable(_bridgehubProxy).owner();
+    }
+
     function getCoreDeployedAddressesV29(
         address _bridgehubProxy
     ) public view returns (CoreDeployedAddresses memory coreAddresses) {
@@ -388,15 +409,28 @@ library AddressIntrospector {
 
     /// @notice Determines whether to use v29-compatible introspection based on protocol version
     function shouldUseV29Introspection(address _bridgehubProxy) public view returns (bool) {
+        return _ecosystemProtocolVersion(_bridgehubProxy) < SemVer.packSemVer(0, 31, 0);
+    }
+
+    /// @notice Whether the ecosystem predates v32, i.e. its nullifier has no `l1InteropHandler` getter.
+    /// @dev Split from `shouldUseV29Introspection` because the two version boundaries differ:
+    /// `chainRegistrationSender` appeared on the bridgehub in v31, `l1InteropHandler` on the nullifier in
+    /// v32. A v31 ecosystem needs the former read and the latter skipped.
+    function shouldUsePreV32Introspection(address _bridgehubProxy) public view returns (bool) {
+        return _ecosystemProtocolVersion(_bridgehubProxy) < SemVer.packSemVer(0, 32, 0);
+    }
+
+    /// @notice Protocol version of the ecosystem, taken from its first registered chain.
+    /// @dev Returns the newest version when there are no chains yet: a chainless ecosystem can only have
+    /// been deployed from scratch with the current contracts.
+    function _ecosystemProtocolVersion(address _bridgehubProxy) private view returns (uint256) {
         require(_bridgehubProxy != address(0) && _bridgehubProxy.code.length > 0, "Bridgehub contract does not exist");
 
         address[] memory zkChains = IL1Bridgehub(_bridgehubProxy).getAllZKChains();
         if (zkChains.length == 0) {
-            return false;
+            return type(uint256).max;
         }
-
-        uint256 v31Version = SemVer.packSemVer(0, 31, 0);
-        return IZKChain(zkChains[0]).getProtocolVersion() < v31Version;
+        return IZKChain(zkChains[0]).getProtocolVersion();
     }
 
     /// @notice Convenience method to fetch everything for a specific chainId
