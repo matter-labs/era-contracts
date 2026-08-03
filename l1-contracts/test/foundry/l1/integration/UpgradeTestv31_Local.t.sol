@@ -281,7 +281,7 @@ contract UpgradeIntegrationTest_Local is
         );
 
         // Post-upgrade wiring that a from-scratch v32 deployment has, and that the upgrade therefore has
-        // to establish as well (see `CoreUpgrade_v31._buildPreV32ParityCalls`).
+        // to establish as well (see `CoreUpgrade_v31._buildL1InteropHandlerWiringCalls`).
         address l1InteropHandler = coreUpgrade.getCoreAddresses().bridges.proxies.l1InteropHandler;
         assertTrue(l1InteropHandler != address(0), "No L1InteropHandler after the upgrade");
         assertEq(

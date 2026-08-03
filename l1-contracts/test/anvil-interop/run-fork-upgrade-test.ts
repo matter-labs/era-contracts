@@ -13,7 +13,7 @@
  *      (with force-deploy-driven anvil_setCode overrides), stage3 migration,
  *      protocol-version verification.
  *
- * Unlike `run-v30-to-v31-upgrade-test.ts`, this does NOT load pre-generated chain states
+ * Unlike `run-v31-to-v32-upgrade-test.ts`, this does NOT load pre-generated chain states
  * and does NOT perform the synthetic-state setup steps (ownership transfer, ChainAdmin
  * deploy, v30 storage patches) — real forked state already has all of those.
  *
@@ -56,6 +56,9 @@ import {
   runEcosystemUpgradeScriptsForEnv,
   verifyProtocolVersions,
 } from "./src/helpers/v31-upgrade-test-runner";
+
+/// Protocol version this release upgrades chains to.
+const TARGET_PROTOCOL_VERSION = "0x2000000000";
 import type { V31UpgradeScenario } from "./src/helpers/v31-upgrade-test-runner";
 import { advanceL1TimePastUpgradeDeadline } from "./src/helpers/harness-shims";
 
@@ -395,7 +398,7 @@ async function main(): Promise<void> {
       console.log("\n=== Step 9: Skipped protocol-version verify (FORK_SKIP_CHAIN_UPGRADES=1) ===\n");
     } else {
       console.log(`\n=== Step 9: Verifying protocol versions (${elapsed()}) ===\n`);
-      await verifyProtocolVersions(l1Provider, upgradeChainAddresses);
+      await verifyProtocolVersions(l1Provider, upgradeChainAddresses, TARGET_PROTOCOL_VERSION);
     }
 
     console.log(`\n=== Fork-mode upgrade test completed successfully! (${elapsed()}) ===\n`);

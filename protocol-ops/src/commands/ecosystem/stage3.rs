@@ -5,8 +5,8 @@
 //!     NTV's `bridgedTokens` list;
 //!   - populates the NTV's `bridgedOut` accounting from the pre-upgrade
 //!     per-chain balances, without which every withdrawal of an L1-native
-//!     asset reverts after the upgrade. Idempotent per (chain, asset) pair, so
-//!     an interrupted run is resumed by simply running the phase again.
+//!     asset reverts after the upgrade. Idempotent per asset, so an interrupted
+//!     run is resumed by simply running the phase again.
 //!
 //! Sequencing: runs *before* the per-chain upgrades (Phase 4), so the NTV
 //! `_requireRegistered(assetId)` gate is cleared before each chain's diamond

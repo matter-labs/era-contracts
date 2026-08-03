@@ -11,6 +11,7 @@ runV31UpgradeScenario({
   permanentValuesTemplatePath: "test/anvil-interop/config/v31-permanent-values.toml",
   upgradeInputTemplatePath: "test/anvil-interop/config/v31-to-v32-upgrade.toml",
   isZKsyncOS: true,
+  expectedProtocolVersion: "0x2000000000",
   targetRoles: ["directSettled", "gateway", "gwSettled"],
 })
   .then(() => {

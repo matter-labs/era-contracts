@@ -204,7 +204,7 @@ Two new L2 built-ins support atomic interop (protocol details in
 
 They are predeployed **only** in the ZKsync OS genesis (registered in the genesis gen tool,
 `tools/zksync-os-genesis-gen`); they have no constructors, so one-time setup happens in `initL2`
-calls made by `L2GenesisForceDeploymentsHelper._initializeV31Contracts` for every ZKsync OS chain, on both
+calls made by `L2GenesisForceDeploymentsHelper._initializeV32Contracts` for every ZKsync OS chain, on both
 the genesis and the upgrade path:
 
 - `L2InteropCommitmentTree.initL2()` seeds the IMT with its `{0,0,0}` sentinel head leaf (reverts
@@ -218,7 +218,7 @@ addresses, so there are no wiring parameters, and the manager never custodies fu
 flow through the normal interop path; destination mints go through the `InteropHandler`).
 
 Pre-existing ZKsync OS chains receive the same two built-ins through the upgrade's force deployments
-(`SystemContractsProcessing.getZKsyncOSAtomicInteropContracts`), so they end up with atomic interop
+(`SystemContractsProcessing.getZKsyncOSOnlyContracts`), so they end up with atomic interop
 as well. Both `initL2`s therefore run on the upgrade path too, guarded on the built-in having code and
 not being initialized yet: a chain that never received them (any Era chain, or a ZKsync OS chain
 upgraded by an older script) has no code at those addresses, and calling `initL2()` twice reverts.

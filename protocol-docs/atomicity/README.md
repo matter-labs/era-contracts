@@ -109,9 +109,10 @@ dependency roots; the genesis batch leaf is seeded by `MessageRootBase.seedGenes
 - registered in the genesis-gen tool (`tools/zksync-os-genesis-gen`) at `0x10012`
   (`L2InteropCommitmentTree`) and `0x10014` (`AtomicFlowManager`) — constants in
   `l1-contracts/contracts/common/l2-helpers/L2ContractAddresses.sol`;
-- seeded in `l2-upgrades/L2GenesisForceDeploymentsHelper._initializeV31Contracts`, guarded on
-  `_isZKsyncOS && _isGenesisUpgrade` — a pre-existing chain upgrading to v31 has no code at these
-  addresses, so calling `initL2` there would revert the whole upgrade. The commitment tree's `initL2`
+- seeded in `l2-upgrades/L2GenesisForceDeploymentsHelper._initializeV32Contracts` for every ZKsync OS
+  chain, on the genesis and the upgrade path alike, and only when the built-in is not seeded yet: a chain
+  created at a v31 genesis already has both, while a chain that predates them receives them from this
+  release's force deployments. The commitment tree's `initL2`
   seeds the IMT; the manager's `initL2(l1ChainId)` records the L1 chain id every flow's settlement layer
   is checked against.
 

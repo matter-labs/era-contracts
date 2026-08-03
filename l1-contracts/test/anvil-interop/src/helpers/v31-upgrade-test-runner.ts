@@ -21,6 +21,8 @@ import {
   L2_COMPLEX_UPGRADER_ADDR,
   L2_CONTRACT_DEPLOYER_ADDR,
   L2_FORCE_DEPLOYER_ADDR,
+  L2_ATOMIC_FLOW_MANAGER_ADDR,
+  L2_INTEROP_COMMITMENT_TREE_ADDR,
   L2_INTEROP_HANDLER_ADDR,
   L2_INTEROP_ROOT_STORAGE_ADDR,
   L2_MESSAGE_ROOT_ADDR,
@@ -81,6 +83,8 @@ export type V31UpgradeScenario = {
   upgradeInputTemplatePath: string;
   isZKsyncOS: boolean;
   targetRoles: ChainRole[];
+  /// Protocol version the chains must report once the upgrade has been applied.
+  expectedProtocolVersion: string;
   clearGenesisUpgradeTxHash?: boolean;
   seedBatchCounters?: boolean;
   transferL1ChainAssetHandlerOwnership?: boolean;
@@ -208,7 +212,7 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       sig: "stage3()",
     });
     console.log("\n── Stage 3 complete, verifying final protocol versions ──");
-    await verifyProtocolVersions(l1Provider, upgradeChainAddresses);
+    await verifyProtocolVersions(l1Provider, upgradeChainAddresses, scenario.expectedProtocolVersion);
     console.log("✅ All protocol versions verified successfully!\n");
   } finally {
     if (cleanupUpgradeHarnessInputs) {
@@ -919,7 +923,7 @@ async function deployL2Contracts(
     await l2Provider.send("anvil_setCode", [L2_BASE_TOKEN_ADDR, getBytecode("L2BaseTokenEra")]);
   }
 
-  // L2BaseToken.initL2 (called from _initializeV31Contracts) mints an initial balance into the
+  // L2BaseToken.initL2 (called on the genesis path of performForceDeployedContractsInit) mints an initial balance into the
   // BaseTokenHolder. For Era it reads the pre-existing __DEPRECATED_totalSupply; for ZKsyncOS it
   // mints via the MINT_BASE_TOKEN_HOOK system hook, which is a no-op mock in the anvil harness.
   // In both cases L2BaseToken then transfers ETH to the holder, so it needs a non-zero balance
@@ -1213,9 +1217,10 @@ async function verifyL2UpgradeResult(l2Provider: ethers.providers.JsonRpcProvide
 
 export async function verifyProtocolVersions(
   provider: ethers.providers.JsonRpcProvider,
-  chains: Array<{ chainId: number; diamondProxy: string }>
+  chains: Array<{ chainId: number; diamondProxy: string }>,
+  expectedProtocolVersion: string
 ): Promise<void> {
-  const expectedVersion = ethers.BigNumber.from("0x1f00000000");
+  const expectedVersion = ethers.BigNumber.from(expectedProtocolVersion);
   for (const chain of chains) {
     const diamond = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), provider);
     const version = await diamond.getProtocolVersion();
@@ -1428,6 +1433,9 @@ function buildAddressToContract(isZKsyncOS: boolean): ReadonlyMap<string, Contra
   ];
   if (isZKsyncOS) {
     entries.push(
+      // Atomic-interop built-ins: force-deployed by this release's upgrade on ZKsync OS chains.
+      [L2_INTEROP_COMMITMENT_TREE_ADDR.toLowerCase(), "L2InteropCommitmentTree"],
+      [L2_ATOMIC_FLOW_MANAGER_ADDR.toLowerCase(), "AtomicFlowManager"],
       [L2_BASE_TOKEN_ADDR.toLowerCase(), "L2BaseTokenZKOS"],
       [L2_TO_L1_MESSENGER_ADDR.toLowerCase(), "L1MessengerZKOS"],
       [SYSTEM_CONTEXT_ADDR.toLowerCase(), "SystemContext"],
