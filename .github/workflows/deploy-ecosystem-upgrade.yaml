@@ -116,14 +116,33 @@ jobs:
           yarn da build:foundry
           yarn l1 build:foundry
 
-      # The deployer bundles + verify log produced by step 1.
-      - name: Download deploy inputs from the calldata (step 1) run
+      # The deploy bundle produced by step 1: the deployer calls, ecosystem.toml,
+      # the Etherscan verify log and `bundle-metadata.json`.
+      - name: Download the deploy bundle from the calldata (step 1) run
         uses: actions/download-artifact@v4
         with:
           name: ecosystem-upgrade-deploy-inputs-${{ inputs.environment }}
           path: ${{ github.workspace }}/deploy-inputs
           run-id: ${{ inputs.generate_run_id }}
           github-token: ${{ github.token }}
+
+      # The bundle's bytecode was compiled from a specific commit. Broadcasting is
+      # commit-agnostic (it just replays calldata), but the Etherscan verify step
+      # below RECOMPILES from this checkout — from a different commit it would
+      # submit sources that don't match the deployed code. Warn loudly.
+      - name: Check the bundle's provenance against this checkout
+        run: |
+          set -euo pipefail
+          META="$(find "$GITHUB_WORKSPACE/deploy-inputs" -name bundle-metadata.json | head -1)"
+          if [ -z "$META" ]; then
+            echo "::warning::bundle-metadata.json not found — bundle predates provenance metadata; cannot check the commit."
+            exit 0
+          fi
+          cat "$META"
+          bundle_commit="$(jq -r '.contracts_commit // empty' "$META")"
+          if [ -n "$bundle_commit" ] && [ "$bundle_commit" != "$GITHUB_SHA" ]; then
+            echo "::warning::bundle was generated from $bundle_commit but this run checked out $GITHUB_SHA — re-dispatch on that commit for a source-matching Etherscan verify."
+          fi
 
       - name: Select + mask RPC and deployer key
         env:

@@ -14,6 +14,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 # Flow (the canonical `l1-contracts/test/anvil-interop/regen-and-verify.sh`):
 #   anvil fork of the L1 RPC
 #     -> protocol_ops ecosystem upgrade-prepare-all   (writes ecosystem.toml)
+#     -> pack-deploy-bundle.sh                        (the transferable handoff)
 #     -> fund + fork-replay the prepare bundles
 #     -> protocol_ops ecosystem verify-upgrade (PUVT)
 #   then emit the git-portable `sim-inputs/` handoff set AND the ready-to-paste
@@ -21,6 +22,22 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 #   the same deliverables PR #2268 committed).
 # Artifacts uploaded: `ecosystem.toml` + `sim-inputs/` + `transaction-simulator.json`.
 # NOT `anvil.log` — it can contain the forked RPC URL.
+#
+# ─── WHY THE DEPLOY BUNDLE IS THE POINT ───
+# Solidity output is not byte-stable across build environments (the default
+# foundry profile embeds path-dependent CBOR metadata), so the bytecode — and
+# with it every CREATE2 address and all the governance calldata — belongs to the
+# machine that compiled it. Nobody can "reproduce" this run elsewhere and get the
+# same addresses. What they CAN do is broadcast the exact deployer calls this run
+# computed: the `prepare/*.safe.json` transactions carry the CREATE2 init code
+# verbatim.
+# So this workflow publishes a self-contained DEPLOY BUNDLE
+# (`ecosystem-upgrade-deploy-inputs-<env>`): the deployer calls, `ecosystem.toml`,
+# the Etherscan verify commands, and a `bundle-metadata.json` pinning the
+# contracts commit / `AllContractsHashes.json` hash / fork height / toolchain
+# versions that the bytecode identity depends on. The `verify-bundle-handoff` job
+# below then proves the bundle is sufficient by deploying + PUVT-ing it from
+# nothing but that artifact, with NO contract build at all.
 #
 # ─── ALREADY-DEPLOYED ECOSYSTEMS ───
 # Re-running the prepare against the chain tip of an ecosystem whose v31 upgrade
@@ -230,6 +247,8 @@ jobs:
           ZK_GOVERNANCE_COMMIT: ${{ inputs.zk_governance_commit }}
           # Optional fork-block pin (blank = tip). regen-and-verify.sh reads this.
           FORK_BLOCK: ${{ inputs.fork_block }}
+          # Recorded in the deploy bundle's metadata (part of the bytecode identity).
+          ZKSYNC_FOUNDRY_VERSION: ${{ inputs.zksync_foundry_version }}
         run: |
           # L1_FORK_URL (masked) + DEPLOYER_ADDR come from $GITHUB_ENV. The script
           # forks L1_FORK_URL into a local anvil and runs prepare/PUVT against
@@ -277,20 +296,26 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-      # Inputs the "Deploy" workflow (step 2) consumes: the deployer prepare
-      # bundles it broadcasts to real L1, and the forge verify-contract command
-      # log it replays for Etherscan verification. Safe to publish — these hold
-      # only tx calldata + addresses, never keys or the RPC URL. NOT anvil.log.
-      - name: Upload deploy inputs (for the Deploy workflow)
+      # The DEPLOY BUNDLE: everything needed to broadcast this run's contracts and
+      # re-verify them, and nothing else. Packed by `pack-deploy-bundle.sh` during
+      # the regen (right after the prepare, so it exists even if PUVT fails):
+      #
+      #   prepare/manifest.json + prepare/*.safe.json  the deployer calls to send
+      #   ecosystem.toml                               addresses + gov stages
+      #   extra-verification-logs.txt                  Etherscan verify commands
+      #   bundle-metadata.json                         provenance (commit, hashes,
+      #                                                fork block, toolchain)
+      #   README.md                                    the commands to run
+      #
+      # Consumed by `deploy-ecosystem-upgrade.yaml` (real broadcast) and by the
+      # `verify-bundle-handoff` job below (fork rehearsal + PUVT). Safe to publish:
+      # tx calldata + addresses only, never keys or the RPC URL. NOT anvil.log.
+      - name: Upload the deploy bundle (for the Deploy workflow + local replay)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ecosystem-upgrade-deploy-inputs-${{ inputs.environment }}
-          path: |
-            l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/prepare/manifest.json
-            l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/prepare/*.safe.json
-            l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/extra-verification-logs.txt
-            l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/ecosystem.toml
+          path: l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/deploy-bundle/
           if-no-files-found: warn
           retention-days: 30
 
@@ -298,3 +323,89 @@ jobs:
         if: always()
         working-directory: l1-contracts/test/anvil-interop
         run: bash cleanup.sh
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Proof that the published deploy bundle is SUFFICIENT on its own.
+  #
+  # This job deliberately does NOT build the contracts (no foundry-zksync, no
+  # `yarn l1 build:foundry`): it has only the artifact, this checkout and
+  # `protocol_ops` — exactly what an operator downloading the bundle has. It
+  # forks L1 at the height recorded in `bundle-metadata.json`, replays every
+  # bundle under impersonation, and runs PUVT against the result.
+  #
+  # If this job is green, "deploy the contracts and run the PUVT yourself"
+  # provably works from the artifact alone. If the bundle were missing anything
+  # (a call, an address, the fork height, the bytecode identity), it fails here
+  # instead of failing on somebody's laptop.
+  # ─────────────────────────────────────────────────────────────────────────────
+  verify-bundle-handoff:
+    needs: regen
+    # Runs whenever the bundle exists — the regen job packs it before its own
+    # replay/PUVT steps, so a PUVT failure upstream still lets us check the
+    # handoff itself.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      # anvil + cast only. No forge --zksync, no contract build: PUVT reads the
+      # committed AllContractsHashes.json / SystemConfig.json / configs/genesis,
+      # never `out/` or `zkout/`.
+      - name: Install Foundry (anvil + cast)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.91.1
+
+      - name: Build protocol_ops
+        working-directory: protocol-ops
+        run: cargo build --release
+
+      - name: Download the deploy bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: ecosystem-upgrade-deploy-inputs-${{ inputs.environment }}
+          path: ${{ github.workspace }}/deploy-bundle
+
+      - name: Show the bundle's provenance
+        run: |
+          set -euo pipefail
+          echo "=== bundle-metadata.json"
+          cat "$GITHUB_WORKSPACE/deploy-bundle/bundle-metadata.json"
+          echo "=== files"
+          find "$GITHUB_WORKSPACE/deploy-bundle" -type f | sed "s|$GITHUB_WORKSPACE/||" | sort
+
+      - name: Select + mask the L1 RPC to fork
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          INPUT_RPC: ${{ inputs.l1_rpc_url }}
+          RPC_SEPOLIA: ${{ secrets.L1_RPC_URL_SEPOLIA }}
+          RPC_MAINNET: ${{ secrets.L1_RPC_URL_MAINNET }}
+        run: |
+          set -euo pipefail
+          if [ "$ENVIRONMENT" = "mainnet" ]; then rpc="$RPC_MAINNET"; else rpc="$RPC_SEPOLIA"; fi
+          if [ -n "${INPUT_RPC:-}" ]; then rpc="$INPUT_RPC"; fi
+          if [ -z "$rpc" ]; then
+            echo "::error::No L1 RPC to fork (see the regen job's requirements)"; exit 1
+          fi
+          echo "::add-mask::$rpc"
+          echo "L1_FORK_URL=$rpc" >> "$GITHUB_ENV"
+
+      # The same command an operator runs locally against a downloaded bundle.
+      - name: Replay the bundle on a fresh fork + PUVT
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          # The script stops its own fork anvil on exit (EXIT trap), so this job
+          # needs no separate cleanup step.
+          ./replay-bundle-and-verify.sh \
+            --bundle "$GITHUB_WORKSPACE/deploy-bundle" \
+            --fork-url "$L1_FORK_URL"

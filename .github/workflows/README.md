@@ -31,6 +31,18 @@ args to `protocol_ops` unless the first post-flag word is `forge`/`cast`).
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `execute-deployer-safe-bundles` | Apply Safe bundles whose `target` is the ecosystem deployer EOA (bundles from the chain-init workflow, the upgrade-prepare workflow, and the migrate-to/from phase-2-finalize workflows). Signs with `DEPLOYER_PRIVATE_KEY_<env>` secret. |
 
+## v31 ecosystem-upgrade workflows
+
+| Workflow                              | Purpose                                                                                                                                                                                                                                                          |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `generate-ecosystem-upgrade-calldata` | Step 1: regenerate the v31 calldata on a fork, PUVT it, and publish the **deploy bundle** (`ecosystem-upgrade-deploy-inputs-<env>`). Its `verify-bundle-handoff` job re-deploys + re-verifies that bundle with no contract build, proving it is self-sufficient. |
+| `deploy-ecosystem-upgrade`            | Step 2: broadcast the bundle's deployer calls to a real L1, then verify on Etherscan. Takes the step-1 run id.                                                                                                                                                   |
+
+See [`docs/ecosystem-upgrade-deploy.md`](../../docs/ecosystem-upgrade-deploy.md)
+for the local equivalents (`regen-and-verify.sh`, `pack-deploy-bundle.sh`,
+`replay-bundle-and-verify.sh`) and why the bundle — not a re-run — is what
+transfers between machines.
+
 ## Conventions
 
 - **All workflows** share: `environment`, `protocol_ops_tag`, `l1_rpc_url`

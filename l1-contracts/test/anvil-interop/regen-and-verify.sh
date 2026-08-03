@@ -3,6 +3,12 @@
 # replay it under impersonation, and run PUVT (`ecosystem verify-upgrade`)
 # against the artifacts.
 #
+# Also packs `output/<env>/deploy-bundle/` (see `pack-deploy-bundle.sh`): the
+# deployer calls plus the provenance needed to broadcast this run's bytecode
+# elsewhere and re-verify it. That bundle — not a re-run of this script — is what
+# transfers to another machine, because the compiled bytecode (and with it every
+# CREATE2 address) is specific to the build environment.
+#
 # Works for every env. Pass the env as the first positional arg
 # (default: stage):
 #
@@ -35,24 +41,22 @@
 
 set -euo pipefail
 
+# Shared helpers (TOML reads, protocol_ops lookup, anvil fork, bundle funding),
+# also used by `replay-bundle-and-verify.sh`.
+# shellcheck source=./upgrade-bundle-lib.sh
+source "$(dirname "$0")/upgrade-bundle-lib.sh"
+
 if [[ -z "${L1_FORK_URL:-}" ]]; then
   echo "L1_FORK_URL is required" >&2
   exit 1
 fi
 
 # First positional arg selects the env (default: stage). Each env gets a
-# distinct anvil port so stage/testnet/mainnet rehearsals can run in parallel
-# without colliding (and a KEEP_ANVIL fork of one is never reused by another).
+# distinct anvil port (see `env_anvil_port`) so stage/testnet/mainnet rehearsals
+# can run in parallel without colliding (and a KEEP_ANVIL fork of one is never
+# reused by another).
 ENV="${1:-stage}"
-case "$ENV" in
-  stage) PORT=29545 ;;
-  testnet) PORT=29547 ;;
-  mainnet) PORT=29549 ;;
-  *)
-    echo "Unknown env '$ENV' (expected: stage | testnet | mainnet)" >&2
-    exit 1
-    ;;
-esac
+PORT="$(env_anvil_port "$ENV")"
 RPC="http://localhost:$PORT"
 echo "Env:          $ENV (anvil port $PORT)"
 
@@ -70,15 +74,6 @@ V31_INPUT="$L1_CONTRACTS_DIR/upgrade-envs/v0.31.0-interopB/$ENV.toml"
 for f in "$PERMANENT_VALUES" "$V31_INPUT"; do
   [[ -f "$f" ]] || { echo "config not found: $f" >&2; exit 1; }
 done
-
-read_toml_str() {
-  # $1 = file, $2 = key (top-level scalar string in TOML — `key = "0x…"`)
-  python3 -c "
-import re, sys
-m = re.search(r'^${2}\s*=\s*[\"\']([^\"\']+)', open('${1}').read(), re.MULTILINE)
-print(m.group(1) if m else '', end='')
-"
-}
 
 # Bridgehub is the one address the prepare wrapper needs on the CLI; pull it
 # from the env's v31 input so we don't keep a per-env copy in this script.
@@ -122,17 +117,9 @@ ZK_ASSET_ID="$(read_toml_str "$PERMANENT_VALUES" zk_token_asset_id)"
 [[ -z "$ZK_ASSET_ID" ]] && { echo "zk_token_asset_id not found in $PERMANENT_VALUES" >&2; exit 1; }
 echo "ZK asset id:  $ZK_ASSET_ID"
 
-# Does this env have a new Gateway? Gateway-enabled envs (stage, mainnet) have a
-# `[new_gateway]` table in permanent-values; their ZK token is the new-GW base
-# token (NTV-mintable) and bundle 5's GW priority tx burns it, so ZK funding
-# MUST succeed. Gateway-less envs (testnet) omit the table; their ZK token is
-# L1-native (a plain ERC20, not NTV-mintable → bridgeMint reverts) and no GW
-# priority tx burns ZK, so the funding is both impossible and unnecessary.
-if grep -qE '^\[new_gateway\]' "$PERMANENT_VALUES"; then
-  HAS_GATEWAY=1
-else
-  HAS_GATEWAY=0
-fi
+# Does this env have a new Gateway? (see `env_has_gateway` for what that implies
+# for the ZK funding below.)
+HAS_GATEWAY="$(env_has_gateway "$PERMANENT_VALUES")"
 echo "New gateway:  $([[ "$HAS_GATEWAY" == "1" ]] && echo yes || echo "no (ZK funding best-effort)")"
 
 # Gateway RPC — PUVT uses it for read-only GW-side checks (only exercised on
@@ -147,25 +134,9 @@ echo "GW RPC:       $GW_RPC_URL"
 # (zksync-association/zk-governance).
 ZK_GOV_COMMIT="${ZK_GOVERNANCE_COMMIT:-cc7c76d}"
 echo "zk-gov commit: $ZK_GOV_COMMIT"
-# 1e30 wei
-FUND_AMOUNT="1000000000000000000000000000000"
 
-# Locate the protocol_ops binary. Prefer the local debug build (devs iterate
-# on this), then the release build, then anything on PATH (Docker image puts
-# it on PATH via /contracts/protocol-ops/).
 _PO_DIR="$(cd "$(dirname "$0")"/../../../protocol-ops && pwd)"
-if [[ -x "$_PO_DIR/target/debug/protocol_ops" ]]; then
-  PROTOCOL_OPS="$_PO_DIR/target/debug/protocol_ops"
-elif [[ -x "$_PO_DIR/target/release/protocol_ops" ]]; then
-  PROTOCOL_OPS="$_PO_DIR/target/release/protocol_ops"
-elif [[ -x "$_PO_DIR/protocol_ops" ]]; then
-  PROTOCOL_OPS="$_PO_DIR/protocol_ops"
-elif command -v protocol_ops >/dev/null 2>&1; then
-  PROTOCOL_OPS="$(command -v protocol_ops)"
-else
-  echo "protocol_ops binary not found — build it with 'cd protocol-ops && cargo build'" >&2
-  exit 1
-fi
+PROTOCOL_OPS="$(locate_protocol_ops "$_PO_DIR")"
 echo "Using protocol_ops at: $PROTOCOL_OPS"
 
 # Set KEEP_ANVIL=1 to leave the fork anvil running on $PORT after the script
@@ -204,30 +175,12 @@ if cast chain-id --rpc-url "$RPC" >/dev/null 2>&1; then
   echo "=== Step 0: reusing anvil on $RPC ==="
 else
   echo "=== Step 0: anvil fork on port $PORT ==="
-  # Optional FORK_BLOCK pin. Needed when the live chain is mid-upgrade: forking the tip would
-  # inherit an already-applied stage (e.g. a started GovernanceUpgradeTimer), making the prepare's
-  # gov-stage replay revert. Pin to a pre-upgrade block to fork a clean pre-stage state.
-  anvil_args=(
-    --port "$PORT"
-    --auto-impersonate
-    --disable-block-gas-limit
-    --gas-price 1000000000
-    --fork-url "$L1_FORK_URL"
-  )
-  if [[ -n "${FORK_BLOCK:-}" ]]; then
-    echo "    pinning fork to block $FORK_BLOCK"
-    anvil_args+=(--fork-block-number "$FORK_BLOCK")
-  fi
-  anvil "${anvil_args[@]}" >"$OUT/anvil.log" 2>&1 &
-  ANVIL_PID=$!
-  for _ in $(seq 1 30); do
-    if cast chain-id --rpc-url "$RPC" >/dev/null 2>&1; then
-      break
-    fi
-    sleep 1
-  done
-  cast chain-id --rpc-url "$RPC" >/dev/null || { echo "anvil failed to start"; exit 1; }
+  start_anvil_fork "$PORT" "$L1_FORK_URL" "${FORK_BLOCK:-}" "$OUT/anvil.log"
 fi
+# The block the bundles below are computed against. Recorded in the deploy
+# bundle's metadata so a later replay can fork the very same state.
+FORKED_AT_BLOCK="$(cast block-number --rpc-url "$RPC")"
+echo "Forked at block: $FORKED_AT_BLOCK"
 
 if [[ "$SKIP_PREPARE" == "1" && -f "$OUT/prepare/manifest.json" ]]; then
   echo "=== Step 1: SKIPPED (SKIP_PREPARE=1, reusing existing $OUT/prepare) ==="
@@ -241,6 +194,18 @@ else
     --out "$OUT/prepare" \
     --additional-args=--memory-limit=536870912
 fi
+
+# Pack the transferable deploy bundle right after the prepare — it only needs
+# the prepare output, so the handoff artifact exists even if the replay or PUVT
+# below fails. This is what somebody else broadcasts and re-verifies: the bundle
+# carries the compiled init code, which a rebuild on another machine would not
+# reproduce byte-for-byte (path-dependent solc metadata → different CREATE2
+# addresses). See pack-deploy-bundle.sh.
+echo "=== Step 1b: pack the deploy bundle ==="
+DEPLOYER_ADDR="$DEPLOYER" \
+FORKED_AT_BLOCK="$FORKED_AT_BLOCK" \
+ZK_GOVERNANCE_COMMIT="$ZK_GOV_COMMIT" \
+  "$(dirname "$0")/pack-deploy-bundle.sh" "$ENV"
 
 # Set SKIP_BROADCAST=1 to skip Step 2 (funding) + Step 3 (bundle replay) and
 # go straight to verify-upgrade against an already-broadcast anvil state.
@@ -266,57 +231,8 @@ if [[ "$SKIP_BROADCAST" == "1" && -f "$OUT/fork-rehearsal/executed.json" ]]; the
 fi
 
 echo "=== Step 2: resolve NTV + ZK token, fund every bundle target ==="
-AR=$(cast call "$BRIDGEHUB" "assetRouter()(address)" --rpc-url "$RPC")
-NTV=$(cast call "$AR" "nativeTokenVault()(address)" --rpc-url "$RPC")
-ZK_TOKEN=$(cast call "$NTV" "tokenAddress(bytes32)(address)" "$ZK_ASSET_ID" --rpc-url "$RPC")
-echo "AR=$AR"
-echo "NTV=$NTV"
-echo "ZK_TOKEN=$ZK_TOKEN"
-cast rpc anvil_setBalance "$NTV" 0x21e19e0c9bab2400000 --rpc-url "$RPC" >/dev/null
-# Pull every distinct bundle.target from the manifest. Fund each with both
-# ETH (gas) and ZK (base-token burn for any GW priority tx). On the deployer-
-# EOA-with-PUH-as-owner split we get the deployer EOA, the security council
-# EOA, AND PUH itself in there — PUH lands in the list because it owns a
-# CTM/ProxyAdmin and the wrap script broadcasts the corresponding accept-
-# ownership / transferOwnership txs from PUH.
-TARGETS=$(jq -r '.bundles[].target' "$OUT/prepare/manifest.json" | sort -u)
-echo "Bundle targets:"
-echo "$TARGETS" | sed 's/^/  /'
-for TARGET in $TARGETS; do
-  cast rpc anvil_setBalance "$TARGET" 0x21e19e0c9bab2400000 --rpc-url "$RPC" >/dev/null
-  if [[ "$HAS_GATEWAY" == "1" ]]; then
-    # Gateway-enabled env: ZK is the NTV-mintable new-GW base token and bundle 5's
-    # GW priority tx burns it — funding must succeed.
-    echo "  bridgeMint($TARGET, $FUND_AMOUNT)"
-    cast send --from "$NTV" --unlocked "$ZK_TOKEN" \
-      "bridgeMint(address,uint256)" "$TARGET" "$FUND_AMOUNT" \
-      --rpc-url "$RPC" >/dev/null
-  else
-    # Gateway-less env: the ZK token is L1-native (a plain ERC20, not
-    # NTV-mintable, so bridgeMint reverts Unauthorized(NTV)) and unnecessary —
-    # no GW priority tx burns ZK. Tolerate the revert; the ETH gas funding
-    # above is all the fork replay needs.
-    echo "  bridgeMint($TARGET, $FUND_AMOUNT) [best-effort]"
-    cast send --from "$NTV" --unlocked "$ZK_TOKEN" \
-      "bridgeMint(address,uint256)" "$TARGET" "$FUND_AMOUNT" \
-      --rpc-url "$RPC" >/dev/null 2>&1 || true
-  fi
-done
-
-# Register the ZK token assetId in L1AssetTracker so bundle 5's GW priority
-# deposits (which burn ZK as the new-GW base token) pass the
-# `_requireRegistered` check on `handleChainBalanceIncreaseOnL1`. In production
-# this registration lands as stage-2 call 6 (`registerLegacyToken`), but Step 3
-# replays the prepare bundles BEFORE governance, so we prime it here directly.
-# `registerLegacyToken` is public — anyone can call it.
-ASSET_TRACKER=$(awk -F'"' '/^asset_tracker_proxy_addr[ \t]*=/{print $2; exit}' "$OUT/ecosystem.toml")
-if [ -n "$ASSET_TRACKER" ]; then
-  echo "  registerLegacyToken($ZK_ASSET_ID) on $ASSET_TRACKER"
-  cast send "$ASSET_TRACKER" "registerLegacyToken(bytes32)" "$ZK_ASSET_ID" \
-    --from "$DEPLOYER" --unlocked --rpc-url "$RPC" >/dev/null || true
-else
-  echo "  WARNING: asset_tracker_proxy_addr not found in $OUT/ecosystem.toml — skipping registerLegacyToken"
-fi
+fund_bundle_targets "$RPC" "$BRIDGEHUB" "$ZK_ASSET_ID" "$HAS_GATEWAY" \
+  "$OUT/prepare/manifest.json" "$OUT/ecosystem.toml" "$DEPLOYER"
 
 echo "=== Step 3: upgrade-broadcast --unlocked --out ==="
 # The committed `transactions.txt` holds *real-network* deployment hashes only

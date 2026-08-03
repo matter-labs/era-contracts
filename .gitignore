@@ -59,6 +59,11 @@ l1-contracts/upgrade-envs/**/output/**/anvil.log
 # fork, regenerated every run. Kept out of the committed `transactions.txt`
 # (which holds real-network deployments only) so it never accumulates.
 l1-contracts/upgrade-envs/**/output/**/fork-rehearsal/
+# Per-run deploy bundle (pack-deploy-bundle.sh): a copy of the prepare bundles +
+# ecosystem.toml + provenance, published as a CI artifact for whoever broadcasts
+# and re-verifies the upgrade. Machine-specific by construction (it pins the
+# generating build's bytecode), so it is never committed.
+l1-contracts/upgrade-envs/**/output/**/deploy-bundle/
 l1-contracts/test/foundry/l1/integration/deploy-scripts/script-out/*.toml
 !l1-contracts/script-out/.gitkeep
 *.timestamp

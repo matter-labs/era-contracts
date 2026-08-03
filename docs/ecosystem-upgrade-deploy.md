@@ -5,12 +5,23 @@ locally and in CI:
 
 1. **Generate the calldata** — deploy nothing; on a fork, compute the upgrade
    artifacts (`ecosystem.toml`, `sim-inputs/`, `transaction-simulator.json`) and
-   the *deployer bundles* that step 2 will broadcast.
+   the _deployer bundles_ that step 2 will broadcast.
 2. **Deploy** — broadcast the deployer bundles to a real L1, producing
    `transactions.txt`, then verify the deployed contracts on Etherscan.
 
 The same `protocol_ops` binary drives both locally and in CI — CI is only a
 wrapper around the commands below.
+
+**Step 1 output is a handoff, not a recipe.** Solidity output is not byte-stable
+across build environments (the default foundry profile embeds path-dependent CBOR
+metadata), so the bytecode — and therefore every CREATE2 address and all the
+governance calldata — belongs to the machine that compiled it. Re-running step 1
+somewhere else does not "reproduce" the addresses; it produces a different,
+equally valid upgrade. What travels is the **deploy bundle**: the deployer
+transactions carry the CREATE2 init code verbatim, so whoever broadcasts them
+deploys that exact bytecode at the addresses the reviewed `ecosystem.toml` names,
+without compiling anything. See
+[Deploying + verifying from a deploy bundle](#deploying--verifying-from-a-deploy-bundle).
 
 ```
              ┌────────────────────── step 1: GENERATE (fork) ──────────────────────┐
@@ -36,19 +47,20 @@ Then `ecosystem verify-upgrade` (PUVT) consumes `ecosystem.toml` +
 ## Step 1 — generate the calldata
 
 **What it does.** Forks L1, runs `upgrade-prepare-all` (deploys every new
-ecosystem contract *on the fork* to compute deterministic CREATE2 addresses),
+ecosystem contract _on the fork_ to compute deterministic CREATE2 addresses),
 replays the prepare bundles, runs PUVT, and emits the git-portable calldata set.
 Nothing touches real L1 — the deployer is impersonated.
 
 **Outputs** (under `l1-contracts/upgrade-envs/v0.31.0-interopB/output/<env>/`):
 
-| Artifact | Purpose |
-|---|---|
-| `ecosystem.toml` | merged addresses + governance stage 0/1/2 calls (PUVT input) |
-| `sim-inputs/` | Camp-B manifest + bundles for the transaction simulator |
-| `transaction-simulator.json` | ready-to-paste simulator input (Camp-B + PUH stages + smoke tests) |
-| `prepare/manifest.json` + `prepare/*.safe.json` | **the bundles step 2 broadcasts** |
-| `extra-verification-logs.txt` | `forge verify-contract` commands for step 2 |
+| Artifact                                        | Purpose                                                            |
+| ----------------------------------------------- | ------------------------------------------------------------------ |
+| `ecosystem.toml`                                | merged addresses + governance stage 0/1/2 calls (PUVT input)       |
+| `sim-inputs/`                                   | Camp-B manifest + bundles for the transaction simulator            |
+| `transaction-simulator.json`                    | ready-to-paste simulator input (Camp-B + PUH stages + smoke tests) |
+| `prepare/manifest.json` + `prepare/*.safe.json` | **the bundles step 2 broadcasts**                                  |
+| `extra-verification-logs.txt`                   | `forge verify-contract` commands for step 2                        |
+| `deploy-bundle/`                                | the above, packed with provenance for handoff (see below)          |
 
 **Locally:**
 
@@ -72,11 +84,14 @@ OUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet
 **In CI:** run the **`Ecosystem Upgrade Calldata: Regenerate + Verify (v31)`**
 workflow (`generate-ecosystem-upgrade-calldata.yaml`). It does 1a + 1b and
 uploads two artifacts: `ecosystem-upgrade-calldata-<env>` (the review set) and
-`ecosystem-upgrade-deploy-inputs-<env>` (the bundles + verify log for step 2).
+`ecosystem-upgrade-deploy-inputs-<env>` (the deploy bundle for step 2 / for a
+local deploy + PUVT). Its second job, `verify-bundle-handoff`, then re-deploys
+and re-verifies that bundle from scratch **with no contract build**, which is the
+standing proof that the artifact is self-sufficient.
 
 > **Already-deployed ecosystems.** Re-running the prepare against the chain tip
 > of an ecosystem whose v31 upgrade is already live reverts (the deployer no
-> longer owns the ecosystem contracts). Pass `fork_block` = a block *before* the
+> longer owns the ecosystem contracts). Pass `fork_block` = a block _before_ the
 > deployment; CREATE2 addresses are deterministic, so the output is identical.
 
 ---
@@ -94,7 +109,7 @@ The sender (`submit_and_confirm` in
 `protocol-ops/src/commands/dev/execute_safe.rs`) is robust to real-L1 hazards:
 
 - **Stuck (underpriced) tx** — if no receipt lands within ~90s it re-broadcasts
-  the *same nonce* at a higher gas price (+15% per retry, ≥ geth's 10%
+  the _same nonce_ at a higher gas price (+15% per retry, ≥ geth's 10%
   replacement floor), up to `--max-gas-price-gwei`, then keeps trying at the
   ceiling until a 20-minute per-tx deadline.
 - **Nonce takeover** — if the sender's on-chain nonce advances past ours without
@@ -163,3 +178,58 @@ OUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet
 Pre-governance (contracts deployed, governance not yet executed) this reports the
 allowed exemptions for contracts still owned by the legacy Governor pending their
 ceremony; everything else must be clean.
+
+---
+
+## Deploying + verifying from a deploy bundle
+
+A generation run packs `output/<env>/deploy-bundle/` (uploaded by CI as
+`ecosystem-upgrade-deploy-inputs-<env>`). It is the unit of handoff between the
+machine that compiled the upgrade and whoever deploys or audits it:
+
+| File                          | Why it is in there                                                                                                                     |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `prepare/manifest.json`       | the bundles, in execution order, each with its signer (`target`)                                                                       |
+| `prepare/*.safe.json`         | the calls themselves — `to`/`value`/`data`, CREATE2 init code included                                                                 |
+| `ecosystem.toml`              | the resulting addresses + governance stage 0/1/2 calldata                                                                              |
+| `bundle-metadata.json`        | provenance: contracts commit, `AllContractsHashes.json` hash, fork height, deployer, toolchain versions, per-bundle tx counts + sha256 |
+| `extra-verification-logs.txt` | `forge verify-contract` commands, constructor args included                                                                            |
+| `README.md`                   | the two commands below, pre-filled for that bundle                                                                                     |
+
+**Check out the commit `bundle-metadata.json` names.** PUVT identifies deployed
+contracts by matching their code against the committed `AllContractsHashes.json`;
+from a different commit the deployments are not recognised and the verdict is
+meaningless. `replay-bundle-and-verify.sh` compares the hash and warns.
+
+**Rehearse the deploy and run PUVT — no compiler, no regeneration:**
+
+```bash
+cd protocol-ops && cargo build --release && cd ..     # the only build needed
+./l1-contracts/test/anvil-interop/replay-bundle-and-verify.sh \
+  --bundle <unpacked-bundle-dir> --fork-url <l1-rpc>
+```
+
+That forks L1 at the bundle's recorded height, funds every bundle signer, replays
+all bundles under impersonation (including the governance ceremony, so PUVT sees
+the post-upgrade state) and runs `ecosystem verify-upgrade`.
+
+Variants:
+
+```bash
+# verify a chain the bundle was already broadcast to (no replay)
+./…/replay-bundle-and-verify.sh --bundle <dir> --rpc <l1-rpc> --verify-only
+
+# broadcast the deployer bundles for real, then verify
+./…/replay-bundle-and-verify.sh --bundle <dir> --rpc <l1-rpc> --key "$DEPLOYER_KEY"
+```
+
+`--key` signs only the deployer's bundles (`--skip-unkeyed`); the governance
+ceremony bundles stay for their multisig. Same broadcast path, and same
+idempotency, as step 2 above.
+
+**Pack a bundle by hand** (e.g. from an older generation output):
+
+```bash
+DEPLOYER_ADDR=<deployer> FORKED_AT_BLOCK=<block> \
+  ./l1-contracts/test/anvil-interop/pack-deploy-bundle.sh <env>
+```
