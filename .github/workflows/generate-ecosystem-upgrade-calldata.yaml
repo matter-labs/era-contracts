@@ -317,7 +317,11 @@ jobs:
           name: ecosystem-upgrade-deploy-inputs-${{ inputs.environment }}
           path: l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}/deploy-bundle/
           if-no-files-found: warn
-          retention-days: 30
+          # 90 days, matching the deploy workflow's result artifact: this is the
+          # operational record of which bytecode was deployed, and it cannot be
+          # regenerated (a later build produces different bytecode). Archive it
+          # elsewhere if it must outlive the retention window.
+          retention-days: 90
 
       - name: Cleanup anvil
         if: always()
@@ -370,11 +374,25 @@ jobs:
         working-directory: protocol-ops
         run: cargo build --release
 
+      # Tolerated so the next step can explain WHY there is no bundle: the pack
+      # runs right after the prepare, so a prepare that never finished leaves
+      # nothing to hand off (and the upload step, being `always()` +
+      # `if-no-files-found: warn`, still "succeeds" having uploaded nothing).
       - name: Download the deploy bundle
+        id: download-bundle
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: ecosystem-upgrade-deploy-inputs-${{ inputs.environment }}
           path: ${{ github.workspace }}/deploy-bundle
+
+      - name: Require a bundle to hand off
+        run: |
+          set -euo pipefail
+          if [ ! -f "$GITHUB_WORKSPACE/deploy-bundle/bundle-metadata.json" ]; then
+            echo "::error::No deploy bundle was published, so there is nothing to verify. The bundle is packed straight after `upgrade-prepare-all`, so the generate job failed at or before the prepare — fix that first."
+            exit 1
+          fi
 
       - name: Show the bundle's provenance
         run: |
