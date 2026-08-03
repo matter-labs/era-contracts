@@ -3,11 +3,12 @@ pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {IZiskVerifier} from "contracts/state-transition/chain-interfaces/IZiskVerifier.sol";
+import {ISnarkPlonkVerifier} from "contracts/state-transition/chain-interfaces/ISnarkPlonkVerifier.sol";
+import {ZiskVerifier} from "contracts/state-transition/verifiers/ZiskVerifier.sol";
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
 
-/// @dev Mock verifier that always returns true (Airbender + aggregated-SNARK
-///      sides; both are exercised with real-proof fixtures elsewhere).
+/// @dev Mock verifier that always returns true (Airbender side; exercised with
+///      real-proof fixtures elsewhere).
 contract MockPassVerifier is IVerifier {
     function verify(uint256[] calldata, uint256[] calldata) external pure returns (bool) {
         return true;
@@ -18,30 +19,22 @@ contract MockPassVerifier is IVerifier {
     }
 }
 
-/// @dev Mock per-batch ZiSK verifier exposing the vector's wire-form pins.
-contract MockZiskPinsVerifier is IZiskVerifier {
-    bytes32 public immutable programVKPin;
-    bytes32 public immutable rootCPin;
+/// @dev Stand-in for the snarkJS Plonk verifier that accepts iff the single
+///      public signal it is handed equals `expectedSignal`. Because the real
+///      aggregated SNARK crypto has no fixture yet, this lets the tests assert
+///      the EXACT signal the on-chain reconstruction produces (the digest
+///      formula, the sha256 preimage byte order and the field reduction)
+///      without a real pairing. A wrong reconstruction hands a wrong signal
+///      and is rejected.
+contract ExpectSignalPlonkVerifier is ISnarkPlonkVerifier {
+    uint256 public immutable expectedSignal;
 
-    constructor(bytes32 _programVK, bytes32 _rootC) {
-        programVKPin = _programVK;
-        rootCPin = _rootC;
+    constructor(uint256 _expectedSignal) {
+        expectedSignal = _expectedSignal;
     }
 
-    function verify(uint256[] calldata, uint256[] calldata) external pure returns (bool) {
-        return true;
-    }
-
-    function verificationKeyHash() external view returns (bytes32) {
-        return keccak256(abi.encodePacked(programVKPin, rootCPin));
-    }
-
-    function programVK() external view returns (bytes32) {
-        return programVKPin;
-    }
-
-    function rootCVadcopFinal() external view returns (bytes32) {
-        return rootCPin;
+    function verifyProof(uint256[24] calldata, uint256[1] calldata _pubSignals) external view returns (bool) {
+        return _pubSignals[0] == expectedSignal;
     }
 }
 
@@ -52,11 +45,28 @@ contract MockZiskPinsVerifier is IZiskVerifier {
 ///      the aggregator guest (`cross_stack_binding_vector` host test), the
 ///      server's aggregation job validation, and this test. Update all pins
 ///      together whenever any input rotates.
+///
+///      This suite deploys the REAL ZiskVerifier (whose baked inner programVK /
+///      rootCVadcopFinal must equal the vector pins) and drives it through
+///      MultiProofVerifier, asserting that the on-chain RECONSTRUCTION of the
+///      ZiSK public values reproduces the pinned digest and the expected PLONK
+///      signal. NB: the SNARK pairing itself is stand-in-mocked (no real
+///      aggregated fixture); this validates the reconstruction + binding, not
+///      the pairing against a real aggregated proof.
 contract MultiProofRangeVectorTest is Test {
-    /// @dev STF guest programVK: wire public-values bytes [0..32].
+    /// @dev Inner state-transition guest programVK: the first field of the
+    ///      binding digest. It is NOT the aggregated proof's wire [0..32].
     bytes32 internal constant INNER_PROGRAM_VK =
         0x481748830df5c3b7aa5522333ace2c4b533352637b92fd3c83ecc506c5104ead;
-    /// @dev Vadcop-final root: wire public-values bytes [288..320].
+    /// @dev Aggregator guest programVK: the aggregated proof's wire
+    ///      public-values bytes [0..32]. The aggregator ELF setup is deferred,
+    ///      so the contract pins the stand-in
+    ///      `keccak256("zisk-aggregator-programvk-standin")`. This test pins
+    ///      the same value. A real setup rotates both together.
+    bytes32 internal constant AGGREGATOR_PROGRAM_VK =
+        0xf60b59b4811b77a34524a9e2c15a3afd09d0d9fe5aa6757850eac5d8614c8899;
+    /// @dev Vadcop-final root: the second field of the binding digest, and
+    ///      wire public-values bytes [288..320].
     bytes32 internal constant ROOT_C_VADCOP_FINAL =
         0xcf2a309856f107b143836ada112806da71ae11567fa3f2d2050baba5381c7b7d;
 
@@ -79,15 +89,20 @@ contract MultiProofRangeVectorTest is Test {
     bytes32 internal constant DIGEST =
         0x5f47db9b336cf84b7b7fc49ca77eadb5160e373dc8f12057d719f45d3b2fbd84;
 
+    /// @dev BN254 scalar field modulus (must equal ZiskVerifier._RFIELD).
+    uint256 internal constant RFIELD =
+        21888242871839275222246405745257275088548364400416034343698204186575808495617;
+
     MultiProofVerifier internal verifier;
+    ZiskVerifier internal ziskVerifier;
 
     function setUp() public {
-        verifier = new MultiProofVerifier(
-            IVerifier(address(new MockPassVerifier())),
-            IVerifier(address(new MockZiskPinsVerifier(INNER_PROGRAM_VK, ROOT_C_VADCOP_FINAL))),
-            address(this)
-        );
-        verifier.setZiskRangeVerifier(IVerifier(address(new MockPassVerifier())));
+        // The range verifier is the REAL ZiskVerifier. It reconstructs the ZiSK
+        // public values from its own pins; the Plonk stand-in accepts iff the
+        // reconstructed signal equals the one this vector implies.
+        ziskVerifier = new ZiskVerifier(ISnarkPlonkVerifier(address(new ExpectSignalPlonkVerifier(_expectedSignal()))));
+        verifier = new MultiProofVerifier(IVerifier(address(new MockPassVerifier())), address(this));
+        verifier.setZiskRangeVerifier(IVerifier(address(ziskVerifier)));
     }
 
     /// @dev The per-batch public inputs as L1 consumes them: each commitment
@@ -100,14 +115,42 @@ contract MultiProofRangeVectorTest is Test {
         pis[3] = uint256(COMMITMENT_4) >> 32;
     }
 
-    /// @dev Build a type-5 proof whose ZiSK public-values word 1 is `digest`.
-    function _rangeProof(uint256 _previousHash, uint256 _digest) internal pure returns (uint256[] memory proof) {
+    /// @dev The single PLONK public signal the on-chain reconstruction must
+    ///      produce for the pinned range: sha256 over the reconstructed
+    ///      320-byte preimage (aggregatorProgramVK || DIGEST || 224 zeros ||
+    ///      rootCVadcopFinal), reduced mod the BN254 scalar field. The wire
+    ///      carries the AGGREGATOR pin; the INNER pin is inside DIGEST.
+    function _expectedSignal() internal pure returns (uint256) {
+        bytes memory preimage = abi.encodePacked(AGGREGATOR_PROGRAM_VK, DIGEST, new bytes(224), ROOT_C_VADCOP_FINAL);
+        require(preimage.length == 320, "preimage length");
+        return uint256(sha256(preimage)) % RFIELD;
+    }
+
+    /// @dev The signal a verifier would produce with the two program VK pins
+    ///      exchanged: the inner pin on the wire, the aggregator pin inside the
+    ///      digest. The real reconstruction must never produce this signal.
+    function _swappedPinSignal() internal pure returns (uint256) {
+        bytes32 swappedDigest = keccak256(
+            abi.encodePacked(AGGREGATOR_PROGRAM_VK, ROOT_C_VADCOP_FINAL, CHAINED_PI)
+        );
+        bytes memory preimage = abi.encodePacked(
+            INNER_PROGRAM_VK,
+            swappedDigest,
+            new bytes(224),
+            ROOT_C_VADCOP_FINAL
+        );
+        require(preimage.length == 320, "preimage length");
+        return uint256(sha256(preimage)) % RFIELD;
+    }
+
+    /// @dev Build a type-5 proof with an opaque 24-word ZiSK SNARK section (the
+    ///      reconstruction never reads it).
+    function _rangeProof(uint256 _previousHash) internal pure returns (uint256[] memory proof) {
         uint256 airbenderLen = 2;
-        proof = new uint256[](3 + airbenderLen + 34);
+        proof = new uint256[](3 + airbenderLen + 24);
         proof[0] = 5; // MULTI_PROOF_TYPE
         proof[1] = _previousHash;
         proof[2] = airbenderLen;
-        proof[5 + 25] = _digest;
     }
 
     /// @dev The pinned chain trace and digest formula, replayed step by step.
@@ -128,41 +171,66 @@ contract MultiProofRangeVectorTest is Test {
         );
     }
 
-    /// @dev The contract accepts the pinned digest for the pinned range —
-    ///      i.e. its own pin-readback + _computeZKsyncOSHash path reproduces
-    ///      the vector exactly.
-    function test_bindingVector_verify_accepts() public view {
-        assertTrue(verifier.verify(_publicInputs(), _rangeProof(0, uint256(DIGEST))));
+    /// @dev The deployed ZiskVerifier's baked pins must equal the vector — the
+    ///      reconstruction rebuilds the digest and the wire from THEM, so any
+    ///      drift breaks the whole binding.
+    function test_ziskVerifier_pinsMatchVector() public view {
+        assertEq(ziskVerifier.innerProgramVK(), INNER_PROGRAM_VK, "innerProgramVK pin");
+        assertEq(ziskVerifier.aggregatorProgramVK(), AGGREGATOR_PROGRAM_VK, "aggregatorProgramVK pin");
+        assertEq(ziskVerifier.rootCVadcopFinal(), ROOT_C_VADCOP_FINAL, "rootCVadcopFinal pin");
     }
 
-    /// @dev Self-contained seed: a nonzero Airbender previous_hash
-    ///      continuation does not change the expected ZiSK digest.
+    /// @dev The two guest programs are different ELFs, so the two pins must
+    ///      hold different values. Equal pins would hide a swapped pin.
+    function test_ziskVerifier_programVkPinsDiffer() public view {
+        assertTrue(
+            ziskVerifier.innerProgramVK() != ziskVerifier.aggregatorProgramVK(),
+            "program VK pins must differ"
+        );
+    }
+
+    /// @dev The contract's own reconstruction (chainedPI -> digest -> preimage
+    ///      -> sha256 -> signal) reproduces the pinned vector exactly: the
+    ///      ExpectSignal Plonk stand-in accepts only that signal.
+    function test_bindingVector_reconstructsSignal_accepts() public view {
+        assertTrue(verifier.verify(_publicInputs(), _rangeProof(0)));
+    }
+
+    /// @dev Self-contained seed: a nonzero Airbender previous_hash continuation
+    ///      does not change the reconstructed ZiSK signal (the ZiSK chain is
+    ///      always seed-0), so the same signal is produced and accepted.
     function test_bindingVector_previousHashContinuation_accepts() public view {
         uint256 previousHash = uint256(keccak256("earlier range")) >> 32;
-        assertTrue(verifier.verify(_publicInputs(), _rangeProof(previousHash, uint256(DIGEST))));
+        assertTrue(verifier.verify(_publicInputs(), _rangeProof(previousHash)));
     }
 
-    /// @dev Any change to the range's public inputs breaks the binding.
+    /// @dev Any change to the range's public inputs changes the reconstructed
+    ///      digest -> signal, so the pinned-signal stand-in rejects it: the
+    ///      binding is inherent, no separate commitment word to check.
     function test_bindingVector_tamperedBatch_rejected() public {
         uint256[] memory pis = _publicInputs();
         pis[2] ^= 1;
 
-        // The digest the tampered range would need instead.
-        uint256 result = pis[0];
-        for (uint256 i = 1; i < pis.length; ++i) {
-            result = uint256(keccak256(abi.encodePacked(result, pis[i]))) >> 32;
-        }
-        uint256 tamperedDigest = uint256(
-            keccak256(abi.encodePacked(INNER_PROGRAM_VK, ROOT_C_VADCOP_FINAL, bytes32(result)))
+        vm.expectRevert(MultiProofVerifier.ZiskVerificationFailed.selector);
+        verifier.verify(pis, _rangeProof(0));
+    }
+
+    /// @dev The two program VK pins have one role each and are not
+    ///      interchangeable. A stand-in that expects the swapped-pin signal
+    ///      (inner pin on the wire, aggregator pin in the digest) is rejected,
+    ///      because the reconstruction puts each pin in its own place.
+    function test_swappedProgramVkPins_rejected() public {
+        ZiskVerifier swappedExpectation = new ZiskVerifier(
+            ISnarkPlonkVerifier(address(new ExpectSignalPlonkVerifier(_swappedPinSignal())))
         );
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                MultiProofVerifier.ZiskRangeDigestMismatch.selector,
-                tamperedDigest,
-                uint256(DIGEST)
-            )
-        );
-        verifier.verify(pis, _rangeProof(0, uint256(DIGEST)));
+        assertTrue(_swappedPinSignal() != _expectedSignal(), "swap must change the signal");
+        assertFalse(swappedExpectation.verify(_publicInputs(), _ziskSnarkWords()));
+    }
+
+    /// @dev The 24 opaque SNARK words, as MultiProofVerifier hands them to the
+    ///      range verifier (the header is already stripped).
+    function _ziskSnarkWords() internal pure returns (uint256[] memory words) {
+        words = new uint256[](24);
     }
 }

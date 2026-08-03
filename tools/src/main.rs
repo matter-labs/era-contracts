@@ -57,7 +57,8 @@ struct Opt {
     #[structopt(short = "l2", long = "l2_mode")]
     l2_mode: bool,
 
-    /// ZiSK VK input JSON (programVK + rootCVadcopFinal).
+    /// ZiSK VK input JSON (inner programVK, aggregator programVK,
+    /// rootCVadcopFinal).
     #[structopt(long = "zisk_vk_path", default_value = "data/ZiSK_vk.json")]
     zisk_vk_path: String,
 
