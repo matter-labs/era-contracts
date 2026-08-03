@@ -438,9 +438,10 @@ contract L1NativeTokenVaultTest is Test {
 
         vm.expectEmit(true, true, false, true, address(nativeTokenVault));
         emit IL1NativeTokenVault.BridgedOutPopulated(chainId, tokenAssetId, 100);
-        uint256 populated = nativeTokenVault.populateBridgedOut(chainId, _assetIdArray(tokenAssetId));
+        uint256[] memory populated = nativeTokenVault.populateBridgedOut(chainId, _assetIdArray(tokenAssetId));
 
-        assertEq(populated, 100, "first chain's legacy amount returned");
+        assertEq(populated.length, 1, "one amount per requested asset");
+        assertEq(populated[0], 100, "first chain's legacy amount returned");
         assertEq(nativeTokenVault.bridgedOut(tokenAssetId), 100, "first chain's legacy amount folded in");
         assertTrue(nativeTokenVault.bridgedOutPopulated(chainId, tokenAssetId), "pair marked as populated");
         assertFalse(
@@ -485,8 +486,8 @@ contract L1NativeTokenVaultTest is Test {
         nativeTokenVault.populateBridgedOut(chainId, _assetIdArray(tokenAssetId));
 
         // Re-running a batch (e.g. after a partially mined stage3) must not double count.
-        uint256 populated = nativeTokenVault.populateBridgedOut(chainId, _assetIdArray(tokenAssetId));
-        assertEq(populated, 0, "nothing populated the second time");
+        uint256[] memory populated = nativeTokenVault.populateBridgedOut(chainId, _assetIdArray(tokenAssetId));
+        assertEq(populated[0], 0, "nothing populated the second time");
         assertEq(nativeTokenVault.bridgedOut(tokenAssetId), 100, "amount not double counted");
     }
 

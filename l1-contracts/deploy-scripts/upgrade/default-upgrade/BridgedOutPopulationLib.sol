@@ -25,28 +25,52 @@ library BridgedOutPopulationLib {
     uint256 internal constant DEFAULT_ASSETS_PER_CALL = 25;
 
     /// @notice Populates `bridgedOut` for every (registered chain, L1-native asset) pair with a non-zero
-    /// legacy amount.
+    /// legacy amount, taking its settings from the environment.
     /// @param _bridgehub The L1 bridgehub, used to discover the NTV and the registered chains.
-    /// @return totalPopulated The total amount folded into `bridgedOut` across all chains.
-    function populateBridgedOutForAllChains(address _bridgehub) internal returns (uint256 totalPopulated) {
+    /// @return assetIds The L1-native assets that were considered.
+    /// @return populatedPerAsset Per entry of `assetIds`, the amount folded into that asset's `bridgedOut`
+    /// across all chains.
+    function populateBridgedOutForAllChains(
+        address _bridgehub
+    ) internal returns (bytes32[] memory assetIds, uint256[] memory populatedPerAsset) {
+        return
+            populateBridgedOutForAllChains(
+                _bridgehub,
+                vm.envOr("BRIDGED_OUT_ASSETS_PER_CALL", DEFAULT_ASSETS_PER_CALL),
+                vm.envOr("BRIDGED_OUT_SKIP_INVARIANT_CHECK", false)
+            );
+    }
+
+    /// @notice Populates `bridgedOut` with explicit settings.
+    /// @param _bridgehub The L1 bridgehub, used to discover the NTV and the registered chains.
+    /// @param _assetsPerCall Maximum number of assets per `populateBridgedOut` call.
+    /// @param _skipInvariantCheck Populate even if the legacy totals cross-check fails.
+    /// @return assetIds The L1-native assets that were considered.
+    /// @return populatedPerAsset Per entry of `assetIds`, the amount folded into that asset's `bridgedOut`
+    /// across all chains.
+    function populateBridgedOutForAllChains(
+        address _bridgehub,
+        uint256 _assetsPerCall,
+        bool _skipInvariantCheck
+    ) internal returns (bytes32[] memory assetIds, uint256[] memory populatedPerAsset) {
+        require(_assetsPerCall != 0, "assets per call must be non-zero");
+
         IL1NativeTokenVault ntv = _nativeTokenVault(_bridgehub);
         uint256[] memory chainIds = IBridgehubBase(_bridgehub).getAllZKChainChainIDs();
-        bytes32[] memory assetIds = _l1NativeAssetIds(ntv);
+        assetIds = _l1NativeAssetIds(ntv);
+        populatedPerAsset = new uint256[](assetIds.length);
 
         console.log("Populating bridgedOut. Chains:", chainIds.length);
         console.log("L1-native assets found in the NTV:", assetIds.length);
         console.log("Legacy L1 asset tracker:", ntv.legacyL1AssetTracker());
 
-        _checkLegacyTotalsInvariant(ntv, chainIds, assetIds);
-
-        uint256 assetsPerCall = vm.envOr("BRIDGED_OUT_ASSETS_PER_CALL", DEFAULT_ASSETS_PER_CALL);
-        require(assetsPerCall != 0, "BRIDGED_OUT_ASSETS_PER_CALL must be non-zero");
+        _checkLegacyTotalsInvariant(ntv, chainIds, assetIds, _skipInvariantCheck);
 
         for (uint256 i = 0; i < chainIds.length; ++i) {
-            totalPopulated += _populateBridgedOutForChain(ntv, chainIds[i], assetIds, assetsPerCall);
+            _populateBridgedOutForChain(ntv, chainIds[i], assetIds, _assetsPerCall, populatedPerAsset);
         }
 
-        console.log("bridgedOut population complete. Total amount populated:", totalPopulated);
+        _logPerAssetTotals(ntv, assetIds, populatedPerAsset);
     }
 
     /// @notice Populates `bridgedOut` for a single chain, batching the assets across several calls.
@@ -54,16 +78,17 @@ library BridgedOutPopulationLib {
     /// @param _chainId The chain whose legacy amounts are folded in.
     /// @param _assetIds The L1-native assets to consider.
     /// @param _assetsPerCall Maximum number of assets per `populateBridgedOut` call.
-    /// @return populated The amount folded into `bridgedOut` for this chain.
+    /// @param _populatedPerAsset Accumulator, indexed like `_assetIds`, that this call adds to.
     function _populateBridgedOutForChain(
         IL1NativeTokenVault _ntv,
         uint256 _chainId,
         bytes32[] memory _assetIds,
-        uint256 _assetsPerCall
-    ) private returns (uint256 populated) {
-        bytes32[] memory pending = _pendingAssetIds(_ntv, _chainId, _assetIds);
+        uint256 _assetsPerCall,
+        uint256[] memory _populatedPerAsset
+    ) private {
+        uint256[] memory pending = _pendingAssetIndexes(_ntv, _chainId, _assetIds);
         if (pending.length == 0) {
-            return 0;
+            return;
         }
 
         console.log("  Chain:", _chainId);
@@ -73,23 +98,26 @@ library BridgedOutPopulationLib {
             uint256 batchLength = pending.length - offset < _assetsPerCall ? pending.length - offset : _assetsPerCall;
             bytes32[] memory batch = new bytes32[](batchLength);
             for (uint256 i = 0; i < batchLength; ++i) {
-                batch[i] = pending[offset + i];
+                batch[i] = _assetIds[pending[offset + i]];
             }
-            populated += _ntv.populateBridgedOut(_chainId, batch);
-        }
 
-        console.log("  Populated amount for the chain:", populated);
+            uint256[] memory populatedAmounts = _ntv.populateBridgedOut(_chainId, batch);
+            for (uint256 i = 0; i < batchLength; ++i) {
+                _populatedPerAsset[pending[offset + i]] += populatedAmounts[i];
+            }
+        }
     }
 
-    /// @notice The L1-native assets of `_chainId` that still hold a non-zero legacy amount.
+    /// @notice Indexes into `_assetIds` of the assets that still hold a non-zero legacy amount for
+    /// `_chainId`.
     /// @dev Pairs whose legacy amount is zero are dropped: populating them would only burn gas on writing
     ///      the "already populated" flag, since a later call would add zero anyway.
-    function _pendingAssetIds(
+    function _pendingAssetIndexes(
         IL1NativeTokenVault _ntv,
         uint256 _chainId,
         bytes32[] memory _assetIds
-    ) private view returns (bytes32[] memory pending) {
-        bytes32[] memory buffer = new bytes32[](_assetIds.length);
+    ) private view returns (uint256[] memory pending) {
+        uint256[] memory buffer = new uint256[](_assetIds.length);
         uint256 count;
 
         for (uint256 i = 0; i < _assetIds.length; ++i) {
@@ -100,11 +128,11 @@ library BridgedOutPopulationLib {
             if (_ntv.legacyBridgedOutForChain(_chainId, assetId) == 0) {
                 continue;
             }
-            buffer[count] = assetId;
+            buffer[count] = i;
             ++count;
         }
 
-        pending = new bytes32[](count);
+        pending = new uint256[](count);
         for (uint256 i = 0; i < count; ++i) {
             pending[i] = buffer[i];
         }
@@ -135,9 +163,9 @@ library BridgedOutPopulationLib {
         }
     }
 
-    /// @notice Cross-checks the per-chain legacy amounts against L1's own entry in the legacy tracker.
-    /// @dev The tracker keeps L1's entry as `MAX_TOKEN_BALANCE` minus everything ever bridged out of L1, so
-    ///      its complement must equal the sum of the per-chain amounts. A mismatch means the assumptions
+    /// @notice Cross-checks the per-chain legacy amounts against L1's own bulkhead in the legacy tracker.
+    /// @dev The tracker keeps L1's bulkhead as `MAX_TOKEN_BALANCE` minus everything ever bridged out of L1,
+    ///      so its complement must equal the sum of the per-chain amounts. A mismatch means the assumptions
     ///      about the legacy state do not hold and the amounts must be reviewed by hand; set
     ///      `BRIDGED_OUT_SKIP_INVARIANT_CHECK=true` to populate anyway. Skipped for assets that the tracker
     ///      never registered (their legacy amounts live in the vault's own deprecated mapping instead) and
@@ -145,14 +173,14 @@ library BridgedOutPopulationLib {
     function _checkLegacyTotalsInvariant(
         IL1NativeTokenVault _ntv,
         uint256[] memory _chainIds,
-        bytes32[] memory _assetIds
+        bytes32[] memory _assetIds,
+        bool _skipCheck
     ) private view {
         address legacyTracker = _ntv.legacyL1AssetTracker();
         if (legacyTracker == address(0)) {
             console.log("No legacy asset tracker recorded, skipping the legacy totals cross-check");
             return;
         }
-        bool skipCheck = vm.envOr("BRIDGED_OUT_SKIP_INVARIANT_CHECK", false);
 
         for (uint256 i = 0; i < _assetIds.length; ++i) {
             bytes32 assetId = _assetIds[i];
@@ -172,8 +200,26 @@ library BridgedOutPopulationLib {
                 console.logBytes32(assetId);
                 console.log("    sum over chains:", perChainSum);
                 console.log("    outflow recorded for L1:", trackedOutflow);
-                require(skipCheck, "bridgedOut: legacy per-chain amounts do not match L1's recorded outflow");
+                require(_skipCheck, "bridgedOut: legacy per-chain amounts do not match L1's recorded outflow");
             }
+        }
+    }
+
+    /// @dev Amounts are only ever comparable per asset, so the run is reported that way rather than as a
+    ///      single cross-asset total.
+    function _logPerAssetTotals(
+        IL1NativeTokenVault _ntv,
+        bytes32[] memory _assetIds,
+        uint256[] memory _populatedPerAsset
+    ) private view {
+        console.log("bridgedOut population complete. Populated amounts per asset:");
+        for (uint256 i = 0; i < _assetIds.length; ++i) {
+            if (_populatedPerAsset[i] == 0) {
+                continue;
+            }
+            console.logBytes32(_assetIds[i]);
+            console.log("    populated:", _populatedPerAsset[i]);
+            console.log("    bridgedOut now:", _ntv.bridgedOut(_assetIds[i]));
         }
     }
 

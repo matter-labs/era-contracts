@@ -121,9 +121,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     /// @inheritdoc IL1NativeTokenVault
     function legacyBridgedOutForChain(uint256 _chainId, bytes32 _assetId) public view returns (uint256 amount) {
-        // L1's own entry is not part of the bridged-out amount: in the legacy tracker it is the
-        // `MAX_TOKEN_BALANCE` sentinel of the origin chain, and in `DEPRECATED_chainBalance` it only ever
-        // tracked assets native to other chains.
+        // L1's own entry is not part of the bridged-out amount: in the legacy tracker L1 is the origin
+        // chain of these assets, so its bulkhead starts at `MAX_TOKEN_BALANCE` instead of at a real
+        // balance, and in `DEPRECATED_chainBalance` it only ever tracked assets native to other chains.
         if (_chainId == L1_CHAIN_ID) {
             return 0;
         }
@@ -142,10 +142,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     function populateBridgedOut(
         uint256 _chainId,
         bytes32[] calldata _assetIds
-    ) external returns (uint256 populatedAmount) {
+    ) external returns (uint256[] memory populatedAmounts) {
         require(_chainId != L1_CHAIN_ID, InvalidChainId());
 
         uint256 assetIdsLength = _assetIds.length;
+        populatedAmounts = new uint256[](assetIdsLength);
         for (uint256 i = 0; i < assetIdsLength; ++i) {
             bytes32 assetIdToPopulate = _assetIds[i];
             uint256 assetOriginChainId = originChainId[assetIdToPopulate];
@@ -163,7 +164,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             uint256 legacyAmount = legacyBridgedOutForChain(_chainId, assetIdToPopulate);
             if (legacyAmount != 0) {
                 bridgedOut[assetIdToPopulate] += legacyAmount;
-                populatedAmount += legacyAmount;
+                populatedAmounts[i] = legacyAmount;
             }
             emit BridgedOutPopulated(_chainId, assetIdToPopulate, legacyAmount);
         }

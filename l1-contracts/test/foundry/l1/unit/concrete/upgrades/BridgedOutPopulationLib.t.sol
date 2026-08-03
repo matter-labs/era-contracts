@@ -51,8 +51,16 @@ contract L1NativeTokenVaultWithLegacyState is L1NativeTokenVault {
 
 /// @dev Makes the library callable externally so that reverts can be asserted with `vm.expectRevert`.
 contract BridgedOutPopulationRunner {
-    function run(address _bridgehub) external returns (uint256) {
+    function run(address _bridgehub) external returns (bytes32[] memory, uint256[] memory) {
         return BridgedOutPopulationLib.populateBridgedOutForAllChains(_bridgehub);
+    }
+
+    function runWithSettings(
+        address _bridgehub,
+        uint256 _assetsPerCall,
+        bool _skipInvariantCheck
+    ) external returns (bytes32[] memory, uint256[] memory) {
+        return BridgedOutPopulationLib.populateBridgedOutForAllChains(_bridgehub, _assetsPerCall, _skipInvariantCheck);
     }
 
     function test() internal virtual {}
@@ -186,29 +194,45 @@ contract BridgedOutPopulationLibTest is Test {
         runner = new BridgedOutPopulationRunner();
     }
 
-    function _populate() internal returns (uint256) {
+    function _populate() internal returns (bytes32[] memory assetIds, uint256[] memory populatedPerAsset) {
         return runner.run(bridgehub);
+    }
+
+    /// @dev The amount the run folded into `_assetId`'s `bridgedOut`, across all chains.
+    function _populatedFor(
+        bytes32[] memory _assetIds,
+        uint256[] memory _amounts,
+        bytes32 _assetId
+    ) internal pure returns (uint256) {
+        for (uint256 i = 0; i < _assetIds.length; ++i) {
+            if (_assetIds[i] == _assetId) {
+                return _amounts[i];
+            }
+        }
+        revert("asset not considered by the run");
     }
 
     function test_populatesEveryChainAndAsset() public {
         legacyTracker.setChainBalance(FIRST_CHAIN_ID, firstAssetId, 100);
         legacyTracker.setChainBalance(SECOND_CHAIN_ID, firstAssetId, 20);
         legacyTracker.setChainBalance(FIRST_CHAIN_ID, secondAssetId, 7);
-        // L1's own entry is the sentinel complement of everything bridged out of L1.
+        // L1's own bulkhead is the complement of everything ever bridged out of L1.
         legacyTracker.setChainBalance(block.chainid, firstAssetId, type(uint256).max - 120);
         legacyTracker.setChainBalance(block.chainid, secondAssetId, type(uint256).max - 7);
         ntv.setLegacyAssetTracker(address(legacyTracker));
 
-        uint256 populated = _populate();
+        (bytes32[] memory assetIds, uint256[] memory populated) = _populate();
 
-        assertEq(populated, 127, "everything reported as populated");
+        assertEq(_populatedFor(assetIds, populated, firstAssetId), 120, "first asset reported per asset");
+        assertEq(_populatedFor(assetIds, populated, secondAssetId), 7, "second asset reported per asset");
         assertEq(ntv.bridgedOut(firstAssetId), 120, "first asset summed across chains");
         assertEq(ntv.bridgedOut(secondAssetId), 7, "second asset populated");
         assertTrue(ntv.bridgedOutPopulated(FIRST_CHAIN_ID, firstAssetId));
         assertTrue(ntv.bridgedOutPopulated(SECOND_CHAIN_ID, firstAssetId));
 
         // Re-running is a no-op, which is what makes an interrupted stage3 safe to resume.
-        assertEq(_populate(), 0, "second run populates nothing");
+        (assetIds, populated) = _populate();
+        assertEq(_populatedFor(assetIds, populated, firstAssetId), 0, "second run populates nothing");
         assertEq(ntv.bridgedOut(firstAssetId), 120, "no double counting");
     }
 
@@ -216,13 +240,15 @@ contract BridgedOutPopulationLibTest is Test {
         // Pre-v31 ecosystems never had a tracker; the amounts sit in the vault itself.
         ntv.setDeprecatedChainBalance(FIRST_CHAIN_ID, firstAssetId, 55);
 
-        assertEq(_populate(), 55);
+        (bytes32[] memory assetIds, uint256[] memory populated) = _populate();
+        assertEq(_populatedFor(assetIds, populated, firstAssetId), 55);
         assertEq(ntv.bridgedOut(firstAssetId), 55);
     }
 
     function test_noopWithoutLegacyState() public {
         // Freshly deployed ecosystems have nothing to populate, and no flags are written for them.
-        assertEq(_populate(), 0);
+        (bytes32[] memory assetIds, uint256[] memory populated) = _populate();
+        assertEq(_populatedFor(assetIds, populated, firstAssetId), 0);
         assertFalse(ntv.bridgedOutPopulated(FIRST_CHAIN_ID, firstAssetId), "no gas spent on empty pairs");
     }
 
@@ -236,7 +262,13 @@ contract BridgedOutPopulationLibTest is Test {
         legacyTracker.setChainBalance(FIRST_CHAIN_ID, remoteAssetId, 1234);
         ntv.setLegacyAssetTracker(address(legacyTracker));
 
-        assertEq(_populate(), 0, "no L1-native amounts to populate");
+        (bytes32[] memory assetIds, uint256[] memory populated) = _populate();
+        for (uint256 i = 0; i < populated.length; ++i) {
+            assertEq(populated[i], 0, "no L1-native amounts to populate");
+        }
+        for (uint256 i = 0; i < assetIds.length; ++i) {
+            assertTrue(assetIds[i] != remoteAssetId, "non-L1-native asset must not be considered");
+        }
         assertEq(ntv.bridgedOut(remoteAssetId), 0, "non-L1-native asset untouched");
     }
 
@@ -256,9 +288,12 @@ contract BridgedOutPopulationLibTest is Test {
         legacyTracker.setChainBalance(block.chainid, firstAssetId, type(uint256).max - 999);
         ntv.setLegacyAssetTracker(address(legacyTracker));
 
-        vm.setEnv("BRIDGED_OUT_SKIP_INVARIANT_CHECK", "true");
-        assertEq(_populate(), 100);
-        vm.setEnv("BRIDGED_OUT_SKIP_INVARIANT_CHECK", "false");
+        (bytes32[] memory assetIds, uint256[] memory populated) = runner.runWithSettings(
+            bridgehub,
+            BridgedOutPopulationLib.DEFAULT_ASSETS_PER_CALL,
+            true
+        );
+        assertEq(_populatedFor(assetIds, populated, firstAssetId), 100);
     }
 
     function test_batchesAssetsAcrossCalls() public {
@@ -269,10 +304,10 @@ contract BridgedOutPopulationLibTest is Test {
         legacyTracker.setChainBalance(block.chainid, secondAssetId, type(uint256).max - 4);
         ntv.setLegacyAssetTracker(address(legacyTracker));
 
-        vm.setEnv("BRIDGED_OUT_ASSETS_PER_CALL", "1");
-        assertEq(_populate(), 7);
-        vm.setEnv("BRIDGED_OUT_ASSETS_PER_CALL", "25");
+        (bytes32[] memory assetIds, uint256[] memory populated) = runner.runWithSettings(bridgehub, 1, false);
 
+        assertEq(_populatedFor(assetIds, populated, firstAssetId), 3, "per-asset amounts survive batching");
+        assertEq(_populatedFor(assetIds, populated, secondAssetId), 4, "per-asset amounts survive batching");
         assertEq(ntv.bridgedOut(firstAssetId), 3);
         assertEq(ntv.bridgedOut(secondAssetId), 4);
     }
@@ -282,7 +317,8 @@ contract BridgedOutPopulationLibTest is Test {
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         ntv.setDeprecatedChainBalance(FIRST_CHAIN_ID, ethAssetId, 9 ether);
 
-        assertEq(_populate(), 9 ether);
+        (bytes32[] memory assetIds, uint256[] memory populated) = _populate();
+        assertEq(_populatedFor(assetIds, populated, ethAssetId), 9 ether);
         assertEq(ntv.bridgedOut(ethAssetId), 9 ether);
     }
 

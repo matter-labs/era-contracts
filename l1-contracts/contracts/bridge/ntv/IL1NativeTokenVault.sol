@@ -47,11 +47,12 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     /// See {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}.
     /// @param _chainId The chain whose legacy amounts are being folded in.
     /// @param _assetIds The L1-native assets to populate; pairs already populated are skipped.
-    /// @return populatedAmount The total amount added to `bridgedOut` by this call.
+    /// @return populatedAmounts Per entry of `_assetIds`, the amount added to that asset's
+    /// `bridgedOut`; zero for pairs that were skipped or had no legacy amount.
     function populateBridgedOut(
         uint256 _chainId,
         bytes32[] calldata _assetIds
-    ) external returns (uint256 populatedAmount);
+    ) external returns (uint256[] memory populatedAmounts);
 
     event TokenBeaconUpdated(address indexed l2TokenBeacon);
 

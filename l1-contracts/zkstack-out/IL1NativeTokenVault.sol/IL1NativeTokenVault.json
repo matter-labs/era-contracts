@@ -329,9 +329,9 @@
     ],
     "outputs": [
       {
-        "name": "populatedAmount",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "populatedAmounts",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
       }
     ],
     "stateMutability": "nonpayable"

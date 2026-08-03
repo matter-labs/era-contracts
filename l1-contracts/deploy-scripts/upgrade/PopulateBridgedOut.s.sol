@@ -21,9 +21,7 @@ contract PopulateBridgedOutScript is Script {
         console.log("Bridgehub:", _bridgehub);
 
         vm.startBroadcast();
-        uint256 populated = BridgedOutPopulationLib.populateBridgedOutForAllChains(_bridgehub);
+        BridgedOutPopulationLib.populateBridgedOutForAllChains(_bridgehub);
         vm.stopBroadcast();
-
-        console.log("Total amount populated:", populated);
     }
 }
