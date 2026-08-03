@@ -66,6 +66,22 @@
   },
   {
     "type": "error",
+    "name": "AtomicFlowManagerL1ChainIdMismatch",
+    "inputs": [
+      {
+        "name": "recorded",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "expected",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InvalidChainId",
     "inputs": []
   },

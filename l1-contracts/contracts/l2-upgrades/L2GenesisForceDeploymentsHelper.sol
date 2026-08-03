@@ -39,6 +39,7 @@ import {L2AssetRouter} from "../bridge/asset-router/L2AssetRouter.sol";
 import {L2AssetTracker} from "../bridge/asset-tracker/L2AssetTracker.sol";
 import {L2ChainAssetHandler} from "../core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {L2InteropHandler} from "../interop/interop-handler/L2InteropHandler.sol";
+import {AtomicFlowManager} from "../atomic-interop/AtomicFlowManager.sol";
 import {L2InteropCommitmentTree} from "../atomic-interop/L2InteropCommitmentTree.sol";
 import {IAtomicFlowManager} from "../atomic-interop/IAtomicFlowManager.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
@@ -51,6 +52,7 @@ import {
     ZKsyncOSNotForceDeployToPrecompileAddress,
     NonCanonicalRepresentation
 } from "../common/L1ContractErrors.sol";
+import {AtomicFlowManagerL1ChainIdMismatch} from "../atomic-interop/AtomicInteropErrors.sol";
 
 import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
@@ -399,13 +401,28 @@ library L2GenesisForceDeploymentsHelper {
     /// {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}).
     /// Contracts that already existed in v31 are initialized on the genesis path only — their `initL2`s are
     /// unchanged since v31 and are one-shot, so an upgraded chain must not run them again.
+    /// @dev The built-ins are the one place where `_isGenesisUpgrade` cannot decide: a ZKsync OS chain
+    /// created at a v31 genesis already has them seeded, while a chain that predates them receives them from
+    /// this upgrade and does not. Both ancestries reach the non-genesis path, so the decision is taken from
+    /// the built-ins' own state, which is also what makes the upgrade transaction re-runnable.
     function _initializeV32Contracts(
         bool _isZKsyncOS,
         FixedForceDeploymentsData memory _fixedForceDeploymentsData
     ) private {
         if (_isZKsyncOS) {
-            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
-            IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
+            if (L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount() == 0) {
+                L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
+            }
+
+            uint256 managerL1ChainId = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).L1_CHAIN_ID();
+            if (managerL1ChainId == 0) {
+                IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
+            } else {
+                require(
+                    managerL1ChainId == _fixedForceDeploymentsData.l1ChainId,
+                    AtomicFlowManagerL1ChainIdMismatch(managerL1ChainId, _fixedForceDeploymentsData.l1ChainId)
+                );
+            }
         }
     }
 

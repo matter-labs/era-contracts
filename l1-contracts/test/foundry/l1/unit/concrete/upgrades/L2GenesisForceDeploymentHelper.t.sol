@@ -181,9 +181,18 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // same state a fresh one gets from genesis.
         _assertAtomicInteropInitialized();
 
-        // Note: the initialization is one-shot by design — this release's upgrade transaction is applied to
-        // a chain exactly once, and both built-ins reject a second seeding (`IMTAlreadyInitialized` /
-        // `ManagerAlreadyInitialized`) rather than silently accepting it.
+        // Re-running must be a no-op: a ZKsync OS chain created at a v31 genesis already has both
+        // built-ins seeded and reaches this same non-genesis path when it upgrades.
+        vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
+        L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
+            true,
+            ctmDeployerAddress,
+            fixedEncoded,
+            additionalEncoded,
+            false
+        );
+        vm.stopPrank();
+        _assertAtomicInteropInitialized();
     }
 
     function testEraForceDeployment() public {
