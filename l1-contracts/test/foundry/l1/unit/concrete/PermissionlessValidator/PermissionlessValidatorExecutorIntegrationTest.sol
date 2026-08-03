@@ -131,7 +131,7 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
         storedArray[0] = _buildStoredBatchInfoZKsyncOS(commitInfo);
 
         (, , proveData) = Utils.encodeProveBatchesData(genesisStoredBatchInfo, storedArray, proofInput);
-        (, , executeData) = Utils.encodeExecuteBatchesDataZeroLogs(storedArray, priorityOps);
+        (, , executeData) = Utils.encodeExecuteBatchesData(storedArray, priorityOps);
     }
 
     /// @dev Builds a ZKsync OS commit batch info for a priority-mode batch (no L2 txs).

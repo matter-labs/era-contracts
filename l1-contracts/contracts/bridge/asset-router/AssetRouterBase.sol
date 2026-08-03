@@ -168,6 +168,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         });
 
         request = _requestToBridge({
+            _chainId: _chainId,
             _originalCaller: _originalCaller,
             _assetId: assetId,
             _bridgeMintCalldata: bridgeMintCalldata,
@@ -351,6 +352,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
     /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify bridge requests.
     /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
     function _requestToBridge(
+        uint256 _chainId,
         address _originalCaller,
         bytes32 _assetId,
         bytes memory _bridgeMintCalldata,
@@ -360,11 +362,17 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
 
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,
-            l2Contract: L2_ASSET_ROUTER_ADDR,
+            l2Contract: _l2AssetRouterAddress(_chainId),
             l2Calldata: l2TxCalldata,
             factoryDeps: new bytes[](0),
             txDataHash: _txDataHash
         });
+    }
+
+    /// @dev Returns the address of the L2 asset router on the destination chain.
+    /// Overridden by private interop to return the registered remote router address.
+    function _l2AssetRouterAddress(uint256 /* _destinationChainId */) internal view virtual returns (address) {
+        return L2_ASSET_ROUTER_ADDR;
     }
 
     function getDepositCalldata(

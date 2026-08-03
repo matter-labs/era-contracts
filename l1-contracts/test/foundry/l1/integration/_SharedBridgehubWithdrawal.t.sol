@@ -127,7 +127,7 @@ abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeploy
         }
 
         // Bundle marked as fully executed (replay protection lives in the interop handler's bundle status).
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(currentChainId, bundle);
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
         assertTrue(
             addresses.l1InteropHandler.bundleStatus(bundleHash) == BundleStatus.FullyExecuted,
             "Bundle should be marked as fully executed"

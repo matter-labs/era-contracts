@@ -140,14 +140,36 @@ struct BridgehubL2TransactionRequest {
 /// @param chainId The chain id of the dependency chain
 /// @param blockOrBatchNumber The block number or the batch number where the message root was created
 /// For proof based interop it is block number. For commit based interop it is batch number.
+/// @param timestamp The settlement-layer block timestamp at which the imported root was created
+/// (i.e. `block.timestamp` of `blockOrBatchNumber` on the dependency chain). Imported alongside the
+/// root itself so that time-sensitive proofs (e.g. the atomic-interop timeout protocol) can anchor
+/// "this aggregated root is from after the deadline" on chain. Double checked on the settlement
+/// layer during batch execution against `MessageRoot.historicalRoot`.
 /// @param sides The sides of the dynamic incremental merkle tree emitted in the L2ToL1Messenger for precommit based interop
 /// For proof and commit based interop, the sides contain a single root.
 struct InteropRoot {
     uint256 chainId;
     uint256 blockOrBatchNumber;
+    uint256 timestamp;
     // We are double overloading this. The sides of the dynamic incremental merkle tree normally contains the root, as well as the sides of the tree.
     // Second overloading: if the length is 1, we are importing a chainBatchRoot/messageRoot instead of sides.
     bytes32[] sides;
+}
+
+/// @dev An aggregated (interop) root stored together with its creation timestamp — the value half of
+/// the `(blockNumber, root, timestamp)` tuple. Used both by the settlement layer's `MessageRoot`
+/// (`historicalRoot`) and by the L2 `L2InteropRootStorage` (`interopRoots`), so the executor's
+/// double check and the L2 consumers read the same shape.
+/// @dev IMPORTANT: this logic is not compatible with EraVM, as the EraVM bootloader does not yet
+/// support the new (timestamp-carrying) add-interop-roots entry point; it is expected to be deployed
+/// on ZKsync OS chains only.
+/// @param root The aggregated root.
+/// @param timestamp The block timestamp at which the root was created on its origin chain. Note that
+/// no roots recorded under previous protocol versions exist: interop was not activated in v31, so
+/// all stored roots carry the full tuple.
+struct StoredInteropRoot {
+    bytes32 root;
+    uint256 timestamp;
 }
 
 /// @param chainId The chain ID of the transaction to check.
@@ -194,8 +216,8 @@ struct InteropCallStarterInternal {
 /// @param indirectCallMessageValue Base token value on sending chain to send for indirect call.
 struct CallAttributes {
     uint256 interopCallValue;
-    bool indirectCall;
     uint256 indirectCallMessageValue;
+    bool indirectCall;
 }
 
 /// @param executionAddress ERC-7930 Address allowed to execute the bundle on the destination chain. If the byte array is empty then execution is permissionless.
@@ -225,9 +247,9 @@ struct BundleAttributes {
 
 /// @dev A single call.
 /// @param version Version of the InteropCall.
-/// @param shadowAccount If true, execute via a shadow account, otherwise normal. In current release always false, as it's not yet implemented.
-///                      Shadow accounts help with interop when `to` doesn't support 7786. In this case, a "shadow" account could be deployed, allowing
-///                      the user to hold funds securely on the destination chain, and interact with anything on destination chain using this shadow account.
+/// @param shadowAccount Reserved field, always false. ShadowAccount routing was removed; this slot is
+///                      kept to preserve the on-wire InteropBundle encoding (bundleHash / event topic /
+///                      pre-generated chain states) and may host a future feature.
 /// @param to Destination contract address on the target chain.
 /// @param from Original sender address that initiated the call.
 /// @param value Amount of base token to send with the call.
@@ -289,7 +311,7 @@ enum BundleStatus {
 /// @param chainId Source chain identifier.
 /// @param l1BatchNumber Batch number on L1 where the message root was committed.
 /// @param l2MessageIndex Position in the L2 logs Merkle tree of this message.
-/// @param message The raw L2 message payload (including `BUNDLE_IDENTIFIER` prefix).
+/// @param message The raw L2 message payload.
 /// @param proof Merkle‐proof for verifying the message inclusion.
 struct MessageInclusionProof {
     uint256 chainId;
@@ -334,6 +356,10 @@ struct ProofData {
     uint256 batchLeafProofLen;
     bytes32 batchSettlementRoot;
     bytes32 chainIdLeaf;
+    /// @dev Settlement-layer block timestamp at which the batch root was aggregated into the message
+    /// root (bound into the batch leaf, so it is proven by the inclusion proof). Zero for final-node
+    /// proofs, which carry no aggregation hop.
+    uint256 l1BatchTimestamp;
     uint256 ptr;
     bool finalProofNode;
 }

@@ -75,3 +75,22 @@ export function encodeBridgeMintData(
     [originalCaller, remoteReceiver, originToken, amount, erc20Metadata]
   );
 }
+
+/**
+ * Encode a chain ID in ERC-7930 format (EVM chain without address).
+ */
+export function encodeEvmChain(chainId: number): string {
+  let chainIdHex = chainId.toString(16);
+  if (chainIdHex.length % 2 !== 0) chainIdHex = `0${chainIdHex}`;
+  const chainRefBytes = ethers.utils.arrayify(`0x${chainIdHex}`);
+  const chainRefLen = chainRefBytes.length;
+  return ethers.utils.hexlify(new Uint8Array([0x00, 0x01, 0x00, 0x00, chainRefLen, ...chainRefBytes, 0x00]));
+}
+
+/**
+ * Encode an address in ERC-7930 format (EVM address without chain reference).
+ */
+export function encodeEvmAddress(address: string): string {
+  const addrBytes = ethers.utils.arrayify(address);
+  return ethers.utils.hexlify(new Uint8Array([0x00, 0x01, 0x00, 0x00, 0x00, 0x14, ...addrBytes]));
+}

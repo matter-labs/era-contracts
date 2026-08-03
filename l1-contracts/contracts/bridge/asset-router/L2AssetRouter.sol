@@ -6,22 +6,31 @@ import {IL2AssetRouter} from "./IL2AssetRouter.sol";
 import {IL2CrossChainSender} from "../interfaces/IL2CrossChainSender.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
+import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
 
 import {IL2Bridgehub} from "../../core/bridgehub/IL2Bridgehub.sol";
 
 import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {InteropCallStarter} from "../../common/Messaging.sol";
+import {IAtomicRecoverable} from "../../atomic-interop/IAtomicRecoverable.sol";
 import {
+    L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_HANDLER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {AssetIdNotSupported, EmptyAddress, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {
+    AssetIdNotSupported,
+    EmptyAddress,
+    RecoverToL1NotSupported,
+    Unauthorized
+} from "../../common/L1ContractErrors.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
 import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 
@@ -30,7 +39,7 @@ import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol"
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
-contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
+contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAtomicRecoverable {
     /// @dev Deprecated: previously stored the L2 Bridgehub. Now the address is resolved via
     /// `_bridgehub()` → `L2_BRIDGEHUB_ADDR` constant. Kept as an empty slot to preserve storage layout.
     IL2Bridgehub private __DEPRECATED_BRIDGE_HUB;
@@ -63,6 +72,25 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     /// @notice Returns the bridgehub contract.
     function _bridgehub() internal view virtual override returns (IBridgehubBase) {
         return IBridgehubBase(L2_BRIDGEHUB_ADDR);
+    }
+
+    /// @notice Returns the native token vault address. Virtual for private interop override.
+    function _nativeTokenVaultAddr() internal view virtual returns (address) {
+        return L2_NATIVE_TOKEN_VAULT_ADDR;
+    }
+
+    /// @notice Returns the interop center address. Virtual for private interop override.
+    function _interopCenterAddr() internal view virtual returns (address) {
+        return L2_INTEROP_CENTER_ADDR;
+    }
+
+    /// @notice Returns the canonical atomic-flow manager address — the contract whitelisted to call
+    /// `recoverAtomicCall` (the IMT atomic flow's timeout recovery path). It is a genesis-deployed
+    /// built-in at a fixed address, like the interop center above; chains without the
+    /// atomic-flow stack simply have nothing deployed there, so the auth gate never passes. Virtual
+    /// for private interop override.
+    function _atomicFlowManagerAddr() internal view virtual returns (address) {
+        return L2_ATOMIC_FLOW_MANAGER_ADDR;
     }
 
     /// @notice Checks that the message sender is the asset-router counterpart for messages originating on L1.
@@ -99,13 +127,21 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     }
 
     modifier onlyNTV() {
-        require(msg.sender == L2_NATIVE_TOKEN_VAULT_ADDR, Unauthorized(msg.sender));
+        require(msg.sender == _nativeTokenVaultAddr(), Unauthorized(msg.sender));
         _;
     }
 
     /// @notice Checks that the message sender is the interop center.
     modifier onlyL2InteropCenter() {
-        require(msg.sender == L2_INTEROP_CENTER_ADDR, Unauthorized(msg.sender));
+        require(msg.sender == _interopCenterAddr(), Unauthorized(msg.sender));
+        _;
+    }
+
+    /// @notice Checks that the message sender is the canonical atomic-flow manager, which drives
+    /// `recoverAtomicCall` for the atomic interop flow's timeout path. On chains without the
+    /// atomic-flow stack nothing is deployed at that address, so this gate naturally never passes.
+    modifier onlyAtomicFlowManager() {
+        require(msg.sender == _atomicFlowManagerAddr(), Unauthorized(msg.sender));
         _;
     }
 
@@ -180,7 +216,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         bytes32 _assetRegistrationData,
         address _assetHandlerAddress
     ) external override {
-        _setAssetHandlerAddressThisChain(L2_NATIVE_TOKEN_VAULT_ADDR, _assetRegistrationData, _assetHandlerAddress);
+        _setAssetHandlerAddressThisChain(_nativeTokenVaultAddr(), _assetRegistrationData, _assetHandlerAddress);
     }
 
     /// @inheritdoc AssetRouterBase
@@ -238,9 +274,60 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         bytes calldata _transferData
     ) public payable override onlyAssetRouterCounterpartOrSelf(_sourceChainId) nonReentrant {
         require(_assetId != BASE_TOKEN_ASSET_ID, AssetIdNotSupported(BASE_TOKEN_ASSET_ID));
-        _finalizeDeposit(_sourceChainId, _assetId, _transferData, L2_NATIVE_TOKEN_VAULT_ADDR);
+        _finalizeDeposit(_sourceChainId, _assetId, _transferData, _nativeTokenVaultAddr());
 
         emit DepositFinalizedAssetRouter(_sourceChainId, _assetId, _transferData);
+    }
+
+    /// @inheritdoc IAtomicRecoverable
+    /// @dev Recovers the burn embedded in an atomic-bundle `finalizeDeposit(chainId, assetId, transferData)`
+    /// call: re-credits the burned asset to the original depositor (the burn's `originalCaller`) on the
+    /// burn's destination chain, swapping the receiver to the depositor. Returns `false` for any other
+    /// call so the {AtomicFlowManager} can skip non-recoverable bundle calls without reverting.
+    function recoverAtomicCall(
+        uint256 _destChainId,
+        bytes calldata _callData
+    ) external onlyAtomicFlowManager nonReentrant returns (bool recovered) {
+        // L2->L1 interop is never revertable ({InteropCenter} rejects L1-destined atomic bundles at send),
+        // so no L1-destined burn can ever be recovered. Assert it: the L1-withdrawal accounting
+        // (`totalWithdrawalsToL1`, consumed once during the L1->GW migration) must stay append-only.
+        require(_destChainId != L1_CHAIN_ID, RecoverToL1NotSupported());
+        if (_callData.length < 4 || bytes4(_callData[:4]) != AssetRouterBase.finalizeDeposit.selector) {
+            return false;
+        }
+
+        // Decode finalizeDeposit(sourceChainId, assetId, bridgeMintData); the source chain id is unused.
+        // The bundle's mint data is forwarded verbatim: NTV.bridgeRecoverFailedTransfer refunds the data's
+        // `originalCaller` (the source depositor), so the receiver swap no longer happens here.
+        // slither-disable-next-line unused-return
+        (, bytes32 assetId, bytes memory mintData) = abi.decode(_callData[4:], (uint256, bytes32, bytes));
+        IL2NativeTokenVault(_nativeTokenVaultAddr()).bridgeRecoverFailedTransfer(_destChainId, assetId, mintData);
+        return true;
+    }
+
+    /// @notice Refunds a timed-out atomic-interop value leg, re-crediting the destination base-token asset
+    /// to the depositor.
+    /// @dev Manager-gated wrapper symmetric with {bridgehubDepositBaseToken} and the same-base
+    /// BaseTokenHolder path; forwards to the NTV, which dispatches through the existing failed-transfer
+    /// recovery logic.
+    /// @param _chainId The chain the asset was being bridged to at burn time.
+    /// @param _assetId The destination base-token asset id that was burned.
+    /// @param _receiver The original depositor to refund.
+    /// @param _amount The amount to recover.
+    function bridgehubRecoverBaseToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _receiver,
+        uint256 _amount
+    ) external onlyAtomicFlowManager nonReentrant {
+        require(_chainId != L1_CHAIN_ID, RecoverToL1NotSupported());
+        // Reuse the generic failed-transfer recovery. The base-token deposit (bridgehubDepositBaseToken)
+        // discarded its bridge-mint data, so reconstruct the minimal form: `bridgeRecoverFailedTransfer`
+        // refunds the mint data's `originalCaller` for `amount`, and the asset is already registered on
+        // this chain (it was burned from the depositor), so origin-token / erc20 metadata go unused.
+        // solhint-disable-next-line func-named-parameters
+        bytes memory mintData = DataEncoding.encodeBridgeMintData(_receiver, _receiver, address(0), _amount, "");
+        IL2NativeTokenVault(_nativeTokenVaultAddr()).bridgeRecoverFailedTransfer(_chainId, _assetId, mintData);
     }
 
     /// @inheritdoc IL2CrossChainSender
@@ -263,12 +350,14 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         // - L2B AssetRouter receives via executeMessage() with sender=address(this)
         //   (L2AssetRouter address is equal on all ZKsync chains)
 
+        address ntvAddr = _nativeTokenVaultAddr();
+
         L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit({
             _chainId: _chainId,
             _originalCaller: _originalCaller,
             _value: _value,
             _data: _data,
-            _nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR
+            _nativeTokenVault: ntvAddr
         });
 
         // The _value parameter represents the amount being bridged and is encoded

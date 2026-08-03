@@ -32,7 +32,7 @@ import {
     HistoricalSettlementLayerMismatch,
     NotSystemContext
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
-import {NotAssetRouter, MigrationPaused} from "contracts/common/L1ContractErrors.sol";
+import {NotAssetRouter, MigrationPaused, ChainMigrationsDisabled} from "contracts/common/L1ContractErrors.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
@@ -42,6 +42,7 @@ import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {IL2ChainAssetHandler} from "contracts/core/chain-asset-handler/IL2ChainAssetHandler.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
+import {L2ChainAssetHandlerDev} from "contracts/dev-contracts/L2ChainAssetHandlerDev.sol";
 
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
@@ -219,6 +220,55 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         vm.expectRevert(abi.encodeWithSelector(MigrationPaused.selector));
         vm.prank(L2_ASSET_ROUTER_ADDR);
         IChainAssetHandlerBase(address(l2ChainAssetHandler)).bridgeBurn(eraZKChainId, 0, 0, address(0), "");
+    }
+
+    // Chain migrations are explicitly disabled in the v32 release, in which all chains settle
+    // on L1 (see `CHAIN_MIGRATIONS_ENABLED` in `Config.sol`). The following tests pin the
+    // release-level ban on the production (non-Dev) chain asset handlers on both layers.
+
+    function test_bridgeBurn_revertWhen_chainMigrationsDisabled_L2() public {
+        vm.expectRevert(abi.encodeWithSelector(ChainMigrationsDisabled.selector));
+        vm.prank(L2_ASSET_ROUTER_ADDR);
+        IChainAssetHandlerBase(address(l2ChainAssetHandler)).bridgeBurn(eraZKChainId, 0, 0, address(0), "");
+    }
+
+    function test_bridgeMint_revertWhen_chainMigrationsDisabled_L2() public {
+        vm.expectRevert(abi.encodeWithSelector(ChainMigrationsDisabled.selector));
+        vm.prank(L2_ASSET_ROUTER_ADDR);
+        IChainAssetHandlerBase(address(l2ChainAssetHandler)).bridgeMint(eraZKChainId, bytes32(0), "");
+    }
+
+    function test_bridgeBurn_revertWhen_chainMigrationsDisabled_L1() public {
+        address handler = ecosystemAddresses.bridgehub.proxies.chainAssetHandler;
+        vm.expectRevert(abi.encodeWithSelector(ChainMigrationsDisabled.selector));
+        vm.prank(address(addresses.sharedBridge));
+        IChainAssetHandlerBase(handler).bridgeBurn(eraZKChainId, 0, 0, address(0), "");
+    }
+
+    function test_bridgeMint_revertWhen_chainMigrationsDisabled_L1() public {
+        address handler = ecosystemAddresses.bridgehub.proxies.chainAssetHandler;
+        vm.expectRevert(abi.encodeWithSelector(ChainMigrationsDisabled.selector));
+        vm.prank(address(addresses.sharedBridge));
+        IChainAssetHandlerBase(handler).bridgeMint(eraZKChainId, bytes32(0), "");
+    }
+
+    function test_migrationsEnabled_falseOnProductionHandlers() public view {
+        address handler = ecosystemAddresses.bridgehub.proxies.chainAssetHandler;
+        assertFalse(
+            IChainAssetHandlerBase(handler).migrationsEnabled(),
+            "Chain migrations must be disabled on the production L1 chain asset handler"
+        );
+        assertFalse(
+            IChainAssetHandlerBase(address(l2ChainAssetHandler)).migrationsEnabled(),
+            "Chain migrations must be disabled on the production L2 chain asset handler"
+        );
+    }
+
+    function test_migrationsEnabled_trueOnDevHandler() public {
+        // The Dev variant re-enables migrations so the migration machinery, which is preserved
+        // for future releases, stays covered by the gateway and interop test harnesses.
+        L2ChainAssetHandlerDev devHandler = new L2ChainAssetHandlerDev();
+        assertTrue(devHandler.migrationsEnabled(), "Chain migrations should be enabled on the Dev chain asset handler");
     }
 
     function test_setSettlementLayerChainId_sameChainId() public {

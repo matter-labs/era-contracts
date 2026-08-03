@@ -7,8 +7,6 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT, PUBLIC_INPUT_SHIFT} from "contracts/common/Config.sol";
 
 contract ExecutorZKsyncOSPublicInputHarness is ExecutorFacet {
-    constructor() ExecutorFacet(block.chainid) {}
-
     function util_setZKsyncOSChainConfig(uint256 _chainId, uint64 _maxTxGasLimit) external {
         s.chainId = _chainId;
         s.zksyncOSMaxTxGasLimit = _maxTxGasLimit;

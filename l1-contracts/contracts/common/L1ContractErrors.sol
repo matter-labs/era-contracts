@@ -23,6 +23,8 @@ error AlreadyPermanentRollup();
 error AlreadyWhitelisted(address);
 // 0x5e85ae73
 error AmountMustBeGreaterThanZero();
+// 0x76fc80ad
+error AssetDeploymentTrackerNotSet(bytes32 assetId);
 // 0xfde974f4
 error AssetHandlerDoesNotExist(bytes32 assetId);
 // 0x64107968
@@ -83,6 +85,8 @@ error ChainIdMismatch();
 error ChainIdNotRegistered(uint256 chainId);
 // 0x8f620a06
 error ChainIdTooBig();
+// 0x41888953
+error ChainMigrationsDisabled();
 // 0x5e361ef9
 error ChainRequiresValidatorsSignaturesForCommit();
 // 0x8746f42f
@@ -360,6 +364,8 @@ error ProtocolIdNotGreater();
 error PubdataGreaterThanLimit(uint256 limit, uint256 length);
 // 0x63c36549
 error QueueIsEmpty();
+// 0x881fba9f
+error RecoverToL1NotSupported();
 // 0xab143c06
 error Reentrancy();
 // 0x667d17de

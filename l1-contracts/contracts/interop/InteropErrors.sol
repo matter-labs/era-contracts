@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
+// 0x979e85dd
+error AtomicBundleToL1NotSupported();
 // 0x9031f751
 error AttributeAlreadySet(bytes4 selector);
 // 0xbcb41ec7
@@ -35,10 +37,14 @@ error InteropCallToL1NotToAssetRouter(address target);
 error InteroperableAddressChainReferenceNotEmpty(bytes interoperableAddress);
 // 0x884f49ba
 error InteroperableAddressNotEmpty(bytes interoperableAddress);
+// 0x290dc1c0
+error InteropPreviewHash(bytes32 bundleHash);
 // 0x9b021130
 error InteropToSelfNotSupported();
 // 0x2d48e8cf
 error InteropRootAlreadyExists();
+// 0x8a011102
+error InteropRootTimestampIsZero();
 // 0xeae192ef
 error InvalidInteropBundleVersion();
 // 0xd5f13973
@@ -47,6 +53,8 @@ error InvalidInteropCallVersion();
 error MessageNotIncluded();
 // 0x6a430157
 error MultiCallToL1NotSupported(uint256 callCount);
+// 0x1db1b07e
+error NonAtomicSendUnsupported();
 // 0xd72e81d8
 error NonZeroValueToL1NotSupported(uint256 value);
 // 0x2f59bd0d

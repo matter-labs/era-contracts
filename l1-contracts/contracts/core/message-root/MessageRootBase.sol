@@ -15,17 +15,20 @@ import {
     DepthMoreThanOneForRecursiveMerkleProof,
     MessageRootNotRegistered,
     NonConsecutiveBatchNumber,
+    OnlyBridgehub,
     OnlyChainAssetHandler,
     OnlyBridgehubOrChainAssetHandler,
     OnlyChain
 } from "../bridgehub/L1BridgehubErrors.sol";
 
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
+import {StoredInteropRoot} from "../../common/Messaging.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
 
 import {MessageVerification} from "../../common/MessageVerification.sol";
+import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -57,20 +60,30 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     mapping(uint256 chainIndex => uint256 chainId) public chainIndexToId;
 
     /// @notice The shared full merkle tree storing the aggregate hash.
-    /// @dev Note, that on L1, the chainId leaves are empty.
+    /// @dev The chainId leaves are updated on every pushed chain batch root.
     FullMerkle.FullTree public sharedTree;
 
     /// @dev The incremental merkle tree storing the chain message roots.
-    /// @dev On L1, these are empty leaves and are populated only during the addition of the chain
-    /// are not updated thereafter.
+    /// @dev A chain's leaves are seeded empty when the chain is added and then pushed to on every
+    /// `addChainBatchRoot`.
     mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) internal chainTree;
 
-    /// @notice The mapping from block number to the global message root.
+    /// @notice The mapping from block number to the global message root and the block timestamp at
+    /// which it was written — the `(blockNumber, root, timestamp)` tuple chains import into their
+    /// `L2InteropRootStorage` and the executor double checks during batch execution
+    /// (see `ExecutorFacet._verifyDependencyInteropRoots`). Time-sensitive proofs (e.g. the
+    /// atomic-interop timeout protocol) rely on the timestamp to show a root is from after a deadline.
     /// @dev Each block might have multiple txs that change the historical root. You can safely use the final root in the block,
     /// since each new root cumulatively aggregates all prior changes — so the last root always contains (at minimum) everything
     /// from the earlier ones.
-    /// @dev Populated only on L2.
-    mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
+    /// @dev Populated on every pushed chain batch root.
+    /// @dev This field was never populated on L1 prior to this upgrade (the same holds for the chain
+    /// trees — those were empty as well): since interop has not been enabled in v31, this mapping was
+    /// empty at the time of the upgrade, so no backfill of past blocks is needed. Additionally,
+    /// mapping values live at hashed locations, so extending the value type from `bytes32` to a
+    /// struct (whose first member `root` occupies exactly the slot the plain `bytes32` used) does not
+    /// shift any other storage.
+    mapping(uint256 blockNumber => StoredInteropRoot) internal historicalRoots;
 
     /// @dev Chain ID of L1.
     /// @dev Kept here for storage layout compatibility with previous versions.
@@ -83,10 +96,16 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
 
     /// @notice The mapping from chainId to batchNumber to chainBatchRoot.
     /// @dev These are the same values as the leaves of the chainTree.
-    /// @dev We store these values for message verification on L1 and Gateway.
-    /// @dev We only updated the chainTree on deprecated Era GW as of V31.
+    /// @dev We store these values for message verification.
     /// @dev An expected invariant is that for all batches starting from currentChainBatchNumber + 1, the `chainBatchRoots` is 0.
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
+
+    /// @notice The settlement-layer block timestamp at which each `(chainId, batchNumber)` chainBatchRoot
+    /// was aggregated (i.e. when the chain settled on this layer).
+    /// @dev This is the same `l1Timestamp` that is bound into the batch leaf (`MessageHashing.batchLeafHash`),
+    /// so it is provable via the aggregated-root inclusion proof. Stored so that off-chain proof builders
+    /// can retrieve the exact timestamp they must feed into a proof.
+    mapping(uint256 chainId => mapping(uint256 batchNumber => uint256 l1Timestamp)) public chainBatchRootTimestamp;
 
     /// @notice The current logId value emitted in `NewInteropRoot` events.
     /// @dev Increments at most once per block: all emissions within the same block share the same
@@ -131,11 +150,8 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         _;
     }
 
-    /// @notice The chain itself appends its batch root, both on L1 and on Gateway. On Gateway the
-    /// chain's `Executor` calls this directly while settling (it no longer routes through the asset
-    /// tracker). Asset correctness across chains is guaranteed by ZK proofs.
-    /// @dev Note, that at the moment of the v31 upgrade we no chains to settle on top of the old
-    /// Era-based Gateway, and so no special handling is needed for pre-v31 chains.
+    /// @notice The chain itself appends its batch root (its `Executor` calls this directly while
+    /// settling). Asset correctness across chains is guaranteed by ZK proofs.
     modifier addChainBatchRootRestriction(uint256 _chainId) {
         if (msg.sender != IBridgehubBase(_bridgehub()).getZKChain(_chainId)) {
             revert OnlyChain(msg.sender, IBridgehubBase(_bridgehub()).getZKChain(_chainId));
@@ -170,8 +186,14 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         return (_chainId == block.chainid || chainIndex[_chainId] != 0);
     }
 
-    /// @notice Adds a new chainBatchRoot to the chainTree.
-    /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
+    /// @notice Records a new chainBatchRoot WITHOUT pushing it into the interop trees — the v31 flow.
+    /// @dev Kept with the pre-v32 name and behavior because pre-upgrade (v31) executor facets keep
+    /// calling it while their chains have not upgraded yet. Roots recorded here do NOT enter the
+    /// chain tree / shared tree: only v32 chains (which call {addChainBatchRootV32}) populate the
+    /// interop trees, so every chain with a non-empty chain tree is known to use the most recent
+    /// (v32) chain-batch-root format. `currentChainBatchNumber` still advances, so the consecutive
+    /// numbering continues seamlessly once the chain upgrades and switches to the V32 entry point.
+    /// @param _chainId The ID of the chain whose chainBatchRoot is being recorded.
     /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
     /// @param _chainBatchRoot The value of chainBatchRoot which is being added.
     function addChainBatchRoot(
@@ -179,6 +201,31 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
     ) public virtual addChainBatchRootRestriction(_chainId) {
+        _recordChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
+    }
+
+    /// @notice Adds a new chainBatchRoot to the chainTree and updates the aggregated shared tree — the
+    /// v32 flow.
+    /// @dev The chain's `Executor` calls it directly while settling (see
+    /// `addChainBatchRootRestriction`). The chainBatchRoot is recorded, pushed to the chain tree,
+    /// the shared tree leaf is updated, and a new interop root is emitted — so settling chains
+    /// participate in interop. Only v32 executors call this entry point (v31 chains keep using the record-only
+    /// {addChainBatchRoot}), so the interop trees contain v32-format roots exclusively.
+    /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
+    /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
+    /// @param _chainBatchRoot The value of chainBatchRoot which is being added.
+    function addChainBatchRootV32(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        bytes32 _chainBatchRoot
+    ) public virtual addChainBatchRootRestriction(_chainId) {
+        _recordChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
+        _pushChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
+    }
+
+    /// @dev Shared validation + bookkeeping of both add-chain-batch-root flows: verifies the chain is
+    /// registered, the root is non-zero, not yet recorded, and consecutive, then records it.
+    function _recordChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) internal {
         // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();
@@ -193,6 +240,46 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
 
         chainBatchRoots[_chainId][_batchNumber] = _chainBatchRoot;
         currentChainBatchNumber[_chainId] = expectedNewChainBatchNumber;
+    }
+
+    /// @dev Pushes an already-recorded chainBatchRoot into the chain tree and propagates the new chain
+    /// root into the shared tree (the interop half of the v32 flow).
+    function _pushChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) internal {
+        // Record the settlement-layer timestamp at which this batch root was aggregated. It is bound into
+        // the batch leaf below, so a later inclusion proof against the aggregated root also proves the
+        // timestamp — a single aggregated root can prove many chain batch roots, each with its own time.
+        uint256 l1Timestamp = block.timestamp;
+        chainBatchRootTimestamp[_chainId][_batchNumber] = l1Timestamp;
+
+        // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.
+        bytes32 chainRoot;
+        // slither-disable-next-line unused-return
+        (, chainRoot) = chainTree[_chainId].push(
+            MessageHashing.batchLeafHash(_chainBatchRoot, _batchNumber, l1Timestamp)
+        );
+
+        emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot, l1Timestamp);
+
+        // Update leaf corresponding to the specified chainId with newly acquired value of the chainRoot.
+        bytes32 cachedChainIdLeafHash = MessageHashing.chainIdLeafHash(chainRoot, _chainId);
+        bytes32 sharedTreeRoot = sharedTree.updateLeaf(chainIndex[_chainId], cachedChainIdLeafHash);
+
+        emit NewChainRoot(_chainId, chainRoot, cachedChainIdLeafHash);
+
+        _emitRoot(sharedTreeRoot);
+        _recordHistoricalRoot(sharedTreeRoot);
+    }
+
+    /// @dev Records the current shared tree root together with the block timestamp at which it was
+    /// created, forming the `(blockNumber, root, timestamp)` tuple chains import for interop.
+    function _recordHistoricalRoot(bytes32 _sharedTreeRoot) internal {
+        historicalRoots[block.number] = StoredInteropRoot({root: _sharedTreeRoot, timestamp: block.timestamp});
+    }
+
+    /// @notice Returns the global message root written at `_blockNumber` together with the block
+    /// timestamp at which it was written (the `(blockNumber, root, timestamp)` tuple).
+    function historicalRoot(uint256 _blockNumber) external view returns (StoredInteropRoot memory) {
+        return historicalRoots[_blockNumber];
     }
 
     /// @notice Emits a new interop root event when the shared tree root changes.
@@ -211,7 +298,8 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
             lastEmitBlock = block.number;
         }
 
-        emit NewInteropRoot(block.chainid, block.number, currentCount, _sides);
+        // solhint-disable-next-line func-named-parameters
+        emit NewInteropRoot(block.chainid, block.number, currentCount, block.timestamp, _sides);
     }
 
     /// @notice Gets the aggregated root of all chains.
@@ -220,6 +308,12 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
             return SHARED_ROOT_TREE_EMPTY_HASH;
         }
         return sharedTree.root();
+    }
+
+    /// @notice The number of batch leaves in a chain's tree on this settlement layer.
+    /// @param _chainId The ID of the chain whose tree is being queried.
+    function chainTreeLeafCount(uint256 _chainId) external view returns (uint256) {
+        return chainTree[_chainId]._nextLeafIndex;
     }
 
     /// @dev Gets the message root of a single chain.
@@ -232,7 +326,15 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         return chainTree[_chainId].root();
     }
 
-    /// @dev Adds a single chain to the message root.
+    /// @dev Adds a single chain to the message root. The chain's tree starts empty; freshly created
+    /// ZKsync OS chains report their genesis (batch 0) chain batch root themselves right after
+    /// registration via {seedGenesisRoot} (triggered by the Bridgehub in the same `createNewChain`
+    /// transaction), keeping the "chain reports its own roots" interface intact — this contract never
+    /// computes a chain's batch root format.
+    /// @dev Chains registered with a non-zero `_startingBatchNumber` (already-deployed chains being
+    /// onboarded, settlement-layer migrations) never report a genesis root. Such chains must settle at least one
+    /// batch on this layer before they can be registered for interop — enforced by
+    /// `ChainRegistrationSender`.
     /// @param _chainId The ID of the chain that is being added to the message root.
     function _addNewChain(uint256 _chainId, uint256 _startingBatchNumber) internal {
         uint256 cachedChainCount = chainCount;
@@ -245,14 +347,43 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         currentChainBatchNumber[_chainId] = _startingBatchNumber;
 
         // slither-disable-next-line unused-return
-        bytes32 initialHash = chainTree[_chainId].setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
+        chainTree[_chainId].setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
 
-        bytes32 sharedTreeRoot = sharedTree.pushNewLeaf(MessageHashing.chainIdLeafHash(initialHash, _chainId));
+        bytes32 sharedTreeRoot = sharedTree.pushNewLeaf(MessageHashing.chainIdLeafHash(bytes32(0), _chainId));
 
         emit AddedChain(_chainId, cachedChainCount);
 
         _emitRoot(sharedTreeRoot);
-        historicalRoot[block.number] = sharedTreeRoot;
+        _recordHistoricalRoot(sharedTreeRoot);
+    }
+
+    /// @notice One-time seeding of a freshly created chain's genesis (batch 0) chain batch root,
+    /// pulled from the chain itself (`l2LogsRootHash(0)`, stored by its DiamondInit). The Bridgehub
+    /// calls this right after registration in `createNewChain`; a no-op for EraVM chains.
+    /// @param _chainId The ID of the chain whose genesis root is seeded.
+    function seedGenesisRoot(uint256 _chainId) external {
+        if (msg.sender != _bridgehub()) {
+            revert OnlyBridgehub(msg.sender, _bridgehub());
+        }
+        IGetters zkChain = IGetters(IBridgehubBase(_bridgehub()).getZKChain(_chainId));
+        if (!zkChain.getZKsyncOS()) {
+            return;
+        }
+        // A ZKsync OS chain always stores its genesis root in DiamondInit; a zero read is a bug.
+        bytes32 genesisChainBatchRoot = zkChain.l2LogsRootHash(0);
+        require(genesisChainBatchRoot != bytes32(0), ChainBatchRootZero());
+        if (!chainRegistered(_chainId)) {
+            revert MessageRootNotRegistered();
+        }
+        // Expected next batch number must be 1: rules out chains onboarded at a non-zero starting
+        // batch and chains that already pushed real batches.
+        require(currentChainBatchNumber[_chainId] == 0, NonConsecutiveBatchNumber(_chainId, 0));
+        require(chainBatchRoots[_chainId][0] == bytes32(0), ChainBatchRootAlreadyExists(_chainId, 0));
+
+        chainBatchRoots[_chainId][0] = genesisChainBatchRoot;
+        // `currentChainBatchNumber` stays 0: the first real batch continues at 1 exactly as without
+        // the genesis leaf.
+        _pushChainBatchRoot(_chainId, 0, genesisChainBatchRoot);
     }
 
     //////////////////////////////
@@ -283,7 +414,10 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
             _proof: _proof
         });
         if (proofData.finalProofNode) {
-            // For proof based interop this is the SL InteropRoot at block number _batchNumber
+            // finalProofNode terminates on the settlement layer — in this release always L1 (every chain
+            // settles on L1; SL migrations are disabled). The proven root must equal the settling chain's
+            // batch root recorded here (`chainBatchRoots`) — NOT this layer's aggregate root
+            // (`historicalRoot`), which is only exported to consumers (where L2 verifiers use `interopRoots`).
             bytes32 correctBatchRoot = _getChainBatchRoot(_chainId, _batchNumber);
             return correctBatchRoot == proofData.batchSettlementRoot && correctBatchRoot != bytes32(0);
         }

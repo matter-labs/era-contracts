@@ -37,6 +37,7 @@ describe("01 - Deployment Verification", function () {
     it("has Bridgehub deployed with code", async () => {
       const code = await l1Provider.getCode(state.l1Addresses!.bridgehub);
       expect(code).to.not.equal("0x");
+      expect(code).to.not.equal("0x0");
     });
 
     it("has L1AssetRouter (SharedBridge) deployed with code", async () => {
@@ -50,7 +51,8 @@ describe("01 - Deployment Verification", function () {
     });
 
     it("has CTM registered in Bridgehub", async () => {
-      const bridgehub = new Contract(state.l1Addresses!.bridgehub, getAbi("L1Bridgehub"), l1Provider);
+      const bridgehubAbi = getAbi("L1Bridgehub");
+      const bridgehub = new Contract(state.l1Addresses!.bridgehub, bridgehubAbi, l1Provider);
       const isRegistered = await bridgehub.chainTypeManagerIsRegistered(state.ctmAddresses!.chainTypeManager);
       expect(isRegistered).to.equal(true);
     });
@@ -103,6 +105,7 @@ describe("01 - Deployment Verification", function () {
           it(`has ${contract.name} at ${contract.addr}`, async () => {
             const code = await l2Provider.getCode(contract.addr);
             expect(code, `${contract.name} not deployed on chain ${chainConfig.chainId}`).to.not.equal("0x");
+            expect(code).to.not.equal("0x0");
           });
         }
       });

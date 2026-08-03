@@ -5,8 +5,6 @@ pragma solidity 0.8.28;
 import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
 
 contract ExecutorProvingTest is ExecutorFacet {
-    constructor() ExecutorFacet(block.chainid) {}
-
     function getBatchProofPublicInput(
         bytes32 _prevBatchCommitment,
         bytes32 _currentBatchCommitment

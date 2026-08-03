@@ -65,6 +65,11 @@ uint256 constant PUBLIC_INPUT_SHIFT = 32;
 /// @dev Maximum number of linked-list leaves checked when correcting a stale indexed Merkle tree low leaf.
 uint256 constant MAX_LOW_INDEX_SEARCH_ATTEMPTS = 5;
 
+/// @dev Padding value for empty/unused leaves in an {IndexedMerkleTree}. Deliberately NOT a valid
+/// `hashLeaf(IMTLeaf)` output, so an unused padded index can't be presented as a `{0,0,0}` low leaf to forge
+/// a non-inclusion proof. The off-chain imt-engine must use the same value.
+bytes32 constant IMT_EMPTY_LEAF_HASH = keccak256("zkSync:IndexedMerkleTree:emptyLeaf");
+
 /// @dev The maximum number of L2 gas that a user can request for an L2 transaction
 uint256 constant MAX_GAS_PER_TRANSACTION = 80_000_000;
 
@@ -274,7 +279,18 @@ uint64 constant DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 uint256 constant INITIAL_BASE_TOKEN_HOLDER_BALANCE = (2 ** 127) - 1;
 
 /// @dev The total number of supported interop attributes.
-uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 6;
+uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 7;
+
+/// @dev Whether chain migrations between settlement layers are enabled in the current release.
+/// @dev In the v32 release the protocol operates under the invariant that all chains settle on L1,
+/// so chain migrations are explicitly disabled to remove any migration-related risks for the time being.
+/// The whole migration machinery (chain asset handlers, Migrator facet, migration intervals, etc.)
+/// is intentionally kept intact and covered by tests, so that a future release can bring settlement
+/// layers (e.g. ZK Gateway) back by simply setting this constant to `true`.
+/// @dev Note that this is a release-level switch: lifting the ban requires deploying new
+/// implementations as part of a protocol upgrade; it cannot be lifted by a governance call alone
+/// (unlike the runtime `migrationPaused` flag in `ChainAssetHandlerBase`).
+bool constant CHAIN_MIGRATIONS_ENABLED = false;
 
 /// @dev Migration number used when a chain migrates from L1 to a settlement layer.
 uint256 constant MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER = 1;

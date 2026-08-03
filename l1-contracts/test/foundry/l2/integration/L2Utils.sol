@@ -16,6 +16,7 @@ import {
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_FORCE_DEPLOYER_ADDR,
     L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
     L2_INTEROP_HANDLER_ADDR,
     L2_ASSET_TRACKER_ADDR,
     L2_INTEROP_ROOT_STORAGE,
@@ -39,6 +40,7 @@ import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymen
 import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {InteropAttributeParser} from "contracts/interop/InteropAttributeParser.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 // import {InteropAccount} from "contracts/interop/InteropAccount.sol";
@@ -56,6 +58,7 @@ import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/_Share
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 import {BytecodeUtils} from "deploy-scripts/utils/bytecode/BytecodeUtils.s.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
+import {L2ChainAssetHandlerDev} from "contracts/dev-contracts/L2ChainAssetHandlerDev.sol";
 import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 
 library L2Utils {
@@ -85,6 +88,7 @@ library L2Utils {
         forceDeployNativeTokenVault(_args);
         forceDeployL2MessageVerification(_args);
         forceDeployL2InteropRootStorage(_args);
+        forceDeployInteropAttributeParser(_args);
         forceDeployInteropCenter(_args);
         forceDeployInteropHandler(_args);
         forceDeployL2AssetTracker(_args);
@@ -152,8 +156,11 @@ library L2Utils {
     }
 
     function forceDeployChainAssetHandler(SystemContractsArgs memory _args) internal {
-        new L2ChainAssetHandler();
-        forceDeployWithoutConstructor("L2ChainAssetHandler", L2_CHAIN_ASSET_HANDLER_ADDR);
+        // The Dev variant re-enables chain migrations, which are explicitly disabled in the
+        // production contracts for the v32 release (see `CHAIN_MIGRATIONS_ENABLED` in `Config.sol`),
+        // so that the L2 migration machinery stays covered by these tests.
+        new L2ChainAssetHandlerDev();
+        forceDeployWithoutConstructor("L2ChainAssetHandlerDev", L2_CHAIN_ASSET_HANDLER_ADDR);
         L2ChainAssetHandler chainAssetHandler = L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         chainAssetHandler.initL2(_args.l1ChainId, _args.aliasedOwner);
@@ -163,6 +170,12 @@ library L2Utils {
         new L2MessageVerification();
 
         forceDeployWithoutConstructor("L2MessageVerification", address(L2_MESSAGE_VERIFICATION));
+    }
+
+    function forceDeployInteropAttributeParser(SystemContractsArgs memory _args) internal {
+        new InteropAttributeParser();
+
+        forceDeployWithoutConstructor("InteropAttributeParser", L2_INTEROP_ATTRIBUTE_PARSER_ADDR);
     }
 
     function forceDeployL2InteropRootStorage(SystemContractsArgs memory _args) internal {

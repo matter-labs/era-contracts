@@ -15,7 +15,9 @@ import {
     L2_NTV_BEACON_DEPLOYER_ADDR,
     L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
-    L2_INTEROP_CENTER_ADDR
+    L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_COMMITMENT_TREE_ADDR,
+    L2_ATOMIC_FLOW_MANAGER_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2BaseTokenBase} from "../l2-system/interfaces/IL2BaseTokenBase.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
@@ -38,6 +40,8 @@ import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
 import {L2AssetTracker} from "../bridge/asset-tracker/L2AssetTracker.sol";
 import {L2ChainAssetHandler} from "../core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {L2InteropHandler} from "../interop/interop-handler/L2InteropHandler.sol";
+import {L2InteropCommitmentTree} from "../atomic-interop/L2InteropCommitmentTree.sol";
+import {IAtomicFlowManager} from "../atomic-interop/IAtomicFlowManager.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {
     DeployFailed,
@@ -440,6 +444,21 @@ library L2GenesisForceDeploymentsHelper {
         // For Era: initializes holder balance, with __DEPRECATED_totalSupply kept in totalSupply().
         // For ZKOS: mints via MINT_BASE_TOKEN_HOOK and transfers to holder.
         IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
+
+        // Atomic interop: seed the commitment tree's IMT (the only one-time state setup).
+        // All cross-contract wiring (the tree's appender, and the manager's tree / asset router /
+        // interop center / interop handler) is referenced by canonical fixed address in the contracts
+        // themselves, so no initialize wiring is needed. The manager never custodies funds: the source
+        // burn flows through the normal interop path and destination mints through the interop handler.
+        //
+        // Gated on `_isGenesisUpgrade`: the atomic built-ins are predeployed ONLY in the ZKsync OS
+        // genesis (see the genesis gen tool), so they exist only on fresh chains. A pre-existing chain
+        // being upgraded to v31 has no code at L2_INTEROP_COMMITMENT_TREE_ADDR, so calling `initL2()`
+        // there would revert the whole upgrade transaction; such chains simply don't get atomic interop.
+        if (_isZKsyncOS && _isGenesisUpgrade) {
+            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
+            IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
+        }
     }
 
     /// @notice Constructs the initialization calldata for the L2WrappedBaseToken.

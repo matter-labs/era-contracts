@@ -126,6 +126,34 @@
   },
   {
     "type": "function",
+    "name": "bridgehubRecoverBaseToken",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_receiver",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "finalizeDeposit",
     "inputs": [
       {
@@ -334,6 +362,30 @@
       }
     ],
     "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "recoverAtomicCall",
+    "inputs": [
+      {
+        "name": "_destChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_callData",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "recovered",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -728,6 +780,11 @@
   {
     "type": "error",
     "name": "PayloadTooShort",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "RecoverToL1NotSupported",
     "inputs": []
   },
   {
