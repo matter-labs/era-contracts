@@ -89,13 +89,17 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment"
+        description: "Environment = basename of the config pair upgrade-envs/permanent-values/<env>.toml + upgrade-envs/v0.31.0-interopB/<env>.toml. Today: stage, testnet, mainnet, battlechain. The L1 to fork is chosen from that env's l1_chain_id (1 → mainnet, 11155111 → Sepolia)."
         required: true
+        type: string
+      verify_mode:
+        description: "strict = PUVT must pass (PUH-governed envs: stage/testnet/mainnet). report-only = run PUVT and print everything, but don't fail the job on its exit — for ecosystems whose topology PUVT doesn't model (legacy-Governance-owned and/or single-chain, e.g. battlechain)."
+        required: true
+        default: "strict"
         type: choice
         options:
-          - stage
-          - testnet
-          - mainnet
+          - strict
+          - report-only
       l1_rpc_url:
         description: "L1 RPC URL (optional override; BLANK = use repo secret. NOTE: a typed value is visible in the run summary — not secret-grade)"
         required: false
@@ -199,11 +203,28 @@ jobs:
           GW_RPC_URL: ${{ secrets.GW_RPC_URL }}
         run: |
           set -euo pipefail
-          if [ "$ENVIRONMENT" = "mainnet" ]; then
-            rpc="$RPC_MAINNET"; pk="$PK_MAINNET"
-          else
-            rpc="$RPC_SEPOLIA"; pk="$PK_SEPOLIA"
+          # The env is just a config-pair basename; fail early and legibly if the
+          # pair isn't committed, before spending a fork on it.
+          PV="l1-contracts/upgrade-envs/permanent-values/${ENVIRONMENT}.toml"
+          V31="l1-contracts/upgrade-envs/v0.31.0-interopB/${ENVIRONMENT}.toml"
+          for f in "$PV" "$V31"; do
+            if [ ! -f "$f" ]; then
+              echo "::error::No config for env '$ENVIRONMENT' at $f — commit the config pair first."; exit 1
+            fi
+          done
+          # Which L1 to fork comes from the env itself, so a new ecosystem needs no
+          # workflow edit. Capture the digits AFTER '=' so the '1' in the key name
+          # can't match.
+          L1_CHAIN_ID="$(sed -nE 's/^[[:space:]]*l1_chain_id[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' "$PV" | head -1)"
+          if [ -z "$L1_CHAIN_ID" ]; then
+            echo "::error::$PV has no top-level 'l1_chain_id ='"; exit 1
           fi
+          case "$L1_CHAIN_ID" in
+            1)        rpc="$RPC_MAINNET"; pk="${PK_MAINNET:-}"; net=mainnet ;;
+            11155111) rpc="$RPC_SEPOLIA"; pk="${PK_SEPOLIA:-}"; net=sepolia ;;
+            *) echo "::error::l1_chain_id=$L1_CHAIN_ID has no RPC secret wired (only 1 / 11155111)"; exit 1 ;;
+          esac
+          echo "env=$ENVIRONMENT l1_chain_id=$L1_CHAIN_ID -> forking $net"
           # Optional dispatch-time override wins over the secret (see the
           # CAVEAT in the header: the typed value is visible in the run summary).
           if [ -n "${INPUT_RPC:-}" ]; then
@@ -211,7 +232,7 @@ jobs:
             echo "Using L1 RPC from the dispatch input (masked in logs; visible in run summary)."
           fi
           if [ -z "$rpc" ]; then
-            echo "::error::No L1 RPC: pass the l1_rpc_url input or set L1_RPC_URL_SEPOLIA / L1_RPC_URL_MAINNET"
+            echo "::error::No L1 RPC for $net: pass the l1_rpc_url input or set the matching L1_RPC_URL_* secret"
             exit 1
           fi
           echo "::add-mask::$rpc"
@@ -249,6 +270,8 @@ jobs:
           FORK_BLOCK: ${{ inputs.fork_block }}
           # Recorded in the deploy bundle's metadata (part of the bytecode identity).
           ZKSYNC_FOUNDRY_VERSION: ${{ inputs.zksync_foundry_version }}
+          # report-only → PUVT runs and prints, but its exit doesn't fail the job.
+          VERIFY_NONFATAL: ${{ inputs.verify_mode == 'report-only' && '1' || '0' }}
         run: |
           # L1_FORK_URL (masked) + DEPLOYER_ADDR come from $GITHUB_ENV. The script
           # forks L1_FORK_URL into a local anvil and runs prepare/PUVT against
@@ -411,7 +434,15 @@ jobs:
           GW_RPC_URL: ${{ secrets.GW_RPC_URL }}
         run: |
           set -euo pipefail
-          if [ "$ENVIRONMENT" = "mainnet" ]; then rpc="$RPC_MAINNET"; else rpc="$RPC_SEPOLIA"; fi
+          # Which L1 the bundle belongs to is recorded IN the bundle — one more
+          # thing a consumer doesn't have to be told out of band.
+          L1_CHAIN_ID="$(jq -r '.l1.chain_id // empty' "$GITHUB_WORKSPACE/deploy-bundle/bundle-metadata.json")"
+          case "$L1_CHAIN_ID" in
+            1)        rpc="$RPC_MAINNET" ;;
+            11155111) rpc="$RPC_SEPOLIA" ;;
+            *) echo "::error::bundle l1.chain_id=$L1_CHAIN_ID has no RPC secret wired"; exit 1 ;;
+          esac
+          echo "bundle l1_chain_id=$L1_CHAIN_ID"
           if [ -n "${INPUT_RPC:-}" ]; then rpc="$INPUT_RPC"; fi
           if [ -z "$rpc" ]; then
             echo "::error::No L1 RPC to fork (see the regen job's requirements)"; exit 1
@@ -428,6 +459,10 @@ jobs:
       # The same command an operator runs locally against a downloaded bundle.
       - name: Replay the bundle on a fresh fork + PUVT
         working-directory: l1-contracts/test/anvil-interop
+        env:
+          # Same PUVT policy as the generate job: on a report-only env the replay
+          # must not be judged by checks that env's topology doesn't satisfy.
+          VERIFY_NONFATAL: ${{ inputs.verify_mode == 'report-only' && '1' || '0' }}
         run: |
           # The script stops its own fork anvil on exit (EXIT trap), so this job
           # needs no separate cleanup step.

@@ -89,6 +89,29 @@ local deploy + PUVT). Its second job, `verify-bundle-handoff`, then re-deploys
 and re-verifies that bundle from scratch **with no contract build**, which is the
 standing proof that the artifact is self-sufficient.
 
+### Which ecosystems this runs for
+
+`environment` is just the basename of a config pair — `permanent-values/<env>.toml`
+plus `v0.31.0-interopB/<env>.toml` — and the L1 to fork is read from that env's
+`l1_chain_id` (`1` → mainnet, `11155111` → Sepolia). Adding an ecosystem therefore
+needs no workflow edit: commit the config pair, add its anvil port to
+`env_anvil_port` in `upgrade-bundle-lib.sh` if it needs its own fork, and (if PUVT
+should accept it) a variant in `VerifyUpgradeEnv`. Committed today: `stage`,
+`testnet`, `mainnet`, `battlechain`.
+
+`verify_mode` decides whether PUVT gates the job:
+
+- **`strict`** — PUVT must pass. Correct for the PUH-governed envs (`stage`,
+  `testnet`, `mainnet`).
+- **`report-only`** — PUVT still runs and prints everything, but its exit doesn't
+  fail the job. This is for ecosystems whose topology PUVT wasn't written for:
+  `battlechain` is legacy-`Governance.sol`-owned (no ProtocolUpgradeHandler, so the
+  PUH / zk-governance provenance checks don't apply) and single-chain (PUVT's
+  Era-diamond fee-param check compares against a chain that isn't registered
+  there). Those are exemptions of topology, not calldata defects — read the printed
+  PUVT output rather than trusting the green tick. Never use it to silence a
+  PUH-governed env.
+
 > **Already-deployed ecosystems.** Re-running the prepare against the chain tip
 > of an ecosystem whose v31 upgrade is already live reverts (the deployer no
 > longer owns the ecosystem contracts). Pass `fork_block` = a block _before_ the

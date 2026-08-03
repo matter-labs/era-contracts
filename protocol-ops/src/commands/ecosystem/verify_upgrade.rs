@@ -76,6 +76,9 @@ pub enum VerifyUpgradeEnv {
     Stage,
     Testnet,
     Mainnet,
+    /// Battlechain: a standalone ZKsync-OS ecosystem on Ethereum mainnet
+    /// (L1 chainId 1), one ZKsync-OS CTM, owned by a legacy `Governance.sol`.
+    Battlechain,
 }
 
 impl VerifyUpgradeEnv {
@@ -84,11 +87,14 @@ impl VerifyUpgradeEnv {
             Self::Stage => "stage",
             Self::Testnet => "testnet",
             Self::Mainnet => "mainnet",
+            Self::Battlechain => "battlechain",
         }
     }
 
     pub fn is_mainnet(self) -> bool {
-        matches!(self, Self::Mainnet)
+        // Battlechain sits on L1 mainnet with the real (non-testnet) verifier, so
+        // it selects the same verifier / governance bytecode files as mainnet.
+        matches!(self, Self::Mainnet | Self::Battlechain)
     }
 
     pub fn is_stage(self) -> bool {

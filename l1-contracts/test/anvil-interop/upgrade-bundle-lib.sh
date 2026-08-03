@@ -40,11 +40,38 @@ env_anvil_port() {
     stage) echo 29545 ;;
     testnet) echo 29547 ;;
     mainnet) echo 29549 ;;
+    battlechain) echo 29551 ;;
     *)
-      echo "Unknown env '$1' (expected: stage | testnet | mainnet)" >&2
+      echo "Unknown env '$1' (expected: stage | testnet | mainnet | battlechain)" >&2
+      echo "Add a port for it here if it needs its own fork." >&2
       return 1
       ;;
   esac
+}
+
+# Run PUVT (`ecosystem verify-upgrade`) with the given args.
+#
+# With VERIFY_NONFATAL=1 a non-zero exit is reported as a warning instead of
+# aborting. That is for ecosystems whose topology the mainnet-oriented PUVT does
+# not model — e.g. legacy-`Governance.sol`-owned ones (no ProtocolUpgradeHandler,
+# so the PUH/zk-governance provenance checks don't apply) or single-chain ones
+# (PUVT's Era-diamond fee-param check compares against a chain that isn't
+# registered). The calldata is produced by the prepare regardless, so this lets a
+# run publish its artifacts while still printing the full PUVT output for review.
+# Use it deliberately, per env — never to paper over a PUH-governed env's errors.
+# $1 = protocol_ops path; remaining args are forwarded verbatim.
+run_verify_upgrade() {
+  local protocol_ops="$1"; shift
+  local rc=0
+  "$protocol_ops" ecosystem verify-upgrade "$@" || rc=$?
+  if [[ "$rc" != "0" ]]; then
+    if [[ "${VERIFY_NONFATAL:-0}" == "1" ]]; then
+      echo "::warning::verify-upgrade (PUVT) exited $rc — treated as NON-FATAL (VERIFY_NONFATAL=1)." >&2
+      echo "    Review the PUVT output above; the calldata artifacts were still produced." >&2
+      return 0
+    fi
+    return "$rc"
+  fi
 }
 
 # Locate the protocol_ops binary. Prefer the local debug build (devs iterate on

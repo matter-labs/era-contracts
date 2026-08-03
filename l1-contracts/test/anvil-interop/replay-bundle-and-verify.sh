@@ -187,7 +187,7 @@ COMBINED_TXLOG="$WORK/transactions.combined.txt"
 REAL_TXLOG="$L1_CONTRACTS_DIR/upgrade-envs/v0.31.0-interopB/output/$ENV/transactions.txt"
 [[ -f "$REAL_TXLOG" ]] && cat "$REAL_TXLOG" >> "$COMBINED_TXLOG"
 [[ -f "$TXLOG" ]] && cat "$TXLOG" >> "$COMBINED_TXLOG"
-"$PROTOCOL_OPS" ecosystem verify-upgrade \
+run_verify_upgrade "$PROTOCOL_OPS" \
   --env "$ENV" \
   --ecosystem-toml "$BUNDLE/ecosystem.toml" \
   --l1-rpc-url "$RPC" \
