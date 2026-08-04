@@ -43,10 +43,15 @@ depositor. There are two disjoint mechanisms, chosen per call by its local sende
   which reuses the same NTV failed-transfer recovery to re-credit the call's `from`.
 
 The manager is agnostic to call/encoding formats — it forwards `(destChainId, data)` and lets the
-sender own its reversal; the L2 asset router is the only `IAtomicRecoverable` sender today, and the
-`from == L2_ASSET_ROUTER_ADDR` test is what selects the hook. Implementations **must** gate both hooks
-to the canonical `AtomicFlowManager` (`onlyAtomicFlowManager`) and **must** return `false` rather than
-revert for calls they do not recognize.
+sender own its reversal — but the dispatch itself is **address-pinned, not sender-agnostic**: the
+`from == L2_ASSET_ROUTER_ADDR` test is what selects the hook, so the L2 asset router is the only
+`IAtomicRecoverable` sender the manager ever invokes. An indirect call produced by any other
+`IL2CrossChainSender` starter matches neither mechanism — its hook is never called, and (indirect
+calls forcing `interopCallValue == 0`) it carries no `value` to refund — so whatever that starter
+burned at send time is not recovered. This is an accepted limitation of this release; see
+{protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations}. Implementations **must**
+gate both hooks to the canonical `AtomicFlowManager` (`onlyAtomicFlowManager`) and **must** return
+`false` rather than revert for calls they do not recognize.
 
 ### The walk is all-or-nothing, not per-call isolated
 

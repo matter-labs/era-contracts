@@ -154,6 +154,24 @@ The timeout proof relies on three preconditions, each enforced on chain:
    claim — the leg is marked `Reverted` regardless). Accepted for this release; both entry points
    carry a warning, and migrations should use a new asset id instead of re-pointing an existing one.
 
+6. **Funds burned by a non-router indirect call starter cannot be recovered on timeout.**
+   `_recoverBundle` dispatches per call on the local sender: the `recoverAtomicCall` hook fires only
+   for `from == L2_ASSET_ROUTER_ADDR`, and the base-token path only for
+   `from != L2_ASSET_ROUTER_ADDR && value != 0`. Yet any contract implementing `IL2CrossChainSender`
+   can serve as an indirect call starter — `InteropCenter._processCallStarter` invokes
+   `initiateIndirectCall` on the user-supplied `to` and stamps that address as `InteropCall.from` —
+   and indirect calls force `interopCallValue == 0`. A leg whose funds were burned by a non-router
+   starter therefore matches neither branch: no reversal hook is called, no value is refunded, and
+   `claimRefund` consumes the leg as a no-op (`Reverted`), leaving the burn permanently
+   unrecoverable. A generic dispatch over `IAtomicRecoverable` senders is not safely possible today:
+   `InteropCall` carries no direct/indirect marker, so the manager cannot tell an indirect starter
+   (which should get the hook) from a direct call's `from` (possibly an EOA or a contract without
+   the hook), and a reverting probe would block the whole claim (see
+   {protocol-docs/atomicity/recovery.md#the-walk-is-all-or-nothing-not-per-call-isolated}). Making
+   the dispatch generic requires marking indirect calls in the bundle encoding. Accepted for this
+   release: only asset-router burns (and direct-call base-token `value`) are recoverable, and flow
+   authors **must not** burn funds through a custom indirect starter expecting timeout recovery.
+
 ## Trust assumptions
 
 - **L1-only settlement (this release).** Every flow's `settlementLayerChainId` must be the L1 chain id;

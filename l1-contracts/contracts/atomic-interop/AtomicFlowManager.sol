@@ -301,11 +301,14 @@ contract AtomicFlowManager is IAtomicFlowManager {
         uint256 callsLen = _bundle.calls.length;
         for (uint256 i = 0; i < callsLen; ++i) {
             InteropCall memory c = _bundle.calls[i];
-            // Only ask burn-producing calls (from == asset router, as set by `initiateIndirectCall`) to
-            // reverse themselves. A direct call never burned through a recoverable sender, so its `from`
-            // (possibly an EOA) is skipped here; any base-token value it carried is handled below.
-            // The sender reports via the return value whether it recognised (and reversed) the call;
-            // nothing is done with the answer — an unrecognised call simply has nothing to recover.
+            // The reversal hook is pinned to the asset router: `InteropCall` carries no direct/indirect
+            // marker, so a direct call's `from` (possibly an EOA, whose probe would revert and block the
+            // whole claim) cannot be told apart from a non-router indirect starter — whose burn is
+            // therefore NOT recovered here (accepted limitation, see
+            // {protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations}). Any base-token
+            // value a direct call carried is handled below. The sender reports via the return value
+            // whether it recognised (and reversed) the call; nothing is done with the answer — an
+            // unrecognised call simply has nothing to recover.
             if (c.from == L2_ASSET_ROUTER_ADDR) {
                 // slither-disable-next-line unused-return
                 IAtomicRecoverable(c.from).recoverAtomicCall(destChainId, c.data);
