@@ -199,10 +199,11 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     /// @notice Initializes force-deployed contracts.
-    /// @dev `_isZKsyncOS` still distinguishes the two VMs because the **genesis** path serves both: Era chains
-    /// are still created through it. The **upgrade** path (`_isGenesisUpgrade == false`), however, is only
-    /// supported for ZKsync OS in this release — Era chains cannot be upgraded onto it, and the L1 side
-    /// refuses to generate a per-chain upgrade for them (see `CTMUpgrade_v31.deployUsedUpgradeContract`).
+    /// @dev `_isZKsyncOS` still distinguishes the two VMs, but only because the Era paths are kept for
+    /// testing purposes: no Era chain is meant to be spawned with this release, and the upgrade path
+    /// (`_isGenesisUpgrade == false`) refuses to produce anything for Era at all (see
+    /// `CTMUpgrade_v31.deployUsedUpgradeContract`). Deleting Era outright is a large diff, so:
+    /// TODO(EVM-1581): remove the Era paths.
     /// @dev Note, that this function is expected to initialize all system contracts deployed within the user space
     /// with the only exception of the SystemContractProxyAdmin, which is expected to be initialized inside the Genesis.
     /// @dev Contract deployment (conductContractUpgrade) is handled externally via the force deployment list.
@@ -384,9 +385,9 @@ library L2GenesisForceDeploymentsHelper {
 
     /// @notice Initializes the contracts that already existed in v31.
     /// @dev Genesis only: these `initL2`s are unchanged since v31 and are one-shot, so a chain upgraded
-    /// from v31 has already run them. Called after `_finalizeDeployments` — the position v31 called them
-    /// from — because `InteropCenter.initL2` and `registerBaseTokenIfNeeded` run against the bridgehub
-    /// wiring it establishes.
+    /// from v31 has already run them. Kept at the position v31 called them from, after
+    /// `_finalizeDeployments`, so that the genesis sequence is unchanged by this release; none of them reads
+    /// the bridgehub wiring that step establishes.
     function _initPreV32Contracts(
         FixedForceDeploymentsData memory _fixedForceDeploymentsData,
         ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData

@@ -65,17 +65,27 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         deployUpgradeStageValidator();
         deployGovernanceUpgradeTimer();
 
-        // Deploy BytecodesSupplier as TUPP (was a simple contract in old version)
-        // This creates both implementation and proxy
-        (
-            ctmAddresses.stateTransition.implementations.bytecodesSupplier,
-            ctmAddresses.stateTransition.proxies.bytecodesSupplier
-        ) = deployTuppWithContract("BytecodesSupplier", false);
-
-        (
-            ctmAddresses.stateTransition.implementations.permissionlessValidator,
-            ctmAddresses.stateTransition.proxies.permissionlessValidator
-        ) = deployTuppWithContract("PermissionlessValidator", false);
+        // Both proxies were introduced by the v31 upgrade, so every ecosystem this release can upgrade
+        // already has them: only their implementations are redeployed, and stage 1 points the discovered
+        // proxies at them. Deploying fresh proxies would move the addresses the new CTM implementation is
+        // constructed with, leaving each upgraded chain's `s.priorityModeInfo.permissionlessValidator`
+        // (written at its v31 upgrade) pointing at the old validator while new chains get the new one.
+        require(
+            ctmAddresses.stateTransition.proxies.bytecodesSupplier != address(0),
+            "CTM has no BytecodesSupplier registered; it is expected from v31 on"
+        );
+        require(
+            ctmAddresses.stateTransition.proxies.permissionlessValidator != address(0),
+            "CTM has no PermissionlessValidator registered; it is expected from v31 on"
+        );
+        ctmAddresses.stateTransition.implementations.bytecodesSupplier = deploySimpleContract(
+            "BytecodesSupplier",
+            false
+        );
+        ctmAddresses.stateTransition.implementations.permissionlessValidator = deploySimpleContract(
+            "PermissionlessValidator",
+            false
+        );
 
         // Deploy new ChainTypeManager implementation
         // The constructor will receive the new BytecodesSupplier and PermissionlessValidator proxy addresses.
@@ -104,28 +114,49 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         deployStateTransitionDiamondFacets();
     }
 
-    /// @notice Append the ValidatorTimelock proxy-admin upgrade to the stage-1 governance bundle.
-    /// @dev Plain `ProxyAdmin.upgrade` (not `upgradeAndCall`): the new `MultisigCommitter` impl is deployed
-    ///      with no reinitializer call. Proxies already running a MultisigCommitter are at `_initialized=2`
-    ///      with their multisig storage intact, so the swap just restores the multisig code; calling
-    ///      `reinitializeV2()` again would revert "already initialized".
+    /// @notice Append the proxy-admin upgrades of the CTM-side proxies this release keeps to the stage-1
+    ///         governance bundle.
+    /// @dev Plain `ProxyAdmin.upgrade` (not `upgradeAndCall`) for all three: the new implementations are
+    ///      deployed with no reinitializer call. For the validator timelock in particular, proxies already
+    ///      running a `MultisigCommitter` are at `_initialized=2` with their multisig storage intact, so the
+    ///      swap just restores the multisig code; calling `reinitializeV2()` again would revert "already
+    ///      initialized".
     function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
-        address validatorTimelockProxy = ctmAddresses.stateTransition.proxies.validatorTimelock;
-        address newImpl = ctmAddresses.stateTransition.implementations.validatorTimelock;
-        require(validatorTimelockProxy != address(0), "v31: validatorTimelock proxy not set");
-        require(newImpl != address(0), "v31: validatorTimelock impl not deployed");
+        calls = new Call[](3);
+        calls[0] = _buildProxyImplementationUpgrade(
+            ctmAddresses.stateTransition.proxies.validatorTimelock,
+            ctmAddresses.stateTransition.implementations.validatorTimelock,
+            "validatorTimelock"
+        );
+        calls[1] = _buildProxyImplementationUpgrade(
+            ctmAddresses.stateTransition.proxies.bytecodesSupplier,
+            ctmAddresses.stateTransition.implementations.bytecodesSupplier,
+            "bytecodesSupplier"
+        );
+        calls[2] = _buildProxyImplementationUpgrade(
+            ctmAddresses.stateTransition.proxies.permissionlessValidator,
+            ctmAddresses.stateTransition.implementations.permissionlessValidator,
+            "permissionlessValidator"
+        );
+    }
 
-        address proxyAdminAddr = Utils.getProxyAdminAddress(validatorTimelockProxy);
+    function _buildProxyImplementationUpgrade(
+        address _proxy,
+        address _implementation,
+        string memory _name
+    ) private view returns (Call memory) {
+        require(_proxy != address(0), string.concat("v31: ", _name, " proxy not set"));
+        require(_implementation != address(0), string.concat("v31: ", _name, " impl not deployed"));
 
-        calls = new Call[](1);
-        calls[0] = Call({
-            target: proxyAdminAddr,
-            data: abi.encodeCall(
-                ProxyAdmin.upgrade,
-                (ITransparentUpgradeableProxy(payable(validatorTimelockProxy)), newImpl)
-            ),
-            value: 0
-        });
+        return
+            Call({
+                target: Utils.getProxyAdminAddress(_proxy),
+                data: abi.encodeCall(
+                    ProxyAdmin.upgrade,
+                    (ITransparentUpgradeableProxy(payable(_proxy)), _implementation)
+                ),
+                value: 0
+            });
     }
 
     /// @notice Override to deploy the per-chain upgrade contract.
@@ -134,8 +165,8 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     ///      refuses to produce anything for Era instead.
     function deployUsedUpgradeContract() internal virtual override returns (address) {
         require(config.isZKsyncOS, "Upgrading Era chains onto this release is not supported");
-        console.log("Deploying ZKsyncOSSettlementLayerV32Upgrade");
-        return deploySimpleContract("ZKsyncOSSettlementLayerV32Upgrade", false);
+        console.log("Deploying DefaultUpgradeZKsyncOS");
+        return deploySimpleContract("DefaultUpgradeZKsyncOS", false);
     }
 
     function getV31AdditionalFactoryDependencyContracts()

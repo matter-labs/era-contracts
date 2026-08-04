@@ -8,6 +8,7 @@ import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
+import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {UnexpectedUpgradeSelector} from "../common/L1ContractErrors.sol";
 import {UnexpectedZKsyncOSFlag} from "./ZkSyncUpgradeErrors.sol";
 import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
@@ -58,6 +59,44 @@ library L2UpgradeTxLib {
             abi.encodeCall(
                 IL2V31Upgrade.upgrade,
                 (isZKsyncOS, ctmDeployer, fixedForceDeploymentsData, additionalForceDeploymentsData)
+            );
+    }
+
+    /// @notice Rewrite a ZKsync OS chain's L2 upgrade transaction data with its per-chain data.
+    /// @dev The ecosystem-wide transaction wraps `IL2V31Upgrade.upgrade` in
+    /// `IComplexUpgrader.forceDeployAndUpgradeUniversal`; only the innermost per-chain field changes, so the
+    /// wrapper is unwrapped, `buildL2V31UpgradeCalldata` substitutes the data, and the wrapper is rebuilt.
+    /// @param _bridgehub The address of the bridgehub.
+    /// @param _chainId The chain ID to build the upgrade data for.
+    /// @param _zksyncOS Whether the chain is a ZKsyncOS chain, passed from diamond storage.
+    /// @param _existingTxData The L2 upgrade tx data the CTM upgrade produced.
+    function rewriteZKsyncOSUpgradeTxData(
+        address _bridgehub,
+        uint256 _chainId,
+        bool _zksyncOS,
+        bytes memory _existingTxData
+    ) internal view returns (bytes memory) {
+        validateZKsyncOSFlag(_zksyncOS, true);
+        validateUpgradeSelector(_existingTxData, IComplexUpgrader.forceDeployAndUpgradeUniversal.selector);
+
+        (
+            IComplexUpgrader.UniversalContractUpgradeInfo[] memory forceDeployments,
+            address delegateTo,
+            bytes memory existingUpgradeCalldata
+        ) = abi.decode(_existingTxData.slice(4), (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes));
+
+        validateWrappedUpgrade(existingUpgradeCalldata);
+        bytes memory l2UpgradeCalldata = buildL2V31UpgradeCalldata(
+            _bridgehub,
+            _chainId,
+            _zksyncOS,
+            existingUpgradeCalldata
+        );
+
+        return
+            abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                (forceDeployments, delegateTo, l2UpgradeCalldata)
             );
     }
 

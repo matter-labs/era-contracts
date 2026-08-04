@@ -524,6 +524,21 @@ contract L1NativeTokenVaultTest is Test {
         nativeTokenVault.populateBridgedOut(_assetIdArray(bridgedAssetId));
     }
 
+    function test_legacyBridgedOut_RevertWhen_AssetNotNativeToL1() public {
+        // Without the guard the registered branch would return `MAX_TOKEN_BALANCE - chainBalance(L1)` for an
+        // L2-native asset, where L1's entry is a bridged-in balance — a ~2^256 number rather than an outflow.
+        bytes32 bridgedAssetId = keccak256(abi.encode("l2NativeAsset"));
+        nativeTokenVault.setOriginChainId(bridgedAssetId, chainId);
+
+        MockLegacyL1AssetTracker tracker = new MockLegacyL1AssetTracker();
+        // `setChainBalance` also marks the asset registered, i.e. the branch the guard protects.
+        tracker.setChainBalance(block.chainid, bridgedAssetId, 5);
+        nativeTokenVault.setLegacyAssetTracker(address(tracker));
+
+        vm.expectRevert(abi.encodeWithSelector(AssetNotNativeToL1.selector, bridgedAssetId, chainId));
+        nativeTokenVault.legacyBridgedOut(bridgedAssetId);
+    }
+
     function test_populateBridgedOut_UnblocksWithdrawalOfEscrowedFunds() public {
         // The point of the population: an upgraded vault holds pre-upgrade escrow but starts with
         // `bridgedOut == 0`, so every withdrawal of it would be rejected as forged.

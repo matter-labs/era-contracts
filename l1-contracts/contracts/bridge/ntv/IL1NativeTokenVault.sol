@@ -36,6 +36,8 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     function legacyL1AssetTracker() external view returns (address);
 
     /// @notice Net amount of `_assetId` that the pre-upgrade accounting had bridged out of L1.
+    /// @dev Reverts with `AssetNotNativeToL1` unless the asset's origin chain is L1: the legacy sources only
+    /// answer this question for L1-native assets.
     /// @param _assetId The asset to read the legacy amount of.
     /// @return amount The legacy amount; zero on an ecosystem with no legacy accounting left.
     function legacyBridgedOut(bytes32 _assetId) external view returns (uint256 amount);

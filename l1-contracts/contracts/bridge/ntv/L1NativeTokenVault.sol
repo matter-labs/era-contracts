@@ -119,6 +119,12 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     /// @inheritdoc IL1NativeTokenVault
     function legacyBridgedOut(bytes32 _assetId) public view returns (uint256 amount) {
+        // The bulkhead complement below is only a net outflow for an asset whose origin chain is L1: for an
+        // L2-native asset L1's entry is a bridged-in balance, so the complement would be a ~`2^256` garbage
+        // number. `bridgedOut` only governs L1-native assets anyway.
+        uint256 assetOriginChainId = originChainId[_assetId];
+        require(assetOriginChainId == L1_CHAIN_ID, AssetNotNativeToL1(_assetId, assetOriginChainId));
+
         address legacyTracker = __DEPRECATED_l1AssetTracker;
 
         // The v31 tracker seeds the asset's origin chain — L1, for the assets `bridgedOut` tracks — with
@@ -158,10 +164,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
         for (uint256 i = 0; i < assetIdsLength; ++i) {
             bytes32 assetIdToPopulate = _assetIds[i];
-            uint256 assetOriginChainId = originChainId[assetIdToPopulate];
-            // Only L1-native assets are tracked by `bridgedOut`, so anything else is a caller mistake
-            // rather than a no-op worth tolerating.
-            require(assetOriginChainId == L1_CHAIN_ID, AssetNotNativeToL1(assetIdToPopulate, assetOriginChainId));
 
             // Repeated assets are skipped rather than reverted so that a partially mined batch can simply
             // be re-submitted.
@@ -170,6 +172,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             }
             bridgedOutPopulated[assetIdToPopulate] = true;
 
+            // Reverts for anything that is not native to L1, which is a caller mistake rather than a no-op
+            // worth tolerating.
             uint256 legacyAmount = legacyBridgedOut(assetIdToPopulate);
             if (legacyAmount != 0) {
                 bridgedOut[assetIdToPopulate] += legacyAmount;
