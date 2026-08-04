@@ -89,6 +89,8 @@ contract InteropAttributeParser is IInteropAttributeParser {
                     _attributes[i]
                 );
                 atomicSend.isAtomic = true;
+                // The attribute may appear at most once (`parseAttributes` rejects duplicates), so stop scanning.
+                break;
             }
         }
     }
