@@ -77,6 +77,9 @@ struct Config {
     address ownerAddress;
     bool testnetVerifier;
     bool supportL2LegacySharedBridgeTest;
+    bool multiProofVerifier;
+    address ziskPlonkVerifierAddr;
+    address ziskRangeVerifierAddr;
     ContractsConfig contracts;
     TokensConfig tokens;
 }
@@ -138,6 +141,26 @@ abstract contract DeployUtils is Create2FactoryUtils {
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
+        try vm.parseTomlBool(toml, "$.multi_proof_verifier") returns (bool val) {
+            config.multiProofVerifier = val;
+        } catch {
+            config.multiProofVerifier = false;
+        }
+        try vm.parseTomlAddress(toml, "$.zisk_plonk_verifier_addr") returns (address val) {
+            config.ziskPlonkVerifierAddr = val;
+        } catch {
+            config.ziskPlonkVerifierAddr = address(0);
+        }
+        // The aggregation verifier for the single-VK ZiSK lane. Pins the
+        // aggregator guest programVK, the inner guest programVK and the
+        // vadcop-final root, and checks the SNARK for every range size. It
+        // is optional and defaults to zero; when set, the deploy wires it
+        // with setZiskRangeVerifier.
+        try vm.parseTomlAddress(toml, "$.zisk_range_verifier_addr") returns (address val) {
+            config.ziskRangeVerifierAddr = val;
+        } catch {
+            config.ziskRangeVerifierAddr = address(0);
+        }
 
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"
@@ -406,6 +429,17 @@ abstract contract DeployUtils is Create2FactoryUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "VerifierPlonk")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "ZiskVerifier")) {
+            // The standalone snarkJS Plonk verifier this wraps; deployed
+            // beforehand (see verifiers/README.md) and passed by address.
+            return abi.encode(config.ziskPlonkVerifierAddr);
+        } else if (compareStrings(contractName, "MultiProofVerifier")) {
+            return abi.encode(
+                addresses.stateTransition.verifierPlonk,  // airbender verifier
+                msg.sender                                 // initial owner
+            );
+        } else if (compareStrings(contractName, "MultiProofTestnetVerifier")) {
+            return abi.encode(addresses.stateTransition.multiProofVerifier);
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {

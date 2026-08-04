@@ -44,6 +44,9 @@ import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.so
 import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
 import {L1VerifierFflonk} from "contracts/state-transition/verifiers/L1VerifierFflonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {ZiskVerifier} from "contracts/state-transition/verifiers/ZiskVerifier.sol";
+import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
+import {MultiProofTestnetVerifier} from "contracts/state-transition/verifiers/MultiProofTestnetVerifier.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
@@ -147,6 +150,12 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 } else {
                     return type(DualVerifier).creationCode;
                 }
+            } else if (compareStrings(contractName, "ZiskVerifier")) {
+                return type(ZiskVerifier).creationCode;
+            } else if (compareStrings(contractName, "MultiProofVerifier")) {
+                return type(MultiProofVerifier).creationCode;
+            } else if (compareStrings(contractName, "MultiProofTestnetVerifier")) {
+                return type(MultiProofTestnetVerifier).creationCode;
             } else if (compareStrings(contractName, "VerifierFflonk")) {
                 return type(L1VerifierFflonk).creationCode;
             } else if (compareStrings(contractName, "VerifierPlonk")) {
