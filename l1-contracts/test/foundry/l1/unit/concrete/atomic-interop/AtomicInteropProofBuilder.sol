@@ -55,10 +55,11 @@ contract AtomicInteropProofWrapper {
 /// {L2InteropRootStorage} is etched at its canonical address and seeded via the production bootloader
 /// entry point. Only `L2_MESSAGE_VERIFICATION.proveL2LeafInclusionShared` is mocked — that layer is
 /// covered by L2MessageVerification.t.sol; driving it true/false reaches this library's own branches.
-/// The mock does NOT bypass the library's own proof parsing (`MessageHashing.parseProofMetadata` /
-/// `readSettlementLayerReference` / `readAggregationHopPath`): the `settlementProof` blob built here
-/// is still parsed for real (it only needs to parse, not hash to a real root, since the terminal-root
-/// check is the mocked verifier's job), so the SL-match / clock / last-batch branches stay live.
+/// The mock does NOT bypass the `MessageHashing` accessors `AtomicInteropProof` calls directly
+/// (`parseProofMetadata` / `readSettlementLayerReference` / `readAggregationHopPath`): the
+/// `settlementProof` blob built here is still decoded for real (decoded only, never hashed — all
+/// Merkle hashing is the mocked verifier's job, so dummy siblings suffice), keeping the SL-match /
+/// clock / last-batch branches live.
 abstract contract AtomicInteropProofBuilder is Test {
     /// @dev The flow deadline all proofs are built against (shared with the tests so the builders
     /// can declare the honest timeout branch for a given batch timestamp).

@@ -168,7 +168,9 @@ library AtomicInteropProof {
             _leaf: _proof.chainImtRoot,
             _proof: _proof.settlementProof
         });
-        if (!ok) revert ProofImtRootInclusionFailed(_proof.sourceChainId, _proof.batchNumber, _proof.chainImtRoot);
+        if (!ok) {
+            revert ProofImtRootInclusionFailed(_proof.sourceChainId, _proof.batchNumber, _proof.chainImtRoot);
+        }
 
         // A final-node (single-level) proof has no settlement-layer batch reference, so neither the
         // deadline nor `t` could be checked against it.
@@ -176,9 +178,8 @@ library AtomicInteropProof {
             revert ProofMissingSettlementLayerBatch(_proof.sourceChainId, _proof.batchNumber);
         }
 
-        // The SL metadata words are read positionally AFTER the verifier above authenticated the
-        // same proof bytes (see {MessageHashing.readSettlementLayerReference}) — this avoids
-        // re-running the Merkle climbs `proveL2LeafInclusionShared` already performed.
+        // The SL metadata words are read only AFTER the verifier above authenticated the same proof
+        // bytes (see {MessageHashing.readSettlementLayerReference}).
         MessageHashing.SettlementLayerReference memory slReference = MessageHashing.readSettlementLayerReference(
             _proof.settlementProof
         );
