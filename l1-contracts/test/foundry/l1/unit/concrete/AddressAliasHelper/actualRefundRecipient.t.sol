@@ -36,6 +36,9 @@ contract ActualRefundRecipient is AddressAliasHelperSharedTest {
     function test_When_recipientAddressIsZeroAndPrevMsgSenderHasNoCodeAndIsNotTxOrigin() public {
         address recipient = address(0);
         address prevMessageSender = makeAddr("prevMessageSender");
+        // solhint-disable-next-line avoid-tx-origin
+        assertNotEq(tx.origin, prevMessageSender);
+        assertEq(prevMessageSender.code.length, 0);
 
         address expectedRecipient = addressAliasHelper.applyL1ToL2Alias(prevMessageSender);
 

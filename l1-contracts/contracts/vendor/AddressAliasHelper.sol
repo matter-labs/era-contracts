@@ -43,6 +43,8 @@ library AddressAliasHelper {
     }
 
     /// @notice Utility function used to calculate the correct refund recipient
+    /// @dev The returned address is only final after being passed through `actualRefundRecipientMailbox`:
+    /// callers with deployed code are intentionally left unaliased here.
     /// @param _refundRecipient the address that should receive the refund
     /// @param _originalCaller the address that triggered the tx to L2
     /// @return _recipient the corrected address that should receive the refund
@@ -52,10 +54,12 @@ library AddressAliasHelper {
     ) internal view returns (address _recipient) {
         if (_refundRecipient == address(0)) {
             // If the `_refundRecipient` is not provided, we use the `_originalCaller` as the recipient.
-            // A caller without deployed code that is not the tx originator (e.g. a contract calling from its
-            // constructor) is aliased here, as the `code.length`-based aliasing in `actualRefundRecipientMailbox`
-            // would miss it, while the sender aliasing in the Mailbox (based on `tx.origin`) would apply.
-            // Callers with deployed code are left as is: the Mailbox applies the alias to them.
+            // A caller without deployed code that is not the tx originator (i.e. a contract calling from its
+            // constructor) is an L1 contract that only controls its aliased address on L2, but the
+            // `code.length`-based check in `actualRefundRecipientMailbox` cannot recognize it as a contract
+            // and would leave it unaliased — so the alias is applied here. Callers with deployed code are
+            // left as is: `actualRefundRecipientMailbox` aliases them (unless they are EIP-7702 accounts,
+            // which it exempts).
             // solhint-disable avoid-tx-origin
             // slither-disable-next-line tx-origin
             _recipient = (_originalCaller == tx.origin || _originalCaller.code.length != 0)
