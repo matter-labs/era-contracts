@@ -259,6 +259,36 @@ library MessageHashing {
         path.batchLeafSiblings = extractSlice(_proof, ptr + 2, ptr + 2 + metadata.batchLeafProofLen);
     }
 
+    /// @dev The settlement-layer batch reference of a multi-hop proof (the words following the
+    /// aggregation-hop section), read positionally by {readSettlementLayerReference}.
+    struct SettlementLayerReference {
+        /// @dev The settlement-layer block/batch number the chain-id leaf is proven under.
+        uint256 settlementLayerBatchNumber;
+        /// @dev The settlement-layer chain id.
+        uint256 settlementLayerChainId;
+        /// @dev The batch's settlement-layer inclusion timestamp (bound into the batch leaf).
+        uint256 l1BatchTimestamp;
+    }
+
+    /// @notice Reads the settlement-layer batch reference from a multi-hop proof — the single
+    /// accessor for this section's word layout; external libraries must use it instead of parsing
+    /// themselves.
+    /// @dev The returned words can be trusted ONLY after the same proof bytes passed the leaf
+    /// verifier (`proveL2LeafInclusionShared` / {_getProofData}), which also must have rejected
+    /// `finalProofNode` proofs.
+    function readSettlementLayerReference(
+        bytes32[] calldata _proof
+    ) internal pure returns (SettlementLayerReference memory slReference) {
+        ProofMetadata memory metadata = parseProofMetadata(_proof);
+        // Word layout after the leaf-to-batch-root section (see {_getProofData}):
+        // [l1Timestamp][batchLeafProofMask][batchLeafProofLen siblings][slPackedBatchInfo][slChainId]
+        uint256 ptr = metadata.proofStartIndex + metadata.logLeafProofLen;
+        slReference.l1BatchTimestamp = uint256(_proof[ptr]);
+        uint256 settlementLayerPackedBatchInfo = uint256(_proof[ptr + 2 + metadata.batchLeafProofLen]);
+        slReference.settlementLayerBatchNumber = settlementLayerPackedBatchInfo >> 128;
+        slReference.settlementLayerChainId = uint256(_proof[ptr + 3 + metadata.batchLeafProofLen]);
+    }
+
     /// @notice Extracts slice from the proof.
     /// @param _proof The proof.
     /// @param _left The left index.

@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 import {IndexedMerkleTree} from "../../common/libraries/IndexedMerkleTree.sol";
 import {Merkle} from "../../common/libraries/Merkle.sol";
 import {ImtProof, ATOMIC_COMMIT_LEAF_TAG} from "../IAtomicInterop.sol";
-import {ProofData} from "../../common/Messaging.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
 import {ChainBatchRootTree} from "../../common/libraries/ChainBatchRootTree.sol";
 import {L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_VERIFICATION} from "../../common/l2-helpers/L2ContractInterfaces.sol";
@@ -171,21 +170,20 @@ library AtomicInteropProof {
         });
         if (!ok) revert ProofImtRootInclusionFailed(_proof.sourceChainId, _proof.batchNumber, _proof.chainImtRoot);
 
-        // Re-parse the same proof (same leaf, same mask) for the SL metadata, so the parse is bound
-        // to the verified root.
-        ProofData memory pd = MessageHashing._getProofData({
-            _chainId: _proof.sourceChainId,
-            _batchNumber: _proof.batchNumber,
-            _leafProofMask: _imtRootLeafIndex,
-            _leaf: _proof.chainImtRoot,
-            _proof: _proof.settlementProof
-        });
         // A final-node (single-level) proof has no settlement-layer batch reference, so neither the
         // deadline nor `t` could be checked against it.
-        if (pd.finalProofNode) revert ProofMissingSettlementLayerBatch(_proof.sourceChainId, _proof.batchNumber);
+        if (metadata.finalProofNode) {
+            revert ProofMissingSettlementLayerBatch(_proof.sourceChainId, _proof.batchNumber);
+        }
 
-        slBlock = pd.settlementLayerBatchNumber;
-        slChainId = pd.settlementLayerChainId;
-        l1BatchTimestamp = pd.l1BatchTimestamp;
+        // The SL metadata words are read positionally AFTER the verifier above authenticated the
+        // same proof bytes (see {MessageHashing.readSettlementLayerReference}) — this avoids
+        // re-running the Merkle climbs `proveL2LeafInclusionShared` already performed.
+        MessageHashing.SettlementLayerReference memory slReference = MessageHashing.readSettlementLayerReference(
+            _proof.settlementProof
+        );
+        slBlock = slReference.settlementLayerBatchNumber;
+        slChainId = slReference.settlementLayerChainId;
+        l1BatchTimestamp = slReference.l1BatchTimestamp;
     }
 }
