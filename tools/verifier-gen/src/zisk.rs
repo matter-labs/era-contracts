@@ -149,7 +149,7 @@ pub fn generate_zisk_verifier(
         // Gitignored: compiled when present (local builds, the real-proof
         // test), deployed standalone, and referenced by address on-chain.
         let plonk_output =
-            "../l1-contracts/contracts/dev-contracts/generated/ZiskSnarkPlonkVerifier.sol";
+            "../../l1-contracts/contracts/dev-contracts/generated/ZiskSnarkPlonkVerifier.sol";
         if let Some(parent) = std::path::Path::new(plonk_output).parent() {
             fs::create_dir_all(parent)?;
         }

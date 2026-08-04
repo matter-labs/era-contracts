@@ -20,12 +20,11 @@ contract MockPassVerifier is IVerifier {
 }
 
 /// @dev Stand-in for the snarkJS Plonk verifier that accepts iff the single
-///      public signal it is handed equals `expectedSignal`. Because the real
-///      aggregated SNARK crypto has no fixture yet, this lets the tests assert
-///      the EXACT signal the on-chain reconstruction produces (the digest
-///      formula, the sha256 preimage byte order and the field reduction)
-///      without a real pairing. A wrong reconstruction hands a wrong signal
-///      and is rejected.
+///      public signal it is handed equals `expectedSignal`. It lets the tests
+///      assert the EXACT signal the on-chain reconstruction produces (the
+///      digest formula, the sha256 preimage byte order and the field
+///      reduction), and name a near-miss signal a real proof could never
+///      carry. A wrong reconstruction hands a wrong signal and is rejected.
 contract ExpectSignalPlonkVerifier is ISnarkPlonkVerifier {
     uint256 public immutable expectedSignal;
 
@@ -40,7 +39,7 @@ contract ExpectSignalPlonkVerifier is ISnarkPlonkVerifier {
 
 /// @notice THE cross-stack aggregated-range binding vector, pinned verbatim
 ///         from `zksync-os-zisk/guest-aggregator/BINDING_VECTOR.md` (real
-///         4-batch aggregation session, ZiSK v0.18.0, 2026-07-15).
+///         4-batch aggregation session, ZiSK v0.18.0, 2026-08-04).
 /// @dev Three codebases assert these exact values and must stay in lockstep:
 ///      the aggregator guest (`cross_stack_binding_vector` host test), the
 ///      server's aggregation job validation, and this test. Update all pins
@@ -50,21 +49,19 @@ contract ExpectSignalPlonkVerifier is ISnarkPlonkVerifier {
 ///      rootCVadcopFinal must equal the vector pins) and drives it through
 ///      MultiProofVerifier, asserting that the on-chain RECONSTRUCTION of the
 ///      ZiSK public values reproduces the pinned digest and the expected PLONK
-///      signal. NB: the SNARK pairing itself is stand-in-mocked (no real
-///      aggregated fixture); this validates the reconstruction + binding, not
-///      the pairing against a real aggregated proof.
+///      signal. The signal stand-in is what lets this suite name the exact
+///      expected signal and reject the near-misses below; the real pairing
+///      over this vector's aggregated proof is asserted in
+///      ZiskVerifierRealProofTest.
 contract MultiProofRangeVectorTest is Test {
     /// @dev Inner state-transition guest programVK: the first field of the
     ///      binding digest. It is NOT the aggregated proof's wire [0..32].
     bytes32 internal constant INNER_PROGRAM_VK =
-        0x481748830df5c3b7aa5522333ace2c4b533352637b92fd3c83ecc506c5104ead;
+        0x1d16f620e2bc7e58044df7ee8d4284422a0dd37cf151cf79ecf324c131e50468;
     /// @dev Aggregator guest programVK: the aggregated proof's wire
-    ///      public-values bytes [0..32]. The aggregator ELF setup is deferred,
-    ///      so the contract pins the stand-in
-    ///      `keccak256("zisk-aggregator-programvk-standin")`. This test pins
-    ///      the same value. A real setup rotates both together.
+    ///      public-values bytes [0..32].
     bytes32 internal constant AGGREGATOR_PROGRAM_VK =
-        0xf60b59b4811b77a34524a9e2c15a3afd09d0d9fe5aa6757850eac5d8614c8899;
+        0x4c3d7317a62f651d813ba6afbbce59e45eaa7c009ab2a9b51d2f0fb3e7987254;
     /// @dev Vadcop-final root: the second field of the binding digest, and
     ///      wire public-values bytes [288..320].
     bytes32 internal constant ROOT_C_VADCOP_FINAL =
@@ -73,21 +70,21 @@ contract MultiProofRangeVectorTest is Test {
     /// @dev The four per-batch commitments (wire bytes [32..64] of each
     ///      per-batch ZiSK proof), in batch order.
     bytes32 internal constant COMMITMENT_1 =
-        0x95693fd871251f2a04f558f94852d31d4f7b0cd38b0ee2c746bd2851dc701dca;
+        0x6c41981c6fd0bd9a9262fe3dcc9fe4f0d8e142651f80316a8846d6922b5214ea;
     bytes32 internal constant COMMITMENT_2 =
-        0x4962160e4e0addc72fe2178dbbf3c5882ca1033790bb968d4fa451485987f99b;
+        0x1f56fcbd24636dc0a635bc51808d7db9eabf3914f66611c93cf37ea440a5fe27;
     bytes32 internal constant COMMITMENT_3 =
-        0xe697864dd72ddded6f1818db6618efff8e695714db8492ac50abc9f5d8b6221e;
+        0x9d909d7416f29633c361bfc00073a9004423f0e1cc46105cdd24550543c0e41c;
     bytes32 internal constant COMMITMENT_4 =
-        0x3cbda79d374329af945a0b1d2d73c87b2cd2cadb69ab3d6c03166a690dfff898;
+        0x6ca5ada4916397cfb1b07a2f115f21fedf7e4a14a827995b3c5b392966532ad6;
 
     /// @dev `_computeZKsyncOSHash(0, PIs)` over the four public inputs.
     bytes32 internal constant CHAINED_PI =
-        0x000000004e755bc20431285db82f02b677f0fa43b0b4ae7298e2f489e1a45b78;
+        0x00000000aef7dc22681088617d4cefece2e7afcc23e776dd7694c967ad5e5603;
     /// @dev keccak256(INNER_PROGRAM_VK || ROOT_C_VADCOP_FINAL || CHAINED_PI):
     ///      the aggregated proof's public-values bytes [32..64].
     bytes32 internal constant DIGEST =
-        0x5f47db9b336cf84b7b7fc49ca77eadb5160e373dc8f12057d719f45d3b2fbd84;
+        0x7eabba6c7a68150706e10101195be54eaf3b39f699bc8da5f34c8033eedec13e;
 
     /// @dev BN254 scalar field modulus (must equal ZiskVerifier._RFIELD).
     uint256 internal constant RFIELD =

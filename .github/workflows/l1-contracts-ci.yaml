@@ -214,7 +214,7 @@ jobs:
         run: yarn l1 check-legacy-bridge-sol
 
   test-foundry:
-    needs: [build]
+    needs: [build, check-verifier-generator-l1]
     runs-on: ubuntu-latest
 
     steps:
@@ -249,6 +249,13 @@ jobs:
             l2-contracts/cache-forge
             l2-contracts/zkout
             system-contracts/zkout
+
+      - name: Restore the generated Plonk verifier
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: zisk-plonk-verifier-${{ github.sha }}
+          path: l1-contracts/contracts/dev-contracts/generated
 
       - name: Run tests
         working-directory: ./l1-contracts
@@ -345,12 +352,33 @@ jobs:
       - name: Compare ZKsyncOSVerifierFflonk.sol
         run: diff tools/verifier-gen/data/ZKsyncOSVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol
 
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+
+      - name: Render the snarkJS Plonk verifier
+        working-directory: tools/verifier-gen
+        run: |
+          npm ci
+          node render_plonk_verifier.js data/ZiSK_plonk_verification_key.json data/PlonkVerifier.sol
+
       - name: Generate ZiSK verifier
         working-directory: tools/verifier-gen
-        run: cargo run --bin zksync_verifier_contract_generator --release -- --variant zisk
+        run: |
+          cargo run --bin zksync_verifier_contract_generator --release -- \
+            --variant zisk --zisk_plonk_input_path data/PlonkVerifier.sol
 
       - name: Compare ZiskVerifier.sol
         run: diff tools/verifier-gen/data/ZiskVerifier.sol l1-contracts/contracts/state-transition/verifiers/ZiskVerifier.sol
+
+      # ZiskVerifierRealProofTest deploys this generated verifier, so the
+      # foundry job restores it under the same key.
+      - name: Save the generated Plonk verifier
+        uses: actions/cache/save@v4
+        with:
+          key: zisk-plonk-verifier-${{ github.sha }}
+          path: l1-contracts/contracts/dev-contracts/generated
 
   coverage:
     defaults:
