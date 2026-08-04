@@ -28,6 +28,14 @@ import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 
 /// @notice Test-only CTM upgrade that mocks large bytecode reads to avoid MemoryOOG
 contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
+    /// @notice This fixture is an Era ecosystem, which this release refuses to generate a per-chain upgrade
+    ///         for (`deployUsedUpgradeContract` reverts). The fixture exists to exercise the ecosystem-side
+    ///         flow — proxy upgrades, stage calls, wiring — so it keeps the v31 Era contract for the chain
+    ///         step rather than skipping the chain upgrade entirely.
+    function deployUsedUpgradeContract() internal override returns (address) {
+        return deploySimpleContract("EraSettlementLayerV31Upgrade", false);
+    }
+
     /// @notice Override to return dummy bytecode hashes instead of reading huge JSON files
     function getL2BytecodeHash(string memory /* contractName */) public view override returns (bytes32) {
         // Return a valid dummy bytecode hash (must have version byte 0x01 and odd length marker)
