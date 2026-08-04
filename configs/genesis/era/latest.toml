@@ -9,3 +9,4 @@ evm_emulator_hash = "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fb
 [prover]
 recursion_scheduler_level_vk_hash = "0xb2f50340e0edbe49dc657d4eb298e07f13860c1be0fe2e438e44ef8fad133d84"
 fflonk_snark_wrapper_vk_hash = "0x49eae0bf5c7ea580f4979b366e52b386adc5f42e2ce50fc1d3c4de9a86052bff"
+airbender_snark_wrapper_vk_hash = "0xd8176dea8eb7277c3c7ac5c40bfce0b59cd6edfcaa9fff3b06cda5e4aebfdf4c"
