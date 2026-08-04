@@ -262,12 +262,10 @@ async function transferL1Ownership(
 /**
  * Hand the CTM's ProxyAdmin to the deployer EOA when a contract owns it.
  *
- * `AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps` can only act through owners it
- * knows how to wrap, and the wrap registry comes from `permanent-values/<env>.toml`, which the harness
- * does not use (it passes addresses explicitly instead of `--env`). A real environment declares its
- * governance under `[[ownable_proxies]]`; here the equivalent is to normalize the owner to an EOA, in
- * the same spirit as the ownership transfers above. In the v31 fixture the CTM deployment leaves its
- * ProxyAdmin owned by its own `Governance.sol` instance.
+ * For the upgrade scripts to issue calls from a contract owner, that owner has to be listed in
+ * `ownable_proxies`, which reaches them only through protocol-ops' `--env` config — not available to this
+ * harness, which passes addresses explicitly. So every owner has to be an EOA instead. In the v31 fixture
+ * the CTM deployment leaves its ProxyAdmin owned by its own `Governance.sol` instance.
  */
 async function normalizeProxyAdminOwnerToEoa(
   provider: ethers.providers.JsonRpcProvider,

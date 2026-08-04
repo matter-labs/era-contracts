@@ -129,12 +129,13 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     }
 
     /// @notice Override to deploy the correct per-chain upgrade contract based on chain type.
-    /// @dev This release upgrades chains that are already on v31, so it uses the v32 contracts: the v31 ones
-    ///      redo v31's one-time work and would revert (see {SettlementLayerV32UpgradeBase}).
+    /// @dev ZKsync OS chains reaching this release are already on v31, so they must not re-run v31's
+    ///      one-time work; Era keeps the v31 contract, since upgrading Era chains onto this release is not
+    ///      supported.
     function deployUsedUpgradeContract() internal virtual override returns (address) {
         string memory contractName = config.isZKsyncOS
             ? "ZKsyncOSSettlementLayerV32Upgrade"
-            : "EraSettlementLayerV32Upgrade";
+            : "EraSettlementLayerV31Upgrade";
         console.log("Deploying", contractName);
         return deploySimpleContract(contractName, false);
     }
