@@ -1,0 +1,9 @@
+{
+  "name": "zisk-plonk-verifier-renderer",
+  "private": true,
+  "description": "Renders the snarkJS Plonk verifier for the ZiSK SNARK wrap from a Plonk verification key.",
+  "dependencies": {
+    "ejs": "3.1.10",
+    "snarkjs": "0.7.6"
+  }
+}

@@ -153,9 +153,9 @@ abstract contract DeployUtils is Create2FactoryUtils {
         }
         // The aggregation verifier for the single-VK ZiSK lane. Pins the
         // aggregator guest programVK, the inner guest programVK and the
-        // vadcop-final root, and checks the SNARK for every range size. The
-        // aggregator VK is a deferred step, so this defaults to zero; when
-        // set, the deploy wires it with setZiskRangeVerifier.
+        // vadcop-final root, and checks the SNARK for every range size. It
+        // is optional and defaults to zero; when set, the deploy wires it
+        // with setZiskRangeVerifier.
         try vm.parseTomlAddress(toml, "$.zisk_range_verifier_addr") returns (address val) {
             config.ziskRangeVerifierAddr = val;
         } catch {

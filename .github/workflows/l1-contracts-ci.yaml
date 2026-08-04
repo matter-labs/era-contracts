@@ -131,7 +131,7 @@ jobs:
         run: yarn calculate-hashes:check
 
   test-foundry:
-    needs: [build, lint]
+    needs: [build, lint, check-verifier-generator-l2]
     runs-on: ubuntu-latest
 
     steps:
@@ -170,6 +170,13 @@ jobs:
             l2-contracts/cache-forge
             l2-contracts/zkout
             system-contracts/zkout
+
+      - name: Restore the generated Plonk verifier
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: zisk-plonk-verifier-${{ github.sha }}
+          path: l1-contracts/contracts/dev-contracts/generated
 
       - name: Run tests
         working-directory: ./l1-contracts
@@ -284,12 +291,31 @@ jobs:
       - name: Compare L2VerifierFflonk.sol
         run: diff tools/data/VerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/L2VerifierFflonk.sol
 
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+
+      - name: Render the snarkJS Plonk verifier
+        working-directory: tools
+        run: |
+          npm ci
+          node render_plonk_verifier.js data/ZiSK_plonk_verification_key.json data/PlonkVerifier.sol
+
       - name: Generate ZiSK verifier
         working-directory: tools
-        run: cargo run -- --variant zisk
+        run: cargo run -- --variant zisk --zisk_plonk_input_path data/PlonkVerifier.sol
 
       - name: Compare ZiskVerifier.sol
         run: diff tools/data/ZiskVerifier.sol l1-contracts/contracts/state-transition/verifiers/ZiskVerifier.sol
+
+      # ZiskVerifierRealProofTest deploys this generated verifier, so the
+      # foundry job restores it under the same key.
+      - name: Save the generated Plonk verifier
+        uses: actions/cache/save@v4
+        with:
+          key: zisk-plonk-verifier-${{ github.sha }}
+          path: l1-contracts/contracts/dev-contracts/generated
 
   coverage:
     defaults:
