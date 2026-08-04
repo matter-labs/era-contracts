@@ -33,6 +33,8 @@ error ManagerLegNotRevertable(bytes32 flowId, bytes32 bundleHash, LegState actua
 error ManagerLegSourceChainIdsLengthMismatch(uint256 legs, uint256 chainIds);
 // 0x62c42f1d
 error ManagerLegSourceChainNotRegistered(uint256 legSourceChainId);
+// 0x4dbe1536
+error ManagerMissingLegIndexOutOfRange(uint256 legs, uint256 missingLegIndex);
 // 0xd7522d7a
 error ManagerNotInteropCenter(address sender);
 // 0x07029ea6
