@@ -48,8 +48,8 @@ release. The proof-level soundness/completeness arguments live in
 - **Indirect calls may not carry destination-side value.** `interopCallValue != 0` on an indirect call
   is rejected at send (`IndirectCallCannotCarryValue`): on the recovery path native value is returned to
   `InteropCall.from`, which for an indirect call is the starter contract (the asset router for
-  router-produced calls) rather than the payer, so allowing it would strand funds. Direct calls may carry value — theirs is refunded to their own `from` through
-  the base-token recovery path (see
+  router-produced calls) rather than the payer, so allowing it would strand funds. Direct calls may
+  carry value — theirs is refunded to their own `from` through the base-token recovery path (see
   {protocol-docs/atomicity/recovery.md#\_recoverbundle-reversing-the-burns}).
 - **L1 destinations are rejected.** An atomic bundle is never published to L1, so it could only ever
   time out; and L2->L1 withdrawal accounting must stay append-only and never revertable (see
@@ -161,22 +161,33 @@ The timeout proof relies on three preconditions, each enforced on chain:
    can serve as an indirect call starter — `InteropCenter._processCallStarter` invokes
    `initiateIndirectCall` on the user-supplied `to` and stamps that address as `InteropCall.from` —
    and indirect calls force `interopCallValue == 0`. Whatever such a starter burned at send time
-   (including the `indirectCallMessageValue` it was forwarded as `msg.value`) therefore matches
-   neither branch: no reversal hook is called, no value is refunded, and `claimRefund` consumes the
-   leg while silently skipping that call — the manager will never return those funds. A generic
-   dispatch over `IAtomicRecoverable` senders is not safely possible today: `InteropCall` carries no
-   direct/indirect marker, so the manager cannot tell an indirect starter (which should get the
-   hook) from a direct call's `from` (possibly an EOA or a contract without the hook), and a
+   (including the `indirectCallMessageValue` that was forwarded to it as `msg.value`) therefore
+   matches neither branch: no reversal hook is called, no value is refunded, and `claimRefund`
+   consumes the leg while silently skipping that call — the manager will never return those funds.
+   A generic dispatch over `IAtomicRecoverable` senders is not safely possible today: `InteropCall`
+   carries no direct/indirect marker, so the manager cannot tell an indirect starter (which should
+   get the hook) from a direct call's `from` (possibly an EOA or a contract without the hook), and a
    reverting probe would block the whole claim (see
    {protocol-docs/atomicity/recovery.md#the-walk-is-all-or-nothing-not-per-call-isolated}); fixing
-   this requires marking indirect calls in the bundle encoding. Restricting indirect starters to the
-   asset router at send time was rejected too: every L2→L2 send is atomic (see
-   {protocol-docs/interop.md#restrictions}), so the restriction would remove the
-   `IL2CrossChainSender` extension point from interop entirely. Accepted for this release: only
-   asset-router burns (and direct-call base-token `value`) are recovered by the manager. A custom
-   starter that burns funds MUST ship its own permissionless recovery, gated on the manager's
-   terminal leg state (`legState(flowId, bundleHash) == Reverted`, signalled by `FlowRefunded`) —
-   relying on the manager's dispatch strands the burn.
+   this needs either an indirect-call marker in the bundle encoding or a manager-side registry of
+   recoverable senders. Restricting indirect starters to the asset router at send time was rejected
+   too: every L2→L2 send is atomic (see {protocol-docs/interop.md#restrictions}), so the restriction
+   would remove the `IL2CrossChainSender` extension point from interop entirely. Accepted for this
+   release: the manager recovers only asset-router burns and non-router `value` (necessarily
+   direct-call — indirect calls carry none). A custom starter that burns funds and wants them
+   recoverable MUST ship its own permissionless recovery, and gating it on
+   `legState(flowId, bundleHash) == Reverted` alone is NOT safe: the starter cannot learn
+   `(flowId, bundleHash)` at burn time (the bundle hash is computed only after every starter ran,
+   and the flow preimage travels out-of-band), so both arrive as untrusted claim-time inputs, and an
+   arbitrary reverted leg proves nothing about the starter's own burn. A safe claim takes the
+   ABI-encoded bundle plus `flowId`, recomputes the hash
+   (`InteropDataEncoding.encodeInteropBundleHash`), requires
+   `legState(flowId, bundleHash) == Reverted` (signalled by `FlowRefunded` — which does not mean
+   funds moved), locates the starter's own call in `bundle.calls` (`from == address(this)` with the
+   recorded burn data), and consumes a per-burn nullifier. Such a claim also inherits the
+   "permanently stuck at `Revertable`" non-guarantee: if another call's recovery in the same bundle
+   reverts deterministically, the leg never reaches `Reverted` (see
+   {protocol-docs/atomicity/recovery.md#non-guarantees}).
 
 ## Trust assumptions
 

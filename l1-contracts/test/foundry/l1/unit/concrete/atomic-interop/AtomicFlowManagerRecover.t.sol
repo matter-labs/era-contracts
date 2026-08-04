@@ -43,8 +43,8 @@ contract AtomicFlowManagerRecoverTest is Test {
         manager = new AtomicFlowManagerRecoverHarness();
     }
 
-    /// @dev Builds a single direct-call bundle. `destBaseTokenAssetId` selects the refund path; `value`
-    /// marks it as a value-carrying leg.
+    /// @dev Builds a single-call bundle with a non-router sender. `destBaseTokenAssetId` selects the
+    /// refund path; `value` marks it as a value-carrying leg.
     function _bundle(bytes32 _destBaseTokenAssetId, uint256 _value) internal view returns (InteropBundle memory b) {
         b = _bundleFrom(DEPOSITOR, _destBaseTokenAssetId, _value, "");
     }
@@ -171,13 +171,11 @@ contract AtomicFlowManagerRecoverTest is Test {
     }
 
     function test_recoverBundle_succeedsWhenNothingRecoverable() public {
-        // No value and a non-asset-router sender: nothing the manager recovers. This shape covers both a
-        // fund-free direct call and a non-router indirect starter whose burn is deliberately skipped
-        // (accepted limitation — see
-        // {protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations}). The refund must
-        // still go through (flipping the leg to Reverted is meaningful on its own) and must not touch the
-        // asset router at all — both router entry points are set to revert, so any dispatch would fail
-        // the test.
+        // No value and a non-asset-router sender: nothing the manager recovers (which does not imply
+        // nothing was burned — see test_recoverBundle_nonRouterIndirectStarterIsNotDispatched). The
+        // refund must still go through (flipping the leg to Reverted is meaningful on its own) and must
+        // not touch the asset router at all — both router entry points are set to revert, so any
+        // dispatch would fail the test.
         vm.mockCallRevert(
             L2_ASSET_ROUTER_ADDR,
             abi.encodeWithSelector(IAssetRouterShared.bridgehubRecoverBaseToken.selector),
@@ -189,5 +187,31 @@ contract AtomicFlowManagerRecoverTest is Test {
             "unexpected recovery"
         );
         manager.exposedRecoverBundle(_bundle(SOURCE_BASE_TOKEN_ASSET_ID, 0));
+    }
+
+    function test_recoverBundle_nonRouterIndirectStarterIsNotDispatched() public {
+        // Pins the accepted limitation in
+        // {protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations}: recovery dispatch
+        // is pinned to the asset router, so a non-router indirect starter's burn is deliberately
+        // skipped. The starter's own recoverAtomicCall and both router entry points are set to revert,
+        // so any dispatch to any of them would fail the test; the claim still goes through.
+        address starter = makeAddr("customIndirectStarter");
+        bytes memory callData = abi.encodeWithSignature("finalizeDeposit(uint256,bytes32,bytes)");
+        vm.mockCallRevert(
+            starter,
+            abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector),
+            "unexpected non-router recovery"
+        );
+        vm.mockCallRevert(
+            L2_ASSET_ROUTER_ADDR,
+            abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector),
+            "unexpected recovery"
+        );
+        vm.mockCallRevert(
+            L2_ASSET_ROUTER_ADDR,
+            abi.encodeWithSelector(IAssetRouterShared.bridgehubRecoverBaseToken.selector),
+            "unexpected value refund"
+        );
+        manager.exposedRecoverBundle(_bundleFrom(starter, SOURCE_BASE_TOKEN_ASSET_ID, 0, callData));
     }
 }

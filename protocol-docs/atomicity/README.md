@@ -121,7 +121,8 @@ asset router recognises the manager via `_atomicFlowManagerAddr()`. For recovery
 `IAtomicRecoverable.recoverAtomicCall` on a bundle call's **local sender** (`InteropCall.from`), and only
 when that sender is the canonical L2 asset router (`from == L2_ASSET_ROUTER_ADDR`) — the interface is not
 dispatched generically, and not to the call's target. Supporting another `IAtomicRecoverable` sender
-requires marking indirect calls in the bundle encoding — an accepted limitation, see
+needs either an indirect-call marker in the bundle encoding or a manager-side registry of recoverable
+senders — an accepted limitation, see
 [security.md](./security.md#known-issues-and-accepted-limitations).
 
 ## Off-chain tooling

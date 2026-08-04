@@ -13,9 +13,9 @@ interface IL2CrossChainSender {
     ///         We call initiateIndirectCall on contract A on source chain. It returns an interopCallStarter which will be used to pass the call
     ///         to the destination chain. In this second call the sender is contract A on source chain. This "indirect" call mechanism could be used for complex
     ///         Interop scenarios, such as bridging.
-    ///         NOTE: on atomic-flow timeout the AtomicFlowManager reverses only asset-router burns; funds
-    ///         a custom implementer burns here are not reversed by the manager — see
-    ///         {protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations}.
+    /// @dev On atomic-flow timeout the AtomicFlowManager reverses only asset-router burns; funds a custom
+    /// implementer burns here are not reversed by the manager — see
+    /// {protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations}.
     /// @param _chainId Destination chain ID.
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _value The `msg.value` to be deposited on the target chain.

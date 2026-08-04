@@ -286,8 +286,8 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// starter is NOT reversed — see
     /// {protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations}.
     /// @dev Native base-token `value` is reversed separately. Router-produced calls (`from == asset
-    /// router`) never carry it — the send path forces `interopCallValue == 0` on indirect calls, an
-    /// invariant imported from {InteropCenter}, not re-checked here — and take only the
+    /// router`) never carry it — the send path forces `interopCallValue == 0` on indirect calls and the
+    /// router itself never initiates direct sends; neither is re-checked here — and take only the
     /// `recoverAtomicCall` branch. A non-router call's `value` (only a direct call can carry one) routes
     /// through the asset router/NTV base-token recovery path (reusing the existing accounting) back to
     /// its `from`.
@@ -311,7 +311,8 @@ contract AtomicFlowManager is IAtomicFlowManager {
             // {protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations}). Any base-token
             // `value` a non-router call carried is handled below. The sender reports via the return value
             // whether it recognised (and reversed) the call; nothing is done with the answer — an
-            // unrecognised call simply has nothing to recover.
+            // unrecognised call is skipped (see known issue 1 in
+            // {protocol-docs/atomicity/security.md#known-issues-to-be-fixed-in-this-release}).
             if (c.from == L2_ASSET_ROUTER_ADDR) {
                 // slither-disable-next-line unused-return
                 IAtomicRecoverable(c.from).recoverAtomicCall(destChainId, c.data);

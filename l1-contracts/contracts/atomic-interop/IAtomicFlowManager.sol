@@ -14,7 +14,8 @@ interface IAtomicFlowManager {
     event FlowCommitted(bytes32 indexed flowId, bytes32 indexed bundleHash, uint64 deadline, uint256 leafIndex);
     /// @notice Emitted per source leg marked `Revertable` by a timeout proof.
     event FlowRefundAuthorized(bytes32 indexed flowId, bytes32 indexed bundleHash);
-    /// @notice Emitted when a `Revertable` leg's burned funds are recovered.
+    /// @notice Emitted when a `Revertable` leg's refund claim is consumed. Funds move only for the
+    /// bundle's recoverable calls — possibly none (see {protocol-docs/atomicity/recovery.md}).
     event FlowRefunded(bytes32 indexed flowId, bytes32 indexed bundleHash);
 
     /// @notice Records an atomic source leg: recomputes `flowId` from the supplied preimage, verifies
@@ -50,9 +51,11 @@ interface IAtomicFlowManager {
     /// (see {AtomicInteropProof.verifyTimeoutAbsence}).
     function authorizeRefund(AtomicFlow calldata _flow, uint256 _missingLegIndex, ImtProof calldata _absence) external;
 
-    /// @notice Recovers the burned source funds for a `Revertable` leg by reversing the bundle's
-    /// asset-router calls (re-minting each burned asset to its depositor). Permissionless. State
-    /// `Revertable -> Reverted`.
+    /// @notice Claims a `Revertable` leg's refund: reverses the bundle's asset-router calls
+    /// (re-minting each burned asset to its depositor) and refunds a direct call's base-token `value`.
+    /// Other burns are not reversed — see
+    /// {protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations}. Permissionless.
+    /// State `Revertable -> Reverted`.
     /// @param _flowId The flow the leg belongs to.
     /// @param _bundle The ABI-encoded {InteropBundle} of the source leg (hashes to the committed leg).
     function claimRefund(bytes32 _flowId, bytes calldata _bundle) external;
