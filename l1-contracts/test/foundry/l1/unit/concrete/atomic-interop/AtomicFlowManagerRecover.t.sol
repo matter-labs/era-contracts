@@ -171,9 +171,13 @@ contract AtomicFlowManagerRecoverTest is Test {
     }
 
     function test_recoverBundle_succeedsWhenNothingRecoverable() public {
-        // No value and a direct, non-asset-router sender: nothing to reverse. The refund must still go
-        // through (flipping the leg to Reverted is meaningful on its own) and must not touch the asset
-        // router at all — both router entry points are set to revert, so any dispatch would fail the test.
+        // No value and a non-asset-router sender: nothing the manager recovers. This shape covers both a
+        // fund-free direct call and a non-router indirect starter whose burn is deliberately skipped
+        // (accepted limitation — see
+        // {protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations}). The refund must
+        // still go through (flipping the leg to Reverted is meaningful on its own) and must not touch the
+        // asset router at all — both router entry points are set to revert, so any dispatch would fail
+        // the test.
         vm.mockCallRevert(
             L2_ASSET_ROUTER_ADDR,
             abi.encodeWithSelector(IAssetRouterShared.bridgehubRecoverBaseToken.selector),
