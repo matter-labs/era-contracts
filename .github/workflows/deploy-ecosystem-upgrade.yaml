@@ -22,12 +22,26 @@ name: "Ecosystem Upgrade: Deploy + Verify (v31)"
 # calldata is resubmitted at the next free nonce (see `submit_and_confirm` in
 # `protocol-ops/src/commands/dev/execute_safe.rs`).
 #
-# ─── SECRETS ───
+# ─── WHICH L1, WHICH SECRETS ───
+# The target L1 is taken from the downloaded bundle's `bundle-metadata.json`
+# (`l1.chain_id`), NOT from the `environment` name — an ecosystem can sit on
+# mainnet without being named "mainnet" (battlechain does: `l1_chain_id = 1`), and
+# choosing by name would sign against the wrong chain with the wrong key. So:
+#
+#   l1.chain_id = 1         → L1_RPC_URL_MAINNET + DEPLOYER_PRIVATE_KEY_MAINNET,
+#                             Etherscan `--chain mainnet`
+#   l1.chain_id = 11155111  → L1_RPC_URL_SEPOLIA + DEPLOYER_PRIVATE_KEY_SEPOLIA,
+#                             Etherscan `--chain sepolia`
+#
+# e.g. `environment=battlechain` deploys to L1 MAINNET and needs the _MAINNET
+# secrets, even though the env is not called mainnet.
+#
 # Unlike step 1 (a fork rehearsal that impersonates the deployer and signs
-# nothing), this step signs REAL transactions, so it needs the deployer key.
-# Required repository secrets:
-#   L1_RPC_URL_SEPOLIA / L1_RPC_URL_MAINNET   — L1 RPC (carries an API key; masked)
-#   DEPLOYER_PRIVATE_KEY_SEPOLIA / _MAINNET   — deployer EOA key (real signer)
+# nothing), this step signs REAL transactions, so it needs the deployer key. The
+# job also refuses to start if that key's address isn't the deployer the bundle was
+# prepared for — otherwise `--skip-unkeyed` would drop every bundle and "succeed"
+# having deployed nothing.
+#
 # Optional:
 #   ETHERSCAN_API_KEY                         — for the Etherscan verify step
 # The L1 RPC URL comes from the secret (never a plaintext input) so its API key
@@ -37,13 +51,9 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment"
+        description: "Environment = the same config-pair basename you generated with (stage, testnet, mainnet, battlechain, …). Which L1 gets broadcast to is NOT derived from this name — it comes from the bundle's own `bundle-metadata.json` `l1.chain_id`, so an ecosystem on mainnet uses the mainnet RPC/key even if its name isn't 'mainnet'."
         required: true
-        type: choice
-        options:
-          - stage
-          - testnet
-          - mainnet
+        type: string
       generate_run_id:
         description: "Run ID of the 'Ecosystem Upgrade Calldata' (step 1) run to download the deployer bundles from"
         required: true
@@ -144,7 +154,12 @@ jobs:
             echo "::warning::bundle was generated from $bundle_commit but this run checked out $GITHUB_SHA — re-dispatch on that commit for a source-matching Etherscan verify."
           fi
 
-      - name: Select + mask RPC and deployer key
+      # Which L1 to broadcast to comes from the BUNDLE, not from the env's name:
+      # `bundle-metadata.json` records the `l1.chain_id` the calldata was computed
+      # against. An ecosystem can live on mainnet without being called "mainnet"
+      # (battlechain does), and picking the network by name would then sign against
+      # the wrong chain with the wrong key.
+      - name: Select + mask RPC and deployer key (L1 from the bundle)
         env:
           ENVIRONMENT: ${{ inputs.environment }}
           RPC_SEPOLIA: ${{ secrets.L1_RPC_URL_SEPOLIA }}
@@ -153,16 +168,28 @@ jobs:
           PK_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
         run: |
           set -euo pipefail
-          if [ "$ENVIRONMENT" = "mainnet" ]; then
-            rpc="$RPC_MAINNET"; pk="$PK_MAINNET"
-          else
-            rpc="$RPC_SEPOLIA"; pk="$PK_SEPOLIA"
+          META="$(find "$GITHUB_WORKSPACE/deploy-inputs" -name bundle-metadata.json | head -1)"
+          L1_CHAIN_ID=""
+          if [ -n "$META" ]; then
+            L1_CHAIN_ID="$(jq -r '.l1.chain_id // empty' "$META")"
           fi
+          if [ -z "$L1_CHAIN_ID" ]; then
+            # Bundle predates the metadata: fall back to the env config in this checkout.
+            PV="l1-contracts/upgrade-envs/permanent-values/${ENVIRONMENT}.toml"
+            L1_CHAIN_ID="$(sed -nE 's/^[[:space:]]*l1_chain_id[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' "$PV" 2>/dev/null | head -1)"
+            echo "::warning::bundle has no l1.chain_id; falling back to $PV -> ${L1_CHAIN_ID:-<none>}"
+          fi
+          case "$L1_CHAIN_ID" in
+            1)        rpc="$RPC_MAINNET"; pk="$PK_MAINNET"; net=mainnet ;;
+            11155111) rpc="$RPC_SEPOLIA"; pk="$PK_SEPOLIA"; net=sepolia ;;
+            *) echo "::error::Cannot map l1_chain_id='$L1_CHAIN_ID' to a secret (only 1 / 11155111 are wired)"; exit 1 ;;
+          esac
+          echo "Broadcasting '$ENVIRONMENT' to L1 $net (chain id $L1_CHAIN_ID)"
           if [ -z "$rpc" ]; then
-            echo "::error::Missing L1 RPC secret for '$ENVIRONMENT' (L1_RPC_URL_SEPOLIA / L1_RPC_URL_MAINNET)"; exit 1
+            echo "::error::Missing L1 RPC secret for $net (L1_RPC_URL_$(echo "$net" | tr a-z A-Z))"; exit 1
           fi
           if [ -z "$pk" ]; then
-            echo "::error::Missing deployer key secret for '$ENVIRONMENT' (DEPLOYER_PRIVATE_KEY_SEPOLIA / DEPLOYER_PRIVATE_KEY_MAINNET)"; exit 1
+            echo "::error::Missing deployer key secret for $net (DEPLOYER_PRIVATE_KEY_$(echo "$net" | tr a-z A-Z))"; exit 1
           fi
           echo "::add-mask::$rpc"
           echo "::add-mask::$pk"
@@ -172,7 +199,18 @@ jobs:
             echo "L1_RPC_URL=$rpc"
             echo "DEPLOYER_PK=$pk"
             echo "DEPLOYER_ADDR=$deployer"
+            echo "ETHERSCAN_CHAIN=$net"
           } >> "$GITHUB_ENV"
+          # The bundle names the EOA whose bundles are the deployer's. If the key in
+          # CI is a different account, `--skip-unkeyed` would silently broadcast
+          # nothing, so say so now rather than "succeeding" with an empty deploy.
+          if [ -n "$META" ]; then
+            want="$(jq -r '.deployer_address // empty' "$META")"
+            if [ -n "$want" ] && [ "$(echo "$want" | tr 'A-Z' 'a-z')" != "$(echo "$deployer" | tr 'A-Z' 'a-z')" ]; then
+              echo "::error::bundle was prepared for deployer $want but this key is $deployer — its bundles would be skipped. Re-generate with -f deployer_address=$deployer, or use that account's key."
+              exit 1
+            fi
+          fi
 
       # Broadcast ONLY the deployer bundles (target == deployer), robustly, one
       # at a time. Writes transactions.txt next to --out for the PUVT.
@@ -228,10 +266,9 @@ jobs:
           if [ -z "$LOG" ]; then
             echo "::warning::extra-verification-logs.txt not found; skipping"; exit 0
           fi
-          case "${{ inputs.environment }}" in
-            mainnet) CHAIN=mainnet ;;
-            *) CHAIN=sepolia ;;
-          esac
+          # $ETHERSCAN_CHAIN was resolved from the bundle's l1.chain_id, not from
+          # the env's name (see the RPC step).
+          CHAIN="${ETHERSCAN_CHAIN:?}"
           # Replay each logged `forge verify-contract …` command VERBATIM. Step 1
           # already emits the exact `--constructor-args <hex>` for every contract
           # that has them (derived from the CREATE2 init code it deployed — see

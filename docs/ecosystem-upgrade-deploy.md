@@ -174,9 +174,17 @@ grep 'forge verify-contract' \
 
 **In CI:** run the **`Ecosystem Upgrade: Deploy + Verify (v31)`** workflow
 (`deploy-ecosystem-upgrade.yaml`) with `generate_run_id` = the step-1 run to pull
-the deployer bundles from. It requires `DEPLOYER_PRIVATE_KEY_<ENV>`,
-`L1_RPC_URL_<ENV>` and (for verify) `ETHERSCAN_API_KEY` secrets, and uploads
-`transactions.txt` as `ecosystem-upgrade-deploy-result-<env>`.
+the deploy bundle from. It uploads `transactions.txt` as
+`ecosystem-upgrade-deploy-result-<env>`.
+
+Which L1 it signs against comes from the bundle's `bundle-metadata.json`
+(`l1.chain_id`), **not** from the `environment` name — an ecosystem can be on
+mainnet without being called "mainnet". So `environment=battlechain`
+(`l1_chain_id = 1`) uses `L1_RPC_URL_MAINNET` + `DEPLOYER_PRIVATE_KEY_MAINNET` and
+verifies with `--chain mainnet`; a Sepolia env uses the `_SEPOLIA` pair. The job
+also refuses to start if the key's address isn't the deployer the bundle was
+prepared for, since `--skip-unkeyed` would otherwise drop every bundle and report
+success having deployed nothing. `ETHERSCAN_API_KEY` is optional (verify only).
 
 > A single deployer bundle can revert mid-way (e.g. RPC 429). The broadcast is
 > idempotent, so just re-run it — already-deployed / already-transferred txs are

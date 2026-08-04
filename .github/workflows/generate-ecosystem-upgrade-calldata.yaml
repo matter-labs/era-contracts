@@ -56,6 +56,12 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 #   gh workflow run deploy-ecosystem-upgrade.yaml --ref <branch> \
 #     -f environment=<env> -f generate_run_id=<step-1 run id>
 #
+# The L1 it signs against is read from the bundle's `l1.chain_id`, NOT from the env
+# name: `environment=battlechain` goes to L1 MAINNET and needs
+# L1_RPC_URL_MAINNET + DEPLOYER_PRIVATE_KEY_MAINNET (Etherscan `--chain mainnet`),
+# even though the env isn't called "mainnet". The key's address must be the
+# deployer the bundle was prepared for, or the job stops.
+#
 # Or locally from the downloaded bundle — same `protocol_ops` code path:
 #
 #   ./l1-contracts/test/anvil-interop/replay-bundle-and-verify.sh \
