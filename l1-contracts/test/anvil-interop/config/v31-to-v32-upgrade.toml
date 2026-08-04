@@ -1,5 +1,6 @@
-# Upgrade input for the v31 -> v32 scenario. `bridgehub_proxy_address`, `owner_address` and the chain id
-# are substituted by the harness from the loaded chain states.
+# Upgrade input for the v31 -> v32 scenario. `bridgehub_proxy_address` and `owner_address` are substituted
+# by the harness from the loaded chain states; everything else, including `[chain] chain_id`, is a literal
+# that has to match the fixture.
 
 old_protocol_version = 0x1f00000000
 bridgehub_proxy_address = "0x0000000000000000000000000000000000000000"
@@ -10,6 +11,8 @@ owner_address = "0x0000000000000000000000000000000000000000"
 pre_v32_introspection = true
 
 [chain]
+# The sample chain the CTM upgrade reads chain-creation parameters from. Must be a chain that exists in
+# the fixture (`config/anvil-config.json`).
 chain_id = 10
 
 [contracts]

@@ -95,7 +95,8 @@ contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
     /// @notice Override to skip the ownership-acceptance and `setAddresses` calls, which need ownership
     ///         hand-offs the fixture does not perform.
     /// @dev The interop-handler wiring is kept: it is what makes a v31 ecosystem match a from-scratch v32
-    ///      one, and it collapses to nothing once the ecosystem already has a wired handler.
+    ///      one. In this fixture it collapses to nothing — the ecosystem already has a wired handler — so
+    ///      the calls themselves are covered by `PreV32ParityCalls.t.sol`, not here.
     function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
         console.log("Test mode: keeping only the L1InteropHandler wiring in stage 1");
         return _buildL1InteropHandlerWiringCalls();
@@ -129,9 +130,6 @@ uint256 constant ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT = 13;
 // Slot of `L1MessageRoot.v31UpgradeChainBatchNumber` (mapping). Layout:
 // `Initializable(0)`, `MessageRootBase(1-12)`, `__gap[37](13-49)`, this(50).
 uint256 constant L1_MESSAGE_ROOT_V31_UPGRADE_BATCH_NUMBER_SLOT = 50;
-// Slot of OZ `Initializable._initialized` (uint8 packed with `_initializing`).
-uint256 constant OZ_INITIALIZABLE_VERSION_SLOT = 0;
-
 contract UpgradeIntegrationTest_Local is
     UpgradeIntegrationTestBase,
     L1ContractDeployer,
@@ -165,12 +163,12 @@ contract UpgradeIntegrationTest_Local is
         ctmUpgrade.setNewProtocolVersion(newProtocolVersion);
     }
 
-    /// Make the freshly-deployed Era diamond look like it has a committed and
-    /// executed batch (both at 1) so `saveV31UpgradeChainBatchNumber`'s
-    /// `totalBatchesExecuted > 0` and `totalBatchesCommitted == totalBatchesExecuted`
-    /// guards pass, and seed the L1MessageRoot's per-chain placeholder that
-    /// `initializeL1V31Upgrade` would have set in production. See the
-    /// fork-only-violation note at the top of this file.
+    /// Substitute the batch history a live chain would have: a committed and executed batch (both at 1), so
+    /// the upgrade's `totalBatchesCommitted == totalBatchesExecuted` guard and
+    /// `saveV31UpgradeChainBatchNumber`'s `totalBatchesExecuted > 0` guard pass, plus the L1MessageRoot
+    /// per-chain placeholder that v31 set for this chain. Committing and executing a real batch needs a
+    /// prover and a sequencer, so there is no public API to reach this state in a foundry fixture; both are
+    /// only read by the guards. See the fork-only-violation note at the top of this file.
     function beforeChainUpgrade() internal override {
         address eraChainDiamond = addresses.bridgehub.getZKChain(eraZKChainId);
         vm.store(eraChainDiamond, bytes32(ZK_CHAIN_TOTAL_BATCHES_EXECUTED_SLOT), bytes32(uint256(1)));
@@ -186,14 +184,6 @@ contract UpgradeIntegrationTest_Local is
         _deployL1Contracts();
         console.log("setUp: L1 contracts deployed");
 
-        // Roll L1MessageRoot's `_initialized` back to 1 so that
-        // `initializeL1V31Upgrade()` (a `reinitializer(2)` call) is allowed
-        // to run during the upgrade. Fresh deployments call `initialize()`
-        // (also reinitializer(2)) so the proxy already sits at version 2.
-        // See the fork-only-violation note at the top of this file.
-        address messageRootProxy = address(addresses.bridgehub.messageRoot());
-        vm.store(messageRootProxy, bytes32(OZ_INITIALIZABLE_VERSION_SLOT), bytes32(uint256(1)));
-        console.log("setUp: Reset L1MessageRoot initializer version to 1");
         _deployTokens();
         console.log("setUp: Tokens deployed");
         _registerNewTokens(tokens);
@@ -288,8 +278,10 @@ contract UpgradeIntegrationTest_Local is
             "Base token assetId not registered"
         );
 
-        // Post-upgrade wiring that a from-scratch v32 deployment has, and that the upgrade therefore has
-        // to establish as well (see `CoreUpgrade_v31._buildL1InteropHandlerWiringCalls`).
+        // The wiring a v32 ecosystem has to end up with. This fixture starts from current contracts, so it
+        // is already wired and the upgrade emits no wiring calls: these assertions pin the invariant, while
+        // the calls that establish it on a real v31 ecosystem are covered by `PreV32ParityCalls.t.sol`
+        // (`test_wiresTheNewInteropHandler`).
         address l1InteropHandler = coreUpgrade.getCoreAddresses().bridges.proxies.l1InteropHandler;
         assertTrue(l1InteropHandler != address(0), "No L1InteropHandler after the upgrade");
         assertEq(

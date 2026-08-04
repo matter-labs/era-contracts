@@ -217,8 +217,11 @@ library SystemContractsProcessing {
     ///      deployments and Era factory deps; anything here must never be deployed onto an Era chain.
     function getZKsyncOSOnlyContracts() internal pure returns (CoreContract[] memory ids) {
         ids = new CoreContract[](ZKOS_ONLY_CONTRACTS_COUNT);
-        ids[0] = CoreContract.L2InteropCommitmentTree;
-        ids[1] = CoreContract.AtomicFlowManager;
+        uint256 i;
+        ids[i++] = CoreContract.L2InteropCommitmentTree;
+        ids[i++] = CoreContract.AtomicFlowManager;
+        // Same guard as `getFixedAddressCoreContracts`: under-filling would leave `CoreContract(0)` entries.
+        require(i == ZKOS_ONLY_CONTRACTS_COUNT, "ZKsync-OS-only contract count mismatch");
     }
 
     /// @notice System contracts that have l1-contracts EVM bytecodes and need ZKsyncOS proxy upgrades.

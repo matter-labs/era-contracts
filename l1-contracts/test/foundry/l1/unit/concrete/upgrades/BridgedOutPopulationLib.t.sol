@@ -16,6 +16,7 @@ import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {ILegacyL1AssetTracker} from "contracts/bridge/asset-tracker/ILegacyL1AssetTracker.sol";
+import {MAX_TOKEN_BALANCE} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
@@ -213,8 +214,8 @@ contract BridgedOutPopulationLibTest is Test {
 
     function test_populatesEveryAsset() public {
         // L1's bulkhead is the complement of everything ever bridged out of L1.
-        legacyTracker.setChainBalance(block.chainid, firstAssetId, type(uint256).max - 120);
-        legacyTracker.setChainBalance(block.chainid, secondAssetId, type(uint256).max - 7);
+        legacyTracker.setChainBalance(block.chainid, firstAssetId, MAX_TOKEN_BALANCE - 120);
+        legacyTracker.setChainBalance(block.chainid, secondAssetId, MAX_TOKEN_BALANCE - 7);
         ntv.setLegacyAssetTracker(address(legacyTracker));
 
         (bytes32[] memory assetIds, uint256[] memory populated) = _populate();
@@ -233,9 +234,9 @@ contract BridgedOutPopulationLibTest is Test {
     }
 
     function test_isImmuneToLegacyBalancesMovingBetweenChains() public {
-        // The tracker's per-chain buckets can still be redistributed by its own migration entry points; the
+        // The tracker's per-chain entries can still be redistributed by its own migration entry points; the
         // population reads L1's bulkhead, which such moves never touch.
-        legacyTracker.setChainBalance(block.chainid, firstAssetId, type(uint256).max - 50);
+        legacyTracker.setChainBalance(block.chainid, firstAssetId, MAX_TOKEN_BALANCE - 50);
         legacyTracker.setChainBalance(FIRST_CHAIN_ID, firstAssetId, 50);
         ntv.setLegacyAssetTracker(address(legacyTracker));
 
@@ -271,7 +272,7 @@ contract BridgedOutPopulationLibTest is Test {
         ntv.registerRemoteAsset(remoteAssetId, makeAddr("remoteTokenOnL1"), SECOND_CHAIN_ID);
         assertEq(ntv.originChainId(remoteAssetId), SECOND_CHAIN_ID, "asset registered as L2-native");
 
-        legacyTracker.setChainBalance(block.chainid, remoteAssetId, type(uint256).max - 1234);
+        legacyTracker.setChainBalance(block.chainid, remoteAssetId, MAX_TOKEN_BALANCE - 1234);
         ntv.setLegacyAssetTracker(address(legacyTracker));
 
         (bytes32[] memory assetIds, uint256[] memory populated) = _populate();
@@ -286,8 +287,8 @@ contract BridgedOutPopulationLibTest is Test {
 
     function test_batchesAssetsAcrossCalls() public {
         // With a batch size of one, each asset is populated by its own transaction.
-        legacyTracker.setChainBalance(block.chainid, firstAssetId, type(uint256).max - 3);
-        legacyTracker.setChainBalance(block.chainid, secondAssetId, type(uint256).max - 4);
+        legacyTracker.setChainBalance(block.chainid, firstAssetId, MAX_TOKEN_BALANCE - 3);
+        legacyTracker.setChainBalance(block.chainid, secondAssetId, MAX_TOKEN_BALANCE - 4);
         ntv.setLegacyAssetTracker(address(legacyTracker));
 
         // Three L1-native assets are registered (two tokens + ETH), but only these two have a legacy

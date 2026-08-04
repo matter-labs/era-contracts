@@ -158,9 +158,11 @@ tokens) and rejects fee-on-transfer tokens (`TokensWithFeesNotSupported`).
 A vault that is upgraded in place starts with `bridgedOut == 0` while still holding all of the escrow that
 was bridged out before the upgrade. Every withdrawal of an L1-native asset would therefore look like an
 inbound amount exceeding the outstanding one and be rejected as forged. `populateBridgedOut(assetIds)` folds
-the pre-upgrade accounting into `bridgedOut`, once per asset, and `stage3` of the upgrade runs it for every
-L1-native asset in the vault's `bridgedTokens` enumeration, batched across transactions (see
-`deploy-scripts/upgrade/default-upgrade/BridgedOutPopulationLib.sol`).
+the pre-upgrade accounting into `bridgedOut`, once per asset, and `stage3` of the upgrade runs it for the
+L1-native assets in the vault's `bridgedTokens` enumeration that have a non-zero pre-upgrade amount, batched
+across transactions (see `deploy-scripts/upgrade/default-upgrade/BridgedOutPopulationLib.sol`; assets whose
+amount is zero are left out of the batches entirely, so their `bridgedOutPopulated` flag stays unset — there
+is nothing to fold in for them, now or later).
 
 - For an asset the removed v31 `L1AssetTracker` registered, the amount is the complement of **L1's own
   bulkhead** there: L1 is the origin chain of these assets, so its bulkhead starts at `MAX_TOKEN_BALANCE`
@@ -170,15 +172,18 @@ L1-native asset in the vault's `bridgedTokens` enumeration, batched across trans
   vault's retained `__DEPRECATED_l1AssetTracker` slot.
 - Otherwise — for an asset that never went through the tracker migration — the amount is the sum of the
   vault's own `DEPRECATED_chainBalance` entries over the chains the bridgehub reports. The chain list is read
-  by the vault itself rather than supplied by the caller, so an incomplete list cannot silently undercount.
+  by the vault itself rather than supplied by the caller, so the caller cannot undercount it; the sum is exact
+  as long as the bridgehub still lists every chain that holds a non-zero entry, which holds because chains are
+  never removed from it.
   On an ecosystem deployed after the trackers were removed both sources are empty and the population is a
   no-op.
 - No privileges are required. Neither source can be influenced by the caller, and an asset can only be
   folded in once. Amounts bridged in the window between the upgrade and the population are preserved, since
   the population only ever adds to `bridgedOut`.
-- Withdrawals of an asset stay blocked until its amount is populated. Legacy tokens that predate the
-  `bridgedTokens` enumeration must therefore be backfilled into it first, which is why `stage3` registers
-  them before populating.
+- Until an asset is populated, only its pre-upgrade escrow is unwithdrawable — amounts bridged out after the
+  upgrade raise `bridgedOut` normally and can be withdrawn against. Legacy tokens that predate the
+  `bridgedTokens` enumeration have to be backfilled into it before they can be populated at all, which is why
+  `stage3` registers them first.
 
 ## Base-token handling
 
@@ -243,8 +248,10 @@ to preserve the deployed storage layout.
 - **ZKsync OS base token**: `totalSupply()` of the base token is not available by default on ZKsync OS
   chains, so the pre-v31 supply must be backfilled (`needBaseTokenTotalSupplyBackfill`,
   `backFillZKSyncOSBaseTokenV31MigrationData`, called by `L2BaseTokenZKOS`) before the value is used;
-  existing chains register the base token during the upgrade via `registerBaseTokenDuringUpgrade` with a
-  zero placeholder. These fields are expected to be deleted once every ZKsync OS chain is backfilled.
+  chains that went through the v31 upgrade registered the base token during it via
+  `registerBaseTokenDuringUpgrade` with a zero placeholder — from v32 on the tracker is initialized on the
+  genesis path only, so no upgrade calls that entry point. These fields are expected to be deleted once every
+  ZKsync OS chain is backfilled.
 
 ## L1Nullifier and failed-deposit recovery
 

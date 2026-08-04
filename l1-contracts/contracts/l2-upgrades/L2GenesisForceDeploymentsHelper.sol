@@ -199,6 +199,10 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     /// @notice Initializes force-deployed contracts.
+    /// @dev `_isZKsyncOS` still distinguishes the two VMs because the **genesis** path serves both: Era chains
+    /// are still created through it. The **upgrade** path (`_isGenesisUpgrade == false`), however, is only
+    /// supported for ZKsync OS in this release — Era chains cannot be upgraded onto it, and the L1 side
+    /// refuses to generate a per-chain upgrade for them (see `CTMUpgrade_v31.deployUsedUpgradeContract`).
     /// @dev Note, that this function is expected to initialize all system contracts deployed within the user space
     /// with the only exception of the SystemContractProxyAdmin, which is expected to be initialized inside the Genesis.
     /// @dev Contract deployment (conductContractUpgrade) is handled externally via the force deployment list.
@@ -248,6 +252,10 @@ library L2GenesisForceDeploymentsHelper {
         }
         _finalizeDeployments(_ctmDeployer, fixedForceDeploymentsData);
 
+        if (_isGenesisUpgrade) {
+            _initPreV32Contracts(fixedForceDeploymentsData, additionalForceDeploymentsData);
+        }
+
         // Contracts introduced in this release are initialized on both paths: they are uninitialized on a
         // new chain and on an upgraded one alike.
         _initializeV32Contracts(_isZKsyncOS, fixedForceDeploymentsData);
@@ -266,7 +274,8 @@ library L2GenesisForceDeploymentsHelper {
         }
     }
 
-    /// @notice Calls initL2() on ALL contracts. Used during genesis only.
+    /// @notice Calls initL2() on the contracts that have to be initialized before the bridgehub wiring in
+    /// `_finalizeDeployments`. Used during genesis only; see `_initPreV32Contracts` for the rest.
     function _initAllContracts(
         FixedForceDeploymentsData memory _fixedForceDeploymentsData,
         ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData,
@@ -315,26 +324,6 @@ library L2GenesisForceDeploymentsHelper {
             _fixedForceDeploymentsData.l1ChainId,
             _fixedForceDeploymentsData.aliasedL1Governance
         );
-
-        // The backfill flag is only ever set for ZKsync OS chains that predate v31, which by definition
-        // cannot be at genesis.
-        L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(
-            _fixedForceDeploymentsData.l1ChainId,
-            _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
-            false
-        );
-
-        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2();
-
-        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
-            _fixedForceDeploymentsData.l1ChainId,
-            _fixedForceDeploymentsData.aliasedL1Governance,
-            _fixedForceDeploymentsData.zkTokenAssetId
-        );
-
-        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
-
-        IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
     }
 
     /// @notice Calls updateL2() on ALL contracts. Used during non-genesis upgrades.
@@ -393,13 +382,42 @@ library L2GenesisForceDeploymentsHelper {
         });
     }
 
+    /// @notice Initializes the contracts that already existed in v31.
+    /// @dev Genesis only: these `initL2`s are unchanged since v31 and are one-shot, so a chain upgraded
+    /// from v31 has already run them. Called after `_finalizeDeployments` — the position v31 called them
+    /// from — because `InteropCenter.initL2` and `registerBaseTokenIfNeeded` run against the bridgehub
+    /// wiring it establishes.
+    function _initPreV32Contracts(
+        FixedForceDeploymentsData memory _fixedForceDeploymentsData,
+        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData
+    ) private {
+        // `false`: the backfill is only pending on ZKsync OS chains that predate v31, and a chain reaching
+        // genesis is new. Chains that do need it had the flag set by the v31 upgrade, in storage this
+        // release's implementation inherits.
+        L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
+            false
+        );
+
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2();
+
+        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.aliasedL1Governance,
+            _fixedForceDeploymentsData.zkTokenAssetId
+        );
+
+        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
+
+        IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
+    }
+
     /// @notice Initializes the contracts introduced in this release.
     /// @dev Only the atomic-interop built-ins are new here, and they exist on ZKsync OS chains only (see
     /// {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}).
     /// Neither they nor their addresses existed in v31, so a chain always receives them here for the first
     /// time — from its genesis when it is new, from this upgrade's force deployments when it predates them.
-    /// @dev Contracts that already existed in v31 are initialized on the genesis path only: their `initL2`s
-    /// are unchanged since v31 and are one-shot, so an upgraded chain must not run them again.
     function _initializeV32Contracts(
         bool _isZKsyncOS,
         FixedForceDeploymentsData memory _fixedForceDeploymentsData

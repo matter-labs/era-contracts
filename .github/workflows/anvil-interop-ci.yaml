@@ -152,6 +152,19 @@ jobs:
         run: |
           bash cleanup.sh
 
+  # Mandatory determinism gate for the current protocol version's chain state:
+  # rebuilds the state from scratch and verifies it matches the committed
+  # snapshots. If a contract change alters genesis state, this fails —
+  # regenerate via the 'Regenerate Anvil Interop Chain States' workflow and push.
+  #
+  # The compare tolerates block-number-derived drift: the harness runs Anvil with
+  # interval mining (`--block-time 1`, required so the interop relayers/TBM keep
+  # progressing), so the block count is wall-clock-dependent. compare-chain-states
+  # ignores block.number and storage slots that just hold a block number (values
+  # ≤ block height), plus the block-indexed MessageRoot storage. Everything else
+  # (balances, roots, addresses, code, protocol version) must match exactly, so
+  # this still catches real drift. To block merges, add "state-generation-check"
+  # to the branch protection required checks.
   state-generation-check:
     runs-on: ubuntu-latest
     timeout-minutes: 45

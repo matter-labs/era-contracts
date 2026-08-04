@@ -9,6 +9,7 @@ import {L2UpgradeTxLib} from "./L2UpgradeTxLib.sol";
 import {Bytes} from "../vendor/Bytes.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @title ZKsyncOSSettlementLayerV32Upgrade
 /// @notice Per-chain upgrade for ZKsync OS chains moving from v31 onto this release.
 /// @dev The plain {DefaultUpgrade} is all this release needs on L1, except for one thing: the CTM upgrade
@@ -23,15 +24,16 @@ contract ZKsyncOSSettlementLayerV32Upgrade is DefaultUpgrade {
 
     /// @inheritdoc DefaultUpgrade
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
-        ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
-        proposedUpgrade.l2ProtocolUpgradeTx.data = getL2UpgradeTxData(
+        // Rewritten in place: `_proposedUpgrade` is a memory reference, and the base implementation must
+        // see the per-chain data, not the placeholder it was called with.
+        _proposedUpgrade.l2ProtocolUpgradeTx.data = getL2UpgradeTxData(
             s.bridgehub,
             s.chainId,
             s.zksyncOS,
-            proposedUpgrade.l2ProtocolUpgradeTx.data
+            _proposedUpgrade.l2ProtocolUpgradeTx.data
         );
 
-        return super.upgrade(proposedUpgrade);
+        return super.upgrade(_proposedUpgrade);
     }
 
     /// @notice Rewrite the ecosystem-wide L2 upgrade tx data for this chain.

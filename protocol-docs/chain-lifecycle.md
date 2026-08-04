@@ -184,6 +184,12 @@ not follow from swapping implementations are:
 - **Atomic-interop built-ins** are predeployed in the ZKsync OS genesis only; the upgrade force-deploys
   them for pre-existing ZKsync OS chains (next section).
 
+Scope of this release's upgrade: **ZKsync OS chains that settle on L1**. Era chains are not supported —
+`CTMUpgrade_v31.deployUsedUpgradeContract` refuses to produce a per-chain upgrade for them rather than
+emitting one that redoes v31's one-time work — and neither are gateway-settled chains, whose upgrade takes
+the `s.settlementLayer != address(0)` path through their settlement layer instead of recording the L2
+upgrade transaction on L1.
+
 Address discovery has to match the ecosystem's version, because the getters it reads were introduced in
 different releases (`chainRegistrationSender` in v31, `l1InteropHandler` in v32): `AddressIntrospector`
 therefore exposes one entry point per era, and the upgrade scripts pick between them by protocol version.
@@ -219,6 +225,7 @@ flow through the normal interop path; destination mints go through the `InteropH
 
 Pre-existing ZKsync OS chains receive the same two built-ins through the upgrade's force deployments
 (`SystemContractsProcessing.getZKsyncOSOnlyContracts`), so they end up with atomic interop
-as well. Both `initL2`s therefore run on the upgrade path too, guarded on the built-in having code and
-not being initialized yet: a chain that never received them (any Era chain, or a ZKsync OS chain
-upgraded by an older script) has no code at those addresses, and calling `initL2()` twice reverts.
+as well. Both `initL2`s therefore run on the upgrade path too, unconditionally: neither the built-ins
+nor their addresses existed in v31, so no chain can arrive at this upgrade with them already seeded,
+and the force deployments in the same transaction install their code before the `initL2`s run. Era
+chains never receive them — this release upgrades ZKsync OS chains only.

@@ -169,8 +169,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         config.l1ChainId = block.chainid;
         newConfig.ctm = permanentConfig.ctmProxy;
 
-        // Pass bytecodesSupplier to introspection - will overwrite incorrect V29 value
-        setAddressesBasedOnCTM(permanentConfig.bytecodesSupplier);
+        // The supplier is read off the CTM's `L1_BYTECODES_SUPPLIER()` immutable during discovery, so the
+        // permanent-values entry is informational for this path.
+        setAddressesBasedOnCTM();
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
         // Must be non-zero: `InteropCenter.initL2` (invoked on the genesis path of `performForceDeployedContractsInit`) reverts
         // on a zero asset ID, which would abort the L2 upgrade transaction. Catch the
@@ -374,7 +375,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         });
     }
 
-    function setAddressesBasedOnCTM(address _bytecodesSupplier) internal virtual {
+    function setAddressesBasedOnCTM() internal virtual {
         address ctm = newConfig.ctm;
 
         // Verify CTM contract exists

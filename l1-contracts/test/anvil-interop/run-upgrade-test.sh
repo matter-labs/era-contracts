@@ -1,6 +1,6 @@
 #!/bin/bash
 # Kill test Anvil instances on known ports and run the v31->v32 upgrade test
-for port in 9545 4050 4051 4052 4053; do
+for port in 9545 4050 4051 4052 4053 4054; do
   lsof -ti :$port 2>/dev/null | xargs kill -9 2>/dev/null
 done
 sleep 1

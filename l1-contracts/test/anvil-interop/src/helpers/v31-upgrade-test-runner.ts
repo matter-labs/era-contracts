@@ -45,6 +45,10 @@ import type { ChainRole } from "../core/types";
 
 // ── Constants ────────────────────────────────────────────────────────
 
+// Protocol version this release upgrades chains to. The upgrade inputs under `config/` carry it as a
+// literal too, since TOML cannot import it.
+export const TARGET_PROTOCOL_VERSION = "0x2000000000";
+
 // EIP-1967 admin slot: keccak256("eip1967.proxy.admin") - 1
 const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
 // EIP-1967 implementation slot: keccak256("eip1967.proxy.implementation") - 1
@@ -83,10 +87,9 @@ export type V31UpgradeScenario = {
   upgradeInputTemplatePath: string;
   isZKsyncOS: boolean;
   targetRoles: ChainRole[];
-  /// Protocol version the chains must report once the upgrade has been applied.
+  // Protocol version the chains must report once the upgrade has been applied.
   expectedProtocolVersion: string;
   clearGenesisUpgradeTxHash?: boolean;
-  seedBatchCounters?: boolean;
   transferL1ChainAssetHandlerOwnership?: boolean;
 };
 
@@ -170,10 +173,6 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     if (scenario.clearGenesisUpgradeTxHash) {
       console.log("\n── Clearing legacy genesis upgrade tx hashes ──");
       await clearGenesisUpgradeTxHash(l1Provider, upgradeChainAddresses);
-    }
-    if (scenario.seedBatchCounters) {
-      console.log("\n── Seeding batch counters for v31 upgrade compatibility ──");
-      await seedBatchCounters(l1Provider, upgradeChainAddresses);
     }
     // ── Run per-chain upgrades (L1) and relay to L2 ──
     // `default_upgrade_addr` lives in the per-CTM output TOML written by
@@ -718,15 +717,28 @@ export async function runChainUpgradesAndRelayL2(params: {
     await executeSafeBundles(chainOutDir, l1Chain.rpcUrl);
 
     // Decode the L2 upgrade tx from the protocol-ops Safe bundle.
-    const originalUpgradeTxData = decodeLatestL2UpgradeTxData(safeBundles[0].file);
+    const { tx: originalUpgradeTx, paramType: upgradeTxParamType } = decodeLatestL2UpgradeTx(safeBundles[0].file);
+    const originalUpgradeTxData = originalUpgradeTx.data as string;
 
-    // Rewrite the L2 upgrade tx with per-chain data via SettlementLayerV31Upgrade
+    // Rewrite the L2 upgrade tx with per-chain data, the same way the per-chain upgrade contract does.
     const rewrittenUpgradeTxData = await settlementLayerUpgrade.getL2UpgradeTxData(
       bridgehubAddr,
       chain.chainId,
       isZKsyncOS,
       originalUpgradeTxData
     );
+
+    // The chain must have recorded exactly this transaction. Without this check the relay below would
+    // succeed even if the upgrade contract never rewrote the placeholder, since the rewrite is reproduced
+    // here rather than read back from the diamond (the diamond only stores the hash).
+    await assertRecordedUpgradeTxMatches({
+      provider: l1Provider,
+      diamondProxy: chain.diamondProxy,
+      chainId: chain.chainId,
+      upgradeTx: { ...originalUpgradeTx, data: rewrittenUpgradeTxData },
+      placeholderUpgradeTx: originalUpgradeTx,
+      upgradeTxParamType,
+    });
 
     // Relay the upgrade to the L2 chain
     const l2Chain = anvilManager.getL2Chains().find((c) => c.chainId === chain.chainId);
@@ -1125,7 +1137,10 @@ function decodeUpgradeTxData(upgradeTxData: string): {
  * containing a single upgradeChainFromVersion call, then extracts the
  * l2ProtocolUpgradeTx.data from the SettlementLayerV31Upgrade.upgrade calldata.
  */
-function decodeLatestL2UpgradeTxData(broadcastPath: string): string {
+function decodeLatestL2UpgradeTx(broadcastPath: string): {
+  tx: Record<string, unknown>;
+  paramType: ethers.utils.ParamType;
+} {
   const broadcast = JSON.parse(fs.readFileSync(broadcastPath, "utf8")) as {
     transactions?: Array<Record<string, unknown>>;
   };
@@ -1169,7 +1184,12 @@ function decodeLatestL2UpgradeTxData(broadcastPath: string): string {
       }
 
       const [proposedUpgrade] = settlementLayerIface.decodeFunctionData("upgrade", initCalldata);
-      return proposedUpgrade.l2ProtocolUpgradeTx.data;
+      const proposedUpgradeType = settlementLayerIface.getFunction("upgrade").inputs[0];
+      const txParamType = proposedUpgradeType.components.find((c) => c.name === "l2ProtocolUpgradeTx");
+      if (!txParamType) {
+        throw new Error("ProposedUpgrade ABI has no l2ProtocolUpgradeTx component");
+      }
+      return { tx: proposedUpgrade.l2ProtocolUpgradeTx, paramType: txParamType };
     } catch (e) {
       errors.push(`tx decode failed: ${e instanceof Error ? e.message.slice(0, 120) : String(e)}`);
       continue;
@@ -1181,6 +1201,45 @@ function decodeLatestL2UpgradeTxData(broadcastPath: string): string {
       `  Transactions: ${transactions.length}\n` +
       errors.map((e) => `  - ${e}`).join("\n")
   );
+}
+
+/**
+ * Assert the chain recorded the L2 upgrade transaction we are about to relay.
+ *
+ * `BaseZkSyncUpgrade` stores `keccak256(abi.encode(l2ProtocolUpgradeTx))`, so hashing the transaction with
+ * the rewritten calldata and comparing proves the per-chain upgrade contract performed the same rewrite.
+ */
+async function assertRecordedUpgradeTxMatches(params: {
+  provider: ethers.providers.JsonRpcProvider;
+  diamondProxy: string;
+  chainId: number;
+  upgradeTx: Record<string, unknown>;
+  placeholderUpgradeTx: Record<string, unknown>;
+  upgradeTxParamType: ethers.utils.ParamType;
+}): Promise<void> {
+  const hashOf = (tx: Record<string, unknown>): string =>
+    ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode([params.upgradeTxParamType], [tx]));
+
+  const expectedHash = hashOf(params.upgradeTx);
+  const placeholderHash = hashOf(params.placeholderUpgradeTx);
+  if (expectedHash === placeholderHash) {
+    throw new Error(
+      `Chain ${params.chainId}: the rewritten L2 upgrade tx is identical to the placeholder, so this check ` +
+        "cannot tell whether the upgrade contract rewrote anything."
+    );
+  }
+
+  const getters = new ethers.Contract(params.diamondProxy, getAbi("GettersFacet"), params.provider);
+  const recordedHash: string = await getters.getL2SystemContractsUpgradeTxHash();
+
+  if (recordedHash.toLowerCase() !== expectedHash.toLowerCase()) {
+    throw new Error(
+      `Chain ${params.chainId}: the diamond recorded L2 upgrade tx ${recordedHash}, but the transaction ` +
+        `being relayed hashes to ${expectedHash}. The per-chain upgrade contract did not record the ` +
+        "rewritten transaction."
+    );
+  }
+  console.log(`   Recorded L2 upgrade tx hash matches the relayed transaction (${expectedHash})`);
 }
 
 /**
@@ -1322,20 +1381,6 @@ async function clearGenesisUpgradeTxHash(
 ): Promise<void> {
   for (const chain of chains) {
     await provider.send("anvil_setStorageAt", [chain.diamondProxy, "0x22", ethers.constants.HashZero]);
-  }
-}
-
-async function seedBatchCounters(
-  provider: ethers.providers.JsonRpcProvider,
-  chains: Array<{ chainId: number; diamondProxy: string }>
-): Promise<void> {
-  const TOTAL_BATCHES_EXECUTED_SLOT = ethers.utils.hexZeroPad(ethers.utils.hexlify(11), 32);
-  const TOTAL_BATCHES_COMMITTED_SLOT = ethers.utils.hexZeroPad(ethers.utils.hexlify(13), 32);
-  const ONE = ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 32);
-
-  for (const chain of chains) {
-    await provider.send("anvil_setStorageAt", [chain.diamondProxy, TOTAL_BATCHES_EXECUTED_SLOT, ONE]);
-    await provider.send("anvil_setStorageAt", [chain.diamondProxy, TOTAL_BATCHES_COMMITTED_SLOT, ONE]);
   }
 }
 

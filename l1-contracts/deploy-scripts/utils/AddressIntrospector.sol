@@ -126,7 +126,7 @@ library AddressIntrospector {
 
     function _getBridgesDeployedAddressesInternal(
         address _assetRouter,
-        bool isPreV32
+        bool _isPreV32
     ) private view returns (BridgesDeployedAddresses memory info) {
         L1AssetRouter assetRouter = L1AssetRouter(_assetRouter);
 
@@ -134,7 +134,7 @@ library AddressIntrospector {
         address l1NullifierProxy = address(assetRouter.L1_NULLIFIER());
         address l1NativeTokenVaultProxy = address(assetRouter.nativeTokenVault());
         // `l1InteropHandler()` only exists on the nullifier from v32 onward; skip the call for pre-v32 deployments.
-        address l1InteropHandlerProxy = isPreV32 ? address(0) : L1Nullifier(l1NullifierProxy).l1InteropHandler();
+        address l1InteropHandlerProxy = _isPreV32 ? address(0) : L1Nullifier(l1NullifierProxy).l1InteropHandler();
 
         require(l1NativeTokenVaultProxy != address(0), "NativeTokenVault address is zero");
         NativeTokenVaultBase ntv = NativeTokenVaultBase(l1NativeTokenVaultProxy);
@@ -217,18 +217,18 @@ library AddressIntrospector {
     /// reported as absent — the same thing the v29 path used to do.
     function getCTMAddressesV31(
         address _ctmAddr,
-        bool isZKsyncOS
+        bool _isZKsyncOS
     ) public view returns (CTMDeployedAddresses memory info) {
         if (_ctmAddr == address(0) || _ctmAddr.code.length == 0) {
             return info;
         }
-        return _getCTMAddressesInternal(_ctmAddr, isZKsyncOS, true);
+        return _getCTMAddressesInternal(_ctmAddr, _isZKsyncOS, true);
     }
 
     function _getCTMAddressesInternal(
         address _ctmAddr,
-        bool isZKsyncOS,
-        bool isPreV32
+        bool _isZKsyncOS,
+        bool _isPreV32
     ) private view returns (CTMDeployedAddresses memory info) {
         ChainTypeManagerBase ctm = ChainTypeManagerBase(_ctmAddr);
 
@@ -238,9 +238,9 @@ library AddressIntrospector {
         address verifier = _getVerifierFromUptoDateZkChain(ctm);
         // The bytecodes supplier and the permissionless validator exist from v31 on, which is the oldest
         // ecosystem this release can upgrade; the sub-verifier shape does not (see `getCTMAddressesV31`).
-        (address verifierFflonk, address verifierPlonk) = isPreV32
+        (address verifierFflonk, address verifierPlonk) = _isPreV32
             ? (address(0), address(0))
-            : _getSubVerifiers(verifier, isZKsyncOS);
+            : _getSubVerifiers(verifier, _isZKsyncOS);
         address bytecodesSupplier = ctm.L1_BYTECODES_SUPPLIER();
 
         // Note: daAddresses is left zero-initialized (Solidity default)

@@ -7,6 +7,7 @@ import {CoreContract} from "deploy-scripts/ecosystem/CoreContract.sol";
 import {CoreOnGatewayHelper} from "deploy-scripts/ecosystem/CoreOnGatewayHelper.sol";
 import {SystemContractsProcessing} from "deploy-scripts/upgrade/SystemContractsProcessing.s.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
+import {Utils} from "deploy-scripts/utils/Utils.sol";
 
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {
@@ -19,19 +20,53 @@ import {
 /// published makes the L2 upgrade transaction panic on the first access to the missing code, which no
 /// fixture that installs bytecode itself (`vm.etch`, `anvil_setCode`) would notice.
 contract ZKsyncOSOnlyContractsTest is Test {
-    function test_forceDeploymentsIncludeTheZKsyncOSOnlyContracts() public {
+    function test_forceDeploymentsCarryTheRightBytecodeForEachAddress() public {
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = SystemContractsProcessing
             .getBaseZKsyncOSForceDeployments();
 
-        assertTrue(_containsAddress(deployments, L2_INTEROP_COMMITMENT_TREE_ADDR), "commitment tree missing");
-        assertTrue(_containsAddress(deployments, L2_ATOMIC_FLOW_MANAGER_ADDR), "flow manager missing");
+        // Each entry must pair the expected address with the bytecode info of *that* contract: an entry that
+        // deployed the flow manager's code at the tree's address would satisfy a presence-only check while
+        // making `initL2` fail on a real chain.
+        _assertDeploysContractAt(deployments, L2_INTEROP_COMMITMENT_TREE_ADDR, CoreContract.L2InteropCommitmentTree);
+        _assertDeploysContractAt(deployments, L2_ATOMIC_FLOW_MANAGER_ADDR, CoreContract.AtomicFlowManager);
     }
 
-    function test_zkSyncOSFactoryDependenciesCoverEveryForceDeployment() public {
+    /// @dev Asserts the list has exactly one entry for `_address`, that it is a system-proxy upgrade, and that
+    ///      its bytecode info is the one `_contract` resolves to.
+    function _assertDeploysContractAt(
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments,
+        address _address,
+        CoreContract _contract
+    ) private {
+        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, _contract);
+        bytes memory expectedBytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
+
+        uint256 matches;
+        for (uint256 i = 0; i < _deployments.length; ++i) {
+            if (_deployments[i].newAddress != _address) {
+                continue;
+            }
+            ++matches;
+            assertEq(
+                uint256(_deployments[i].upgradeType),
+                uint256(IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade),
+                "unexpected upgrade type"
+            );
+            assertEq(
+                keccak256(_deployments[i].deployedBytecodeInfo),
+                keccak256(expectedBytecodeInfo),
+                "entry carries another contract's bytecode"
+            );
+        }
+        assertEq(matches, 1, "expected exactly one deployment for the address");
+    }
+
+    function test_zkSyncOSFactoryDependenciesIncludeTheNewBuiltInImplementations() public {
         bytes[] memory factoryDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(true, new CoreContract[](0));
 
-        // Every bytecode the force-deploy path materializes must be published, or the sequencer has no
-        // preimage for it.
+        // The implementation preimages of the two new built-ins, which is what this release adds to the
+        // list. Their `SystemContractProxy` preimage is shared with every other ZKsync OS force deployment
+        // and is published by the same list builder, so it is not re-checked here.
         CoreContract[] memory zksyncOSOnlyContracts = SystemContractsProcessing.getZKsyncOSOnlyContracts();
         for (uint256 i = 0; i < zksyncOSOnlyContracts.length; ++i) {
             bytes32 expected = keccak256(_deployedBytecode(zksyncOSOnlyContracts[i]));
@@ -67,18 +102,6 @@ contract ZKsyncOSOnlyContractsTest is Test {
                 ++count;
             }
         }
-    }
-
-    function _containsAddress(
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments,
-        address _address
-    ) private pure returns (bool) {
-        for (uint256 i = 0; i < _deployments.length; ++i) {
-            if (_deployments[i].newAddress == _address) {
-                return true;
-            }
-        }
-        return false;
     }
 
     // add this to be excluded from coverage report

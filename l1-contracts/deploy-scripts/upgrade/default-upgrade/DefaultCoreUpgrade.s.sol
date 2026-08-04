@@ -44,8 +44,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         bool isZKsyncOS;
         bool hasPreV32IntrospectionOverride;
         bool usePreV32IntrospectionOverride;
-        /// @dev Whether the ecosystem being upgraded still runs pre-v32 contracts. Decides both which
-        ///      discovery shape to use and which one-time initializers have already run on it.
+        /// @dev Whether the ecosystem being upgraded still runs pre-v32 contracts, i.e. which discovery
+        ///      shape its L1 contracts expose.
         bool isPreV32Ecosystem;
     }
     AdditionalConfigParams internal additionalConfig;
@@ -456,18 +456,14 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridges.implementations.l1NativeTokenVault
         );
 
-        // L1MessageRoot: `initializeL1V31Upgrade` is a v31 reinitializer, so it only runs for an ecosystem
-        // that has not been through v31 yet; a v31 one would revert with "already initialized".
-        calls[4] = additionalConfig.isPreV32Ecosystem
-            ? _buildCallProxyUpgrade(
-                coreAddresses.bridgehub.proxies.messageRoot,
-                coreAddresses.bridgehub.implementations.messageRoot
-            )
-            : _buildCallProxyUpgradeAndCall(
-                coreAddresses.bridgehub.proxies.messageRoot,
-                coreAddresses.bridgehub.implementations.messageRoot,
-                "L1MessageRoot"
-            );
+        // L1MessageRoot: a plain upgrade, never `upgradeAndCall(initializeL1V31Upgrade())`. That is a v31
+        // reinitializer and every ecosystem this release upgrades has already consumed it — a v31 one during
+        // its own upgrade, a from-scratch v32 one through `initialize()`, which is the same reinitializer
+        // version.
+        calls[4] = _buildCallProxyUpgrade(
+            coreAddresses.bridgehub.proxies.messageRoot,
+            coreAddresses.bridgehub.implementations.messageRoot
+        );
 
         calls[5] = _buildCallProxyUpgrade(
             coreAddresses.bridgehub.proxies.ctmDeploymentTracker,

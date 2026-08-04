@@ -27,7 +27,7 @@
  *   FORK_PERMANENT_VALUES_PATH        — permanent-values template, relative to l1-contracts
  *                                        (default: upgrade-envs/permanent-values/local.toml)
  *   FORK_UPGRADE_INPUT_PATH           — upgrade-input template, relative to l1-contracts
- *                                        (default: upgrade-envs/v0.30.0-zksync-os-blobs/localhost.toml)
+ *                                        (default: upgrade-envs/v0.31.0-interopB/local.toml)
  *   L2_FORK_URL_<chainId>             — per-chain L2 RPC override
  *
  * Per-chain L2 RPCs can also live in `config/fork-l2-rpcs.json` (gitignored):
@@ -55,10 +55,9 @@ import {
   runEcosystemUpgradeScripts,
   runEcosystemUpgradeScriptsForEnv,
   verifyProtocolVersions,
+  TARGET_PROTOCOL_VERSION,
 } from "./src/helpers/v31-upgrade-test-runner";
 
-/// Protocol version this release upgrades chains to.
-const TARGET_PROTOCOL_VERSION = "0x2000000000";
 import type { V31UpgradeScenario } from "./src/helpers/v31-upgrade-test-runner";
 import { advanceL1TimePastUpgradeDeadline } from "./src/helpers/harness-shims";
 
@@ -255,14 +254,14 @@ async function main(): Promise<void> {
       prepareDir = result.prepareOutDir;
     } else {
       const scenario: V31UpgradeScenario = {
-        label: "fork-v30-to-v31",
+        label: "fork-v31-to-v32",
         stateVersion: "fork",
         permanentValuesTemplatePath:
           process.env.FORK_PERMANENT_VALUES_PATH ?? "upgrade-envs/permanent-values/local.toml",
-        upgradeInputTemplatePath:
-          process.env.FORK_UPGRADE_INPUT_PATH ?? "upgrade-envs/v0.30.0-zksync-os-blobs/localhost.toml",
+        upgradeInputTemplatePath: process.env.FORK_UPGRADE_INPUT_PATH ?? "upgrade-envs/v0.31.0-interopB/local.toml",
         isZKsyncOS: true,
         targetRoles: ["directSettled"],
+        expectedProtocolVersion: TARGET_PROTOCOL_VERSION,
       };
       scenarioIsZKsyncOS = scenario.isZKsyncOS;
       const upgradeHarnessInputs = prepareUpgradeHarnessInputs(scenario, {
@@ -314,8 +313,7 @@ async function main(): Promise<void> {
     await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(calls.stage1_calls), "Stage 1");
     await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(calls.stage2_calls), "Stage 2");
 
-    // NOTE: skip clearGenesisUpgradeTxHash / seedBatchCounters — real fork state
-    // already has correct values for both.
+    // NOTE: skip clearGenesisUpgradeTxHash — real fork state already has the correct value.
 
     // ── Step 7: Stage 3 legacy-token registration ────────────────
     // Runs before per-chain upgrades so withdrawals on each chain unblock

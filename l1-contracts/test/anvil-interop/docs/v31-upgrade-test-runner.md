@@ -2,8 +2,9 @@
 
 ## Overview
 
-The v31 upgrade test runner (`v31-upgrade-test-runner.ts`) tests the full v29->v31 and v30->v31
-protocol upgrade flow on local Anvil chains. It exercises the **production Solidity upgrade scripts**
+The v31 upgrade test runner (`v31-upgrade-test-runner.ts`) tests the full v31->v32 protocol upgrade
+flow on local Anvil chains. It is named after the v31 upgrade scripts it drives
+(`CoreUpgrade_v31` / `CTMUpgrade_v31`), which this release still uses. It exercises the **production Solidity upgrade scripts**
 end-to-end, but patches around Anvil EVM limitations that prevent the real L2 ZKsync execution
 environment from working.
 
@@ -38,7 +39,7 @@ In production, a v31 protocol upgrade proceeds as:
 7. **Stage 3**: Post-governance migration. Registers bridged tokens in NTV and migrates token
    legacy bridged tokens in the NTV (shared logic in `TokenMigrationUtils`).
 
-8. **Verification**: Protocol version on each chain is now `0x1f00000000` (v31).
+8. **Verification**: Protocol version on each chain is now `0x2000000000` (v32).
 
 ## Architecture notes
 
@@ -89,20 +90,19 @@ all addresses via `anvil_setCode`.
 
 ### ComplexUpgrader reuse
 
-The existing ComplexUpgrader from the v29/v30 state is used as-is. The L1 side constructs
-calldata using the matching ABI variant. No fresh ComplexUpgrader replacement is needed, and
-there is no `IComplexUpgraderZKsyncOSV29` -- the v30 ComplexUpgrader already supports the
-`forceDeployAndUpgradeUniversal` interface directly.
+The existing ComplexUpgrader from the source state is used as-is. The L1 side constructs
+calldata using the matching ABI variant. No fresh ComplexUpgrader replacement is needed -- the
+v31 ComplexUpgrader already supports the `forceDeployAndUpgradeUniversal` interface directly.
 
 ## Test flow and patches
 
 ### 1. Load pre-generated chain states
 
-Anvil chains boot from serialized state dumps (`chain-states/v0.29.0/`, `chain-states/v0.30.0/`).
+Anvil chains boot from serialized state dumps (`chain-states/v0.31.0/` for the upgrade scenario).
 These contain a fully-deployed L1 ecosystem + multiple L2 chains at the source protocol version.
 The state dumps are generated once via `setup-and-dump-state.ts` and committed to the repo.
 
-No patches here -- this is equivalent to having a live chain at v29/v30.
+No patches here -- this is equivalent to having a live chain at v31.
 
 ### 2. Prepare L1 state
 
@@ -165,8 +165,8 @@ The generated governance calls are decoded from the Forge output TOML and execut
 impersonating the governance address via `anvil_impersonateAccount`.
 
 No patches. All governance calls (including `pauseMigration()` / `unpauseMigration()` on
-ChainAssetHandler) work because the v29 and v30 ChainAssetHandler implementations already
-have these functions.
+ChainAssetHandler) work because the v31 ChainAssetHandler implementation already has these
+functions.
 
 ### 5. Prepare diamond state for chain upgrades
 
@@ -180,15 +180,6 @@ have these functions.
   is still set.
 - Mechanism: `anvil_setStorageAt(diamondProxy, "0x22", HashZero)` -- directly clears storage
   slot 0x22 which holds `l2SystemContractsUpgradeTxHash`.
-
-**Patch: Seed batch counters** (`seedBatchCounters`)
-
-- Production: Real chains have processed batches, so `totalBatchesExecuted > 0`.
-- Test: The state dumps represent freshly-deployed chains that never processed a real batch.
-  The upgrade script's `upgradeChainFromVersion()` requires `totalBatchesExecuted >= 1` to
-  ensure the chain is operational before upgrading.
-- Mechanism: `anvil_setStorageAt` sets `totalBatchesExecuted` (slot 11) and
-  `totalBatchesCommitted` (slot 13) to 1 on each diamond proxy.
 
 ### 6. Per-chain L1 upgrade + L2 relay
 
@@ -216,7 +207,7 @@ ZKsync VM (bytecode hashing, validation, etc.) and do not work. The test patches
 - Test: The runner pre-deploys all contracts via `anvil_setCode` BEFORE sending the upgrade
   transaction, and places a `MockContractDeployer` (no-op fallback) at the ContractDeployer
   address (0x8006). The **original** upgrade calldata is sent unchanged to the existing
-  ComplexUpgrader from the v29/v30 state. Both the outer force-deploy calls (from
+  ComplexUpgrader from the source state. Both the outer force-deploy calls (from
   `forceDeployAndUpgrade`) and the inner calls (from `performForceDeployedContractsInit`)
   hit the MockContractDeployer which silently succeeds -- the contracts are already at their
   addresses via `anvil_setCode`.
@@ -258,7 +249,10 @@ No patches. Reads on-chain state to assert:
 
 - `L2AssetTracker.L1_CHAIN_ID` is set correctly on each L2 chain
 - The base token is registered in L2AssetTracker on each L2 chain
-- `getProtocolVersion()` on each diamond proxy returns `0x1f00000000` (v31)
+- `getProtocolVersion()` on each diamond proxy returns the scenario's `expectedProtocolVersion`
+  (`0x2000000000` for v32)
+- The recorded `getL2SystemContractsUpgradeTxHash()` equals the hash of the upgrade transaction the
+  harness relayed to L2, i.e. the per-chain data really was substituted on L1
 
 ## Summary table
 
@@ -270,10 +264,9 @@ No patches. Reads on-chain state to assert:
 | 4   | Idempotent core upgrade                        | `CoreUpgradeV31Idempotent`         | N/A (single run)                                                | step2 skips `updateContractConnections()`                                                                                                                              | Override `deployNewEcosystemContractsL1()`                    |
 | 5   | Skip factory deps check                        | `CTMUpgradeV31ForTests`            | Validates ZK bytecode lengths                                   | Skip validation                                                                                                                                                        | `setSkipFactoryDepsCheck_TestOnly(true)`                      |
 | 6   | Clear genesis upgrade hash                     | `clearGenesisUpgradeTxHash`        | Server clears after batch processing                            | Clear via storage write                                                                                                                                                | `anvil_setStorageAt(proxy, 0x22, 0x0)`                        |
-| 7   | Seed batch counters                            | `seedBatchCounters`                | Real batches executed                                           | Set counters to 1                                                                                                                                                      | `anvil_setStorageAt(proxy, slot11/13, 1)`                     |
-| 8   | Pre-deploy L2 contracts + MockContractDeployer | `deployL2Contracts`                | ContractDeployer force-deploys ZK bytecodes                     | `anvil_setCode` places EVM bytecodes at addresses from the force deployment calldata; MockContractDeployer (no-op fallback) at 0x8006 makes force-deploy calls succeed | `anvil_setCode` for each address in calldata                  |
-| 9   | L2BaseToken per VM type                        | `deployL2Contracts`                | Era: `L2BaseTokenEra`; ZKsyncOS: `L2BaseTokenZKOS` behind proxy | Same as production. On Anvil, MINT_BASE_TOKEN_HOOK is empty (no-op)                                                                                                    | `anvil_setCode` + `deployBehindSystemProxy` for ZKsyncOS      |
-| 10  | SystemContractProxyAdmin owner                 | `deployL2Contracts`                | Owner = ComplexUpgrader from genesis                            | Real SystemContractProxyAdmin + set owner via storage write                                                                                                            | `anvil_setStorageAt(proxyAdmin, slot0, upgrader)`             |
+| 7   | Pre-deploy L2 contracts + MockContractDeployer | `deployL2Contracts`                | ContractDeployer force-deploys ZK bytecodes                     | `anvil_setCode` places EVM bytecodes at addresses from the force deployment calldata; MockContractDeployer (no-op fallback) at 0x8006 makes force-deploy calls succeed | `anvil_setCode` for each address in calldata                  |
+| 8   | L2BaseToken per VM type                        | `deployL2Contracts`                | Era: `L2BaseTokenEra`; ZKsyncOS: `L2BaseTokenZKOS` behind proxy | Same as production. On Anvil, MINT_BASE_TOKEN_HOOK is empty (no-op)                                                                                                    | `anvil_setCode` + `deployBehindSystemProxy` for ZKsyncOS      |
+| 9   | SystemContractProxyAdmin owner                 | `deployL2Contracts`                | Owner = ComplexUpgrader from genesis                            | Real SystemContractProxyAdmin + set owner via storage write                                                                                                            | `anvil_setStorageAt(proxyAdmin, slot0, upgrader)`             |
 
 ## What IS tested end-to-end (unpatched production code)
 

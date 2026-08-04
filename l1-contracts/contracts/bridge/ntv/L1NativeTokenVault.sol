@@ -70,12 +70,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     ///      `populateBridgedOut` to locate the legacy per-chain accounting.
     address internal __DEPRECATED_l1AssetTracker;
 
-    /// @notice Net amount of each L1-native token currently bridged out of L1.
-    /// See {protocol-docs/bridging.md#native-token-vault}.
+    /// @inheritdoc IL1NativeTokenVault
     mapping(bytes32 assetId => uint256 amount) public bridgedOut;
 
-    /// @notice Whether the pre-upgrade amount of `assetId` has already been folded into `bridgedOut`.
-    /// See {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}.
+    /// @inheritdoc IL1NativeTokenVault
     mapping(bytes32 assetId => bool populated) public bridgedOutPopulated;
 
     /*//////////////////////////////////////////////////////////////
@@ -115,7 +113,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IL1NativeTokenVault
-    function legacyL1AssetTracker() public view returns (address) {
+    function legacyL1AssetTracker() external view returns (address) {
         return __DEPRECATED_l1AssetTracker;
     }
 
@@ -133,6 +131,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         // `migrateTokenBalanceToAssetTracker`, which zeroed the entry it read, for every chain except the
         // asset's origin chain — and that origin chain is L1, whose entry is excluded below anyway. Nothing
         // has written these entries since, so chains registered later hold nothing either.
+        // Neither function is in the tree any more — they went away with the trackers in `1df271ef2`, so
+        // the argument above is checked against `1df271ef2^`; the accounting itself is described in
+        // {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}.
         if (legacyTracker != address(0) && ILegacyL1AssetTracker(legacyTracker).isAssetRegistered(_assetId)) {
             return MAX_TOKEN_BALANCE - ILegacyL1AssetTracker(legacyTracker).chainBalance(L1_CHAIN_ID, _assetId);
         }

@@ -156,6 +156,9 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
     /// @inheritdoc IL2AssetTracker
     /// @dev The base token originates on L1 (non-native to this chain). Reverts on double registration,
     /// which would indicate a broken upgrade invariant (this is called first during the upgrade).
+    /// @dev Retained for chains that went through the v31 upgrade: it was the v31 upgrade path that called
+    /// this, and from this release on the tracker is initialized on the genesis path only, so no upgrade
+    /// script calls it any more.
     function registerBaseTokenDuringUpgrade() external onlyUpgrader {
         bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
         require(!isAssetRegistered[baseTokenAssetId], AssetAlreadyRegistered(baseTokenAssetId));

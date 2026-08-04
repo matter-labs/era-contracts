@@ -10,11 +10,10 @@ import {BridgedOutPopulationLib} from "./default-upgrade/BridgedOutPopulationLib
 /// @notice Standalone entry point for the `bridgedOut` population that `stage3` of the upgrade runs.
 /// @dev Useful for resuming an interrupted stage3 (the population is idempotent per asset) and for
 /// populating legacy tokens that were registered in the NTV later. Requires no governance privileges.
-/// @dev
+/// @dev Usage:
 /// @dev   forge script PopulateBridgedOutScript --sig "run(address)" <BRIDGEHUB> --broadcast --private-key <KEY>
-/// @dev
-/// @dev Env knobs (see `BridgedOutPopulationLib`):
-/// @dev   BRIDGED_OUT_ASSETS_PER_CALL       assets per transaction (default 25)
+/// @dev Env knobs: `BRIDGED_OUT_ASSETS_PER_CALL` sets the assets per transaction; see
+/// `BridgedOutPopulationLib` for its default.
 contract PopulateBridgedOutScript is Script {
     function run(address _bridgehub) public {
         console.log("Bridgehub:", _bridgehub);

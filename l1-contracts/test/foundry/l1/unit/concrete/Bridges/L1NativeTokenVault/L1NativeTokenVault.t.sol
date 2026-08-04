@@ -31,6 +31,7 @@ import {OriginChainIdNotFound, Unauthorized} from "contracts/common/L1ContractEr
 import {AssetNotNativeToL1, OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {InsufficientChainBalance} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {ILegacyL1AssetTracker} from "contracts/bridge/asset-tracker/ILegacyL1AssetTracker.sol";
+import {MAX_TOKEN_BALANCE} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 
 /// @dev Test helper contract that exposes internal functions
 contract L1NativeTokenVaultTestHelper is L1NativeTokenVault {
@@ -432,12 +433,12 @@ contract L1NativeTokenVaultTest is Test {
         assetIds[0] = _assetId;
     }
 
-    /// @dev The vault reads the chain list from the bridgehub when it falls back to its own legacy buckets.
+    /// @dev The vault reads the chain list from the bridgehub when it falls back to its own legacy entries.
     function _mockRegisteredChains() internal {
         uint256[] memory chainIds = new uint256[](3);
         chainIds[0] = chainId;
         chainIds[1] = SECOND_CHAIN_ID;
-        // L1 itself is registered as a chain in some ecosystems; its bucket must not be counted.
+        // L1 itself is registered as a chain in some ecosystems; its entry must not be counted.
         chainIds[2] = block.chainid;
         vm.mockCall(
             bridgehubAddress,
@@ -447,7 +448,7 @@ contract L1NativeTokenVaultTest is Test {
     }
 
     function test_populateBridgedOut_SumsDeprecatedChainBalanceOverTheRegisteredChains() public {
-        // Pre-v31 accounting: the amounts sit in the vault, one bucket per chain, and the vault reads the
+        // Pre-v31 accounting: the amounts sit in the vault, one entry per chain, and the vault reads the
         // chain list from the bridgehub itself so no caller can under-report it.
         nativeTokenVault.setDeprecatedChainBalance(chainId, tokenAssetId, 100);
         nativeTokenVault.setDeprecatedChainBalance(SECOND_CHAIN_ID, tokenAssetId, 40);
@@ -465,15 +466,15 @@ contract L1NativeTokenVaultTest is Test {
 
     function test_populateBridgedOut_ReadsL1sBulkheadFromTheLegacyTracker() public {
         // A registered asset's amount comes from L1's own bulkhead in the tracker: `MAX_TOKEN_BALANCE`
-        // minus everything ever bridged out of L1. Per-chain buckets are ignored, so amounts moved between
+        // minus everything ever bridged out of L1. Per-chain entries are ignored, so amounts moved between
         // chains after the upgrade cannot change the result.
         MockLegacyL1AssetTracker tracker = new MockLegacyL1AssetTracker();
-        tracker.setChainBalance(block.chainid, tokenAssetId, type(uint256).max - 120);
+        tracker.setChainBalance(block.chainid, tokenAssetId, MAX_TOKEN_BALANCE - 120);
         tracker.setChainBalance(chainId, tokenAssetId, 60);
         nativeTokenVault.setLegacyAssetTracker(address(tracker));
 
         assertEq(nativeTokenVault.legacyL1AssetTracker(), address(tracker), "tracker exposed for the scripts");
-        assertEq(nativeTokenVault.legacyBridgedOut(tokenAssetId), 120, "L1's outflow, not the chain buckets");
+        assertEq(nativeTokenVault.legacyBridgedOut(tokenAssetId), 120, "L1's outflow, not the chain entries");
 
         nativeTokenVault.populateBridgedOut(_assetIdArray(tokenAssetId));
         assertEq(nativeTokenVault.bridgedOut(tokenAssetId), 120);
@@ -481,14 +482,14 @@ contract L1NativeTokenVaultTest is Test {
 
     function test_populateBridgedOut_FallsBackToTheVaultForAssetsTheTrackerNeverRegistered() public {
         // The tracker exists but never registered this asset, so its bulkhead is meaningless (a zero
-        // balance would read as `MAX_TOKEN_BALANCE` bridged out) and the vault's own buckets are used.
+        // balance would read as `MAX_TOKEN_BALANCE` bridged out) and the vault's own entries are used.
         MockLegacyL1AssetTracker tracker = new MockLegacyL1AssetTracker();
-        tracker.setChainBalance(block.chainid, ETH_TOKEN_ASSET_ID, type(uint256).max);
+        tracker.setChainBalance(block.chainid, ETH_TOKEN_ASSET_ID, MAX_TOKEN_BALANCE);
         nativeTokenVault.setLegacyAssetTracker(address(tracker));
         nativeTokenVault.setDeprecatedChainBalance(chainId, tokenAssetId, 7);
         _mockRegisteredChains();
 
-        assertEq(nativeTokenVault.legacyBridgedOut(tokenAssetId), 7, "vault buckets used for the asset");
+        assertEq(nativeTokenVault.legacyBridgedOut(tokenAssetId), 7, "vault entries used for the asset");
 
         nativeTokenVault.populateBridgedOut(_assetIdArray(tokenAssetId));
         assertEq(nativeTokenVault.bridgedOut(tokenAssetId), 7);

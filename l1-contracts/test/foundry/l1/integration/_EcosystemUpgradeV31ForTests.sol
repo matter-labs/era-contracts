@@ -20,16 +20,16 @@ import {CTMUpgrade_v31} from "deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
     using stdToml for string;
 
-    /// @dev Optional `contracts.new_protocol_version` from the upgrade input, used as the upgrade target.
-    ///      The production flow reads the target from the genesis config, which pins the release the
-    ///      foundry suite is built against (v31); a harness scenario upgrading a v31 ecosystem onto this
-    ///      release has to say which version it is moving to, the same way the local foundry fixture does
-    ///      with `ctmUpgrade.setNewProtocolVersion`.
     function prepareCTMUpgrade() public override {
         setSkipFactoryDepsCheck_TestOnly(true);
         super.prepareCTMUpgrade();
     }
 
+    /// @dev Reads the optional `contracts.new_protocol_version` from the upgrade input and uses it as the
+    ///      upgrade target. The production flow reads the target from the genesis config, which pins the
+    ///      release the foundry suite is built against (v31); a harness scenario upgrading a v31 ecosystem
+    ///      onto this release has to say which version it is moving to, the same way the local foundry
+    ///      fixture does with `ctmUpgrade.setNewProtocolVersion`.
     // solhint-disable-next-line func-named-parameters
     function initializeWithArgs(
         address _ctmProxy,

@@ -41,7 +41,7 @@ import {BridgedOutPopulationLib} from "../default-upgrade/BridgedOutPopulationLi
 /// FIXME currently we accept ownership as part of stage1, but in fact we should do it as part of stage0.
 /// @notice Script used for v31 upgrade flow.
 /// @dev Owns all v31-specific core-side ecosystem behavior:
-///      - stage 1: ChainRegistrationSender.acceptOwnership, ChainAssetHandler.setAddresses
+///      - stage 1: ChainRegistrationSender implementation upgrade, ChainAssetHandler.setAddresses
 ///      - stage 2: legacy-GW historical migration intervals + old-GW blacklist (read from upgrade input TOML)
 ///      - stage3 (post-governance): bridged-token registration in the NTV + `bridgedOut` population
 contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
@@ -101,10 +101,18 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
             false
         );
         coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler", false);
-        (
-            coreAddresses.bridgehub.implementations.chainRegistrationSender,
-            coreAddresses.bridgehub.proxies.chainRegistrationSender
-        ) = deployTuppWithContract("ChainRegistrationSender", false);
+
+        // The sender exists since v31, and its proxy is kept: it holds the registration history, and the
+        // bridgehub authorizes service transactions by that address. Only the implementation is refreshed
+        // (its validation changed in this release), through the proxy upgrade in stage 1.
+        require(
+            coreAddresses.bridgehub.proxies.chainRegistrationSender != address(0),
+            "Bridgehub has no ChainRegistrationSender registered; register it before this upgrade"
+        );
+        coreAddresses.bridgehub.implementations.chainRegistrationSender = deploySimpleContract(
+            "ChainRegistrationSender",
+            false
+        );
 
         // The interop handler is new in v32: a pre-v32 ecosystem has no proxy for it, so deploy one and let
         // stage 1 wire it into the bridges. An ecosystem already on v32 only gets a fresh implementation.
@@ -120,28 +128,8 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     }
 
     /// @notice Configure contract connections after deployment
-    /// @dev ChainRegistrationSender is new in v31, we initialize it with deployer as owner, then transfer ownership
     function updateContractConnections() internal {
         address properOwner = getOwnerAddress();
-
-        /////// ChainRegistrationSender
-        console.log("Configuring ChainRegistrationSender connections...");
-
-        address chainRegistrationSenderProxy = coreAddresses.bridgehub.proxies.chainRegistrationSender;
-        require(chainRegistrationSenderProxy != address(0), "ChainRegistrationSender proxy not deployed");
-
-        console.log("ChainRegistrationSender proxy:", chainRegistrationSenderProxy);
-        console.log(
-            "Current ChainRegistrationSender owner:",
-            Ownable2StepUpgradeable(chainRegistrationSenderProxy).owner()
-        );
-        console.log("Deployer (msg.sender):", msg.sender);
-
-        // Transfer ownership to the proper owner (governance)
-        console.log("Transferring ChainRegistrationSender ownership from deployer to governance:", properOwner);
-        vm.broadcast(getBroadcasterAddress());
-        Ownable2StepUpgradeable(chainRegistrationSenderProxy).transferOwnership(properOwner);
-        console.log("ChainRegistrationSender ownership transfer initiated (pending acceptance by governance)");
 
         if (deployedL1InteropHandler) {
             console.log("Transferring L1InteropHandler ownership to governance:", properOwner);
@@ -196,25 +184,19 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
         console.log("Preparing v31-specific stage1 governance calls...");
 
-        address chainRegistrationSenderProxy = coreAddresses.bridgehub.proxies.chainRegistrationSender;
         address chainAssetHandlerProxy = coreAddresses.bridgehub.proxies.chainAssetHandler;
-
-        require(chainRegistrationSenderProxy != address(0), "ChainRegistrationSender proxy address not found");
         require(chainAssetHandlerProxy != address(0), "ChainAssetHandler proxy address not found");
-
-        console.log("ChainRegistrationSender address:", chainRegistrationSenderProxy);
         console.log("ChainAssetHandler address:", chainAssetHandlerProxy);
 
         Call[][] memory allCalls = new Call[][](2);
 
         allCalls[0] = new Call[](2);
 
-        // First, accept ownership of ChainRegistrationSender (completes the two-step transfer)
-        allCalls[0][0] = Call({
-            target: chainRegistrationSenderProxy,
-            value: 0,
-            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
-        });
+        // Point the inherited ChainRegistrationSender proxy at the refreshed implementation.
+        allCalls[0][0] = _buildCallProxyUpgrade(
+            coreAddresses.bridgehub.proxies.chainRegistrationSender,
+            coreAddresses.bridgehub.implementations.chainRegistrationSender
+        );
 
         // Cache messageRoot/assetRouter inside the new ChainAssetHandler implementation
         // so its facets don't re-query bridgehub on every call.
@@ -234,6 +216,8 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     ///      Both setters are one-shot and only exist on the new implementations, hence stage 1 rather than
     ///      the deploy step.
     function _buildL1InteropHandlerWiringCalls() internal virtual returns (Call[] memory calls) {
+        // Checked before the early return below: a zero address here means discovery failed to report the
+        // handler, which is a broken run whether or not this script deployed it.
         address l1InteropHandlerProxy = coreAddresses.bridges.proxies.l1InteropHandler;
         require(l1InteropHandlerProxy != address(0), "L1InteropHandler proxy not deployed");
 
