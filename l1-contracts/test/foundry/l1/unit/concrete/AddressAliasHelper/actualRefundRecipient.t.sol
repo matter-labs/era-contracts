@@ -31,6 +31,30 @@ contract ActualRefundRecipient is AddressAliasHelperSharedTest {
         assertEq(actualRecipient, prevMessageSender);
     }
 
+    // Models a caller whose code is not yet deployed (e.g. a contract calling from its own constructor):
+    // the default refund recipient must be aliased, matching the sender aliasing applied in the Mailbox.
+    function test_When_recipientAddressIsZeroAndPrevMsgSenderHasNoCodeAndIsNotTxOrigin() public {
+        address recipient = address(0);
+        address prevMessageSender = makeAddr("prevMessageSender");
+
+        address expectedRecipient = addressAliasHelper.applyL1ToL2Alias(prevMessageSender);
+
+        address actualRecipient = addressAliasHelper.actualRefundRecipient(recipient, prevMessageSender);
+
+        assertEq(actualRecipient, expectedRecipient);
+    }
+
+    // A caller with deployed code is left unaliased here: the Mailbox applies the alias to it
+    // via the `code.length` check in `actualRefundRecipientMailbox`.
+    function test_When_recipientAddressIsZeroAndPrevMsgSenderIsDeployedContract() public {
+        address recipient = address(0);
+        address prevMessageSender = address(new TestContract());
+
+        address actualRecipient = addressAliasHelper.actualRefundRecipient(recipient, prevMessageSender);
+
+        assertEq(actualRecipient, prevMessageSender);
+    }
+
     function test_When_recipientAddressIsZeroAndTxOriginIsNotPrevMsgSender() public {
         address recipient = address(0);
         address prevMessageSender = makeAddr("prevMessageSender");

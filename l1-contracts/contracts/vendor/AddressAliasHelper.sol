@@ -49,12 +49,18 @@ library AddressAliasHelper {
     function actualRefundRecipient(
         address _refundRecipient,
         address _originalCaller
-    ) internal pure returns (address _recipient) {
+    ) internal view returns (address _recipient) {
         if (_refundRecipient == address(0)) {
             // If the `_refundRecipient` is not provided, we use the `_originalCaller` as the recipient.
+            // A caller without deployed code that is not the tx originator (e.g. a contract calling from its
+            // constructor) is aliased here, as the `code.length`-based aliasing in `actualRefundRecipientMailbox`
+            // would miss it, while the sender aliasing in the Mailbox (based on `tx.origin`) would apply.
+            // Callers with deployed code are left as is: the Mailbox applies the alias to them.
             // solhint-disable avoid-tx-origin
             // slither-disable-next-line tx-origin
-            _recipient = _originalCaller;
+            _recipient = (_originalCaller == tx.origin || _originalCaller.code.length != 0)
+                ? _originalCaller
+                : AddressAliasHelper.applyL1ToL2Alias(_originalCaller);
             // solhint-enable avoid-tx-origin
         } else {
             _recipient = _refundRecipient;
