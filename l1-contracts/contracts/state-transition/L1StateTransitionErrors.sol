@@ -68,6 +68,8 @@ error MismatchL2DACommitmentScheme(uint256 operatorProvidedScheme, uint256 expec
 error MismatchNumberOfLayer1Txs(uint256 numberOfLayer1Txs, uint256 expectedLength);
 // 0xf9ba09d6
 error NotAllBatchesExecuted();
+// 0x7695a2f8
+error NotAllBatchesVerified(uint256 batchesVerified, uint256 batchesCommitted);
 // 0x61d9af9e
 error NotAPatchUpgrade(uint256 oldProtocolVersion, uint256 newProtocolVersion);
 // 0xf05c64c6

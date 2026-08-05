@@ -9,10 +9,8 @@ import {ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
-import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {ETH_TOKEN_ADDRESS, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
-import {PriorityQueueNotReady} from "contracts/common/L1ContractErrors.sol";
-import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {NotAllBatchesVerified} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
@@ -30,13 +28,13 @@ contract DummyDefaultUpgradeZKsyncOS is DefaultUpgradeZKsyncOS, BaseUpgradeUtils
         s.zksyncOS = _zksyncOS;
     }
 
-    function setBatchCounters(uint256 _committed, uint256 _executed) public {
+    function setBatchCounters(uint256 _committed, uint256 _verified) public {
         s.totalBatchesCommitted = _committed;
-        s.totalBatchesExecuted = _executed;
+        s.totalBatchesVerified = _verified;
     }
 }
 
-/// @notice Unit tests for the ZKsync OS per-chain upgrade: the two preconditions it enforces before the
+/// @notice Unit tests for the ZKsync OS per-chain upgrade: the verifier precondition it enforces before the
 ///         generic upgrade runs, and the per-chain force-deployments-data substitution it performs.
 /// @dev The ecosystem contracts the substitution reads (bridgehub, asset router, native token vault) are
 ///      mocked: the behaviour under test is which values end up in the rewritten transaction, not how the
@@ -70,9 +68,8 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         upgradeContract.setBridgehub(mockBridgehub);
         upgradeContract.setChainId(CHAIN_ID);
         upgradeContract.setZKsyncOS(true);
-        // The default shape: every committed batch executed, and the chain is not a settlement layer.
+        // The default shape: every committed batch proven.
         upgradeContract.setBatchCounters(7, 7);
-        _mockWhitelistedSettlementLayer(false);
         _mockEcosystemForSubstitution();
 
         proposedUpgrade.l2ProtocolUpgradeTx.data = _placeholderUpgradeTxData();
@@ -80,7 +77,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         proposedUpgrade.l2ProtocolUpgradeTx.txType = ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
     }
 
-    function test_upgradesWhenBothPreconditionsHold() public {
+    function test_upgradesWhenEveryCommittedBatchIsVerified() public {
         bytes32 result = upgradeContract.upgrade(proposedUpgrade);
 
         assertEq(result, Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
@@ -88,38 +85,12 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
     }
 
     /// @dev The generic upgrade installs the new protocol version's verifier, a freshly deployed contract in
-    ///      this release, so a batch committed under the old one would stop being provable. The v31 per-chain
-    ///      upgrade enforced this and the v32 one has to keep doing so.
-    function test_revertWhen_committedBatchesAreNotAllExecuted() public {
+    ///      this release, so a batch committed but not yet proven under the old one would stop being provable.
+    function test_revertWhen_aCommittedBatchIsNotVerified() public {
         upgradeContract.setBatchCounters(8, 7);
 
-        vm.expectRevert(NotAllBatchesExecuted.selector);
+        vm.expectRevert(abi.encodeWithSelector(NotAllBatchesVerified.selector, 7, 8));
         upgradeContract.upgrade(proposedUpgrade);
-    }
-
-    /// @dev A settlement layer relays other chains' priority operations, so its queue has to be drained
-    ///      before the version boundary.
-    function test_revertWhen_settlementLayerHasAPendingPriorityQueue() public {
-        _mockWhitelistedSettlementLayer(true);
-        _mockPriorityQueueSize(3);
-
-        vm.expectRevert(PriorityQueueNotReady.selector);
-        upgradeContract.upgrade(proposedUpgrade);
-    }
-
-    function test_upgradesSettlementLayerWithAnEmptyPriorityQueue() public {
-        _mockWhitelistedSettlementLayer(true);
-        _mockPriorityQueueSize(0);
-
-        assertEq(upgradeContract.upgrade(proposedUpgrade), Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
-    }
-
-    /// @dev The queue check applies to settlement layers only: a regular chain's own pending priority
-    ///      operations survive the upgrade and must not block it.
-    function test_upgradesRegularChainWithANonEmptyPriorityQueue() public {
-        _mockPriorityQueueSize(3);
-
-        assertEq(upgradeContract.upgrade(proposedUpgrade), Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
     }
 
     /// @notice The placeholder per-chain data is replaced with this chain's, and nothing else in the
@@ -224,22 +195,6 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
             mockNativeTokenVault,
             abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, _assetId),
             abi.encode(_originChainId)
-        );
-    }
-
-    function _mockWhitelistedSettlementLayer(bool _whitelisted) internal {
-        vm.mockCall(
-            mockBridgehub,
-            abi.encodeWithSelector(IBridgehubBase.whitelistedSettlementLayers.selector, CHAIN_ID),
-            abi.encode(_whitelisted)
-        );
-    }
-
-    function _mockPriorityQueueSize(uint256 _size) internal {
-        vm.mockCall(
-            address(upgradeContract),
-            abi.encodeWithSelector(IGetters.getPriorityQueueSize.selector),
-            abi.encode(_size)
         );
     }
 

@@ -5,10 +5,7 @@ pragma solidity 0.8.28;
 import {DefaultUpgrade} from "./DefaultUpgrade.sol";
 import {ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {L2UpgradeTxLib} from "./L2UpgradeTxLib.sol";
-import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
-import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
-import {PriorityQueueNotReady} from "../common/L1ContractErrors.sol";
-import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors.sol";
+import {NotAllBatchesVerified} from "../state-transition/L1StateTransitionErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -18,20 +15,19 @@ import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors
 /// @dev The CTM upgrade emits a single ecosystem-wide L2 upgrade transaction whose inner
 /// `IL2V32Upgrade.upgrade` calldata carries a placeholder for the chain-specific force-deployments data.
 /// Substituting the real data can only happen per chain, which is what this contract adds, on top of the
-/// two preconditions every per-chain upgrade has to hold.
+/// verifier precondition below.
 contract DefaultUpgradeZKsyncOS is DefaultUpgrade {
     /// @inheritdoc DefaultUpgrade
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public virtual override returns (bytes32) {
-        // The base implementation installs the new protocol version's verifier, which is a freshly deployed
-        // contract in this release. A batch committed under the old verifier would no longer be provable, so
-        // the chain has to be drained of committed-but-unexecuted batches first (see `_setVerifier`).
-        require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
-
-        // A settlement layer relays other chains' priority operations, so a non-empty queue at upgrade time
-        // would carry requests across the version boundary.
-        if (IBridgehubBase(s.bridgehub).whitelistedSettlementLayers(s.chainId)) {
-            require(IGetters(address(this)).getPriorityQueueSize() == 0, PriorityQueueNotReady());
-        }
+        // The base implementation installs the new protocol version's verifier (see `_setVerifier`), which
+        // is a freshly deployed contract in this release, so a batch that was committed but not yet proven
+        // under the old verifier would stop being provable. Best-effort: it catches an operator upgrading a
+        // chain that still has unproven batches, but it is not an invariant — the check and the batches it
+        // looks at are only as current as the block the upgrade lands in.
+        require(
+            s.totalBatchesCommitted == s.totalBatchesVerified,
+            NotAllBatchesVerified(s.totalBatchesVerified, s.totalBatchesCommitted)
+        );
 
         _proposedUpgrade.l2ProtocolUpgradeTx.data = getL2UpgradeTxData(
             s.bridgehub,
