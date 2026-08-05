@@ -507,6 +507,8 @@ library Utils {
         });
     }
 
+    /// @custom:deprecated Renamed to `prepareL1L2TransactionIndirect` and re-encoded as an
+    /// `L1InteropCenter.sendMessage` call; see {protocol-docs/l1-request-migration.md}.
     function prepareL1L2TransactionTwoBridges(
         uint256 l1GasPrice,
         uint256 l2GasLimit,
@@ -679,6 +681,8 @@ library Utils {
         );
     }
 
+    /// @custom:deprecated Renamed to `prepareGovernanceL1L2IndirectTransaction` and re-encoded as an
+    /// `L1InteropCenter.sendMessage` call; see {protocol-docs/l1-request-migration.md}.
     function prepareGovernanceL1L2TwoBridgesTransaction(
         uint256 l1GasPrice,
         uint256 l2GasLimit,
@@ -803,6 +807,8 @@ library Utils {
         return calls;
     }
 
+    /// @custom:deprecated Renamed to `prepareAdminL1L2IndirectTransaction` and re-encoded as an
+    /// `L1InteropCenter.sendMessage` call; see {protocol-docs/l1-request-migration.md}.
     function prepareAdminL1L2TwoBridgesTransaction(
         uint256 l1GasPrice,
         uint256 l2GasLimit,
@@ -899,6 +905,8 @@ library Utils {
         console.logBytes32(txHash);
     }
 
+    /// @custom:deprecated Renamed to `runAdminL1L2IndirectTransaction` and re-encoded as an
+    /// `L1InteropCenter.sendMessage` call; see {protocol-docs/l1-request-migration.md}.
     function runAdminL1L2TwoBridgesTransaction(
         uint256 l1GasPrice,
         address admin,
@@ -1001,6 +1009,8 @@ library Utils {
         console.logBytes32(txHash);
     }
 
+    /// @custom:deprecated Renamed to `runGovernanceL1L2IndirectTransaction` and re-encoded as an
+    /// `L1InteropCenter.sendMessage` call; see {protocol-docs/l1-request-migration.md}.
     function runGovernanceL1L2TwoBridgesTransaction(
         uint256 l1GasPrice,
         address governor,

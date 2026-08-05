@@ -64,3 +64,7 @@ direct message carrying a migration-shaped payload is not misclassified.
 Every in-repo caller of a deprecated symbol migrates together with it. The one that is not a pure
 rename is `L1AssetRouter.depositLegacyErc20Bridge`, which builds an `L2TransactionRequestDirect` and
 calls `requestL2TransactionDirect`; it has to build a `sendMessage` call instead.
+
+The deploy-script helpers follow the same vocabulary change: `Utils.{prepare,prepareGovernance,prepareAdmin,runAdmin,runGovernance}L1L2*TwoBridges*`
+become their `*Indirect*` counterparts and encode `sendMessage` calls through the shared
+ERC-7930/ERC-7786 request encoders instead of Bridgehub request structs.
