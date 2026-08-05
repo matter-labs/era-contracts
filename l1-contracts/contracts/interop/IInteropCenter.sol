@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+// We use a floating point pragma here so it can be used within other projects that interact with the
+// ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
@@ -8,19 +9,20 @@ import {AtomicFlowPreimage} from "../atomic-interop/IAtomicInterop.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
+/// @notice Interface of the {InteropCenter}. See {protocol-docs/interop.md#zksync-interop-protocol}.
 interface IInteropCenter {
-    /// @notice Send-side metadata for an atomic bundle, parsed from the `atomicBundle` attribute. It is
-    /// deliberately NOT part of the cross-chain {InteropBundle}: keeping it out of `bundleHash` avoids a
-    /// circular dependency (the preimage's `legBundleHashes` include this very bundle's hash, so a
-    /// `bundleHash` that embedded the preimage could never be computed). Consumed by `_dispatchBundle`
-    /// to drive `AtomicFlowManager.append`, which recomputes `flowId` from the preimage and requires
-    /// the sent bundle's hash to be one of its legs.
+    /// @notice Send-side metadata for an atomic bundle, parsed from the `atomicBundle` attribute.
+    /// Deliberately NOT part of the cross-chain {InteropBundle}: `bundleHash` must not depend on the
+    /// flowId preimage (circular — the preimage's leg hashes include this bundle's own hash). See
+    /// {protocol-docs/interop.md#atomic-bundles}.
     struct AtomicSend {
         AtomicFlowPreimage flowPreimage;
         uint256 lowNullifierIndex;
         bool isAtomic;
     }
 
+    /// @notice Emitted once per sent bundle (`l2l1MsgHash` is zero for atomic bundles, which are not
+    /// published to L1).
     event InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle interopBundle);
 
     event NewAssetRouter(address indexed oldAssetRouter, address indexed newAssetRouter);
@@ -117,15 +119,11 @@ interface IInteropCenter {
     /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
     function pause() external;
 
-    /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
+    /// @notice Unpauses the contract, re-enabling functions marked with `whenNotPaused`.
     function unpause() external;
 
-    /// @notice One-shot initialization for the InteropCenter.
-    /// @dev InteropCenter is introduced in v31, so this is called for BOTH new chains (genesis)
-    ///      and existing chains being upgraded to v31. In both cases the contract storage is
-    ///      fresh (the SystemProxy is freshly deployed), so the reentrancy guard and
-    ///      `ZK_TOKEN_ASSET_ID` must be set here. After v31, this function MUST NOT be called
-    ///      again — the `reentrancyGuardInitializer` and `_disableInitializers()` guards prevent it.
+    /// @notice One-shot initialization for the InteropCenter; must never run again after v31.
+    ///      See {protocol-docs/interop.md#initialization-and-versioning-notes}.
     /// @param _l1ChainId The chain ID of L1.
     /// @param _owner The owner address.
     /// @param _zkTokenAssetId The ZK token asset ID.
@@ -144,10 +142,11 @@ interface IInteropCenter {
     ) external;
 
     /// @notice Sends an interop bundle.
-    /// @param _destinationChainId Chain ID to send to. It's an ERC-7930 address that MUST have an empty address field, and encodes an EVM destination chain ID.
+    /// @param _destinationChainId Chain ID to send to: an ERC-7930 address that MUST have an empty
+    ///                            address field, encoding an EVM destination chain ID.
     /// @param _callStarters Array of call descriptors. The ERC-7930 address in each callStarter.to
-    ///                      MUST have an empty ChainReference field. We assume all of the calls should go to the _destinationChainId,
-    ///                      so specifying the chain ID in _callStarters is redundant.
+    ///                      MUST have an empty ChainReference field (all calls go to
+    ///                      _destinationChainId, so a per-call chain ID would be redundant).
     /// @param _bundleAttributes Attributes of the bundle.
     /// @return bundleHash Hash of the sent bundle.
     function sendBundle(

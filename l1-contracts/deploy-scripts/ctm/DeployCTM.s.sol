@@ -323,7 +323,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             config.isZKsyncOS
         );
 
-        IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
         vm.stopBroadcast();
         console.log("Owners updated");
     }

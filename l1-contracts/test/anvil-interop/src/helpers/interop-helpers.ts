@@ -34,6 +34,7 @@ import {
   flowPreimageTuple,
   lowNullifierIndexFor,
   DEFAULT_SL_CHAIN_ID,
+  ATOMIC_FLOW_PREIMAGE_VERSION,
 } from "./imt-engine-lib";
 import type { AtomicFlowPreimage } from "./imt-engine-lib";
 export type { AtomicFlowPreimage } from "./imt-engine-lib";
@@ -65,6 +66,7 @@ async function buildSingleLegAtomicSend(
   // Single-leg flow preimage: this bundle is the only leg, sourced from this chain. `flowId` is
   // recomputed on-chain from this exact preimage, so it must match byte-for-byte at execute time.
   const preimage: AtomicFlowPreimage = {
+    version: ATOMIC_FLOW_PREIMAGE_VERSION,
     deadline: ATOMIC_INTEROP_DEADLINE,
     settlementLayerChainId: DEFAULT_SL_CHAIN_ID,
     legBundleHashes: [bundleHash],
@@ -137,14 +139,8 @@ export function useFixedFeeAttr(useFixedFee: boolean): string {
 
 /**
  * Encode the ERC-7786 `atomicBundle(AtomicFlowPreimage flowPreimage, uint256 lowNullifierIndex)`
- * bundle attribute. All L2->L2 interop is atomic (public L1 publication was removed): the InteropCenter
- * appends the bundle's commit value to the interop IMT via the AtomicFlowManager, and the destination
- * executes it via L2InteropHandler.executeAtomicBundle once the whole flow is proven committed before
- * the deadline. The attribute carries the full `flowId` preimage rather than an opaque `flowId`: the
- * AtomicFlowManager recomputes `flowId` on-chain and requires the sent bundle's hash to be one of
- * `legBundleHashes` (with the sending chain as the leg's declared source), so a preimage that does not
- * contain the bundle (e.g. built from a stale bundle-hash prediction) reverts the send instead of
- * committing a stranded leg.
+ * bundle attribute. All L2->L2 interop is atomic (public L1 publication was removed).
+ * See {protocol-docs/atomicity/README.md#key-values}.
  */
 export function atomicBundleAttr(flowPreimage: AtomicFlowPreimage, lowNullifierIndex: number): string {
   return erc7786Iface.encodeFunctionData("atomicBundle", [flowPreimageTuple(flowPreimage), lowNullifierIndex]);
@@ -177,10 +173,11 @@ function decodeAtomicBundleAttribute(attrs: string[]): { flowId: string; preimag
   const decoded = erc7786Iface.decodeFunctionData("atomicBundle", attr);
   const raw = decoded[0];
   const preimage: AtomicFlowPreimage = {
-    deadline: Number(raw[0]),
-    settlementLayerChainId: raw[1],
-    legBundleHashes: raw[2] as string[],
-    legSourceChainIds: raw[3] as BigNumber[],
+    version: raw[0] as string,
+    deadline: Number(raw[1]),
+    settlementLayerChainId: raw[2],
+    legBundleHashes: raw[3] as string[],
+    legSourceChainIds: raw[4] as BigNumber[],
   };
   return { flowId: computeFlowId(preimage), preimage };
 }
@@ -189,19 +186,11 @@ function decodeAtomicBundleAttribute(attrs: string[]): { flowId: string; preimag
 const INTEROP_BUNDLE_SALT_SELECTOR = erc7786Iface.getSighash("interopBundleSalt");
 
 /**
- * Ensure the bundle attributes carry an `interopBundleSalt` attribute.
- *
- * The InteropCenter derives the bundle hash from `keccak256(msg.sender, salt)` and rejects a (sender, salt)
- * pair that has already been used (`InteropBundleSaltAlreadyUsed`). Since the test harness sends many bundles
- * from the same source wallet, we attach a fresh salt whenever the caller did not provide one, so that each
- * bundle gets a unique hash (mirroring the previously auto-incremented interop nonce). If the caller already
- * supplied a salt attribute, it is left untouched.
- *
- * The salt is derived deterministically from `(sender, account nonce)` rather than random bytes: the nonce is
- * consumed by the send so every bundle still gets a fresh salt, but re-runs of the harness reproduce identical
- * salts. That keeps the pre-generated chain-state snapshots byte-deterministic (random salts change both the
- * salt-keyed storage slots and the calldata gas cost run-to-run), and later test runs against a loaded snapshot
- * cannot collide with salts already used during state generation because the account nonce has advanced.
+ * Attach a fresh `interopBundleSalt` attribute when the caller did not supply one, so every harness
+ * bundle gets a unique (sender, salt) pair. The salt is derived from `(sender, account nonce)`, not
+ * random bytes: re-runs reproduce identical salts, keeping the pre-generated chain-state snapshots
+ * byte-deterministic, while runs against a loaded snapshot cannot collide with salts already used
+ * during state generation (the account nonce has advanced).
  */
 async function ensureUniqueBundleSalt(attributes: string[], wallet: Wallet): Promise<string[]> {
   const hasSalt = attributes.some((attr) => attr.slice(0, 10).toLowerCase() === INTEROP_BUNDLE_SALT_SELECTOR);
@@ -309,10 +298,8 @@ export interface SendAndExecuteTokenInteropParams {
 
 export async function sendAndExecuteTokenInterop(params: SendAndExecuteTokenInteropParams): Promise<string> {
   await approveTokenForNtv(params.sendProvider, params.sourceTokenAddress, params.amount);
-  // Ensure the source token is registered in the NTV so the asset router can bridge-burn it.
-  // Under the new trust model interop eligibility only requires NTV registration; no on-chain
-  // balance migration to the Gateway is needed. A token bridged in from another chain is already
-  // registered (during its bridgeMint), so this is a no-op for those.
+  // Interop eligibility only requires NTV registration; a token bridged in from another chain is
+  // already registered during its bridgeMint, so this is a no-op for those.
   await registerL2NativeTokenIfNeeded(params.sendProvider, params.sourceTokenAddress);
   const fee = await getInteropProtocolFee(params.sendProvider);
 
@@ -424,6 +411,7 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
   let predictedBundleHash: string | undefined;
   // Empty preimage for the non-atomic withdrawal path (unused on the L1 finalization path).
   const emptyPreimage: AtomicFlowPreimage = {
+    version: ATOMIC_FLOW_PREIMAGE_VERSION,
     deadline: 0,
     settlementLayerChainId: 0,
     legBundleHashes: [],

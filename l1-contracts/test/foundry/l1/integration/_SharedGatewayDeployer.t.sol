@@ -14,12 +14,11 @@ import {L1ChainAssetHandlerDev} from "contracts/dev-contracts/L1ChainAssetHandle
 contract GatewayDeployer is L1ContractDeployer {
     GatewayPreparationForTests gatewayScript;
 
-    /// @dev Chain migrations are explicitly disabled in the production contracts for the v32
-    /// release (see `CHAIN_MIGRATIONS_ENABLED` in `Config.sol`), in which all chains settle on L1.
-    /// The gateway tests exercise the migration machinery, which is intentionally preserved for
-    /// future releases, so they upgrade the chain asset handler proxy to the Dev variant that
-    /// re-enables migrations. Only the implementation is swapped: all proxy state (owner,
-    /// messageRoot, assetRouter) and the immutables' values stay identical to production.
+    /// @dev v32 disables chain migrations in production (`CHAIN_MIGRATIONS_ENABLED` in `Config.sol`;
+    /// see {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}), but the gateway tests exercise the migration machinery
+    /// kept for future releases, so the chain asset handler proxy is upgraded to the Dev variant that
+    /// re-enables them. Only the implementation is swapped; proxy state and immutable values stay
+    /// identical to production.
     function _enableChainMigrationsForTesting() internal {
         address cahProxy = ecosystemAddresses.bridgehub.proxies.chainAssetHandler;
         L1ChainAssetHandlerDev devImpl = new L1ChainAssetHandlerDev(

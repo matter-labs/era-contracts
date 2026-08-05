@@ -9,17 +9,22 @@ import {BundleStatus, CallStatus} from "../../common/Messaging.sol";
 /// `AtomicFinalityProof` and the L1 handler a `MessageInclusionProof`, so each derived contract declares its
 /// own proof-typed entry point. Only the proof-agnostic parts (unbundle, status, events) live here.
 interface IInteropHandlerBase {
+    /// @notice Emitted when a bundle is marked Verified.
     event BundleVerified(bytes32 indexed bundleHash);
 
+    /// @notice Emitted when a bundle is fully executed.
     event BundleExecuted(bytes32 indexed bundleHash);
 
+    /// @notice Emitted when a bundle is (partially) processed via unbundling.
     event BundleUnbundled(bytes32 indexed bundleHash);
 
+    /// @notice Emitted for each call whose status changes during unbundling.
     event CallProcessed(bytes32 indexed bundleHash, uint256 indexed callIndex, CallStatus status);
 
-    /// @notice Function used to unbundle the bundle. It's present to give more flexibility in cancelling and overall processing of bundles.
-    ///         Can be invoked multiple times until all calls are processed.
-    /// @dev This function does not verify the validity of the bundle, as it's assumed it was already checked inside `verifyBundle`.
+    /// @notice Executes, cancels or skips a bundle's calls individually; may be invoked multiple times until
+    /// all calls are processed. See {protocol-docs/interop.md#unbundling-unbundlebundle}.
+    /// @dev Does not verify the validity of the bundle itself: it requires the bundle to have been verified
+    /// via `verifyBundle` first.
     /// @param _bundle ABI-encoded InteropBundle to unbundle.
     /// @param _callStatus Array of desired statuses per call.
     function unbundleBundle(bytes memory _bundle, CallStatus[] calldata _callStatus) external;

@@ -71,10 +71,9 @@ library MessageHashing {
     /// @dev Returns the leaf hash for a chain with batch number and batch root.
     /// @param batchRoot The root hash of the batch.
     /// @param batchNumber The number of the batch.
-    /// @param l1Timestamp The settlement-layer block timestamp at which the batch root was aggregated into
-    /// the message root (i.e. when the chain settled). Binding it into the leaf makes the timestamp
-    /// provable via the same inclusion proof: a single aggregated (multi-chain) root can prove many
-    /// chain batch roots, and each carries its own settlement timestamp.
+    /// @param l1Timestamp The settlement-layer block timestamp at which the batch root was aggregated.
+    /// Bound into the leaf so the timestamp is provable via the same inclusion proof; see
+    /// {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
     function batchLeafHash(
         bytes32 batchRoot,
         uint256 batchNumber,
@@ -185,9 +184,8 @@ library MessageHashing {
             if (proofMetadata.finalProofNode) {
                 return result;
             }
-            // The settlement-layer block timestamp at which the batch root was aggregated. It is bound
-            // into the batch leaf below, so an inclusion proof against the aggregated root also proves
-            // this timestamp — a wrong value makes the reconstructed leaf mismatch the tree.
+            // Bound into the batch leaf below, so a wrong timestamp makes the reconstructed leaf
+            // mismatch the tree — that is what authenticates the proof-supplied value.
             l1BatchTimestamp = uint256(_proof[result.ptr]);
             ++result.ptr;
 
@@ -247,14 +245,11 @@ library MessageHashing {
         bytes32[] batchLeafSiblings;
     }
 
-    /// @notice Reads the aggregation-hop batch-leaf Merkle path from a proof. This is the single
-    /// place that knows the proof's word layout; external libraries must consume this accessor
-    /// instead of parsing the metadata themselves.
-    /// @dev The returned words can be trusted ONLY if the caller has already run the same
-    /// proof bytes through the leaf verifier (`proveL2LeafInclusionShared` / {_getProofData}): the
-    /// identical words are folded into the reconstructed batch leaf there, which is what
-    /// authenticates them — call this AFTER that verification. The function also assumes that if the proof was for a
-    /// `finalProofNode`, it has been rejected.
+    /// @notice Reads the aggregation-hop batch-leaf Merkle path from a proof — the single accessor
+    /// for this section's word layout; external libraries must use it instead of parsing themselves.
+    /// @dev The returned words can be trusted ONLY after the same proof bytes passed the leaf
+    /// verifier (`proveL2LeafInclusionShared` / {_getProofData}), which also must have rejected
+    /// `finalProofNode` proofs.
     function readAggregationHopPath(bytes32[] calldata _proof) internal pure returns (AggregationHopPath memory path) {
         ProofMetadata memory metadata = parseProofMetadata(_proof);
         // Word layout after the leaf-to-batch-root section (see {_getProofData}):

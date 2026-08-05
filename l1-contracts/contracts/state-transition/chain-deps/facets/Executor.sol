@@ -112,9 +112,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             bytes32 correctRootHash;
             uint256 correctTimestamp;
             if (interopRoot.chainId == block.chainid) {
-                // For the same chain we verify using the MessageRoot contract. In this release
-                // interop roots are imported from the settlement layer the chain settles on (L1
-                // only — see the AtomicInteropProof header), so this is the only case to cover.
+                // In this release interop roots are imported only from the chain's own settlement
+                // layer, so the local MessageRoot record is the only case to cover.
+                // See {protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}.
                 StoredInteropRoot memory recordedRoot = messageRootContract.historicalRoot(
                     uint256(interopRoot.blockOrBatchNumber)
                 );
@@ -149,7 +149,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @param _batchNumber The number of the batch
     /// @param _messageRoot The root of the merkle tree of the messages to L1.
     function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
-        // Once the batch is executed, we include its message to the message root.
         IMessageRootBase messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
         messageRootContract.addChainBatchRootV32(s.chainId, _batchNumber, _messageRoot);
     }
@@ -176,11 +175,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert InvalidBatchesDataLength(batchesData.length, decoded.dependencyRoots.length);
         }
 
-        // Append each batch's proven `l2LogsTreeRoot` to the global message root. On Gateway the
-        // committed `l2LogsTreeRoot` is the chain batch root (it already commits to the empty
-        // multichain batch root), so the append is identical to the L1 path. Asset correctness across
-        // chains is guaranteed by ZK proofs (assuming proofs are correct),
-        // so no per-batch log reconstruction / balance accounting is performed.
+        // Cross-chain asset correctness is enforced by the ZK proof, so no per-batch log
+        // reconstruction / balance accounting happens here. See {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
         for (uint256 i = 0; i < nBatches; ++i) {
             _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
         }
@@ -277,8 +273,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         bytes32 _currentBatchCommitment
     ) internal view returns (uint256) {
         // `fri_proof_verification_enabled` is always disabled, hence the `0` word.
+        // The final word is the pubdata content (`FULL_PUBDATA=0`/`LOGS_ONLY=1`), mirroring `ChainConfig::hash`
+        // on ZKsync OS, which appends `pubdata_content` after `max_tx_gas_limit`.
         bytes32 chainConfigHash = keccak256(
-            abi.encodePacked(s.chainId, uint256(0), uint256(_getZKsyncOSMaxTxGasLimit()))
+            abi.encodePacked(s.chainId, uint256(0), uint256(_getZKsyncOSMaxTxGasLimit()), uint256(s.pubdataContent))
         );
         return
             uint256(

@@ -5,6 +5,8 @@ import {LegState} from "./IAtomicInterop.sol";
 
 // 0x742d1b5b
 error CommitmentTreeNotAppender(address sender);
+// 0x6bbd3c7c
+error InteropCommitmentLeafHookFailed();
 // 0x00bf0e3a
 error ManagerAlreadyInitialized();
 // 0xeff05b36
@@ -15,8 +17,14 @@ error ManagerCommittedBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
 error ManagerCommittedLegSourceChainMismatch(bytes32 flowId, uint256 thisChainId, uint256 declaredSourceChainId);
 // 0x6a8bdfa0
 error ManagerExecutingBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
+// 0x44906526
+error ManagerFlowDeadlinePassed(uint64 deadline, uint256 latestImportedRootTimestamp);
 // 0xf8585117
 error ManagerFlowIdMismatch(bytes32 expected, bytes32 computed);
+// 0x1f6b4d47
+error ManagerFlowPreimageVersionMismatch(bytes1 expected, bytes1 actual);
+// 0xb5e6e3fc
+error ManagerL1ChainIdZero();
 // 0x3a62d7e3
 error ManagerLegAlreadyCommitted(bytes32 flowId, bytes32 bundleHash);
 // 0x83562707
@@ -25,8 +33,6 @@ error ManagerLegNotRevertable(bytes32 flowId, bytes32 bundleHash, LegState actua
 error ManagerLegSourceChainIdsLengthMismatch(uint256 legs, uint256 chainIds);
 // 0x62c42f1d
 error ManagerLegSourceChainNotRegistered(uint256 legSourceChainId);
-// 0x1f1f5965
-error ManagerNoRecoverableCalls(bytes32 flowId, bytes32 bundleHash);
 // 0xd7522d7a
 error ManagerNotInteropCenter(address sender);
 // 0x07029ea6
@@ -35,6 +41,8 @@ error ManagerNotInteropHandler(address sender);
 error ManagerProofCountMismatch(uint256 legs, uint256 proofs);
 // 0xbf1e3a23
 error ManagerSettlementLayerNotL1(uint256 expectedL1ChainId, uint256 actual);
+// 0x9f73095b
+error ManagerTooManyLegs(uint256 maxLegs, uint256 legs);
 // 0x2911a778
 error ProofDeadlineExceeded(uint256 batchTimestamp, uint64 deadline);
 // 0x0aa51bc5

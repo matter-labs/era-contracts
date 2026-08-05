@@ -47,12 +47,9 @@ library InteropWithdrawalBundleEncoder {
     /// @param _l1AssetRouter The L1 asset router that the bundle's single call targets.
     /// @param _assetId The asset being withdrawn.
     /// @param _transferData The bridge-mint/transfer data for the asset.
-    /// @param _interopBundleSalt The bundle salt. Real bundles carry the salt assigned by the L2 InteropCenter
-    /// (`keccak256(abi.encodePacked(sender, userSalt))`, where `userSalt` comes from the `interopBundleSalt`
-    /// bundle attribute) — a reconstruction can only be finalized against a real inclusion proof if it supplies
-    /// that same salt, since the bundle bytes must hash-match the emitted message. Tests running under mocked
-    /// proofs must still pass a salt unique per bundle, because the salt is what keeps distinct-but-identical
-    /// withdrawals from colliding into the same bundle hash (and thus reverting with `BundleAlreadyProcessed`).
+    /// @param _interopBundleSalt The bundle salt (assigned by the L2 InteropCenter for real bundles).
+    /// Even under mocked proofs it must be unique per bundle: the salt is what keeps distinct-but-identical
+    /// withdrawals from colliding into the same bundle hash and reverting with `BundleAlreadyProcessed`.
     function encodeInteropWithdrawalBundle(
         uint256 _chainId,
         address _l1AssetRouter,
